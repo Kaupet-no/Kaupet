@@ -161,11 +161,11 @@ type RadiusPickerProps = {
   onChange: (v: number) => void;
 };
 
-export function RadiusPicker({ value, onChange }: RadiusPickerProps) {
+export function RadiusPicker({ value, onChange, disabled }: RadiusPickerProps & { disabled?: boolean }) {
   return (
-    <div className="w-[260px] space-y-3 p-2">
+    <div className={`w-[260px] space-y-3 p-2 ${disabled ? "opacity-50" : ""}`}>
       <div className="flex items-baseline justify-between">
-        <span className="text-sm font-medium">Radius</span>
+        <span className="text-sm font-medium">Radius / omkrets</span>
         <span className="font-display text-sm">{value} km</span>
       </div>
       <Slider
@@ -174,6 +174,7 @@ export function RadiusPicker({ value, onChange }: RadiusPickerProps) {
         max={100}
         step={1}
         onValueChange={([v]) => onChange(v)}
+        disabled={disabled}
       />
       <div className="flex justify-between text-xs text-muted-foreground">
         <span>1 km</span>

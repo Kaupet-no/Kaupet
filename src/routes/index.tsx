@@ -152,7 +152,6 @@ function LandingPage() {
                 </div>
               )}
             </div>
-
           </div>
         </div>
       </section>
@@ -200,7 +199,7 @@ function LandingPage() {
               {
                 icon: ShieldCheck,
                 title: "Trygt og åpent",
-                body: "All koden er åpen kildekode. Du ser nøyaktig hvordan dataene dine håndteres.",
+                body: "Kaupet.no utvikles som åpen kildekode. Du kan se nøyaktig hvordan dataene dine håndteres.",
               },
             ].map((item) => (
               <div key={item.title} className="rounded-2xl border border-border bg-card p-6">

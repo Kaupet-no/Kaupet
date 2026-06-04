@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Plus, MessageCircle } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
@@ -40,11 +40,6 @@ export function SiteHeader() {
               <Button variant="ghost" size="icon" aria-label="Meldinger" disabled>
                 <MessageCircle className="size-5" />
               </Button>
-              <Link to="/ny-annonse">
-                <Button size="sm">
-                  <Plus className="size-4" /> Ny annonse
-                </Button>
-              </Link>
               <UserMenu userId={user.id} email={user.email ?? null} />
             </>
           ) : (

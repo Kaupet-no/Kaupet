@@ -289,23 +289,25 @@ function BrowsePage() {
         <LocationFilter value={location} onChange={handleLocationChange} />
       </div>
 
-      <div className="mt-6 lg:hidden">
-        <Sheet open={mobileMapOpen} onOpenChange={setMobileMapOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" className="w-full">
-              <MapIcon className="size-4" /> Vis kart
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="bottom" className="h-[85vh] p-4">
-            <SheetHeader>
-              <SheetTitle>Kart</SheetTitle>
-            </SheetHeader>
-            <div className="mt-4 h-[calc(100%-3rem)]">
-              {mobileMapOpen ? mapNode : null}
-            </div>
-          </SheetContent>
-        </Sheet>
-      </div>
+      {!isDesktop && (
+        <div className="mt-6">
+          <Sheet open={mobileMapOpen} onOpenChange={setMobileMapOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" className="w-full">
+                <MapIcon className="size-4" /> Vis kart
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="bottom" className="h-[85vh] p-4">
+              <SheetHeader>
+                <SheetTitle>Kart</SheetTitle>
+              </SheetHeader>
+              <div className="mt-4 h-[calc(100%-3rem)]">
+                {mobileMapOpen ? mapNode : null}
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
+      )}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_420px]">
         <div>
@@ -331,11 +333,13 @@ function BrowsePage() {
           )}
         </div>
 
-        <aside className="hidden lg:block">
-          <div className="sticky top-20 h-[calc(100vh-6rem)] overflow-hidden rounded-xl border border-border">
-            {mapNode}
-          </div>
-        </aside>
+        {isDesktop && (
+          <aside>
+            <div className="sticky top-20 h-[calc(100vh-6rem)] overflow-hidden rounded-xl border border-border">
+              {mapNode}
+            </div>
+          </aside>
+        )}
       </div>
     </div>
   );

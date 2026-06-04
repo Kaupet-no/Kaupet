@@ -181,7 +181,7 @@ function BrowsePage() {
             qb = qb.or(`title.ilike.${p},description.ilike.${p},city.ilike.${p}`);
           }
         } else {
-          const parts = terms.flatMap((t) => {
+          const parts = terms.flatMap((t: string) => {
             const p = `%${t}%`;
             return [`title.ilike.${p}`, `description.ilike.${p}`, `city.ilike.${p}`];
           });

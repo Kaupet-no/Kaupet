@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth";
 
 import { signListingImageUrls } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { FavoriteButton } from "@/components/favorite-button";
 
 const ListingDetailMap = lazy(() =>

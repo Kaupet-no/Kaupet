@@ -1,6 +1,6 @@
 # Kaupet.no
 
-> Norges åpne markedsplass for brukte ting — fri programvare, eid av fellesskapet.
+> Norges åpne markedsplass for brukte ting — fri programvare, bygget og eid av fellesskapet.
 
 [![Lisens: AGPL-3.0](https://img.shields.io/badge/lisens-AGPL--3.0-blue.svg)](LICENSE)
 [![CI](https://github.com/Kaupet-no/kaupet/actions/workflows/ci.yml/badge.svg)](https://github.com/Kaupet-no/kaupet/actions/workflows/ci.yml)

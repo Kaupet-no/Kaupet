@@ -38,7 +38,7 @@ function FavoritesPage() {
           if (!l) return null;
           const imgs = (l.listing_images ?? [])
             .slice()
-            .sort((a, b) => a.sort_order - b.sort_order);
+            .sort((a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order);
           return {
             id: l.id,
             title: l.title,

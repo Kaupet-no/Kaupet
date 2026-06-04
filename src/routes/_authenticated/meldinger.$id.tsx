@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import * as React from "react";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Send, User as UserIcon } from "lucide-react";
 

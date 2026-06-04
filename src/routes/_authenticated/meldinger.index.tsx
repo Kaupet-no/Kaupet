@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { signListingImageUrls } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
+import { isUnread, useReadVersion } from "@/lib/unread";
 
 export const Route = createFileRoute("/_authenticated/meldinger/")({
   head: () => ({
@@ -111,6 +112,21 @@ function InboxPage() {
     }
   }, [conversations]);
 
+  const readVersion = useReadVersion();
+
+  // Beregn uleste per samtale
+  const unreadByConv = useMemo(() => {
+    void readVersion;
+    const m = new Map<string, boolean>();
+    for (const c of conversations ?? []) {
+      m.set(
+        c.id,
+        isUnread(c.id, c.last_message_at, c.last_message?.sender_id, user?.id),
+      );
+    }
+    return m;
+  }, [conversations, readVersion, user?.id]);
+
   // Grupper etter annonse
   const groups = useMemo(() => {
     const map = new Map<
@@ -119,26 +135,30 @@ function InboxPage() {
         listing: ConversationRow["listing"];
         conversations: ConversationRow[];
         lastActivity: string;
+        unreadCount: number;
       }
     >();
     for (const c of conversations ?? []) {
       const key = c.listing_id;
+      const u = unreadByConv.get(c.id) ? 1 : 0;
       const g = map.get(key);
       if (g) {
         g.conversations.push(c);
+        g.unreadCount += u;
         if (c.last_message_at > g.lastActivity) g.lastActivity = c.last_message_at;
       } else {
         map.set(key, {
           listing: c.listing,
           conversations: [c],
           lastActivity: c.last_message_at,
+          unreadCount: u,
         });
       }
     }
     return Array.from(map.entries())
       .map(([listingId, g]) => ({ listingId, ...g }))
       .sort((a, b) => (a.lastActivity < b.lastActivity ? 1 : -1));
-  }, [conversations]);
+  }, [conversations, unreadByConv]);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
@@ -209,6 +229,14 @@ function InboxPage() {
                       {g.conversations.length === 1 ? "samtale" : "samtaler"}
                     </p>
                   </div>
+                  {g.unreadCount > 0 && (
+                    <span
+                      className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[10px] font-semibold text-accent-foreground"
+                      aria-label={`${g.unreadCount} uleste`}
+                    >
+                      {g.unreadCount}
+                    </span>
+                  )}
                   <span className="text-xs text-muted-foreground">
                     {formatRelative(g.lastActivity)}
                   </span>
@@ -231,12 +259,13 @@ function InboxPage() {
                           user?.id === c.seller_id ? c.buyer : c.seller;
                         const lastFromMe =
                           c.last_message?.sender_id === user?.id;
+                        const unread = unreadByConv.get(c.id) ?? false;
                         return (
                           <li key={c.id}>
                             <Link
                               to="/meldinger/$id"
                               params={{ id: c.id }}
-                              className="flex items-center gap-3 p-3 hover:bg-muted/40"
+                              className={`flex items-center gap-3 p-3 hover:bg-muted/40 ${unread ? "bg-accent/5" : ""}`}
                             >
                               {other?.avatar_url ? (
                                 <img
@@ -252,15 +281,21 @@ function InboxPage() {
                                 </div>
                               )}
                               <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-medium">
+                                <p className={`truncate text-sm ${unread ? "font-semibold" : "font-medium"}`}>
                                   {other?.display_name ?? "Ukjent bruker"}
                                 </p>
-                                <p className="truncate text-xs text-muted-foreground">
+                                <p className={`truncate text-xs ${unread ? "text-foreground" : "text-muted-foreground"}`}>
                                   {c.last_message
                                     ? `${lastFromMe ? "Du: " : ""}${c.last_message.body}`
                                     : "Ingen meldinger enda"}
                                 </p>
                               </div>
+                              {unread && (
+                                <span
+                                  className="size-2 shrink-0 rounded-full bg-accent"
+                                  aria-label="Ulest"
+                                />
+                              )}
                               <span className="text-xs text-muted-foreground">
                                 {formatRelative(c.last_message_at)}
                               </span>

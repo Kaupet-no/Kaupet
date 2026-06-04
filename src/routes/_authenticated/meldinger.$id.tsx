@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { signListingImageUrls } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
+import { markRead } from "@/lib/unread";
 import { Textarea } from "@/components/ui/textarea";
 
 export const Route = createFileRoute("/_authenticated/meldinger/$id")({
@@ -135,6 +136,8 @@ function ConversationPage() {
             if (prev.some((x) => x.id === m.id)) return prev;
             return [...prev, m];
           });
+          // Markér som lest når brukeren er inne i samtalen
+          markRead(id, m.created_at);
         },
       )
       .subscribe();
@@ -143,12 +146,15 @@ function ConversationPage() {
     };
   }, [id, queryClient]);
 
-  // Auto-scroll
+  // Auto-scroll + markér som lest når meldinger lastes/oppdateres
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+    if (messages && messages.length > 0) {
+      markRead(id, messages[messages.length - 1].created_at);
+    }
+  }, [messages, id]);
 
   const sendMutation = useMutation({
     mutationFn: async (text: string) => {

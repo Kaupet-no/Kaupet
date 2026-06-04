@@ -117,11 +117,6 @@ function LandingPage() {
                   Kom i gang gratis
                 </Button>
               </Link>
-              <a href="https://github.com" target="_blank" rel="noreferrer" className="inline-flex">
-                <Button size="lg" variant="ghost">
-                  Se koden på GitHub
-                </Button>
-              </a>
             </div>
           </div>
 

@@ -142,26 +142,24 @@ function EditListingPage() {
         });
       }
 
-      const update: Record<string, unknown> = {
-        title: parsed.title,
-        description: parsed.description,
-        category_id: parsed.category_id,
-        condition: parsed.condition,
-        is_free: parsed.is_free,
-        price_nok: parsed.is_free
-          ? null
-          : typeof parsed.price_nok === "number"
-            ? parsed.price_nok
-            : null,
-        postal_code: parsed.postal_code || null,
-        city: parsed.city || null,
-      };
-      if (coords) {
-        update.lat = coords.lat;
-        update.lng = coords.lng;
-      }
-
-      const { error } = await supabase.from("listings").update(update).eq("id", id);
+      const { error } = await supabase
+        .from("listings")
+        .update({
+          title: parsed.title,
+          description: parsed.description,
+          category_id: parsed.category_id,
+          condition: parsed.condition,
+          is_free: parsed.is_free,
+          price_nok: parsed.is_free
+            ? null
+            : typeof parsed.price_nok === "number"
+              ? parsed.price_nok
+              : null,
+          postal_code: parsed.postal_code || null,
+          city: parsed.city || null,
+          ...(coords ? { lat: coords.lat, lng: coords.lng } : {}),
+        })
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {

@@ -1,6 +1,1 @@
-In `src/routes/index.tsx`:
-
-1. Remove the "Se koden på GitHub" link/button (lines 120-124), keeping the "Kom i gang gratis" CTA.
-2. Remove the `<dl>` stat block (lines 164-177) showing Lisens/Marked/Pris under the popular-listings carousel.
-
-No other changes.
+Remove the "Åpen kildekode · Bygget av fellesskapet" badge (lines 87-89 in `src/routes/index.tsx`). If `Sparkles` is no longer used, remove its import as well.

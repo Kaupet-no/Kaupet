@@ -33,8 +33,8 @@ type ConversationRow = {
     status: string;
     listing_images: { storage_path: string; sort_order: number }[];
   } | null;
-  buyer: { id: string; display_name: string; avatar_url: string | null } | null;
-  seller: { id: string; display_name: string; avatar_url: string | null } | null;
+  buyer: { id: string; display_name: string; avatar_url: string | null; deleted_at: string | null } | null;
+  seller: { id: string; display_name: string; avatar_url: string | null; deleted_at: string | null } | null;
   last_message: { body: string; created_at: string; sender_id: string } | null;
 };
 
@@ -51,9 +51,9 @@ function InboxPage() {
         .from("conversations")
         .select(
           `id, buyer_id, seller_id, listing_id, last_message_at,
-           listing:listings!inner(id, title, price_nok, is_free, status, listing_images(storage_path, sort_order)),
-           buyer:profiles!conversations_buyer_id_fkey(id, display_name, avatar_url),
-           seller:profiles!conversations_seller_id_fkey(id, display_name, avatar_url)`,
+           listing:listings(id, title, price_nok, is_free, status, listing_images(storage_path, sort_order)),
+           buyer:profiles!conversations_buyer_id_fkey(id, display_name, avatar_url, deleted_at),
+           seller:profiles!conversations_seller_id_fkey(id, display_name, avatar_url, deleted_at)`,
         )
         .or(`buyer_id.eq.${user!.id},seller_id.eq.${user!.id}`)
         .order("last_message_at", { ascending: false });
@@ -63,7 +63,7 @@ function InboxPage() {
           .from("conversations")
           .select(
             `id, buyer_id, seller_id, listing_id, last_message_at,
-             listing:listings!inner(id, title, price_nok, is_free, status, listing_images(storage_path, sort_order))`,
+             listing:listings(id, title, price_nok, is_free, status, listing_images(storage_path, sort_order))`,
           )
           .or(`buyer_id.eq.${user!.id},seller_id.eq.${user!.id}`)
           .order("last_message_at", { ascending: false });
@@ -73,7 +73,7 @@ function InboxPage() {
         );
         const { data: profiles } = await supabase
           .from("profiles")
-          .select("id, display_name, avatar_url")
+          .select("id, display_name, avatar_url, deleted_at")
           .in("id", ids);
         const pmap = new Map((profiles ?? []).map((p) => [p.id, p]));
         const enriched = (convs ?? []).map((c: any) => ({
@@ -275,14 +275,19 @@ function InboxPage() {
                                 />
                               ) : (
                                 <div className="flex size-9 items-center justify-center rounded-full bg-muted text-xs font-medium">
-                                  {(other?.display_name ?? "?")
+                                  {(other?.deleted_at
+                                    ? "S"
+                                    : other?.display_name ?? "?"
+                                  )
                                     .slice(0, 1)
                                     .toUpperCase()}
                                 </div>
                               )}
                               <div className="min-w-0 flex-1">
-                                <p className={`truncate text-sm ${unread ? "font-semibold" : "font-medium"}`}>
-                                  {other?.display_name ?? "Ukjent bruker"}
+                                <p className={`truncate text-sm ${unread ? "font-semibold" : "font-medium"} ${other?.deleted_at ? "italic text-muted-foreground" : ""}`}>
+                                  {other?.deleted_at
+                                    ? "Slettet bruker"
+                                    : other?.display_name ?? "Ukjent bruker"}
                                 </p>
                                 <p className={`truncate text-xs ${unread ? "text-foreground" : "text-muted-foreground"}`}>
                                   {c.last_message

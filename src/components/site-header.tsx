@@ -37,9 +37,11 @@ export function SiteHeader() {
         <div className="ml-auto flex items-center gap-2">
           {user ? (
             <>
-              <Button variant="ghost" size="icon" aria-label="Favoritter" disabled>
-                <Heart className="size-5" />
-              </Button>
+              <Link to="/favoritter">
+                <Button variant="ghost" size="icon" aria-label="Favoritter">
+                  <Heart className="size-5" />
+                </Button>
+              </Link>
               <Button variant="ghost" size="icon" aria-label="Meldinger" disabled>
                 <MessageCircle className="size-5" />
               </Button>

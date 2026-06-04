@@ -6,6 +6,7 @@ import { ArrowLeft, MapPin, MessageCircle, User as UserIcon } from "lucide-react
 import { supabase } from "@/integrations/supabase/client";
 import { signListingImageUrls } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
+import { FavoriteButton } from "@/components/favorite-button";
 
 const CONDITION_LABEL: Record<string, string> = {
   new: "Helt ny",
@@ -214,6 +215,7 @@ function ListingDetailPage() {
             <Button className="mt-4 w-full gap-2" disabled>
               <MessageCircle className="size-4" /> Send melding (kommer)
             </Button>
+            <FavoriteButton listingId={data.id} variant="full" size="lg" className="mt-2" />
           </div>
         </aside>
       </div>

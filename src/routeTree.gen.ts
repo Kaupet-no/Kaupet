@@ -15,6 +15,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AnnonseIdRouteImport } from './routes/annonse.$id'
 import { Route as AuthenticatedNyAnnonseRouteImport } from './routes/_authenticated/ny-annonse'
+import { Route as AuthenticatedFavoritterRouteImport } from './routes/_authenticated/favoritter'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -45,11 +46,17 @@ const AuthenticatedNyAnnonseRoute = AuthenticatedNyAnnonseRouteImport.update({
   path: '/ny-annonse',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedFavoritterRoute = AuthenticatedFavoritterRouteImport.update({
+  id: '/favoritter',
+  path: '/favoritter',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
+  '/favoritter': typeof AuthenticatedFavoritterRoute
   '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/annonse/$id': typeof AnnonseIdRoute
 }
@@ -57,6 +64,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
+  '/favoritter': typeof AuthenticatedFavoritterRoute
   '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/annonse/$id': typeof AnnonseIdRoute
 }
@@ -66,20 +74,34 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
+  '/_authenticated/favoritter': typeof AuthenticatedFavoritterRoute
   '/_authenticated/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/annonse/$id': typeof AnnonseIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/annonser' | '/auth' | '/ny-annonse' | '/annonse/$id'
+  fullPaths:
+    | '/'
+    | '/annonser'
+    | '/auth'
+    | '/favoritter'
+    | '/ny-annonse'
+    | '/annonse/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/annonser' | '/auth' | '/ny-annonse' | '/annonse/$id'
+  to:
+    | '/'
+    | '/annonser'
+    | '/auth'
+    | '/favoritter'
+    | '/ny-annonse'
+    | '/annonse/$id'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/annonser'
     | '/auth'
+    | '/_authenticated/favoritter'
     | '/_authenticated/ny-annonse'
     | '/annonse/$id'
   fileRoutesById: FileRoutesById
@@ -136,14 +158,23 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedNyAnnonseRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/favoritter': {
+      id: '/_authenticated/favoritter'
+      path: '/favoritter'
+      fullPath: '/favoritter'
+      preLoaderRoute: typeof AuthenticatedFavoritterRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedFavoritterRoute: typeof AuthenticatedFavoritterRoute
   AuthenticatedNyAnnonseRoute: typeof AuthenticatedNyAnnonseRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedFavoritterRoute: AuthenticatedFavoritterRoute,
   AuthenticatedNyAnnonseRoute: AuthenticatedNyAnnonseRoute,
 }
 

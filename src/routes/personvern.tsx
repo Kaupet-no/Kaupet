@@ -31,7 +31,7 @@ function PersonvernPage() {
           Personvernerklæring
         </h1>
         <p className="mt-3 text-sm text-muted-foreground">
-          Versjon 1.0 — sist oppdatert 4. juni 2026
+          Versjon 1.1 — sist oppdatert 4. juni 2026
         </p>
       </header>
 

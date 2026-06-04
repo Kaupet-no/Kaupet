@@ -229,9 +229,35 @@ function BrowsePage() {
   // Avoid hydration mismatch crashes by rendering the body only after mount.
   if (!mounted) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-10">
+      <div className="mx-auto max-w-7xl px-4 py-10" aria-busy="true" aria-live="polite">
         <h1 className="font-display text-3xl tracking-tight">Annonser</h1>
-        <div className="mt-8 h-12 animate-pulse rounded-md bg-muted" />
+        <span className="sr-only">Laster…</span>
+
+        {/* Søke- og filterrad */}
+        <div className="mt-6 flex flex-wrap gap-3">
+          <div className="h-10 flex-1 min-w-[220px] animate-pulse rounded-md bg-muted" />
+          <div className="h-10 w-40 animate-pulse rounded-md bg-muted" />
+          <div className="h-10 w-44 animate-pulse rounded-md bg-muted" />
+          <div className="h-10 w-24 animate-pulse rounded-md bg-muted" />
+        </div>
+        <div className="mt-3 h-10 w-full max-w-md animate-pulse rounded-md bg-muted" />
+
+        <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_420px]">
+          {/* Annonse-skjelett */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="space-y-3 rounded-xl border border-border p-3">
+                <div className="aspect-[4/3] w-full animate-pulse rounded-lg bg-muted" />
+                <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
+                <div className="h-4 w-1/3 animate-pulse rounded bg-muted" />
+              </div>
+            ))}
+          </div>
+          {/* Kart-skjelett */}
+          <div className="hidden lg:block">
+            <div className="sticky top-24 h-[calc(100vh-8rem)] w-full animate-pulse rounded-xl bg-muted" />
+          </div>
+        </div>
       </div>
     );
   }

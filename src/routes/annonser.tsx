@@ -24,6 +24,7 @@ import {
 import { SearchBar } from "@/components/search-bar";
 import type { LocationValue } from "@/components/location-filter";
 import type { MapListing } from "@/components/listings-map";
+import { reverseGeocode } from "@/lib/geocode";
 
 const ListingsMap = lazy(() =>
   import("@/components/listings-map").then((m) => ({ default: m.ListingsMap })),

@@ -1,0 +1,35 @@
+Kaupet.no — åpen kildekode markedsplass for Norge
+Copyright (C) 2026 Kaupet.no-bidragsytere
+
+Dette programmet er fri programvare: du kan distribuere det og/eller
+endre det under vilkårene i GNU Affero General Public License,
+publisert av Free Software Foundation, enten versjon 3 av lisensen,
+eller (etter eget valg) en senere versjon.
+
+Dette programmet distribueres i håp om at det skal være nyttig, men
+UTEN NOEN GARANTI; uten engang den underforståtte garantien om
+SALGBARHET eller EGNETHET FOR ET BESTEMT FORMÅL. Se GNU Affero
+General Public License for flere detaljer.
+
+Du skal ha mottatt en kopi av GNU Affero General Public License sammen
+med dette programmet (se filen LICENSE). Hvis ikke, se
+<https://www.gnu.org/licenses/>.
+
+═══════════════════════════════════════════════════════════════════════
+
+Viktig om AGPL-3.0 og nettverksbruk (§13):
+
+Hvis du modifiserer Kaupet.no og kjører det som en nettverkstjeneste
+(f.eks. en konkurrerende markedsplass), MÅ du tilby kildekoden til
+din modifiserte versjon til alle brukerne av tjenesten, under samme
+AGPL-3.0-lisens.
+
+Dette sikrer at forbedringer i fellesskapets kode kommer fellesskapet
+til gode — ingen kan ta dette arbeidet, lukke det, og selge det
+videre som proprietær SaaS.
+
+═══════════════════════════════════════════════════════════════════════
+
+Tredjeparts komponenter brukt av dette prosjektet beholder sine
+opprinnelige lisenser. Se package.json og node_modules/*/LICENSE
+for detaljer.

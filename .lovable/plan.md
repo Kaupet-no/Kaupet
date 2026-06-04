@@ -1,4 +1,12 @@
-## Endre lisens fra MIT til AGPL-3.0
+## Lisens: AGPL-3.0
+
+Kaupet.no er lisensiert under **GNU Affero General Public License v3.0**. Se `LICENSE` og `NOTICE` i repo-roten.
+
+Hvorfor AGPL-3.0: Krever at modifiserte versjoner som kjøres som nettverkstjeneste (SaaS) må publisere kildekoden sin under samme lisens. Hindrer at fellesskapets arbeid lukkes og selges som konkurrerende proprietær tjeneste. Brukt av Nextcloud, Mastodon, Plausible.
+
+---
+
+## Endre lisens fra MIT til AGPL-3.0 (utført)
 
 ### Hva som gjøres
 1. Oppdater `.lovable/plan.md` — endre "Lisens: MIT" til "Lisens: AGPL-3.0"

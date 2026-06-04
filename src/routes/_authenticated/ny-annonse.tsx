@@ -28,7 +28,7 @@ const CONDITIONS = [
   { value: "like_new", label: "Som ny" },
   { value: "good", label: "Pent brukt" },
   { value: "acceptable", label: "Brukt med slitasje" },
-  { value: "for_parts", label: "Til reservedeler" },
+  { value: "for_parts", label: "Må repareres" },
 ] as const;
 
 const listingSchema = z

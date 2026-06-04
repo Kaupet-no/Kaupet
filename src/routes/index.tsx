@@ -1,11 +1,21 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Heart, MapPin, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, Heart, MapPin, Search, ShieldCheck, Sparkles } from "lucide-react";
 import { z } from "zod";
+import { useRef, useState } from "react";
+import Autoplay from "embla-carousel-autoplay";
 
-import heroImage from "@/assets/hero.jpg";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
+import { ListingCard, type ListingCardData } from "@/components/listing-card";
 
 const searchSchema = z.object({
   q: z.string().optional().default(""),
@@ -27,6 +37,10 @@ export const Route = createFileRoute("/")({
 });
 
 function LandingPage() {
+  const navigate = useNavigate();
+  const [qDraft, setQDraft] = useState("");
+  const autoplay = useRef(Autoplay({ delay: 4500, stopOnInteraction: true }));
+
   const { data: categories } = useQuery({
     queryKey: ["categories"],
     queryFn: async () => {
@@ -39,11 +53,47 @@ function LandingPage() {
     },
   });
 
+  const { data: popular } = useQuery({
+    queryKey: ["popular-listings"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("listings")
+        .select(
+          "id, title, price_nok, is_free, city, created_at, view_count, listing_images(storage_path, sort_order)",
+        )
+        .eq("status", "active")
+        .order("view_count", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(8);
+      if (error) throw error;
+      return (data ?? []).map<ListingCardData>((l) => {
+        const imgs = (l.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
+        return {
+          id: l.id,
+          title: l.title,
+          price_nok: l.price_nok,
+          is_free: l.is_free,
+          city: l.city,
+          created_at: l.created_at,
+          cover_path: imgs[0]?.storage_path ?? null,
+        };
+      });
+    },
+  });
+
+  const submitSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    navigate({
+      to: "/annonser",
+      search: { q: qDraft.trim(), category: "", sort: "new" },
+    });
+  };
+
   return (
     <div>
       {/* Hero */}
       <section className="relative overflow-hidden bg-surface">
-        <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-16 md:grid-cols-[1.1fr_1fr] md:py-24">
+        <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-16 md:grid-cols-[1.05fr_1fr] md:py-24">
           <div className="space-y-6">
             <span className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground">
               <Sparkles className="size-3 text-accent" /> Åpen kildekode · Bygget av fellesskapet
@@ -56,10 +106,27 @@ function LandingPage() {
               Kaupet.no er en norsk markedsplass for brukte ting mellom privatpersoner.
               Ingen mellomledd, ingen reklame — bare deg, naboen din, og en god handel.
             </p>
+
+            <form onSubmit={submitSearch} className="flex max-w-lg gap-2">
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={qDraft}
+                  onChange={(e) => setQDraft(e.target.value)}
+                  placeholder="Hva leter du etter? F.eks. sykkel, sofa, iPhone…"
+                  className="h-12 pl-9 text-base"
+                  aria-label="Søk i annonser"
+                />
+              </div>
+              <Button type="submit" size="lg" className="gap-2">
+                Søk <ArrowRight className="size-4" />
+              </Button>
+            </form>
+
             <div className="flex flex-wrap gap-3">
               <Link to="/auth" search={{ mode: "signup" }}>
-                <Button size="lg" className="gap-2">
-                  Kom i gang gratis <ArrowRight className="size-4" />
+                <Button size="lg" variant="outline">
+                  Kom i gang gratis
                 </Button>
               </Link>
               <a
@@ -68,12 +135,59 @@ function LandingPage() {
                 rel="noreferrer"
                 className="inline-flex"
               >
-                <Button size="lg" variant="outline">
+                <Button size="lg" variant="ghost">
                   Se koden på GitHub
                 </Button>
               </a>
             </div>
-            <dl className="flex gap-8 pt-4 text-sm">
+          </div>
+
+          {/* Popular listings carousel */}
+          <div className="relative">
+            <div className="absolute -inset-4 -z-10 rounded-3xl bg-accent/10 blur-2xl" />
+            <div className="rounded-2xl border border-border bg-card p-4 shadow-xl">
+              <div className="mb-3 flex items-center justify-between px-1">
+                <h2 className="font-display text-sm tracking-tight text-muted-foreground">
+                  Populært akkurat nå
+                </h2>
+                <Link
+                  to="/annonser"
+                  search={{ q: "", category: "", sort: "new" }}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Se alle →
+                </Link>
+              </div>
+
+              {popular && popular.length > 0 ? (
+                <Carousel
+                  opts={{ align: "start", loop: true }}
+                  plugins={[autoplay.current]}
+                  className="w-full"
+                >
+                  <CarouselContent>
+                    {popular.map((listing) => (
+                      <CarouselItem key={listing.id} className="basis-full sm:basis-1/2">
+                        <ListingCard listing={listing} />
+                      </CarouselItem>
+                    ))}
+                  </CarouselContent>
+                  <CarouselPrevious className="-left-3" />
+                  <CarouselNext className="-right-3" />
+                </Carousel>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  {Array.from({ length: 2 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="aspect-[4/3] animate-pulse rounded-xl bg-muted"
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <dl className="mt-6 flex gap-8 text-sm">
               <div>
                 <dt className="text-muted-foreground">Lisens</dt>
                 <dd className="font-display text-xl">AGPL-3.0</dd>
@@ -87,17 +201,6 @@ function LandingPage() {
                 <dd className="font-display text-xl">Gratis</dd>
               </div>
             </dl>
-          </div>
-
-          <div className="relative">
-            <div className="absolute -inset-4 -z-10 rounded-3xl bg-accent/10 blur-2xl" />
-            <img
-              src={heroImage}
-              alt="Naboer som bytter brukte ting foran nordiske trehus"
-              width={1536}
-              height={1024}
-              className="rounded-2xl border border-border shadow-xl"
-            />
           </div>
         </div>
       </section>

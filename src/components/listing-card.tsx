@@ -20,7 +20,13 @@ function formatPrice(p: ListingCardData) {
   return `${p.price_nok.toLocaleString("nb-NO")} kr`;
 }
 
-export function ListingCard({ listing }: { listing: ListingCardData }) {
+type Props = {
+  listing: ListingCardData;
+  highlighted?: boolean;
+  onHoverChange?: (id: string | null) => void;
+};
+
+export function ListingCard({ listing, highlighted, onHoverChange }: Props) {
   const [imgUrl, setImgUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -38,7 +44,13 @@ export function ListingCard({ listing }: { listing: ListingCardData }) {
     <Link
       to="/annonse/$id"
       params={{ id: listing.id }}
-      className="group block overflow-hidden rounded-xl border border-border bg-card transition hover:border-primary hover:shadow-md"
+      onMouseEnter={onHoverChange ? () => onHoverChange(listing.id) : undefined}
+      onMouseLeave={onHoverChange ? () => onHoverChange(null) : undefined}
+      className={`group block overflow-hidden rounded-xl border bg-card transition hover:shadow-md ${
+        highlighted
+          ? "border-primary shadow-md ring-2 ring-primary/30"
+          : "border-border hover:border-primary"
+      }`}
     >
       <div className="relative aspect-[4/3] bg-muted">
         {imgUrl ? (

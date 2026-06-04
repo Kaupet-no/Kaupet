@@ -149,7 +149,18 @@ function RootComponent() {
         </main>
         <footer className="border-t border-border bg-surface">
           <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-            <p>© {new Date().getFullYear()} Kaupet.no — åpen kildekode, AGPL-3.0.</p>
+            <p>
+              © {new Date().getFullYear()} Kaupet.no — åpen kildekode,{" "}
+              <a
+                href="https://www.gnu.org/licenses/agpl-3.0.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-foreground transition-colors"
+              >
+                AGPL-3.0
+              </a>
+              .
+            </p>
             <p className="sm:max-w-xl sm:text-right">
               Ditt personvern på internett er viktig. Kaupet.no benytter derfor ingen sporende cookies eller tredjeparts analyseverktøy. Les vår{" "}
               <Link to="/personvern" className="underline hover:text-foreground transition-colors">

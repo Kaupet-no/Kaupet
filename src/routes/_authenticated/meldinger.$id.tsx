@@ -136,6 +136,8 @@ function ConversationPage() {
             if (prev.some((x) => x.id === m.id)) return prev;
             return [...prev, m];
           });
+          // Markér som lest når brukeren er inne i samtalen
+          markRead(id, m.created_at);
         },
       )
       .subscribe();

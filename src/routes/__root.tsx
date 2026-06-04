@@ -150,7 +150,16 @@ function RootComponent() {
         <footer className="border-t border-border bg-surface">
           <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
             <p>© {new Date().getFullYear()} Kaupet.no — åpen kildekode, AGPL-3.0.</p>
-            <p>Drevet av fellesskapet · Bidra på GitHub</p>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              <Link
+                to="/personvern"
+                className="hover:text-foreground transition-colors"
+              >
+                Personvern
+              </Link>
+              <span className="hidden sm:inline">·</span>
+              <p>Kun nødvendige cookies — ingen sporing.</p>
+            </div>
           </div>
         </footer>
       </div>

@@ -119,6 +119,12 @@ function NewListingPage() {
       if (userErr || !userData.user) throw new Error("Du må være logget inn.");
       const userId = userData.user.id;
 
+      // Best-effort geocoding så annonsen dukker opp i radius-søk.
+      const coords = await geocodeNorwayAddress({
+        postal_code: parsed.postal_code,
+        city: parsed.city,
+      });
+
       const { data: listing, error: insertErr } = await supabase
         .from("listings")
         .insert({
@@ -135,6 +141,8 @@ function NewListingPage() {
               : null,
           postal_code: parsed.postal_code || null,
           city: parsed.city || null,
+          lat: coords?.lat ?? null,
+          lng: coords?.lng ?? null,
           status: "active",
           published_at: new Date().toISOString(),
         })

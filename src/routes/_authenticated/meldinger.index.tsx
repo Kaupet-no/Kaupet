@@ -281,15 +281,21 @@ function InboxPage() {
                                 </div>
                               )}
                               <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-medium">
+                                <p className={`truncate text-sm ${unread ? "font-semibold" : "font-medium"}`}>
                                   {other?.display_name ?? "Ukjent bruker"}
                                 </p>
-                                <p className="truncate text-xs text-muted-foreground">
+                                <p className={`truncate text-xs ${unread ? "text-foreground" : "text-muted-foreground"}`}>
                                   {c.last_message
                                     ? `${lastFromMe ? "Du: " : ""}${c.last_message.body}`
                                     : "Ingen meldinger enda"}
                                 </p>
                               </div>
+                              {unread && (
+                                <span
+                                  className="size-2 shrink-0 rounded-full bg-accent"
+                                  aria-label="Ulest"
+                                />
+                              )}
                               <span className="text-xs text-muted-foreground">
                                 {formatRelative(c.last_message_at)}
                               </span>

@@ -23,6 +23,7 @@ import { Route as AuthenticatedMineAnnonserIndexRouteImport } from './routes/_au
 import { Route as AuthenticatedMeldingerIndexRouteImport } from './routes/_authenticated/meldinger.index'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedMeldingerIdRouteImport } from './routes/_authenticated/meldinger.$id'
+import { Route as AuthenticatedAdminBrukereRouteImport } from './routes/_authenticated/admin/brukere'
 import { Route as AuthenticatedMineAnnonserIdRedigerRouteImport } from './routes/_authenticated/mine-annonser.$id.rediger'
 
 const PersonvernRoute = PersonvernRouteImport.update({
@@ -97,6 +98,12 @@ const AuthenticatedMeldingerIdRoute =
     path: '/meldinger/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAdminBrukereRoute =
+  AuthenticatedAdminBrukereRouteImport.update({
+    id: '/brukere',
+    path: '/brukere',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
 const AuthenticatedMineAnnonserIdRedigerRoute =
   AuthenticatedMineAnnonserIdRedigerRouteImport.update({
     id: '/mine-annonser/$id/rediger',
@@ -114,6 +121,7 @@ export interface FileRoutesByFullPath {
   '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
   '/annonse/$id': typeof AnnonseIdRoute
+  '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/meldinger/': typeof AuthenticatedMeldingerIndexRoute
@@ -129,6 +137,7 @@ export interface FileRoutesByTo {
   '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
   '/annonse/$id': typeof AnnonseIdRoute
+  '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/meldinger': typeof AuthenticatedMeldingerIndexRoute
@@ -147,6 +156,7 @@ export interface FileRoutesById {
   '/_authenticated/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/_authenticated/profil': typeof AuthenticatedProfilRoute
   '/annonse/$id': typeof AnnonseIdRoute
+  '/_authenticated/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/_authenticated/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/meldinger/': typeof AuthenticatedMeldingerIndexRoute
@@ -165,6 +175,7 @@ export interface FileRouteTypes {
     | '/ny-annonse'
     | '/profil'
     | '/annonse/$id'
+    | '/admin/brukere'
     | '/meldinger/$id'
     | '/admin/'
     | '/meldinger/'
@@ -180,6 +191,7 @@ export interface FileRouteTypes {
     | '/ny-annonse'
     | '/profil'
     | '/annonse/$id'
+    | '/admin/brukere'
     | '/meldinger/$id'
     | '/admin'
     | '/meldinger'
@@ -197,6 +209,7 @@ export interface FileRouteTypes {
     | '/_authenticated/ny-annonse'
     | '/_authenticated/profil'
     | '/annonse/$id'
+    | '/_authenticated/admin/brukere'
     | '/_authenticated/meldinger/$id'
     | '/_authenticated/admin/'
     | '/_authenticated/meldinger/'
@@ -313,6 +326,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMeldingerIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/brukere': {
+      id: '/_authenticated/admin/brukere'
+      path: '/brukere'
+      fullPath: '/admin/brukere'
+      preLoaderRoute: typeof AuthenticatedAdminBrukereRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
     '/_authenticated/mine-annonser/$id/rediger': {
       id: '/_authenticated/mine-annonser/$id/rediger'
       path: '/mine-annonser/$id/rediger'
@@ -324,11 +344,13 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedAdminRouteRouteChildren {
+  AuthenticatedAdminBrukereRoute: typeof AuthenticatedAdminBrukereRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
 }
 
 const AuthenticatedAdminRouteRouteChildren: AuthenticatedAdminRouteRouteChildren =
   {
+    AuthenticatedAdminBrukereRoute: AuthenticatedAdminBrukereRoute,
     AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
   }
 

@@ -70,7 +70,7 @@ function ConversationPage() {
         .from("conversations")
         .select(
           `id, buyer_id, seller_id, listing_id,
-           listing:listings!inner(id, title, price_nok, is_free, listing_images(storage_path, sort_order))`,
+           listing:listings(id, title, price_nok, is_free, listing_images(storage_path, sort_order))`,
         )
         .eq("id", id)
         .maybeSingle();
@@ -83,10 +83,21 @@ function ConversationPage() {
         user!.id === data.seller_id ? data.buyer_id : data.seller_id;
       const { data: profile } = await supabase
         .from("profiles")
-        .select("id, display_name, avatar_url")
+        .select("id, display_name, avatar_url, deleted_at")
         .eq("id", otherId)
         .maybeSingle();
-      return { ...data, listing, other: profile };
+      const { data: pendingFlag } = await supabase.rpc("is_user_deletion_pending", {
+        _user_id: otherId,
+      });
+      const otherDeleted = !!profile?.deleted_at;
+      const otherPending = !!pendingFlag;
+      return {
+        ...data,
+        listing,
+        other: profile,
+        otherDeleted,
+        otherPending,
+      };
     },
   });
 
@@ -211,18 +222,27 @@ function ConversationPage() {
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <Link
-              to="/annonse/$id"
-              params={{ id: conv.listing_id }}
-              className="block truncate font-medium hover:underline"
-            >
-              {conv.listing?.title ?? "Annonse"}
-            </Link>
+            {conv.listing ? (
+              <Link
+                to="/annonse/$id"
+                params={{ id: conv.listing_id }}
+                className="block truncate font-medium hover:underline"
+              >
+                {conv.listing.title}
+              </Link>
+            ) : (
+              <p className="block truncate font-medium italic text-muted-foreground">
+                Annonsen er ikke lenger tilgjengelig
+              </p>
+            )}
             <p className="text-xs text-muted-foreground">
-              {priceLabel} · med {conv.other?.display_name ?? "ukjent bruker"}
+              {priceLabel} · med{" "}
+              {conv.otherDeleted
+                ? "Slettet bruker"
+                : conv.other?.display_name ?? "ukjent bruker"}
             </p>
           </div>
-          {conv.other?.avatar_url ? (
+          {conv.other?.avatar_url && !conv.otherDeleted ? (
             <img
               src={conv.other.avatar_url}
               alt=""
@@ -233,6 +253,14 @@ function ConversationPage() {
               <UserIcon className="size-4 text-muted-foreground" />
             </div>
           )}
+        </div>
+      )}
+
+      {conv && (conv.otherDeleted || conv.otherPending) && (
+        <div className="mt-3 rounded-xl border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+          {conv.otherDeleted
+            ? "Denne brukeren har slettet kontoen sin. Du kan ikke lenger sende meldinger i denne samtalen."
+            : "Denne brukeren har bedt om å få slettet kontoen sin. Du kan ikke sende nye meldinger."}
         </div>
       )}
 
@@ -262,17 +290,29 @@ function ConversationPage() {
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              if (!sendMutation.isPending) sendMutation.mutate(body);
+              if (!sendMutation.isPending && !conv?.otherDeleted && !conv?.otherPending) {
+                sendMutation.mutate(body);
+              }
             }
           }}
-          placeholder="Skriv en melding…"
+          placeholder={
+            conv?.otherDeleted || conv?.otherPending
+              ? "Du kan ikke svare denne brukeren"
+              : "Skriv en melding…"
+          }
           rows={2}
           maxLength={4000}
+          disabled={!!conv?.otherDeleted || !!conv?.otherPending}
           className="min-h-[60px] flex-1 resize-none"
         />
         <Button
           type="submit"
-          disabled={sendMutation.isPending || !body.trim()}
+          disabled={
+            sendMutation.isPending ||
+            !body.trim() ||
+            !!conv?.otherDeleted ||
+            !!conv?.otherPending
+          }
           className="gap-2"
         >
           <Send className="size-4" /> Send
@@ -286,6 +326,7 @@ function ConversationPage() {
     </div>
   );
 }
+
 
 function renderWithDayDividers(messages: Message[], myId: string) {
   const out: React.ReactElement[] = [];

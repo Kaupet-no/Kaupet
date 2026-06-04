@@ -295,6 +295,7 @@ export type Database = {
           avatar_url: string | null
           bio: string | null
           created_at: string
+          deleted_at: string | null
           display_name: string
           id: string
           location: string | null
@@ -304,6 +305,7 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
+          deleted_at?: string | null
           display_name: string
           id: string
           location?: string | null
@@ -313,6 +315,7 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
+          deleted_at?: string | null
           display_name?: string
           id?: string
           location?: string | null
@@ -515,6 +518,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_user_deletion_pending: { Args: { _user_id: string }; Returns: boolean }
       listing_stats: {
         Args: { _listing_id: string }
         Returns: {

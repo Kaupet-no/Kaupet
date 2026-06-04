@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
-import { Expand, Map as MapIcon } from "lucide-react";
+import { Expand, Map as MapIcon, SlidersHorizontal } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +22,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { SearchBar } from "@/components/search-bar";
+import {
+  AdvancedSearchSheet,
+  valueToCriteria,
+  type AdvancedSearchValue,
+} from "@/components/advanced-search-sheet";
 import type { LocationValue } from "@/components/location-filter";
 import type { MapListing } from "@/components/listings-map";
 import { reverseGeocode } from "@/lib/geocode";
@@ -30,9 +35,20 @@ const ListingsMap = lazy(() =>
   import("@/components/listings-map").then((m) => ({ default: m.ListingsMap })),
 );
 
+const stringArray = z.preprocess((v) => {
+  if (Array.isArray(v)) return v;
+  if (typeof v === "string" && v.length > 0) return [v];
+  return [];
+}, z.array(z.string()));
+
 const searchSchema = z.object({
   q: z.string().optional().default(""),
+  qMode: z.enum(["all", "any"]).optional().default("all"),
   category: z.string().optional().default(""),
+  categories: stringArray.optional().default([]),
+  catMode: z.enum(["all", "any"]).optional().default("any"),
+  conditions: stringArray.optional().default([]),
+  includeFree: z.coerce.boolean().optional().default(true),
   min: z.coerce.number().int().min(0).optional(),
   max: z.coerce.number().int().min(0).optional(),
   sort: z.enum(["new", "price_asc", "price_desc"]).optional().default("new"),

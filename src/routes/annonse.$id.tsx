@@ -104,6 +104,43 @@ function ListingDetailPage() {
     },
   });
 
+  const contactMutation = useMutation({
+    mutationFn: async () => {
+      if (!user) {
+        navigate({
+          to: "/auth",
+          search: { mode: "signin", redirect: `/annonse/${id}` } as any,
+        });
+        return null;
+      }
+      if (!data) throw new Error("Mangler annonse");
+      // Slå opp eksisterende samtale
+      const { data: existing } = await supabase
+        .from("conversations")
+        .select("id")
+        .eq("listing_id", data.id)
+        .eq("buyer_id", user.id)
+        .maybeSingle();
+      if (existing?.id) return existing.id;
+      const { data: created, error } = await supabase
+        .from("conversations")
+        .insert({
+          listing_id: data.id,
+          buyer_id: user.id,
+          seller_id: data.seller_id,
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      return created.id;
+    },
+    onSuccess: (conversationId) => {
+      if (conversationId) {
+        navigate({ to: "/meldinger/$id", params: { id: conversationId } });
+      }
+    },
+  });
+
   const images = (data?.listing_images ?? [])
     .slice()
     .sort((a, b) => a.sort_order - b.sort_order);

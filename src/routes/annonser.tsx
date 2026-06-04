@@ -24,6 +24,7 @@ import {
 import { SearchBar } from "@/components/search-bar";
 import type { LocationValue } from "@/components/location-filter";
 import type { MapListing } from "@/components/listings-map";
+import { reverseGeocode } from "@/lib/geocode";
 
 const ListingsMap = lazy(() =>
   import("@/components/listings-map").then((m) => ({ default: m.ListingsMap })),
@@ -236,23 +237,40 @@ function BrowsePage() {
           activeId={activeId}
           onMarkerHover={setHoveredId}
           onMarkerSelect={setActiveId}
-          onCenterChange={(c) =>
+          onCenterChange={(c) => {
             updateSearch({
               lat: c.lat,
               lng: c.lng,
               radius: search.radius ?? 10,
-              loc: search.loc ?? "Valgt punkt",
-            })
-          }
+              loc: "Henter sted…",
+            });
+            void reverseGeocode(c).then((name) => {
+              updateSearch({
+                lat: c.lat,
+                lng: c.lng,
+                radius: search.radius ?? 10,
+                loc: name ?? "Valgt punkt",
+              });
+            });
+          }}
           onAreaSearch={
             withAreaSearch
-              ? (c) =>
+              ? (c) => {
                   updateSearch({
                     lat: c.lat,
                     lng: c.lng,
                     radius: search.radius ?? 10,
-                    loc: search.loc ?? "Valgt punkt",
-                  })
+                    loc: "Henter sted…",
+                  });
+                  void reverseGeocode(c).then((name) => {
+                    updateSearch({
+                      lat: c.lat,
+                      lng: c.lng,
+                      radius: search.radius ?? 10,
+                      loc: name ?? "Valgt punkt",
+                    });
+                  });
+                }
               : undefined
           }
           className="h-full w-full"

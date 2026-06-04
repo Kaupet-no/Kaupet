@@ -74,7 +74,7 @@ function ListingDetailPage() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, title, description, price_nok, is_free, condition, city, postal_code, lat, lng, created_at, seller_id, category_id, listing_images(storage_path, sort_order), categories(name_nb, slug)",
+          "id, title, description, price_nok, is_free, condition, city, postal_code, lat, lng, created_at, updated_at, published_at, seller_id, category_id, listing_images(storage_path, sort_order), categories(name_nb, slug)",
         )
         .eq("id", id)
         .maybeSingle();

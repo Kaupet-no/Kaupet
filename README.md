@@ -20,9 +20,9 @@ bun dev
 
 Appen kjører deretter på `http://localhost:3000`.
 
-### Miljøvariabler
+### Variabler
 
-Backenden (database, auth, filer) leveres av Lovable Cloud (Supabase under panseret). Variabler i `.env` genereres automatisk når du jobber i Lovable. Lokal kjøring mot egen Supabase-instans krever:
+Backenden (database, auth, filer) leveres av Supabase. Variabler i `.env` genereres automatisk når du jobber i Lovable. Lokal kjøring mot egen Supabase-instans krever:
 
 ```
 VITE_SUPABASE_URL=...

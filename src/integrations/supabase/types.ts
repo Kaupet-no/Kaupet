@@ -142,6 +142,30 @@ export type Database = {
           },
         ]
       }
+      listing_views: {
+        Row: {
+          created_at: string
+          id: string
+          listing_id: string
+          user_id: string | null
+          visitor_key: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          listing_id: string
+          user_id?: string | null
+          visitor_key: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          listing_id?: string
+          user_id?: string | null
+          visitor_key?: string
+        }
+        Relationships: []
+      }
       listings: {
         Row: {
           category_id: string | null

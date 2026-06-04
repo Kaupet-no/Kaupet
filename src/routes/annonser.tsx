@@ -62,8 +62,16 @@ function BrowsePage() {
   const [qDraft, setQDraft] = useState(search.q);
   const [mounted, setMounted] = useState(false);
   const [mobileMapOpen, setMobileMapOpen] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
 
   useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 1024px)");
+    const update = () => setIsDesktop(mql.matches);
+    update();
+    mql.addEventListener("change", update);
+    return () => mql.removeEventListener("change", update);
+  }, []);
   useEffect(() => setQDraft(search.q), [search.q]);
 
   const location: LocationValue = useMemo(

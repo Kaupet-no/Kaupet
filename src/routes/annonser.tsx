@@ -233,9 +233,20 @@ function BrowsePage() {
     <div className="h-full w-full animate-pulse rounded-xl bg-muted" />
   );
 
+  // Avoid hydration mismatch crashes by rendering the body only after mount.
+  if (!mounted) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 py-10">
+        <h1 className="font-display text-3xl tracking-tight">Annonser</h1>
+        <div className="mt-8 h-12 animate-pulse rounded-md bg-muted" />
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-10">
       <h1 className="font-display text-3xl tracking-tight">Annonser</h1>
+
 
       <form
         onSubmit={(e) => {

@@ -85,6 +85,11 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
             <Heart className="size-4" /> Favoritter
           </Link>
         </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/mine-sok" className="cursor-pointer">
+            <Bell className="size-4" /> Mine søk
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link to="/profil" className="cursor-pointer">

@@ -74,7 +74,7 @@ function ListingDetailPage() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, title, description, price_nok, is_free, condition, city, postal_code, lat, lng, created_at, seller_id, category_id, listing_images(storage_path, sort_order), categories(name_nb, slug)",
+          "id, title, description, price_nok, is_free, condition, city, postal_code, lat, lng, created_at, updated_at, published_at, seller_id, category_id, listing_images(storage_path, sort_order), categories(name_nb, slug)",
         )
         .eq("id", id)
         .maybeSingle();
@@ -268,21 +268,42 @@ function ListingDetailPage() {
             <p className="mt-3 font-display text-3xl text-primary">{priceLabel}</p>
           </div>
 
-          <dl className="grid grid-cols-2 gap-3 rounded-xl border border-border bg-card p-4 text-sm">
-            <div>
-              <dt className="text-muted-foreground">Tilstand</dt>
-              <dd className="font-medium">
-                {CONDITION_LABEL[data.condition] ?? data.condition}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Lokasjon</dt>
-              <dd className="flex items-center gap-1 font-medium">
-                <MapPin className="size-3.5 text-muted-foreground" />
-                {data.city || data.postal_code || "Ikke oppgitt"}
-              </dd>
-            </div>
-          </dl>
+          {(() => {
+            const fmt = (s: string) =>
+              new Date(s).toLocaleDateString("nb-NO", { day: "numeric", month: "long", year: "numeric" });
+            const publishedRaw = (data as any).published_at as string | null;
+            const updatedRaw = (data as any).updated_at as string | null;
+            const baseRaw = publishedRaw ?? data.created_at;
+            const baseLabel = publishedRaw ? "Publisert" : "Opprettet";
+            const showEdited =
+              updatedRaw && new Date(updatedRaw).getTime() - new Date(baseRaw).getTime() > 60_000;
+            return (
+              <dl className="grid grid-cols-2 gap-3 rounded-xl border border-border bg-card p-4 text-sm sm:grid-cols-3">
+                <div>
+                  <dt className="text-muted-foreground">Tilstand</dt>
+                  <dd className="font-medium">
+                    {CONDITION_LABEL[data.condition] ?? data.condition}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Lokasjon</dt>
+                  <dd className="flex items-center gap-1 font-medium">
+                    <MapPin className="size-3.5 text-muted-foreground" />
+                    {data.city || data.postal_code || "Ikke oppgitt"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">{baseLabel}</dt>
+                  <dd className="font-medium">{fmt(baseRaw)}</dd>
+                  {showEdited && (
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Sist redigert {fmt(updatedRaw!)}
+                    </p>
+                  )}
+                </div>
+              </dl>
+            );
+          })()}
 
           {isOwner && (
             <div className="rounded-xl border border-primary/40 bg-primary/5 p-4">

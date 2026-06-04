@@ -61,13 +61,18 @@ function ListingDetailPage() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, title, description, price_nok, is_free, condition, city, postal_code, created_at, seller_id, category_id, listing_images(storage_path, sort_order), categories(name_nb, slug), profiles!listings_seller_id_fkey(display_name, avatar_url, created_at)",
+          "id, title, description, price_nok, is_free, condition, city, postal_code, created_at, seller_id, category_id, listing_images(storage_path, sort_order), categories(name_nb, slug)",
         )
         .eq("id", id)
         .maybeSingle();
       if (error) throw error;
       if (!data) throw new Error("Annonsen finnes ikke");
-      return data;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("display_name, avatar_url, created_at")
+        .eq("id", data.seller_id)
+        .maybeSingle();
+      return { ...data, seller: profile };
     },
   });
 
@@ -95,7 +100,7 @@ function ListingDetailPage() {
       ? `${data.price_nok.toLocaleString("nb-NO")} kr`
       : "Pris ved henvendelse";
 
-  const seller = Array.isArray(data.profiles) ? data.profiles[0] : data.profiles;
+  const seller = data.seller;
   const category = Array.isArray(data.categories) ? data.categories[0] : data.categories;
 
   return (

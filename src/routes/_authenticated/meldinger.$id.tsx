@@ -281,7 +281,7 @@ function ConversationPage() {
 }
 
 function renderWithDayDividers(messages: Message[], myId: string) {
-  const out: JSX.Element[] = [];
+  const out: React.ReactElement[] = [];
   let lastDay = "";
   for (const m of messages) {
     const d = new Date(m.created_at);

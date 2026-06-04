@@ -1,61 +1,70 @@
-# Kartfilter for annonser
+# Airbnb-stil kart og søk på /annonser
 
-Legg til lokasjonsbasert filtrering på `/annonser` med både stedssøk + radius og interaktiv pin på kart, vist som split-view (liste venstre, kart høyre).
+Implementerer Retning B: listen er primær, kartet er en glatt sidekikker, og hele søket samles i én pille-formet bar.
 
-## Hva som bygges
+## 1. Samlet søkebar (pille-stil)
 
-**Filter-UI (over listen, ved siden av eksisterende søk):**
-- Tekstfelt for stedssøk (Places Autocomplete, Norge)
-- Radius-slider (1–100 km, default 10 km)
-- Knapp «Bruk min posisjon» (browser geolocation)
-- «Nullstill lokasjon»
+Erstatter dagens to rader (søk+kategori+sortering, så lokasjon under) med én container `rounded-full border bg-background shadow-sm` med segmenter delt av tynne `border-l`:
 
-**Kart (høyre side, sticky):**
-- Google Maps sentrert på valgt punkt
-- Sirkel som viser radius
-- Draggable pin – flytter man pinnen, oppdateres senter (og søk)
-- Markører for alle treff med lat/lng; klikk åpner mini-popup med tittel + pris + lenke til annonsen
-- Hover på listekort highlighter tilhørende markør
+```
+[ 🔍 Hva  ] | [ 📍 Hvor ] | [ ⊙ Radius ] | [ Kategori ] | [ Sortering ] [Søk-knapp]
+```
 
-**Layout:**
-- Desktop: 2-kolonne split (liste 60% / kart 40%, kart `sticky top-20`)
-- Mobil: kart skjult bak knapp «Vis kart» som åpner fullskjerm-overlay
+- **Hva**: inline input, samme oppførsel som i dag.
+- **Hvor**: Popover som åpner Nominatim-autocomplete + "Min posisjon" + "Tegn på kart"-snarvei.
+- **Radius**: Popover med slider 1–100 km. Disabled (grået ut + tooltip "Velg sted først") til lat/lng finnes. Viser "10 km" som etikett.
+- **Kategori / Sortering**: Popover med radio-liste i stedet for native `<select>` for konsistent stil.
+- På mobil kollapser baren til ett trykk → bottom-sheet med samme felter stablet vertikalt (Airbnb mobile mønster).
 
-**Søk-parametere (URL):**
-Utvid `searchSchema` i `src/routes/annonser.tsx` med `lat`, `lng`, `radius` (alle optional). Bevares på tvers av nav via standard search-merging.
+Eksisterende `LocationFilter`-komponent splittes i to mindre stykker (`LocationPicker`, `RadiusPicker`) som kan brukes i den nye baren.
 
-**Filtrering (DB):**
-Postgres-funksjon `listings_within_radius(center_lat, center_lng, radius_km)` som bruker Haversine-formel direkte i SQL (ingen PostGIS nødvendig). Returnerer listing-id-er innenfor radius. Kalles via `supabase.rpc()` når lat/lng er satt, og resultatet kombineres med øvrige filtre.
+## 2. Kart-stil og pins
 
-Alternativ enklere variant: legg `earthdistance`-ext + bounding-box-filter i query (`lat BETWEEN ... AND ...`) og finjuster i klient. Velger RPC-varianten for korrekthet.
+`listings-map.tsx`:
+- Bytt tile-layer til **CartoDB Positron** (`https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png`) med riktig attribusjon — lys, minimalistisk, matcher resten av siden.
+- **Pris-pins** via `L.divIcon`: liten rounded-full kapsel med pris, hvit bakgrunn, primary border, myk skygge. "Gis bort" får accent-farge. Bruker design tokens (`hsl(var(--primary))`, `--shadow-elegant`).
+- Hover på pin → kapsel vokser litt og hever skygge; aktiv (klikket) pin får solid primary-fyll.
+- Popup erstattes med custom card-popup: bilde 16:9, tittel, pris, "Se annonse"-knapp i samme stil som `ListingCard`.
+- Sentrum-markøren beholdes som i dag, radius-sirkel får lavere opacity.
 
-## Tekniske detaljer
+## 3. Liste ↔ kart synkronisering
 
-**Connector:** Bruker den allerede tilgjengelige Google Maps Platform-connectoren:
-- Browser-nøkkel (`VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY`) for Maps JS API + Places Autocomplete (New).
-- Gateway via TanStack server function for evt. geocoding fallback.
-- Bruker `google.maps.Marker` (ikke AdvancedMarker), ingen `mapId`.
+- Hover på `ListingCard` → tilhørende pin highlightes (via et delt `hoveredId` state lokalt i `BrowsePage`).
+- Hover/klikk på pin → tilhørende kort scrollet inn i view og highlightet.
+- Implementeres med to enkle props: `hoveredId`, `onHoverChange` på `ListingsMap` og `ListingCard`.
 
-**Nye filer:**
-- `src/components/listings-map.tsx` – kart, sirkel, markører, pin-drag
-- `src/components/location-filter.tsx` – autocomplete-input + radius-slider + geolocation-knapp
-- `src/hooks/use-google-maps.ts` – async loader for Maps JS API (callback-pattern, singleton)
-- DB-migration: SQL-funksjon `public.listings_within_radius(double precision, double precision, double precision)` (SECURITY DEFINER, search_path = public, returnerer setof uuid)
+## 4. "Utvid kart" + mobil FAB
 
-**Endrede filer:**
-- `src/routes/annonser.tsx` – utvid schema, split-layout, integrer kart + filter, query-logikk
-- `package.json` – ingen nye deps (Maps lastes via `<script>`)
+- Desktop: liten "⤢ Utvid kart"-knapp øverst til høyre i kartcontaineren → åpner `Dialog` med fullbredde-kart (90vw × 85vh) som inkluderer en "Søk i dette området"-knapp som flyter øverst.
+- Mobil: dagens "Vis kart"-knapp blir en **flytende FAB** nederst til høyre (`fixed bottom-4 right-4 rounded-full shadow-lg`) med kart-ikon + "Kart"-tekst. Åpner samme `Sheet` som i dag.
 
-**Ingen endringer** i auth, listing-skjema, favoritter eller andre sider.
+## 5. "Søk i dette området"-knapp
 
-## Mobil
+Felles for utvidet kart-dialog og desktop-kart:
+- Når brukeren panner kartet > ~500 m fra forrige senter, vises en flytende knapp øverst sentrert: "Søk i dette området".
+- Klikk = oppdaterer `lat`/`lng` til kartets senter, beholder eksisterende radius.
+- Implementeres ved å lytte på Leaflet `moveend` og sammenligne med forrige senter (Haversine).
 
-På < `md` skjules kartet. En flytende «Vis kart»-knapp åpner kartet som fullskjerm-sheet med samme markører og kontroller.
+## 6. Visuell polish
 
-## Rekkefølge
+- Søkebar: `rounded-full`, `shadow-sm` hvilende, `shadow-md` på hover/fokus, divider mellom segmenter er `border-l border-border/60`.
+- Kart-container: `rounded-2xl` (i dag `rounded-xl`), tynnere border, samme `--shadow-elegant`.
+- Tomtilstand: behold dagens design men legg til en "Nullstill filtre"-knapp.
 
-1. Migration: `listings_within_radius` SQL-funksjon
-2. Maps-loader hook + ListingsMap-komponent
-3. LocationFilter-komponent med Places Autocomplete
-4. Integrer i `annonser.tsx` (schema, layout, query)
-5. Mobil-sheet
+## Filer som endres
+
+- `src/routes/annonser.tsx` — ny header med pille-bar, hover-state, dialog + FAB.
+- `src/components/listings-map.tsx` — Positron tiles, pris-pins, custom popup, hoveredId, moveend-knapp.
+- `src/components/location-filter.tsx` — refaktoreres til `LocationPicker` + `RadiusPicker` (popovers).
+- Ny: `src/components/search-bar.tsx` — pille-containeren som komponerer alle delene.
+
+## Tekniske notater
+
+- Ingen nye npm-pakker nødvendig. `leaflet.markercluster` skippes i denne runden — pris-pins er ofte unike nok med dagens 60-rad-limit.
+- Beholder lazy-loading av kartet og `mounted`-guarden.
+- Alle farger via CSS-variabler (`--primary`, `--accent`, `--surface`) — ingen hardkodede hex.
+
+## Spørsmål før jeg går videre
+
+1. CartoDB Positron som ny tile-stil (lys og minimal) er greit? Alternativet er Stadia Alidade Smooth som er litt varmere.
+2. Skal `Hva`-feltet søke automatisk mens du skriver (debounced), eller beholde "trykk Enter / Søk-knapp" som nå?

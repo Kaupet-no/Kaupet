@@ -238,6 +238,54 @@ function ListingDetailPage() {
             </div>
           </dl>
 
+          {isOwner && (
+            <div className="rounded-xl border border-primary/40 bg-primary/5 p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-primary">
+                Dette er din annonse
+              </p>
+              <Link
+                to="/mine-annonser/$id/rediger"
+                params={{ id: data.id }}
+                className="mt-3 block"
+              >
+                <Button className="w-full gap-2" variant="default">
+                  <Pencil className="size-4" /> Rediger annonse
+                </Button>
+              </Link>
+              <dl className="mt-4 grid grid-cols-3 gap-3 text-center">
+                <div className="rounded-lg bg-card p-2">
+                  <Eye className="mx-auto size-4 text-muted-foreground" />
+                  <dd className="mt-1 font-display text-lg leading-none">
+                    {stats?.total_views ?? "–"}
+                  </dd>
+                  <dt className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Visninger
+                  </dt>
+                </div>
+                <div className="rounded-lg bg-card p-2">
+                  <Users className="mx-auto size-4 text-muted-foreground" />
+                  <dd className="mt-1 font-display text-lg leading-none">
+                    {stats?.unique_visitors ?? "–"}
+                  </dd>
+                  <dt className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Unike besøk
+                  </dt>
+                </div>
+                <div className="rounded-lg bg-card p-2">
+                  <Heart className="mx-auto size-4 text-muted-foreground" />
+                  <dd className="mt-1 font-display text-lg leading-none">
+                    {stats?.favorite_count ?? "–"}
+                  </dd>
+                  <dt className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Favoritter
+                  </dt>
+                </div>
+              </dl>
+            </div>
+          )}
+
+
+
           <div className="rounded-xl border border-border bg-card p-4">
             <div className="flex items-center gap-3">
               {seller?.avatar_url ? (

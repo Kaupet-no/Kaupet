@@ -1,0 +1,168 @@
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { z } from "zod";
+import { toast } from "sonner";
+
+import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable/index";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
+const searchSchema = z.object({
+  mode: z.enum(["signin", "signup"]).optional().default("signin"),
+});
+
+export const Route = createFileRoute("/auth")({
+  validateSearch: searchSchema,
+  head: () => ({
+    meta: [
+      { title: "Logg inn — Kaupet.no" },
+      { name: "description", content: "Logg inn eller bli medlem på Kaupet.no." },
+    ],
+  }),
+  component: AuthPage,
+});
+
+function AuthPage() {
+  const { mode } = Route.useSearch();
+  const navigate = useNavigate();
+  const [isSignUp, setIsSignUp] = useState(mode === "signup");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => setIsSignUp(mode === "signup"), [mode]);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) navigate({ to: "/", replace: true });
+    });
+  }, [navigate]);
+
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      if (isSignUp) {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: window.location.origin,
+            data: { display_name: displayName || email.split("@")[0] },
+          },
+        });
+        if (error) throw error;
+        toast.success("Konto opprettet! Sjekk e-posten for å bekrefte adressen.");
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        toast.success("Velkommen tilbake!");
+        navigate({ to: "/", replace: true });
+      }
+    } catch (err: any) {
+      toast.error(err?.message ?? "Noe gikk galt. Prøv igjen.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogle = async () => {
+    setLoading(true);
+    const result = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: window.location.origin,
+    });
+    if (result.error) {
+      toast.error("Kunne ikke logge inn med Google.");
+      setLoading(false);
+      return;
+    }
+    if (result.redirected) return;
+    navigate({ to: "/", replace: true });
+  };
+
+  return (
+    <div className="mx-auto flex max-w-md flex-col px-4 py-16">
+      <div className="rounded-2xl border border-border bg-card p-8 shadow-sm">
+        <h1 className="font-display text-3xl tracking-tight">
+          {isSignUp ? "Bli medlem" : "Logg inn"}
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {isSignUp
+            ? "Det tar bare et halvt minutt og er helt gratis."
+            : "Velkommen tilbake til Kaupet."}
+        </p>
+
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-6 w-full"
+          onClick={handleGoogle}
+          disabled={loading}
+        >
+          Fortsett med Google
+        </Button>
+
+        <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">
+          <span className="h-px flex-1 bg-border" /> eller med e-post <span className="h-px flex-1 bg-border" />
+        </div>
+
+        <form onSubmit={handleEmailAuth} className="space-y-4">
+          {isSignUp && (
+            <div className="space-y-1.5">
+              <Label htmlFor="name">Visningsnavn</Label>
+              <Input
+                id="name"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Kari Nordmann"
+              />
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label htmlFor="email">E-post</Label>
+            <Input
+              id="email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="kari@eksempel.no"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="password">Passord</Label>
+            <Input
+              id="password"
+              type="password"
+              required
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading ? "Vent litt…" : isSignUp ? "Opprett konto" : "Logg inn"}
+          </Button>
+        </form>
+
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          {isSignUp ? "Har du allerede en konto? " : "Ny på Kaupet? "}
+          <button
+            type="button"
+            className="font-medium text-primary hover:underline"
+            onClick={() => setIsSignUp(!isSignUp)}
+          >
+            {isSignUp ? "Logg inn" : "Bli medlem"}
+          </button>
+        </p>
+      </div>
+
+      <p className="mt-6 text-center text-xs text-muted-foreground">
+        <Link to="/" className="hover:underline">← Tilbake til forsiden</Link>
+      </p>
+    </div>
+  );
+}

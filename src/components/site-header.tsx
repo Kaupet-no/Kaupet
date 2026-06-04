@@ -39,6 +39,7 @@ export function SiteHeader() {
         <div className="ml-auto flex items-center gap-2">
           {user ? (
             <>
+              <NotificationsBell />
               <MessagesIconLink />
               <UserMenu userId={user.id} email={user.email ?? null} />
             </>

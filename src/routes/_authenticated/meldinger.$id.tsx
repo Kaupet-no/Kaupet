@@ -146,12 +146,15 @@ function ConversationPage() {
     };
   }, [id, queryClient]);
 
-  // Auto-scroll
+  // Auto-scroll + markér som lest når meldinger lastes/oppdateres
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+    if (messages && messages.length > 0) {
+      markRead(id, messages[messages.length - 1].created_at);
+    }
+  }, [messages, id]);
 
   const sendMutation = useMutation({
     mutationFn: async (text: string) => {

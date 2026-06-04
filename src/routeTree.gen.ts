@@ -18,6 +18,8 @@ import { Route as AuthenticatedProfilRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedNyAnnonseRouteImport } from './routes/_authenticated/ny-annonse'
 import { Route as AuthenticatedFavoritterRouteImport } from './routes/_authenticated/favoritter'
 import { Route as AuthenticatedMineAnnonserIndexRouteImport } from './routes/_authenticated/mine-annonser.index'
+import { Route as AuthenticatedMeldingerIndexRouteImport } from './routes/_authenticated/meldinger.index'
+import { Route as AuthenticatedMeldingerIdRouteImport } from './routes/_authenticated/meldinger.$id'
 import { Route as AuthenticatedMineAnnonserIdRedigerRouteImport } from './routes/_authenticated/mine-annonser.$id.rediger'
 
 const AuthRoute = AuthRouteImport.update({
@@ -65,6 +67,18 @@ const AuthenticatedMineAnnonserIndexRoute =
     path: '/mine-annonser/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedMeldingerIndexRoute =
+  AuthenticatedMeldingerIndexRouteImport.update({
+    id: '/meldinger/',
+    path: '/meldinger/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedMeldingerIdRoute =
+  AuthenticatedMeldingerIdRouteImport.update({
+    id: '/meldinger/$id',
+    path: '/meldinger/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedMineAnnonserIdRedigerRoute =
   AuthenticatedMineAnnonserIdRedigerRouteImport.update({
     id: '/mine-annonser/$id/rediger',
@@ -80,6 +94,8 @@ export interface FileRoutesByFullPath {
   '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
   '/annonse/$id': typeof AnnonseIdRoute
+  '/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
+  '/meldinger/': typeof AuthenticatedMeldingerIndexRoute
   '/mine-annonser/': typeof AuthenticatedMineAnnonserIndexRoute
   '/mine-annonser/$id/rediger': typeof AuthenticatedMineAnnonserIdRedigerRoute
 }
@@ -91,6 +107,8 @@ export interface FileRoutesByTo {
   '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
   '/annonse/$id': typeof AnnonseIdRoute
+  '/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
+  '/meldinger': typeof AuthenticatedMeldingerIndexRoute
   '/mine-annonser': typeof AuthenticatedMineAnnonserIndexRoute
   '/mine-annonser/$id/rediger': typeof AuthenticatedMineAnnonserIdRedigerRoute
 }
@@ -104,6 +122,8 @@ export interface FileRoutesById {
   '/_authenticated/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/_authenticated/profil': typeof AuthenticatedProfilRoute
   '/annonse/$id': typeof AnnonseIdRoute
+  '/_authenticated/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
+  '/_authenticated/meldinger/': typeof AuthenticatedMeldingerIndexRoute
   '/_authenticated/mine-annonser/': typeof AuthenticatedMineAnnonserIndexRoute
   '/_authenticated/mine-annonser/$id/rediger': typeof AuthenticatedMineAnnonserIdRedigerRoute
 }
@@ -117,6 +137,8 @@ export interface FileRouteTypes {
     | '/ny-annonse'
     | '/profil'
     | '/annonse/$id'
+    | '/meldinger/$id'
+    | '/meldinger/'
     | '/mine-annonser/'
     | '/mine-annonser/$id/rediger'
   fileRoutesByTo: FileRoutesByTo
@@ -128,6 +150,8 @@ export interface FileRouteTypes {
     | '/ny-annonse'
     | '/profil'
     | '/annonse/$id'
+    | '/meldinger/$id'
+    | '/meldinger'
     | '/mine-annonser'
     | '/mine-annonser/$id/rediger'
   id:
@@ -140,6 +164,8 @@ export interface FileRouteTypes {
     | '/_authenticated/ny-annonse'
     | '/_authenticated/profil'
     | '/annonse/$id'
+    | '/_authenticated/meldinger/$id'
+    | '/_authenticated/meldinger/'
     | '/_authenticated/mine-annonser/'
     | '/_authenticated/mine-annonser/$id/rediger'
   fileRoutesById: FileRoutesById
@@ -217,6 +243,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMineAnnonserIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/meldinger/': {
+      id: '/_authenticated/meldinger/'
+      path: '/meldinger'
+      fullPath: '/meldinger/'
+      preLoaderRoute: typeof AuthenticatedMeldingerIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/meldinger/$id': {
+      id: '/_authenticated/meldinger/$id'
+      path: '/meldinger/$id'
+      fullPath: '/meldinger/$id'
+      preLoaderRoute: typeof AuthenticatedMeldingerIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/mine-annonser/$id/rediger': {
       id: '/_authenticated/mine-annonser/$id/rediger'
       path: '/mine-annonser/$id/rediger'
@@ -231,6 +271,8 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedFavoritterRoute: typeof AuthenticatedFavoritterRoute
   AuthenticatedNyAnnonseRoute: typeof AuthenticatedNyAnnonseRoute
   AuthenticatedProfilRoute: typeof AuthenticatedProfilRoute
+  AuthenticatedMeldingerIdRoute: typeof AuthenticatedMeldingerIdRoute
+  AuthenticatedMeldingerIndexRoute: typeof AuthenticatedMeldingerIndexRoute
   AuthenticatedMineAnnonserIndexRoute: typeof AuthenticatedMineAnnonserIndexRoute
   AuthenticatedMineAnnonserIdRedigerRoute: typeof AuthenticatedMineAnnonserIdRedigerRoute
 }
@@ -239,6 +281,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFavoritterRoute: AuthenticatedFavoritterRoute,
   AuthenticatedNyAnnonseRoute: AuthenticatedNyAnnonseRoute,
   AuthenticatedProfilRoute: AuthenticatedProfilRoute,
+  AuthenticatedMeldingerIdRoute: AuthenticatedMeldingerIdRoute,
+  AuthenticatedMeldingerIndexRoute: AuthenticatedMeldingerIndexRoute,
   AuthenticatedMineAnnonserIndexRoute: AuthenticatedMineAnnonserIndexRoute,
   AuthenticatedMineAnnonserIdRedigerRoute:
     AuthenticatedMineAnnonserIdRedigerRoute,

@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PersonvernRouteImport } from './routes/personvern'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AnnonserRouteImport } from './routes/annonser'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
@@ -22,6 +23,11 @@ import { Route as AuthenticatedMeldingerIndexRouteImport } from './routes/_authe
 import { Route as AuthenticatedMeldingerIdRouteImport } from './routes/_authenticated/meldinger.$id'
 import { Route as AuthenticatedMineAnnonserIdRedigerRouteImport } from './routes/_authenticated/mine-annonser.$id.rediger'
 
+const PersonvernRoute = PersonvernRouteImport.update({
+  id: '/personvern',
+  path: '/personvern',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -90,6 +96,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
+  '/personvern': typeof PersonvernRoute
   '/favoritter': typeof AuthenticatedFavoritterRoute
   '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
@@ -103,6 +110,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
+  '/personvern': typeof PersonvernRoute
   '/favoritter': typeof AuthenticatedFavoritterRoute
   '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
@@ -118,6 +126,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
+  '/personvern': typeof PersonvernRoute
   '/_authenticated/favoritter': typeof AuthenticatedFavoritterRoute
   '/_authenticated/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/_authenticated/profil': typeof AuthenticatedProfilRoute
@@ -133,6 +142,7 @@ export interface FileRouteTypes {
     | '/'
     | '/annonser'
     | '/auth'
+    | '/personvern'
     | '/favoritter'
     | '/ny-annonse'
     | '/profil'
@@ -146,6 +156,7 @@ export interface FileRouteTypes {
     | '/'
     | '/annonser'
     | '/auth'
+    | '/personvern'
     | '/favoritter'
     | '/ny-annonse'
     | '/profil'
@@ -160,6 +171,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/annonser'
     | '/auth'
+    | '/personvern'
     | '/_authenticated/favoritter'
     | '/_authenticated/ny-annonse'
     | '/_authenticated/profil'
@@ -175,11 +187,19 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AnnonserRoute: typeof AnnonserRoute
   AuthRoute: typeof AuthRoute
+  PersonvernRoute: typeof PersonvernRoute
   AnnonseIdRoute: typeof AnnonseIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/personvern': {
+      id: '/personvern'
+      path: '/personvern'
+      fullPath: '/personvern'
+      preLoaderRoute: typeof PersonvernRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
@@ -296,6 +316,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AnnonserRoute: AnnonserRoute,
   AuthRoute: AuthRoute,
+  PersonvernRoute: PersonvernRoute,
   AnnonseIdRoute: AnnonseIdRoute,
 }
 export const routeTree = rootRouteImport

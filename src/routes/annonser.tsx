@@ -71,8 +71,8 @@ function BrowsePage() {
         const terms = search.q
           .trim()
           .split(/\s+/)
-          .filter((t) => t.length > 0)
-          .map((t) => t.replace(/[%_,()]/g, " ").trim())
+          .filter((t: string) => t.length > 0)
+          .map((t: string) => t.replace(/[%_,()]/g, " ").trim())
           .filter(Boolean);
         if (terms.length > 0) {
           // Substring-match (case-insensitive) on title, description and city

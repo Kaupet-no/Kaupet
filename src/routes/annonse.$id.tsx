@@ -273,10 +273,18 @@ function ListingDetailPage() {
               new Date(s).toLocaleDateString("nb-NO", { day: "numeric", month: "long", year: "numeric" });
             const publishedRaw = (data as any).published_at as string | null;
             const updatedRaw = (data as any).updated_at as string | null;
-            const baseRaw = publishedRaw ?? data.created_at;
-            const baseLabel = publishedRaw ? "Publisert" : "Opprettet";
-            const showEdited =
-              updatedRaw && new Date(updatedRaw).getTime() - new Date(baseRaw).getTime() > 60_000;
+            const publishedDate = publishedRaw ? new Date(publishedRaw) : new Date(data.created_at);
+            const updatedDate = updatedRaw ? new Date(updatedRaw) : null;
+
+            const isEditedLater =
+              updatedDate != null &&
+              (updatedDate.getFullYear() > publishedDate.getFullYear() ||
+                updatedDate.getMonth() > publishedDate.getMonth() ||
+                updatedDate.getDate() > publishedDate.getDate());
+
+            const label = isEditedLater ? "Sist redigert" : "Publisert";
+            const dateStr = isEditedLater && updatedRaw ? fmt(updatedRaw) : fmt(publishedRaw ?? data.created_at);
+
             return (
               <dl className="grid grid-cols-2 gap-3 rounded-xl border border-border bg-card p-4 text-sm sm:grid-cols-3">
                 <div>
@@ -293,13 +301,8 @@ function ListingDetailPage() {
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">{baseLabel}</dt>
-                  <dd className="font-medium">{fmt(baseRaw)}</dd>
-                  {showEdited && (
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      Sist redigert {fmt(updatedRaw!)}
-                    </p>
-                  )}
+                  <dt className="text-muted-foreground">{label}</dt>
+                  <dd className="font-medium">{dateStr}</dd>
                 </div>
               </dl>
             );

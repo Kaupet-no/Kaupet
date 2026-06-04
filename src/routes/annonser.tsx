@@ -236,23 +236,40 @@ function BrowsePage() {
           activeId={activeId}
           onMarkerHover={setHoveredId}
           onMarkerSelect={setActiveId}
-          onCenterChange={(c) =>
+          onCenterChange={(c) => {
             updateSearch({
               lat: c.lat,
               lng: c.lng,
               radius: search.radius ?? 10,
-              loc: search.loc ?? "Valgt punkt",
-            })
-          }
+              loc: "Henter sted…",
+            });
+            void reverseGeocode(c).then((name) => {
+              updateSearch({
+                lat: c.lat,
+                lng: c.lng,
+                radius: search.radius ?? 10,
+                loc: name ?? "Valgt punkt",
+              });
+            });
+          }}
           onAreaSearch={
             withAreaSearch
-              ? (c) =>
+              ? (c) => {
                   updateSearch({
                     lat: c.lat,
                     lng: c.lng,
                     radius: search.radius ?? 10,
-                    loc: search.loc ?? "Valgt punkt",
-                  })
+                    loc: "Henter sted…",
+                  });
+                  void reverseGeocode(c).then((name) => {
+                    updateSearch({
+                      lat: c.lat,
+                      lng: c.lng,
+                      radius: search.radius ?? 10,
+                      loc: name ?? "Valgt punkt",
+                    });
+                  });
+                }
               : undefined
           }
           className="h-full w-full"

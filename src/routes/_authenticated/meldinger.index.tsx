@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { signListingImageUrls } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
+import { isUnread, useReadVersion } from "@/lib/unread";
 
 export const Route = createFileRoute("/_authenticated/meldinger/")({
   head: () => ({

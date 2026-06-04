@@ -43,6 +43,7 @@ const searchSchema = z.object({
 
 export const Route = createFileRoute("/annonser")({
   validateSearch: searchSchema,
+  ssr: false,
   head: () => ({
     meta: [
       { title: "Alle annonser — Kaupet.no" },

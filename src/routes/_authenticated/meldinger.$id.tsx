@@ -70,7 +70,7 @@ function ConversationPage() {
         .from("conversations")
         .select(
           `id, buyer_id, seller_id, listing_id,
-           listing:listings!inner(id, title, price_nok, is_free, listing_images(storage_path, sort_order))`,
+           listing:listings(id, title, price_nok, is_free, listing_images(storage_path, sort_order))`,
         )
         .eq("id", id)
         .maybeSingle();
@@ -83,10 +83,21 @@ function ConversationPage() {
         user!.id === data.seller_id ? data.buyer_id : data.seller_id;
       const { data: profile } = await supabase
         .from("profiles")
-        .select("id, display_name, avatar_url")
+        .select("id, display_name, avatar_url, deleted_at")
         .eq("id", otherId)
         .maybeSingle();
-      return { ...data, listing, other: profile };
+      const { data: pendingFlag } = await supabase.rpc("is_user_deletion_pending", {
+        _user_id: otherId,
+      });
+      const otherDeleted = !!profile?.deleted_at;
+      const otherPending = !!pendingFlag;
+      return {
+        ...data,
+        listing,
+        other: profile,
+        otherDeleted,
+        otherPending,
+      };
     },
   });
 

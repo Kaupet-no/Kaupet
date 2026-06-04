@@ -112,6 +112,21 @@ function InboxPage() {
     }
   }, [conversations]);
 
+  const readVersion = useReadVersion();
+
+  // Beregn uleste per samtale
+  const unreadByConv = useMemo(() => {
+    void readVersion;
+    const m = new Map<string, boolean>();
+    for (const c of conversations ?? []) {
+      m.set(
+        c.id,
+        isUnread(c.id, c.last_message_at, c.last_message?.sender_id, user?.id),
+      );
+    }
+    return m;
+  }, [conversations, readVersion, user?.id]);
+
   // Grupper etter annonse
   const groups = useMemo(() => {
     const map = new Map<
@@ -120,26 +135,30 @@ function InboxPage() {
         listing: ConversationRow["listing"];
         conversations: ConversationRow[];
         lastActivity: string;
+        unreadCount: number;
       }
     >();
     for (const c of conversations ?? []) {
       const key = c.listing_id;
+      const u = unreadByConv.get(c.id) ? 1 : 0;
       const g = map.get(key);
       if (g) {
         g.conversations.push(c);
+        g.unreadCount += u;
         if (c.last_message_at > g.lastActivity) g.lastActivity = c.last_message_at;
       } else {
         map.set(key, {
           listing: c.listing,
           conversations: [c],
           lastActivity: c.last_message_at,
+          unreadCount: u,
         });
       }
     }
     return Array.from(map.entries())
       .map(([listingId, g]) => ({ listingId, ...g }))
       .sort((a, b) => (a.lastActivity < b.lastActivity ? 1 : -1));
-  }, [conversations]);
+  }, [conversations, unreadByConv]);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">

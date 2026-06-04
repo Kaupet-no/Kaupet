@@ -96,6 +96,16 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
             <Settings className="size-4" /> Kontoinnstillinger
           </Link>
         </DropdownMenuItem>
+        {isAdmin && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link to="/admin" className="cursor-pointer">
+                <Shield className="size-4" /> Administrasjon
+              </Link>
+            </DropdownMenuItem>
+          </>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           className="cursor-pointer text-destructive focus:text-destructive"

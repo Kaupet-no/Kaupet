@@ -334,6 +334,81 @@ export type Database = {
           },
         ]
       }
+      saved_search_notifications: {
+        Row: {
+          created_at: string
+          id: string
+          listing_id: string
+          read_at: string | null
+          saved_search_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          listing_id: string
+          read_at?: string | null
+          saved_search_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          listing_id?: string
+          read_at?: string | null
+          saved_search_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_search_notifications_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_search_notifications_saved_search_id_fkey"
+            columns: ["saved_search_id"]
+            isOneToOne: false
+            referencedRelation: "saved_searches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saved_searches: {
+        Row: {
+          created_at: string
+          criteria: Json
+          id: string
+          last_checked_at: string
+          name: string
+          notify: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          criteria?: Json
+          id?: string
+          last_checked_at?: string
+          name: string
+          notify?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          criteria?: Json
+          id?: string
+          last_checked_at?: string
+          name?: string
+          notify?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -432,6 +507,10 @@ export type Database = {
           distance_km: number
           id: string
         }[]
+      }
+      match_listing_to_saved_searches: {
+        Args: { _listing_id: string }
+        Returns: undefined
       }
     }
     Enums: {

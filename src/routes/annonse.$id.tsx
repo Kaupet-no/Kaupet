@@ -1,5 +1,5 @@
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { ArrowLeft, MapPin, MessageCircle, User as UserIcon, Pencil, Eye, Users, Heart } from "lucide-react";
 
@@ -60,6 +60,7 @@ export const Route = createFileRoute("/annonse/$id")({
 function ListingDetailPage() {
   const { id } = Route.useParams();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [activeImage, setActiveImage] = useState(0);
   const [imgUrls, setImgUrls] = useState<Record<string, string>>({});
   const [mounted, setMounted] = useState(false);
@@ -100,6 +101,43 @@ function ListingDetailPage() {
         unique_visitors: Number(row?.unique_visitors ?? 0),
         favorite_count: Number(row?.favorite_count ?? 0),
       };
+    },
+  });
+
+  const contactMutation = useMutation({
+    mutationFn: async () => {
+      if (!user) {
+        navigate({
+          to: "/auth",
+          search: { mode: "signin", redirect: `/annonse/${id}` } as any,
+        });
+        return null;
+      }
+      if (!data) throw new Error("Mangler annonse");
+      // Slå opp eksisterende samtale
+      const { data: existing } = await supabase
+        .from("conversations")
+        .select("id")
+        .eq("listing_id", data.id)
+        .eq("buyer_id", user.id)
+        .maybeSingle();
+      if (existing?.id) return existing.id;
+      const { data: created, error } = await supabase
+        .from("conversations")
+        .insert({
+          listing_id: data.id,
+          buyer_id: user.id,
+          seller_id: data.seller_id,
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      return created.id;
+    },
+    onSuccess: (conversationId) => {
+      if (conversationId) {
+        navigate({ to: "/meldinger/$id", params: { id: conversationId } });
+      }
     },
   });
 
@@ -318,9 +356,16 @@ function ListingDetailPage() {
                 )}
               </div>
             </div>
-            <Button className="mt-4 w-full gap-2" disabled>
-              <MessageCircle className="size-4" /> Send melding (kommer)
-            </Button>
+            {!isOwner && (
+              <Button
+                className="mt-4 w-full gap-2"
+                onClick={() => contactMutation.mutate()}
+                disabled={contactMutation.isPending}
+              >
+                <MessageCircle className="size-4" />
+                {contactMutation.isPending ? "Åpner samtale…" : "Send melding til selger"}
+              </Button>
+            )}
             <FavoriteButton listingId={data.id} variant="full" size="lg" className="mt-2" />
           </div>
         </aside>

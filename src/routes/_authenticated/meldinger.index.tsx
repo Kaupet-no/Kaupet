@@ -1,0 +1,320 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { MessageCircle, ChevronDown, ChevronRight } from "lucide-react";
+
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth";
+import { signListingImageUrls } from "@/lib/storage";
+import { Button } from "@/components/ui/button";
+
+export const Route = createFileRoute("/_authenticated/meldinger/")({
+  head: () => ({
+    meta: [
+      { title: "Meldinger — Kaupet.no" },
+      { name: "description", content: "Dine samtaler med kjøpere og selgere." },
+    ],
+  }),
+  component: InboxPage,
+});
+
+type ConversationRow = {
+  id: string;
+  buyer_id: string;
+  seller_id: string;
+  listing_id: string;
+  last_message_at: string;
+  listing: {
+    id: string;
+    title: string;
+    price_nok: number | null;
+    is_free: boolean;
+    status: string;
+    listing_images: { storage_path: string; sort_order: number }[];
+  } | null;
+  buyer: { id: string; display_name: string; avatar_url: string | null } | null;
+  seller: { id: string; display_name: string; avatar_url: string | null } | null;
+  last_message: { body: string; created_at: string; sender_id: string } | null;
+};
+
+function InboxPage() {
+  const { user } = useAuth();
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [imgUrls, setImgUrls] = useState<Record<string, string>>({});
+
+  const { data: conversations, isLoading } = useQuery({
+    queryKey: ["my-conversations", user?.id],
+    enabled: !!user,
+    queryFn: async (): Promise<ConversationRow[]> => {
+      const { data, error } = await supabase
+        .from("conversations")
+        .select(
+          `id, buyer_id, seller_id, listing_id, last_message_at,
+           listing:listings!inner(id, title, price_nok, is_free, status, listing_images(storage_path, sort_order)),
+           buyer:profiles!conversations_buyer_id_fkey(id, display_name, avatar_url),
+           seller:profiles!conversations_seller_id_fkey(id, display_name, avatar_url)`,
+        )
+        .or(`buyer_id.eq.${user!.id},seller_id.eq.${user!.id}`)
+        .order("last_message_at", { ascending: false });
+      if (error) {
+        // Fall back if FK alias join fails: fetch profiles separately
+        const { data: convs, error: e2 } = await supabase
+          .from("conversations")
+          .select(
+            `id, buyer_id, seller_id, listing_id, last_message_at,
+             listing:listings!inner(id, title, price_nok, is_free, status, listing_images(storage_path, sort_order))`,
+          )
+          .or(`buyer_id.eq.${user!.id},seller_id.eq.${user!.id}`)
+          .order("last_message_at", { ascending: false });
+        if (e2) throw e2;
+        const ids = Array.from(
+          new Set((convs ?? []).flatMap((c: any) => [c.buyer_id, c.seller_id])),
+        );
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, display_name, avatar_url")
+          .in("id", ids);
+        const pmap = new Map((profiles ?? []).map((p) => [p.id, p]));
+        const enriched = (convs ?? []).map((c: any) => ({
+          ...c,
+          listing: Array.isArray(c.listing) ? c.listing[0] : c.listing,
+          buyer: pmap.get(c.buyer_id) ?? null,
+          seller: pmap.get(c.seller_id) ?? null,
+        }));
+        return await attachLastMessage(enriched);
+      }
+      const normalised = (data ?? []).map((c: any) => ({
+        ...c,
+        listing: Array.isArray(c.listing) ? c.listing[0] : c.listing,
+        buyer: Array.isArray(c.buyer) ? c.buyer[0] : c.buyer,
+        seller: Array.isArray(c.seller) ? c.seller[0] : c.seller,
+      }));
+      return await attachLastMessage(normalised);
+    },
+  });
+
+  // Last opp signerte bilde-URLer for omslagsbilder
+  useEffect(() => {
+    if (!conversations) return;
+    const paths = conversations
+      .map((c) => {
+        const imgs = (c.listing?.listing_images ?? [])
+          .slice()
+          .sort((a, b) => a.sort_order - b.sort_order);
+        return imgs[0]?.storage_path;
+      })
+      .filter((p): p is string => !!p);
+    if (paths.length > 0) {
+      signListingImageUrls(paths).then((urls) =>
+        setImgUrls((prev) => ({ ...prev, ...urls })),
+      );
+    }
+  }, [conversations]);
+
+  // Grupper etter annonse
+  const groups = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        listing: ConversationRow["listing"];
+        conversations: ConversationRow[];
+        lastActivity: string;
+      }
+    >();
+    for (const c of conversations ?? []) {
+      const key = c.listing_id;
+      const g = map.get(key);
+      if (g) {
+        g.conversations.push(c);
+        if (c.last_message_at > g.lastActivity) g.lastActivity = c.last_message_at;
+      } else {
+        map.set(key, {
+          listing: c.listing,
+          conversations: [c],
+          lastActivity: c.last_message_at,
+        });
+      }
+    }
+    return Array.from(map.entries())
+      .map(([listingId, g]) => ({ listingId, ...g }))
+      .sort((a, b) => (a.lastActivity < b.lastActivity ? 1 : -1));
+  }, [conversations]);
+
+  return (
+    <div className="mx-auto max-w-4xl px-4 py-10">
+      <div className="flex items-center gap-3">
+        <MessageCircle className="size-6 text-accent" />
+        <h1 className="font-display text-3xl tracking-tight">Meldinger</h1>
+      </div>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Samtalene dine er gruppert etter annonse.
+      </p>
+
+      <div className="mt-8 space-y-3">
+        {isLoading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-20 animate-pulse rounded-xl bg-muted" />
+            ))}
+          </div>
+        ) : groups.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border bg-surface p-12 text-center">
+            <p className="text-lg font-medium">Ingen samtaler enda</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Når du eller noen andre starter en samtale om en annonse, dukker den opp her.
+            </p>
+            <Link to="/annonser" search={{ q: "", category: "", sort: "new" }}>
+              <Button className="mt-6">Utforsk annonser</Button>
+            </Link>
+          </div>
+        ) : (
+          groups.map((g) => {
+            const isExpanded = expanded[g.listingId] ?? true;
+            const cover = (g.listing?.listing_images ?? [])
+              .slice()
+              .sort((a, b) => a.sort_order - b.sort_order)[0];
+            const coverUrl = cover ? imgUrls[cover.storage_path] : undefined;
+            const priceLabel = g.listing?.is_free
+              ? "Gis bort"
+              : g.listing?.price_nok != null
+                ? `${g.listing.price_nok.toLocaleString("nb-NO")} kr`
+                : "Pris ved henvendelse";
+            return (
+              <div
+                key={g.listingId}
+                className="overflow-hidden rounded-xl border border-border bg-card"
+              >
+                <button
+                  type="button"
+                  onClick={() =>
+                    setExpanded((p) => ({ ...p, [g.listingId]: !isExpanded }))
+                  }
+                  className="flex w-full items-center gap-3 p-3 text-left hover:bg-muted/40"
+                >
+                  <div className="size-14 shrink-0 overflow-hidden rounded-lg bg-muted">
+                    {coverUrl ? (
+                      <img
+                        src={coverUrl}
+                        alt=""
+                        className="size-full object-cover"
+                      />
+                    ) : null}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">
+                      {g.listing?.title ?? "Slettet annonse"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {priceLabel} · {g.conversations.length}{" "}
+                      {g.conversations.length === 1 ? "samtale" : "samtaler"}
+                    </p>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {formatRelative(g.lastActivity)}
+                  </span>
+                  {isExpanded ? (
+                    <ChevronDown className="size-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="size-4 text-muted-foreground" />
+                  )}
+                </button>
+
+                {isExpanded && (
+                  <ul className="divide-y divide-border border-t border-border">
+                    {g.conversations
+                      .slice()
+                      .sort((a, b) =>
+                        a.last_message_at < b.last_message_at ? 1 : -1,
+                      )
+                      .map((c) => {
+                        const other =
+                          user?.id === c.seller_id ? c.buyer : c.seller;
+                        const lastFromMe =
+                          c.last_message?.sender_id === user?.id;
+                        return (
+                          <li key={c.id}>
+                            <Link
+                              to="/meldinger/$id"
+                              params={{ id: c.id }}
+                              className="flex items-center gap-3 p-3 hover:bg-muted/40"
+                            >
+                              {other?.avatar_url ? (
+                                <img
+                                  src={other.avatar_url}
+                                  alt=""
+                                  className="size-9 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div className="flex size-9 items-center justify-center rounded-full bg-muted text-xs font-medium">
+                                  {(other?.display_name ?? "?")
+                                    .slice(0, 1)
+                                    .toUpperCase()}
+                                </div>
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-medium">
+                                  {other?.display_name ?? "Ukjent bruker"}
+                                </p>
+                                <p className="truncate text-xs text-muted-foreground">
+                                  {c.last_message
+                                    ? `${lastFromMe ? "Du: " : ""}${c.last_message.body}`
+                                    : "Ingen meldinger enda"}
+                                </p>
+                              </div>
+                              <span className="text-xs text-muted-foreground">
+                                {formatRelative(c.last_message_at)}
+                              </span>
+                            </Link>
+                          </li>
+                        );
+                      })}
+                  </ul>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+async function attachLastMessage(
+  convs: ConversationRow[],
+): Promise<ConversationRow[]> {
+  if (convs.length === 0) return convs;
+  const ids = convs.map((c) => c.id);
+  const { data } = await supabase
+    .from("messages")
+    .select("conversation_id, body, created_at, sender_id")
+    .in("conversation_id", ids)
+    .order("created_at", { ascending: false });
+  const lastByConv = new Map<
+    string,
+    { body: string; created_at: string; sender_id: string }
+  >();
+  for (const m of data ?? []) {
+    if (!lastByConv.has(m.conversation_id)) {
+      lastByConv.set(m.conversation_id, {
+        body: m.body,
+        created_at: m.created_at,
+        sender_id: m.sender_id,
+      });
+    }
+  }
+  return convs.map((c) => ({ ...c, last_message: lastByConv.get(c.id) ?? null }));
+}
+
+function formatRelative(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const min = Math.floor(diffMs / 60000);
+  if (min < 1) return "nå";
+  if (min < 60) return `${min} min`;
+  const hours = Math.floor(min / 60);
+  if (hours < 24) return `${hours} t`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} d`;
+  return d.toLocaleDateString("nb-NO", { day: "numeric", month: "short" });
+}

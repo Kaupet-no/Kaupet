@@ -221,8 +221,8 @@ function LandingPage() {
             <div>
               <h2 className="font-display text-3xl tracking-tight md:text-4xl">Et alternativ vi bygger sammen.</h2>
               <p className="mt-3 max-w-xl opacity-90">
-              Kaupet.no bygges åpent på GitHub. Frivillige utviklere, designere og oversettere er hjertelig velkomne.
-                Sjekk åpne issues på GitHub og bli med, eller foreslå noe selv.
+                Kaupet.no bygges åpent på GitHub. Frivillige utviklere og designere er hjertelig velkomne. Sjekk «good
+                first issue» og bli med.
               </p>
             </div>
             <div className="flex flex-wrap gap-3 md:justify-end">

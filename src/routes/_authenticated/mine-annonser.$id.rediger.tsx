@@ -1,13 +1,21 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, ImagePlus, X, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { geocodeNorwayAddress } from "@/lib/geocode";
+import {
+  LISTING_BUCKET,
+  MAX_IMAGES,
+  describeImageError,
+  signListingImageUrls,
+  uploadListingImage,
+  validateImages,
+} from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -54,6 +62,10 @@ const schema = z
 
 type FormValues = z.infer<typeof schema>;
 
+type EditorItem =
+  | { kind: "existing"; key: string; storage_path: string; url?: string }
+  | { kind: "new"; key: string; file: File; previewUrl: string };
+
 export const Route = createFileRoute("/_authenticated/mine-annonser/$id/rediger")({
   head: () => ({
     meta: [{ title: "Rediger annonse — Kaupet.no" }],
@@ -83,7 +95,7 @@ function EditListingPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("listings")
-        .select("*")
+        .select("*, listing_images(id, storage_path, sort_order)")
         .eq("id", id)
         .single();
       if (error) throw error;
@@ -91,14 +103,28 @@ function EditListingPage() {
     },
   });
 
+  const formValues = useMemo<FormValues | undefined>(() => {
+    if (!listing) return undefined;
+    return {
+      title: listing.title,
+      description: listing.description ?? "",
+      category_id: listing.category_id ?? "",
+      condition: (listing.condition as FormValues["condition"]) ?? "good",
+      is_free: listing.is_free,
+      price_nok: listing.price_nok ?? "",
+      postal_code: listing.postal_code ?? "",
+      city: listing.city ?? "",
+    };
+  }, [listing]);
+
   const {
     register,
     handleSubmit,
     setValue,
     watch,
-    reset,
     formState: { errors },
   } = useForm<FormValues>({
+    values: formValues,
     defaultValues: {
       title: "",
       description: "",
@@ -111,23 +137,86 @@ function EditListingPage() {
     },
   });
 
-  useEffect(() => {
-    if (!listing) return;
-    reset({
-      title: listing.title,
-      description: listing.description ?? "",
-      category_id: listing.category_id ?? "",
-      condition: (listing.condition as FormValues["condition"]) ?? "good",
-      is_free: listing.is_free,
-      price_nok: listing.price_nok ?? "",
-      postal_code: listing.postal_code ?? "",
-      city: listing.city ?? "",
-    });
-  }, [listing, reset]);
-
   const isFree = watch("is_free");
   const categoryId = watch("category_id");
   const condition = watch("condition");
+
+  // Image editor state
+  const [items, setItems] = useState<EditorItem[]>([]);
+  const [removedPaths, setRemovedPaths] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const hydratedFor = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!listing || hydratedFor.current === listing.id) return;
+    const sorted = [...(listing.listing_images ?? [])].sort(
+      (a, b) => a.sort_order - b.sort_order,
+    );
+    const initial: EditorItem[] = sorted.map((img) => ({
+      kind: "existing",
+      key: img.storage_path,
+      storage_path: img.storage_path,
+    }));
+    setItems(initial);
+    hydratedFor.current = listing.id;
+    if (sorted.length > 0) {
+      signListingImageUrls(sorted.map((i) => i.storage_path)).then((map) => {
+        setItems((curr) =>
+          curr.map((it) =>
+            it.kind === "existing" ? { ...it, url: map[it.storage_path] } : it,
+          ),
+        );
+      });
+    }
+  }, [listing]);
+
+  useEffect(() => {
+    return () => {
+      items.forEach((it) => {
+        if (it.kind === "new") URL.revokeObjectURL(it.previewUrl);
+      });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const addFiles = (files: File[]) => {
+    const err = validateImages(files, items.length);
+    if (err) {
+      toast.error(describeImageError(err));
+      return;
+    }
+    const next: EditorItem[] = files.map((file) => ({
+      kind: "new",
+      key: crypto.randomUUID(),
+      file,
+      previewUrl: URL.createObjectURL(file),
+    }));
+    setItems((curr) => [...curr, ...next]);
+  };
+
+  const removeItem = (key: string) => {
+    setItems((curr) => {
+      const target = curr.find((i) => i.key === key);
+      if (target?.kind === "new") URL.revokeObjectURL(target.previewUrl);
+      if (target?.kind === "existing") {
+        setRemovedPaths((paths) => [...paths, target.storage_path]);
+      }
+      return curr.filter((i) => i.key !== key);
+    });
+  };
+
+  const move = (key: string, dir: -1 | 1) => {
+    setItems((curr) => {
+      const idx = curr.findIndex((i) => i.key === key);
+      if (idx < 0) return curr;
+      const newIdx = idx + dir;
+      if (newIdx < 0 || newIdx >= curr.length) return curr;
+      const copy = [...curr];
+      const [it] = copy.splice(idx, 1);
+      copy.splice(newIdx, 0, it);
+      return copy;
+    });
+  };
 
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
@@ -142,7 +231,7 @@ function EditListingPage() {
         });
       }
 
-      const { error } = await supabase
+      const { error: updErr } = await supabase
         .from("listings")
         .update({
           title: parsed.title,
@@ -160,11 +249,54 @@ function EditListingPage() {
           ...(coords ? { lat: coords.lat, lng: coords.lng } : {}),
         })
         .eq("id", id);
-      if (error) throw error;
+      if (updErr) throw updErr;
+
+      // Images: upload new files, then replace listing_images rows.
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      if (!userId) throw new Error("Du må være logget inn.");
+
+      const uploadedPaths: Record<string, string> = {};
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        if (it.kind === "new") {
+          const path = await uploadListingImage({
+            userId,
+            listingId: id,
+            index: i,
+            file: it.file,
+          });
+          uploadedPaths[it.key] = path;
+        }
+      }
+
+      // Wipe and re-insert listing_images in new order.
+      const { error: delErr } = await supabase
+        .from("listing_images")
+        .delete()
+        .eq("listing_id", id);
+      if (delErr) throw delErr;
+
+      const rows = items.map((it, idx) => ({
+        listing_id: id,
+        storage_path:
+          it.kind === "existing" ? it.storage_path : uploadedPaths[it.key],
+        sort_order: idx,
+      }));
+      if (rows.length > 0) {
+        const { error: insErr } = await supabase.from("listing_images").insert(rows);
+        if (insErr) throw insErr;
+      }
+
+      // Best-effort: delete removed files from storage.
+      if (removedPaths.length > 0) {
+        await supabase.storage.from(LISTING_BUCKET).remove(removedPaths);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-listings"] });
       queryClient.invalidateQueries({ queryKey: ["listing-edit", id] });
+      queryClient.invalidateQueries({ queryKey: ["listing", id] });
       toast.success("Endringer lagret");
       navigate({ to: "/mine-annonser" });
     },
@@ -183,13 +315,114 @@ function EditListingPage() {
     <div className="mx-auto max-w-3xl px-4 py-10">
       <h1 className="font-display text-3xl tracking-tight">Rediger annonse</h1>
       <p className="mt-1 text-muted-foreground">
-        Oppdater detaljer. Bilder kan endres ved å opprette en ny annonse.
+        Oppdater detaljer og bilder. Endringene lagres når du trykker «Lagre endringer».
       </p>
 
       <form
         onSubmit={handleSubmit((v) => mutation.mutate(v))}
         className="mt-8 space-y-8"
       >
+        {/* Images */}
+        <section className="space-y-3">
+          <Label>Bilder</Label>
+          <p className="text-xs text-muted-foreground">
+            {items.length} av {MAX_IMAGES} bilder. Første bilde er hovedbildet. Bruk
+            pilene for å endre rekkefølge.
+          </p>
+
+          {items.length > 0 && (
+            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+              {items.map((it, idx) => {
+                const src =
+                  it.kind === "existing" ? it.url : it.previewUrl;
+                return (
+                  <li
+                    key={it.key}
+                    className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted"
+                  >
+                    {src ? (
+                      <img
+                        src={src}
+                        alt={`Bilde ${idx + 1}`}
+                        className="size-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex size-full items-center justify-center">
+                        <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                      </div>
+                    )}
+                    {idx === 0 && (
+                      <span className="absolute left-2 top-2 rounded bg-primary/90 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary-foreground">
+                        Hoved
+                      </span>
+                    )}
+                    {it.kind === "new" && (
+                      <span className="absolute right-2 top-2 rounded bg-accent/90 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent-foreground">
+                        Ny
+                      </span>
+                    )}
+                    <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent p-1 opacity-0 transition group-hover:opacity-100">
+                      <div className="flex">
+                        <button
+                          type="button"
+                          onClick={() => move(it.key, -1)}
+                          className="rounded p-1 text-white hover:bg-white/20 disabled:opacity-40"
+                          disabled={idx === 0}
+                          aria-label="Flytt venstre"
+                        >
+                          <ChevronLeft className="size-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => move(it.key, 1)}
+                          className="rounded p-1 text-white hover:bg-white/20 disabled:opacity-40"
+                          disabled={idx === items.length - 1}
+                          aria-label="Flytt høyre"
+                        >
+                          <ChevronRight className="size-3.5" />
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeItem(it.key)}
+                        className="rounded p-1 text-white hover:bg-destructive"
+                        aria-label="Fjern bilde"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          <div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                const fl = e.target.files;
+                if (fl) addFiles(Array.from(fl));
+                e.target.value = "";
+              }}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={items.length >= MAX_IMAGES}
+            >
+              <ImagePlus className="size-4" />
+              Last opp bilder
+            </Button>
+          </div>
+        </section>
+
         <section className="space-y-2">
           <Label htmlFor="title">Tittel</Label>
           <Input id="title" {...register("title")} />
@@ -210,7 +443,7 @@ function EditListingPage() {
           <div className="space-y-2">
             <Label>Kategori</Label>
             <Select
-              value={categoryId}
+              value={categoryId || undefined}
               onValueChange={(v) => setValue("category_id", v, { shouldValidate: true })}
             >
               <SelectTrigger>
@@ -228,7 +461,7 @@ function EditListingPage() {
           <div className="space-y-2">
             <Label>Tilstand</Label>
             <Select
-              value={condition}
+              value={condition || undefined}
               onValueChange={(v) =>
                 setValue("condition", v as FormValues["condition"], { shouldValidate: true })
               }

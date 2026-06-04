@@ -1,70 +1,64 @@
-# Airbnb-stil kart og søk på /annonser
+# Brukermeny for innloggede brukere
 
-Implementerer Retning B: listen er primær, kartet er en glatt sidekikker, og hele søket samles i én pille-formet bar.
+Erstatter dagens "Ny annonse"-knapp + "Logg ut"-knapp i headeren med en samlet avatar-nedtrekksmeny (à la AirBnB/Finn). Legger til to nye sider: **Mine annonser** og **Profil**.
 
-## 1. Samlet søkebar (pille-stil)
+## Endringer i UI
 
-Erstatter dagens to rader (søk+kategori+sortering, så lokasjon under) med én container `rounded-full border bg-background shadow-sm` med segmenter delt av tynne `border-l`:
+### 1. Header (`src/components/site-header.tsx`)
+For innloggede brukere vises:
+- Favoritter (hjerte-ikon) — beholdes
+- Meldinger-ikon — beholdes (disabled inntil videre)
+- **Ny annonse**-knapp — beholdes som primær CTA
+- **Avatar-knapp** med nedtrekksmeny (erstatter "Logg ut"-knappen)
 
-```
-[ 🔍 Hva  ] | [ 📍 Hvor ] | [ ⊙ Radius ] | [ Kategori ] | [ Sortering ] [Søk-knapp]
-```
+Avataren henter `avatar_url` + `display_name` fra `profiles`-tabellen via en liten `useQuery`. Faller tilbake til initialer hvis ingen avatar.
 
-- **Hva**: inline input, samme oppførsel som i dag.
-- **Hvor**: Popover som åpner Nominatim-autocomplete + "Min posisjon" + "Tegn på kart"-snarvei.
-- **Radius**: Popover med slider 1–100 km. Disabled (grået ut + tooltip "Velg sted først") til lat/lng finnes. Viser "10 km" som etikett.
-- **Kategori / Sortering**: Popover med radio-liste i stedet for native `<select>` for konsistent stil.
-- På mobil kollapser baren til ett trykk → bottom-sheet med samme felter stablet vertikalt (Airbnb mobile mønster).
+Nedtrekksmeny (shadcn `DropdownMenu`):
+- **Min profil** → `/profil`
+- **Mine annonser** → `/mine-annonser`
+- **Ny annonse** → `/ny-annonse`
+- **Favoritter** → `/favoritter`
+- ── separator ──
+- **Kontoinnstillinger** → `/profil/innstillinger`
+- **Logg ut**
 
-Eksisterende `LocationFilter`-komponent splittes i to mindre stykker (`LocationPicker`, `RadiusPicker`) som kan brukes i den nye baren.
+### 2. Ny side: Mine annonser (`src/routes/_authenticated/mine-annonser.tsx`)
+Lister alle annonser der `seller_id = auth.uid()`, gruppert/filtrert på status (aktiv, utkast, solgt/arkivert). Hver rad viser bilde, tittel, pris, status, visninger og handlinger:
+- **Rediger** → `/mine-annonser/$id/rediger` (gjenbruker skjemaet fra `ny-annonse.tsx`)
+- **Marker som solgt** / **Reaktiver** (oppdaterer `status`)
+- **Slett** (med bekreftelses-dialog)
 
-## 2. Kart-stil og pins
+### 3. Ny side: Profil (`src/routes/_authenticated/profil.tsx`)
+To faner / seksjoner:
+- **Profilinfo**: rediger `display_name`, `bio`, `location`, `avatar_url` (gjenbruker `ImageUploader` for avatar).
+- **Konto** (kan være egen rute `/profil/innstillinger` eller seksjon på samme side):
+  - Endre e-post via `supabase.auth.updateUser({ email })` — Supabase sender bekreftelses-e-post.
+  - Endre passord via `supabase.auth.updateUser({ password })` med bekreftelse.
+  - Logg ut-knapp.
 
-`listings-map.tsx`:
-- Bytt tile-layer til **CartoDB Positron** (`https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png`) med riktig attribusjon — lys, minimalistisk, matcher resten av siden.
-- **Pris-pins** via `L.divIcon`: liten rounded-full kapsel med pris, hvit bakgrunn, primary border, myk skygge. "Gis bort" får accent-farge. Bruker design tokens (`hsl(var(--primary))`, `--shadow-elegant`).
-- Hover på pin → kapsel vokser litt og hever skygge; aktiv (klikket) pin får solid primary-fyll.
-- Popup erstattes med custom card-popup: bilde 16:9, tittel, pris, "Se annonse"-knapp i samme stil som `ListingCard`.
-- Sentrum-markøren beholdes som i dag, radius-sirkel får lavere opacity.
+### 4. Ny side: Rediger annonse (`src/routes/_authenticated/mine-annonser.$id.rediger.tsx`)
+Refaktorerer felles skjema fra `ny-annonse.tsx` ut i en delt komponent `<ListingForm mode="create" | "edit" />` slik at samme skjema brukes til både opprettelse og redigering. Geokoding kjøres på nytt hvis postnummer/by endres.
 
-## 3. Liste ↔ kart synkronisering
+## Tekniske detaljer
 
-- Hover på `ListingCard` → tilhørende pin highlightes (via et delt `hoveredId` state lokalt i `BrowsePage`).
-- Hover/klikk på pin → tilhørende kort scrollet inn i view og highlightet.
-- Implementeres med to enkle props: `hoveredId`, `onHoverChange` på `ListingsMap` og `ListingCard`.
+- Bruker eksisterende `DropdownMenu`, `Avatar`, `Dialog`, `Tabs` fra shadcn (legges til om de mangler).
+- Alle nye ruter ligger under `_authenticated/` så de arver auth-gaten.
+- Datahenting via `useQuery` mot `supabase` (browser-client, RLS sørger for at brukeren kun ser egne annonser/profil).
+- Mutasjoner via `useMutation` + `queryClient.invalidateQueries`.
+- Ingen DB-endringer nødvendig — `profiles`, `listings`, og `auth.users` dekker alt.
+- Følger eksisterende designtokens i `src/styles.css` (ingen hardkodede farger).
 
-## 4. "Utvid kart" + mobil FAB
+## Filer som opprettes / endres
 
-- Desktop: liten "⤢ Utvid kart"-knapp øverst til høyre i kartcontaineren → åpner `Dialog` med fullbredde-kart (90vw × 85vh) som inkluderer en "Søk i dette området"-knapp som flyter øverst.
-- Mobil: dagens "Vis kart"-knapp blir en **flytende FAB** nederst til høyre (`fixed bottom-4 right-4 rounded-full shadow-lg`) med kart-ikon + "Kart"-tekst. Åpner samme `Sheet` som i dag.
+**Nye:**
+- `src/components/user-menu.tsx` (avatar + dropdown)
+- `src/components/listing-form.tsx` (delt skjema)
+- `src/routes/_authenticated/mine-annonser.tsx`
+- `src/routes/_authenticated/mine-annonser.$id.rediger.tsx`
+- `src/routes/_authenticated/profil.tsx`
 
-## 5. "Søk i dette området"-knapp
+**Endres:**
+- `src/components/site-header.tsx` (bytt ut Logg ut-knapp med `<UserMenu />`)
+- `src/routes/_authenticated/ny-annonse.tsx` (bruker `<ListingForm />`)
 
-Felles for utvidet kart-dialog og desktop-kart:
-- Når brukeren panner kartet > ~500 m fra forrige senter, vises en flytende knapp øverst sentrert: "Søk i dette området".
-- Klikk = oppdaterer `lat`/`lng` til kartets senter, beholder eksisterende radius.
-- Implementeres ved å lytte på Leaflet `moveend` og sammenligne med forrige senter (Haversine).
-
-## 6. Visuell polish
-
-- Søkebar: `rounded-full`, `shadow-sm` hvilende, `shadow-md` på hover/fokus, divider mellom segmenter er `border-l border-border/60`.
-- Kart-container: `rounded-2xl` (i dag `rounded-xl`), tynnere border, samme `--shadow-elegant`.
-- Tomtilstand: behold dagens design men legg til en "Nullstill filtre"-knapp.
-
-## Filer som endres
-
-- `src/routes/annonser.tsx` — ny header med pille-bar, hover-state, dialog + FAB.
-- `src/components/listings-map.tsx` — Positron tiles, pris-pins, custom popup, hoveredId, moveend-knapp.
-- `src/components/location-filter.tsx` — refaktoreres til `LocationPicker` + `RadiusPicker` (popovers).
-- Ny: `src/components/search-bar.tsx` — pille-containeren som komponerer alle delene.
-
-## Tekniske notater
-
-- Ingen nye npm-pakker nødvendig. `leaflet.markercluster` skippes i denne runden — pris-pins er ofte unike nok med dagens 60-rad-limit.
-- Beholder lazy-loading av kartet og `mounted`-guarden.
-- Alle farger via CSS-variabler (`--primary`, `--accent`, `--surface`) — ingen hardkodede hex.
-
-## Spørsmål før jeg går videre
-
-1. CartoDB Positron som ny tile-stil (lys og minimal) er greit? Alternativet er Stadia Alidade Smooth som er litt varmere.
-2. Skal `Hva`-feltet søke automatisk mens du skriver (debounced), eller beholde "trykk Enter / Søk-knapp" som nå?
+Si fra om du vil ha kontoinnstillinger som egen side (`/profil/innstillinger`) eller som fane på profilsiden — jeg foreslår fane for færre klikk.

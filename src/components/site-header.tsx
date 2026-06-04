@@ -1,8 +1,8 @@
 import { Link } from "@tanstack/react-router";
-import { Plus, Heart, MessageCircle } from "lucide-react";
+import { Plus, MessageCircle } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { UserMenu } from "@/components/user-menu";
 
 export function SiteHeader() {
   const { user } = useAuth();
@@ -37,26 +37,15 @@ export function SiteHeader() {
         <div className="ml-auto flex items-center gap-2">
           {user ? (
             <>
-              <Link to="/favoritter">
-                <Button variant="ghost" size="icon" aria-label="Favoritter">
-                  <Heart className="size-5" />
-                </Button>
-              </Link>
               <Button variant="ghost" size="icon" aria-label="Meldinger" disabled>
                 <MessageCircle className="size-5" />
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => supabase.auth.signOut()}
-              >
-                Logg ut
               </Button>
               <Link to="/ny-annonse">
                 <Button size="sm">
                   <Plus className="size-4" /> Ny annonse
                 </Button>
               </Link>
+              <UserMenu userId={user.id} email={user.email ?? null} />
             </>
           ) : (
             <>

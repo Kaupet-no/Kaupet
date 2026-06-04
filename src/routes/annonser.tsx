@@ -291,7 +291,9 @@ function BrowsePage() {
             <SheetHeader>
               <SheetTitle>Kart</SheetTitle>
             </SheetHeader>
-            <div className="mt-4 h-[calc(100%-3rem)]">{mapNode}</div>
+            <div className="mt-4 h-[calc(100%-3rem)]">
+              {mobileMapOpen ? mapNode : null}
+            </div>
           </SheetContent>
         </Sheet>
       </div>

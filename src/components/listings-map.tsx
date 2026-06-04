@@ -87,16 +87,24 @@ function makePricePin(l: MapListing, opts: { hovered: boolean; active: boolean }
   });
 }
 
-function CenterUpdater({ center }: { center: { lat: number; lng: number } | null }) {
+function CenterUpdater({
+  center,
+  radiusKm,
+}: {
+  center: { lat: number; lng: number } | null;
+  radiusKm: number;
+}) {
   const map = useMap();
   const last = useRef<string>("");
   useEffect(() => {
     if (!center) return;
-    const key = `${center.lat.toFixed(5)},${center.lng.toFixed(5)}`;
+    const key = `${center.lat.toFixed(5)},${center.lng.toFixed(5)},${radiusKm}`;
     if (key === last.current) return;
     last.current = key;
-    map.setView([center.lat, center.lng], map.getZoom() ?? 11, { animate: true });
-  }, [center, map]);
+    // Tilpass kartet slik at hele radius-sirkelen synes med litt luft rundt.
+    const bounds = L.latLng(center.lat, center.lng).toBounds(radiusKm * 1000 * 2.2);
+    map.fitBounds(bounds, { animate: true, padding: [20, 20] });
+  }, [center, radiusKm, map]);
   return null;
 }
 
@@ -175,7 +183,7 @@ export function ListingsMap({
           url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
           subdomains="abcd"
         />
-        <CenterUpdater center={center} />
+        <CenterUpdater center={center} radiusKm={radiusKm} />
         <ClickHandler onClick={onCenterChange} />
         {onAreaSearch && <AreaSearchTracker center={center} onShow={setAreaCenter} />}
         {center && (

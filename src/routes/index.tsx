@@ -1,29 +1,189 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { ArrowRight, Heart, MapPin, ShieldCheck, Sparkles } from "lucide-react";
+import { z } from "zod";
 
-export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title: "Your App" },
-      { name: "description", content: "Replace this with a one-sentence description of your app." },
-      { property: "og:title", content: "Your App" },
-      { property: "og:description", content: "Replace this with a one-sentence description of your app." },
-    ],
-  }),
-  component: Index,
+import heroImage from "@/assets/hero.jpg";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+
+const searchSchema = z.object({
+  q: z.string().optional().default(""),
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
+export const Route = createFileRoute("/")({
+  validateSearch: searchSchema,
+  head: () => ({
+    meta: [
+      { title: "Kaupet.no — Kjøp og selg brukte ting i Norge" },
+      {
+        name: "description",
+        content:
+          "Norges åpne markedsplass for brukt. Finn møbler, elektronikk, klær og mer fra naboer over hele landet. Gratis, åpen kildekode.",
+      },
+    ],
+  }),
+  component: LandingPage,
+});
+
+function LandingPage() {
+  const { data: categories } = useQuery({
+    queryKey: ["categories"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("categories")
+        .select("id, slug, name_nb")
+        .order("sort_order");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
+    <div>
+      {/* Hero */}
+      <section className="relative overflow-hidden bg-surface">
+        <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-16 md:grid-cols-[1.1fr_1fr] md:py-24">
+          <div className="space-y-6">
+            <span className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground">
+              <Sparkles className="size-3 text-accent" /> Åpen kildekode · Bygget av fellesskapet
+            </span>
+            <h1 className="font-display text-5xl leading-[1.05] tracking-tight md:text-6xl">
+              Gi tingene dine{" "}
+              <span className="italic text-accent">et nytt liv</span>.
+            </h1>
+            <p className="max-w-lg text-lg text-muted-foreground">
+              Kaupet.no er en norsk markedsplass for brukte ting mellom privatpersoner.
+              Ingen mellomledd, ingen reklame — bare deg, naboen din, og en god handel.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Link to="/auth" search={{ mode: "signup" }}>
+                <Button size="lg" className="gap-2">
+                  Kom i gang gratis <ArrowRight className="size-4" />
+                </Button>
+              </Link>
+              <a
+                href="https://github.com"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex"
+              >
+                <Button size="lg" variant="outline">
+                  Se koden på GitHub
+                </Button>
+              </a>
+            </div>
+            <dl className="flex gap-8 pt-4 text-sm">
+              <div>
+                <dt className="text-muted-foreground">Lisens</dt>
+                <dd className="font-display text-xl">MIT</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Marked</dt>
+                <dd className="font-display text-xl">Norge 🇳🇴</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Pris</dt>
+                <dd className="font-display text-xl">Gratis</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div className="relative">
+            <div className="absolute -inset-4 -z-10 rounded-3xl bg-accent/10 blur-2xl" />
+            <img
+              src={heroImage}
+              alt="Naboer som bytter brukte ting foran nordiske trehus"
+              width={1536}
+              height={1024}
+              className="rounded-2xl border border-border shadow-xl"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Categories */}
+      <section className="mx-auto max-w-6xl px-4 py-16">
+        <div className="mb-8 flex items-end justify-between">
+          <div>
+            <h2 className="font-display text-3xl tracking-tight">Utforsk kategorier</h2>
+            <p className="mt-1 text-muted-foreground">
+              Bla gjennom det folk i nærheten selger akkurat nå.
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {(categories ?? []).map((cat) => (
+            <button
+              key={cat.id}
+              type="button"
+              className="group flex items-center justify-between rounded-xl border border-border bg-card px-4 py-5 text-left transition hover:border-primary hover:shadow-sm"
+            >
+              <span className="font-medium">{cat.name_nb}</span>
+              <ArrowRight className="size-4 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
+            </button>
+          ))}
+          {!categories && (
+            <div className="col-span-full text-sm text-muted-foreground">Laster kategorier…</div>
+          )}
+        </div>
+      </section>
+
+      {/* How it works */}
+      <section className="bg-surface">
+        <div className="mx-auto max-w-6xl px-4 py-16">
+          <h2 className="font-display text-3xl tracking-tight">Slik fungerer det</h2>
+          <div className="mt-8 grid gap-6 md:grid-cols-3">
+            {[
+              {
+                icon: Heart,
+                title: "Finn noe du liker",
+                body: "Søk etter brukte skatter fra hele Norge — eller bare nabolaget ditt.",
+              },
+              {
+                icon: MapPin,
+                title: "Møt selgeren",
+                body: "Send en melding, avtal henting lokalt eller post i posten.",
+              },
+              {
+                icon: ShieldCheck,
+                title: "Trygt og åpent",
+                body: "All koden er åpen kildekode. Du ser nøyaktig hvordan dataene dine håndteres.",
+              },
+            ].map((item) => (
+              <div key={item.title} className="rounded-2xl border border-border bg-card p-6">
+                <div className="mb-4 flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <item.icon className="size-5" />
+                </div>
+                <h3 className="font-display text-xl">{item.title}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">{item.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Open source CTA */}
+      <section className="mx-auto max-w-6xl px-4 py-20">
+        <div className="overflow-hidden rounded-3xl border border-border bg-primary px-8 py-12 text-primary-foreground md:px-16 md:py-16">
+          <div className="grid items-center gap-8 md:grid-cols-[1.5fr_1fr]">
+            <div>
+              <h2 className="font-display text-3xl tracking-tight md:text-4xl">
+                Et alternativ vi eier sammen.
+              </h2>
+              <p className="mt-3 max-w-xl opacity-90">
+                Kaupet.no bygges åpent på GitHub. Frivillige utviklere, designere og
+                oversettere er hjertelig velkomne. Sjekk «good first issue» og bli med.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3 md:justify-end">
+              <a href="https://github.com" target="_blank" rel="noreferrer">
+                <Button size="lg" variant="secondary">Bidra på GitHub</Button>
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

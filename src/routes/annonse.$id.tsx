@@ -464,6 +464,9 @@ function ListingDetailPage() {
               <div className="h-full w-full animate-pulse bg-muted" />
             )}
           </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Lokasjonen er omtrentlig. Gjenstanden befinner seg ikke nødvendigvis innenfor det markerte området.
+          </p>
         </section>
       )}
 

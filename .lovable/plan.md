@@ -1,14 +1,1 @@
-## Endring
-
-Oppdatere teksten i fotnoten (`src/routes/__root.tsx`, linje 153-161) fra dagens:
-
-> Personvern · Kun nødvendige cookies — ingen sporing.
-
-til brukerens foretrukne ordlyd:
-
-> Ditt personvern på internett er viktig. Kaupet.no benytter derfor ingen sporende cookies eller tredjeparts analyseverktøy. Les vår personvernerklæring her.
-
-Lenken «her» peker til `/personvern`. Resten av siden (copyright, AGPL-merke, layout) beholdes uendret.
-
-## Filer
-- `src/routes/__root.tsx` — én tekstlig endring i footeren.
+Update the footer in `src/routes/__root.tsx` so the text "AGPL-3.0" becomes a clickable link to https://www.gnu.org/licenses/agpl-3.0.html. The rest of the footer text and layout remain unchanged.

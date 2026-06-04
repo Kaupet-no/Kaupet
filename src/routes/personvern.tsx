@@ -132,6 +132,24 @@ function PersonvernPage() {
         </section>
 
         <section>
+          <h2 className="font-display text-2xl">Sletting av brukerkonto</h2>
+          <p className="mt-3">
+            Du kan slette kontoen din når som helst fra{" "}
+            <strong>Profil → Kontoinnstillinger</strong>. Av sikkerhetshensyn
+            settes kontoen først som <em>inaktiv</em> i 7 dager. I denne
+            perioden kan du logge inn igjen for å angre slettingen. Etter 7
+            dager fjernes kontoen permanent fra systemet.
+          </p>
+          <p className="mt-3">
+            For å bevare samtalehistorikken for andre brukere blir profilen din{" "}
+            <strong>anonymisert</strong> ved permanent sletting: navn,
+            profilbilde, bio og lokasjon fjernes, og du vises som "Slettet
+            bruker" i tidligere meldinger. Annonsene dine slettes. E-postadresse
+            og innloggingsdata fjernes fullstendig.
+          </p>
+        </section>
+
+        <section>
           <h2 className="font-display text-2xl">Tredjeparter</h2>
           <ul className="mt-3 space-y-2 list-disc pl-5">
             <li>
@@ -144,8 +162,10 @@ function PersonvernPage() {
               henting av skrifttypene.
             </li>
             <li>
-              <strong>CartoDB</strong> — kartfliser for visning av lokasjon på
-              annonser.
+              <strong>OpenStreetMap / CARTO</strong> — kartfliser og
+              adressesøk (Nominatim) for visning og geokoding av lokasjon på
+              annonser. IP-adressen din blir synlig for disse tjenestene når
+              kart eller adressesøk brukes.
             </li>
           </ul>
         </section>

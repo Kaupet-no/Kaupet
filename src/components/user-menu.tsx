@@ -25,6 +25,7 @@ function initials(name: string | null | undefined, fallback: string) {
 
 export function UserMenu({ userId, email }: { userId: string; email: string | null }) {
   const navigate = useNavigate();
+  const { data: isAdmin } = useIsAdmin();
 
   const { data: profile } = useQuery({
     queryKey: ["profile-menu", userId],

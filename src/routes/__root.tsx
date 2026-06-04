@@ -136,9 +136,26 @@ function RootComponent() {
         router.invalidate();
         queryClient.invalidateQueries();
       }
+      if (event === "SIGNED_IN") {
+        // Cancel pending account deletion if the user signs back in
+        void (async () => {
+          try {
+            const { data } = await supabase.rpc("cancel_account_deletion");
+            if (data === true) {
+              const { toast } = await import("sonner");
+              toast.success(
+                "Velkommen tilbake! Slettingen av kontoen din er avbrutt.",
+              );
+            }
+          } catch {
+            // ignore
+          }
+        })();
+      }
     });
     return () => subscription.unsubscribe();
   }, [router, queryClient]);
+
 
   return (
     <QueryClientProvider client={queryClient}>

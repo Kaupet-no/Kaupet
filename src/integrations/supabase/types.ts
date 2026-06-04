@@ -334,11 +334,90 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      admin_find_users_by_email: {
+        Args: { _query: string }
+        Returns: {
+          created_at: string
+          display_name: string
+          email: string
+          is_admin: boolean
+          user_id: string
+        }[]
+      }
+      admin_grant_role: { Args: { _user_id: string }; Returns: undefined }
+      admin_overview_stats: {
+        Args: never
+        Returns: {
+          active_listings: number
+          conversations_total: number
+          new_users_30d: number
+          total_listings: number
+          views_30d: number
+          views_7d: number
+        }[]
+      }
+      admin_popular_categories: {
+        Args: never
+        Returns: {
+          id: string
+          listing_count: number
+          name_nb: string
+          slug: string
+          view_count: number
+        }[]
+      }
+      admin_popular_listings: {
+        Args: { _limit?: number }
+        Returns: {
+          created_at: string
+          favorite_count: number
+          id: string
+          status: Database["public"]["Enums"]["listing_status"]
+          title: string
+          view_count: number
+        }[]
+      }
+      admin_revoke_role: { Args: { _user_id: string }; Returns: undefined }
+      admin_views_timeseries: {
+        Args: { _days?: number }
+        Returns: {
+          day: string
+          views: number
+        }[]
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       listing_stats: {
         Args: { _listing_id: string }
         Returns: {
@@ -356,6 +435,7 @@ export type Database = {
       }
     }
     Enums: {
+      app_role: "admin" | "user"
       listing_condition:
         | "new"
         | "like_new"
@@ -490,6 +570,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "user"],
       listing_condition: ["new", "like_new", "good", "acceptable", "for_parts"],
       listing_status: ["draft", "active", "sold", "archived"],
     },

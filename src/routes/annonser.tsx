@@ -461,7 +461,7 @@ function BrowsePage() {
         onApply={(v) => {
           const c = valueToCriteria(v);
           navigate({
-            search: (prev) => ({
+            search: (prev: z.infer<typeof searchSchema>) => ({
               ...prev,
               q: (c.terms ?? []).join(" "),
               qMode: c.qMode,

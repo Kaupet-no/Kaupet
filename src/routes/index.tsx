@@ -76,7 +76,7 @@ function LandingPage() {
             <dl className="flex gap-8 pt-4 text-sm">
               <div>
                 <dt className="text-muted-foreground">Lisens</dt>
-                <dd className="font-display text-xl">MIT</dd>
+                <dd className="font-display text-xl">AGPL-3.0</dd>
               </div>
               <div>
                 <dt className="text-muted-foreground">Marked</dt>
@@ -114,14 +114,15 @@ function LandingPage() {
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {(categories ?? []).map((cat) => (
-            <button
+            <Link
               key={cat.id}
-              type="button"
+              to="/annonser"
+              search={{ q: "", category: cat.slug, sort: "new" }}
               className="group flex items-center justify-between rounded-xl border border-border bg-card px-4 py-5 text-left transition hover:border-primary hover:shadow-sm"
             >
               <span className="font-medium">{cat.name_nb}</span>
               <ArrowRight className="size-4 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
-            </button>
+            </Link>
           ))}
           {!categories && (
             <div className="col-span-full text-sm text-muted-foreground">Laster kategorier…</div>

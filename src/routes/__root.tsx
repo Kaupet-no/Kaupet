@@ -144,7 +144,7 @@ function RootComponent() {
         </main>
         <footer className="border-t border-border bg-surface">
           <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-            <p>© {new Date().getFullYear()} Kaupet.no — åpen kildekode, MIT-lisens.</p>
+            <p>© {new Date().getFullYear()} Kaupet.no — åpen kildekode, AGPL-3.0.</p>
             <p>Drevet av fellesskapet · Bidra på GitHub</p>
           </div>
         </footer>

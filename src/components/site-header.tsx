@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Search, Plus, Heart, MessageCircle, User as UserIcon } from "lucide-react";
+import { Plus, Heart, MessageCircle } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -20,14 +20,18 @@ export function SiteHeader() {
 
         <nav className="hidden flex-1 items-center gap-6 md:flex">
           <Link
-            to="/"
-            search={{ q: "" }}
+            to="/annonser"
+            search={{ q: "", category: "", sort: "new" }}
             className="text-sm text-muted-foreground hover:text-foreground"
           >
             Utforsk
           </Link>
-          <span className="text-sm text-muted-foreground/50">Kategorier</span>
-          <span className="text-sm text-muted-foreground/50">Om Kaupet</span>
+          <Link
+            to="/"
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            Hjem
+          </Link>
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
@@ -39,9 +43,6 @@ export function SiteHeader() {
               <Button variant="ghost" size="icon" aria-label="Meldinger" disabled>
                 <MessageCircle className="size-5" />
               </Button>
-              <Button size="sm" variant="secondary" disabled>
-                <UserIcon className="size-4" /> Min side
-              </Button>
               <Button
                 size="sm"
                 variant="ghost"
@@ -49,9 +50,11 @@ export function SiteHeader() {
               >
                 Logg ut
               </Button>
-              <Button size="sm" disabled>
-                <Plus className="size-4" /> Ny annonse
-              </Button>
+              <Link to="/ny-annonse">
+                <Button size="sm">
+                  <Plus className="size-4" /> Ny annonse
+                </Button>
+              </Link>
             </>
           ) : (
             <>

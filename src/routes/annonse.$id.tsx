@@ -332,7 +332,7 @@ function ListingDetailPage() {
 
           <div className="rounded-xl border border-border bg-card p-4">
             <div className="flex items-center gap-3">
-              {seller?.avatar_url ? (
+              {user && seller?.avatar_url ? (
                 <img
                   src={seller.avatar_url}
                   alt=""
@@ -344,18 +344,27 @@ function ListingDetailPage() {
                 </div>
               )}
               <div className="text-sm">
-                <p className="font-medium">{seller?.display_name ?? "Selger"}</p>
-                {seller?.created_at && (
-                  <p className="text-xs text-muted-foreground">
-                    Medlem siden{" "}
-                    {new Date(seller.created_at).toLocaleDateString("nb-NO", {
-                      month: "long",
-                      year: "numeric",
-                    })}
+                {user ? (
+                  <>
+                    <p className="font-medium">{seller?.display_name ?? "Selger"}</p>
+                    {seller?.created_at && (
+                      <p className="text-xs text-muted-foreground">
+                        Medlem siden{" "}
+                        {new Date(seller.created_at).toLocaleDateString("nb-NO", {
+                          month: "long",
+                          year: "numeric",
+                        })}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-muted-foreground">
+                    Logg inn for å se informasjon om selger
                   </p>
                 )}
               </div>
             </div>
+
             {!isOwner && (
               <Button
                 className="mt-4 w-full gap-2"

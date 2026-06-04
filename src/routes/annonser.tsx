@@ -68,7 +68,24 @@ function BrowsePage() {
         .eq("status", "active");
 
       if (search.q) {
-        qb = qb.textSearch("search_vector", search.q, { config: "norwegian" });
+        const terms = search.q
+          .trim()
+          .split(/\s+/)
+          .filter((t) => t.length > 0)
+          .map((t) => t.replace(/[%_,()]/g, " ").trim())
+          .filter(Boolean);
+        if (terms.length > 0) {
+          // Substring-match (case-insensitive) on title, description and city
+          // for each term, så «sykkel» også treffer «sparkesykkel».
+          // Alle termer må matche (AND), men hver term kan matche i hvilket
+          // som helst av feltene (OR).
+          for (const term of terms) {
+            const pattern = `%${term}%`;
+            qb = qb.or(
+              `title.ilike.${pattern},description.ilike.${pattern},city.ilike.${pattern}`,
+            );
+          }
+        }
       }
       if (search.category) {
         const cat = categories?.find((c) => c.slug === search.category);

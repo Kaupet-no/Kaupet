@@ -138,11 +138,12 @@ function BrowsePage() {
   }, [search.categories, search.category]);
 
   // Build terms list from `q` (space-separated)
-  const terms = useMemo(() => {
-    return (search.q ?? "")
+  const terms = useMemo<string[]>(() => {
+    const q: string = search.q ?? "";
+    return q
       .trim()
       .split(/\s+/)
-      .map((t) => t.replace(/[%_,()]/g, " ").trim())
+      .map((t: string) => t.replace(/[%_,()]/g, " ").trim())
       .filter(Boolean);
   }, [search.q]);
 

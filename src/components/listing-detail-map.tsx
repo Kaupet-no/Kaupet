@@ -1,13 +1,18 @@
-import { MapContainer, TileLayer, Marker } from "react-leaflet";
+import { MapContainer, TileLayer, Circle, useMap } from "react-leaflet";
+import { useEffect } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-const locationIcon = L.divIcon({
-  className: "",
-  html: `<div style="width:20px;height:20px;border-radius:9999px;background:oklch(0.5 0.02 140);border:3px solid white;box-shadow:0 0 0 3px oklch(0.5 0.02 140/0.3),0 4px 12px hsl(0 0% 0%/0.2);"></div>`,
-  iconSize: [20, 20],
-  iconAnchor: [10, 10],
-});
+const AREA_RADIUS_M = 500;
+
+function FitToCircle({ lat, lng, radius }: { lat: number; lng: number; radius: number }) {
+  const map = useMap();
+  useEffect(() => {
+    const bounds = L.latLng(lat, lng).toBounds(radius * 2.4);
+    map.fitBounds(bounds, { padding: [16, 16] });
+  }, [lat, lng, radius, map]);
+  return null;
+}
 
 type Props = {
   lat: number;
@@ -28,7 +33,18 @@ export function ListingDetailMap({ lat, lng }: Props) {
         url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
         subdomains="abcd"
       />
-      <Marker position={[lat, lng]} icon={locationIcon} />
+      <Circle
+        center={[lat, lng]}
+        radius={AREA_RADIUS_M}
+        pathOptions={{
+          color: "oklch(0.5 0.02 140)",
+          weight: 2,
+          opacity: 0.9,
+          fillColor: "oklch(0.5 0.02 140)",
+          fillOpacity: 0.15,
+        }}
+      />
+      <FitToCircle lat={lat} lng={lng} radius={AREA_RADIUS_M} />
     </MapContainer>
   );
 }

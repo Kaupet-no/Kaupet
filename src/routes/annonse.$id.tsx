@@ -65,6 +65,7 @@ function ListingDetailPage() {
   const [activeImage, setActiveImage] = useState(0);
   const [imgUrls, setImgUrls] = useState<Record<string, string>>({});
   const [mounted, setMounted] = useState(false);
+  const [statsInfoOpen, setStatsInfoOpen] = useState(false);
   useEffect(() => setMounted(true), []);
 
   const { data, isLoading } = useQuery({

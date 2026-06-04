@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
-import { Expand, Map as MapIcon } from "lucide-react";
+import { Expand, Map as MapIcon, SlidersHorizontal } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +22,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { SearchBar } from "@/components/search-bar";
+import {
+  AdvancedSearchSheet,
+  valueToCriteria,
+  type AdvancedSearchValue,
+} from "@/components/advanced-search-sheet";
 import type { LocationValue } from "@/components/location-filter";
 import type { MapListing } from "@/components/listings-map";
 import { reverseGeocode } from "@/lib/geocode";
@@ -30,9 +35,20 @@ const ListingsMap = lazy(() =>
   import("@/components/listings-map").then((m) => ({ default: m.ListingsMap })),
 );
 
+const stringArray = z.preprocess((v) => {
+  if (Array.isArray(v)) return v;
+  if (typeof v === "string" && v.length > 0) return [v];
+  return [];
+}, z.array(z.string()));
+
 const searchSchema = z.object({
   q: z.string().optional().default(""),
+  qMode: z.enum(["all", "any"]).optional().default("all"),
   category: z.string().optional().default(""),
+  categories: stringArray.optional().default([]),
+  catMode: z.enum(["all", "any"]).optional().default("any"),
+  conditions: stringArray.optional().default([]),
+  includeFree: z.coerce.boolean().optional().default(true),
   min: z.coerce.number().int().min(0).optional(),
   max: z.coerce.number().int().min(0).optional(),
   sort: z.enum(["new", "price_asc", "price_desc"]).optional().default("new"),
@@ -67,6 +83,7 @@ function BrowsePage() {
   const [isDesktop, setIsDesktop] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [advOpen, setAdvOpen] = useState(false);
 
   useEffect(() => setMounted(true), []);
   useEffect(() => {
@@ -114,10 +131,73 @@ function BrowsePage() {
     },
   });
 
+  // Merge legacy single `category` into `categories`
+  const effectiveCategories = useMemo(() => {
+    const arr = Array.isArray(search.categories) ? search.categories : [];
+    if (search.category && !arr.includes(search.category)) return [...arr, search.category];
+    return arr;
+  }, [search.categories, search.category]);
+
+  // Build terms list from `q` (space-separated)
+  const terms = useMemo<string[]>(() => {
+    const q: string = search.q ?? "";
+    return q
+      .trim()
+      .split(/\s+/)
+      .map((t: string) => t.replace(/[%_,()]/g, " ").trim())
+      .filter(Boolean);
+  }, [search.q]);
+
+  const advancedInitial: AdvancedSearchValue = useMemo(
+    () => ({
+      terms,
+      qMode: search.qMode ?? "all",
+      categories: effectiveCategories,
+      catMode: search.catMode ?? "any",
+      conditions: search.conditions ?? [],
+      min: typeof search.min === "number" ? search.min : null,
+      max: typeof search.max === "number" ? search.max : null,
+      includeFree: search.includeFree ?? true,
+      location: {
+        lat: search.lat ?? null,
+        lng: search.lng ?? null,
+        radius: search.radius ?? 10,
+        label: search.loc ?? "",
+      },
+    }),
+    [
+      terms,
+      search.qMode,
+      effectiveCategories,
+      search.catMode,
+      search.conditions,
+      search.min,
+      search.max,
+      search.includeFree,
+      search.lat,
+      search.lng,
+      search.radius,
+      search.loc,
+    ],
+  );
+
+  const advancedFilterCount =
+    (effectiveCategories.length > 0 ? 1 : 0) +
+    ((search.conditions?.length ?? 0) > 0 ? 1 : 0) +
+    (typeof search.min === "number" || typeof search.max === "number" ? 1 : 0) +
+    (search.lat != null && search.lng != null ? 1 : 0) +
+    (search.includeFree === false ? 1 : 0);
+
   const { data: listings, isLoading } = useQuery({
-    queryKey: ["listings", search, radiusIds],
+    queryKey: [
+      "listings",
+      search,
+      radiusIds,
+      effectiveCategories,
+      terms,
+    ],
     enabled:
-      (!search.category || !!categories) &&
+      (effectiveCategories.length === 0 || !!categories) &&
       (search.lat == null || search.lng == null || radiusIds != null),
     queryFn: async () => {
       let qb = supabase
@@ -133,28 +213,58 @@ function BrowsePage() {
         qb = qb.in("id", ids);
       }
 
-      if (search.q) {
-        const terms = search.q
-          .trim()
-          .split(/\s+/)
-          .filter((t: string) => t.length > 0)
-          .map((t: string) => t.replace(/[%_,()]/g, " ").trim())
-          .filter(Boolean);
-        if (terms.length > 0) {
+      // Search terms with AND/OR logic
+      if (terms.length > 0) {
+        const qMode = search.qMode ?? "all";
+        if (qMode === "all") {
           for (const term of terms) {
-            const pattern = `%${term}%`;
-            qb = qb.or(
-              `title.ilike.${pattern},description.ilike.${pattern},city.ilike.${pattern}`,
-            );
+            const p = `%${term}%`;
+            qb = qb.or(`title.ilike.${p},description.ilike.${p},city.ilike.${p}`);
           }
+        } else {
+          const parts = terms.flatMap((t: string) => {
+            const p = `%${t}%`;
+            return [`title.ilike.${p}`, `description.ilike.${p}`, `city.ilike.${p}`];
+          });
+          qb = qb.or(parts.join(","));
         }
       }
-      if (search.category) {
-        const cat = categories?.find((c) => c.slug === search.category);
-        if (cat) qb = qb.eq("category_id", cat.id);
+
+      // Categories
+      if (effectiveCategories.length > 0 && categories) {
+        const ids = categories
+          .filter((c) => effectiveCategories.includes(c.slug))
+          .map((c) => c.id);
+        if ((search.catMode ?? "any") === "all" && ids.length > 1) {
+          // A listing has only one category — AND of 2+ can't match.
+          return [];
+        }
+        if (ids.length === 0) return [];
+        qb = qb.in("category_id", ids);
       }
-      if (typeof search.min === "number") qb = qb.gte("price_nok", search.min);
-      if (typeof search.max === "number") qb = qb.lte("price_nok", search.max);
+
+      // Conditions
+      if (search.conditions && search.conditions.length > 0) {
+        qb = qb.in("condition", search.conditions);
+      }
+
+      // Price
+      const includeFree = search.includeFree ?? true;
+      if (!includeFree) qb = qb.eq("is_free", false);
+      if (typeof search.min === "number") {
+        if (includeFree) {
+          qb = qb.or(`is_free.eq.true,price_nok.gte.${search.min}`);
+        } else {
+          qb = qb.gte("price_nok", search.min);
+        }
+      }
+      if (typeof search.max === "number") {
+        if (includeFree) {
+          qb = qb.or(`is_free.eq.true,price_nok.lte.${search.max}`);
+        } else {
+          qb = qb.lte("price_nok", search.max);
+        }
+      }
 
       if (search.sort === "price_asc") qb = qb.order("price_nok", { ascending: true, nullsFirst: false });
       else if (search.sort === "price_desc") qb = qb.order("price_nok", { ascending: false, nullsFirst: false });
@@ -316,18 +426,61 @@ function BrowsePage() {
           location={location}
           onLocationChange={handleLocationChange}
           categorySlug={search.category}
-          onCategoryChange={(slug) => updateSearch({ category: slug })}
+          onCategoryChange={(slug) => updateSearch({ category: slug, categories: [] })}
           categories={categories ?? []}
           sort={search.sort}
           onSortChange={(s) => updateSearch({ sort: s })}
         />
       </div>
 
-      <div className="mt-2 flex items-center justify-between text-sm text-muted-foreground">
+      <div className="mt-2 flex items-center justify-between gap-2 text-sm text-muted-foreground">
         <span>
           {isLoading ? "Søker…" : `${cards.length} annonse${cards.length === 1 ? "" : "r"}`}
         </span>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setAdvOpen(true)}
+          className="gap-1.5"
+        >
+          <SlidersHorizontal className="size-4" /> Avansert søk
+          {advancedFilterCount > 0 && (
+            <span className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
+              {advancedFilterCount}
+            </span>
+          )}
+        </Button>
       </div>
+
+      <AdvancedSearchSheet
+        open={advOpen}
+        onOpenChange={setAdvOpen}
+        initial={advancedInitial}
+        categories={categories ?? []}
+        onApply={(v) => {
+          const c = valueToCriteria(v);
+          navigate({
+            search: (prev: z.infer<typeof searchSchema>) => ({
+              ...prev,
+              q: (c.terms ?? []).join(" "),
+              qMode: c.qMode,
+              categories: c.categories,
+              catMode: c.catMode,
+              conditions: c.conditions,
+              includeFree: c.includeFree,
+              min: c.min ?? undefined,
+              max: c.max ?? undefined,
+              lat: c.lat ?? undefined,
+              lng: c.lng ?? undefined,
+              radius: c.radius ?? undefined,
+              loc: c.loc,
+              category: "",
+            }),
+          });
+        }}
+      />
+
 
       <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_420px]">
         <div>

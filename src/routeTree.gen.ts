@@ -17,6 +17,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AnnonseIdRouteImport } from './routes/annonse.$id'
 import { Route as AuthenticatedProfilRouteImport } from './routes/_authenticated/profil'
 import { Route as AuthenticatedNyAnnonseRouteImport } from './routes/_authenticated/ny-annonse'
+import { Route as AuthenticatedMineSokRouteImport } from './routes/_authenticated/mine-sok'
 import { Route as AuthenticatedFavoritterRouteImport } from './routes/_authenticated/favoritter'
 import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authenticated/admin/route'
 import { Route as AuthenticatedMineAnnonserIndexRouteImport } from './routes/_authenticated/mine-annonser.index'
@@ -64,6 +65,11 @@ const AuthenticatedProfilRoute = AuthenticatedProfilRouteImport.update({
 const AuthenticatedNyAnnonseRoute = AuthenticatedNyAnnonseRouteImport.update({
   id: '/ny-annonse',
   path: '/ny-annonse',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedMineSokRoute = AuthenticatedMineSokRouteImport.update({
+  id: '/mine-sok',
+  path: '/mine-sok',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedFavoritterRoute = AuthenticatedFavoritterRouteImport.update({
@@ -125,6 +131,7 @@ export interface FileRoutesByFullPath {
   '/personvern': typeof PersonvernRoute
   '/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/favoritter': typeof AuthenticatedFavoritterRoute
+  '/mine-sok': typeof AuthenticatedMineSokRoute
   '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
   '/annonse/$id': typeof AnnonseIdRoute
@@ -142,6 +149,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/personvern': typeof PersonvernRoute
   '/favoritter': typeof AuthenticatedFavoritterRoute
+  '/mine-sok': typeof AuthenticatedMineSokRoute
   '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
   '/annonse/$id': typeof AnnonseIdRoute
@@ -162,6 +170,7 @@ export interface FileRoutesById {
   '/personvern': typeof PersonvernRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/_authenticated/favoritter': typeof AuthenticatedFavoritterRoute
+  '/_authenticated/mine-sok': typeof AuthenticatedMineSokRoute
   '/_authenticated/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/_authenticated/profil': typeof AuthenticatedProfilRoute
   '/annonse/$id': typeof AnnonseIdRoute
@@ -182,6 +191,7 @@ export interface FileRouteTypes {
     | '/personvern'
     | '/admin'
     | '/favoritter'
+    | '/mine-sok'
     | '/ny-annonse'
     | '/profil'
     | '/annonse/$id'
@@ -199,6 +209,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/personvern'
     | '/favoritter'
+    | '/mine-sok'
     | '/ny-annonse'
     | '/profil'
     | '/annonse/$id'
@@ -218,6 +229,7 @@ export interface FileRouteTypes {
     | '/personvern'
     | '/_authenticated/admin'
     | '/_authenticated/favoritter'
+    | '/_authenticated/mine-sok'
     | '/_authenticated/ny-annonse'
     | '/_authenticated/profil'
     | '/annonse/$id'
@@ -295,6 +307,13 @@ declare module '@tanstack/react-router' {
       path: '/ny-annonse'
       fullPath: '/ny-annonse'
       preLoaderRoute: typeof AuthenticatedNyAnnonseRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/mine-sok': {
+      id: '/_authenticated/mine-sok'
+      path: '/mine-sok'
+      fullPath: '/mine-sok'
+      preLoaderRoute: typeof AuthenticatedMineSokRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/favoritter': {
@@ -384,6 +403,7 @@ const AuthenticatedAdminRouteRouteWithChildren =
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRouteRoute: typeof AuthenticatedAdminRouteRouteWithChildren
   AuthenticatedFavoritterRoute: typeof AuthenticatedFavoritterRoute
+  AuthenticatedMineSokRoute: typeof AuthenticatedMineSokRoute
   AuthenticatedNyAnnonseRoute: typeof AuthenticatedNyAnnonseRoute
   AuthenticatedProfilRoute: typeof AuthenticatedProfilRoute
   AuthenticatedMeldingerIdRoute: typeof AuthenticatedMeldingerIdRoute
@@ -395,6 +415,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRouteRoute: AuthenticatedAdminRouteRouteWithChildren,
   AuthenticatedFavoritterRoute: AuthenticatedFavoritterRoute,
+  AuthenticatedMineSokRoute: AuthenticatedMineSokRoute,
   AuthenticatedNyAnnonseRoute: AuthenticatedNyAnnonseRoute,
   AuthenticatedProfilRoute: AuthenticatedProfilRoute,
   AuthenticatedMeldingerIdRoute: AuthenticatedMeldingerIdRoute,

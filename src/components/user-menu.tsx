@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { User, ListChecks, Plus, Heart, Settings, LogOut, Shield } from "lucide-react";
+import { User, ListChecks, Plus, Heart, Bell, Settings, LogOut, Shield } from "lucide-react";
 
 import { useIsAdmin } from "@/lib/use-is-admin";
 
@@ -83,6 +83,11 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
         <DropdownMenuItem asChild>
           <Link to="/favoritter" className="cursor-pointer">
             <Heart className="size-4" /> Favoritter
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/mine-sok" className="cursor-pointer">
+            <Bell className="size-4" /> Mine søk
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />

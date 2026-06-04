@@ -1,6 +1,6 @@
 # Bidra til Kaupet.no
 
-Tusen takk for at du vurderer å bidra! Kaupet.no er et fellesskapseid prosjekt, og hvert bidrag — fra skrivefeil til nye funksjoner — gjør tjenesten bedre for alle.
+Tusen takk for at du vurderer å bidra! Kaupet.no er et fellesskapsdrevet prosjekt, og hvert bidrag — fra skrivefeil til nye funksjoner — gjør tjenesten bedre for alle.
 
 ## Slik foreslår du en endring
 

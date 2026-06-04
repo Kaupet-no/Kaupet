@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Heart, MapPin, Search, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, Heart, MapPin, Search, ShieldCheck } from "lucide-react";
 import { z } from "zod";
 import { useRef, useState } from "react";
 import Autoplay from "embla-carousel-autoplay";
@@ -84,9 +84,6 @@ function LandingPage() {
       <section className="relative overflow-hidden bg-surface">
         <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-16 md:grid-cols-[1.05fr_1fr] md:py-24">
           <div className="space-y-6">
-            <span className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground">
-              <Sparkles className="size-3 text-accent" /> Åpen kildekode · Bygget av fellesskapet
-            </span>
             <h1 className="font-display text-5xl leading-[1.05] tracking-tight md:text-6xl">
               Gi tingene dine <span className="italic text-accent">et nytt liv</span>.
             </h1>

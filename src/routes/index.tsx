@@ -88,8 +88,7 @@ function LandingPage() {
               Gi tingene dine <span className="italic text-accent">et nytt liv</span>.
             </h1>
             <p className="max-w-lg text-lg text-muted-foreground">
-              Kaupet.no er en norsk markedsplass for brukte ting mellom privatpersoner. Ingen mellomledd, ingen reklame
-              — bare deg, naboen din, og en god handel.
+              Kaupet.no er en norsk markedsplass for brukte ting mellom privatpersoner. Ingen mellomledd, ingen reklame.
             </p>
 
             <form onSubmit={submitSearch} className="flex max-w-lg gap-2">

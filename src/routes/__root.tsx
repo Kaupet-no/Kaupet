@@ -162,7 +162,7 @@ function RootComponent() {
               .
             </p>
             <p className="sm:max-w-xl sm:text-right">
-              Ditt personvern på internett er viktig. Kaupet.no benytter derfor ingen sporende cookies eller tredjeparts analyseverktøy. Les vår{" "}
+              Ditt personvern på internett er viktig. Kaupet.no benytter derfor ingen sporende informasjonskapsler eller tredjeparts analyseverktøy. Les vår{" "}
               <Link to="/personvern" className="underline hover:text-foreground transition-colors">
                 personvernerklæring her
               </Link>

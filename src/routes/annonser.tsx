@@ -130,10 +130,32 @@ function BrowsePage() {
     },
   });
 
+  // Merge legacy single `category` into `categories`
+  const effectiveCategories = useMemo(() => {
+    const arr = Array.isArray(search.categories) ? search.categories : [];
+    if (search.category && !arr.includes(search.category)) return [...arr, search.category];
+    return arr;
+  }, [search.categories, search.category]);
+
+  // Build terms list from `q` (space-separated)
+  const terms = useMemo(() => {
+    return (search.q ?? "")
+      .trim()
+      .split(/\s+/)
+      .map((t) => t.replace(/[%_,()]/g, " ").trim())
+      .filter(Boolean);
+  }, [search.q]);
+
   const { data: listings, isLoading } = useQuery({
-    queryKey: ["listings", search, radiusIds],
+    queryKey: [
+      "listings",
+      search,
+      radiusIds,
+      effectiveCategories,
+      terms,
+    ],
     enabled:
-      (!search.category || !!categories) &&
+      (effectiveCategories.length === 0 || !!categories) &&
       (search.lat == null || search.lng == null || radiusIds != null),
     queryFn: async () => {
       let qb = supabase
@@ -149,28 +171,58 @@ function BrowsePage() {
         qb = qb.in("id", ids);
       }
 
-      if (search.q) {
-        const terms = search.q
-          .trim()
-          .split(/\s+/)
-          .filter((t: string) => t.length > 0)
-          .map((t: string) => t.replace(/[%_,()]/g, " ").trim())
-          .filter(Boolean);
-        if (terms.length > 0) {
+      // Search terms with AND/OR logic
+      if (terms.length > 0) {
+        const qMode = search.qMode ?? "all";
+        if (qMode === "all") {
           for (const term of terms) {
-            const pattern = `%${term}%`;
-            qb = qb.or(
-              `title.ilike.${pattern},description.ilike.${pattern},city.ilike.${pattern}`,
-            );
+            const p = `%${term}%`;
+            qb = qb.or(`title.ilike.${p},description.ilike.${p},city.ilike.${p}`);
           }
+        } else {
+          const parts = terms.flatMap((t) => {
+            const p = `%${t}%`;
+            return [`title.ilike.${p}`, `description.ilike.${p}`, `city.ilike.${p}`];
+          });
+          qb = qb.or(parts.join(","));
         }
       }
-      if (search.category) {
-        const cat = categories?.find((c) => c.slug === search.category);
-        if (cat) qb = qb.eq("category_id", cat.id);
+
+      // Categories
+      if (effectiveCategories.length > 0 && categories) {
+        const ids = categories
+          .filter((c) => effectiveCategories.includes(c.slug))
+          .map((c) => c.id);
+        if ((search.catMode ?? "any") === "all" && ids.length > 1) {
+          // A listing has only one category — AND of 2+ can't match.
+          return [];
+        }
+        if (ids.length === 0) return [];
+        qb = qb.in("category_id", ids);
       }
-      if (typeof search.min === "number") qb = qb.gte("price_nok", search.min);
-      if (typeof search.max === "number") qb = qb.lte("price_nok", search.max);
+
+      // Conditions
+      if (search.conditions && search.conditions.length > 0) {
+        qb = qb.in("condition", search.conditions);
+      }
+
+      // Price
+      const includeFree = search.includeFree ?? true;
+      if (!includeFree) qb = qb.eq("is_free", false);
+      if (typeof search.min === "number") {
+        if (includeFree) {
+          qb = qb.or(`is_free.eq.true,price_nok.gte.${search.min}`);
+        } else {
+          qb = qb.gte("price_nok", search.min);
+        }
+      }
+      if (typeof search.max === "number") {
+        if (includeFree) {
+          qb = qb.or(`is_free.eq.true,price_nok.lte.${search.max}`);
+        } else {
+          qb = qb.lte("price_nok", search.max);
+        }
+      }
 
       if (search.sort === "price_asc") qb = qb.order("price_nok", { ascending: true, nullsFirst: false });
       else if (search.sort === "price_desc") qb = qb.order("price_nok", { ascending: false, nullsFirst: false });

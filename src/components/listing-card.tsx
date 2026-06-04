@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 import { signListingImageUrls } from "@/lib/storage";
+import { FavoriteButton } from "@/components/favorite-button";
 
 export type ListingCardData = {
   id: string;
@@ -39,7 +40,7 @@ export function ListingCard({ listing }: { listing: ListingCardData }) {
       params={{ id: listing.id }}
       className="group block overflow-hidden rounded-xl border border-border bg-card transition hover:border-primary hover:shadow-md"
     >
-      <div className="aspect-[4/3] bg-muted">
+      <div className="relative aspect-[4/3] bg-muted">
         {imgUrl ? (
           <img
             src={imgUrl}
@@ -52,6 +53,7 @@ export function ListingCard({ listing }: { listing: ListingCardData }) {
             Ingen bilde
           </div>
         )}
+        <FavoriteButton listingId={listing.id} size="sm" className="absolute right-2 top-2" />
       </div>
       <div className="space-y-1 p-3">
         <h3 className="line-clamp-2 text-sm font-medium leading-snug">{listing.title}</h3>

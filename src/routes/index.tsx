@@ -8,13 +8,7 @@ import Autoplay from "embla-carousel-autoplay";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel";
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
 
 const searchSchema = z.object({
@@ -44,10 +38,7 @@ function LandingPage() {
   const { data: categories } = useQuery({
     queryKey: ["categories"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("categories")
-        .select("id, slug, name_nb")
-        .order("sort_order");
+      const { data, error } = await supabase.from("categories").select("id, slug, name_nb").order("sort_order");
       if (error) throw error;
       return data;
     },
@@ -58,9 +49,7 @@ function LandingPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("listings")
-        .select(
-          "id, title, price_nok, is_free, city, created_at, view_count, listing_images(storage_path, sort_order)",
-        )
+        .select("id, title, price_nok, is_free, city, created_at, view_count, listing_images(storage_path, sort_order)")
         .eq("status", "active")
         .order("view_count", { ascending: false })
         .order("created_at", { ascending: false })
@@ -99,12 +88,11 @@ function LandingPage() {
               <Sparkles className="size-3 text-accent" /> Åpen kildekode · Bygget av fellesskapet
             </span>
             <h1 className="font-display text-5xl leading-[1.05] tracking-tight md:text-6xl">
-              Gi tingene dine{" "}
-              <span className="italic text-accent">et nytt liv</span>.
+              Gi tingene dine <span className="italic text-accent">et nytt liv</span>.
             </h1>
             <p className="max-w-lg text-lg text-muted-foreground">
-              Kaupet.no er en norsk markedsplass for brukte ting mellom privatpersoner.
-              Ingen mellomledd, ingen reklame — bare deg, naboen din, og en god handel.
+              Kaupet.no er en norsk markedsplass for brukte ting mellom privatpersoner. Ingen mellomledd, ingen reklame
+              — bare deg, naboen din, og en god handel.
             </p>
 
             <form onSubmit={submitSearch} className="flex max-w-lg gap-2">
@@ -129,12 +117,7 @@ function LandingPage() {
                   Kom i gang gratis
                 </Button>
               </Link>
-              <a
-                href="https://github.com"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex"
-              >
+              <a href="https://github.com" target="_blank" rel="noreferrer" className="inline-flex">
                 <Button size="lg" variant="ghost">
                   Se koden på GitHub
                 </Button>
@@ -147,9 +130,7 @@ function LandingPage() {
             <div className="absolute -inset-4 -z-10 rounded-3xl bg-accent/10 blur-2xl" />
             <div className="rounded-2xl border border-border bg-card p-4 shadow-xl">
               <div className="mb-3 flex items-center justify-between px-1">
-                <h2 className="font-display text-sm tracking-tight text-muted-foreground">
-                  Populært akkurat nå
-                </h2>
+                <h2 className="font-display text-sm tracking-tight text-muted-foreground">Populært akkurat nå</h2>
                 <Link
                   to="/annonser"
                   search={{ q: "", category: "", sort: "new" }}
@@ -160,11 +141,7 @@ function LandingPage() {
               </div>
 
               {popular && popular.length > 0 ? (
-                <Carousel
-                  opts={{ align: "start", loop: true }}
-                  plugins={[autoplay.current]}
-                  className="w-full"
-                >
+                <Carousel opts={{ align: "start", loop: true }} plugins={[autoplay.current]} className="w-full">
                   <CarouselContent>
                     {popular.map((listing) => (
                       <CarouselItem key={listing.id} className="basis-full sm:basis-1/2">
@@ -178,10 +155,7 @@ function LandingPage() {
               ) : (
                 <div className="grid grid-cols-2 gap-3">
                   {Array.from({ length: 2 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="aspect-[4/3] animate-pulse rounded-xl bg-muted"
-                    />
+                    <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-muted" />
                   ))}
                 </div>
               )}
@@ -210,9 +184,7 @@ function LandingPage() {
         <div className="mb-8 flex items-end justify-between">
           <div>
             <h2 className="font-display text-3xl tracking-tight">Utforsk kategorier</h2>
-            <p className="mt-1 text-muted-foreground">
-              Bla gjennom det folk i nærheten selger akkurat nå.
-            </p>
+            <p className="mt-1 text-muted-foreground">Bla gjennom det folk i nærheten selger akkurat nå.</p>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -227,9 +199,7 @@ function LandingPage() {
               <ArrowRight className="size-4 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
             </Link>
           ))}
-          {!categories && (
-            <div className="col-span-full text-sm text-muted-foreground">Laster kategorier…</div>
-          )}
+          {!categories && <div className="col-span-full text-sm text-muted-foreground">Laster kategorier…</div>}
         </div>
       </section>
 
@@ -272,17 +242,17 @@ function LandingPage() {
         <div className="overflow-hidden rounded-3xl border border-border bg-primary px-8 py-12 text-primary-foreground md:px-16 md:py-16">
           <div className="grid items-center gap-8 md:grid-cols-[1.5fr_1fr]">
             <div>
-              <h2 className="font-display text-3xl tracking-tight md:text-4xl">
-                Et alternativ vi eier sammen.
-              </h2>
+              <h2 className="font-display text-3xl tracking-tight md:text-4xl">Et alternativ vi bygger sammen.</h2>
               <p className="mt-3 max-w-xl opacity-90">
-                Kaupet.no bygges åpent på GitHub. Frivillige utviklere, designere og
-                oversettere er hjertelig velkomne. Sjekk «good first issue» og bli med.
+                Kaupet.no bygges åpent på GitHub. Frivillige utviklere, designere og oversettere er hjertelig velkomne.
+                Sjekk «good first issue» og bli med.
               </p>
             </div>
             <div className="flex flex-wrap gap-3 md:justify-end">
               <a href="https://github.com" target="_blank" rel="noreferrer">
-                <Button size="lg" variant="secondary">Bidra på GitHub</Button>
+                <Button size="lg" variant="secondary">
+                  Bidra på GitHub
+                </Button>
               </a>
             </div>
           </div>

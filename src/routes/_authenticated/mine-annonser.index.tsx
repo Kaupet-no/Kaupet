@@ -21,7 +21,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-export const Route = createFileRoute("/_authenticated/mine-annonser")({
+export const Route = createFileRoute("/_authenticated/mine-annonser/")({
   head: () => ({
     meta: [
       { title: "Mine annonser — Kaupet.no" },

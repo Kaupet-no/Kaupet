@@ -82,7 +82,7 @@ export function FavoriteButton({
     e.preventDefault();
     e.stopPropagation();
     if (!user) {
-      navigate({ to: "/auth", search: { mode: "login" } });
+      navigate({ to: "/auth", search: { mode: "signin" } });
       return;
     }
     toggle.mutate();

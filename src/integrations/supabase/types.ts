@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_deletions: {
+        Row: {
+          confirmation_email: string
+          requested_at: string
+          scheduled_purge_at: string
+          user_id: string
+        }
+        Insert: {
+          confirmation_email: string
+          requested_at?: string
+          scheduled_purge_at?: string
+          user_id: string
+        }
+        Update: {
+          confirmation_email?: string
+          requested_at?: string
+          scheduled_purge_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           created_at: string
@@ -486,6 +507,7 @@ export type Database = {
           views: number
         }[]
       }
+      cancel_account_deletion: { Args: never; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -512,6 +534,8 @@ export type Database = {
         Args: { _listing_id: string }
         Returns: undefined
       }
+      purge_expired_accounts: { Args: never; Returns: number }
+      request_account_deletion: { Args: { _email: string }; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "user"

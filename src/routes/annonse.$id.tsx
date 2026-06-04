@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { ArrowLeft, MapPin, MessageCircle, User as UserIcon, Pencil, Eye, Users, Heart } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +9,10 @@ import { useAuth } from "@/lib/auth";
 import { signListingImageUrls } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { FavoriteButton } from "@/components/favorite-button";
+
+const ListingDetailMap = lazy(() =>
+  import("@/components/listing-detail-map").then((m) => ({ default: m.ListingDetailMap })),
+);
 
 const CONDITION_LABEL: Record<string, string> = {
   new: "Helt ny",
@@ -58,6 +62,8 @@ function ListingDetailPage() {
   const { user } = useAuth();
   const [activeImage, setActiveImage] = useState(0);
   const [imgUrls, setImgUrls] = useState<Record<string, string>>({});
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const { data, isLoading } = useQuery({
     queryKey: ["listing", id],
@@ -65,7 +71,7 @@ function ListingDetailPage() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, title, description, price_nok, is_free, condition, city, postal_code, created_at, seller_id, category_id, listing_images(storage_path, sort_order), categories(name_nb, slug)",
+          "id, title, description, price_nok, is_free, condition, city, postal_code, lat, lng, created_at, seller_id, category_id, listing_images(storage_path, sort_order), categories(name_nb, slug)",
         )
         .eq("id", id)
         .maybeSingle();
@@ -326,6 +332,26 @@ function ListingDetailPage() {
           {data.description}
         </p>
       </section>
+
+      {data.lat != null && data.lng != null && (
+        <section className="mt-10">
+          <h2 className="font-display text-xl">Lokasjon</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {data.city || data.postal_code || "Omtrentlig plassering"}
+          </p>
+          <div className="mt-3 h-80 overflow-hidden rounded-2xl border border-border">
+            {mounted ? (
+              <Suspense
+                fallback={<div className="h-full w-full animate-pulse bg-muted" />}
+              >
+                <ListingDetailMap lat={data.lat} lng={data.lng} />
+              </Suspense>
+            ) : (
+              <div className="h-full w-full animate-pulse bg-muted" />
+            )}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

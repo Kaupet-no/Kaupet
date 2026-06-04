@@ -1,64 +1,77 @@
-# Brukermeny for innloggede brukere
+## Mål
 
-Erstatter dagens "Ny annonse"-knapp + "Logg ut"-knapp i headeren med en samlet avatar-nedtrekksmeny (à la AirBnB/Finn). Legger til to nye sider: **Mine annonser** og **Profil**.
+La interesserte kjøpere kontakte selgere via meldinger, og gi alle brukere en samlet innboks der chatter er gruppert per annonse.
 
-## Endringer i UI
+Databasen har allerede `conversations` (buyer_id, seller_id, listing_id) og `messages` (conversation_id, sender_id, body) med RLS — vi bygger UI og litt server-logikk oppå dette.
 
-### 1. Header (`src/components/site-header.tsx`)
-For innloggede brukere vises:
-- Favoritter (hjerte-ikon) — beholdes
-- Meldinger-ikon — beholdes (disabled inntil videre)
-- **Ny annonse**-knapp — beholdes som primær CTA
-- **Avatar-knapp** med nedtrekksmeny (erstatter "Logg ut"-knappen)
+## 1. Kontakt-knapp på annonsevisning
 
-Avataren henter `avatar_url` + `display_name` fra `profiles`-tabellen via en liten `useQuery`. Faller tilbake til initialer hvis ingen avatar.
+På `/annonse/$id`, under pristen ved siden av "Lagre favoritt", legge til en **"Send melding til selger"**-knapp.
+- Skjult hvis bruker er selger eller annonsen ikke er aktiv.
+- Hvis ikke innlogget → redirect til `/auth` med `redirect` tilbake til annonsen.
+- Ved klikk: kall serverfunksjon `getOrCreateConversation({ listingId })` som finner eller oppretter en samtale mellom innlogget bruker (buyer) og selger, og naviger til `/meldinger/$conversationId`.
 
-Nedtrekksmeny (shadcn `DropdownMenu`):
-- **Min profil** → `/profil`
-- **Mine annonser** → `/mine-annonser`
-- **Ny annonse** → `/ny-annonse`
-- **Favoritter** → `/favoritter`
-- ── separator ──
-- **Kontoinnstillinger** → `/profil/innstillinger`
-- **Logg ut**
+## 2. Innboks `/meldinger` (gruppert per annonse)
 
-### 2. Ny side: Mine annonser (`src/routes/_authenticated/mine-annonser.tsx`)
-Lister alle annonser der `seller_id = auth.uid()`, gruppert/filtrert på status (aktiv, utkast, solgt/arkivert). Hver rad viser bilde, tittel, pris, status, visninger og handlinger:
-- **Rediger** → `/mine-annonser/$id/rediger` (gjenbruker skjemaet fra `ny-annonse.tsx`)
-- **Marker som solgt** / **Reaktiver** (oppdaterer `status`)
-- **Slett** (med bekreftelses-dialog)
+Ny rute `src/routes/_authenticated/meldinger.index.tsx`.
 
-### 3. Ny side: Profil (`src/routes/_authenticated/profil.tsx`)
-To faner / seksjoner:
-- **Profilinfo**: rediger `display_name`, `bio`, `location`, `avatar_url` (gjenbruker `ImageUploader` for avatar).
-- **Konto** (kan være egen rute `/profil/innstillinger` eller seksjon på samme side):
-  - Endre e-post via `supabase.auth.updateUser({ email })` — Supabase sender bekreftelses-e-post.
-  - Endre passord via `supabase.auth.updateUser({ password })` med bekreftelse.
-  - Logg ut-knapp.
+Layout: to-kolonne på desktop, stacked på mobil.
+- **Venstre panel:** liste over annonser brukeren har samtaler knyttet til (både som selger og kjøper), sortert på siste aktivitet.
+  - Hvert annonse-element viser miniatyrbilde, tittel, antall samtaler, og siste meldings-tidsstempel.
+  - Klikk utvider og viser alle samtaler under den annonsen (motpartens navn + siste meldingsutdrag).
+  - Som selger med flere annonser får man et naturlig oppslagsverk: "Sykkel (3 samtaler)", "Sofa (1 samtale)" osv.
+- **Tom-tilstand:** vennlig melding + lenke til Utforsk.
 
-### 4. Ny side: Rediger annonse (`src/routes/_authenticated/mine-annonser.$id.rediger.tsx`)
-Refaktorerer felles skjema fra `ny-annonse.tsx` ut i en delt komponent `<ListingForm mode="create" | "edit" />` slik at samme skjema brukes til både opprettelse og redigering. Geokoding kjøres på nytt hvis postnummer/by endres.
+## 3. Samtalevisning `/meldinger/$id`
 
-## Tekniske detaljer
+Ny rute `src/routes/_authenticated/meldinger.$id.tsx`.
 
-- Bruker eksisterende `DropdownMenu`, `Avatar`, `Dialog`, `Tabs` fra shadcn (legges til om de mangler).
-- Alle nye ruter ligger under `_authenticated/` så de arver auth-gaten.
-- Datahenting via `useQuery` mot `supabase` (browser-client, RLS sørger for at brukeren kun ser egne annonser/profil).
-- Mutasjoner via `useMutation` + `queryClient.invalidateQueries`.
-- Ingen DB-endringer nødvendig — `profiles`, `listings`, og `auth.users` dekker alt.
-- Følger eksisterende designtokens i `src/styles.css` (ingen hardkodede farger).
+- Header: annonsens miniatyrbilde + tittel + pris, lenke til annonsen, samt motpartens navn.
+- Meldingsliste i kronologisk rekkefølge, bobler høyrejustert for egne meldinger og venstrejustert for motpart. Dagsskiller.
+- Skrivefelt nederst (textarea + Send-knapp, Enter = send, Shift+Enter = ny linje).
+- Realtime via Supabase channel på `messages` filtrert på `conversation_id` — nye meldinger dukker opp uten refresh. Også oppdater `conversations.last_message_at` på send.
+- Auto-scroll til bunnen ved nye meldinger.
 
-## Filer som opprettes / endres
+## 4. Header-ikon
+
+`site-header.tsx`: Meldinger-ikonet er i dag `disabled`. Gjør det til en `<Link to="/meldinger">` og vis en liten badge med antall samtaler med uleste meldinger (enkel implementasjon: samtaler med `last_message_at` nyere enn en lokalt lagret "sist sett"-tid per samtale, lagret i `localStorage`. Dette unngår skjemaendringer i første runde).
+
+## 5. Serverfunksjoner (`createServerFn` + `requireSupabaseAuth`)
+
+Ny fil `src/lib/messages.functions.ts`:
+- `getOrCreateConversation({ listingId })` — slår opp eksisterende (buyer = auth.uid, listing_id), oppretter ellers. Avviser hvis bruker = selger.
+- `listMyConversations()` — returnerer alle samtaler der bruker er buyer eller seller, joinet med listing (id, title, første bilde, pris) og motpartens profil (display_name, avatar_url) og siste melding (body, created_at). Gruppering gjøres i UI.
+- `getConversation({ id })` — sjekker tilgang, returnerer samtale + listing-header + motpart.
+- `listMessages({ conversationId })` — meldinger i samtalen.
+- `sendMessage({ conversationId, body })` — validerer (1–4000 tegn), inserter melding, oppdaterer `last_message_at`.
+
+RLS dekker allerede tilgangskontroll; server-funksjonene gir oss typete DTO-er og join-effektivitet.
+
+## 6. Realtime
+
+Aktivere `messages`-tabellen for Supabase Realtime i en ny migrasjon:
+```sql
+ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+ALTER TABLE public.messages REPLICA IDENTITY FULL;
+```
+
+Klient abonnerer kun på samtalevisningen.
+
+## 7. Filer som opprettes/endres
 
 **Nye:**
-- `src/components/user-menu.tsx` (avatar + dropdown)
-- `src/components/listing-form.tsx` (delt skjema)
-- `src/routes/_authenticated/mine-annonser.tsx`
-- `src/routes/_authenticated/mine-annonser.$id.rediger.tsx`
-- `src/routes/_authenticated/profil.tsx`
+- `src/lib/messages.functions.ts`
+- `src/routes/_authenticated/meldinger.index.tsx`
+- `src/routes/_authenticated/meldinger.$id.tsx`
+- `supabase/migrations/<timestamp>_messages_realtime.sql`
 
 **Endres:**
-- `src/components/site-header.tsx` (bytt ut Logg ut-knapp med `<UserMenu />`)
-- `src/routes/_authenticated/ny-annonse.tsx` (bruker `<ListingForm />`)
+- `src/routes/annonse.$id.tsx` — kontakt-knapp.
+- `src/components/site-header.tsx` — gjør meldinger-ikon klikkbart (+ enkel uleste-indikator).
 
-Si fra om du vil ha kontoinnstillinger som egen side (`/profil/innstillinger`) eller som fane på profilsiden — jeg foreslår fane for færre klikk.
+## 8. Utenfor scope (kan komme senere)
+
+- Server-side ulest-tracking (krever ny `last_read_at`-kolonne på conversations per deltaker — kan legges til når brukerne ønsker mer presis ulest-telling).
+- Push-varsler / e-postvarsler.
+- Vedlegg / bilder i meldinger.
+- Blokkering og rapportering av samtaler.

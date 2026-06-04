@@ -1,77 +1,55 @@
 ## Mål
+Unngå unødvendig cookie-banner gjennom GDPR-kompliant design, og gi brukerne full innsikt i hvilke data som lagres og hvorfor.
 
-La interesserte kjøpere kontakte selgere via meldinger, og gi alle brukere en samlet innboks der chatter er gruppert per annonse.
+## 1. Cookie-minimering
 
-Databasen har allerede `conversations` (buyer_id, seller_id, listing_id) og `messages` (conversation_id, sender_id, body) med RLS — vi bygger UI og litt server-logikk oppå dette.
+Endre `kaupet_visitor_id` fra persistent `localStorage` til sesjonsbasert `sessionStorage`.
 
-## 1. Kontakt-knapp på annonsevisning
+- I `src/routes/annonse.$id.tsx`, linje 159-168: `localStorage.getItem("kaupet_visitor_id")` / `localStorage.setItem(...)` erstattes med `sessionStorage`.
+- Dette gjør at det unike besøkende-IDet leve kun innenfor én nettleser-økt. Når fanen lukkes, slettes nøkkelen. Det fjerner behovet for samtykke fordi dataen er teknisk nødvendig (unik besøkstelling per økt for selger-statistikk) og ikke persistent.
+- Eksisterende `listing_views`-tabell og SQL-spørringer i `listing_stats` påvirkes ikke; nøkkelen brukes fortsatt som `visitor_key`.
 
-På `/annonse/$id`, under pristen ved siden av "Lagre favoritt", legge til en **"Send melding til selger"**-knapp.
-- Skjult hvis bruker er selger eller annonsen ikke er aktiv.
-- Hvis ikke innlogget → redirect til `/auth` med `redirect` tilbake til annonsen.
-- Ved klikk: kall serverfunksjon `getOrCreateConversation({ listingId })` som finner eller oppretter en samtale mellom innlogget bruker (buyer) og selger, og naviger til `/meldinger/$conversationId`.
+## 2. Personvernerklæring (`/personvern`)
 
-## 2. Innboks `/meldinger` (gruppert per annonse)
+Ny rute `src/routes/personvern.tsx`.
 
-Ny rute `src/routes/_authenticated/meldinger.index.tsx`.
+Innhold (på norsk):
+- **Introduksjon:** Vi lagrer kun det som er nødvendig for at tjenesten skal fungere. Ingen tredjepartssporing, ingen markedsføringscookies, ingen analyseplattformer.
+- **Hva lagres lokalt i nettleseren din:**
+  - Supabase-autentiseringssesjon (nødvendig for innlogging).
+  - `kaupet_read_<id>` per samtale (når du sist åpnet en chat — brukes til uleste-indikator).
+  - `kaupet_viewed_<id>` per fane (unngår dobbel visningslogging ved refresh).
+  - `kaupet_session_id` i `sessionStorage` (økt-basert besøkende-ID for anonym statistikk).
+- **Hva lagres på serveren (hos databehandler):**
+  - Brukerprofil (navn, e-post, profilbilde), annonser, meldinger, favoritter, anonyme visninger.
+  - Databehandler: **Supabase**. Data lagres på servere i EU.
+  - Lenke til [Supabase sin personvernerklæring](https://supabase.com/privacy).
+- **Juridisk grunnlag:** Avtale (nødvendig for å levere tjenesten) og berettiget interesse (selger-statistikk og sikkerhet).
+- **Dine rettigheter:** Innsyn, retting, sletting, dataportabilitet. Kontakt oss for å utøve dem.
+- **Tredjeparter:** Kun Supabase (databehandler). Google Fonts lastes direkte fra Google (se eget avsnitt).
+- **Versjon:** Datert og versjonsnummer for sporbarhet.
 
-Layout: to-kolonne på desktop, stacked på mobil.
-- **Venstre panel:** liste over annonser brukeren har samtaler knyttet til (både som selger og kjøper), sortert på siste aktivitet.
-  - Hvert annonse-element viser miniatyrbilde, tittel, antall samtaler, og siste meldings-tidsstempel.
-  - Klikk utvider og viser alle samtaler under den annonsen (motpartens navn + siste meldingsutdrag).
-  - Som selger med flere annonser får man et naturlig oppslagsverk: "Sykkel (3 samtaler)", "Sofa (1 samtale)" osv.
-- **Tom-tilstand:** vennlig melding + lenke til Utforsk.
+## 3. Footer-lenke
 
-## 3. Samtalevisning `/meldinger/$id`
+I `src/routes/__root.tsx`, erstatt dagens "Bidra på GitHub"-tekst med:
+- Lenke til `/personvern` ("Personvern").
+- Kort setning: "Vi bruker kun nødvendige cookies. Ingen sporingsbanner nødvendig."
 
-Ny rute `src/routes/_authenticated/meldinger.$id.tsx`.
+## 4. Bekreftelse: ingen cookie-banner
 
-- Header: annonsens miniatyrbilde + tittel + pris, lenke til annonsen, samt motpartens navn.
-- Meldingsliste i kronologisk rekkefølge, bobler høyrejustert for egne meldinger og venstrejustert for motpart. Dagsskiller.
-- Skrivefelt nederst (textarea + Send-knapp, Enter = send, Shift+Enter = ny linje).
-- Realtime via Supabase channel på `messages` filtrert på `conversation_id` — nye meldinger dukker opp uten refresh. Også oppdater `conversations.last_message_at` på send.
-- Auto-scroll til bunnen ved nye meldinger.
+Siden vi ikke bruker persistente analysecookies, markedsføringscookies eller tredjepartssporing, og den eneste persistente lagringen er autentisering (nødvendig) og uleste-tidsstempler (funksjonelt nødvendig), er en GDPR-cookie-banner unødvendig. Standardvalget for alle brukere er "kun nødvendige cookies".
 
-## 4. Header-ikon
-
-`site-header.tsx`: Meldinger-ikonet er i dag `disabled`. Gjør det til en `<Link to="/meldinger">` og vis en liten badge med antall samtaler med uleste meldinger (enkel implementasjon: samtaler med `last_message_at` nyere enn en lokalt lagret "sist sett"-tid per samtale, lagret i `localStorage`. Dette unngår skjemaendringer i første runde).
-
-## 5. Serverfunksjoner (`createServerFn` + `requireSupabaseAuth`)
-
-Ny fil `src/lib/messages.functions.ts`:
-- `getOrCreateConversation({ listingId })` — slår opp eksisterende (buyer = auth.uid, listing_id), oppretter ellers. Avviser hvis bruker = selger.
-- `listMyConversations()` — returnerer alle samtaler der bruker er buyer eller seller, joinet med listing (id, title, første bilde, pris) og motpartens profil (display_name, avatar_url) og siste melding (body, created_at). Gruppering gjøres i UI.
-- `getConversation({ id })` — sjekker tilgang, returnerer samtale + listing-header + motpart.
-- `listMessages({ conversationId })` — meldinger i samtalen.
-- `sendMessage({ conversationId, body })` — validerer (1–4000 tegn), inserter melding, oppdaterer `last_message_at`.
-
-RLS dekker allerede tilgangskontroll; server-funksjonene gir oss typete DTO-er og join-effektivitet.
-
-## 6. Realtime
-
-Aktivere `messages`-tabellen for Supabase Realtime i en ny migrasjon:
-```sql
-ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
-ALTER TABLE public.messages REPLICA IDENTITY FULL;
-```
-
-Klient abonnerer kun på samtalevisningen.
-
-## 7. Filer som opprettes/endres
+## Filer som opprettes/endres
 
 **Nye:**
-- `src/lib/messages.functions.ts`
-- `src/routes/_authenticated/meldinger.index.tsx`
-- `src/routes/_authenticated/meldinger.$id.tsx`
-- `supabase/migrations/<timestamp>_messages_realtime.sql`
+- `src/routes/personvern.tsx`
 
 **Endres:**
-- `src/routes/annonse.$id.tsx` — kontakt-knapp.
-- `src/components/site-header.tsx` — gjør meldinger-ikon klikkbart (+ enkel uleste-indikator).
+- `src/routes/annonse.$id.tsx` — `localStorage` → `sessionStorage` for visitor ID.
+- `src/routes/__root.tsx` — footer med lenke til `/personvern`.
 
-## 8. Utenfor scope (kan komme senere)
+## Utenfor scope
 
-- Server-side ulest-tracking (krever ny `last_read_at`-kolonne på conversations per deltaker — kan legges til når brukerne ønsker mer presis ulest-telling).
-- Push-varsler / e-postvarsler.
-- Vedlegg / bilder i meldinger.
-- Blokkering og rapportering av samtaler.
+- Egne cookie-innstillinger / samtykkepanel (ikke nødvendig uten valgfrie cookies).
+- Vilkår for bruk (kan legges til separat om ønskelig).
+- Self-hosting av Google Fonts.

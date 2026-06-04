@@ -1,12 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
-import { Map as MapIcon, Search } from "lucide-react";
+import { Expand, Map as MapIcon } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -15,7 +14,15 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { LocationFilter, type LocationValue } from "@/components/location-filter";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { SearchBar } from "@/components/search-bar";
+import type { LocationValue } from "@/components/location-filter";
 import type { MapListing } from "@/components/listings-map";
 
 const ListingsMap = lazy(() =>
@@ -55,7 +62,10 @@ function BrowsePage() {
   const [qDraft, setQDraft] = useState(search.q);
   const [mounted, setMounted] = useState(false);
   const [mobileMapOpen, setMobileMapOpen] = useState(false);
+  const [bigMapOpen, setBigMapOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
 
   useEffect(() => setMounted(true), []);
   useEffect(() => {
@@ -89,7 +99,6 @@ function BrowsePage() {
     },
   });
 
-  // If a center+radius is set, fetch matching ids from RPC first
   const { data: radiusIds } = useQuery({
     queryKey: ["listings-radius", search.lat, search.lng, search.radius],
     enabled: search.lat != null && search.lng != null,
@@ -182,6 +191,11 @@ function BrowsePage() {
     });
   };
 
+  const resetFilters = () => {
+    navigate({ search: () => ({ q: "", category: "", sort: "new" }) });
+    setQDraft("");
+  };
+
   const cards: ListingCardData[] = (listings ?? []).map((l) => ({
     id: l.id,
     title: l.title,
@@ -201,6 +215,7 @@ function BrowsePage() {
       is_free: l.is_free,
       lat: l.lat,
       lng: l.lng,
+      cover_path: l.cover_path,
     }));
 
   const mapCenter =
@@ -208,43 +223,53 @@ function BrowsePage() {
       ? { lat: search.lat, lng: search.lng }
       : null;
 
-  const mapNode = mounted ? (
-    <Suspense
-      fallback={<div className="h-full w-full animate-pulse rounded-xl bg-muted" />}
-    >
-      <ListingsMap
-        center={mapCenter}
-        radiusKm={search.radius ?? 10}
-        listings={mapListings}
-        onCenterChange={(c) =>
-          updateSearch({ lat: c.lat, lng: c.lng, radius: search.radius ?? 10, loc: search.loc ?? "Valgt punkt" })
-        }
-        className="h-full w-full"
-      />
-    </Suspense>
-  ) : (
-    <div className="h-full w-full animate-pulse rounded-xl bg-muted" />
-  );
+  const renderMap = (withAreaSearch: boolean) =>
+    mounted ? (
+      <Suspense
+        fallback={<div className="h-full w-full animate-pulse rounded-2xl bg-muted" />}
+      >
+        <ListingsMap
+          center={mapCenter}
+          radiusKm={search.radius ?? 10}
+          listings={mapListings}
+          hoveredId={hoveredId}
+          activeId={activeId}
+          onMarkerHover={setHoveredId}
+          onMarkerSelect={setActiveId}
+          onCenterChange={(c) =>
+            updateSearch({
+              lat: c.lat,
+              lng: c.lng,
+              radius: search.radius ?? 10,
+              loc: search.loc ?? "Valgt punkt",
+            })
+          }
+          onAreaSearch={
+            withAreaSearch
+              ? (c) =>
+                  updateSearch({
+                    lat: c.lat,
+                    lng: c.lng,
+                    radius: search.radius ?? 10,
+                    loc: search.loc ?? "Valgt punkt",
+                  })
+              : undefined
+          }
+          className="h-full w-full"
+        />
+      </Suspense>
+    ) : (
+      <div className="h-full w-full animate-pulse rounded-2xl bg-muted" />
+    );
 
-  // Avoid hydration mismatch crashes by rendering the body only after mount.
   if (!mounted) {
     return (
       <div className="mx-auto max-w-7xl px-4 py-10" aria-busy="true" aria-live="polite">
         <h1 className="font-display text-3xl tracking-tight">Annonser</h1>
         <span className="sr-only">Laster…</span>
-
-        {/* Søke- og filterrad */}
-        <div className="mt-6 flex flex-wrap gap-3">
-          <div className="h-10 flex-1 min-w-[220px] animate-pulse rounded-md bg-muted" />
-          <div className="h-10 w-40 animate-pulse rounded-md bg-muted" />
-          <div className="h-10 w-44 animate-pulse rounded-md bg-muted" />
-          <div className="h-10 w-24 animate-pulse rounded-md bg-muted" />
-        </div>
-        <div className="mt-3 h-10 w-full max-w-md animate-pulse rounded-md bg-muted" />
-
+        <div className="mt-6 h-14 w-full animate-pulse rounded-full bg-muted" />
         <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_420px]">
-          {/* Annonse-skjelett */}
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="space-y-3 rounded-xl border border-border p-3">
                 <div className="aspect-[4/3] w-full animate-pulse rounded-lg bg-muted" />
@@ -253,9 +278,8 @@ function BrowsePage() {
               </div>
             ))}
           </div>
-          {/* Kart-skjelett */}
           <div className="hidden lg:block">
-            <div className="sticky top-24 h-[calc(100vh-8rem)] w-full animate-pulse rounded-xl bg-muted" />
+            <div className="sticky top-24 h-[calc(100vh-8rem)] w-full animate-pulse rounded-2xl bg-muted" />
           </div>
         </div>
       </div>
@@ -263,77 +287,31 @@ function BrowsePage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-10">
+    <div className="mx-auto max-w-7xl px-4 py-8 md:py-10">
       <h1 className="font-display text-3xl tracking-tight">Annonser</h1>
 
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          updateSearch({ q: qDraft });
-        }}
-        className="mt-6 flex flex-wrap gap-3"
-      >
-        <div className="relative flex-1 min-w-[220px]">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={qDraft}
-            onChange={(e) => setQDraft(e.target.value)}
-            placeholder="Søk etter f.eks. sykkel, kommode, iPhone…"
-            className="pl-9"
-          />
-        </div>
-        <select
-          value={search.category || "all"}
-          onChange={(e) => updateSearch({ category: e.target.value === "all" ? "" : e.target.value })}
-          className="h-9 w-[180px] rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          aria-label="Kategori"
-        >
-          <option value="all">Alle kategorier</option>
-          {(categories ?? []).map((c) => (
-            <option key={c.id} value={c.slug}>
-              {c.name_nb}
-            </option>
-          ))}
-        </select>
-        <select
-          value={search.sort}
-          onChange={(e) => updateSearch({ sort: e.target.value as typeof search.sort })}
-          className="h-9 w-[160px] rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          aria-label="Sortering"
-        >
-          <option value="new">Nyeste først</option>
-          <option value="price_asc">Pris: lav → høy</option>
-          <option value="price_desc">Pris: høy → lav</option>
-        </select>
-        <Button type="submit">Søk</Button>
-      </form>
-
-      <div className="mt-4">
-        <LocationFilter value={location} onChange={handleLocationChange} />
+      <div className="mt-6">
+        <SearchBar
+          q={qDraft}
+          onQChange={setQDraft}
+          onSubmitQ={() => updateSearch({ q: qDraft })}
+          location={location}
+          onLocationChange={handleLocationChange}
+          categorySlug={search.category}
+          onCategoryChange={(slug) => updateSearch({ category: slug })}
+          categories={categories ?? []}
+          sort={search.sort}
+          onSortChange={(s) => updateSearch({ sort: s })}
+        />
       </div>
 
-      {!isDesktop && (
-        <div className="mt-6">
-          <Sheet open={mobileMapOpen} onOpenChange={setMobileMapOpen}>
-            <SheetTrigger asChild>
-              <Button variant="outline" className="w-full">
-                <MapIcon className="size-4" /> Vis kart
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="bottom" className="h-[85vh] p-4">
-              <SheetHeader>
-                <SheetTitle>Kart</SheetTitle>
-              </SheetHeader>
-              <div className="mt-4 h-[calc(100%-3rem)]">
-                {mobileMapOpen ? mapNode : null}
-              </div>
-            </SheetContent>
-          </Sheet>
-        </div>
-      )}
+      <div className="mt-2 flex items-center justify-between text-sm text-muted-foreground">
+        <span>
+          {isLoading ? "Søker…" : `${cards.length} annonse${cards.length === 1 ? "" : "r"}`}
+        </span>
+      </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_420px]">
+      <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_420px]">
         <div>
           {isLoading ? (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
@@ -347,11 +325,19 @@ function BrowsePage() {
               <p className="mt-1 text-sm text-muted-foreground">
                 Prøv et bredere søk eller øk radiusen.
               </p>
+              <Button variant="outline" className="mt-4" onClick={resetFilters}>
+                Nullstill filtre
+              </Button>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               {cards.map((l) => (
-                <ListingCard key={l.id} listing={l} />
+                <ListingCard
+                  key={l.id}
+                  listing={l}
+                  highlighted={hoveredId === l.id || activeId === l.id}
+                  onHoverChange={setHoveredId}
+                />
               ))}
             </div>
           )}
@@ -359,12 +345,56 @@ function BrowsePage() {
 
         {isDesktop && (
           <aside>
-            <div className="sticky top-20 h-[calc(100vh-6rem)] overflow-hidden rounded-xl border border-border">
-              {mapNode}
+            <div className="sticky top-20 h-[calc(100vh-6rem)]">
+              <div className="relative h-full overflow-hidden rounded-2xl border border-border shadow-sm">
+                {renderMap(true)}
+                <Dialog open={bigMapOpen} onOpenChange={setBigMapOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      className="absolute right-3 top-3 z-[450] rounded-full shadow-md"
+                    >
+                      <Expand className="size-4" /> Utvid
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-[95vw] p-0 sm:max-w-[95vw]">
+                    <DialogHeader className="px-4 pt-4">
+                      <DialogTitle>Kart</DialogTitle>
+                    </DialogHeader>
+                    <div className="h-[85vh] w-full p-4 pt-2">
+                      {bigMapOpen ? renderMap(true) : null}
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </div>
           </aside>
         )}
       </div>
+
+      {!isDesktop && (
+        <Sheet open={mobileMapOpen} onOpenChange={setMobileMapOpen}>
+          <SheetTrigger asChild>
+            <Button
+              type="button"
+              size="lg"
+              className="fixed bottom-5 right-5 z-40 rounded-full shadow-lg"
+            >
+              <MapIcon className="size-4" /> Kart
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="bottom" className="h-[88vh] p-4">
+            <SheetHeader>
+              <SheetTitle>Kart</SheetTitle>
+            </SheetHeader>
+            <div className="mt-3 h-[calc(100%-3rem)]">
+              {mobileMapOpen ? renderMap(true) : null}
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
     </div>
   );
 }

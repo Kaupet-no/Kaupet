@@ -20,7 +20,7 @@ const CONDITION_LABEL: Record<string, string> = {
   like_new: "Som ny",
   good: "Pent brukt",
   acceptable: "Brukt med slitasje",
-  for_parts: "Til reservedeler",
+  for_parts: "Må repareres",
 };
 
 export const Route = createFileRoute("/annonse/$id")({

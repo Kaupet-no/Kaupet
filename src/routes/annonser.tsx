@@ -83,6 +83,7 @@ function BrowsePage() {
   const [isDesktop, setIsDesktop] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [advOpen, setAdvOpen] = useState(false);
 
   useEffect(() => setMounted(true), []);
   useEffect(() => {

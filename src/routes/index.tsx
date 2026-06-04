@@ -117,11 +117,6 @@ function LandingPage() {
                   Kom i gang gratis
                 </Button>
               </Link>
-              <a href="https://github.com" target="_blank" rel="noreferrer" className="inline-flex">
-                <Button size="lg" variant="ghost">
-                  Se koden på GitHub
-                </Button>
-              </a>
             </div>
           </div>
 
@@ -161,20 +156,6 @@ function LandingPage() {
               )}
             </div>
 
-            <dl className="mt-6 flex gap-8 text-sm">
-              <div>
-                <dt className="text-muted-foreground">Lisens</dt>
-                <dd className="font-display text-xl">AGPL-3.0</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Marked</dt>
-                <dd className="font-display text-xl">Norge 🇳🇴</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Pris</dt>
-                <dd className="font-display text-xl">Gratis</dd>
-              </div>
-            </dl>
           </div>
         </div>
       </section>

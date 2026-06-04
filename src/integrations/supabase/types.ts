@@ -142,6 +142,30 @@ export type Database = {
           },
         ]
       }
+      listing_views: {
+        Row: {
+          created_at: string
+          id: string
+          listing_id: string
+          user_id: string | null
+          visitor_key: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          listing_id: string
+          user_id?: string | null
+          visitor_key: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          listing_id?: string
+          user_id?: string | null
+          visitor_key?: string
+        }
+        Relationships: []
+      }
       listings: {
         Row: {
           category_id: string | null
@@ -315,6 +339,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      listing_stats: {
+        Args: { _listing_id: string }
+        Returns: {
+          favorite_count: number
+          total_views: number
+          unique_visitors: number
+        }[]
+      }
       listings_within_radius: {
         Args: { center_lat: number; center_lng: number; radius_km: number }
         Returns: {

@@ -1,9 +1,11 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { ArrowLeft, MapPin, MessageCircle, User as UserIcon } from "lucide-react";
+import { ArrowLeft, MapPin, MessageCircle, User as UserIcon, Pencil, Eye, Users, Heart } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth";
+
 import { signListingImageUrls } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { FavoriteButton } from "@/components/favorite-button";
@@ -53,6 +55,7 @@ export const Route = createFileRoute("/annonse/$id")({
 
 function ListingDetailPage() {
   const { id } = Route.useParams();
+  const { user } = useAuth();
   const [activeImage, setActiveImage] = useState(0);
   const [imgUrls, setImgUrls] = useState<Record<string, string>>({});
 
@@ -77,6 +80,23 @@ function ListingDetailPage() {
     },
   });
 
+  const isOwner = !!user && !!data && user.id === data.seller_id;
+
+  const { data: stats } = useQuery({
+    queryKey: ["listing-stats", id],
+    enabled: isOwner,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("listing_stats", { _listing_id: id });
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+      return {
+        total_views: Number(row?.total_views ?? 0),
+        unique_visitors: Number(row?.unique_visitors ?? 0),
+        favorite_count: Number(row?.favorite_count ?? 0),
+      };
+    },
+  });
+
   const images = (data?.listing_images ?? [])
     .slice()
     .sort((a, b) => a.sort_order - b.sort_order);
@@ -85,6 +105,38 @@ function ListingDetailPage() {
     if (images.length === 0) return;
     signListingImageUrls(images.map((i) => i.storage_path)).then(setImgUrls);
   }, [images.length, data?.id]);
+
+  // Logg visning (én gang per annonse + besøkende-nøkkel per økt)
+  useEffect(() => {
+    if (!data?.id) return;
+    if (user && user.id === data.seller_id) return; // ikke tell egne visninger
+    let visitorKey = user?.id ?? null;
+    if (!visitorKey) {
+      try {
+        const k = "kaupet_visitor_id";
+        visitorKey = localStorage.getItem(k);
+        if (!visitorKey) {
+          visitorKey = crypto.randomUUID();
+          localStorage.setItem(k, visitorKey);
+        }
+      } catch {
+        visitorKey = crypto.randomUUID();
+      }
+    }
+    const sessionKey = `kaupet_viewed_${data.id}`;
+    try {
+      if (sessionStorage.getItem(sessionKey)) return;
+      sessionStorage.setItem(sessionKey, "1");
+    } catch {
+      /* ignore */
+    }
+    supabase
+      .from("listing_views")
+      .insert({ listing_id: data.id, visitor_key: visitorKey, user_id: user?.id ?? null })
+      .then(() => undefined);
+  }, [data?.id, data?.seller_id, user?.id]);
+
+
 
   if (isLoading) {
     return (
@@ -185,6 +237,54 @@ function ListingDetailPage() {
               </dd>
             </div>
           </dl>
+
+          {isOwner && (
+            <div className="rounded-xl border border-primary/40 bg-primary/5 p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-primary">
+                Dette er din annonse
+              </p>
+              <Link
+                to="/mine-annonser/$id/rediger"
+                params={{ id: data.id }}
+                className="mt-3 block"
+              >
+                <Button className="w-full gap-2" variant="default">
+                  <Pencil className="size-4" /> Rediger annonse
+                </Button>
+              </Link>
+              <dl className="mt-4 grid grid-cols-3 gap-3 text-center">
+                <div className="rounded-lg bg-card p-2">
+                  <Eye className="mx-auto size-4 text-muted-foreground" />
+                  <dd className="mt-1 font-display text-lg leading-none">
+                    {stats?.total_views ?? "–"}
+                  </dd>
+                  <dt className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Visninger
+                  </dt>
+                </div>
+                <div className="rounded-lg bg-card p-2">
+                  <Users className="mx-auto size-4 text-muted-foreground" />
+                  <dd className="mt-1 font-display text-lg leading-none">
+                    {stats?.unique_visitors ?? "–"}
+                  </dd>
+                  <dt className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Unike besøk
+                  </dt>
+                </div>
+                <div className="rounded-lg bg-card p-2">
+                  <Heart className="mx-auto size-4 text-muted-foreground" />
+                  <dd className="mt-1 font-display text-lg leading-none">
+                    {stats?.favorite_count ?? "–"}
+                  </dd>
+                  <dt className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Favoritter
+                  </dt>
+                </div>
+              </dl>
+            </div>
+          )}
+
+
 
           <div className="rounded-xl border border-border bg-card p-4">
             <div className="flex items-center gap-3">

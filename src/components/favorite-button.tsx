@@ -30,8 +30,6 @@ export function FavoriteButton({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  if (!user) return null;
-
   const { data: isFavorite = false } = useQuery({
     queryKey: ["favorite", listingId, user?.id],
     enabled: !!user,
@@ -77,6 +75,8 @@ export function FavoriteButton({
       }
     },
   });
+
+  if (!user) return null;
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();

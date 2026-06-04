@@ -19,11 +19,11 @@ export const Route = createFileRoute("/")({
   validateSearch: searchSchema,
   head: () => ({
     meta: [
-      { title: "Kaupet.no — Kjøp og selg brukte ting i Norge" },
+      { title: "Kaupet.no — Kjøp og salg av brukte ting" },
       {
         name: "description",
         content:
-          "Norges åpne markedsplass for brukt. Finn møbler, elektronikk, klær og mer fra naboer over hele landet. Gratis, åpen kildekode.",
+          "Norges åpne markedsplass for brukte ting. Finn møbler, elektronikk, klær og mer fra naboer over hele landet.",
       },
     ],
   }),

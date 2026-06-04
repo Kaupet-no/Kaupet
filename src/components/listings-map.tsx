@@ -119,8 +119,6 @@ export function ListingsMap({ center, radiusKm, listings, onCenterChange, classN
   );
 }
 
-// Inline popup component using react-leaflet Popup
-import { Popup } from "react-leaflet";
 function LeafletPopup({ listing }: { listing: MapListing }) {
   return (
     <Popup>

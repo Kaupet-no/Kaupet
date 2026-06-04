@@ -332,6 +332,26 @@ function ListingDetailPage() {
           {data.description}
         </p>
       </section>
+
+      {data.lat != null && data.lng != null && (
+        <section className="mt-10">
+          <h2 className="font-display text-xl">Lokasjon</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {data.city || data.postal_code || "Omtrentlig plassering"}
+          </p>
+          <div className="mt-3 h-80 overflow-hidden rounded-2xl border border-border">
+            {mounted ? (
+              <Suspense
+                fallback={<div className="h-full w-full animate-pulse bg-muted" />}
+              >
+                <ListingDetailMap lat={data.lat} lng={data.lng} />
+              </Suspense>
+            ) : (
+              <div className="h-full w-full animate-pulse bg-muted" />
+            )}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

@@ -21,6 +21,7 @@ import { Route as AuthenticatedFavoritterRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authenticated/admin/route'
 import { Route as AuthenticatedMineAnnonserIndexRouteImport } from './routes/_authenticated/mine-annonser.index'
 import { Route as AuthenticatedMeldingerIndexRouteImport } from './routes/_authenticated/meldinger.index'
+import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedMeldingerIdRouteImport } from './routes/_authenticated/meldinger.$id'
 import { Route as AuthenticatedMineAnnonserIdRedigerRouteImport } from './routes/_authenticated/mine-annonser.$id.rediger'
 
@@ -85,6 +86,11 @@ const AuthenticatedMeldingerIndexRoute =
     path: '/meldinger/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedAdminRouteRoute,
+} as any)
 const AuthenticatedMeldingerIdRoute =
   AuthenticatedMeldingerIdRouteImport.update({
     id: '/meldinger/$id',
@@ -103,12 +109,13 @@ export interface FileRoutesByFullPath {
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
   '/personvern': typeof PersonvernRoute
-  '/admin': typeof AuthenticatedAdminRouteRoute
+  '/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/favoritter': typeof AuthenticatedFavoritterRoute
   '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
   '/annonse/$id': typeof AnnonseIdRoute
   '/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
+  '/admin/': typeof AuthenticatedAdminIndexRoute
   '/meldinger/': typeof AuthenticatedMeldingerIndexRoute
   '/mine-annonser/': typeof AuthenticatedMineAnnonserIndexRoute
   '/mine-annonser/$id/rediger': typeof AuthenticatedMineAnnonserIdRedigerRoute
@@ -118,12 +125,12 @@ export interface FileRoutesByTo {
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
   '/personvern': typeof PersonvernRoute
-  '/admin': typeof AuthenticatedAdminRouteRoute
   '/favoritter': typeof AuthenticatedFavoritterRoute
   '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
   '/annonse/$id': typeof AnnonseIdRoute
   '/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
+  '/admin': typeof AuthenticatedAdminIndexRoute
   '/meldinger': typeof AuthenticatedMeldingerIndexRoute
   '/mine-annonser': typeof AuthenticatedMineAnnonserIndexRoute
   '/mine-annonser/$id/rediger': typeof AuthenticatedMineAnnonserIdRedigerRoute
@@ -135,12 +142,13 @@ export interface FileRoutesById {
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
   '/personvern': typeof PersonvernRoute
-  '/_authenticated/admin': typeof AuthenticatedAdminRouteRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/_authenticated/favoritter': typeof AuthenticatedFavoritterRoute
   '/_authenticated/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/_authenticated/profil': typeof AuthenticatedProfilRoute
   '/annonse/$id': typeof AnnonseIdRoute
   '/_authenticated/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
+  '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/meldinger/': typeof AuthenticatedMeldingerIndexRoute
   '/_authenticated/mine-annonser/': typeof AuthenticatedMineAnnonserIndexRoute
   '/_authenticated/mine-annonser/$id/rediger': typeof AuthenticatedMineAnnonserIdRedigerRoute
@@ -158,6 +166,7 @@ export interface FileRouteTypes {
     | '/profil'
     | '/annonse/$id'
     | '/meldinger/$id'
+    | '/admin/'
     | '/meldinger/'
     | '/mine-annonser/'
     | '/mine-annonser/$id/rediger'
@@ -167,12 +176,12 @@ export interface FileRouteTypes {
     | '/annonser'
     | '/auth'
     | '/personvern'
-    | '/admin'
     | '/favoritter'
     | '/ny-annonse'
     | '/profil'
     | '/annonse/$id'
     | '/meldinger/$id'
+    | '/admin'
     | '/meldinger'
     | '/mine-annonser'
     | '/mine-annonser/$id/rediger'
@@ -189,6 +198,7 @@ export interface FileRouteTypes {
     | '/_authenticated/profil'
     | '/annonse/$id'
     | '/_authenticated/meldinger/$id'
+    | '/_authenticated/admin/'
     | '/_authenticated/meldinger/'
     | '/_authenticated/mine-annonser/'
     | '/_authenticated/mine-annonser/$id/rediger'
@@ -289,6 +299,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMeldingerIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/': {
+      id: '/_authenticated/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
     '/_authenticated/meldinger/$id': {
       id: '/_authenticated/meldinger/$id'
       path: '/meldinger/$id'
@@ -306,8 +323,22 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedAdminRouteRouteChildren {
+  AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
+}
+
+const AuthenticatedAdminRouteRouteChildren: AuthenticatedAdminRouteRouteChildren =
+  {
+    AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
+  }
+
+const AuthenticatedAdminRouteRouteWithChildren =
+  AuthenticatedAdminRouteRoute._addFileChildren(
+    AuthenticatedAdminRouteRouteChildren,
+  )
+
 interface AuthenticatedRouteRouteChildren {
-  AuthenticatedAdminRouteRoute: typeof AuthenticatedAdminRouteRoute
+  AuthenticatedAdminRouteRoute: typeof AuthenticatedAdminRouteRouteWithChildren
   AuthenticatedFavoritterRoute: typeof AuthenticatedFavoritterRoute
   AuthenticatedNyAnnonseRoute: typeof AuthenticatedNyAnnonseRoute
   AuthenticatedProfilRoute: typeof AuthenticatedProfilRoute
@@ -318,7 +349,7 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
-  AuthenticatedAdminRouteRoute: AuthenticatedAdminRouteRoute,
+  AuthenticatedAdminRouteRoute: AuthenticatedAdminRouteRouteWithChildren,
   AuthenticatedFavoritterRoute: AuthenticatedFavoritterRoute,
   AuthenticatedNyAnnonseRoute: AuthenticatedNyAnnonseRoute,
   AuthenticatedProfilRoute: AuthenticatedProfilRoute,

@@ -1,9 +1,11 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { ArrowLeft, MapPin, MessageCircle, User as UserIcon } from "lucide-react";
+import { ArrowLeft, MapPin, MessageCircle, User as UserIcon, Pencil, Eye, Users, Heart } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth";
+
 import { signListingImageUrls } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { FavoriteButton } from "@/components/favorite-button";

@@ -157,11 +157,11 @@ function ListingDetailPage() {
     let visitorKey = user?.id ?? null;
     if (!visitorKey) {
       try {
-        const k = "kaupet_visitor_id";
-        visitorKey = localStorage.getItem(k);
+        const k = "kaupet_session_id";
+        visitorKey = sessionStorage.getItem(k);
         if (!visitorKey) {
           visitorKey = crypto.randomUUID();
-          localStorage.setItem(k, visitorKey);
+          sessionStorage.setItem(k, visitorKey);
         }
       } catch {
         visitorKey = crypto.randomUUID();

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { MapContainer, TileLayer, Marker, Circle, useMap, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Circle, Popup, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Link } from "@tanstack/react-router";
@@ -119,8 +119,6 @@ export function ListingsMap({ center, radiusKm, listings, onCenterChange, classN
   );
 }
 
-// Inline popup component using react-leaflet Popup
-import { Popup } from "react-leaflet";
 function LeafletPopup({ listing }: { listing: MapListing }) {
   return (
     <Popup>

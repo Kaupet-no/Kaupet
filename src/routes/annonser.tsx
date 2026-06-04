@@ -7,13 +7,6 @@ import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -62,8 +55,16 @@ function BrowsePage() {
   const [qDraft, setQDraft] = useState(search.q);
   const [mounted, setMounted] = useState(false);
   const [mobileMapOpen, setMobileMapOpen] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
 
   useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 1024px)");
+    const update = () => setIsDesktop(mql.matches);
+    update();
+    mql.addEventListener("change", update);
+    return () => mql.removeEventListener("change", update);
+  }, []);
   useEffect(() => setQDraft(search.q), [search.q]);
 
   const location: LocationValue = useMemo(
@@ -225,9 +226,20 @@ function BrowsePage() {
     <div className="h-full w-full animate-pulse rounded-xl bg-muted" />
   );
 
+  // Avoid hydration mismatch crashes by rendering the body only after mount.
+  if (!mounted) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 py-10">
+        <h1 className="font-display text-3xl tracking-tight">Annonser</h1>
+        <div className="mt-8 h-12 animate-pulse rounded-md bg-muted" />
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-10">
       <h1 className="font-display text-3xl tracking-tight">Annonser</h1>
+
 
       <form
         onSubmit={(e) => {
@@ -245,35 +257,29 @@ function BrowsePage() {
             className="pl-9"
           />
         </div>
-        <Select
+        <select
           value={search.category || "all"}
-          onValueChange={(v) => updateSearch({ category: v === "all" ? "" : v })}
+          onChange={(e) => updateSearch({ category: e.target.value === "all" ? "" : e.target.value })}
+          className="h-9 w-[180px] rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          aria-label="Kategori"
         >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Alle kategorier" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Alle kategorier</SelectItem>
-            {(categories ?? []).map((c) => (
-              <SelectItem key={c.id} value={c.slug}>
-                {c.name_nb}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
+          <option value="all">Alle kategorier</option>
+          {(categories ?? []).map((c) => (
+            <option key={c.id} value={c.slug}>
+              {c.name_nb}
+            </option>
+          ))}
+        </select>
+        <select
           value={search.sort}
-          onValueChange={(v) => updateSearch({ sort: v as typeof search.sort })}
+          onChange={(e) => updateSearch({ sort: e.target.value as typeof search.sort })}
+          className="h-9 w-[160px] rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          aria-label="Sortering"
         >
-          <SelectTrigger className="w-[160px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="new">Nyeste først</SelectItem>
-            <SelectItem value="price_asc">Pris: lav → høy</SelectItem>
-            <SelectItem value="price_desc">Pris: høy → lav</SelectItem>
-          </SelectContent>
-        </Select>
+          <option value="new">Nyeste først</option>
+          <option value="price_asc">Pris: lav → høy</option>
+          <option value="price_desc">Pris: høy → lav</option>
+        </select>
         <Button type="submit">Søk</Button>
       </form>
 
@@ -281,23 +287,25 @@ function BrowsePage() {
         <LocationFilter value={location} onChange={handleLocationChange} />
       </div>
 
-      <div className="mt-6 lg:hidden">
-        <Sheet open={mobileMapOpen} onOpenChange={setMobileMapOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" className="w-full">
-              <MapIcon className="size-4" /> Vis kart
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="bottom" className="h-[85vh] p-4">
-            <SheetHeader>
-              <SheetTitle>Kart</SheetTitle>
-            </SheetHeader>
-            <div className="mt-4 h-[calc(100%-3rem)]">
-              {mobileMapOpen ? mapNode : null}
-            </div>
-          </SheetContent>
-        </Sheet>
-      </div>
+      {!isDesktop && (
+        <div className="mt-6">
+          <Sheet open={mobileMapOpen} onOpenChange={setMobileMapOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" className="w-full">
+                <MapIcon className="size-4" /> Vis kart
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="bottom" className="h-[85vh] p-4">
+              <SheetHeader>
+                <SheetTitle>Kart</SheetTitle>
+              </SheetHeader>
+              <div className="mt-4 h-[calc(100%-3rem)]">
+                {mobileMapOpen ? mapNode : null}
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
+      )}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_420px]">
         <div>
@@ -323,11 +331,13 @@ function BrowsePage() {
           )}
         </div>
 
-        <aside className="hidden lg:block">
-          <div className="sticky top-20 h-[calc(100vh-6rem)] overflow-hidden rounded-xl border border-border">
-            {mapNode}
-          </div>
-        </aside>
+        {isDesktop && (
+          <aside>
+            <div className="sticky top-20 h-[calc(100vh-6rem)] overflow-hidden rounded-xl border border-border">
+              {mapNode}
+            </div>
+          </aside>
+        )}
       </div>
     </div>
   );

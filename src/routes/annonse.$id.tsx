@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { lazy, Suspense, useEffect, useState } from "react";
-import { ArrowLeft, MapPin, MessageCircle, User as UserIcon, Pencil, Eye, Users, Heart } from "lucide-react";
+import { ArrowLeft, MapPin, MessageCircle, User as UserIcon, Pencil, Eye, Users, Heart, Info } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -325,6 +325,20 @@ function ListingDetailPage() {
                   </dt>
                 </div>
               </dl>
+              <div className="mt-4 flex items-start gap-2 rounded-lg bg-card p-3 text-xs text-muted-foreground">
+                <Info className="mt-0.5 size-3.5 shrink-0 text-primary" />
+                <div>
+                  <p className="font-medium text-foreground">Om statistikken</p>
+                  <p className="mt-1">
+                    <strong>Visninger</strong> = antall ganger annonsen er åpnet (én per time).{" "}
+                    <strong>Unike besøk</strong> = forskjellige besøkende, basert på innlogget bruker-ID eller en tilfeldig nøkkel i nettleseren. Samme person telles kun én gang.{" "}
+                    <strong>Favoritter</strong> = antall brukere som har lagt annonsen i favoritter.
+                  </p>
+                  <p className="mt-1">
+                    Tallene kan være noe unøyaktige fordi vi ikke sporer brukere på tvers av økter eller nettlesere.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 

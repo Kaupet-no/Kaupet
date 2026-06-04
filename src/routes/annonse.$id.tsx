@@ -327,20 +327,44 @@ function ListingDetailPage() {
                   </dt>
                 </div>
               </dl>
-              <div className="mt-4 flex items-start gap-2 rounded-lg bg-card p-3 text-xs text-muted-foreground">
-                <Info className="mt-0.5 size-3.5 shrink-0 text-primary" />
-                <div>
-                  <p className="font-medium text-foreground">Om statistikken</p>
-                  <p className="mt-1">
-                    <strong>Visninger</strong> = antall ganger annonsen er åpnet (én per time).{" "}
-                    <strong>Unike besøk</strong> = forskjellige besøkende, basert på innlogget bruker-ID eller en tilfeldig nøkkel i nettleseren. Samme person telles kun én gang.{" "}
-                    <strong>Favoritter</strong> = antall brukere som har lagt annonsen i favoritter.
-                  </p>
-                  <p className="mt-1">
-                    Tallene kan være noe unøyaktige fordi vi ikke sporer brukere på tvers av økter eller nettlesere.
-                  </p>
-                </div>
-              </div>
+              <Collapsible open={statsInfoOpen} onOpenChange={setStatsInfoOpen} className="mt-4 rounded-lg bg-card">
+                <CollapsibleTrigger asChild>
+                  <button className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-xs text-muted-foreground transition-colors hover:text-foreground">
+                    <span className="flex items-center gap-2 font-medium text-foreground">
+                      <Info className="size-3.5 shrink-0 text-primary" />
+                      Hva betyr tallene?
+                    </span>
+                    <ChevronDown className={`size-3.5 shrink-0 transition-transform ${statsInfoOpen ? "rotate-180" : ""}`} />
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="border-t border-border px-3 pb-3 pt-2 text-xs text-muted-foreground">
+                    <ul className="space-y-2">
+                      <li className="flex gap-2">
+                        <span className="mt-0.5 shrink-0 text-primary">•</span>
+                        <span>
+                          <strong className="text-foreground">Visninger</strong> — antall ganger annonsen er åpnet (ett oppslag per time).
+                        </span>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="mt-0.5 shrink-0 text-primary">•</span>
+                        <span>
+                          <strong className="text-foreground">Unike besøk</strong> — antall distinkte besøkende. Vi skiller brukere ved innlogget bruker-ID eller en tilfeldig nøkkel i nettleseren. Samme person telles bare én gang.
+                        </span>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="mt-0.5 shrink-0 text-primary">•</span>
+                        <span>
+                          <strong className="text-foreground">Favoritter</strong> — antall brukere som har lagt annonsen i favoritter.
+                        </span>
+                      </li>
+                    </ul>
+                    <p className="mt-3 rounded-md bg-muted/60 p-2 text-[11px] leading-relaxed">
+                      Tallene kan være noe unøyaktige fordi vi ikke sporer brukere på tvers av nettlesere eller økter. Bytter noen nettleser eller rydder data, telles de på nytt.
+                    </p>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             </div>
           )}
 

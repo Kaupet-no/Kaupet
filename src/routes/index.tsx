@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Heart, MapPin, Search, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, Heart, MapPin, Search, ShieldCheck } from "lucide-react";
 import { z } from "zod";
 import { useRef, useState } from "react";
 import Autoplay from "embla-carousel-autoplay";

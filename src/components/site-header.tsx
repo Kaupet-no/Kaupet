@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Search, Plus, Heart, MessageCircle, User as UserIcon } from "lucide-react";
+import { Plus, Heart, MessageCircle } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";

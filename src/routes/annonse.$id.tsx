@@ -356,9 +356,16 @@ function ListingDetailPage() {
                 )}
               </div>
             </div>
-            <Button className="mt-4 w-full gap-2" disabled>
-              <MessageCircle className="size-4" /> Send melding (kommer)
-            </Button>
+            {!isOwner && (
+              <Button
+                className="mt-4 w-full gap-2"
+                onClick={() => contactMutation.mutate()}
+                disabled={contactMutation.isPending}
+              >
+                <MessageCircle className="size-4" />
+                {contactMutation.isPending ? "Åpner samtale…" : "Send melding til selger"}
+              </Button>
+            )}
             <FavoriteButton listingId={data.id} variant="full" size="lg" className="mt-2" />
           </div>
         </aside>

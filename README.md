@@ -47,5 +47,3 @@ Funnet en sårbarhet? Se [SECURITY.md](SECURITY.md) — ikke åpne en offentlig 
 ## Lisens
 
 Kaupet.no er lisensiert under [GNU Affero General Public License v3.0](LICENSE). Se [NOTICE](NOTICE) for hva det betyr i praksis — særlig at modifiserte nettverkstjenester må dele kildekoden sin tilbake til fellesskapet.
-
-

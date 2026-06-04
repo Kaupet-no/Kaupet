@@ -227,7 +227,7 @@ function LandingPage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-3 md:justify-end">
-              <a href="https://github.com" target="_blank" rel="noreferrer">
+              <a href="https://github.com/Kaupet-no/kaupet" target="_blank" rel="noreferrer">
                 <Button size="lg" variant="secondary">
                   Bidra på GitHub
                 </Button>

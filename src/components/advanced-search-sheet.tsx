@@ -268,13 +268,15 @@ export function AdvancedSearchSheet({ open, onOpenChange, initial, categories, o
                   onChange={(loc) => setV({ ...v, location: loc })}
                 />
               </div>
-              {v.location.lat != null && (
-                <div className="rounded-md border border-border p-1">
-                  <RadiusPicker
-                    value={v.location.radius}
-                    onChange={(r) => setV({ ...v, location: { ...v.location, radius: r } })}
-                  />
-                </div>
+              <div className="rounded-md border border-border p-1">
+                <RadiusPicker
+                  value={v.location.radius}
+                  onChange={(r) => setV({ ...v, location: { ...v.location, radius: r } })}
+                  disabled={v.location.lat == null}
+                />
+              </div>
+              {v.location.lat == null && (
+                <p className="text-xs text-muted-foreground">Velg sted overfor for å aktivere radius.</p>
               )}
             </section>
           </div>

@@ -128,9 +128,14 @@ function RootComponent() {
   const router = useRouter();
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      router.invalidate();
-      queryClient.invalidateQueries();
+    // Only invalidate on real sign-in / sign-out — NOT on INITIAL_SESSION or
+    // TOKEN_REFRESHED, which fire on every mount/tab-focus and would refetch
+    // every query in the app, causing the UI to feel slow and unstable.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
+        router.invalidate();
+        queryClient.invalidateQueries();
+      }
     });
     return () => subscription.unsubscribe();
   }, [router, queryClient]);

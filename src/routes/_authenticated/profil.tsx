@@ -383,10 +383,12 @@ function DeleteAccountSection({ currentEmail }: { currentEmail: string }) {
     <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6">
       <h2 className="text-lg font-medium text-destructive">Slett konto</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Sletter kontoen din og alt innhold (annonser, meldinger, favoritter og lagrede søk).
+        Sletter kontoen din og dine personopplysninger. Annonsene dine fjernes helt.
+        Tidligere meldinger du har sendt vil fortsatt være synlige for mottakerne,
+        men avsendernavnet endres til «Slettet bruker».
         Av sikkerhetshensyn settes kontoen først inaktiv i 7 dager. Logger du inn igjen
-        innen denne perioden, avbrytes slettingen automatisk. Etter 7 dager slettes alt
-        permanent og kan ikke gjenopprettes.
+        innen denne perioden, avbrytes slettingen automatisk. Etter 7 dager slettes
+        kontoen permanent og kan ikke gjenopprettes.
       </p>
       <div className="mt-4 flex justify-end">
         <AlertDialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setConfirmation(""); }}>
@@ -406,8 +408,9 @@ function DeleteAccountSection({ currentEmail }: { currentEmail: string }) {
                   </p>
                   <p>
                     Innen <strong>7 dager</strong> kan du gjenopprette kontoen ved å logge
-                    inn på nytt. Etter 7 dager slettes kontoen og alt tilhørende innhold{" "}
-                    <strong>permanent</strong>, og kan ikke gjenopprettes.
+                    inn på nytt. Etter 7 dager slettes profilen din permanent — annonsene
+                    dine fjernes, men meldinger du har sendt blir værende hos mottakerne
+                    med avsendernavnet <em>«Slettet bruker»</em>.
                   </p>
                   <p>
                     Skriv inn e-postadressen din (<strong>{currentEmail}</strong>) for å

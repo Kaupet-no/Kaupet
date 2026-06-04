@@ -386,18 +386,61 @@ function BrowsePage() {
           location={location}
           onLocationChange={handleLocationChange}
           categorySlug={search.category}
-          onCategoryChange={(slug) => updateSearch({ category: slug })}
+          onCategoryChange={(slug) => updateSearch({ category: slug, categories: [] })}
           categories={categories ?? []}
           sort={search.sort}
           onSortChange={(s) => updateSearch({ sort: s })}
         />
       </div>
 
-      <div className="mt-2 flex items-center justify-between text-sm text-muted-foreground">
+      <div className="mt-2 flex items-center justify-between gap-2 text-sm text-muted-foreground">
         <span>
           {isLoading ? "Søker…" : `${cards.length} annonse${cards.length === 1 ? "" : "r"}`}
         </span>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setAdvOpen(true)}
+          className="gap-1.5"
+        >
+          <SlidersHorizontal className="size-4" /> Avansert søk
+          {advancedFilterCount > 0 && (
+            <span className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
+              {advancedFilterCount}
+            </span>
+          )}
+        </Button>
       </div>
+
+      <AdvancedSearchSheet
+        open={advOpen}
+        onOpenChange={setAdvOpen}
+        initial={advancedInitial}
+        categories={categories ?? []}
+        onApply={(v) => {
+          const c = valueToCriteria(v);
+          navigate({
+            search: (prev) => ({
+              ...prev,
+              q: (c.terms ?? []).join(" "),
+              qMode: c.qMode,
+              categories: c.categories,
+              catMode: c.catMode,
+              conditions: c.conditions,
+              includeFree: c.includeFree,
+              min: c.min ?? undefined,
+              max: c.max ?? undefined,
+              lat: c.lat ?? undefined,
+              lng: c.lng ?? undefined,
+              radius: c.radius ?? undefined,
+              loc: c.loc,
+              category: "",
+            }),
+          });
+        }}
+      />
+
 
       <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_420px]">
         <div>

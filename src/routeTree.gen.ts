@@ -18,6 +18,7 @@ import { Route as AnnonseIdRouteImport } from './routes/annonse.$id'
 import { Route as AuthenticatedProfilRouteImport } from './routes/_authenticated/profil'
 import { Route as AuthenticatedNyAnnonseRouteImport } from './routes/_authenticated/ny-annonse'
 import { Route as AuthenticatedFavoritterRouteImport } from './routes/_authenticated/favoritter'
+import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authenticated/admin/route'
 import { Route as AuthenticatedMineAnnonserIndexRouteImport } from './routes/_authenticated/mine-annonser.index'
 import { Route as AuthenticatedMeldingerIndexRouteImport } from './routes/_authenticated/meldinger.index'
 import { Route as AuthenticatedMeldingerIdRouteImport } from './routes/_authenticated/meldinger.$id'
@@ -67,6 +68,11 @@ const AuthenticatedFavoritterRoute = AuthenticatedFavoritterRouteImport.update({
   path: '/favoritter',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAdminRouteRoute = AuthenticatedAdminRouteRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedMineAnnonserIndexRoute =
   AuthenticatedMineAnnonserIndexRouteImport.update({
     id: '/mine-annonser/',
@@ -97,6 +103,7 @@ export interface FileRoutesByFullPath {
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
   '/personvern': typeof PersonvernRoute
+  '/admin': typeof AuthenticatedAdminRouteRoute
   '/favoritter': typeof AuthenticatedFavoritterRoute
   '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
@@ -111,6 +118,7 @@ export interface FileRoutesByTo {
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
   '/personvern': typeof PersonvernRoute
+  '/admin': typeof AuthenticatedAdminRouteRoute
   '/favoritter': typeof AuthenticatedFavoritterRoute
   '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
@@ -127,6 +135,7 @@ export interface FileRoutesById {
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
   '/personvern': typeof PersonvernRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRouteRoute
   '/_authenticated/favoritter': typeof AuthenticatedFavoritterRoute
   '/_authenticated/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/_authenticated/profil': typeof AuthenticatedProfilRoute
@@ -143,6 +152,7 @@ export interface FileRouteTypes {
     | '/annonser'
     | '/auth'
     | '/personvern'
+    | '/admin'
     | '/favoritter'
     | '/ny-annonse'
     | '/profil'
@@ -157,6 +167,7 @@ export interface FileRouteTypes {
     | '/annonser'
     | '/auth'
     | '/personvern'
+    | '/admin'
     | '/favoritter'
     | '/ny-annonse'
     | '/profil'
@@ -172,6 +183,7 @@ export interface FileRouteTypes {
     | '/annonser'
     | '/auth'
     | '/personvern'
+    | '/_authenticated/admin'
     | '/_authenticated/favoritter'
     | '/_authenticated/ny-annonse'
     | '/_authenticated/profil'
@@ -256,6 +268,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedFavoritterRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/mine-annonser/': {
       id: '/_authenticated/mine-annonser/'
       path: '/mine-annonser'
@@ -288,6 +307,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdminRouteRoute: typeof AuthenticatedAdminRouteRoute
   AuthenticatedFavoritterRoute: typeof AuthenticatedFavoritterRoute
   AuthenticatedNyAnnonseRoute: typeof AuthenticatedNyAnnonseRoute
   AuthenticatedProfilRoute: typeof AuthenticatedProfilRoute
@@ -298,6 +318,7 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdminRouteRoute: AuthenticatedAdminRouteRoute,
   AuthenticatedFavoritterRoute: AuthenticatedFavoritterRoute,
   AuthenticatedNyAnnonseRoute: AuthenticatedNyAnnonseRoute,
   AuthenticatedProfilRoute: AuthenticatedProfilRoute,
@@ -322,3 +343,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

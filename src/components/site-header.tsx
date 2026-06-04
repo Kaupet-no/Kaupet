@@ -37,9 +37,11 @@ export function SiteHeader() {
         <div className="ml-auto flex items-center gap-2">
           {user ? (
             <>
-              <Button variant="ghost" size="icon" aria-label="Meldinger" disabled>
-                <MessageCircle className="size-5" />
-              </Button>
+              <Link to="/meldinger" aria-label="Meldinger">
+                <Button variant="ghost" size="icon" aria-label="Meldinger">
+                  <MessageCircle className="size-5" />
+                </Button>
+              </Link>
               <UserMenu userId={user.id} email={user.email ?? null} />
             </>
           ) : (

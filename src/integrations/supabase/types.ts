@@ -315,7 +315,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      listings_within_radius: {
+        Args: { center_lat: number; center_lng: number; radius_km: number }
+        Returns: {
+          distance_km: number
+          id: string
+        }[]
+      }
     }
     Enums: {
       listing_condition:

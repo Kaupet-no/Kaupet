@@ -18,9 +18,13 @@ import { Route as AnnonseIdRouteImport } from './routes/annonse.$id'
 import { Route as AuthenticatedProfilRouteImport } from './routes/_authenticated/profil'
 import { Route as AuthenticatedNyAnnonseRouteImport } from './routes/_authenticated/ny-annonse'
 import { Route as AuthenticatedFavoritterRouteImport } from './routes/_authenticated/favoritter'
+import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authenticated/admin/route'
 import { Route as AuthenticatedMineAnnonserIndexRouteImport } from './routes/_authenticated/mine-annonser.index'
 import { Route as AuthenticatedMeldingerIndexRouteImport } from './routes/_authenticated/meldinger.index'
+import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedMeldingerIdRouteImport } from './routes/_authenticated/meldinger.$id'
+import { Route as AuthenticatedAdminKategorierRouteImport } from './routes/_authenticated/admin/kategorier'
+import { Route as AuthenticatedAdminBrukereRouteImport } from './routes/_authenticated/admin/brukere'
 import { Route as AuthenticatedMineAnnonserIdRedigerRouteImport } from './routes/_authenticated/mine-annonser.$id.rediger'
 
 const PersonvernRoute = PersonvernRouteImport.update({
@@ -67,6 +71,11 @@ const AuthenticatedFavoritterRoute = AuthenticatedFavoritterRouteImport.update({
   path: '/favoritter',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAdminRouteRoute = AuthenticatedAdminRouteRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedMineAnnonserIndexRoute =
   AuthenticatedMineAnnonserIndexRouteImport.update({
     id: '/mine-annonser/',
@@ -79,11 +88,28 @@ const AuthenticatedMeldingerIndexRoute =
     path: '/meldinger/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedAdminRouteRoute,
+} as any)
 const AuthenticatedMeldingerIdRoute =
   AuthenticatedMeldingerIdRouteImport.update({
     id: '/meldinger/$id',
     path: '/meldinger/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAdminKategorierRoute =
+  AuthenticatedAdminKategorierRouteImport.update({
+    id: '/kategorier',
+    path: '/kategorier',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminBrukereRoute =
+  AuthenticatedAdminBrukereRouteImport.update({
+    id: '/brukere',
+    path: '/brukere',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
   } as any)
 const AuthenticatedMineAnnonserIdRedigerRoute =
   AuthenticatedMineAnnonserIdRedigerRouteImport.update({
@@ -97,11 +123,15 @@ export interface FileRoutesByFullPath {
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
   '/personvern': typeof PersonvernRoute
+  '/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/favoritter': typeof AuthenticatedFavoritterRoute
   '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
   '/annonse/$id': typeof AnnonseIdRoute
+  '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
+  '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
+  '/admin/': typeof AuthenticatedAdminIndexRoute
   '/meldinger/': typeof AuthenticatedMeldingerIndexRoute
   '/mine-annonser/': typeof AuthenticatedMineAnnonserIndexRoute
   '/mine-annonser/$id/rediger': typeof AuthenticatedMineAnnonserIdRedigerRoute
@@ -115,7 +145,10 @@ export interface FileRoutesByTo {
   '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
   '/annonse/$id': typeof AnnonseIdRoute
+  '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
+  '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
+  '/admin': typeof AuthenticatedAdminIndexRoute
   '/meldinger': typeof AuthenticatedMeldingerIndexRoute
   '/mine-annonser': typeof AuthenticatedMineAnnonserIndexRoute
   '/mine-annonser/$id/rediger': typeof AuthenticatedMineAnnonserIdRedigerRoute
@@ -127,11 +160,15 @@ export interface FileRoutesById {
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
   '/personvern': typeof PersonvernRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/_authenticated/favoritter': typeof AuthenticatedFavoritterRoute
   '/_authenticated/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/_authenticated/profil': typeof AuthenticatedProfilRoute
   '/annonse/$id': typeof AnnonseIdRoute
+  '/_authenticated/admin/brukere': typeof AuthenticatedAdminBrukereRoute
+  '/_authenticated/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/_authenticated/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
+  '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/meldinger/': typeof AuthenticatedMeldingerIndexRoute
   '/_authenticated/mine-annonser/': typeof AuthenticatedMineAnnonserIndexRoute
   '/_authenticated/mine-annonser/$id/rediger': typeof AuthenticatedMineAnnonserIdRedigerRoute
@@ -143,11 +180,15 @@ export interface FileRouteTypes {
     | '/annonser'
     | '/auth'
     | '/personvern'
+    | '/admin'
     | '/favoritter'
     | '/ny-annonse'
     | '/profil'
     | '/annonse/$id'
+    | '/admin/brukere'
+    | '/admin/kategorier'
     | '/meldinger/$id'
+    | '/admin/'
     | '/meldinger/'
     | '/mine-annonser/'
     | '/mine-annonser/$id/rediger'
@@ -161,7 +202,10 @@ export interface FileRouteTypes {
     | '/ny-annonse'
     | '/profil'
     | '/annonse/$id'
+    | '/admin/brukere'
+    | '/admin/kategorier'
     | '/meldinger/$id'
+    | '/admin'
     | '/meldinger'
     | '/mine-annonser'
     | '/mine-annonser/$id/rediger'
@@ -172,11 +216,15 @@ export interface FileRouteTypes {
     | '/annonser'
     | '/auth'
     | '/personvern'
+    | '/_authenticated/admin'
     | '/_authenticated/favoritter'
     | '/_authenticated/ny-annonse'
     | '/_authenticated/profil'
     | '/annonse/$id'
+    | '/_authenticated/admin/brukere'
+    | '/_authenticated/admin/kategorier'
     | '/_authenticated/meldinger/$id'
+    | '/_authenticated/admin/'
     | '/_authenticated/meldinger/'
     | '/_authenticated/mine-annonser/'
     | '/_authenticated/mine-annonser/$id/rediger'
@@ -256,6 +304,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedFavoritterRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/mine-annonser/': {
       id: '/_authenticated/mine-annonser/'
       path: '/mine-annonser'
@@ -270,12 +325,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMeldingerIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/': {
+      id: '/_authenticated/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
     '/_authenticated/meldinger/$id': {
       id: '/_authenticated/meldinger/$id'
       path: '/meldinger/$id'
       fullPath: '/meldinger/$id'
       preLoaderRoute: typeof AuthenticatedMeldingerIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/kategorier': {
+      id: '/_authenticated/admin/kategorier'
+      path: '/kategorier'
+      fullPath: '/admin/kategorier'
+      preLoaderRoute: typeof AuthenticatedAdminKategorierRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/brukere': {
+      id: '/_authenticated/admin/brukere'
+      path: '/brukere'
+      fullPath: '/admin/brukere'
+      preLoaderRoute: typeof AuthenticatedAdminBrukereRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
     }
     '/_authenticated/mine-annonser/$id/rediger': {
       id: '/_authenticated/mine-annonser/$id/rediger'
@@ -287,7 +363,26 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedAdminRouteRouteChildren {
+  AuthenticatedAdminBrukereRoute: typeof AuthenticatedAdminBrukereRoute
+  AuthenticatedAdminKategorierRoute: typeof AuthenticatedAdminKategorierRoute
+  AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
+}
+
+const AuthenticatedAdminRouteRouteChildren: AuthenticatedAdminRouteRouteChildren =
+  {
+    AuthenticatedAdminBrukereRoute: AuthenticatedAdminBrukereRoute,
+    AuthenticatedAdminKategorierRoute: AuthenticatedAdminKategorierRoute,
+    AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
+  }
+
+const AuthenticatedAdminRouteRouteWithChildren =
+  AuthenticatedAdminRouteRoute._addFileChildren(
+    AuthenticatedAdminRouteRouteChildren,
+  )
+
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdminRouteRoute: typeof AuthenticatedAdminRouteRouteWithChildren
   AuthenticatedFavoritterRoute: typeof AuthenticatedFavoritterRoute
   AuthenticatedNyAnnonseRoute: typeof AuthenticatedNyAnnonseRoute
   AuthenticatedProfilRoute: typeof AuthenticatedProfilRoute
@@ -298,6 +393,7 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdminRouteRoute: AuthenticatedAdminRouteRouteWithChildren,
   AuthenticatedFavoritterRoute: AuthenticatedFavoritterRoute,
   AuthenticatedNyAnnonseRoute: AuthenticatedNyAnnonseRoute,
   AuthenticatedProfilRoute: AuthenticatedProfilRoute,
@@ -322,13 +418,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

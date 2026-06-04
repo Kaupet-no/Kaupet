@@ -1,6 +1,8 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { User, ListChecks, Plus, Heart, Settings, LogOut } from "lucide-react";
+import { User, ListChecks, Plus, Heart, Settings, LogOut, Shield } from "lucide-react";
+
+import { useIsAdmin } from "@/lib/use-is-admin";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -23,6 +25,7 @@ function initials(name: string | null | undefined, fallback: string) {
 
 export function UserMenu({ userId, email }: { userId: string; email: string | null }) {
   const navigate = useNavigate();
+  const { data: isAdmin } = useIsAdmin();
 
   const { data: profile } = useQuery({
     queryKey: ["profile-menu", userId],
@@ -93,6 +96,16 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
             <Settings className="size-4" /> Kontoinnstillinger
           </Link>
         </DropdownMenuItem>
+        {isAdmin && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link to="/admin" className="cursor-pointer">
+                <Shield className="size-4" /> Administrasjon
+              </Link>
+            </DropdownMenuItem>
+          </>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           className="cursor-pointer text-destructive focus:text-destructive"

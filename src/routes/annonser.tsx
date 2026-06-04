@@ -148,6 +148,46 @@ function BrowsePage() {
       .filter(Boolean);
   }, [search.q]);
 
+  const advancedInitial: AdvancedSearchValue = useMemo(
+    () => ({
+      terms,
+      qMode: search.qMode ?? "all",
+      categories: effectiveCategories,
+      catMode: search.catMode ?? "any",
+      conditions: search.conditions ?? [],
+      min: typeof search.min === "number" ? search.min : null,
+      max: typeof search.max === "number" ? search.max : null,
+      includeFree: search.includeFree ?? true,
+      location: {
+        lat: search.lat ?? null,
+        lng: search.lng ?? null,
+        radius: search.radius ?? 10,
+        label: search.loc ?? "",
+      },
+    }),
+    [
+      terms,
+      search.qMode,
+      effectiveCategories,
+      search.catMode,
+      search.conditions,
+      search.min,
+      search.max,
+      search.includeFree,
+      search.lat,
+      search.lng,
+      search.radius,
+      search.loc,
+    ],
+  );
+
+  const advancedFilterCount =
+    (effectiveCategories.length > 0 ? 1 : 0) +
+    ((search.conditions?.length ?? 0) > 0 ? 1 : 0) +
+    (typeof search.min === "number" || typeof search.max === "number" ? 1 : 0) +
+    (search.lat != null && search.lng != null ? 1 : 0) +
+    (search.includeFree === false ? 1 : 0);
+
   const { data: listings, isLoading } = useQuery({
     queryKey: [
       "listings",

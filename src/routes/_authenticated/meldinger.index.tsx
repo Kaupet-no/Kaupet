@@ -229,6 +229,14 @@ function InboxPage() {
                       {g.conversations.length === 1 ? "samtale" : "samtaler"}
                     </p>
                   </div>
+                  {g.unreadCount > 0 && (
+                    <span
+                      className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[10px] font-semibold text-accent-foreground"
+                      aria-label={`${g.unreadCount} uleste`}
+                    >
+                      {g.unreadCount}
+                    </span>
+                  )}
                   <span className="text-xs text-muted-foreground">
                     {formatRelative(g.lastActivity)}
                   </span>
@@ -251,12 +259,13 @@ function InboxPage() {
                           user?.id === c.seller_id ? c.buyer : c.seller;
                         const lastFromMe =
                           c.last_message?.sender_id === user?.id;
+                        const unread = unreadByConv.get(c.id) ?? false;
                         return (
                           <li key={c.id}>
                             <Link
                               to="/meldinger/$id"
                               params={{ id: c.id }}
-                              className="flex items-center gap-3 p-3 hover:bg-muted/40"
+                              className={`flex items-center gap-3 p-3 hover:bg-muted/40 ${unread ? "bg-accent/5" : ""}`}
                             >
                               {other?.avatar_url ? (
                                 <img

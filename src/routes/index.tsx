@@ -76,7 +76,7 @@ function LandingPage() {
             <dl className="flex gap-8 pt-4 text-sm">
               <div>
                 <dt className="text-muted-foreground">Lisens</dt>
-                <dd className="font-display text-xl">MIT</dd>
+                <dd className="font-display text-xl">AGPL-3.0</dd>
               </div>
               <div>
                 <dt className="text-muted-foreground">Marked</dt>

@@ -99,8 +99,8 @@ function BrowsePage() {
     enabled: !search.category || !!categories,
   });
 
-  const updateSearch = (patch: Partial<typeof search>) => {
-    navigate({ search: (prev) => ({ ...prev, ...patch }) });
+  const updateSearch = (patch: Partial<z.infer<typeof searchSchema>>) => {
+    navigate({ search: (prev: z.infer<typeof searchSchema>) => ({ ...prev, ...patch }) });
   };
 
   return (

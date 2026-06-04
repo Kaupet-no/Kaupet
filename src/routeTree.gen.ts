@@ -10,11 +10,24 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AnnonserRouteImport } from './routes/annonser'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AnnonseIdRouteImport } from './routes/annonse.$id'
+import { Route as AuthenticatedNyAnnonseRouteImport } from './routes/_authenticated/ny-annonse'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AnnonserRoute = AnnonserRouteImport.update({
+  id: '/annonser',
+  path: '/annonser',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -22,31 +35,61 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AnnonseIdRoute = AnnonseIdRouteImport.update({
+  id: '/annonse/$id',
+  path: '/annonse/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedNyAnnonseRoute = AuthenticatedNyAnnonseRouteImport.update({
+  id: '/ny-annonse',
+  path: '/ny-annonse',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
+  '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
+  '/annonse/$id': typeof AnnonseIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
+  '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
+  '/annonse/$id': typeof AnnonseIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
+  '/_authenticated/ny-annonse': typeof AuthenticatedNyAnnonseRoute
+  '/annonse/$id': typeof AnnonseIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth'
+  fullPaths: '/' | '/annonser' | '/auth' | '/ny-annonse' | '/annonse/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth'
-  id: '__root__' | '/' | '/auth'
+  to: '/' | '/annonser' | '/auth' | '/ny-annonse' | '/annonse/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/annonser'
+    | '/auth'
+    | '/_authenticated/ny-annonse'
+    | '/annonse/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AnnonserRoute: typeof AnnonserRoute
   AuthRoute: typeof AuthRoute
+  AnnonseIdRoute: typeof AnnonseIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -58,6 +101,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/annonser': {
+      id: '/annonser'
+      path: '/annonser'
+      fullPath: '/annonser'
+      preLoaderRoute: typeof AnnonserRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -65,13 +122,51 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/annonse/$id': {
+      id: '/annonse/$id'
+      path: '/annonse/$id'
+      fullPath: '/annonse/$id'
+      preLoaderRoute: typeof AnnonseIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/ny-annonse': {
+      id: '/_authenticated/ny-annonse'
+      path: '/ny-annonse'
+      fullPath: '/ny-annonse'
+      preLoaderRoute: typeof AuthenticatedNyAnnonseRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedNyAnnonseRoute: typeof AuthenticatedNyAnnonseRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedNyAnnonseRoute: AuthenticatedNyAnnonseRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AnnonserRoute: AnnonserRoute,
   AuthRoute: AuthRoute,
+  AnnonseIdRoute: AnnonseIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

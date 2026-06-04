@@ -264,35 +264,29 @@ function BrowsePage() {
             className="pl-9"
           />
         </div>
-        <Select
+        <select
           value={search.category || "all"}
-          onValueChange={(v) => updateSearch({ category: v === "all" ? "" : v })}
+          onChange={(e) => updateSearch({ category: e.target.value === "all" ? "" : e.target.value })}
+          className="h-9 w-[180px] rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          aria-label="Kategori"
         >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Alle kategorier" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Alle kategorier</SelectItem>
-            {(categories ?? []).map((c) => (
-              <SelectItem key={c.id} value={c.slug}>
-                {c.name_nb}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
+          <option value="all">Alle kategorier</option>
+          {(categories ?? []).map((c) => (
+            <option key={c.id} value={c.slug}>
+              {c.name_nb}
+            </option>
+          ))}
+        </select>
+        <select
           value={search.sort}
-          onValueChange={(v) => updateSearch({ sort: v as typeof search.sort })}
+          onChange={(e) => updateSearch({ sort: e.target.value as typeof search.sort })}
+          className="h-9 w-[160px] rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          aria-label="Sortering"
         >
-          <SelectTrigger className="w-[160px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="new">Nyeste først</SelectItem>
-            <SelectItem value="price_asc">Pris: lav → høy</SelectItem>
-            <SelectItem value="price_desc">Pris: høy → lav</SelectItem>
-          </SelectContent>
-        </Select>
+          <option value="new">Nyeste først</option>
+          <option value="price_asc">Pris: lav → høy</option>
+          <option value="price_desc">Pris: høy → lav</option>
+        </select>
         <Button type="submit">Søk</Button>
       </form>
 

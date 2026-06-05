@@ -307,6 +307,9 @@ function ListingRow({
           <span className="inline-flex items-center gap-1">
             <Eye className="size-3" /> {row.view_count}
           </span>
+          <span className="inline-flex items-center gap-1">
+            <Heart className="size-3" /> {row.favorite_count}
+          </span>
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">

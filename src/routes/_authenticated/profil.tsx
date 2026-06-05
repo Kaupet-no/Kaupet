@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Bell, Loader2, LogOut, Trash2, ShieldOff } from "lucide-react";
+import { Bell, Loader2, LogOut, Trash2, ShieldOff, ShieldCheck } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,13 @@ import {
   updateNotificationPreferences,
 } from "@/lib/push.functions";
 import { listMyBlocks, deleteBlock } from "@/lib/blocks.functions";
+import {
+  getMyVerification,
+  isVippsEnabled,
+  startVippsVerification,
+  unverifyVipps,
+} from "@/lib/vipps.functions";
+import { VerifiedBadge } from "@/components/verified-badge";
 
 
 

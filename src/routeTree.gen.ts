@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as PersonvernRouteImport } from './routes/personvern'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AnnonserRouteImport } from './routes/annonser'
@@ -28,6 +29,11 @@ import { Route as AuthenticatedAdminKategorierRouteImport } from './routes/_auth
 import { Route as AuthenticatedAdminBrukereRouteImport } from './routes/_authenticated/admin/brukere'
 import { Route as AuthenticatedMineAnnonserIdRedigerRouteImport } from './routes/_authenticated/mine-annonser.$id.rediger'
 
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PersonvernRoute = PersonvernRouteImport.update({
   id: '/personvern',
   path: '/personvern',
@@ -129,6 +135,7 @@ export interface FileRoutesByFullPath {
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
   '/personvern': typeof PersonvernRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/favoritter': typeof AuthenticatedFavoritterRoute
   '/mine-sok': typeof AuthenticatedMineSokRoute
@@ -148,6 +155,7 @@ export interface FileRoutesByTo {
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
   '/personvern': typeof PersonvernRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/favoritter': typeof AuthenticatedFavoritterRoute
   '/mine-sok': typeof AuthenticatedMineSokRoute
   '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
@@ -168,6 +176,7 @@ export interface FileRoutesById {
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
   '/personvern': typeof PersonvernRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/_authenticated/favoritter': typeof AuthenticatedFavoritterRoute
   '/_authenticated/mine-sok': typeof AuthenticatedMineSokRoute
@@ -189,6 +198,7 @@ export interface FileRouteTypes {
     | '/annonser'
     | '/auth'
     | '/personvern'
+    | '/sitemap.xml'
     | '/admin'
     | '/favoritter'
     | '/mine-sok'
@@ -208,6 +218,7 @@ export interface FileRouteTypes {
     | '/annonser'
     | '/auth'
     | '/personvern'
+    | '/sitemap.xml'
     | '/favoritter'
     | '/mine-sok'
     | '/ny-annonse'
@@ -227,6 +238,7 @@ export interface FileRouteTypes {
     | '/annonser'
     | '/auth'
     | '/personvern'
+    | '/sitemap.xml'
     | '/_authenticated/admin'
     | '/_authenticated/favoritter'
     | '/_authenticated/mine-sok'
@@ -248,11 +260,19 @@ export interface RootRouteChildren {
   AnnonserRoute: typeof AnnonserRoute
   AuthRoute: typeof AuthRoute
   PersonvernRoute: typeof PersonvernRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   AnnonseIdRoute: typeof AnnonseIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/personvern': {
       id: '/personvern'
       path: '/personvern'
@@ -434,8 +454,19 @@ const rootRouteChildren: RootRouteChildren = {
   AnnonserRoute: AnnonserRoute,
   AuthRoute: AuthRoute,
   PersonvernRoute: PersonvernRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   AnnonseIdRoute: AnnonseIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

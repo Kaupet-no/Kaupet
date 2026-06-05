@@ -343,7 +343,7 @@ function EditListingPage() {
                     {src ? (
                       <img
                         src={src}
-                        alt={`Bilde ${idx + 1}`}
+                        alt={idx === 0 ? "Hovedbilde av annonsen" : `Bilde ${idx + 1} av annonsen`}
                         className="size-full object-cover"
                       />
                     ) : (

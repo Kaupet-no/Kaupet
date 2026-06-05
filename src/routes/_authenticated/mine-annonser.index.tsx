@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, Pencil, Trash2, CheckCircle2, RotateCcw, Plus, Eye, Clock } from "lucide-react";
+import { Loader2, Pencil, Trash2, CheckCircle2, RotateCcw, Plus, Eye, Heart, Clock } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";

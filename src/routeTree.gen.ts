@@ -26,6 +26,7 @@ import { Route as AuthenticatedMineAnnonserIndexRouteImport } from './routes/_au
 import { Route as AuthenticatedMeldingerIndexRouteImport } from './routes/_authenticated/meldinger.index'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedMeldingerIdRouteImport } from './routes/_authenticated/meldinger.$id'
+import { Route as AuthenticatedAdminModerasjonRouteImport } from './routes/_authenticated/admin/moderasjon'
 import { Route as AuthenticatedAdminKategorierRouteImport } from './routes/_authenticated/admin/kategorier'
 import { Route as AuthenticatedAdminBrukereRouteImport } from './routes/_authenticated/admin/brukere'
 import { Route as ApiPublicPushDispatchRouteImport } from './routes/api/public/push/dispatch'
@@ -119,6 +120,12 @@ const AuthenticatedMeldingerIdRoute =
     path: '/meldinger/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAdminModerasjonRoute =
+  AuthenticatedAdminModerasjonRouteImport.update({
+    id: '/moderasjon',
+    path: '/moderasjon',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
 const AuthenticatedAdminKategorierRoute =
   AuthenticatedAdminKategorierRouteImport.update({
     id: '/kategorier',
@@ -164,6 +171,7 @@ export interface FileRoutesByFullPath {
   '/bruker/$id': typeof BrukerIdRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
+  '/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
   '/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/meldinger/': typeof AuthenticatedMeldingerIndexRoute
@@ -186,6 +194,7 @@ export interface FileRoutesByTo {
   '/bruker/$id': typeof BrukerIdRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
+  '/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
   '/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/meldinger': typeof AuthenticatedMeldingerIndexRoute
@@ -211,6 +220,7 @@ export interface FileRoutesById {
   '/bruker/$id': typeof BrukerIdRoute
   '/_authenticated/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/_authenticated/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
+  '/_authenticated/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
   '/_authenticated/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/meldinger/': typeof AuthenticatedMeldingerIndexRoute
@@ -236,6 +246,7 @@ export interface FileRouteTypes {
     | '/bruker/$id'
     | '/admin/brukere'
     | '/admin/kategorier'
+    | '/admin/moderasjon'
     | '/meldinger/$id'
     | '/admin/'
     | '/meldinger/'
@@ -258,6 +269,7 @@ export interface FileRouteTypes {
     | '/bruker/$id'
     | '/admin/brukere'
     | '/admin/kategorier'
+    | '/admin/moderasjon'
     | '/meldinger/$id'
     | '/admin'
     | '/meldinger'
@@ -282,6 +294,7 @@ export interface FileRouteTypes {
     | '/bruker/$id'
     | '/_authenticated/admin/brukere'
     | '/_authenticated/admin/kategorier'
+    | '/_authenticated/admin/moderasjon'
     | '/_authenticated/meldinger/$id'
     | '/_authenticated/admin/'
     | '/_authenticated/meldinger/'
@@ -425,6 +438,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMeldingerIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/moderasjon': {
+      id: '/_authenticated/admin/moderasjon'
+      path: '/moderasjon'
+      fullPath: '/admin/moderasjon'
+      preLoaderRoute: typeof AuthenticatedAdminModerasjonRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
     '/_authenticated/admin/kategorier': {
       id: '/_authenticated/admin/kategorier'
       path: '/kategorier'
@@ -466,6 +486,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedAdminRouteRouteChildren {
   AuthenticatedAdminBrukereRoute: typeof AuthenticatedAdminBrukereRoute
   AuthenticatedAdminKategorierRoute: typeof AuthenticatedAdminKategorierRoute
+  AuthenticatedAdminModerasjonRoute: typeof AuthenticatedAdminModerasjonRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
 }
 
@@ -473,6 +494,7 @@ const AuthenticatedAdminRouteRouteChildren: AuthenticatedAdminRouteRouteChildren
   {
     AuthenticatedAdminBrukereRoute: AuthenticatedAdminBrukereRoute,
     AuthenticatedAdminKategorierRoute: AuthenticatedAdminKategorierRoute,
+    AuthenticatedAdminModerasjonRoute: AuthenticatedAdminModerasjonRoute,
     AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
   }
 

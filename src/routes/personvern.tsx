@@ -57,6 +57,10 @@ function PersonvernPage() {
               <strong>kaupet_session_id</strong> — en anonym ID som lever kun i én nettleser-økt. Brukes til å gi selger
               en grov teller på unike besøk per annonse. Slettes når du lukker fanen.
             </li>
+            <li>
+              <strong>kaupet_push_msg_hint_dismissed_v1</strong> — husker at du har lukket informasjonsmeldingen om
+              push-varsler i meldingsoversikten, slik at den ikke vises på nytt.
+            </li>
           </ul>
         </section>
 

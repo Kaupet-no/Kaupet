@@ -33,10 +33,16 @@ function extractIp(headers: Headers): string | null {
   return null;
 }
 
+// Only block write/auth requests. Read-only requests (GET/HEAD/OPTIONS) are
+// always allowed so banned IPs can still browse the site.
+const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
 const ipBanMiddleware = createMiddleware().server(async ({ next }) => {
   try {
     const request = getRequest();
-    const ip = request?.headers ? extractIp(request.headers) : null;
+    if (!request) return next();
+    if (!WRITE_METHODS.has(request.method.toUpperCase())) return next();
+    const ip = extractIp(request.headers);
     if (!ip) return next();
 
     const now = Date.now();

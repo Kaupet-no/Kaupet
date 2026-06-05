@@ -604,6 +604,57 @@ export type Database = {
         }
         Relationships: []
       }
+      user_verifications: {
+        Row: {
+          expires_at: string
+          phone_e164: string | null
+          provider: string
+          subject: string
+          user_id: string
+          verified_at: string
+          verified_name: string
+        }
+        Insert: {
+          expires_at?: string
+          phone_e164?: string | null
+          provider: string
+          subject: string
+          user_id: string
+          verified_at?: string
+          verified_name: string
+        }
+        Update: {
+          expires_at?: string
+          phone_e164?: string | null
+          provider?: string
+          subject?: string
+          user_id?: string
+          verified_at?: string
+          verified_name?: string
+        }
+        Relationships: []
+      }
+      vipps_oauth_states: {
+        Row: {
+          created_at: string
+          expires_at: string
+          state: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          state: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          state?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -700,6 +751,16 @@ export type Database = {
         Returns: {
           avg_rating: number
           review_count: number
+        }[]
+      }
+      user_verification_status: {
+        Args: { _user_id: string }
+        Returns: {
+          expires_at: string
+          is_valid: boolean
+          provider: string
+          verified_at: string
+          verified_name: string
         }[]
       }
     }

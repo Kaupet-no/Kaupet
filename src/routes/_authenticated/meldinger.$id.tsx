@@ -61,9 +61,22 @@ function ConversationPage() {
   const { id } = Route.useParams();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const listMyBlocksFn = useServerFn(listMyBlocks);
+  const listBlocksAgainstMeFn = useServerFn(listBlocksAgainstMe);
   const [body, setBody] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
+
+  const { data: myBlocks } = useQuery({
+    queryKey: ["my-blocks"],
+    enabled: !!user,
+    queryFn: () => listMyBlocksFn(),
+  });
+  const { data: blocksAgainstMe } = useQuery({
+    queryKey: ["blocks-against-me"],
+    enabled: !!user,
+    queryFn: () => listBlocksAgainstMeFn(),
+  });
 
   const { data: conv } = useQuery({
     queryKey: ["conversation", id],

@@ -79,19 +79,36 @@ export const Route = createFileRoute("/_authenticated/profil")({
   }),
   validateSearch: (search: Record<string, unknown>) => {
     const t = search.tab as string;
+    const v = search.vipps as string;
     return {
       tab:
         t === "konto" || t === "varslinger" || t === "blokkerte"
           ? t
           : "profil",
+      vipps: v === "ok" || v === "error" ? v : undefined,
+      reason: typeof search.reason === "string" ? (search.reason as string) : undefined,
     };
   },
   component: ProfilePage,
 });
 
 function ProfilePage() {
-  const { tab } = Route.useSearch();
+  const { tab, vipps, reason } = Route.useSearch();
   const navigate = Route.useNavigate();
+
+  useEffect(() => {
+    if (vipps === "ok") {
+      toast.success("Identiteten din er bekreftet med Vipps");
+      navigate({ search: { tab }, replace: true });
+    } else if (vipps === "error") {
+      toast.error(
+        reason === "not_configured"
+          ? "Vipps-pålogging er ikke konfigurert ennå"
+          : "Vipps-verifisering mislyktes. Prøv igjen.",
+      );
+      navigate({ search: { tab }, replace: true });
+    }
+  }, [vipps, reason, tab, navigate]);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">

@@ -100,8 +100,11 @@ export const Route = createFileRoute("/api/public/push/dispatch")({
           return new Response(null, { status: 204 });
         }
 
-        const webpushModule = await import("web-push");
-        const webpush = (webpushModule as { default?: typeof webpushModule }).default ?? webpushModule;
+        const webpushModule = (await import("web-push")) as unknown as {
+          default?: typeof import("web-push");
+        } & typeof import("web-push");
+        const webpush = webpushModule.default ?? webpushModule;
+
 
         const subject = process.env.VAPID_SUBJECT || "mailto:post@kaupet.no";
         const publicKey =

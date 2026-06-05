@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
@@ -98,6 +99,8 @@ function NewListingPage() {
     watch,
     formState: { errors },
   } = useForm<ListingForm>({
+    resolver: zodResolver(listingSchema),
+    mode: "onTouched",
     defaultValues: {
       title: "",
       description: "",
@@ -167,7 +170,7 @@ function NewListingPage() {
 
   const mutation = useMutation({
     mutationFn: async (values: ListingForm) => {
-      const parsed = listingSchema.parse(values);
+      const parsed = values;
       const { data: userData, error: userErr } = await supabase.auth.getUser();
       if (userErr || !userData.user) throw new Error("Du må være logget inn.");
       const userId = userData.user.id;
@@ -233,7 +236,8 @@ function NewListingPage() {
       navigate({ to: "/annonse/$id", params: { id } });
     },
     onError: (err: Error) => {
-      toast.error(err.message || "Kunne ikke publisere annonsen");
+      const msg = err.message ?? "";
+      toast.error(msg.startsWith("[") ? "Sjekk feltene og prøv igjen" : msg || "Kunne ikke publisere annonsen");
     },
   });
 

@@ -324,6 +324,105 @@ function InboxPage() {
   );
 }
 
+const PUSH_HINT_DISMISS_KEY = "kaupet_push_msg_hint_dismissed_v1";
+
+function PushHintForMessages() {
+  const push = usePushStatus();
+  const [dismissed, setDismissed] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    try {
+      setDismissed(localStorage.getItem(PUSH_HINT_DISMISS_KEY) === "1");
+    } catch {
+      setDismissed(false);
+    }
+  }, []);
+
+  if (push.loading || push.messagesActive || dismissed) return null;
+  // Hide silently when the env doesn't support push (e.g. Lovable preview iframe)
+  if (!push.supported) return null;
+
+  const enable = async () => {
+    setBusy(true);
+    try {
+      await push.enableOnThisDevice("messages");
+      toast.success("Push-varsler er aktivert på denne enheten");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Klarte ikke å aktivere varsler");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const dismiss = () => {
+    try {
+      localStorage.setItem(PUSH_HINT_DISMISS_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+    setDismissed(true);
+  };
+
+  return (
+    <div className="mt-6 flex gap-3 rounded-xl border border-border bg-card p-4">
+      <BellRing className="mt-0.5 size-5 shrink-0 text-primary" />
+      <div className="flex-1 space-y-2 text-sm">
+        {push.permission === "denied" ? (
+          <>
+            <p className="font-medium">Push-varsler er blokkert</p>
+            <p className="text-muted-foreground">
+              Du har blokkert varsler for kaupet.no. Endre tillatelsen i
+              nettleserinnstillingene for å få varsel om nye meldinger.
+            </p>
+          </>
+        ) : !push.subscribedHere ? (
+          <>
+            <p className="font-medium">Få varsel om nye meldinger</p>
+            <p className="text-muted-foreground">
+              Push-varsler er ikke aktivert på denne enheten. Du vil ikke få varsel
+              når Kaupet.no er lukket.
+            </p>
+            <Button size="sm" onClick={enable} disabled={busy}>
+              {busy && <Loader2 className="size-4 animate-spin" />}
+              Aktiver push-varsler
+            </Button>
+          </>
+        ) : (
+          <>
+            <p className="font-medium">Push-varsler for meldinger er av</p>
+            <p className="text-muted-foreground">
+              Slå på for å få varsel om nye meldinger på denne enheten.
+            </p>
+            <Button size="sm" onClick={enable} disabled={busy}>
+              {busy && <Loader2 className="size-4 animate-spin" />}
+              Slå på for meldinger
+            </Button>
+          </>
+        )}
+        <p>
+          <Link
+            to="/profil"
+            search={{ tab: "varslinger" } as never}
+            className="text-xs underline underline-offset-2 text-muted-foreground"
+          >
+            Administrer varsler
+          </Link>
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={dismiss}
+        className="rounded p-1 text-muted-foreground hover:bg-muted"
+        aria-label="Skjul melding"
+      >
+        <X className="size-4" />
+      </button>
+    </div>
+  );
+}
+
+
 async function attachLastMessage(
   convs: ConversationRow[],
 ): Promise<ConversationRow[]> {

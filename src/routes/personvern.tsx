@@ -25,7 +25,7 @@ function PersonvernPage() {
       <header className="mb-10">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">Personvern</p>
         <h1 className="mt-2 font-display text-4xl leading-tight tracking-tight">Personvernerklæring</h1>
-        <p className="mt-3 text-sm text-muted-foreground">Versjon 1.1 — sist oppdatert 4. juni 2026</p>
+        <p className="mt-3 text-sm text-muted-foreground">Versjon 1.3 — sist oppdatert 5. juni 2026</p>
       </header>
 
       <div className="space-y-10 text-sm leading-relaxed text-foreground/90">
@@ -79,6 +79,11 @@ function PersonvernPage() {
               <strong>Anonyme visninger</strong> av annonser, for å gi selger statistikk. Disse knyttes til en
               sesjons-ID, ikke til personlige opplysninger.
             </li>
+            <li>
+              <strong>Push-varslinger</strong> — hvis du slår på varsler, lagrer vi et kryptografisk
+              abonnementsnøkkelpar (offentlig/privat), nettleserinformasjon og dine preferanser for hva du vil
+              varsles om (nye meldinger, lagrede søk).
+            </li>
           </ul>
           <p className="mt-4">
             Data lagres og behandles av <strong>Supabase</strong> på servere i EU. Supabase er vår databehandler. Du kan
@@ -96,10 +101,36 @@ function PersonvernPage() {
         </section>
 
         <section>
+          <h2 className="font-display text-2xl">Push-varslinger</h2>
+          <p className="mt-3">
+            Push-varslinger er <strong>frivillige og krever eksplisitt samtykke</strong>. Du aktiverer dem selv i
+            nettleseren eller appen. Vi lagrer kun det som er nødvendig for å sende varsler:
+          </p>
+          <ul className="mt-3 space-y-2 list-disc pl-5">
+            <li>
+              <strong>Abonnementsnøkler</strong> — et kryptografisk nøkkelpar generert av nettleseren din. Vi kan ikke
+              bruke disse til å spore deg på tvers av nettsteder.
+            </li>
+            <li>
+              <strong>Enhets- og nettleserinformasjon</strong> — brukes til å sende varslet til riktig enhet.
+            </li>
+            <li>
+              <strong>Varselformål</strong> — hvilke hendelser du vil varsles om (for eksempel nye meldinger eller treff
+              på lagrede søk).
+            </li>
+          </ul>
+          <p className="mt-4">
+            Du kan når som helst <strong>skru av varsler</strong> i nettleserens innstillinger eller i profilen din på
+            Kaupet.no. Da slettes abonnementsdataene automatisk fra serveren.
+          </p>
+        </section>
+
+        <section>
           <h2 className="font-display text-2xl">Juridisk grunnlag</h2>
           <p className="mt-3">
-            Behandlingen skjer på grunnlag av <strong>avtale</strong> (nødvendig for å levere tjenesten du har bedt om)
-            og <strong>berettiget interesse</strong> (statistikk til selgere og sikkerhet i tjenesten).
+            Behandlingen skjer på grunnlag av <strong>avtale</strong> (nødvendig for å levere tjenesten du har bedt om),{" "}
+            <strong>samtykke</strong> (push-varslinger og eventuelle preferanser) og{" "}
+            <strong>berettiget interesse</strong> (statistikk til selgere og sikkerhet i tjenesten).
           </p>
         </section>
 

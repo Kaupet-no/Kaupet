@@ -87,6 +87,45 @@ export async function reverseGeocode(input: {
 }
 
 /**
+ * Reverse-geocode et punkt og hent ut sted + postnummer (best-effort).
+ */
+export async function reverseGeocodeAddress(input: {
+  lat: number;
+  lng: number;
+}): Promise<{ city: string | null; postal_code: string | null }> {
+  try {
+    const url = new URL("https://nominatim.openstreetmap.org/reverse");
+    url.searchParams.set("lat", String(input.lat));
+    url.searchParams.set("lon", String(input.lng));
+    url.searchParams.set("format", "json");
+    url.searchParams.set("zoom", "12");
+    url.searchParams.set("addressdetails", "1");
+    const res = await fetch(url.toString(), {
+      headers: { "Accept-Language": "nb" },
+    });
+    if (!res.ok) return { city: null, postal_code: null };
+    const data: {
+      address?: {
+        city?: string;
+        town?: string;
+        village?: string;
+        suburb?: string;
+        municipality?: string;
+        postcode?: string;
+        country_code?: string;
+      };
+    } = await res.json();
+    const a = data.address ?? {};
+    if (a.country_code && a.country_code !== "no") return { city: null, postal_code: null };
+    const city = a.city ?? a.town ?? a.village ?? a.suburb ?? a.municipality ?? null;
+    const postal_code = a.postcode ?? null;
+    return { city, postal_code };
+  } catch {
+    return { city: null, postal_code: null };
+  }
+}
+
+/**
  * Slå opp et norsk postnummer → city + koordinater.
  */
 export async function lookupPostalCode(postal: string): Promise<{

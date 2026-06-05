@@ -31,7 +31,7 @@ function PersonvernPage() {
           Personvernerklæring
         </h1>
         <p className="mt-3 text-sm text-muted-foreground">
-          Versjon 1.1 — sist oppdatert 4. juni 2026
+          Versjon 1.2 — sist oppdatert 5. juni 2026
         </p>
       </header>
 
@@ -48,29 +48,90 @@ function PersonvernPage() {
         </section>
 
         <section>
-          <h2 className="font-display text-2xl">Hva lagres lokalt i nettleseren din</h2>
-          <ul className="mt-3 space-y-2 list-disc pl-5">
-            <li>
-              <strong>Innloggingssesjon</strong> — nødvendig for at du skal kunne
-              være logget inn mellom besøk. Lagres i nettleserens{" "}
-              <code>localStorage</code> av vår autentiseringsleverandør.
-            </li>
-            <li>
-              <strong>kaupet_read_&lt;id&gt;</strong> — et tidsstempel per samtale
-              som forteller når du sist åpnet chatten. Brukes kun til
-              uleste-indikatoren i meldingsinnboksen.
-            </li>
-            <li>
-              <strong>kaupet_viewed_&lt;id&gt;</strong> — en markering per
-              nettleserfane som hindrer at samme annonse telles flere ganger ved
-              refresh. Slettes når fanen lukkes.
-            </li>
-            <li>
-              <strong>kaupet_session_id</strong> — en anonym ID som lever kun i
-              én nettleser-økt. Brukes til å gi selger en grov teller på unike
-              besøk per annonse. Slettes når du lukker fanen.
-            </li>
-          </ul>
+          <h2 className="font-display text-2xl">Informasjonskapsler (cookies)</h2>
+          <p className="mt-3">
+            Vi benytter kun én HTTP-informasjonskapsel. I tillegg lagres noen
+            nødvendige data i nettleserens <code>localStorage</code> og{" "}
+            <code>sessionStorage</code>.
+          </p>
+
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="pb-2 pr-4 font-semibold">Navn</th>
+                  <th className="pb-2 pr-4 font-semibold">Type</th>
+                  <th className="pb-2 pr-4 font-semibold">Varighet</th>
+                  <th className="pb-2 font-semibold">Formål</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                <tr>
+                  <td className="py-2 pr-4 font-mono text-xs">sidebar_state</td>
+                  <td className="py-2 pr-4">HTTP-cookie</td>
+                  <td className="py-2 pr-4">7 dager</td>
+                  <td className="py-2">
+                    Husker om sidepanelet er utvidet eller minimert på
+                    dataskjermer.
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2 pr-4 font-mono text-xs">
+                    sb-{'{prosjekt}'}-auth-token
+                  </td>
+                  <td className="py-2 pr-4">localStorage</td>
+                  <td className="py-2 pr-4">Til utlogging</td>
+                  <td className="py-2">
+                    Nødvendig for innloggingssesjonen. Settes av vår
+                    autentiseringsleverandør.
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2 pr-4 font-mono text-xs">
+                    kaupet_read_&lt;id&gt;
+                  </td>
+                  <td className="py-2 pr-4">localStorage</td>
+                  <td className="py-2 pr-4">Ved sletting</td>
+                  <td className="py-2">
+                    Tidsstempel per samtale som forteller når du sist åpnet
+                    chatten. Brukes kun til uleste-indikatoren i
+                    meldingsinnboksen.
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2 pr-4 font-mono text-xs">
+                    kaupet_viewed_&lt;id&gt;
+                  </td>
+                  <td className="py-2 pr-4">sessionStorage</td>
+                  <td className="py-2 pr-4">Fanen lukkes</td>
+                  <td className="py-2">
+                    Hindrer at samme annonse telles flere ganger ved
+                    oppdatering av siden i samme fane.
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2 pr-4 font-mono text-xs">
+                    kaupet_session_id
+                  </td>
+                  <td className="py-2 pr-4">sessionStorage</td>
+                  <td className="py-2 pr-4">Fanen lukkes</td>
+                  <td className="py-2">
+                    Anonym sesjons-ID som brukes til å telle unike besøk per
+                    annonse for selgerens statistikk. Kan ikke knyttes til
+                    personlige opplysninger.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-3 text-muted-foreground">
+            <strong>Push-varsler (valgfritt):</strong> Hvis du aktiverer
+            nettleservarsler, registrerer vi en service worker og lagrer et
+            kryptografisk abonnement (endepunkt, p256dh-nøkkel og auth-token)
+            på serveren. Dette er nødvendig for å kunne sende deg varsler om
+            nye meldinger og treff i lagrede søk. Du kan trekke tilbake dette
+            når som helst under <strong>Profil → Varslinger</strong>.
+          </p>
         </section>
 
         <section>
@@ -78,7 +139,7 @@ function PersonvernPage() {
           <ul className="mt-3 space-y-2 list-disc pl-5">
             <li>
               <strong>Brukerprofil</strong>: navn, e-postadresse og eventuelt
-              profilbilde.
+              profilbilde, bio og sted.
             </li>
             <li>
               <strong>Annonser</strong> du har lagt ut, med tilhørende bilder,
@@ -88,18 +149,27 @@ function PersonvernPage() {
               <strong>Meldinger</strong> mellom deg og andre brukere.
             </li>
             <li>
-              <strong>Favoritter</strong> du har lagret.
+              <strong>Favoritter</strong> og <strong>lagrede søk</strong> du
+              har registrert.
             </li>
             <li>
               <strong>Anonyme visninger</strong> av annonser, for å gi selger
               statistikk. Disse knyttes til en sesjons-ID, ikke til personlige
               opplysninger.
             </li>
+            <li>
+              <strong>Push-abonnement</strong> (valgfritt): endepunkt,
+              kryptografiske nøkler og brukeragent for den aktuelle enheten.
+            </li>
+            <li>
+              <strong>Varslingsinnstillinger</strong> (valgfritt): om du ønsker
+              push-varsler for nye meldinger og treff i lagrede søk.
+            </li>
           </ul>
           <p className="mt-4">
-            Data lagres og behandles av <strong>Supabase</strong> på servere i
-            EU. Supabase er vår databehandler. Du kan lese deres
-            personvernerklæring her:{" "}
+            Data lagres og behandles av <strong>Lovable Cloud</strong> på
+            servere i EU. Du kan lese databehandlerens personvernerklæring
+            her:{" "}
             <a
               href="https://supabase.com/privacy"
               target="_blank"
@@ -118,7 +188,9 @@ function PersonvernPage() {
             Behandlingen skjer på grunnlag av <strong>avtale</strong> (nødvendig
             for å levere tjenesten du har bedt om) og{" "}
             <strong>berettiget interesse</strong> (statistikk til selgere og
-            sikkerhet i tjenesten).
+            sikkerhet i tjenesten). Push-varsler behandles med{" "}
+            <strong>samtykke</strong>, som du gir når du aktiverer funksjonen i
+            nettleseren og som du kan trekke tilbake når som helst.
           </p>
         </section>
 
@@ -153,7 +225,7 @@ function PersonvernPage() {
           <h2 className="font-display text-2xl">Tredjeparter</h2>
           <ul className="mt-3 space-y-2 list-disc pl-5">
             <li>
-              <strong>Supabase</strong> — databehandler for autentisering,
+              <strong>Lovable Cloud</strong> — databehandler for autentisering,
               database og fillagring. Servere i EU.
             </li>
             <li>

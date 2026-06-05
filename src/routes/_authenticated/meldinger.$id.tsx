@@ -78,6 +78,11 @@ function ConversationPage() {
   const queryClient = useQueryClient();
   const listMyBlocksFn = useServerFn(listMyBlocks);
   const listBlocksAgainstMeFn = useServerFn(listBlocksAgainstMe);
+  const getSaleFn = useServerFn(getSaleForListing);
+  const confirmBuyerFn = useServerFn(confirmBuyer);
+  const unconfirmBuyerFn = useServerFn(unconfirmBuyer);
+  const getMyReviewFn = useServerFn(getMyReviewForListing);
+  const createReviewFn = useServerFn(createReview);
   const [body, setBody] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);

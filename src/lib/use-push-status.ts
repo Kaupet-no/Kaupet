@@ -79,8 +79,7 @@ export function usePushStatus(): PushStatus {
     let permCancelled = false;
     if (typeof navigator !== "undefined" && navigator.permissions?.query) {
       navigator.permissions
-        // @ts-expect-error - "notifications" is valid but not in all TS lib versions
-        .query({ name: "notifications" })
+        .query({ name: "notifications" as PermissionName })
         .then((status) => {
           if (permCancelled) return;
           permStatus = status;

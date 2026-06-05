@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -17,6 +17,7 @@ type ConvSummary = {
  */
 export function useUnreadConversationsCount(): number {
   const { user } = useAuth();
+  const qc = useQueryClient();
   const readVersion = useReadVersion();
 
   const { data, refetch } = useQuery({
@@ -66,6 +67,23 @@ export function useUnreadConversationsCount(): number {
       supabase.removeChannel(channel);
     };
   }, [user?.id, refetch]);
+
+  // Fallback: refresh når fanen får fokus igjen (i tilfelle realtime ikke leverer)
+  useEffect(() => {
+    if (!user) return;
+    const onFocus = () => {
+      qc.invalidateQueries({ queryKey: ["unread-conversations"] });
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") onFocus();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [user?.id, qc]);
 
   // readVersion brukes for å re-evaluere isUnread når noe markeres som lest
   void readVersion;

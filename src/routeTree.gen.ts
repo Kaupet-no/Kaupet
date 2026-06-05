@@ -15,6 +15,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AnnonserRouteImport } from './routes/annonser'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as BrukerIdRouteImport } from './routes/bruker.$id'
 import { Route as AnnonseIdRouteImport } from './routes/annonse.$id'
 import { Route as AuthenticatedProfilRouteImport } from './routes/_authenticated/profil'
 import { Route as AuthenticatedNyAnnonseRouteImport } from './routes/_authenticated/ny-annonse'
@@ -57,6 +58,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BrukerIdRoute = BrukerIdRouteImport.update({
+  id: '/bruker/$id',
+  path: '/bruker/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AnnonseIdRoute = AnnonseIdRouteImport.update({
@@ -148,6 +154,7 @@ export interface FileRoutesByFullPath {
   '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
   '/annonse/$id': typeof AnnonseIdRoute
+  '/bruker/$id': typeof BrukerIdRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
@@ -168,6 +175,7 @@ export interface FileRoutesByTo {
   '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
   '/annonse/$id': typeof AnnonseIdRoute
+  '/bruker/$id': typeof BrukerIdRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
@@ -191,6 +199,7 @@ export interface FileRoutesById {
   '/_authenticated/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/_authenticated/profil': typeof AuthenticatedProfilRoute
   '/annonse/$id': typeof AnnonseIdRoute
+  '/bruker/$id': typeof BrukerIdRoute
   '/_authenticated/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/_authenticated/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/_authenticated/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
@@ -214,6 +223,7 @@ export interface FileRouteTypes {
     | '/ny-annonse'
     | '/profil'
     | '/annonse/$id'
+    | '/bruker/$id'
     | '/admin/brukere'
     | '/admin/kategorier'
     | '/meldinger/$id'
@@ -234,6 +244,7 @@ export interface FileRouteTypes {
     | '/ny-annonse'
     | '/profil'
     | '/annonse/$id'
+    | '/bruker/$id'
     | '/admin/brukere'
     | '/admin/kategorier'
     | '/meldinger/$id'
@@ -256,6 +267,7 @@ export interface FileRouteTypes {
     | '/_authenticated/ny-annonse'
     | '/_authenticated/profil'
     | '/annonse/$id'
+    | '/bruker/$id'
     | '/_authenticated/admin/brukere'
     | '/_authenticated/admin/kategorier'
     | '/_authenticated/meldinger/$id'
@@ -274,6 +286,7 @@ export interface RootRouteChildren {
   PersonvernRoute: typeof PersonvernRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   AnnonseIdRoute: typeof AnnonseIdRoute
+  BrukerIdRoute: typeof BrukerIdRoute
   ApiPublicPushDispatchRoute: typeof ApiPublicPushDispatchRoute
 }
 
@@ -319,6 +332,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bruker/$id': {
+      id: '/bruker/$id'
+      path: '/bruker/$id'
+      fullPath: '/bruker/$id'
+      preLoaderRoute: typeof BrukerIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/annonse/$id': {
@@ -476,6 +496,7 @@ const rootRouteChildren: RootRouteChildren = {
   PersonvernRoute: PersonvernRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   AnnonseIdRoute: AnnonseIdRoute,
+  BrukerIdRoute: BrukerIdRoute,
   ApiPublicPushDispatchRoute: ApiPublicPushDispatchRoute,
 }
 export const routeTree = rootRouteImport

@@ -19,7 +19,7 @@ export const Route = createFileRoute("/")({
   validateSearch: searchSchema,
   head: () => ({
     meta: [
-      { title: "Kaupet.no — Kjøp og salg av brukte ting" },
+      { title: "Kaupet.no — Gi tingene dine et nytt liv" },
       {
         name: "description",
         content:

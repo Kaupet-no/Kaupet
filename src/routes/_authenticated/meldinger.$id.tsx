@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import * as React from "react";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Send, User as UserIcon } from "lucide-react";
@@ -10,6 +11,8 @@ import { signListingImageUrls } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { markRead } from "@/lib/unread";
 import { Textarea } from "@/components/ui/textarea";
+import { BlockConversationMenu } from "@/components/block-conversation-menu";
+import { listMyBlocks, listBlocksAgainstMe } from "@/lib/blocks.functions";
 
 export const Route = createFileRoute("/_authenticated/meldinger/$id")({
   head: () => ({

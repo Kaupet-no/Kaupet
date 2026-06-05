@@ -85,7 +85,7 @@ function ListingsTab() {
     queryFn: async () => {
       const { data, error } = await supabase.rpc("admin_search_listings", {
         _query: q,
-        _status: status === "all" ? null : status,
+        _status: status === "all" ? undefined : status,
         _limit: 100,
       });
       if (error) throw error;

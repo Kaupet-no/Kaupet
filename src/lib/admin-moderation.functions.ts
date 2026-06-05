@@ -125,7 +125,7 @@ export const adminBanIp = createServerFn({ method: "POST" })
     const { error } = await context.supabase.rpc("admin_ban_ip", {
       _ip: data.ip,
       _reason: data.reason,
-      _expires_at: data.expiresAt ?? null,
+      _expires_at: data.expiresAt ?? undefined,
     });
     if (error) throw error;
     return { ok: true };

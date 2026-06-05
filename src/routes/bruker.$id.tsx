@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { StarRating } from "@/components/star-rating";
 import { VerifiedBadge } from "@/components/verified-badge";
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
+import { AdminUserActions } from "@/components/admin/suspend-user-menu";
 import { getPublicProfile, listUserReviews } from "@/lib/reviews.functions";
 
 export const Route = createFileRoute("/bruker/$id")({
@@ -130,6 +131,7 @@ function PublicProfilePage() {
             )}
           </div>
         </div>
+        <AdminUserActions userId={id} displayName={profile.display_name ?? "brukeren"} />
       </div>
 
       {profile.bio && (

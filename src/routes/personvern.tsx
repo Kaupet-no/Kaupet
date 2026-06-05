@@ -79,6 +79,11 @@ function PersonvernPage() {
               <strong>Anonyme visninger</strong> av annonser, for å gi selger statistikk. Disse knyttes til en
               sesjons-ID, ikke til personlige opplysninger.
             </li>
+            <li>
+              <strong>Push-varslinger</strong> — hvis du slår på varsler, lagrer vi et kryptografisk
+              abonnementsnøkkelpar (offentlig/privat), nettleserinformasjon og dine preferanser for hva du vil
+              varsles om (nye meldinger, lagrede søk).
+            </li>
           </ul>
           <p className="mt-4">
             Data lagres og behandles av <strong>Supabase</strong> på servere i EU. Supabase er vår databehandler. Du kan

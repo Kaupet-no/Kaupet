@@ -182,8 +182,8 @@ function NewListingPage() {
               : null,
           postal_code: parsed.postal_code || null,
           city: parsed.city || null,
-          lat: coords?.lat ?? null,
-          lng: coords?.lng ?? null,
+          lat: finalCoords?.lat ?? null,
+          lng: finalCoords?.lng ?? null,
           status: "active",
           published_at: new Date().toISOString(),
         })

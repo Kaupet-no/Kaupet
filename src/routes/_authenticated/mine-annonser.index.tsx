@@ -132,7 +132,8 @@ function MyListingsPage() {
   const filtered = (rows ?? []).filter((r) => {
     if (tab === "all") return true;
     if (tab === "active") return r.status === "active";
-    if (tab === "sold") return r.status === "sold" || r.status === "archived";
+    if (tab === "sold")
+      return r.status === "sold" || r.status === "archived" || r.status === "expired";
     if (tab === "draft") return r.status === "draft";
     return true;
   });

@@ -1,19 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 
+// The endpoint is invoked by an internal Postgres trigger via pg_net.
+// It is intentionally unauthenticated (no auth header), but it is also
+// hardened against abuse: callers cannot supply user_id, conversation_id
+// or message body. Only an id is accepted, and everything else is
+// re-derived from the database. A forged request that references a
+// non-existent row simply does nothing.
 const PayloadSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("message"),
-    user_id: z.string().uuid(),
-    conversation_id: z.string().uuid(),
     message_id: z.string().uuid(),
-    body: z.string().max(2000).optional().nullable(),
   }),
   z.object({
     type: z.literal("saved_search"),
-    user_id: z.string().uuid(),
-    saved_search_id: z.string().uuid(),
-    listing_id: z.string().uuid(),
+    notification_id: z.string().uuid(),
   }),
 ]);
 
@@ -29,15 +30,84 @@ export const Route = createFileRoute("/api/public/push/dispatch")({
           return new Response("Invalid payload", { status: 400 });
         }
 
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { supabaseAdmin } = await import(
+          "@/integrations/supabase/client.server"
+        );
 
-        // Check preferences (per type)
+        // Build notification content from authoritative DB rows only.
+        let userId: string | null = null;
+        let title = "Kaupet.no";
+        let body = "";
+        let url = "/";
+        let tag: string | undefined;
+
+        if (payload.type === "message") {
+          const { data: msg } = await supabaseAdmin
+            .from("messages")
+            .select("id, sender_id, conversation_id, body")
+            .eq("id", payload.message_id)
+            .maybeSingle();
+          if (!msg) return new Response(null, { status: 204 });
+
+          const { data: conv } = await supabaseAdmin
+            .from("conversations")
+            .select("buyer_id, seller_id")
+            .eq("id", msg.conversation_id)
+            .maybeSingle();
+          if (!conv) return new Response(null, { status: 204 });
+
+          userId =
+            conv.buyer_id === msg.sender_id ? conv.seller_id : conv.buyer_id;
+          if (!userId || userId === msg.sender_id) {
+            return new Response(null, { status: 204 });
+          }
+
+          let senderName = "Noen";
+          const { data: p } = await supabaseAdmin
+            .from("profiles")
+            .select("display_name")
+            .eq("id", msg.sender_id)
+            .maybeSingle();
+          if (p?.display_name) senderName = p.display_name;
+
+          title = `Ny melding fra ${senderName}`;
+          body = (msg.body ?? "").slice(0, 140);
+          url = `/meldinger/${msg.conversation_id}`;
+          tag = `msg-${msg.conversation_id}`;
+        } else {
+          const { data: notif } = await supabaseAdmin
+            .from("saved_search_notifications")
+            .select("user_id, listing_id, saved_search_id")
+            .eq("id", payload.notification_id)
+            .maybeSingle();
+          if (!notif) return new Response(null, { status: 204 });
+          userId = notif.user_id;
+
+          const { data: listing } = await supabaseAdmin
+            .from("listings")
+            .select("title")
+            .eq("id", notif.listing_id)
+            .maybeSingle();
+          const { data: search } = await supabaseAdmin
+            .from("saved_searches")
+            .select("name")
+            .eq("id", notif.saved_search_id)
+            .maybeSingle();
+
+          title = `Nytt treff: ${search?.name ?? "Lagret søk"}`;
+          body = listing?.title ?? "Ny annonse matcher søket ditt";
+          url = `/annonse/${notif.listing_id}`;
+          tag = `ss-${notif.saved_search_id}-${notif.listing_id}`;
+        }
+
+        if (!userId) return new Response(null, { status: 204 });
+
+        // Check per-type preference
         const { data: prefs } = await supabaseAdmin
           .from("notification_preferences")
           .select("web_push_messages, web_push_saved_searches")
-          .eq("user_id", payload.user_id)
+          .eq("user_id", userId)
           .maybeSingle();
-
         const messagesEnabled = prefs?.web_push_messages ?? true;
         const savedSearchEnabled = prefs?.web_push_saved_searches ?? true;
         if (payload.type === "message" && !messagesEnabled) {
@@ -47,54 +117,11 @@ export const Route = createFileRoute("/api/public/push/dispatch")({
           return new Response(null, { status: 204 });
         }
 
-        // Build notification content
-        let title = "Kaupet.no";
-        let body = "";
-        let url = "/";
-        let tag: string | undefined;
-
-        if (payload.type === "message") {
-          // Look up sender's display name
-          const { data: msg } = await supabaseAdmin
-            .from("messages")
-            .select("sender_id")
-            .eq("id", payload.message_id)
-            .maybeSingle();
-          let senderName = "Noen";
-          if (msg?.sender_id) {
-            const { data: p } = await supabaseAdmin
-              .from("profiles")
-              .select("display_name")
-              .eq("id", msg.sender_id)
-              .maybeSingle();
-            if (p?.display_name) senderName = p.display_name;
-          }
-          title = `Ny melding fra ${senderName}`;
-          body = payload.body?.slice(0, 140) ?? "";
-          url = `/meldinger/${payload.conversation_id}`;
-          tag = `msg-${payload.conversation_id}`;
-        } else {
-          const { data: listing } = await supabaseAdmin
-            .from("listings")
-            .select("title")
-            .eq("id", payload.listing_id)
-            .maybeSingle();
-          const { data: search } = await supabaseAdmin
-            .from("saved_searches")
-            .select("name")
-            .eq("id", payload.saved_search_id)
-            .maybeSingle();
-          title = `Nytt treff: ${search?.name ?? "Lagret søk"}`;
-          body = listing?.title ?? "Ny annonse matcher søket ditt";
-          url = `/annonse/${payload.listing_id}`;
-          tag = `ss-${payload.saved_search_id}-${payload.listing_id}`;
-        }
-
-        // Get all subscriptions for the user
+        // Get all subscriptions for the recipient
         const { data: subs } = await supabaseAdmin
           .from("push_subscriptions")
           .select("id, endpoint, p256dh, auth")
-          .eq("user_id", payload.user_id);
+          .eq("user_id", userId);
 
         if (!subs || subs.length === 0) {
           return new Response(null, { status: 204 });
@@ -104,7 +131,6 @@ export const Route = createFileRoute("/api/public/push/dispatch")({
           default?: typeof import("web-push");
         } & typeof import("web-push");
         const webpush = webpushModule.default ?? webpushModule;
-
 
         const subject = process.env.VAPID_SUBJECT || "mailto:post@kaupet.no";
         const publicKey =
@@ -142,7 +168,7 @@ export const Route = createFileRoute("/api/public/push/dispatch")({
                   .delete()
                   .eq("id", s.id);
               } else {
-                console.error("Web push error", statusCode, err);
+                console.error("Web push error", statusCode);
               }
             }
           }),

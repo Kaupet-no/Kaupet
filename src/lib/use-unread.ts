@@ -68,6 +68,23 @@ export function useUnreadConversationsCount(): number {
     };
   }, [user?.id, refetch]);
 
+  // Fallback: refresh når fanen får fokus igjen (i tilfelle realtime ikke leverer)
+  useEffect(() => {
+    if (!user) return;
+    const onFocus = () => {
+      qc.invalidateQueries({ queryKey: ["unread-conversations"] });
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") onFocus();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [user?.id, qc]);
+
   // readVersion brukes for å re-evaluere isUnread når noe markeres som lest
   void readVersion;
 

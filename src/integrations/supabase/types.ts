@@ -929,6 +929,14 @@ export type Database = {
         Args: { _listing_id: string }
         Returns: undefined
       }
+      my_listing_counts: {
+        Args: never
+        Returns: {
+          favorite_count: number
+          listing_id: string
+          view_count: number
+        }[]
+      }
       my_moderation_status: {
         Args: never
         Returns: {

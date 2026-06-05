@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, Pencil, Trash2, CheckCircle2, RotateCcw, Plus, Eye, Clock } from "lucide-react";
+import { Loader2, Pencil, Trash2, CheckCircle2, RotateCcw, Plus, Eye, Heart, Clock } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -41,6 +41,7 @@ type Row = {
   is_free: boolean;
   city: string | null;
   view_count: number;
+  favorite_count: number;
   created_at: string;
   expires_at: string | null;
   cover_path: string | null;
@@ -79,15 +80,25 @@ function MyListingsPage() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, title, status, price_nok, is_free, city, view_count, created_at, expires_at, listing_images(storage_path, sort_order)",
+          "id, title, status, price_nok, is_free, city, created_at, expires_at, listing_images(storage_path, sort_order)",
         )
         .eq("seller_id", userId)
         .order("created_at", { ascending: false });
       if (error) throw error;
+      const { data: counts, error: countsError } = await supabase.rpc("my_listing_counts");
+      if (countsError) throw countsError;
+      const countMap = new Map<string, { views: number; favs: number }>();
+      for (const c of counts ?? []) {
+        countMap.set(c.listing_id, {
+          views: Number(c.view_count ?? 0),
+          favs: Number(c.favorite_count ?? 0),
+        });
+      }
       return (data ?? []).map((l) => {
         const cover = (l.listing_images ?? [])
           .slice()
           .sort((a, b) => a.sort_order - b.sort_order)[0]?.storage_path ?? null;
+        const c = countMap.get(l.id);
         return {
           id: l.id,
           title: l.title,
@@ -95,7 +106,8 @@ function MyListingsPage() {
           price_nok: l.price_nok,
           is_free: l.is_free,
           city: l.city,
-          view_count: l.view_count,
+          view_count: c?.views ?? 0,
+          favorite_count: c?.favs ?? 0,
           created_at: l.created_at,
           expires_at: l.expires_at,
           cover_path: cover,
@@ -294,6 +306,9 @@ function ListingRow({
           {row.city && <span>{row.city}</span>}
           <span className="inline-flex items-center gap-1">
             <Eye className="size-3" /> {row.view_count}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <Heart className="size-3" /> {row.favorite_count}
           </span>
         </p>
       </div>

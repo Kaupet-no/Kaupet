@@ -303,12 +303,14 @@ function ListingDetailPage() {
             )}
           </div>
           {images.length > 1 && (
-            <div className="mt-3 flex gap-2 overflow-x-auto">
+            <div className="mt-3 flex gap-2 overflow-x-auto" role="list">
               {images.map((img, i) => (
                 <button
                   key={img.storage_path}
                   type="button"
                   onClick={() => setActiveImage(i)}
+                  aria-label={`Vis bilde ${i + 1} av ${images.length} for «${data.title}»`}
+                  aria-pressed={i === activeImage}
                   className={`size-20 shrink-0 overflow-hidden rounded-lg border-2 ${
                     i === activeImage ? "border-primary" : "border-transparent"
                   }`}

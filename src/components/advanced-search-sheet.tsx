@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { X, Plus, Save, Search as SearchIcon, RotateCcw } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { X, Plus, Save, Search as SearchIcon, RotateCcw, BellRing, Loader2 } from "lucide-react";
+
+import { usePushStatus } from "@/lib/use-push-status";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -418,6 +421,7 @@ function SaveSearchDialog({
             />
             Varsle meg om nye treff
           </label>
+          {notify && <PushHintForSavedSearch />}
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>

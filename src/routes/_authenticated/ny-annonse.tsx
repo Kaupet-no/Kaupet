@@ -8,7 +8,7 @@ import { Loader2 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { uploadListingImage } from "@/lib/storage";
-import { geocodeNorwayAddress, lookupPostalCode, lookupCity } from "@/lib/geocode";
+import { geocodeNorwayAddress, lookupPostalCode, lookupCity, reverseGeocodeAddress } from "@/lib/geocode";
 import { ImageUploader, type PendingImage } from "@/components/image-uploader";
 import { ListingLocationPicker } from "@/components/listing-location-picker";
 import { Button } from "@/components/ui/button";
@@ -150,6 +150,20 @@ function NewListingPage() {
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [city, setValue]);
+
+  // Reverse-geocode map position back to city/postal
+  useEffect(() => {
+    if (lastEdited.current !== "map" || !coords) return;
+    const t = window.setTimeout(async () => {
+      const r = await reverseGeocodeAddress(coords);
+      if (r.city) setValue("city", r.city, { shouldValidate: false });
+      if (r.postal_code && /^\d{4}$/.test(r.postal_code)) {
+        setValue("postal_code", r.postal_code, { shouldValidate: false });
+      }
+    }, 300);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coords, setValue]);
 
   const mutation = useMutation({
     mutationFn: async (values: ListingForm) => {

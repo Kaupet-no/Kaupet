@@ -297,6 +297,13 @@ function ConversationPage() {
               <UserIcon className="size-4 text-muted-foreground" />
             </div>
           )}
+          {otherId && !conv.otherDeleted && !theyBlockedMe && (
+            <BlockConversationMenu
+              targetUserId={otherId}
+              conversationId={id}
+              targetName={conv.other?.display_name ?? "denne brukeren"}
+            />
+          )}
         </div>
       )}
 
@@ -305,6 +312,20 @@ function ConversationPage() {
           {conv.otherDeleted
             ? "Denne brukeren har slettet kontoen sin. Du kan ikke lenger sende meldinger i denne samtalen."
             : "Denne brukeren har bedt om å få slettet kontoen sin. Du kan ikke sende nye meldinger."}
+        </div>
+      )}
+
+      {conv && iBlocked && (
+        <div className="mt-3 rounded-xl border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+          {iBlockedAll
+            ? `Du har blokkert ${conv.other?.display_name ?? "denne brukeren"}. Du kan oppheve blokkeringen øverst eller fra profilen din.`
+            : "Du har blokkert denne samtalen. Du kan oppheve blokkeringen øverst eller fra profilen din."}
+        </div>
+      )}
+
+      {conv && theyBlockedMe && !iBlocked && (
+        <div className="mt-3 rounded-xl border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+          Du kan ikke sende meldinger i denne samtalen.
         </div>
       )}
 

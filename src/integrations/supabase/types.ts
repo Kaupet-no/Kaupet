@@ -290,6 +290,30 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          created_at: string
+          updated_at: string
+          user_id: string
+          web_push_messages: boolean
+          web_push_saved_searches: boolean
+        }
+        Insert: {
+          created_at?: string
+          updated_at?: string
+          user_id: string
+          web_push_messages?: boolean
+          web_push_saved_searches?: boolean
+        }
+        Update: {
+          created_at?: string
+          updated_at?: string
+          user_id?: string
+          web_push_messages?: boolean
+          web_push_saved_searches?: boolean
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -320,6 +344,39 @@ export type Database = {
           id?: string
           location?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          last_used_at: string
+          p256dh: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          last_used_at?: string
+          p256dh: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          last_used_at?: string
+          p256dh?: string
+          user_agent?: string | null
+          user_id?: string
         }
         Relationships: []
       }

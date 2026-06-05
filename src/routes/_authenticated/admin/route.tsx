@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
-import { BarChart3, Users, FolderTree } from "lucide-react";
+import { BarChart3, Users, FolderTree, ShieldAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -31,6 +31,7 @@ function AdminLayout() {
         <NavTab to="/admin" icon={<BarChart3 className="size-4" />} label="Oversikt" exact />
         <NavTab to="/admin/brukere" icon={<Users className="size-4" />} label="Brukere" />
         <NavTab to="/admin/kategorier" icon={<FolderTree className="size-4" />} label="Kategorier" />
+        <NavTab to="/admin/moderasjon" icon={<ShieldAlert className="size-4" />} label="Moderasjon" />
       </nav>
       <Outlet />
     </div>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { X, Plus, Save, Search as SearchIcon, RotateCcw, BellRing, Loader2 } from "lucide-react";
 
@@ -455,7 +455,7 @@ function PushHintForSavedSearch() {
     }
   };
 
-  let body: React.ReactNode;
+  let body: ReactNode;
   if (!push.supported) {
     body = (
       <p>

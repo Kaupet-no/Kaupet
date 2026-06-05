@@ -216,12 +216,14 @@ function ListingRow({
   row,
   onMarkSold,
   onReactivate,
+  onRepublish,
   onDelete,
   busy,
 }: {
   row: Row;
   onMarkSold: () => void;
   onReactivate: () => void;
+  onRepublish: () => void;
   onDelete: () => void;
   busy: boolean;
 }) {

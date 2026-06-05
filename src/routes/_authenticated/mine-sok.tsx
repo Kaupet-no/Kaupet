@@ -38,17 +38,45 @@ function MineSokPage() {
   const qc = useQueryClient();
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
+  const push = usePushStatus();
+  const [enablingPush, setEnablingPush] = useState(false);
+
   const { data, isLoading } = useQuery({
     queryKey: ["saved-searches"],
     queryFn: listSavedSearches,
   });
 
   const searches = data ?? [];
+  const hasActiveNotify = searches.some((s) => s.notify);
+  const showPushBanner =
+    hasActiveNotify && !push.loading && !push.savedSearchesActive;
+
+  const enablePush = async () => {
+    setEnablingPush(true);
+    try {
+      await push.enableOnThisDevice("saved_searches");
+      toast.success("Push-varsler er aktivert på denne enheten");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Klarte ikke å aktivere varsler");
+    } finally {
+      setEnablingPush(false);
+    }
+  };
 
   const toggleNotify = async (s: SavedSearch) => {
     await updateSavedSearch(s.id, { notify: !s.notify });
     qc.invalidateQueries({ queryKey: ["saved-searches"] });
+    const turningOn = !s.notify;
     toast.success(s.notify ? "Varsler slått av" : "Varsler slått på");
+    if (turningOn && !push.savedSearchesActive) {
+      if (!push.supported) {
+        toast.message("Push-varsler er ikke tilgjengelig i denne nettleseren");
+      } else if (push.permission === "denied") {
+        toast.message("Push er blokkert i nettleseren — endre tillatelsen for å motta varsler her");
+      } else {
+        toast.message("Aktiver push-varsler øverst på siden for å motta dem på denne enheten");
+      }
+    }
   };
 
   const handleDelete = async () => {

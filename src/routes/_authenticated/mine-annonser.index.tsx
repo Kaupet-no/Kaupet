@@ -34,12 +34,13 @@ export const Route = createFileRoute("/_authenticated/mine-annonser/")({
 type Row = {
   id: string;
   title: string;
-  status: "draft" | "active" | "sold" | "archived";
+  status: "draft" | "active" | "sold" | "archived" | "expired";
   price_nok: number | null;
   is_free: boolean;
   city: string | null;
   view_count: number;
   created_at: string;
+  expires_at: string | null;
   cover_path: string | null;
 };
 
@@ -49,11 +50,18 @@ function formatPrice(r: Row) {
   return `${r.price_nok.toLocaleString("nb-NO")} kr`;
 }
 
+function daysLeft(expires_at: string | null): number | null {
+  if (!expires_at) return null;
+  const ms = new Date(expires_at).getTime() - Date.now();
+  return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)));
+}
+
 const STATUS_LABEL: Record<Row["status"], string> = {
   draft: "Utkast",
   active: "Aktiv",
   sold: "Solgt",
   archived: "Arkivert",
+  expired: "Utløpt",
 };
 
 function MyListingsPage() {

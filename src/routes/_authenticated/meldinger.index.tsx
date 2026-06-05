@@ -1,13 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { MessageCircle, ChevronDown, ChevronRight } from "lucide-react";
+import { MessageCircle, ChevronDown, ChevronRight, BellRing, Loader2, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { signListingImageUrls } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { isUnread, useReadVersion } from "@/lib/unread";
+import { usePushStatus } from "@/lib/use-push-status";
 
 export const Route = createFileRoute("/_authenticated/meldinger/")({
   head: () => ({
@@ -170,7 +172,10 @@ function InboxPage() {
         Samtalene dine er gruppert etter annonse.
       </p>
 
+      <PushHintForMessages />
+
       <div className="mt-8 space-y-3">
+
         {isLoading ? (
           <div className="space-y-3">
             {Array.from({ length: 4 }).map((_, i) => (

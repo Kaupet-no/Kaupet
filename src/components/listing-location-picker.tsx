@@ -18,6 +18,16 @@ const defaultIcon = L.icon({
   shadowSize: [41, 41],
 });
 
+function MapClickHandler({ onChange }: { onChange: (next: { lat: number; lng: number }) => void }) {
+  useMapEvents({
+    click(e) {
+      const p = e.latlng;
+      onChange({ lat: p.lat, lng: p.lng });
+    },
+  });
+  return null;
+}
+
 function Recenter({ lat, lng }: { lat: number; lng: number }) {
   const map = useMap();
   const last = useRef<{ lat: number; lng: number } | null>(null);

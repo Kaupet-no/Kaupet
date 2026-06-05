@@ -3,7 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import * as React from "react";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Send, User as UserIcon } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Loader2, Send, User as UserIcon } from "lucide-react";
+import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -13,6 +14,20 @@ import { markRead } from "@/lib/unread";
 import { Textarea } from "@/components/ui/textarea";
 import { BlockConversationMenu } from "@/components/block-conversation-menu";
 import { listMyBlocks, listBlocksAgainstMe } from "@/lib/blocks.functions";
+import { StarRating } from "@/components/star-rating";
+import { confirmBuyer, getSaleForListing, unconfirmBuyer } from "@/lib/sales.functions";
+import { createReview, getMyReviewForListing } from "@/lib/reviews.functions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/_authenticated/meldinger/$id")({
   head: () => ({

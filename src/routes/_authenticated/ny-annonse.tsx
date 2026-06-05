@@ -99,6 +99,8 @@ function NewListingPage() {
     watch,
     formState: { errors },
   } = useForm<ListingForm>({
+    resolver: zodResolver(listingSchema),
+    mode: "onTouched",
     defaultValues: {
       title: "",
       description: "",

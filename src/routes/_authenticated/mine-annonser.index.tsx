@@ -131,6 +131,18 @@ function MyListingsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const doRepublish = useServerFn(republishListing);
+  const republish = useMutation({
+    mutationFn: async (id: string) => {
+      return doRepublish({ data: { id } });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-listings"] });
+      toast.success("Annonsen er publisert på nytt i 30 nye dager");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const filtered = (rows ?? []).filter((r) => {
     if (tab === "all") return true;
     if (tab === "active") return r.status === "active";

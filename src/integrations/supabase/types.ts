@@ -194,6 +194,7 @@ export type Database = {
           condition: Database["public"]["Enums"]["listing_condition"]
           created_at: string
           description: string
+          expires_at: string | null
           id: string
           is_free: boolean
           lat: number | null
@@ -214,6 +215,7 @@ export type Database = {
           condition?: Database["public"]["Enums"]["listing_condition"]
           created_at?: string
           description?: string
+          expires_at?: string | null
           id?: string
           is_free?: boolean
           lat?: number | null
@@ -234,6 +236,7 @@ export type Database = {
           condition?: Database["public"]["Enums"]["listing_condition"]
           created_at?: string
           description?: string
+          expires_at?: string | null
           id?: string
           is_free?: boolean
           lat?: number | null
@@ -601,6 +604,7 @@ export type Database = {
         }[]
       }
       cancel_account_deletion: { Args: never; Returns: boolean }
+      expire_old_listings: { Args: never; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -644,7 +648,7 @@ export type Database = {
         | "good"
         | "acceptable"
         | "for_parts"
-      listing_status: "draft" | "active" | "sold" | "archived"
+      listing_status: "draft" | "active" | "sold" | "archived" | "expired"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -775,7 +779,7 @@ export const Constants = {
       app_role: ["admin", "user"],
       block_scope: ["all", "conversation"],
       listing_condition: ["new", "like_new", "good", "acceptable", "for_parts"],
-      listing_status: ["draft", "active", "sold", "archived"],
+      listing_status: ["draft", "active", "sold", "archived", "expired"],
     },
   },
 } as const

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Pencil, Trash2, CheckCircle2, RotateCcw, Plus, Eye } from "lucide-react";
+import { Loader2, Pencil, Trash2, CheckCircle2, RotateCcw, Plus, Eye, Clock } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -34,12 +34,13 @@ export const Route = createFileRoute("/_authenticated/mine-annonser/")({
 type Row = {
   id: string;
   title: string;
-  status: "draft" | "active" | "sold" | "archived";
+  status: "draft" | "active" | "sold" | "archived" | "expired";
   price_nok: number | null;
   is_free: boolean;
   city: string | null;
   view_count: number;
   created_at: string;
+  expires_at: string | null;
   cover_path: string | null;
 };
 
@@ -49,11 +50,18 @@ function formatPrice(r: Row) {
   return `${r.price_nok.toLocaleString("nb-NO")} kr`;
 }
 
+function daysLeft(expires_at: string | null): number | null {
+  if (!expires_at) return null;
+  const ms = new Date(expires_at).getTime() - Date.now();
+  return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)));
+}
+
 const STATUS_LABEL: Record<Row["status"], string> = {
   draft: "Utkast",
   active: "Aktiv",
   sold: "Solgt",
   archived: "Arkivert",
+  expired: "Utløpt",
 };
 
 function MyListingsPage() {
@@ -69,7 +77,7 @@ function MyListingsPage() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, title, status, price_nok, is_free, city, view_count, created_at, listing_images(storage_path, sort_order)",
+          "id, title, status, price_nok, is_free, city, view_count, created_at, expires_at, listing_images(storage_path, sort_order)",
         )
         .eq("seller_id", userId)
         .order("created_at", { ascending: false });
@@ -87,6 +95,7 @@ function MyListingsPage() {
           city: l.city,
           view_count: l.view_count,
           created_at: l.created_at,
+          expires_at: l.expires_at,
           cover_path: cover,
         };
       });
@@ -123,7 +132,8 @@ function MyListingsPage() {
   const filtered = (rows ?? []).filter((r) => {
     if (tab === "all") return true;
     if (tab === "active") return r.status === "active";
-    if (tab === "sold") return r.status === "sold" || r.status === "archived";
+    if (tab === "sold")
+      return r.status === "sold" || r.status === "archived" || r.status === "expired";
     if (tab === "draft") return r.status === "draft";
     return true;
   });
@@ -148,7 +158,7 @@ function MyListingsPage() {
         <TabsList>
           <TabsTrigger value="all">Alle ({rows?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="active">Aktive</TabsTrigger>
-          <TabsTrigger value="sold">Solgt / arkivert</TabsTrigger>
+          <TabsTrigger value="sold">Solgt / utløpt</TabsTrigger>
           <TabsTrigger value="draft">Utkast</TabsTrigger>
         </TabsList>
         <TabsContent value={tab} className="mt-6">
@@ -238,6 +248,29 @@ function ListingRow({
           >
             {STATUS_LABEL[row.status]}
           </Badge>
+          {row.status === "active" && (() => {
+            const d = daysLeft(row.expires_at);
+            if (d == null) return null;
+            const tone =
+              d <= 2
+                ? "border-destructive/40 text-destructive"
+                : d <= 7
+                  ? "border-amber-500/40 text-amber-700 dark:text-amber-400"
+                  : "border-border text-muted-foreground";
+            return (
+              <span
+                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${tone}`}
+              >
+                <Clock className="size-3" />
+                {d === 0 ? "Utløper i dag" : `${d} ${d === 1 ? "dag" : "dager"} igjen`}
+              </span>
+            );
+          })()}
+          {row.status === "expired" && (
+            <span className="text-xs text-muted-foreground">
+              Publiser på nytt for 30 nye dager
+            </span>
+          )}
         </div>
         <p className="mt-1 font-display text-sm">{formatPrice(row)}</p>
         <p className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
@@ -262,7 +295,8 @@ function ListingRow({
           </Button>
         ) : (
           <Button size="sm" variant="outline" onClick={onReactivate} disabled={busy}>
-            <RotateCcw className="size-4" /> Reaktiver
+            <RotateCcw className="size-4" />
+            {row.status === "expired" ? "Publiser på nytt" : "Reaktiver"}
           </Button>
         )}
         <AlertDialog>

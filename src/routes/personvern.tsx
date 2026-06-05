@@ -47,7 +47,7 @@ function PersonvernPage() {
             </li>
             <li>
               <strong>kaupet_read_&lt;id&gt;</strong> — et tidsstempel per samtale som forteller når du sist åpnet
-              chatten. Brukes kun til uleste-indikatoren i meldingsinnboksen.
+              chatten. Brukes kun til ulest-indikatoren i meldingsinnboksen.
             </li>
             <li>
               <strong>kaupet_viewed_&lt;id&gt;</strong> — en markering per nettleserfane som hindrer at samme annonse

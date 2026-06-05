@@ -33,6 +33,7 @@ export const Route = createFileRoute("/annonse/$id")({
       .eq("id", params.id)
       .maybeSingle();
     if (error) throw error;
+    if (!data) throw notFound();
     return { listing: data };
   },
   head: ({ params, loaderData }) => {

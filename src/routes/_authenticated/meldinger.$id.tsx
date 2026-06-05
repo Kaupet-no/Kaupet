@@ -221,6 +221,34 @@ function ConversationPage() {
       ? `${conv.listing.price_nok.toLocaleString("nb-NO")} kr`
       : "Pris ved henvendelse";
 
+  const otherId = conv
+    ? conv.buyer_id === user?.id
+      ? conv.seller_id
+      : conv.buyer_id
+    : null;
+
+  const iBlockedAll = !!(otherId && myBlocks?.some(
+    (b) => b.scope === "all" && b.blocked_id === otherId,
+  ));
+  const iBlockedConv = !!myBlocks?.some(
+    (b) => b.scope === "conversation" && b.conversation_id === id,
+  );
+  const iBlocked = iBlockedAll || iBlockedConv;
+  const theyBlockedMe = !!(otherId && blocksAgainstMe?.some(
+    (b) =>
+      b.blocker_id === otherId &&
+      (b.scope === "all" || b.conversation_id === id),
+  ));
+  const disabled =
+    !!conv?.otherDeleted || !!conv?.otherPending || iBlocked || theyBlockedMe;
+  const disabledPlaceholder = conv?.otherDeleted || conv?.otherPending
+    ? "Du kan ikke svare denne brukeren"
+    : iBlocked
+      ? "Du har blokkert denne samtalen"
+      : theyBlockedMe
+        ? "Du kan ikke sende meldinger i denne samtalen"
+        : "Skriv en melding…";
+
   return (
     <div className="mx-auto flex h-[calc(100vh-4rem)] max-w-3xl flex-col px-4 py-4">
       <Link

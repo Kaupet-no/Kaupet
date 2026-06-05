@@ -125,7 +125,59 @@ function MineSokPage() {
         </Link>
       </div>
 
+      {showPushBanner && (
+        <div className="mt-6 flex gap-3 rounded-xl border border-border bg-card p-4">
+          <BellRing className="mt-0.5 size-5 shrink-0 text-primary" />
+          <div className="flex-1 space-y-2 text-sm">
+            {!push.supported ? (
+              <p className="text-muted-foreground">
+                Push-varsler er ikke tilgjengelig i denne nettleseren. Du vil ikke
+                få varsler her, men kan motta dem på andre enheter der du er logget inn.
+              </p>
+            ) : push.permission === "denied" ? (
+              <p className="text-muted-foreground">
+                Du har blokkert varsler for kaupet.no. Endre tillatelsen i
+                nettleserinnstillingene for å motta varsler her.
+              </p>
+            ) : !push.subscribedHere ? (
+              <>
+                <p className="font-medium">Aktiver push-varsler for å motta treffene</p>
+                <p className="text-muted-foreground">
+                  Du har lagrede søk med varsling på, men push-varsler er ikke aktivert
+                  i nettleseren. Du vil ikke få beskjed når en ny annonse matcher.
+                </p>
+                <Button size="sm" onClick={enablePush} disabled={enablingPush}>
+                  {enablingPush && <Loader2 className="size-4 animate-spin" />}
+                  Aktiver push-varsler
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="font-medium">Push-varsler for lagrede søk er av</p>
+                <p className="text-muted-foreground">
+                  Slå på i profilen for å motta dem på denne enheten.
+                </p>
+                <Button size="sm" onClick={enablePush} disabled={enablingPush}>
+                  {enablingPush && <Loader2 className="size-4 animate-spin" />}
+                  Slå på for lagrede søk
+                </Button>
+              </>
+            )}
+            <p>
+              <Link
+                to="/profil"
+                search={{ tab: "varslinger" } as never}
+                className="text-xs underline underline-offset-2 text-muted-foreground"
+              >
+                Administrer varsler
+              </Link>
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="mt-8">
+
         {isLoading ? (
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, i) => (

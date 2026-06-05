@@ -236,7 +236,8 @@ function NewListingPage() {
       navigate({ to: "/annonse/$id", params: { id } });
     },
     onError: (err: Error) => {
-      toast.error(err.message || "Kunne ikke publisere annonsen");
+      const msg = err.message ?? "";
+      toast.error(msg.startsWith("[") ? "Sjekk feltene og prøv igjen" : msg || "Kunne ikke publisere annonsen");
     },
   });
 

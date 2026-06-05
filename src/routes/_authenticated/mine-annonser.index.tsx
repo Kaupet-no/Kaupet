@@ -41,6 +41,7 @@ type Row = {
   is_free: boolean;
   city: string | null;
   view_count: number;
+  favorite_count: number;
   created_at: string;
   expires_at: string | null;
   cover_path: string | null;

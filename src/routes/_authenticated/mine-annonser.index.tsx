@@ -248,6 +248,29 @@ function ListingRow({
           >
             {STATUS_LABEL[row.status]}
           </Badge>
+          {row.status === "active" && (() => {
+            const d = daysLeft(row.expires_at);
+            if (d == null) return null;
+            const tone =
+              d <= 2
+                ? "border-destructive/40 text-destructive"
+                : d <= 7
+                  ? "border-amber-500/40 text-amber-700 dark:text-amber-400"
+                  : "border-border text-muted-foreground";
+            return (
+              <span
+                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${tone}`}
+              >
+                <Clock className="size-3" />
+                {d === 0 ? "Utløper i dag" : `${d} ${d === 1 ? "dag" : "dager"} igjen`}
+              </span>
+            );
+          })()}
+          {row.status === "expired" && (
+            <span className="text-xs text-muted-foreground">
+              Publiser på nytt for 30 nye dager
+            </span>
+          )}
         </div>
         <p className="mt-1 font-display text-sm">{formatPrice(row)}</p>
         <p className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
@@ -272,7 +295,8 @@ function ListingRow({
           </Button>
         ) : (
           <Button size="sm" variant="outline" onClick={onReactivate} disabled={busy}>
-            <RotateCcw className="size-4" /> Reaktiver
+            <RotateCcw className="size-4" />
+            {row.status === "expired" ? "Publiser på nytt" : "Reaktiver"}
           </Button>
         )}
         <AlertDialog>

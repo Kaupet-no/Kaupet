@@ -346,7 +346,7 @@ function ConversationPage() {
         className="mt-3 flex items-end gap-2"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!sendMutation.isPending) sendMutation.mutate(body);
+          if (!sendMutation.isPending && !disabled) sendMutation.mutate(body);
         }}
       >
         <Textarea
@@ -355,29 +355,20 @@ function ConversationPage() {
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              if (!sendMutation.isPending && !conv?.otherDeleted && !conv?.otherPending) {
+              if (!sendMutation.isPending && !disabled) {
                 sendMutation.mutate(body);
               }
             }
           }}
-          placeholder={
-            conv?.otherDeleted || conv?.otherPending
-              ? "Du kan ikke svare denne brukeren"
-              : "Skriv en melding…"
-          }
+          placeholder={disabledPlaceholder}
           rows={2}
           maxLength={4000}
-          disabled={!!conv?.otherDeleted || !!conv?.otherPending}
+          disabled={disabled}
           className="min-h-[60px] flex-1 resize-none"
         />
         <Button
           type="submit"
-          disabled={
-            sendMutation.isPending ||
-            !body.trim() ||
-            !!conv?.otherDeleted ||
-            !!conv?.otherPending
-          }
+          disabled={sendMutation.isPending || !body.trim() || disabled}
           className="gap-2"
         >
           <Send className="size-4" /> Send

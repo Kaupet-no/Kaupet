@@ -113,6 +113,43 @@ function NewListingPage() {
   const isFree = watch("is_free");
   const categoryId = watch("category_id");
   const condition = watch("condition");
+  const postalCode = watch("postal_code");
+  const city = watch("city");
+
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const lastEdited = useRef<"postal_code" | "city" | "map" | null>(null);
+  const markerMoved = useRef(false);
+
+  // Auto-fill city from postal code
+  useEffect(() => {
+    if (lastEdited.current !== "postal_code") return;
+    const p = (postalCode ?? "").trim();
+    if (!/^\d{4}$/.test(p)) return;
+    const t = window.setTimeout(async () => {
+      const r = await lookupPostalCode(p);
+      if (!r) return;
+      if (r.city) setValue("city", r.city, { shouldValidate: false });
+      if (!markerMoved.current) setCoords({ lat: r.lat, lng: r.lng });
+    }, 500);
+    return () => window.clearTimeout(t);
+  }, [postalCode, setValue]);
+
+  // Auto-fill postal from city
+  useEffect(() => {
+    if (lastEdited.current !== "city") return;
+    const c = (city ?? "").trim();
+    if (c.length < 2) return;
+    const t = window.setTimeout(async () => {
+      const r = await lookupCity(c);
+      if (!r) return;
+      if (r.postal_code && !(postalCode ?? "").trim()) {
+        setValue("postal_code", r.postal_code, { shouldValidate: false });
+      }
+      if (!markerMoved.current) setCoords({ lat: r.lat, lng: r.lng });
+    }, 500);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [city, setValue]);
 
   const mutation = useMutation({
     mutationFn: async (values: ListingForm) => {

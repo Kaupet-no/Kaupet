@@ -341,17 +341,37 @@ function ConversationPage() {
             )}
             <p className="text-xs text-muted-foreground">
               {priceLabel} · med{" "}
-              {conv.otherDeleted
-                ? "Slettet bruker"
-                : conv.other?.display_name ?? "ukjent bruker"}
+              {conv.otherDeleted || !otherId ? (
+                <span>{conv.otherDeleted ? "Slettet bruker" : "ukjent bruker"}</span>
+              ) : (
+                <Link
+                  to="/bruker/$id"
+                  params={{ id: otherId }}
+                  className="underline-offset-2 hover:underline"
+                >
+                  {conv.other?.display_name ?? "ukjent bruker"}
+                </Link>
+              )}
             </p>
           </div>
-          {conv.other?.avatar_url && !conv.otherDeleted ? (
-            <img
-              src={conv.other.avatar_url}
-              alt=""
-              className="size-9 rounded-full object-cover"
-            />
+          {otherId && !conv.otherDeleted ? (
+            <Link
+              to="/bruker/$id"
+              params={{ id: otherId }}
+              aria-label={`Se profilen til ${conv.other?.display_name ?? "denne brukeren"}`}
+            >
+              {conv.other?.avatar_url ? (
+                <img
+                  src={conv.other.avatar_url}
+                  alt=""
+                  className="size-9 rounded-full object-cover ring-offset-2 transition hover:ring-2 hover:ring-primary"
+                />
+              ) : (
+                <div className="flex size-9 items-center justify-center rounded-full bg-muted transition hover:ring-2 hover:ring-primary">
+                  <UserIcon className="size-4 text-muted-foreground" />
+                </div>
+              )}
+            </Link>
           ) : (
             <div className="flex size-9 items-center justify-center rounded-full bg-muted">
               <UserIcon className="size-4 text-muted-foreground" />
@@ -365,6 +385,28 @@ function ConversationPage() {
             />
           )}
         </div>
+      )}
+
+      {conv && (
+        <SalePanel
+          isSeller={isSeller}
+          sale={sale ?? null}
+          saleIsForThisConversation={saleIsForThisConversation}
+          saleConfirmedForOtherBuyer={saleConfirmedForOtherBuyer}
+          iAmInSale={iAmInSale}
+          otherName={conv.other?.display_name ?? "denne brukeren"}
+          otherDeleted={!!conv.otherDeleted}
+          myReview={myReview ?? null}
+          onConfirm={() => confirmMutation.mutate()}
+          onUnconfirm={() => unconfirmMutation.mutate()}
+          confirming={confirmMutation.isPending}
+          unconfirming={unconfirmMutation.isPending}
+          onSubmitReview={async (rating, comment) => {
+            await createReviewFn({ data: { listingId: listingId!, rating, comment } });
+            toast.success("Takk for vurderingen!");
+            refetchMyReview();
+          }}
+        />
       )}
 
       {conv && (conv.otherDeleted || conv.otherPending) && (

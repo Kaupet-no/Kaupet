@@ -20,22 +20,6 @@ export function SiteHeader() {
           <span className="font-display text-xl text-muted-foreground">no</span>
         </Link>
 
-        <nav className="hidden flex-1 items-center gap-6 md:flex">
-          <Link
-            to="/annonser"
-            search={{ q: "", category: "", sort: "new" }}
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            Utforsk
-          </Link>
-          <Link
-            to="/"
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            Hjem
-          </Link>
-        </nav>
-
         <div className="ml-auto flex items-center gap-2">
           {user ? (
             <>

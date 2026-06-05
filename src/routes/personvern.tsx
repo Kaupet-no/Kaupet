@@ -101,10 +101,36 @@ function PersonvernPage() {
         </section>
 
         <section>
+          <h2 className="font-display text-2xl">Push-varslinger</h2>
+          <p className="mt-3">
+            Push-varslinger er <strong>frivillige og krever eksplisitt samtykke</strong>. Du aktiverer dem selv i
+            nettleseren eller appen. Vi lagrer kun det som er nødvendig for å sende varsler:
+          </p>
+          <ul className="mt-3 space-y-2 list-disc pl-5">
+            <li>
+              <strong>Abonnementsnøkler</strong> — et kryptografisk nøkkelpar generert av nettleseren din. Vi kan ikke
+              bruke disse til å spore deg på tvers av nettsteder.
+            </li>
+            <li>
+              <strong>Enhets- og nettleserinformasjon</strong> — brukes til å sende varslet til riktig enhet.
+            </li>
+            <li>
+              <strong>Varselformål</strong> — hvilke hendelser du vil varsles om (for eksempel nye meldinger eller treff
+              på lagrede søk).
+            </li>
+          </ul>
+          <p className="mt-4">
+            Du kan når som helst <strong>skru av varsler</strong> i nettleserens innstillinger eller i profilen din på
+            Kaupet.no. Da slettes abonnementsdataene automatisk fra serveren.
+          </p>
+        </section>
+
+        <section>
           <h2 className="font-display text-2xl">Juridisk grunnlag</h2>
           <p className="mt-3">
-            Behandlingen skjer på grunnlag av <strong>avtale</strong> (nødvendig for å levere tjenesten du har bedt om)
-            og <strong>berettiget interesse</strong> (statistikk til selgere og sikkerhet i tjenesten).
+            Behandlingen skjer på grunnlag av <strong>avtale</strong> (nødvendig for å levere tjenesten du har bedt om),{" "}
+            <strong>samtykke</strong> (push-varslinger og eventuelle preferanser) og{" "}
+            <strong>berettiget interesse</strong> (statistikk til selgere og sikkerhet i tjenesten).
           </p>
         </section>
 

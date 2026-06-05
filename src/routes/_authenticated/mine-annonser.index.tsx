@@ -199,8 +199,9 @@ function MyListingsPage() {
                   row={r}
                   onMarkSold={() => updateStatus.mutate({ id: r.id, status: "sold" })}
                   onReactivate={() => updateStatus.mutate({ id: r.id, status: "active" })}
+                  onRepublish={() => republish.mutate(r.id)}
                   onDelete={() => deleteListing.mutate(r.id)}
-                  busy={updateStatus.isPending || deleteListing.isPending}
+                  busy={updateStatus.isPending || deleteListing.isPending || republish.isPending}
                 />
               ))}
             </ul>

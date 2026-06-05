@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, useNavigate, useRouter } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { ArrowLeft, MapPin, MessageCircle, User as UserIcon, Pencil, Eye, Users, Heart, Info, ChevronDown } from "lucide-react";
@@ -24,6 +24,82 @@ const CONDITION_LABEL: Record<string, string> = {
 };
 
 export const Route = createFileRoute("/annonse/$id")({
+  loader: async ({ params }) => {
+    const { data, error } = await supabase
+      .from("listings")
+      .select(
+        "id, title, description, price_nok, is_free, condition, city, updated_at, published_at, status",
+      )
+      .eq("id", params.id)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) throw notFound();
+    return { listing: data };
+  },
+  head: ({ params, loaderData }) => {
+    const l = loaderData?.listing;
+    if (!l) {
+      return {
+        meta: [
+          { title: "Annonse — Kaupet.no" },
+          { name: "robots", content: "noindex" },
+        ],
+      };
+    }
+    const priceLabel = l.is_free
+      ? "Gis bort gratis"
+      : l.price_nok != null
+        ? `${l.price_nok.toLocaleString("nb-NO")} kr`
+        : "Pris ved henvendelse";
+    const place = l.city ? ` i ${l.city}` : "";
+    const rawTitle = `${l.title} — ${priceLabel}${place} | Kaupet.no`;
+    const title = rawTitle.length > 60 ? `${l.title} — ${priceLabel} | Kaupet.no` : rawTitle;
+    const baseDesc = (l.description ?? "").replace(/\s+/g, " ").trim();
+    const descCore = baseDesc
+      ? baseDesc.length > 130
+        ? `${baseDesc.slice(0, 127)}…`
+        : baseDesc
+      : `${l.title}${place}. ${priceLabel} på Kaupet.no.`;
+    const description =
+      descCore.length < 60 ? `${descCore} ${priceLabel}${place}. Selges på Kaupet.no.` : descCore;
+    const url = `https://kaupet.no/annonse/${params.id}`;
+    const isActive = (l.status as string | undefined) === "active";
+    return {
+      meta: [
+        { title },
+        { name: "description", content: description },
+        ...(!isActive ? [{ name: "robots", content: "noindex" }] : []),
+        { property: "og:title", content: title },
+        { property: "og:description", content: description },
+        { property: "og:type", content: "product" },
+        { property: "og:url", content: url },
+        { name: "twitter:title", content: title },
+        { name: "twitter:description", content: description },
+      ],
+      links: [{ rel: "canonical", href: url }],
+      scripts: [
+        {
+          type: "application/ld+json",
+          children: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Product",
+            name: l.title,
+            description: descCore,
+            url,
+            offers: {
+              "@type": "Offer",
+              priceCurrency: "NOK",
+              price: l.is_free ? 0 : (l.price_nok ?? undefined),
+              availability: isActive
+                ? "https://schema.org/InStock"
+                : "https://schema.org/OutOfStock",
+              url,
+            },
+          }),
+        },
+      ],
+    };
+  },
   component: ListingDetailPage,
   errorComponent: ({ error, reset }) => {
     const router = useRouter();
@@ -228,12 +304,14 @@ function ListingDetailPage() {
             )}
           </div>
           {images.length > 1 && (
-            <div className="mt-3 flex gap-2 overflow-x-auto">
+            <div className="mt-3 flex gap-2 overflow-x-auto" role="list">
               {images.map((img, i) => (
                 <button
                   key={img.storage_path}
                   type="button"
                   onClick={() => setActiveImage(i)}
+                  aria-label={`Vis bilde ${i + 1} av ${images.length} for «${data.title}»`}
+                  aria-pressed={i === activeImage}
                   className={`size-20 shrink-0 overflow-hidden rounded-lg border-2 ${
                     i === activeImage ? "border-primary" : "border-transparent"
                   }`}

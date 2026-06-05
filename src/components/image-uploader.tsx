@@ -132,7 +132,7 @@ export function ImageUploader({
               >
                 <img
                   src={img.previewUrl}
-                  alt={`Bilde ${idx + 1}`}
+                  alt={idx === 0 ? `Hovedbilde av annonsen (${img.file.name})` : `Bilde ${idx + 1} av annonsen (${img.file.name})`}
                   className="size-full object-cover"
                 />
                 {idx === 0 && (

@@ -69,9 +69,12 @@ export const Route = createFileRoute("/_authenticated/profil")({
   head: () => ({
     meta: [{ title: "Min profil — Kaupet.no" }],
   }),
-  validateSearch: (search: Record<string, unknown>) => ({
-    tab: (search.tab as string) === "konto" ? "konto" : "profil",
-  }),
+  validateSearch: (search: Record<string, unknown>) => {
+    const t = search.tab as string;
+    return {
+      tab: t === "konto" || t === "varslinger" ? t : "profil",
+    };
+  },
   component: ProfilePage,
 });
 
@@ -89,16 +92,25 @@ function ProfilePage() {
       <Tabs
         value={tab}
         onValueChange={(v) =>
-          navigate({ search: { tab: v === "konto" ? "konto" : "profil" }, replace: true })
+          navigate({
+            search: {
+              tab: v === "konto" || v === "varslinger" ? (v as "konto" | "varslinger") : "profil",
+            },
+            replace: true,
+          })
         }
         className="mt-8"
       >
         <TabsList>
           <TabsTrigger value="profil">Profilinfo</TabsTrigger>
+          <TabsTrigger value="varslinger">Varslinger</TabsTrigger>
           <TabsTrigger value="konto">Konto</TabsTrigger>
         </TabsList>
         <TabsContent value="profil" className="mt-6">
           <ProfileSection />
+        </TabsContent>
+        <TabsContent value="varslinger" className="mt-6">
+          <NotificationsSection />
         </TabsContent>
         <TabsContent value="konto" className="mt-6">
           <AccountSection />
@@ -107,6 +119,7 @@ function ProfilePage() {
     </div>
   );
 }
+
 
 function ProfileSection() {
   const queryClient = useQueryClient();

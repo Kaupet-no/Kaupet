@@ -61,13 +61,33 @@ export function NotificationsBell() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "saved_search_notifications", filter: `user_id=eq.${user.id}` },
-        () => refetch(),
+        () => {
+          qc.invalidateQueries({ queryKey: ["notifications"] });
+          void refetch();
+        },
       )
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
     };
-  }, [user?.id, refetch]);
+  }, [user?.id, refetch, qc]);
+
+  // Fallback: refresh når fanen får fokus igjen
+  useEffect(() => {
+    if (!user) return;
+    const onFocus = () => {
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") onFocus();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [user?.id, qc]);
 
   if (!user) return null;
 

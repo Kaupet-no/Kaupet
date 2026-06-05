@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -8,8 +8,9 @@ import { Loader2 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { uploadListingImage } from "@/lib/storage";
-import { geocodeNorwayAddress } from "@/lib/geocode";
+import { geocodeNorwayAddress, lookupPostalCode, lookupCity } from "@/lib/geocode";
 import { ImageUploader, type PendingImage } from "@/components/image-uploader";
+import { ListingLocationPicker } from "@/components/listing-location-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -112,6 +113,43 @@ function NewListingPage() {
   const isFree = watch("is_free");
   const categoryId = watch("category_id");
   const condition = watch("condition");
+  const postalCode = watch("postal_code");
+  const city = watch("city");
+
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const lastEdited = useRef<"postal_code" | "city" | "map" | null>(null);
+  const markerMoved = useRef(false);
+
+  // Auto-fill city from postal code
+  useEffect(() => {
+    if (lastEdited.current !== "postal_code") return;
+    const p = (postalCode ?? "").trim();
+    if (!/^\d{4}$/.test(p)) return;
+    const t = window.setTimeout(async () => {
+      const r = await lookupPostalCode(p);
+      if (!r) return;
+      if (r.city) setValue("city", r.city, { shouldValidate: false });
+      if (!markerMoved.current) setCoords({ lat: r.lat, lng: r.lng });
+    }, 500);
+    return () => window.clearTimeout(t);
+  }, [postalCode, setValue]);
+
+  // Auto-fill postal from city
+  useEffect(() => {
+    if (lastEdited.current !== "city") return;
+    const c = (city ?? "").trim();
+    if (c.length < 2) return;
+    const t = window.setTimeout(async () => {
+      const r = await lookupCity(c);
+      if (!r) return;
+      if (r.postal_code && !(postalCode ?? "").trim()) {
+        setValue("postal_code", r.postal_code, { shouldValidate: false });
+      }
+      if (!markerMoved.current) setCoords({ lat: r.lat, lng: r.lng });
+    }, 500);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [city, setValue]);
 
   const mutation = useMutation({
     mutationFn: async (values: ListingForm) => {
@@ -120,11 +158,13 @@ function NewListingPage() {
       if (userErr || !userData.user) throw new Error("Du må være logget inn.");
       const userId = userData.user.id;
 
-      // Best-effort geocoding så annonsen dukker opp i radius-søk.
-      const coords = await geocodeNorwayAddress({
-        postal_code: parsed.postal_code,
-        city: parsed.city,
-      });
+      // Bruk manuelt valgte koordinater (kart eller geokoding fra auto-fyll) hvis tilgjengelig.
+      const finalCoords =
+        coords ??
+        (await geocodeNorwayAddress({
+          postal_code: parsed.postal_code,
+          city: parsed.city,
+        }));
 
       const { data: listing, error: insertErr } = await supabase
         .from("listings")
@@ -142,8 +182,8 @@ function NewListingPage() {
               : null,
           postal_code: parsed.postal_code || null,
           city: parsed.city || null,
-          lat: coords?.lat ?? null,
-          lng: coords?.lng ?? null,
+          lat: finalCoords?.lat ?? null,
+          lng: finalCoords?.lng ?? null,
           status: "active",
           published_at: new Date().toISOString(),
         })
@@ -300,18 +340,56 @@ function NewListingPage() {
         </section>
 
         {/* Location */}
-        <section className="grid gap-4 md:grid-cols-[160px_1fr]">
-          <div className="space-y-2">
-            <Label htmlFor="postal_code">Postnummer</Label>
-            <Input id="postal_code" inputMode="numeric" maxLength={4} placeholder="0150" {...register("postal_code")} />
-            {errors.postal_code && (
-              <p className="text-sm text-destructive">{errors.postal_code.message}</p>
-            )}
+        <section className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-[160px_1fr]">
+            <div className="space-y-2">
+              <Label htmlFor="postal_code">Postnummer</Label>
+              <Input
+                id="postal_code"
+                inputMode="numeric"
+                maxLength={4}
+                placeholder="0150"
+                {...register("postal_code", {
+                  onChange: () => {
+                    lastEdited.current = "postal_code";
+                    markerMoved.current = false;
+                  },
+                })}
+              />
+              {errors.postal_code && (
+                <p className="text-sm text-destructive">{errors.postal_code.message}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="city">Sted</Label>
+              <Input
+                id="city"
+                placeholder="Oslo"
+                {...register("city", {
+                  onChange: () => {
+                    lastEdited.current = "city";
+                    markerMoved.current = false;
+                  },
+                })}
+              />
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="city">Sted</Label>
-            <Input id="city" placeholder="Oslo" {...register("city")} />
-          </div>
+          {coords && (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Dra markøren for å justere hvor området vises på annonsen.
+              </p>
+              <ListingLocationPicker
+                lat={coords.lat}
+                lng={coords.lng}
+                onChange={(next) => {
+                  markerMoved.current = true;
+                  lastEdited.current = "map";
+                  setCoords(next);
+                }}
+              />
+            </div>
+          )}
         </section>
 
         <div className="flex items-center justify-end gap-3 border-t border-border pt-6">

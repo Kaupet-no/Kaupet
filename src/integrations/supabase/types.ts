@@ -35,6 +35,36 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_moderation_log: {
+        Row: {
+          action: string
+          admin_id: string
+          created_at: string
+          id: string
+          reason: string | null
+          target_id: string | null
+          target_type: string
+        }
+        Insert: {
+          action: string
+          admin_id: string
+          created_at?: string
+          id?: string
+          reason?: string | null
+          target_id?: string | null
+          target_type: string
+        }
+        Update: {
+          action?: string
+          admin_id?: string
+          created_at?: string
+          id?: string
+          reason?: string | null
+          target_id?: string | null
+          target_type?: string
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           created_at: string
@@ -130,6 +160,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ip_bans: {
+        Row: {
+          banned_by: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          ip_address: unknown
+          reason: string
+        }
+        Insert: {
+          banned_by: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          ip_address: unknown
+          reason: string
+        }
+        Update: {
+          banned_by?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          ip_address?: unknown
+          reason?: string
+        }
+        Relationships: []
       }
       listing_images: {
         Row: {
@@ -517,6 +574,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_bans: {
+        Row: {
+          banned_by: string
+          created_at: string
+          reason: string
+          user_id: string
+        }
+        Insert: {
+          banned_by: string
+          created_at?: string
+          reason: string
+          user_id: string
+        }
+        Update: {
+          banned_by?: string
+          created_at?: string
+          reason?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_blocks: {
         Row: {
           blocked_id: string
@@ -604,6 +682,33 @@ export type Database = {
         }
         Relationships: []
       }
+      user_suspensions: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          reason: string
+          suspended_by: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          reason: string
+          suspended_by: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          reason?: string
+          suspended_by?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_verifications: {
         Row: {
           expires_at: string
@@ -660,6 +765,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_ban_ip: {
+        Args: { _expires_at?: string; _ip: unknown; _reason: string }
+        Returns: string
+      }
+      admin_ban_user: {
+        Args: { _reason: string; _user_id: string }
+        Returns: undefined
+      }
+      admin_disable_listing: {
+        Args: { _id: string; _reason: string }
+        Returns: undefined
+      }
+      admin_enable_listing: { Args: { _id: string }; Returns: undefined }
       admin_find_users_by_email: {
         Args: { _query: string }
         Returns: {
@@ -704,6 +822,13 @@ export type Database = {
         }[]
       }
       admin_revoke_role: { Args: { _user_id: string }; Returns: undefined }
+      admin_suspend_user: {
+        Args: { _days?: number; _reason: string; _user_id: string }
+        Returns: undefined
+      }
+      admin_unban_ip: { Args: { _id: string }; Returns: undefined }
+      admin_unban_user: { Args: { _user_id: string }; Returns: undefined }
+      admin_unsuspend_user: { Args: { _user_id: string }; Returns: undefined }
       admin_views_timeseries: {
         Args: { _days?: number }
         Returns: {
@@ -724,7 +849,9 @@ export type Database = {
         Args: { _a: string; _b: string; _conversation_id: string }
         Returns: boolean
       }
+      is_user_banned: { Args: { _uid: string }; Returns: boolean }
       is_user_deletion_pending: { Args: { _user_id: string }; Returns: boolean }
+      is_user_suspended: { Args: { _uid: string }; Returns: boolean }
       listing_stats: {
         Args: { _listing_id: string }
         Returns: {
@@ -743,6 +870,16 @@ export type Database = {
       match_listing_to_saved_searches: {
         Args: { _listing_id: string }
         Returns: undefined
+      }
+      my_moderation_status: {
+        Args: never
+        Returns: {
+          ban_reason: string
+          is_banned: boolean
+          is_suspended: boolean
+          suspension_expires_at: string
+          suspension_reason: string
+        }[]
       }
       purge_expired_accounts: { Args: never; Returns: number }
       request_account_deletion: { Args: { _email: string }; Returns: undefined }
@@ -773,7 +910,13 @@ export type Database = {
         | "good"
         | "acceptable"
         | "for_parts"
-      listing_status: "draft" | "active" | "sold" | "archived" | "expired"
+      listing_status:
+        | "draft"
+        | "active"
+        | "sold"
+        | "archived"
+        | "expired"
+        | "disabled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -904,7 +1047,14 @@ export const Constants = {
       app_role: ["admin", "user"],
       block_scope: ["all", "conversation"],
       listing_condition: ["new", "like_new", "good", "acceptable", "for_parts"],
-      listing_status: ["draft", "active", "sold", "archived", "expired"],
+      listing_status: [
+        "draft",
+        "active",
+        "sold",
+        "archived",
+        "expired",
+        "disabled",
+      ],
     },
   },
 } as const

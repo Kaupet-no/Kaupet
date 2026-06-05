@@ -310,10 +310,13 @@ function ListingRow({
           <Button size="sm" variant="outline" onClick={onMarkSold} disabled={busy}>
             <CheckCircle2 className="size-4" /> Marker som solgt
           </Button>
+        ) : row.status === "expired" ? (
+          <Button size="sm" variant="outline" onClick={onRepublish} disabled={busy}>
+            <RotateCcw className="size-4" /> Publiser på nytt
+          </Button>
         ) : (
           <Button size="sm" variant="outline" onClick={onReactivate} disabled={busy}>
-            <RotateCcw className="size-4" />
-            {row.status === "expired" ? "Publiser på nytt" : "Reaktiver"}
+            <RotateCcw className="size-4" /> Reaktiver
           </Button>
         )}
         <AlertDialog>

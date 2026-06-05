@@ -25,7 +25,7 @@ function PersonvernPage() {
       <header className="mb-10">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">Personvern</p>
         <h1 className="mt-2 font-display text-4xl leading-tight tracking-tight">Personvernerklæring</h1>
-        <p className="mt-3 text-sm text-muted-foreground">Versjon 1.1 — sist oppdatert 4. juni 2026</p>
+        <p className="mt-3 text-sm text-muted-foreground">Versjon 1.3 — sist oppdatert 5. juni 2026</p>
       </header>
 
       <div className="space-y-10 text-sm leading-relaxed text-foreground/90">

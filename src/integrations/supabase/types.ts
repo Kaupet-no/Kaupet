@@ -490,6 +490,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_blocks: {
+        Row: {
+          blocked_id: string
+          blocker_id: string
+          conversation_id: string | null
+          created_at: string
+          id: string
+          listing_id: string | null
+          reason: string | null
+          scope: Database["public"]["Enums"]["block_scope"]
+        }
+        Insert: {
+          blocked_id: string
+          blocker_id: string
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          listing_id?: string | null
+          reason?: string | null
+          scope: Database["public"]["Enums"]["block_scope"]
+        }
+        Update: {
+          blocked_id?: string
+          blocker_id?: string
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          listing_id?: string | null
+          reason?: string | null
+          scope?: Database["public"]["Enums"]["block_scope"]
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -575,6 +608,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_blocked_between: {
+        Args: { _a: string; _b: string; _conversation_id: string }
+        Returns: boolean
+      }
       is_user_deletion_pending: { Args: { _user_id: string }; Returns: boolean }
       listing_stats: {
         Args: { _listing_id: string }
@@ -600,6 +637,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      block_scope: "all" | "conversation"
       listing_condition:
         | "new"
         | "like_new"
@@ -735,6 +773,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      block_scope: ["all", "conversation"],
       listing_condition: ["new", "like_new", "good", "acceptable", "for_parts"],
       listing_status: ["draft", "active", "sold", "archived"],
     },

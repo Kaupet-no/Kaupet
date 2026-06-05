@@ -27,6 +27,7 @@ import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authentic
 import { Route as AuthenticatedMeldingerIdRouteImport } from './routes/_authenticated/meldinger.$id'
 import { Route as AuthenticatedAdminKategorierRouteImport } from './routes/_authenticated/admin/kategorier'
 import { Route as AuthenticatedAdminBrukereRouteImport } from './routes/_authenticated/admin/brukere'
+import { Route as ApiPublicPushDispatchRouteImport } from './routes/api/public/push/dispatch'
 import { Route as AuthenticatedMineAnnonserIdRedigerRouteImport } from './routes/_authenticated/mine-annonser.$id.rediger'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -123,6 +124,11 @@ const AuthenticatedAdminBrukereRoute =
     path: '/brukere',
     getParentRoute: () => AuthenticatedAdminRouteRoute,
   } as any)
+const ApiPublicPushDispatchRoute = ApiPublicPushDispatchRouteImport.update({
+  id: '/api/public/push/dispatch',
+  path: '/api/public/push/dispatch',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedMineAnnonserIdRedigerRoute =
   AuthenticatedMineAnnonserIdRedigerRouteImport.update({
     id: '/mine-annonser/$id/rediger',
@@ -149,6 +155,7 @@ export interface FileRoutesByFullPath {
   '/meldinger/': typeof AuthenticatedMeldingerIndexRoute
   '/mine-annonser/': typeof AuthenticatedMineAnnonserIndexRoute
   '/mine-annonser/$id/rediger': typeof AuthenticatedMineAnnonserIdRedigerRoute
+  '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -168,6 +175,7 @@ export interface FileRoutesByTo {
   '/meldinger': typeof AuthenticatedMeldingerIndexRoute
   '/mine-annonser': typeof AuthenticatedMineAnnonserIndexRoute
   '/mine-annonser/$id/rediger': typeof AuthenticatedMineAnnonserIdRedigerRoute
+  '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -190,6 +198,7 @@ export interface FileRoutesById {
   '/_authenticated/meldinger/': typeof AuthenticatedMeldingerIndexRoute
   '/_authenticated/mine-annonser/': typeof AuthenticatedMineAnnonserIndexRoute
   '/_authenticated/mine-annonser/$id/rediger': typeof AuthenticatedMineAnnonserIdRedigerRoute
+  '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -212,6 +221,7 @@ export interface FileRouteTypes {
     | '/meldinger/'
     | '/mine-annonser/'
     | '/mine-annonser/$id/rediger'
+    | '/api/public/push/dispatch'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -231,6 +241,7 @@ export interface FileRouteTypes {
     | '/meldinger'
     | '/mine-annonser'
     | '/mine-annonser/$id/rediger'
+    | '/api/public/push/dispatch'
   id:
     | '__root__'
     | '/'
@@ -252,6 +263,7 @@ export interface FileRouteTypes {
     | '/_authenticated/meldinger/'
     | '/_authenticated/mine-annonser/'
     | '/_authenticated/mine-annonser/$id/rediger'
+    | '/api/public/push/dispatch'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -262,6 +274,7 @@ export interface RootRouteChildren {
   PersonvernRoute: typeof PersonvernRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   AnnonseIdRoute: typeof AnnonseIdRoute
+  ApiPublicPushDispatchRoute: typeof ApiPublicPushDispatchRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -392,6 +405,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminBrukereRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
+    '/api/public/push/dispatch': {
+      id: '/api/public/push/dispatch'
+      path: '/api/public/push/dispatch'
+      fullPath: '/api/public/push/dispatch'
+      preLoaderRoute: typeof ApiPublicPushDispatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/mine-annonser/$id/rediger': {
       id: '/_authenticated/mine-annonser/$id/rediger'
       path: '/mine-annonser/$id/rediger'
@@ -456,6 +476,7 @@ const rootRouteChildren: RootRouteChildren = {
   PersonvernRoute: PersonvernRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   AnnonseIdRoute: AnnonseIdRoute,
+  ApiPublicPushDispatchRoute: ApiPublicPushDispatchRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

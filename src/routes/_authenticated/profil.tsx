@@ -98,7 +98,10 @@ function ProfilePage() {
         onValueChange={(v) =>
           navigate({
             search: {
-              tab: v === "konto" || v === "varslinger" ? (v as "konto" | "varslinger") : "profil",
+              tab:
+                v === "konto" || v === "varslinger" || v === "blokkerte"
+                  ? (v as "konto" | "varslinger" | "blokkerte")
+                  : "profil",
             },
             replace: true,
           })
@@ -108,6 +111,7 @@ function ProfilePage() {
         <TabsList>
           <TabsTrigger value="profil">Profilinfo</TabsTrigger>
           <TabsTrigger value="varslinger">Varslinger</TabsTrigger>
+          <TabsTrigger value="blokkerte">Blokkerte</TabsTrigger>
           <TabsTrigger value="konto">Konto</TabsTrigger>
         </TabsList>
         <TabsContent value="profil" className="mt-6">
@@ -115,6 +119,9 @@ function ProfilePage() {
         </TabsContent>
         <TabsContent value="varslinger" className="mt-6">
           <NotificationsSection />
+        </TabsContent>
+        <TabsContent value="blokkerte" className="mt-6">
+          <BlockedSection />
         </TabsContent>
         <TabsContent value="konto" className="mt-6">
           <AccountSection />

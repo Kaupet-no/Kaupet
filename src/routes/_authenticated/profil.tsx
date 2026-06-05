@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Bell, Loader2, LogOut, Trash2 } from "lucide-react";
+import { Bell, Loader2, LogOut, Trash2, ShieldOff } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,7 @@ import {
   getNotificationPreferences,
   updateNotificationPreferences,
 } from "@/lib/push.functions";
+import { listMyBlocks, deleteBlock } from "@/lib/blocks.functions";
 
 
 
@@ -72,7 +73,10 @@ export const Route = createFileRoute("/_authenticated/profil")({
   validateSearch: (search: Record<string, unknown>) => {
     const t = search.tab as string;
     return {
-      tab: t === "konto" || t === "varslinger" ? t : "profil",
+      tab:
+        t === "konto" || t === "varslinger" || t === "blokkerte"
+          ? t
+          : "profil",
     };
   },
   component: ProfilePage,
@@ -94,7 +98,10 @@ function ProfilePage() {
         onValueChange={(v) =>
           navigate({
             search: {
-              tab: v === "konto" || v === "varslinger" ? (v as "konto" | "varslinger") : "profil",
+              tab:
+                v === "konto" || v === "varslinger" || v === "blokkerte"
+                  ? (v as "konto" | "varslinger" | "blokkerte")
+                  : "profil",
             },
             replace: true,
           })
@@ -104,6 +111,7 @@ function ProfilePage() {
         <TabsList>
           <TabsTrigger value="profil">Profilinfo</TabsTrigger>
           <TabsTrigger value="varslinger">Varslinger</TabsTrigger>
+          <TabsTrigger value="blokkerte">Blokkerte</TabsTrigger>
           <TabsTrigger value="konto">Konto</TabsTrigger>
         </TabsList>
         <TabsContent value="profil" className="mt-6">
@@ -111,6 +119,9 @@ function ProfilePage() {
         </TabsContent>
         <TabsContent value="varslinger" className="mt-6">
           <NotificationsSection />
+        </TabsContent>
+        <TabsContent value="blokkerte" className="mt-6">
+          <BlockedSection />
         </TabsContent>
         <TabsContent value="konto" className="mt-6">
           <AccountSection />
@@ -654,5 +665,96 @@ function NotificationsSection() {
     </div>
   );
 }
+
+function BlockedSection() {
+  const qc = useQueryClient();
+  const listFn = useServerFn(listMyBlocks);
+  const deleteFn = useServerFn(deleteBlock);
+
+  const { data: blocks, isLoading } = useQuery({
+    queryKey: ["my-blocks"],
+    queryFn: () => listFn(),
+  });
+
+  const unblock = useMutation({
+    mutationFn: async (blockId: string) => deleteFn({ data: { blockId } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["my-blocks"] });
+      toast.success("Blokkering opphevet");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  if (isLoading) {
+    return <Loader2 className="size-5 animate-spin text-muted-foreground" />;
+  }
+
+  if (!blocks || blocks.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-border bg-surface p-10 text-center text-sm text-muted-foreground">
+        Du har ikke blokkert noen brukere eller samtaler.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">
+        Brukere og samtaler du har blokkert. Opphev blokkeringen for å kunne sende
+        og motta meldinger igjen.
+      </p>
+      <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+        {blocks.map((b) => (
+          <li key={b.id} className="flex items-center gap-3 p-4">
+            <Avatar className="size-10">
+              {b.blocked_profile?.avatar_url && (
+                <AvatarImage
+                  src={b.blocked_profile.avatar_url}
+                  alt={b.blocked_profile.display_name ?? ""}
+                />
+              )}
+              <AvatarFallback className="bg-muted text-xs">
+                {(b.blocked_profile?.display_name ?? "?")
+                  .slice(0, 2)
+                  .toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium">
+                {b.blocked_profile?.display_name ?? "Ukjent bruker"}
+              </p>
+              <p className="truncate text-xs text-muted-foreground">
+                {b.scope === "all"
+                  ? "All kommunikasjon blokkert"
+                  : `Samtale blokkert${b.listing ? ` · ${b.listing.title}` : ""}`}
+                {" · "}
+                {new Date(b.created_at).toLocaleDateString("nb-NO", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={unblock.isPending}
+              onClick={() => unblock.mutate(b.id)}
+              className="gap-2"
+            >
+              {unblock.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <ShieldOff className="size-4" />
+              )}
+              Opphev
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 
 

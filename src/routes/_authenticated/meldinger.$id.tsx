@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import * as React from "react";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Send, User as UserIcon } from "lucide-react";
@@ -10,6 +11,8 @@ import { signListingImageUrls } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { markRead } from "@/lib/unread";
 import { Textarea } from "@/components/ui/textarea";
+import { BlockConversationMenu } from "@/components/block-conversation-menu";
+import { listMyBlocks, listBlocksAgainstMe } from "@/lib/blocks.functions";
 
 export const Route = createFileRoute("/_authenticated/meldinger/$id")({
   head: () => ({
@@ -58,9 +61,22 @@ function ConversationPage() {
   const { id } = Route.useParams();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const listMyBlocksFn = useServerFn(listMyBlocks);
+  const listBlocksAgainstMeFn = useServerFn(listBlocksAgainstMe);
   const [body, setBody] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
+
+  const { data: myBlocks } = useQuery({
+    queryKey: ["my-blocks"],
+    enabled: !!user,
+    queryFn: () => listMyBlocksFn(),
+  });
+  const { data: blocksAgainstMe } = useQuery({
+    queryKey: ["blocks-against-me"],
+    enabled: !!user,
+    queryFn: () => listBlocksAgainstMeFn(),
+  });
 
   const { data: conv } = useQuery({
     queryKey: ["conversation", id],
@@ -205,6 +221,34 @@ function ConversationPage() {
       ? `${conv.listing.price_nok.toLocaleString("nb-NO")} kr`
       : "Pris ved henvendelse";
 
+  const otherId = conv
+    ? conv.buyer_id === user?.id
+      ? conv.seller_id
+      : conv.buyer_id
+    : null;
+
+  const iBlockedAll = !!(otherId && myBlocks?.some(
+    (b) => b.scope === "all" && b.blocked_id === otherId,
+  ));
+  const iBlockedConv = !!myBlocks?.some(
+    (b) => b.scope === "conversation" && b.conversation_id === id,
+  );
+  const iBlocked = iBlockedAll || iBlockedConv;
+  const theyBlockedMe = !!(otherId && blocksAgainstMe?.some(
+    (b) =>
+      b.blocker_id === otherId &&
+      (b.scope === "all" || b.conversation_id === id),
+  ));
+  const disabled =
+    !!conv?.otherDeleted || !!conv?.otherPending || iBlocked || theyBlockedMe;
+  const disabledPlaceholder = conv?.otherDeleted || conv?.otherPending
+    ? "Du kan ikke svare denne brukeren"
+    : iBlocked
+      ? "Du har blokkert denne samtalen"
+      : theyBlockedMe
+        ? "Du kan ikke sende meldinger i denne samtalen"
+        : "Skriv en melding…";
+
   return (
     <div className="mx-auto flex h-[calc(100vh-4rem)] max-w-3xl flex-col px-4 py-4">
       <Link
@@ -253,6 +297,13 @@ function ConversationPage() {
               <UserIcon className="size-4 text-muted-foreground" />
             </div>
           )}
+          {otherId && !conv.otherDeleted && !theyBlockedMe && (
+            <BlockConversationMenu
+              targetUserId={otherId}
+              conversationId={id}
+              targetName={conv.other?.display_name ?? "denne brukeren"}
+            />
+          )}
         </div>
       )}
 
@@ -261,6 +312,20 @@ function ConversationPage() {
           {conv.otherDeleted
             ? "Denne brukeren har slettet kontoen sin. Du kan ikke lenger sende meldinger i denne samtalen."
             : "Denne brukeren har bedt om å få slettet kontoen sin. Du kan ikke sende nye meldinger."}
+        </div>
+      )}
+
+      {conv && iBlocked && (
+        <div className="mt-3 rounded-xl border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+          {iBlockedAll
+            ? `Du har blokkert ${conv.other?.display_name ?? "denne brukeren"}. Du kan oppheve blokkeringen øverst eller fra profilen din.`
+            : "Du har blokkert denne samtalen. Du kan oppheve blokkeringen øverst eller fra profilen din."}
+        </div>
+      )}
+
+      {conv && theyBlockedMe && !iBlocked && (
+        <div className="mt-3 rounded-xl border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+          Du kan ikke sende meldinger i denne samtalen.
         </div>
       )}
 
@@ -281,7 +346,7 @@ function ConversationPage() {
         className="mt-3 flex items-end gap-2"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!sendMutation.isPending) sendMutation.mutate(body);
+          if (!sendMutation.isPending && !disabled) sendMutation.mutate(body);
         }}
       >
         <Textarea
@@ -290,29 +355,20 @@ function ConversationPage() {
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              if (!sendMutation.isPending && !conv?.otherDeleted && !conv?.otherPending) {
+              if (!sendMutation.isPending && !disabled) {
                 sendMutation.mutate(body);
               }
             }
           }}
-          placeholder={
-            conv?.otherDeleted || conv?.otherPending
-              ? "Du kan ikke svare denne brukeren"
-              : "Skriv en melding…"
-          }
+          placeholder={disabledPlaceholder}
           rows={2}
           maxLength={4000}
-          disabled={!!conv?.otherDeleted || !!conv?.otherPending}
+          disabled={disabled}
           className="min-h-[60px] flex-1 resize-none"
         />
         <Button
           type="submit"
-          disabled={
-            sendMutation.isPending ||
-            !body.trim() ||
-            !!conv?.otherDeleted ||
-            !!conv?.otherPending
-          }
+          disabled={sendMutation.isPending || !body.trim() || disabled}
           className="gap-2"
         >
           <Send className="size-4" /> Send

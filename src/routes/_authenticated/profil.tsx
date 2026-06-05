@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Loader2, LogOut, Trash2 } from "lucide-react";
+import { Bell, Loader2, LogOut, Trash2 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -25,6 +27,18 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useNavigate } from "@tanstack/react-router";
+import {
+  getCurrentEndpoint,
+  getPermissionState,
+  pushSupported,
+  subscribe as subscribePush,
+  unsubscribeThisDevice,
+} from "@/lib/push";
+import {
+  getNotificationPreferences,
+  updateNotificationPreferences,
+} from "@/lib/push.functions";
+
 
 
 const profileSchema = z.object({

@@ -163,6 +163,30 @@ export type Database = {
           },
         ]
       }
+      listing_sales: {
+        Row: {
+          buyer_id: string
+          confirmed_at: string
+          conversation_id: string
+          listing_id: string
+          seller_id: string
+        }
+        Insert: {
+          buyer_id: string
+          confirmed_at?: string
+          conversation_id: string
+          listing_id: string
+          seller_id: string
+        }
+        Update: {
+          buyer_id?: string
+          confirmed_at?: string
+          conversation_id?: string
+          listing_id?: string
+          seller_id?: string
+        }
+        Relationships: []
+      }
       listing_views: {
         Row: {
           created_at: string
@@ -526,6 +550,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_reviews: {
+        Row: {
+          comment: string | null
+          created_at: string
+          id: string
+          listing_id: string
+          rating: number
+          reviewee_id: string
+          reviewer_id: string
+          role: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          listing_id: string
+          rating: number
+          reviewee_id: string
+          reviewer_id: string
+          role: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          listing_id?: string
+          rating?: number
+          reviewee_id?: string
+          reviewer_id?: string
+          role?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -638,6 +695,13 @@ export type Database = {
       }
       purge_expired_accounts: { Args: never; Returns: number }
       request_account_deletion: { Args: { _email: string }; Returns: undefined }
+      user_review_summary: {
+        Args: { _user_id: string }
+        Returns: {
+          avg_rating: number
+          review_count: number
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "user"

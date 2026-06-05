@@ -8,7 +8,7 @@ import { Loader2 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { uploadListingImage } from "@/lib/storage";
-import { geocodeNorwayAddress, lookupPostalCode, lookupCity } from "@/lib/geocode";
+import { geocodeNorwayAddress, lookupPostalCode, lookupCity, reverseGeocodeAddress } from "@/lib/geocode";
 import { ImageUploader, type PendingImage } from "@/components/image-uploader";
 import { ListingLocationPicker } from "@/components/listing-location-picker";
 import { Button } from "@/components/ui/button";

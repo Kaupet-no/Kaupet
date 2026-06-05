@@ -1,5 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
-import { X, Plus, Save, Search as SearchIcon, RotateCcw } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Link } from "@tanstack/react-router";
+import { X, Plus, Save, Search as SearchIcon, RotateCcw, BellRing, Loader2 } from "lucide-react";
+
+import { usePushStatus } from "@/lib/use-push-status";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -418,6 +421,7 @@ function SaveSearchDialog({
             />
             Varsle meg om nye treff
           </label>
+          {notify && <PushHintForSavedSearch />}
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
@@ -431,6 +435,87 @@ function SaveSearchDialog({
     </Dialog>
   );
 }
+
+function PushHintForSavedSearch() {
+  const push = usePushStatus();
+  const [busy, setBusy] = useState(false);
+
+  if (push.loading) return null;
+  if (push.savedSearchesActive) return null;
+
+  const enable = async () => {
+    setBusy(true);
+    try {
+      await push.enableOnThisDevice("saved_searches");
+      toast.success("Push-varsler er aktivert på denne enheten");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Klarte ikke å aktivere varsler");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  let body: ReactNode;
+  if (!push.supported) {
+    body = (
+      <p>
+        Push-varsler er ikke tilgjengelig i denne nettleseren. Du kan fortsatt lagre søket
+        og motta varsler på andre enheter der du er logget inn.
+      </p>
+    );
+  } else if (push.permission === "denied") {
+    body = (
+      <p>
+        Du har blokkert varsler for kaupet.no i nettleseren. Endre tillatelsen i
+        nettleserinnstillingene for å motta varsler her.
+      </p>
+    );
+  } else if (!push.subscribedHere) {
+    body = (
+      <div className="space-y-2">
+        <p>
+          For å få varsler om nye treff på denne enheten må du aktivere push-varsler i nettleseren.
+        </p>
+        <Button size="sm" type="button" onClick={enable} disabled={busy}>
+          {busy && <Loader2 className="size-4 animate-spin" />}
+          Aktiver push-varsler
+        </Button>
+      </div>
+    );
+  } else {
+    // subscribed but pref off
+    body = (
+      <div className="space-y-2">
+        <p>
+          Push-varsler for lagrede søk er slått av i profilen din.
+        </p>
+        <Button size="sm" type="button" onClick={enable} disabled={busy}>
+          {busy && <Loader2 className="size-4 animate-spin" />}
+          Slå på for lagrede søk
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex gap-2 rounded-md border border-border bg-muted/50 p-3 text-xs text-muted-foreground">
+      <BellRing className="mt-0.5 size-4 shrink-0 text-primary" />
+      <div className="flex-1 space-y-1">
+        {body}
+        <p>
+          <Link
+            to="/profil"
+            search={{ tab: "varslinger" } as never}
+            className="underline underline-offset-2"
+          >
+            Administrer varsler
+          </Link>
+        </p>
+      </div>
+    </div>
+  );
+}
+
 
 export function valueToCriteria(v: AdvancedSearchValue): SearchCriteria {
   return {

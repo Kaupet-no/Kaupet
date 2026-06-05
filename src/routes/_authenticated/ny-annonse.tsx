@@ -170,7 +170,7 @@ function NewListingPage() {
 
   const mutation = useMutation({
     mutationFn: async (values: ListingForm) => {
-      const parsed = listingSchema.parse(values);
+      const parsed = values;
       const { data: userData, error: userErr } = await supabase.auth.getUser();
       if (userErr || !userData.user) throw new Error("Du må være logget inn.");
       const userId = userData.user.id;

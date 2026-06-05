@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import { MapContainer, TileLayer, Circle, Marker, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Circle, Marker, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import markerIcon from "leaflet/dist/images/marker-icon.png";

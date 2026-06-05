@@ -537,3 +537,186 @@ function renderWithDayDividers(messages: Message[], myId: string) {
   }
   return out;
 }
+
+type SalePanelProps = {
+  isSeller: boolean;
+  sale: { listing_id: string; buyer_id: string; seller_id: string; conversation_id: string } | null;
+  saleIsForThisConversation: boolean;
+  saleConfirmedForOtherBuyer: boolean;
+  iAmInSale: boolean;
+  otherName: string;
+  otherDeleted: boolean;
+  myReview: { id: string; rating: number; comment: string | null } | null;
+  onConfirm: () => void;
+  onUnconfirm: () => void;
+  confirming: boolean;
+  unconfirming: boolean;
+  onSubmitReview: (rating: number, comment: string) => Promise<void>;
+};
+
+function SalePanel(props: SalePanelProps) {
+  const {
+    isSeller,
+    sale,
+    saleIsForThisConversation,
+    saleConfirmedForOtherBuyer,
+    iAmInSale,
+    otherName,
+    otherDeleted,
+    myReview,
+    onConfirm,
+    onUnconfirm,
+    confirming,
+    unconfirming,
+    onSubmitReview,
+  } = props;
+
+  if (otherDeleted) return null;
+
+  // No sale yet
+  if (!sale) {
+    if (!isSeller) return null;
+    return (
+      <div className="mt-3 flex flex-col gap-2 rounded-xl border border-border bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="text-sm">
+          <p className="font-medium">Solgte du gjenstanden til {otherName}?</p>
+          <p className="text-xs text-muted-foreground">
+            Marker som solgt for å låse annonsen og åpne for vurdering av kjøperen.
+          </p>
+        </div>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button size="sm" className="gap-2" disabled={confirming}>
+              {confirming && <Loader2 className="size-4 animate-spin" />}
+              <CheckCircle2 className="size-4" /> Marker som solgt
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Bekreft kjøper</AlertDialogTitle>
+              <AlertDialogDescription>
+                {`Marker ${otherName} som kjøper av denne annonsen? Annonsen settes til «solgt» og kan ikke vises som aktiv igjen før salget eventuelt angres.`}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Avbryt</AlertDialogCancel>
+              <AlertDialogAction onClick={onConfirm}>Bekreft</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    );
+  }
+
+  // Sale exists but is for a different conversation/buyer
+  if (saleConfirmedForOtherBuyer) {
+    return (
+      <div className="mt-3 rounded-xl border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+        Denne annonsen er allerede markert som solgt til en annen kjøper.
+      </div>
+    );
+  }
+
+  // Sale is for this conversation
+  return (
+    <div className="mt-3 space-y-3 rounded-xl border border-primary/30 bg-primary/5 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="flex items-center gap-2 text-sm font-medium">
+          <CheckCircle2 className="size-4 text-primary" />
+          {isSeller
+            ? `Solgt til ${otherName}`
+            : `Du er bekreftet som kjøper av denne annonsen`}
+        </p>
+        {isSeller && !myReview && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onUnconfirm}
+            disabled={unconfirming}
+            className="text-xs"
+          >
+            {unconfirming && <Loader2 className="size-3 animate-spin" />}
+            Angre salg
+          </Button>
+        )}
+      </div>
+
+      {iAmInSale && (
+        <ReviewForm myReview={myReview} otherName={otherName} onSubmit={onSubmitReview} />
+      )}
+    </div>
+  );
+}
+
+function ReviewForm({
+  myReview,
+  otherName,
+  onSubmit,
+}: {
+  myReview: { rating: number; comment: string | null } | null;
+  otherName: string;
+  onSubmit: (rating: number, comment: string) => Promise<void>;
+}) {
+  const [rating, setRating] = useState(myReview?.rating ?? 0);
+  const [comment, setComment] = useState(myReview?.comment ?? "");
+  const [submitting, setSubmitting] = useState(false);
+
+  if (myReview) {
+    return (
+      <div className="rounded-lg border border-border bg-card p-3">
+        <p className="text-xs font-medium text-muted-foreground">Din vurdering</p>
+        <div className="mt-1 flex items-center gap-2">
+          <StarRating value={myReview.rating} readOnly size={18} />
+          <span className="text-sm font-medium">{myReview.rating} / 5</span>
+        </div>
+        {myReview.comment && (
+          <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">{myReview.comment}</p>
+        )}
+        <p className="mt-2 text-xs text-muted-foreground">
+          Vurderinger er endelige og kan ikke endres etter publisering.
+        </p>
+      </div>
+    );
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (rating < 1) {
+      toast.error("Velg minst én stjerne");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await onSubmit(rating, comment.trim());
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Kunne ikke sende vurderingen");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3 rounded-lg border border-border bg-card p-3">
+      <div>
+        <p className="text-sm font-medium">Gi {otherName} en vurdering</p>
+        <p className="text-xs text-muted-foreground">
+          1–5 stjerner og en kort kommentar (valgfri). Vurderingen er endelig.
+        </p>
+      </div>
+      <StarRating value={rating} onChange={setRating} size={28} />
+      <Textarea
+        value={comment}
+        onChange={(e) => setComment(e.target.value)}
+        placeholder="Kort kommentar (valgfri)"
+        rows={3}
+        maxLength={500}
+      />
+      <div className="flex justify-end">
+        <Button type="submit" size="sm" disabled={submitting || rating < 1} className="gap-2">
+          {submitting && <Loader2 className="size-4 animate-spin" />}
+          Publiser vurdering
+        </Button>
+      </div>
+    </form>
+  );
+}

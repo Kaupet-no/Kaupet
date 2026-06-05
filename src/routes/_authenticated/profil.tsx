@@ -214,14 +214,15 @@ function ProfileSection() {
     mutationFn: async (values: ProfileForm) => {
       if (!userId) throw new Error("Ikke innlogget");
       const parsed = profileSchema.parse(values);
+      const updates: Record<string, string | null> = {
+        bio: parsed.bio || null,
+        location: parsed.location || null,
+        avatar_url: parsed.avatar_url || null,
+      };
+      if (!isLocked) updates.display_name = parsed.display_name;
       const { error } = await supabase
         .from("profiles")
-        .update({
-          display_name: parsed.display_name,
-          bio: parsed.bio || null,
-          location: parsed.location || null,
-          avatar_url: parsed.avatar_url || null,
-        })
+        .update(updates)
         .eq("id", userId);
       if (error) throw error;
     },
@@ -257,8 +258,13 @@ function ProfileSection() {
 
       <div className="space-y-2">
         <Label htmlFor="display_name">Visningsnavn</Label>
-        <Input id="display_name" {...register("display_name")} />
-        {errors.display_name && (
+        <Input id="display_name" {...register("display_name")} disabled={isLocked} />
+        {isLocked && (
+          <p className="text-xs text-muted-foreground">
+            Låst til navnet fra Vipps. Avverifiser øverst for å endre.
+          </p>
+        )}
+        {errors.display_name && !isLocked && (
           <p className="text-sm text-destructive">{errors.display_name.message}</p>
         )}
       </div>

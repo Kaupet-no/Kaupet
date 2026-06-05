@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { Loader2, Pencil, Trash2, CheckCircle2, RotateCcw, Plus, Eye, Clock } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { signListingImageUrls } from "@/lib/storage";
+import { republishListing } from "@/lib/listings.functions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -129,6 +131,18 @@ function MyListingsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const doRepublish = useServerFn(republishListing);
+  const republish = useMutation({
+    mutationFn: async (id: string) => {
+      return doRepublish({ data: { id } });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-listings"] });
+      toast.success("Annonsen er publisert på nytt i 30 nye dager");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const filtered = (rows ?? []).filter((r) => {
     if (tab === "all") return true;
     if (tab === "active") return r.status === "active";
@@ -185,8 +199,9 @@ function MyListingsPage() {
                   row={r}
                   onMarkSold={() => updateStatus.mutate({ id: r.id, status: "sold" })}
                   onReactivate={() => updateStatus.mutate({ id: r.id, status: "active" })}
+                  onRepublish={() => republish.mutate(r.id)}
                   onDelete={() => deleteListing.mutate(r.id)}
-                  busy={updateStatus.isPending || deleteListing.isPending}
+                  busy={updateStatus.isPending || deleteListing.isPending || republish.isPending}
                 />
               ))}
             </ul>
@@ -201,12 +216,14 @@ function ListingRow({
   row,
   onMarkSold,
   onReactivate,
+  onRepublish,
   onDelete,
   busy,
 }: {
   row: Row;
   onMarkSold: () => void;
   onReactivate: () => void;
+  onRepublish: () => void;
   onDelete: () => void;
   busy: boolean;
 }) {
@@ -293,10 +310,13 @@ function ListingRow({
           <Button size="sm" variant="outline" onClick={onMarkSold} disabled={busy}>
             <CheckCircle2 className="size-4" /> Marker som solgt
           </Button>
+        ) : row.status === "expired" ? (
+          <Button size="sm" variant="outline" onClick={onRepublish} disabled={busy}>
+            <RotateCcw className="size-4" /> Publiser på nytt
+          </Button>
         ) : (
           <Button size="sm" variant="outline" onClick={onReactivate} disabled={busy}>
-            <RotateCcw className="size-4" />
-            {row.status === "expired" ? "Publiser på nytt" : "Reaktiver"}
+            <RotateCcw className="size-4" /> Reaktiver
           </Button>
         )}
         <AlertDialog>

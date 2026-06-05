@@ -159,6 +159,7 @@ function ProfilePage() {
 
 function ProfileSection() {
   const queryClient = useQueryClient();
+  const getMyVerificationFn = useServerFn(getMyVerification);
   const { data: userData } = useQuery({
     queryKey: ["current-user"],
     queryFn: async () => {
@@ -167,6 +168,12 @@ function ProfileSection() {
     },
   });
   const userId = userData?.id ?? null;
+
+  const { data: verification } = useQuery({
+    queryKey: ["my-verification"],
+    queryFn: () => getMyVerificationFn(),
+  });
+  const isLocked = !!verification?.is_valid;
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ["profile-edit", userId],

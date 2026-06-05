@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+
+Disallow: /admin
+Disallow: /auth
+Disallow: /favoritter
+Disallow: /mine-sok
+Disallow: /mine-annonser
+Disallow: /ny-annonse
+Disallow: /profil
+Disallow: /meldinger
+
+Sitemap: https://kaupet.no/sitemap.xml

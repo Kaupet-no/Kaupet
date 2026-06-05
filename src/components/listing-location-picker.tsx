@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import { MapContainer, TileLayer, Circle, Marker, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Circle, Marker, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -17,6 +17,16 @@ const defaultIcon = L.icon({
   popupAnchor: [1, -34],
   shadowSize: [41, 41],
 });
+
+function MapClickHandler({ onChange }: { onChange: (next: { lat: number; lng: number }) => void }) {
+  useMapEvents({
+    click(e) {
+      const p = e.latlng;
+      onChange({ lat: p.lat, lng: p.lng });
+    },
+  });
+  return null;
+}
 
 function Recenter({ lat, lng }: { lat: number; lng: number }) {
   const map = useMap();
@@ -89,6 +99,7 @@ export function ListingLocationPicker({ lat, lng, onChange }: Props) {
           icon={defaultIcon}
           eventHandlers={handlers}
         />
+        <MapClickHandler onChange={onChange} />
         <Recenter lat={lat} lng={lng} />
       </MapContainer>
     </div>

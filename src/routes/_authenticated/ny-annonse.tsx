@@ -340,18 +340,56 @@ function NewListingPage() {
         </section>
 
         {/* Location */}
-        <section className="grid gap-4 md:grid-cols-[160px_1fr]">
-          <div className="space-y-2">
-            <Label htmlFor="postal_code">Postnummer</Label>
-            <Input id="postal_code" inputMode="numeric" maxLength={4} placeholder="0150" {...register("postal_code")} />
-            {errors.postal_code && (
-              <p className="text-sm text-destructive">{errors.postal_code.message}</p>
-            )}
+        <section className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-[160px_1fr]">
+            <div className="space-y-2">
+              <Label htmlFor="postal_code">Postnummer</Label>
+              <Input
+                id="postal_code"
+                inputMode="numeric"
+                maxLength={4}
+                placeholder="0150"
+                {...register("postal_code", {
+                  onChange: () => {
+                    lastEdited.current = "postal_code";
+                    markerMoved.current = false;
+                  },
+                })}
+              />
+              {errors.postal_code && (
+                <p className="text-sm text-destructive">{errors.postal_code.message}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="city">Sted</Label>
+              <Input
+                id="city"
+                placeholder="Oslo"
+                {...register("city", {
+                  onChange: () => {
+                    lastEdited.current = "city";
+                    markerMoved.current = false;
+                  },
+                })}
+              />
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="city">Sted</Label>
-            <Input id="city" placeholder="Oslo" {...register("city")} />
-          </div>
+          {coords && (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Dra markøren for å justere hvor området vises på annonsen.
+              </p>
+              <ListingLocationPicker
+                lat={coords.lat}
+                lng={coords.lng}
+                onChange={(next) => {
+                  markerMoved.current = true;
+                  lastEdited.current = "map";
+                  setCoords(next);
+                }}
+              />
+            </div>
+          )}
         </section>
 
         <div className="flex items-center justify-end gap-3 border-t border-border pt-6">

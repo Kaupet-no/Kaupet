@@ -246,6 +246,46 @@ function ConversationPage() {
       ? conv.seller_id
       : conv.buyer_id
     : null;
+  const isSeller = !!(conv && user && conv.seller_id === user.id);
+  const listingId = conv?.listing_id ?? null;
+
+  const { data: sale, refetch: refetchSale } = useQuery({
+    queryKey: ["listing-sale", listingId],
+    enabled: !!listingId,
+    queryFn: () => getSaleFn({ data: { listingId: listingId! } }),
+  });
+
+  const saleIsForThisConversation = !!(sale && sale.conversation_id === id);
+  const saleConfirmedForOtherBuyer = !!(sale && !saleIsForThisConversation);
+  const iAmInSale = !!(sale && user && (sale.buyer_id === user.id || sale.seller_id === user.id));
+
+  const { data: myReview, refetch: refetchMyReview } = useQuery({
+    queryKey: ["my-review", listingId],
+    enabled: !!listingId && iAmInSale,
+    queryFn: () => getMyReviewFn({ data: { listingId: listingId! } }),
+  });
+
+  const confirmMutation = useMutation({
+    mutationFn: () => confirmBuyerFn({ data: { conversationId: id } }),
+    onSuccess: () => {
+      toast.success("Kjøper bekreftet");
+      refetchSale();
+      queryClient.invalidateQueries({ queryKey: ["conversation", id] });
+      queryClient.invalidateQueries({ queryKey: ["my-conversations"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const unconfirmMutation = useMutation({
+    mutationFn: () =>
+      unconfirmBuyerFn({ data: { listingId: listingId! } }),
+    onSuccess: () => {
+      toast.success("Salget er angret");
+      refetchSale();
+      queryClient.invalidateQueries({ queryKey: ["conversation", id] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const iBlockedAll = !!(otherId && myBlocks?.some(
     (b) => b.scope === "all" && b.blocked_id === otherId,

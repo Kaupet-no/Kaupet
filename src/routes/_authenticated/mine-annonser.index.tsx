@@ -77,7 +77,7 @@ function MyListingsPage() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, title, status, price_nok, is_free, city, view_count, created_at, listing_images(storage_path, sort_order)",
+          "id, title, status, price_nok, is_free, city, view_count, created_at, expires_at, listing_images(storage_path, sort_order)",
         )
         .eq("seller_id", userId)
         .order("created_at", { ascending: false });
@@ -95,6 +95,7 @@ function MyListingsPage() {
           city: l.city,
           view_count: l.view_count,
           created_at: l.created_at,
+          expires_at: l.expires_at,
           cover_path: cover,
         };
       });

@@ -214,7 +214,12 @@ function ProfileSection() {
     mutationFn: async (values: ProfileForm) => {
       if (!userId) throw new Error("Ikke innlogget");
       const parsed = profileSchema.parse(values);
-      const updates: Record<string, string | null> = {
+      const updates: {
+        bio: string | null;
+        location: string | null;
+        avatar_url: string | null;
+        display_name?: string;
+      } = {
         bio: parsed.bio || null,
         location: parsed.location || null,
         avatar_url: parsed.avatar_url || null,

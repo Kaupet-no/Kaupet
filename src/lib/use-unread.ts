@@ -17,6 +17,7 @@ type ConvSummary = {
  */
 export function useUnreadConversationsCount(): number {
   const { user } = useAuth();
+  const qc = useQueryClient();
   const readVersion = useReadVersion();
 
   const { data, refetch } = useQuery({

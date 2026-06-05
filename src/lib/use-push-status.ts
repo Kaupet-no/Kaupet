@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 
@@ -53,17 +53,50 @@ export function usePushStatus(): PushStatus {
   const [endpoint, setEndpoint] = useState<string | null>(null);
   const [browserReady, setBrowserReady] = useState(false);
 
-  const refreshBrowser = async () => {
+  const refreshBrowser = useCallback(async () => {
     const ok = pushSupported();
     setSupported(ok);
     setPermission(getPermissionState());
     setEndpoint(ok ? await getCurrentEndpoint() : null);
     setBrowserReady(true);
-  };
+  }, []);
 
   useEffect(() => {
     void refreshBrowser();
-  }, []);
+
+    const handleRefresh = () => {
+      void refreshBrowser();
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") handleRefresh();
+    };
+
+    window.addEventListener("focus", handleRefresh);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    let permStatus: PermissionStatus | null = null;
+    let permCancelled = false;
+    if (typeof navigator !== "undefined" && navigator.permissions?.query) {
+      navigator.permissions
+        .query({ name: "notifications" as PermissionName })
+        .then((status) => {
+          if (permCancelled) return;
+          permStatus = status;
+          status.addEventListener("change", handleRefresh);
+        })
+        .catch(() => {
+          /* ignore — fall back to focus/visibility */
+        });
+    }
+
+    return () => {
+      window.removeEventListener("focus", handleRefresh);
+      document.removeEventListener("visibilitychange", onVisibility);
+      permCancelled = true;
+      permStatus?.removeEventListener("change", handleRefresh);
+    };
+  }, [refreshBrowser]);
 
   const { data: prefs, isLoading: prefsLoading } = useQuery({
     queryKey: ["notification-preferences"],

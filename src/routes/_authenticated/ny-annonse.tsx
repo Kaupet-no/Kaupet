@@ -158,11 +158,13 @@ function NewListingPage() {
       if (userErr || !userData.user) throw new Error("Du må være logget inn.");
       const userId = userData.user.id;
 
-      // Best-effort geocoding så annonsen dukker opp i radius-søk.
-      const coords = await geocodeNorwayAddress({
-        postal_code: parsed.postal_code,
-        city: parsed.city,
-      });
+      // Bruk manuelt valgte koordinater (kart eller geokoding fra auto-fyll) hvis tilgjengelig.
+      const finalCoords =
+        coords ??
+        (await geocodeNorwayAddress({
+          postal_code: parsed.postal_code,
+          city: parsed.city,
+        }));
 
       const { data: listing, error: insertErr } = await supabase
         .from("listings")

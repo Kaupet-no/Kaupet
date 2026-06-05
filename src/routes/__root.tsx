@@ -78,7 +78,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Kaupet.no — Norges åpne markedsplass for brukte ting" },
+      { title: "Kaupet.no — Gi tingene dine et nytt liv" },
       {
         name: "description",
         content:
@@ -88,18 +88,23 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:site_name", content: "Kaupet.no" },
       { property: "og:locale", content: "nb_NO" },
       { property: "og:type", content: "website" },
-      { property: "og:title", content: "Kaupet.no — Norges åpne markedsplass" },
+      { property: "og:title", content: "Kaupet.no — Gi tingene dine et nytt liv" },
       {
         property: "og:description",
         content: "Kjøp og selg brukte ting lokalt. Åpen kildekode, drevet av fellesskapet.",
       },
       { property: "og:url", content: "https://kaupet.no/" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "Kaupet.no — Norges åpne markedsplass" },
+      { name: "twitter:title", content: "Kaupet.no — Gi tingene dine et nytt liv" },
       {
         name: "twitter:description",
         content: "Kjøp og selg brukte ting lokalt. Åpen kildekode, drevet av fellesskapet.",
       },
+      { name: "description", content: "Kaupet.no er en norsk markedsplass for brukte ting mellom privatpersoner. Ingen mellomledd, ingen reklame." },
+      { property: "og:description", content: "Kaupet.no er en norsk markedsplass for brukte ting mellom privatpersoner. Ingen mellomledd, ingen reklame." },
+      { name: "twitter:description", content: "Kaupet.no er en norsk markedsplass for brukte ting mellom privatpersoner. Ingen mellomledd, ingen reklame." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/Zav741ZnKNZxYODrMCRKtvCwST03/social-images/social-1780646011042-Skjermbilde_2026-06-05_kl._09.35.02.webp" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/Zav741ZnKNZxYODrMCRKtvCwST03/social-images/social-1780646011042-Skjermbilde_2026-06-05_kl._09.35.02.webp" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },

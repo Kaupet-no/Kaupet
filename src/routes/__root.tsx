@@ -85,13 +85,21 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "Kaupet.no er en åpen kildekode-markedsplass for kjøp og salg av brukte ting i Norge. Bygget av frivillige, for fellesskapet.",
       },
       { name: "author", content: "Kaupet.no" },
+      { property: "og:site_name", content: "Kaupet.no" },
+      { property: "og:locale", content: "nb_NO" },
+      { property: "og:type", content: "website" },
       { property: "og:title", content: "Kaupet.no — Norges åpne markedsplass" },
       {
         property: "og:description",
         content: "Kjøp og selg brukte ting lokalt. Åpen kildekode, drevet av fellesskapet.",
       },
-      { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://kaupet.no/" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Kaupet.no — Norges åpne markedsplass" },
+      {
+        name: "twitter:description",
+        content: "Kjøp og selg brukte ting lokalt. Åpen kildekode, drevet av fellesskapet.",
+      },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -100,6 +108,37 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap",
+      },
+    ],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "Organization",
+              "@id": "https://kaupet.no/#organization",
+              name: "Kaupet.no",
+              url: "https://kaupet.no/",
+              description:
+                "Norsk åpen kildekode-markedsplass for brukte ting mellom privatpersoner.",
+            },
+            {
+              "@type": "WebSite",
+              "@id": "https://kaupet.no/#website",
+              url: "https://kaupet.no/",
+              name: "Kaupet.no",
+              inLanguage: "nb-NO",
+              publisher: { "@id": "https://kaupet.no/#organization" },
+              potentialAction: {
+                "@type": "SearchAction",
+                target: "https://kaupet.no/annonser?q={search_term_string}",
+                "query-input": "required name=search_term_string",
+              },
+            },
+          ],
+        }),
       },
     ],
   }),

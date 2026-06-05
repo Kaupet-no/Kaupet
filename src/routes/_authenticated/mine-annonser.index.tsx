@@ -158,7 +158,7 @@ function MyListingsPage() {
         <TabsList>
           <TabsTrigger value="all">Alle ({rows?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="active">Aktive</TabsTrigger>
-          <TabsTrigger value="sold">Solgt / arkivert</TabsTrigger>
+          <TabsTrigger value="sold">Solgt / utløpt</TabsTrigger>
           <TabsTrigger value="draft">Utkast</TabsTrigger>
         </TabsList>
         <TabsContent value={tab} className="mt-6">

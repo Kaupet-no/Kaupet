@@ -43,7 +43,7 @@ function PersonvernPage() {
           <ul className="mt-3 space-y-2 list-disc pl-5">
             <li>
               <strong>Innloggingssesjon</strong> — nødvendig for at du skal kunne være logget inn mellom besøk. Lagres i
-              nettleserens <code>localStorage</code> av vår autentiseringsleverandør.
+              nettleserens <code>localStorage</code> av vår autentiseringsleverandør Supabase.
             </li>
             <li>
               <strong>kaupet_read_&lt;id&gt;</strong> — et tidsstempel per samtale som forteller når du sist åpnet

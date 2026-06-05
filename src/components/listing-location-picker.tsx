@@ -99,6 +99,7 @@ export function ListingLocationPicker({ lat, lng, onChange }: Props) {
           icon={defaultIcon}
           eventHandlers={handlers}
         />
+        <MapClickHandler onChange={onChange} />
         <Recenter lat={lat} lng={lng} />
       </MapContainer>
     </div>

@@ -75,6 +75,7 @@ export const Route = createFileRoute("/")({
 
 function LandingPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [qDraft, setQDraft] = useState("");
   const autoplay = useRef(Autoplay({ delay: 4500, stopOnInteraction: true }));
 

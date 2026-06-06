@@ -72,8 +72,6 @@ export const Route = createFileRoute("/_authenticated/profil")({
   }),
   validateSearch: (search: Record<string, unknown>) => {
     const t = search.tab as string;
-  validateSearch: (search: Record<string, unknown>) => {
-    const t = search.tab as string;
     return {
       tab:
         t === "konto" || t === "varslinger" || t === "blokkerte"

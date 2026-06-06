@@ -1,8 +1,27 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Heart, MapPin, Search, ShieldCheck } from "lucide-react";
+import {
+  ArrowRight,
+  Baby,
+  Car,
+  Dumbbell,
+  Gamepad2,
+  Heart,
+  Home,
+  type LucideIcon,
+  MapPin,
+  Package,
+  Palette,
+  Search,
+  ShieldCheck,
+  Shirt,
+  Ship,
+  Smartphone,
+  Sofa,
+  Wrench,
+} from "lucide-react";
 import { z } from "zod";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Autoplay from "embla-carousel-autoplay";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +29,34 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  "mobler-og-interior": Sofa,
+  "elektronikk": Smartphone,
+  "klar-og-mote": Shirt,
+  "barn-og-baby": Baby,
+  "sport-og-friluft": Dumbbell,
+  "hus-og-hage": Home,
+  "verktoy-og-byggvarer": Wrench,
+  "hobby-fritid-og-underholdning": Gamepad2,
+  "antikviteter-og-kunst": Palette,
+  "deler-bil-og-mc": Car,
+  "deler-til-bat": Ship,
+  "annet": Package,
+};
+
+type CategoryRow = {
+  id: string;
+  slug: string;
+  name_nb: string;
+  parent_id: string | null;
+};
 
 const searchSchema = z.object({
   q: z.string().optional().default(""),

@@ -116,7 +116,6 @@ function ProfilePage() {
           <TabsTrigger value="konto">Konto</TabsTrigger>
         </TabsList>
         <TabsContent value="profil" className="mt-6 space-y-6">
-          <VerificationSection />
           <ProfileSection />
         </TabsContent>
         <TabsContent value="varslinger" className="mt-6">

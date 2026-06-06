@@ -162,14 +162,7 @@ function ListingDetailPage() {
         .select("display_name, avatar_url, created_at")
         .eq("id", data.seller_id)
         .maybeSingle();
-      const { data: vrows } = await supabase.rpc("user_verification_status", {
-        _user_id: data.seller_id,
-      });
-      const vrow = Array.isArray(vrows) ? vrows[0] : vrows;
-      const verification = vrow?.is_valid
-        ? { verified_at: vrow.verified_at as string }
-        : null;
-      return { ...data, seller: profile, sellerVerification: verification };
+      return { ...data, seller: profile };
     },
   });
 

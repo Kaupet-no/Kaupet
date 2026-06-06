@@ -68,20 +68,6 @@ function AuthPage() {
     }
   };
 
-  const handleGoogle = async () => {
-    setLoading(true);
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
-    });
-    if (result.error) {
-      toast.error("Kunne ikke logge inn med Google.");
-      setLoading(false);
-      return;
-    }
-    if (result.redirected) return;
-    navigate({ to: "/", replace: true });
-  };
-
   return (
     <div className="mx-auto flex max-w-md flex-col px-4 py-16">
       <div className="rounded-2xl border border-border bg-card p-8 shadow-sm">
@@ -94,21 +80,7 @@ function AuthPage() {
             : "Velkommen tilbake til Kaupet."}
         </p>
 
-        <Button
-          type="button"
-          variant="outline"
-          className="mt-6 w-full"
-          onClick={handleGoogle}
-          disabled={loading}
-        >
-          Fortsett med Google
-        </Button>
-
-        <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">
-          <span className="h-px flex-1 bg-border" /> eller med e-post <span className="h-px flex-1 bg-border" />
-        </div>
-
-        <form onSubmit={handleEmailAuth} className="space-y-4">
+        <form onSubmit={handleEmailAuth} className="mt-6 space-y-4">
           {isSignUp && (
             <div className="space-y-1.5">
               <Label htmlFor="name">Visningsnavn</Label>

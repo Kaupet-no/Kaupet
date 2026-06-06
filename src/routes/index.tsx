@@ -289,7 +289,7 @@ function LandingPage() {
                       onClick={() => setActiveCategory(null)}
                       className="flex items-center justify-between rounded-lg border border-primary bg-primary/5 px-4 py-3 font-medium text-primary transition hover:bg-primary hover:text-primary-foreground"
                     >
-                      Se alle i {activeCategory.name_nb}
+                      Alt i {activeCategory.name_nb}
                       <ArrowRight className="size-4" />
                     </Link>
 

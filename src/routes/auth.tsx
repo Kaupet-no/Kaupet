@@ -127,7 +127,28 @@ function AuthPage() {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
+          {isSignUp && (
+            <label className="flex items-start gap-2 text-sm text-muted-foreground">
+              <Checkbox
+                id="accept-terms"
+                checked={acceptedTerms}
+                onCheckedChange={(v) => setAcceptedTerms(v === true)}
+                className="mt-0.5"
+              />
+              <span>
+                Jeg har lest og godtar{" "}
+                <Link to="/vilkar" target="_blank" className="underline text-foreground hover:text-primary">
+                  brukervilkårene
+                </Link>{" "}
+                og{" "}
+                <Link to="/personvern" target="_blank" className="underline text-foreground hover:text-primary">
+                  personvernerklæringen
+                </Link>
+                .
+              </span>
+            </label>
+          )}
+          <Button type="submit" className="w-full" disabled={loading || (isSignUp && !acceptedTerms)}>
             {loading ? "Vent litt…" : isSignUp ? "Opprett konto" : "Logg inn"}
           </Button>
         </form>

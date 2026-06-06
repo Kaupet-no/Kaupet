@@ -491,9 +491,6 @@ function ListingDetailPage() {
                   <>
                     <div className="flex flex-wrap items-center gap-1.5">
                       <p className="font-medium">{seller?.display_name ?? "Selger"}</p>
-                      {data.sellerVerification && (
-                        <VerifiedBadge verifiedAt={data.sellerVerification.verified_at} />
-                      )}
                     </div>
                     {seller?.created_at && (
                       <p className="text-xs text-muted-foreground">

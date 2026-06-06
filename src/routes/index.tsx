@@ -85,11 +85,32 @@ function LandingPage() {
   const { data: categories } = useQuery({
     queryKey: ["categories"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("categories").select("id, slug, name_nb").order("sort_order");
+      const { data, error } = await supabase
+        .from("categories")
+        .select("id, slug, name_nb, parent_id")
+        .order("sort_order")
+        .order("name_nb");
       if (error) throw error;
-      return data;
+      return (data ?? []) as CategoryRow[];
     },
   });
+
+  const rootCategories = useMemo(
+    () => (categories ?? []).filter((c) => c.parent_id === null),
+    [categories],
+  );
+  const childrenByParent = useMemo(() => {
+    const map = new Map<string, CategoryRow[]>();
+    for (const c of categories ?? []) {
+      if (!c.parent_id) continue;
+      const arr = map.get(c.parent_id) ?? [];
+      arr.push(c);
+      map.set(c.parent_id, arr);
+    }
+    return map;
+  }, [categories]);
+
+  const [activeCategory, setActiveCategory] = useState<CategoryRow | null>(null);
 
   const { data: popular } = useQuery({
     queryKey: ["popular-listings"],

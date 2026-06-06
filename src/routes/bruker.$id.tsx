@@ -107,9 +107,6 @@ function PublicProfilePage() {
         <div className="flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="font-display text-3xl tracking-tight">{profile.display_name}</h1>
-            {profile.verification?.is_valid && (
-              <VerifiedBadge verifiedAt={profile.verification.verified_at} size="md" />
-            )}
           </div>
           {profile.location && (
             <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">

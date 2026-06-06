@@ -69,16 +69,35 @@ function PersonvernPage() {
           <h2 className="font-display text-2xl">Hva lagres på serveren</h2>
           <ul className="mt-3 space-y-2 list-disc pl-5">
             <li>
-              <strong>Brukerprofil</strong>: navn, e-postadresse og eventuelt profilbilde.
+              <strong>Brukerprofil</strong>: navn, e-postadresse og eventuelt profilbilde, bio og lokasjon.
             </li>
             <li>
-              <strong>Annonser</strong> du har lagt ut, med tilhørende bilder, beskrivelse og lokasjon.
+              <strong>Annonser</strong> du har lagt ut, med tilhørende bilder, beskrivelse, kategori og lokasjon
+              (postnummer, by og koordinater for kartvisning).
             </li>
             <li>
               <strong>Meldinger</strong> mellom deg og andre brukere.
             </li>
             <li>
               <strong>Favoritter</strong> du har lagret.
+            </li>
+            <li>
+              <strong>Vurderinger</strong> du gir eller mottar etter et salg (stjerner og eventuell kommentar). Disse
+              er <strong>offentlig synlige</strong> på brukerprofilen.
+            </li>
+            <li>
+              <strong>Lagrede søk</strong> med søkekriterier, og varsler om nye treff på disse søkene.
+            </li>
+            <li>
+              <strong>Rapporter</strong> du sender inn om upassende annonser, lagres slik at moderator kan behandle dem.
+            </li>
+            <li>
+              <strong>Blokkeringer</strong> — hvilke brukere eller samtaler du har blokkert. Dette er privat og kun
+              synlig for deg.
+            </li>
+            <li>
+              <strong>Bekreftede salg</strong> — når en selger markerer en annonse som solgt via en samtale, lagres
+              koblingen mellom annonse, kjøper og selger. Denne er kun synlig for partene i salget.
             </li>
             <li>
               <strong>Anonyme visninger</strong> av annonser, for å gi selger statistikk. Disse knyttes til en
@@ -88,6 +107,15 @@ function PersonvernPage() {
               <strong>Push-varslinger</strong> — hvis du slår på varsler, lagrer vi et kryptografisk
               abonnementsnøkkelpar (offentlig/privat), nettleserinformasjon og dine preferanser for hva du vil
               varsles om (nye meldinger, lagrede søk).
+            </li>
+            <li>
+              <strong>Moderering</strong> — ved brudd på reglene kan administrator registrere en{" "}
+              <em>utestengelse</em>, <em>midlertidig suspensjon</em> eller <em>IP-blokkering</em>. Slike
+              administrative handlinger logges internt med tidspunkt og årsak.
+            </li>
+            <li>
+              <strong>Sletteforespørsler</strong> — når du ber om å slette kontoen, lagrer vi e-post og tidsstempel i
+              den 7 dager lange angrefristen før permanent sletting utføres.
             </li>
           </ul>
           <p className="mt-4">

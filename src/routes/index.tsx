@@ -185,11 +185,19 @@ function LandingPage() {
             </form>
 
             <div className="flex flex-wrap gap-3">
-              <Link to="/auth" search={{ mode: "signup" }}>
-                <Button size="lg" variant="outline">
-                  Kom i gang gratis
-                </Button>
-              </Link>
+              {user ? (
+                <Link to="/ny-annonse">
+                  <Button size="lg" variant="outline">
+                    Opprett en annonse
+                  </Button>
+                </Link>
+              ) : (
+                <Link to="/auth" search={{ mode: "signup" }}>
+                  <Button size="lg" variant="outline">
+                    Kom i gang gratis
+                  </Button>
+                </Link>
+              )}
             </div>
           </div>
 

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Search, Shield, ShieldOff } from "lucide-react";
+import { Download, Loader2, Search, Shield, ShieldOff } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -85,6 +85,28 @@ function AdminUsers() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const exportData = useMutation({
+    mutationFn: async (user: FoundUser) => {
+      const { data, error } = await supabase.rpc("admin_export_user_data", {
+        _user_id: user.user_id,
+      });
+      if (error) throw error;
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const safeEmail = user.email.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const date = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `kaupet-innsyn-${safeEmail}-${date}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    },
+    onSuccess: () => toast.success("Brukerdata eksportert"),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   return (
     <div className="space-y-6">
       <Card>
@@ -153,23 +175,39 @@ function AdminUsers() {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        {u.is_admin ? (
+                        <div className="flex justify-end gap-2">
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => setPending({ user: u, action: "revoke" })}
+                            onClick={() => exportData.mutate(u)}
+                            disabled={exportData.isPending}
+                            title="Last ned alle data vi har om denne brukeren (GDPR-innsyn)"
                           >
-                            <ShieldOff className="size-4" /> Fjern admin
+                            {exportData.isPending && exportData.variables?.user_id === u.user_id ? (
+                              <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                              <Download className="size-4" />
+                            )}
+                            Eksporter data
                           </Button>
-                        ) : (
-                          <Button
-                            variant="default"
-                            size="sm"
-                            onClick={() => setPending({ user: u, action: "grant" })}
-                          >
-                            <Shield className="size-4" /> Gjør til admin
-                          </Button>
-                        )}
+                          {u.is_admin ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setPending({ user: u, action: "revoke" })}
+                            >
+                              <ShieldOff className="size-4" /> Fjern admin
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => setPending({ user: u, action: "grant" })}
+                            >
+                              <Shield className="size-4" /> Gjør til admin
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))

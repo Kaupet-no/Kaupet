@@ -25,6 +25,7 @@ import { useMemo, useRef, useState } from "react";
 import Autoplay from "embla-carousel-autoplay";
 
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
@@ -74,6 +75,7 @@ export const Route = createFileRoute("/")({
 
 function LandingPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [qDraft, setQDraft] = useState("");
   const autoplay = useRef(Autoplay({ delay: 4500, stopOnInteraction: true }));
 
@@ -183,11 +185,19 @@ function LandingPage() {
             </form>
 
             <div className="flex flex-wrap gap-3">
-              <Link to="/auth" search={{ mode: "signup" }}>
-                <Button size="lg" variant="outline">
-                  Kom i gang gratis
-                </Button>
-              </Link>
+              {user ? (
+                <Link to="/ny-annonse">
+                  <Button size="lg" variant="outline">
+                    Opprett en annonse
+                  </Button>
+                </Link>
+              ) : (
+                <Link to="/auth" search={{ mode: "signup" }}>
+                  <Button size="lg" variant="outline">
+                    Kom i gang gratis
+                  </Button>
+                </Link>
+              )}
             </div>
           </div>
 

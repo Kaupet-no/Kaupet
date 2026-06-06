@@ -46,20 +46,21 @@ function PersonvernPage() {
               nettleserens <code>localStorage</code> av vår autentiseringsleverandør Supabase.
             </li>
             <li>
-              <strong>kaupet_read_&lt;id&gt;</strong> — et tidsstempel per samtale som forteller når du sist åpnet
-              chatten. Brukes kun til ulest-indikatoren i meldingsinnboksen.
+              <strong>kaupet_read_&lt;id&gt;</strong> — et tidsstempel per samtale i <code>localStorage</code> som
+              forteller når du sist åpnet chatten. Brukes kun til ulest-indikatoren i meldingsinnboksen.
             </li>
             <li>
-              <strong>kaupet_viewed_&lt;id&gt;</strong> — en markering per nettleserfane som hindrer at samme annonse
-              telles flere ganger ved refresh. Slettes når fanen lukkes.
+              <strong>kaupet_viewed_&lt;id&gt;</strong> — en markering per nettleserfane i <code>sessionStorage</code>{" "}
+              som hindrer at samme annonse telles flere ganger ved refresh. Slettes når fanen lukkes.
             </li>
             <li>
-              <strong>kaupet_session_id</strong> — en anonym ID som lever kun i én nettleser-økt. Brukes til å gi selger
-              en grov teller på unike besøk per annonse. Slettes når du lukker fanen.
+              <strong>kaupet_session_id</strong> — en anonym ID i <code>sessionStorage</code> som lever kun i én
+              nettleser-økt. Brukes til å gi selger en grov teller på unike besøk per annonse. Slettes når du lukker
+              fanen.
             </li>
             <li>
-              <strong>kaupet_push_msg_hint_dismissed_v1</strong> — husker at du har lukket informasjonsmeldingen om
-              push-varsler i meldingsoversikten, slik at den ikke vises på nytt.
+              <strong>kaupet_push_msg_hint_dismissed_v1</strong> — lagres i <code>localStorage</code> og husker at du
+              har lukket informasjonsmeldingen om push-varsler i meldingsoversikten, slik at den ikke vises på nytt.
             </li>
           </ul>
         </section>

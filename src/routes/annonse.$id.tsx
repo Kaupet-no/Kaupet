@@ -10,7 +10,7 @@ import { signListingImageUrls } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { FavoriteButton } from "@/components/favorite-button";
-import { VerifiedBadge } from "@/components/verified-badge";
+
 
 const ListingDetailMap = lazy(() =>
   import("@/components/listing-detail-map").then((m) => ({ default: m.ListingDetailMap })),
@@ -162,14 +162,7 @@ function ListingDetailPage() {
         .select("display_name, avatar_url, created_at")
         .eq("id", data.seller_id)
         .maybeSingle();
-      const { data: vrows } = await supabase.rpc("user_verification_status", {
-        _user_id: data.seller_id,
-      });
-      const vrow = Array.isArray(vrows) ? vrows[0] : vrows;
-      const verification = vrow?.is_valid
-        ? { verified_at: vrow.verified_at as string }
-        : null;
-      return { ...data, seller: profile, sellerVerification: verification };
+      return { ...data, seller: profile };
     },
   });
 
@@ -498,9 +491,6 @@ function ListingDetailPage() {
                   <>
                     <div className="flex flex-wrap items-center gap-1.5">
                       <p className="font-medium">{seller?.display_name ?? "Selger"}</p>
-                      {data.sellerVerification && (
-                        <VerifiedBadge verifiedAt={data.sellerVerification.verified_at} />
-                      )}
                     </div>
                     {seller?.created_at && (
                       <p className="text-xs text-muted-foreground">

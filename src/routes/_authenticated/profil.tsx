@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Bell, Loader2, LogOut, Trash2, ShieldOff, ShieldCheck } from "lucide-react";
+import { Bell, Loader2, LogOut, Trash2, ShieldOff } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -39,13 +39,6 @@ import {
   updateNotificationPreferences,
 } from "@/lib/push.functions";
 import { listMyBlocks, deleteBlock } from "@/lib/blocks.functions";
-import {
-  getMyVerification,
-  isVippsEnabled,
-  startVippsVerification,
-  unverifyVipps,
-} from "@/lib/vipps.functions";
-import { VerifiedBadge } from "@/components/verified-badge";
 
 
 
@@ -79,36 +72,20 @@ export const Route = createFileRoute("/_authenticated/profil")({
   }),
   validateSearch: (search: Record<string, unknown>) => {
     const t = search.tab as string;
-    const v = search.vipps as string;
     return {
       tab:
         t === "konto" || t === "varslinger" || t === "blokkerte"
           ? t
           : "profil",
-      vipps: v === "ok" || v === "error" ? v : undefined,
-      reason: typeof search.reason === "string" ? (search.reason as string) : undefined,
     };
   },
   component: ProfilePage,
 });
 
 function ProfilePage() {
-  const { tab, vipps, reason } = Route.useSearch();
+  const { tab } = Route.useSearch();
   const navigate = Route.useNavigate();
 
-  useEffect(() => {
-    if (vipps === "ok") {
-      toast.success("Identiteten din er bekreftet med Vipps");
-      navigate({ search: { tab }, replace: true });
-    } else if (vipps === "error") {
-      toast.error(
-        reason === "not_configured"
-          ? "Vipps-pålogging er ikke konfigurert ennå"
-          : "Vipps-verifisering mislyktes. Prøv igjen.",
-      );
-      navigate({ search: { tab }, replace: true });
-    }
-  }, [vipps, reason, tab, navigate]);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">
@@ -139,7 +116,6 @@ function ProfilePage() {
           <TabsTrigger value="konto">Konto</TabsTrigger>
         </TabsList>
         <TabsContent value="profil" className="mt-6 space-y-6">
-          <VerificationSection />
           <ProfileSection />
         </TabsContent>
         <TabsContent value="varslinger" className="mt-6">
@@ -159,7 +135,6 @@ function ProfilePage() {
 
 function ProfileSection() {
   const queryClient = useQueryClient();
-  const getMyVerificationFn = useServerFn(getMyVerification);
   const { data: userData } = useQuery({
     queryKey: ["current-user"],
     queryFn: async () => {
@@ -168,12 +143,8 @@ function ProfileSection() {
     },
   });
   const userId = userData?.id ?? null;
+  
 
-  const { data: verification } = useQuery({
-    queryKey: ["my-verification"],
-    queryFn: () => getMyVerificationFn(),
-  });
-  const isLocked = !!verification?.is_valid;
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ["profile-edit", userId],
@@ -223,8 +194,8 @@ function ProfileSection() {
         bio: parsed.bio || null,
         location: parsed.location || null,
         avatar_url: parsed.avatar_url || null,
+        display_name: parsed.display_name,
       };
-      if (!isLocked) updates.display_name = parsed.display_name;
       const { error } = await supabase
         .from("profiles")
         .update(updates)
@@ -263,13 +234,8 @@ function ProfileSection() {
 
       <div className="space-y-2">
         <Label htmlFor="display_name">Visningsnavn</Label>
-        <Input id="display_name" {...register("display_name")} disabled={isLocked} />
-        {isLocked && (
-          <p className="text-xs text-muted-foreground">
-            Låst til navnet fra Vipps. Avverifiser øverst for å endre.
-          </p>
-        )}
-        {errors.display_name && !isLocked && (
+        <Input id="display_name" {...register("display_name")} />
+        {errors.display_name && (
           <p className="text-sm text-destructive">{errors.display_name.message}</p>
         )}
       </div>
@@ -799,113 +765,3 @@ function BlockedSection() {
   );
 }
 
-
-
-
-function VerificationSection() {
-  const queryClient = useQueryClient();
-  const enabledFn = useServerFn(isVippsEnabled);
-  const getMyVerificationFn = useServerFn(getMyVerification);
-  const startFn = useServerFn(startVippsVerification);
-  const unverifyFn = useServerFn(unverifyVipps);
-
-  const { data: enabled } = useQuery({
-    queryKey: ["vipps-enabled"],
-    queryFn: () => enabledFn(),
-  });
-
-  const { data: verification, isLoading } = useQuery({
-    queryKey: ["my-verification"],
-    queryFn: () => getMyVerificationFn(),
-  });
-
-  const startMutation = useMutation({
-    mutationFn: () => startFn(),
-    onSuccess: (res) => {
-      window.location.href = res.url;
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const unverifyMutation = useMutation({
-    mutationFn: () => unverifyFn(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["my-verification"] });
-      toast.success("Verifiseringen er fjernet");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const isVerified = !!verification?.is_valid;
-
-  return (
-    <div className="rounded-xl border border-border bg-card p-6">
-      <div className="flex items-start gap-3">
-        <ShieldCheck
-          className={`size-6 ${isVerified ? "text-primary" : "text-muted-foreground"}`}
-        />
-        <div className="flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-medium">Verifisert identitet</h2>
-            {isVerified && verification && (
-              <VerifiedBadge verifiedAt={verification.verified_at} />
-            )}
-          </div>
-          {isLoading ? (
-            <Loader2 className="mt-2 size-4 animate-spin text-muted-foreground" />
-          ) : isVerified && verification ? (
-            <>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Bekreftet som <strong>{verification.verified_name}</strong>. Gyldig til{" "}
-                {new Date(verification.expires_at).toLocaleDateString("nb-NO", {
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                })}
-                . Visningsnavnet ditt er låst til dette navnet.
-              </p>
-              <div className="mt-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => unverifyMutation.mutate()}
-                  disabled={unverifyMutation.isPending}
-                >
-                  {unverifyMutation.isPending && (
-                    <Loader2 className="size-4 animate-spin" />
-                  )}
-                  Avverifiser
-                </Button>
-              </div>
-            </>
-          ) : (
-            <>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Verifiser identiteten din med Vipps for å få en synlig
-                «Verifisert»-pin på profilen og annonsene dine. Visningsnavnet
-                blir låst til navnet ditt i Vipps. Gyldig i 12 måneder.
-              </p>
-              <div className="mt-4">
-                <Button
-                  size="sm"
-                  onClick={() => startMutation.mutate()}
-                  disabled={!enabled?.enabled || startMutation.isPending}
-                >
-                  {startMutation.isPending && (
-                    <Loader2 className="size-4 animate-spin" />
-                  )}
-                  Verifiser med Vipps
-                </Button>
-                {!enabled?.enabled && (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Vipps-pålogging er ikke konfigurert ennå.
-                  </p>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}

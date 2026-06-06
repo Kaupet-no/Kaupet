@@ -291,12 +291,7 @@ function LandingPage() {
                     search={{ q: "", category: sub.slug, sort: "new" }}
                     className="group flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-5 text-left transition hover:border-primary hover:shadow-sm"
                   >
-                    <div className="flex min-w-0 flex-1 items-center gap-3">
-                      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground transition group-hover:bg-primary/10 group-hover:text-primary">
-                        <ParentIcon className="size-5" />
-                      </span>
-                      <div className="truncate font-medium">{sub.name_nb}</div>
-                    </div>
+                    <div className="truncate font-medium">{sub.name_nb}</div>
                     <ArrowRight className="size-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
                   </Link>
                 ))}

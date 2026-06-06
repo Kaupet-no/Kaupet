@@ -143,7 +143,7 @@ function ProfileSection() {
     },
   });
   const userId = userData?.id ?? null;
-  const isLocked = false;
+  
 
 
   const { data: profile, isLoading } = useQuery({

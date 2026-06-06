@@ -25,6 +25,7 @@ import { useMemo, useRef, useState } from "react";
 import Autoplay from "embla-carousel-autoplay";
 
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";

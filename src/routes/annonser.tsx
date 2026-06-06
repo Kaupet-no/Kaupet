@@ -459,7 +459,7 @@ function BrowsePage() {
           onLocationChange={handleLocationChange}
           selectedSlugs={
             search.category
-              ? [search.category, ...search.categories.filter((s) => s !== search.category)]
+              ? [search.category, ...search.categories.filter((s: string) => s !== search.category)]
               : search.categories
           }
           onSelectedChange={(slugs) =>

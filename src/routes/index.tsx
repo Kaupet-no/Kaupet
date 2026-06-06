@@ -262,7 +262,7 @@ function LandingPage() {
           {activeCategory ? (() => {
             const subs = childrenByParent.get(activeCategory.id) ?? [];
             const allSlugs = [activeCategory.slug, ...subs.map((s) => s.slug)];
-            const ParentIcon = CATEGORY_ICONS[activeCategory.slug] ?? Package;
+            
             return (
               <>
                 <Link
@@ -277,9 +277,6 @@ function LandingPage() {
                   className="group flex items-center justify-between gap-3 rounded-xl border border-primary bg-primary/5 px-4 py-5 text-left font-medium text-primary transition hover:bg-primary hover:text-primary-foreground hover:shadow-sm"
                 >
                   <div className="flex min-w-0 flex-1 items-center gap-3">
-                    <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition group-hover:bg-primary-foreground group-hover:text-primary">
-                      <ParentIcon className="size-5" />
-                    </span>
                     <div className="truncate">Alt i {activeCategory.name_nb}</div>
                   </div>
                   <ArrowRight className="size-4 shrink-0 transition group-hover:translate-x-0.5" />

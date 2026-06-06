@@ -83,7 +83,7 @@ function EditListingPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
-        .select("id, name_nb")
+        .select("id, name_nb, parent_id")
         .order("sort_order");
       if (error) throw error;
       return data;
@@ -140,6 +140,24 @@ function EditListingPage() {
   const isFree = watch("is_free");
   const categoryId = watch("category_id");
   const condition = watch("condition");
+
+  const parentCategories = (categories ?? []).filter((c) => !c.parent_id);
+  const [selectedParentId, setSelectedParentId] = useState<string>("");
+  const subcategories = (categories ?? []).filter(
+    (c) => c.parent_id === selectedParentId,
+  );
+
+  // Initialize parent selector from existing category when listing loads
+  useEffect(() => {
+    if (!listing || !categories) return;
+    const current = categories.find((c) => c.id === listing.category_id);
+    if (!current) return;
+    if (current.parent_id) {
+      setSelectedParentId(current.parent_id);
+    } else {
+      setSelectedParentId(current.id);
+    }
+  }, [listing, categories]);
 
   // Image editor state
   const [items, setItems] = useState<EditorItem[]>([]);
@@ -443,20 +461,45 @@ function EditListingPage() {
           <div className="space-y-2">
             <Label>Kategori</Label>
             <Select
-              value={categoryId || undefined}
-              onValueChange={(v) => setValue("category_id", v, { shouldValidate: true })}
+              value={selectedParentId}
+              onValueChange={(v) => {
+                setSelectedParentId(v);
+                const hasSubs = (categories ?? []).some((c) => c.parent_id === v);
+                if (!hasSubs) {
+                  setValue("category_id", v, { shouldValidate: true });
+                } else {
+                  setValue("category_id", "", { shouldValidate: false });
+                }
+              }}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Velg kategori" />
+                <SelectValue placeholder="Velg hovedkategori" />
               </SelectTrigger>
               <SelectContent>
-                {(categories ?? []).map((c) => (
+                {parentCategories.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
                     {c.name_nb}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {selectedParentId && subcategories.length > 0 && (
+              <Select
+                value={categoryId || undefined}
+                onValueChange={(v) => setValue("category_id", v, { shouldValidate: true })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Velg underkategori" />
+                </SelectTrigger>
+                <SelectContent>
+                  {subcategories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name_nb}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
           <div className="space-y-2">
             <Label>Tilstand</Label>

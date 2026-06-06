@@ -107,6 +107,18 @@ function LandingPage() {
 
   const [activeCategory, setActiveCategory] = useState<CategoryRow | null>(null);
 
+  const handlePickCategory = (cat: CategoryRow) => {
+    const subs = childrenByParent.get(cat.id) ?? [];
+    if (subs.length === 0) {
+      navigate({
+        to: "/annonser",
+        search: { q: "", category: cat.slug, sort: "new" },
+      });
+      return;
+    }
+    setActiveCategory(cat);
+  };
+
   const { data: popular } = useQuery({
     queryKey: ["popular-listings"],
     queryFn: async () => {

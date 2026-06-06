@@ -7,6 +7,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+
+const TERMS_VERSION = "1.0";
 
 const searchSchema = z.object({
   mode: z.enum(["signin", "signup"]).optional().default("signin"),
@@ -30,6 +33,7 @@ function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => setIsSignUp(mode === "signup"), [mode]);
@@ -45,12 +49,21 @@ function AuthPage() {
     setLoading(true);
     try {
       if (isSignUp) {
+        if (!acceptedTerms) {
+          toast.error("Du må godta brukervilkårene og personvernerklæringen for å opprette konto.");
+          setLoading(false);
+          return;
+        }
         const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: window.location.origin,
-            data: { display_name: displayName || email.split("@")[0] },
+            data: {
+              display_name: displayName || email.split("@")[0],
+              terms_accepted_version: TERMS_VERSION,
+              terms_accepted_at: new Date().toISOString(),
+            },
           },
         });
         if (error) throw error;
@@ -114,7 +127,28 @@ function AuthPage() {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
+          {isSignUp && (
+            <label className="flex items-start gap-2 text-sm text-muted-foreground">
+              <Checkbox
+                id="accept-terms"
+                checked={acceptedTerms}
+                onCheckedChange={(v) => setAcceptedTerms(v === true)}
+                className="mt-0.5"
+              />
+              <span>
+                Jeg har lest og godtar{" "}
+                <Link to="/vilkar" target="_blank" className="underline text-foreground hover:text-primary">
+                  brukervilkårene
+                </Link>{" "}
+                og{" "}
+                <Link to="/personvern" target="_blank" className="underline text-foreground hover:text-primary">
+                  personvernerklæringen
+                </Link>
+                .
+              </span>
+            </label>
+          )}
+          <Button type="submit" className="w-full" disabled={loading || (isSignUp && !acceptedTerms)}>
             {loading ? "Vent litt…" : isSignUp ? "Opprett konto" : "Logg inn"}
           </Button>
         </form>

@@ -226,13 +226,22 @@ function RootComponent() {
               </a>
               .
             </p>
-            <p className="sm:max-w-xl sm:text-right">
-              Ditt personvern på internett er viktig. Kaupet.no benytter derfor ingen sporende informasjonskapsler eller tredjeparts analyseverktøy. Les vår{" "}
-              <Link to="/personvern" className="underline hover:text-foreground transition-colors">
-                personvernerklæring her
-              </Link>
-              .
-            </p>
+            <div className="space-y-1 sm:max-w-xl sm:text-right">
+              <p>
+                Ditt personvern på internett er viktig. Kaupet.no benytter derfor ingen sporende informasjonskapsler eller tredjeparts analyseverktøy. Les vår{" "}
+                <Link to="/personvern" className="underline hover:text-foreground transition-colors">
+                  personvernerklæring her
+                </Link>
+                .
+              </p>
+              <p>
+                Ved å bruke Kaupet.no godtar du våre{" "}
+                <Link to="/vilkar" className="underline hover:text-foreground transition-colors">
+                  brukervilkår
+                </Link>
+                .
+              </p>
+            </div>
           </div>
         </footer>
       </div>

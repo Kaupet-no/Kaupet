@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VilkarRouteImport } from './routes/vilkar'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as PersonvernRouteImport } from './routes/personvern'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -32,6 +33,11 @@ import { Route as AuthenticatedAdminBrukereRouteImport } from './routes/_authent
 import { Route as ApiPublicPushDispatchRouteImport } from './routes/api/public/push/dispatch'
 import { Route as AuthenticatedMineAnnonserIdRedigerRouteImport } from './routes/_authenticated/mine-annonser.$id.rediger'
 
+const VilkarRoute = VilkarRouteImport.update({
+  id: '/vilkar',
+  path: '/vilkar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
   path: '/sitemap.xml',
@@ -155,6 +161,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/personvern': typeof PersonvernRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/vilkar': typeof VilkarRoute
   '/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/favoritter': typeof AuthenticatedFavoritterRoute
   '/mine-sok': typeof AuthenticatedMineSokRoute
@@ -178,6 +185,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/personvern': typeof PersonvernRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/vilkar': typeof VilkarRoute
   '/favoritter': typeof AuthenticatedFavoritterRoute
   '/mine-sok': typeof AuthenticatedMineSokRoute
   '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
@@ -202,6 +210,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/personvern': typeof PersonvernRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/vilkar': typeof VilkarRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/_authenticated/favoritter': typeof AuthenticatedFavoritterRoute
   '/_authenticated/mine-sok': typeof AuthenticatedMineSokRoute
@@ -227,6 +236,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/personvern'
     | '/sitemap.xml'
+    | '/vilkar'
     | '/admin'
     | '/favoritter'
     | '/mine-sok'
@@ -250,6 +260,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/personvern'
     | '/sitemap.xml'
+    | '/vilkar'
     | '/favoritter'
     | '/mine-sok'
     | '/ny-annonse'
@@ -273,6 +284,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/personvern'
     | '/sitemap.xml'
+    | '/vilkar'
     | '/_authenticated/admin'
     | '/_authenticated/favoritter'
     | '/_authenticated/mine-sok'
@@ -298,6 +310,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   PersonvernRoute: typeof PersonvernRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  VilkarRoute: typeof VilkarRoute
   AnnonseIdRoute: typeof AnnonseIdRoute
   BrukerIdRoute: typeof BrukerIdRoute
   ApiPublicPushDispatchRoute: typeof ApiPublicPushDispatchRoute
@@ -305,6 +318,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/vilkar': {
+      id: '/vilkar'
+      path: '/vilkar'
+      fullPath: '/vilkar'
+      preLoaderRoute: typeof VilkarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sitemap.xml': {
       id: '/sitemap.xml'
       path: '/sitemap.xml'
@@ -517,6 +537,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   PersonvernRoute: PersonvernRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  VilkarRoute: VilkarRoute,
   AnnonseIdRoute: AnnonseIdRoute,
   BrukerIdRoute: BrukerIdRoute,
   ApiPublicPushDispatchRoute: ApiPublicPushDispatchRoute,

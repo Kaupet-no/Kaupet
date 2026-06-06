@@ -296,20 +296,46 @@ function NewListingPage() {
           <div className="space-y-2">
             <Label>Kategori</Label>
             <Select
-              value={categoryId}
-              onValueChange={(v) => setValue("category_id", v, { shouldValidate: true })}
+              value={selectedParentId}
+              onValueChange={(v) => {
+                setSelectedParentId(v);
+                // If parent has no subcategories, use parent as final category
+                const hasSubs = (categories ?? []).some((c) => c.parent_id === v);
+                if (!hasSubs) {
+                  setValue("category_id", v, { shouldValidate: true });
+                } else {
+                  setValue("category_id", "", { shouldValidate: false });
+                }
+              }}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Velg kategori" />
+                <SelectValue placeholder="Velg hovedkategori" />
               </SelectTrigger>
               <SelectContent>
-                {(categories ?? []).map((c) => (
+                {parentCategories.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
                     {c.name_nb}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {selectedParentId && subcategories.length > 0 && (
+              <Select
+                value={categoryId}
+                onValueChange={(v) => setValue("category_id", v, { shouldValidate: true })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Velg underkategori" />
+                </SelectTrigger>
+                <SelectContent>
+                  {subcategories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name_nb}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             {errors.category_id && (
               <p className="text-sm text-destructive">{errors.category_id.message}</p>
             )}

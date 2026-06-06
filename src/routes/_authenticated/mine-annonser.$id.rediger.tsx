@@ -83,7 +83,7 @@ function EditListingPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
-        .select("id, name_nb")
+        .select("id, name_nb, parent_id")
         .order("sort_order");
       if (error) throw error;
       return data;

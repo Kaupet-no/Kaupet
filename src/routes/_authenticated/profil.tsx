@@ -234,13 +234,8 @@ function ProfileSection() {
 
       <div className="space-y-2">
         <Label htmlFor="display_name">Visningsnavn</Label>
-        <Input id="display_name" {...register("display_name")} disabled={isLocked} />
-        {isLocked && (
-          <p className="text-xs text-muted-foreground">
-            Låst til navnet fra Vipps. Avverifiser øverst for å endre.
-          </p>
-        )}
-        {errors.display_name && !isLocked && (
+        <Input id="display_name" {...register("display_name")} />
+        {errors.display_name && (
           <p className="text-sm text-destructive">{errors.display_name.message}</p>
         )}
       </div>

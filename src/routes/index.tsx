@@ -262,7 +262,7 @@ function LandingPage() {
           {activeCategory ? (() => {
             const subs = childrenByParent.get(activeCategory.id) ?? [];
             const allSlugs = [activeCategory.slug, ...subs.map((s) => s.slug)];
-            const ParentIcon = CATEGORY_ICONS[activeCategory.slug] ?? Package;
+            
             return (
               <>
                 <Link

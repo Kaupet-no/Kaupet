@@ -81,16 +81,22 @@ function NewListingPage() {
   const [images, setImages] = useState<PendingImage[]>([]);
 
   const { data: categories } = useQuery({
-    queryKey: ["categories"],
+    queryKey: ["categories", "with-parent"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
-        .select("id, name_nb")
+        .select("id, name_nb, parent_id")
         .order("sort_order");
       if (error) throw error;
       return data;
     },
   });
+
+  const parentCategories = (categories ?? []).filter((c) => !c.parent_id);
+  const [selectedParentId, setSelectedParentId] = useState<string>("");
+  const subcategories = (categories ?? []).filter(
+    (c) => c.parent_id === selectedParentId,
+  );
 
   const {
     register,

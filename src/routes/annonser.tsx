@@ -141,8 +141,9 @@ function BrowsePage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
-        .select("id, slug, name_nb")
-        .order("sort_order");
+        .select("id, slug, name_nb, parent_id")
+        .order("sort_order")
+        .order("name_nb");
       if (error) throw error;
       return data;
     },
@@ -456,8 +457,14 @@ function BrowsePage() {
           onSubmitQ={() => updateSearch({ q: qDraft })}
           location={location}
           onLocationChange={handleLocationChange}
-          categorySlug={search.category}
-          onCategoryChange={(slug) => updateSearch({ category: slug, categories: [] })}
+          selectedSlugs={
+            search.category
+              ? [search.category, ...search.categories.filter((s: string) => s !== search.category)]
+              : search.categories
+          }
+          onSelectedChange={(slugs) =>
+            updateSearch({ category: "", categories: slugs, catMode: "any" })
+          }
           categories={categories ?? []}
           sort={search.sort}
           onSortChange={(s) => updateSearch({ sort: s })}

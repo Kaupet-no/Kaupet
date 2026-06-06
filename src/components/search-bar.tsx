@@ -230,7 +230,7 @@ function DesktopBar({
                     setDrillParentId(null);
                   }}
                 >
-                  <span className="font-medium">Alle i {drillParent.name_nb}</span>
+                  <span className="font-medium">Alt i {drillParent.name_nb}</span>
                 </PopoverOption>
                 {drillKids.length === 0 ? (
                   <p className="px-3 py-2 text-xs text-muted-foreground">
@@ -418,7 +418,7 @@ function MobileBar(props: Props) {
                         setDrillParentId(null);
                       }}
                     >
-                      <span className="font-medium">Alle i {drillParent.name_nb}</span>
+                      <span className="font-medium">Alt i {drillParent.name_nb}</span>
                     </PopoverOption>
                     {drillKids.length === 0 ? (
                       <p className="px-3 py-2 text-xs text-muted-foreground">

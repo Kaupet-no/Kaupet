@@ -457,8 +457,14 @@ function BrowsePage() {
           onSubmitQ={() => updateSearch({ q: qDraft })}
           location={location}
           onLocationChange={handleLocationChange}
-          categorySlug={search.category}
-          onCategoryChange={(slug) => updateSearch({ category: slug, categories: [] })}
+          selectedSlugs={
+            search.category
+              ? [search.category, ...search.categories.filter((s) => s !== search.category)]
+              : search.categories
+          }
+          onSelectedChange={(slugs) =>
+            updateSearch({ category: "", categories: slugs, catMode: "any" })
+          }
           categories={categories ?? []}
           sort={search.sort}
           onSortChange={(s) => updateSearch({ sort: s })}

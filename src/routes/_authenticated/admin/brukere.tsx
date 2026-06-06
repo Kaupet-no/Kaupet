@@ -85,6 +85,28 @@ function AdminUsers() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const exportData = useMutation({
+    mutationFn: async (user: FoundUser) => {
+      const { data, error } = await supabase.rpc("admin_export_user_data", {
+        _user_id: user.user_id,
+      });
+      if (error) throw error;
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const safeEmail = user.email.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const date = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `kaupet-innsyn-${safeEmail}-${date}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    },
+    onSuccess: () => toast.success("Brukerdata eksportert"),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   return (
     <div className="space-y-6">
       <Card>

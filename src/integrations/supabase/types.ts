@@ -727,6 +727,7 @@ export type Database = {
         Returns: undefined
       }
       admin_enable_listing: { Args: { _id: string }; Returns: undefined }
+      admin_export_user_data: { Args: { _user_id: string }; Returns: Json }
       admin_find_users_by_email: {
         Args: { _query: string }
         Returns: {

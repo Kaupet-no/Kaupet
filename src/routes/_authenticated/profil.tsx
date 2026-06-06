@@ -194,8 +194,8 @@ function ProfileSection() {
         bio: parsed.bio || null,
         location: parsed.location || null,
         avatar_url: parsed.avatar_url || null,
+        display_name: parsed.display_name,
       };
-      if (!isLocked) updates.display_name = parsed.display_name;
       const { error } = await supabase
         .from("profiles")
         .update(updates)

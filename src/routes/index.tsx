@@ -257,7 +257,7 @@ function LandingPage() {
 
         <div
           key={activeCategory?.id ?? "root"}
-          className="grid animate-fade-in grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4"
+          className={`grid grid-cols-2 gap-3 duration-300 animate-in fade-in sm:grid-cols-3 lg:grid-cols-4 ${activeCategory ? "slide-in-from-right-8" : "slide-in-from-left-8"}`}
         >
           {activeCategory ? (() => {
             const subs = childrenByParent.get(activeCategory.id) ?? [];
@@ -316,7 +316,7 @@ function LandingPage() {
                   <button
                     key={cat.id}
                     type="button"
-                    onClick={() => setActiveCategory(cat)}
+                    onClick={() => handlePickCategory(cat)}
                     className="group flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-5 text-left transition hover:border-primary hover:shadow-sm"
                   >
                     <div className="flex min-w-0 flex-1 items-center gap-3">

@@ -49,12 +49,21 @@ function AuthPage() {
     setLoading(true);
     try {
       if (isSignUp) {
+        if (!acceptedTerms) {
+          toast.error("Du må godta brukervilkårene og personvernerklæringen for å opprette konto.");
+          setLoading(false);
+          return;
+        }
         const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: window.location.origin,
-            data: { display_name: displayName || email.split("@")[0] },
+            data: {
+              display_name: displayName || email.split("@")[0],
+              terms_accepted_version: TERMS_VERSION,
+              terms_accepted_at: new Date().toISOString(),
+            },
           },
         });
         if (error) throw error;

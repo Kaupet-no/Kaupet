@@ -25,7 +25,7 @@ function PersonvernPage() {
       <header className="mb-10">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">Personvern</p>
         <h1 className="mt-2 font-display text-4xl leading-tight tracking-tight">Personvernerklæring</h1>
-        <p className="mt-3 text-sm text-muted-foreground">Versjon 1.4 — sist oppdatert 6. juni 2026</p>
+        <p className="mt-3 text-sm text-muted-foreground">Versjon 1.5 — sist oppdatert 6. juni 2026</p>
       </header>
 
       <div className="space-y-10 text-sm leading-relaxed text-foreground/90">
@@ -46,20 +46,21 @@ function PersonvernPage() {
               nettleserens <code>localStorage</code> av vår autentiseringsleverandør Supabase.
             </li>
             <li>
-              <strong>kaupet_read_&lt;id&gt;</strong> — et tidsstempel per samtale som forteller når du sist åpnet
-              chatten. Brukes kun til ulest-indikatoren i meldingsinnboksen.
+              <strong>kaupet_read_&lt;id&gt;</strong> — et tidsstempel per samtale i <code>localStorage</code> som
+              forteller når du sist åpnet chatten. Brukes kun til ulest-indikatoren i meldingsinnboksen.
             </li>
             <li>
-              <strong>kaupet_viewed_&lt;id&gt;</strong> — en markering per nettleserfane som hindrer at samme annonse
-              telles flere ganger ved refresh. Slettes når fanen lukkes.
+              <strong>kaupet_viewed_&lt;id&gt;</strong> — en markering per nettleserfane i <code>sessionStorage</code>{" "}
+              som hindrer at samme annonse telles flere ganger ved refresh. Slettes når fanen lukkes.
             </li>
             <li>
-              <strong>kaupet_session_id</strong> — en anonym ID som lever kun i én nettleser-økt. Brukes til å gi selger
-              en grov teller på unike besøk per annonse. Slettes når du lukker fanen.
+              <strong>kaupet_session_id</strong> — en anonym ID i <code>sessionStorage</code> som lever kun i én
+              nettleser-økt. Brukes til å gi selger en grov teller på unike besøk per annonse. Slettes når du lukker
+              fanen.
             </li>
             <li>
-              <strong>kaupet_push_msg_hint_dismissed_v1</strong> — husker at du har lukket informasjonsmeldingen om
-              push-varsler i meldingsoversikten, slik at den ikke vises på nytt.
+              <strong>kaupet_push_msg_hint_dismissed_v1</strong> — lagres i <code>localStorage</code> og husker at du
+              har lukket informasjonsmeldingen om push-varsler i meldingsoversikten, slik at den ikke vises på nytt.
             </li>
           </ul>
         </section>
@@ -68,16 +69,35 @@ function PersonvernPage() {
           <h2 className="font-display text-2xl">Hva lagres på serveren</h2>
           <ul className="mt-3 space-y-2 list-disc pl-5">
             <li>
-              <strong>Brukerprofil</strong>: navn, e-postadresse og eventuelt profilbilde.
+              <strong>Brukerprofil</strong>: navn, e-postadresse og eventuelt profilbilde, bio og lokasjon.
             </li>
             <li>
-              <strong>Annonser</strong> du har lagt ut, med tilhørende bilder, beskrivelse og lokasjon.
+              <strong>Annonser</strong> du har lagt ut, med tilhørende bilder, beskrivelse, kategori og lokasjon
+              (postnummer, by og koordinater for kartvisning).
             </li>
             <li>
               <strong>Meldinger</strong> mellom deg og andre brukere.
             </li>
             <li>
               <strong>Favoritter</strong> du har lagret.
+            </li>
+            <li>
+              <strong>Vurderinger</strong> du gir eller mottar etter et salg (stjerner og eventuell kommentar). Disse
+              er <strong>offentlig synlige</strong> på brukerprofilen.
+            </li>
+            <li>
+              <strong>Lagrede søk</strong> med søkekriterier, og varsler om nye treff på disse søkene.
+            </li>
+            <li>
+              <strong>Rapporter</strong> du sender inn om upassende annonser, lagres slik at moderator kan behandle dem.
+            </li>
+            <li>
+              <strong>Blokkeringer</strong> — hvilke brukere eller samtaler du har blokkert. Dette er privat og kun
+              synlig for deg.
+            </li>
+            <li>
+              <strong>Bekreftede salg</strong> — når en selger markerer en annonse som solgt via en samtale, lagres
+              koblingen mellom annonse, kjøper og selger. Denne er kun synlig for partene i salget.
             </li>
             <li>
               <strong>Anonyme visninger</strong> av annonser, for å gi selger statistikk. Disse knyttes til en
@@ -87,6 +107,15 @@ function PersonvernPage() {
               <strong>Push-varslinger</strong> — hvis du slår på varsler, lagrer vi et kryptografisk
               abonnementsnøkkelpar (offentlig/privat), nettleserinformasjon og dine preferanser for hva du vil
               varsles om (nye meldinger, lagrede søk).
+            </li>
+            <li>
+              <strong>Moderering</strong> — ved brudd på reglene kan administrator registrere en{" "}
+              <em>utestengelse</em>, <em>midlertidig suspensjon</em> eller <em>IP-blokkering</em>. Slike
+              administrative handlinger logges internt med tidspunkt og årsak.
+            </li>
+            <li>
+              <strong>Sletteforespørsler</strong> — når du ber om å slette kontoen, lagrer vi e-post og tidsstempel i
+              den 7 dager lange angrefristen før permanent sletting utføres.
             </li>
           </ul>
           <p className="mt-4">

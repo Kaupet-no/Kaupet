@@ -461,7 +461,7 @@ function EditListingPage() {
           <div className="space-y-2">
             <Label>Kategori</Label>
             <Select
-              value={selectedParentId}
+              value={selectedParentId || undefined}
               onValueChange={(v) => {
                 setSelectedParentId(v);
                 const hasSubs = (categories ?? []).some((c) => c.parent_id === v);

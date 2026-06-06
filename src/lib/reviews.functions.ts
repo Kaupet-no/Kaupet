@@ -30,13 +30,6 @@ export type PublicProfile = {
   deleted_at: string | null;
   avg_rating: number;
   review_count: number;
-  verification: {
-    provider: string;
-    verified_name: string;
-    verified_at: string;
-    expires_at: string;
-    is_valid: boolean;
-  } | null;
 };
 
 export const createReview = createServerFn({ method: "POST" })

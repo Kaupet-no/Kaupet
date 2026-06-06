@@ -114,12 +114,10 @@ export const getPublicProfile = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     if (!profile) return null;
 
-    const [{ data: summary }, { data: verification }] = await Promise.all([
-      supabaseAdmin.rpc("user_review_summary", { _user_id: data.userId }),
-      supabaseAdmin.rpc("user_verification_status", { _user_id: data.userId }),
-    ]);
+    const { data: summary } = await supabaseAdmin.rpc("user_review_summary", {
+      _user_id: data.userId,
+    });
     const row = Array.isArray(summary) ? summary[0] : summary;
-    const vrow = Array.isArray(verification) ? verification[0] : verification;
     return {
       id: profile.id,
       display_name: profile.deleted_at ? "Slettet bruker" : profile.display_name,
@@ -130,16 +128,6 @@ export const getPublicProfile = createServerFn({ method: "POST" })
       deleted_at: profile.deleted_at,
       avg_rating: Number(row?.avg_rating ?? 0),
       review_count: Number(row?.review_count ?? 0),
-      verification:
-        vrow && !profile.deleted_at
-          ? {
-              provider: vrow.provider,
-              verified_name: vrow.verified_name,
-              verified_at: vrow.verified_at,
-              expires_at: vrow.expires_at,
-              is_valid: !!vrow.is_valid,
-            }
-          : null,
     };
   });
 

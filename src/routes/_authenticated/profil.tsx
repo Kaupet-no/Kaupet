@@ -72,14 +72,13 @@ export const Route = createFileRoute("/_authenticated/profil")({
   }),
   validateSearch: (search: Record<string, unknown>) => {
     const t = search.tab as string;
-    const v = search.vipps as string;
+  validateSearch: (search: Record<string, unknown>) => {
+    const t = search.tab as string;
     return {
       tab:
         t === "konto" || t === "varslinger" || t === "blokkerte"
           ? t
           : "profil",
-      vipps: v === "ok" || v === "error" ? v : undefined,
-      reason: typeof search.reason === "string" ? (search.reason as string) : undefined,
     };
   },
   component: ProfilePage,

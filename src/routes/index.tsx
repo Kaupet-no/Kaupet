@@ -232,19 +232,98 @@ function LandingPage() {
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {(categories ?? []).map((cat) => (
-            <Link
-              key={cat.id}
-              to="/annonser"
-              search={{ q: "", category: cat.slug, sort: "new" }}
-              className="group flex items-center justify-between rounded-xl border border-border bg-card px-4 py-5 text-left transition hover:border-primary hover:shadow-sm"
-            >
-              <span className="font-medium">{cat.name_nb}</span>
-              <ArrowRight className="size-4 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
-            </Link>
-          ))}
+          {rootCategories.map((cat) => {
+            const Icon = CATEGORY_ICONS[cat.slug] ?? Package;
+            const subCount = childrenByParent.get(cat.id)?.length ?? 0;
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setActiveCategory(cat)}
+                className="group flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-5 text-left transition hover:border-primary hover:shadow-sm"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
+                    <Icon className="size-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="truncate font-medium">{cat.name_nb}</div>
+                    {subCount > 0 && (
+                      <div className="text-xs text-muted-foreground">{subCount} underkategorier</div>
+                    )}
+                  </div>
+                </div>
+                <ArrowRight className="size-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
+              </button>
+            );
+          })}
           {!categories && <div className="col-span-full text-sm text-muted-foreground">Laster kategorier…</div>}
         </div>
+
+        <Dialog open={!!activeCategory} onOpenChange={(o) => !o && setActiveCategory(null)}>
+          <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+            {activeCategory && (() => {
+              const Icon = CATEGORY_ICONS[activeCategory.slug] ?? Package;
+              const subs = childrenByParent.get(activeCategory.id) ?? [];
+              const allSlugs = [activeCategory.slug, ...subs.map((s) => s.slug)];
+              return (
+                <>
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-3">
+                      <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <Icon className="size-5" />
+                      </span>
+                      {activeCategory.name_nb}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="mt-2 space-y-4">
+                    <Link
+                      to="/annonser"
+                      search={{
+                        q: "",
+                        category: "",
+                        categories: allSlugs,
+                        catMode: "any",
+                        sort: "new",
+                      }}
+                      onClick={() => setActiveCategory(null)}
+                      className="flex items-center justify-between rounded-lg border border-primary bg-primary/5 px-4 py-3 font-medium text-primary transition hover:bg-primary hover:text-primary-foreground"
+                    >
+                      Se alle i {activeCategory.name_nb}
+                      <ArrowRight className="size-4" />
+                    </Link>
+
+                    {subs.length > 0 ? (
+                      <div>
+                        <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          Underkategorier
+                        </div>
+                        <div className="grid gap-1.5 sm:grid-cols-2">
+                          {subs.map((sub) => (
+                            <Link
+                              key={sub.id}
+                              to="/annonser"
+                              search={{ q: "", category: sub.slug, sort: "new" }}
+                              onClick={() => setActiveCategory(null)}
+                              className="flex items-center justify-between rounded-md px-3 py-2 text-sm transition hover:bg-accent"
+                            >
+                              <span className="truncate">{sub.name_nb}</span>
+                              <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Ingen underkategorier — trykk over for å se alle annonser.
+                      </p>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
+          </DialogContent>
+        </Dialog>
       </section>
 
       {/* How it works */}

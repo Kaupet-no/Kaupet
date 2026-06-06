@@ -239,7 +239,7 @@ function LandingPage() {
             </h2>
             <p className="mt-1 text-muted-foreground">
               {activeCategory
-                ? "Velg en underkategori, eller se alt i kategorien."
+                ? "Velg en underkategori."
                 : "Bla gjennom det folk i nærheten selger akkurat nå."}
             </p>
           </div>

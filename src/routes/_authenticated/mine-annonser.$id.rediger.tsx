@@ -141,6 +141,24 @@ function EditListingPage() {
   const categoryId = watch("category_id");
   const condition = watch("condition");
 
+  const parentCategories = (categories ?? []).filter((c) => !c.parent_id);
+  const [selectedParentId, setSelectedParentId] = useState<string>("");
+  const subcategories = (categories ?? []).filter(
+    (c) => c.parent_id === selectedParentId,
+  );
+
+  // Initialize parent selector from existing category when listing loads
+  useEffect(() => {
+    if (!listing || !categories) return;
+    const current = categories.find((c) => c.id === listing.category_id);
+    if (!current) return;
+    if (current.parent_id) {
+      setSelectedParentId(current.parent_id);
+    } else {
+      setSelectedParentId(current.id);
+    }
+  }, [listing, categories]);
+
   // Image editor state
   const [items, setItems] = useState<EditorItem[]>([]);
   const [removedPaths, setRemovedPaths] = useState<string[]>([]);

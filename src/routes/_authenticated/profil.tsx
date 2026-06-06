@@ -39,13 +39,6 @@ import {
   updateNotificationPreferences,
 } from "@/lib/push.functions";
 import { listMyBlocks, deleteBlock } from "@/lib/blocks.functions";
-import {
-  getMyVerification,
-  isVippsEnabled,
-  startVippsVerification,
-  unverifyVipps,
-} from "@/lib/vipps.functions";
-import { VerifiedBadge } from "@/components/verified-badge";
 
 
 

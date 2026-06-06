@@ -175,23 +175,39 @@ function AdminUsers() {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        {u.is_admin ? (
+                        <div className="flex justify-end gap-2">
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => setPending({ user: u, action: "revoke" })}
+                            onClick={() => exportData.mutate(u)}
+                            disabled={exportData.isPending}
+                            title="Last ned alle data vi har om denne brukeren (GDPR-innsyn)"
                           >
-                            <ShieldOff className="size-4" /> Fjern admin
+                            {exportData.isPending && exportData.variables?.user_id === u.user_id ? (
+                              <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                              <Download className="size-4" />
+                            )}
+                            Eksporter data
                           </Button>
-                        ) : (
-                          <Button
-                            variant="default"
-                            size="sm"
-                            onClick={() => setPending({ user: u, action: "grant" })}
-                          >
-                            <Shield className="size-4" /> Gjør til admin
-                          </Button>
-                        )}
+                          {u.is_admin ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setPending({ user: u, action: "revoke" })}
+                            >
+                              <ShieldOff className="size-4" /> Fjern admin
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => setPending({ user: u, action: "grant" })}
+                            >
+                              <Shield className="size-4" /> Gjør til admin
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))

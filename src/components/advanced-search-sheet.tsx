@@ -187,9 +187,10 @@ export function AdvancedSearchSheet({ open, onOpenChange, initial, categories, o
             {/* Kategori */}
             <CategoryPicker
               categories={categories}
-              selected={v.categories[0] ?? ""}
-              onChange={(slug) => setV({ ...v, categories: slug ? [slug] : [], catMode: "any" })}
+              selected={v.categories}
+              onChange={(slugs) => setV({ ...v, categories: slugs, catMode: "any" })}
             />
+
 
 
             {/* Pris */}

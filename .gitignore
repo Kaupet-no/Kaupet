@@ -32,3 +32,12 @@ dist-ssr
 *.sw?
 
 .lovable/
+
+# App
+ios/App/Pods/
+ios/App/build/
+ios/App/Podfile.lock
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties

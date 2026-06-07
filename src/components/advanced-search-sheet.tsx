@@ -91,13 +91,6 @@ export function AdvancedSearchSheet({ open, onOpenChange, initial, categories, o
 
   const removeTerm = (t: string) => setV({ ...v, terms: v.terms.filter((x) => x !== t) });
 
-  const toggleCat = (slug: string) =>
-    setV({
-      ...v,
-      categories: v.categories.includes(slug)
-        ? v.categories.filter((c) => c !== slug)
-        : [...v.categories, slug],
-    });
 
   const toggleCondition = (val: string) =>
     setV({

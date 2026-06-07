@@ -191,31 +191,13 @@ export function AdvancedSearchSheet({ open, onOpenChange, initial, categories, o
               )}
             </section>
 
-            {/* Kategorier */}
-            <section className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <Label className="text-sm font-medium">Kategorier</Label>
-                <ModeToggle
-                  value={v.catMode}
-                  onChange={(m) => setV({ ...v, catMode: m })}
-                  labels={["Alle", "Minst én"]}
-                />
-              </div>
-              <div className="grid max-h-56 grid-cols-1 gap-1 overflow-y-auto rounded-md border border-border p-2 sm:grid-cols-2">
-                {categories.map((c) => (
-                  <label
-                    key={c.id}
-                    className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted"
-                  >
-                    <Checkbox
-                      checked={v.categories.includes(c.slug)}
-                      onCheckedChange={() => toggleCat(c.slug)}
-                    />
-                    <span>{c.name_nb}</span>
-                  </label>
-                ))}
-              </div>
-            </section>
+            {/* Kategori */}
+            <CategoryPicker
+              categories={categories}
+              selected={v.categories[0] ?? ""}
+              onChange={(slug) => setV({ ...v, categories: slug ? [slug] : [], catMode: "any" })}
+            />
+
 
             {/* Pris */}
             <section className="space-y-2">

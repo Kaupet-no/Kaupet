@@ -262,18 +262,23 @@ function BrowsePage() {
         }
       }
 
-      // Categories
+      // Categories — single selection; if a parent is chosen, include all children
       if (effectiveCategories.length > 0 && categories) {
-        const ids = categories
-          .filter((c) => effectiveCategories.includes(c.slug))
-          .map((c) => c.id);
-        if ((search.catMode ?? "any") === "all" && ids.length > 1) {
-          // A listing has only one category — AND of 2+ can't match.
-          return [];
+        const selectedSlugs = new Set(effectiveCategories);
+        const selectedCats = categories.filter((c) => selectedSlugs.has(c.slug));
+        const ids = new Set<string>();
+        for (const c of selectedCats) {
+          ids.add(c.id);
+          if (c.parent_id == null) {
+            for (const child of categories) {
+              if (child.parent_id === c.id) ids.add(child.id);
+            }
+          }
         }
-        if (ids.length === 0) return [];
-        qb = qb.in("category_id", ids);
+        if (ids.size === 0) return [];
+        qb = qb.in("category_id", Array.from(ids));
       }
+
 
       // Conditions
       if (search.conditions && search.conditions.length > 0) {

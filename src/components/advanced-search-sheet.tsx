@@ -187,9 +187,10 @@ export function AdvancedSearchSheet({ open, onOpenChange, initial, categories, o
             {/* Kategori */}
             <CategoryPicker
               categories={categories}
-              selected={v.categories[0] ?? ""}
-              onChange={(slug) => setV({ ...v, categories: slug ? [slug] : [], catMode: "any" })}
+              selected={v.categories}
+              onChange={(slugs) => setV({ ...v, categories: slugs, catMode: "any" })}
             />
+
 
 
             {/* Pris */}
@@ -308,41 +309,58 @@ function CategoryPicker({
   onChange,
 }: {
   categories: Category[];
-  selected: string;
-  onChange: (slug: string) => void;
+  selected: string[];
+  onChange: (slugs: string[]) => void;
 }) {
   const ALL = "__all__";
   const parents = useMemo(
     () => categories.filter((c) => c.parent_id == null),
     [categories],
   );
-  const childrenBySlug = useMemo(() => {
+  const childrenById = useMemo(() => {
     const map = new Map<string, Category[]>();
     for (const p of parents) {
       map.set(
-        p.slug,
+        p.id,
         categories.filter((c) => c.parent_id === p.id),
       );
     }
     return map;
   }, [categories, parents]);
 
-  const selectedCat = categories.find((c) => c.slug === selected);
-  const mainSlug = selectedCat
-    ? selectedCat.parent_id == null
-      ? selectedCat.slug
-      : categories.find((c) => c.id === selectedCat.parent_id)?.slug ?? ""
-    : "";
-  const subs = mainSlug ? childrenBySlug.get(mainSlug) ?? [] : [];
-  const subSlug = selectedCat && selectedCat.parent_id != null ? selectedCat.slug : "";
+  // Derive main category from selected slugs (all selected must belong to same parent)
+  const selectedCats = categories.filter((c) => selected.includes(c.slug));
+  const firstSel = selectedCats[0];
+  const mainCat = firstSel
+    ? firstSel.parent_id == null
+      ? firstSel
+      : categories.find((c) => c.id === firstSel.parent_id) ?? null
+    : null;
+  const mainSlug = mainCat?.slug ?? "";
+  const subs = mainCat ? childrenById.get(mainCat.id) ?? [] : [];
+  const selectedSubSlugs = new Set(
+    selectedCats.filter((c) => c.parent_id != null).map((c) => c.slug),
+  );
+
+  const onMainChange = (val: string) => {
+    if (val === ALL) onChange([]);
+    else onChange([val]);
+  };
+
+  const toggleSub = (slug: string) => {
+    const next = new Set(selectedSubSlugs);
+    if (next.has(slug)) next.delete(slug);
+    else next.add(slug);
+    // When at least one sub is selected, store only sub slugs (drop the main).
+    // When none, fall back to just the main slug (= "all subs").
+    if (next.size === 0) onChange(mainSlug ? [mainSlug] : []);
+    else onChange(Array.from(next));
+  };
 
   return (
     <section className="space-y-2">
       <Label className="text-sm font-medium">Kategori</Label>
-      <Select
-        value={mainSlug || ALL}
-        onValueChange={(val) => onChange(val === ALL ? "" : val)}
-      >
+      <Select value={mainSlug || ALL} onValueChange={onMainChange}>
         <SelectTrigger>
           <SelectValue placeholder="Alle hovedkategorier" />
         </SelectTrigger>
@@ -355,27 +373,31 @@ function CategoryPicker({
           ))}
         </SelectContent>
       </Select>
-      {mainSlug && subs.length > 0 && (
-        <Select
-          value={subSlug || ALL}
-          onValueChange={(val) => onChange(val === ALL ? mainSlug : val)}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Alle underkategorier" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>Alle underkategorier</SelectItem>
+      {mainCat && subs.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-xs text-muted-foreground">
+            Underkategorier (velg én eller flere — tomt = alle)
+          </p>
+          <div className="grid max-h-56 grid-cols-1 gap-1 overflow-y-auto rounded-md border border-border p-2 sm:grid-cols-2">
             {subs.map((s) => (
-              <SelectItem key={s.id} value={s.slug}>
-                {s.name_nb}
-              </SelectItem>
+              <label
+                key={s.id}
+                className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted"
+              >
+                <Checkbox
+                  checked={selectedSubSlugs.has(s.slug)}
+                  onCheckedChange={() => toggleSub(s.slug)}
+                />
+                <span>{s.name_nb}</span>
+              </label>
             ))}
-          </SelectContent>
-        </Select>
+          </div>
+        </div>
       )}
     </section>
   );
 }
+
 
 function ModeToggle({
   value,

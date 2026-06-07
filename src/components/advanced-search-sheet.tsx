@@ -9,6 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -84,13 +91,6 @@ export function AdvancedSearchSheet({ open, onOpenChange, initial, categories, o
 
   const removeTerm = (t: string) => setV({ ...v, terms: v.terms.filter((x) => x !== t) });
 
-  const toggleCat = (slug: string) =>
-    setV({
-      ...v,
-      categories: v.categories.includes(slug)
-        ? v.categories.filter((c) => c !== slug)
-        : [...v.categories, slug],
-    });
 
   const toggleCondition = (val: string) =>
     setV({
@@ -184,31 +184,13 @@ export function AdvancedSearchSheet({ open, onOpenChange, initial, categories, o
               )}
             </section>
 
-            {/* Kategorier */}
-            <section className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <Label className="text-sm font-medium">Kategorier</Label>
-                <ModeToggle
-                  value={v.catMode}
-                  onChange={(m) => setV({ ...v, catMode: m })}
-                  labels={["Alle", "Minst én"]}
-                />
-              </div>
-              <div className="grid max-h-56 grid-cols-1 gap-1 overflow-y-auto rounded-md border border-border p-2 sm:grid-cols-2">
-                {categories.map((c) => (
-                  <label
-                    key={c.id}
-                    className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted"
-                  >
-                    <Checkbox
-                      checked={v.categories.includes(c.slug)}
-                      onCheckedChange={() => toggleCat(c.slug)}
-                    />
-                    <span>{c.name_nb}</span>
-                  </label>
-                ))}
-              </div>
-            </section>
+            {/* Kategori */}
+            <CategoryPicker
+              categories={categories}
+              selected={v.categories[0] ?? ""}
+              onChange={(slug) => setV({ ...v, categories: slug ? [slug] : [], catMode: "any" })}
+            />
+
 
             {/* Pris */}
             <section className="space-y-2">
@@ -317,6 +299,81 @@ export function AdvancedSearchSheet({ open, onOpenChange, initial, categories, o
         }}
       />
     </>
+  );
+}
+
+function CategoryPicker({
+  categories,
+  selected,
+  onChange,
+}: {
+  categories: Category[];
+  selected: string;
+  onChange: (slug: string) => void;
+}) {
+  const ALL = "__all__";
+  const parents = useMemo(
+    () => categories.filter((c) => c.parent_id == null),
+    [categories],
+  );
+  const childrenBySlug = useMemo(() => {
+    const map = new Map<string, Category[]>();
+    for (const p of parents) {
+      map.set(
+        p.slug,
+        categories.filter((c) => c.parent_id === p.id),
+      );
+    }
+    return map;
+  }, [categories, parents]);
+
+  const selectedCat = categories.find((c) => c.slug === selected);
+  const mainSlug = selectedCat
+    ? selectedCat.parent_id == null
+      ? selectedCat.slug
+      : categories.find((c) => c.id === selectedCat.parent_id)?.slug ?? ""
+    : "";
+  const subs = mainSlug ? childrenBySlug.get(mainSlug) ?? [] : [];
+  const subSlug = selectedCat && selectedCat.parent_id != null ? selectedCat.slug : "";
+
+  return (
+    <section className="space-y-2">
+      <Label className="text-sm font-medium">Kategori</Label>
+      <Select
+        value={mainSlug || ALL}
+        onValueChange={(val) => onChange(val === ALL ? "" : val)}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Alle hovedkategorier" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL}>Alle hovedkategorier</SelectItem>
+          {parents.map((p) => (
+            <SelectItem key={p.id} value={p.slug}>
+              {p.name_nb}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {mainSlug && subs.length > 0 && (
+        <Select
+          value={subSlug || ALL}
+          onValueChange={(val) => onChange(val === ALL ? mainSlug : val)}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Alle underkategorier" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>Alle underkategorier</SelectItem>
+            {subs.map((s) => (
+              <SelectItem key={s.id} value={s.slug}>
+                {s.name_nb}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+    </section>
   );
 }
 

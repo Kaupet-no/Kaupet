@@ -15,6 +15,8 @@ import { SiteHeader } from "@/components/site-header";
 import { ModerationBanner } from "@/components/moderation-banner";
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { initNativeOfflineWatcher } from "@/lib/native-offline";
+
 
 function NotFoundComponent() {
   return (
@@ -202,6 +204,13 @@ function RootComponent() {
     });
     return () => subscription.unsubscribe();
   }, [router, queryClient]);
+
+  useEffect(() => {
+    const cleanup = initNativeOfflineWatcher();
+    return cleanup;
+  }, []);
+
+
 
 
   return (

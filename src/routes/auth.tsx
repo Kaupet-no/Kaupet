@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { isNative } from "@/lib/native";
+
 
 const TERMS_VERSION = "1.0";
 
@@ -58,7 +60,7 @@ function AuthPage() {
           email,
           password,
           options: {
-            emailRedirectTo: window.location.origin,
+            emailRedirectTo: isNative() ? "https://kaupet.no/" : window.location.origin,
             data: {
               display_name: displayName || email.split("@")[0],
               terms_accepted_version: TERMS_VERSION,

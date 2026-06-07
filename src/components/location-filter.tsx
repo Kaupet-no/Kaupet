@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
+import { getCurrentPosition } from "@/lib/native";
+
 
 export type LocationValue = {
   lat: number | null;
@@ -77,24 +79,25 @@ export function LocationPicker({ value, onChange, onDone }: LocationPickerProps)
     onDone?.();
   };
 
-  const useMyLocation = () => {
-    if (!navigator.geolocation) {
-      toast.error("Posisjon ikke støttet i denne nettleseren");
-      return;
+  const useMyLocation = async () => {
+    try {
+      const pos = await getCurrentPosition();
+      if (!pos) {
+        toast.error("Posisjon ikke støttet på denne enheten");
+        return;
+      }
+      onChange({
+        ...value,
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        label: "Min posisjon",
+      });
+      onDone?.();
+    } catch {
+      toast.error("Kunne ikke hente posisjon");
     }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        onChange({
-          ...value,
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          label: "Min posisjon",
-        });
-        onDone?.();
-      },
-      () => toast.error("Kunne ikke hente posisjon"),
-    );
   };
+
 
   const clear = () => {
     onChange({ lat: null, lng: null, radius: value.radius, label: "" });

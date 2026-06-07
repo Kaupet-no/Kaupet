@@ -1,0 +1,152 @@
+# Kaupet som native app (Capacitor)
+
+Kaupet er pakket som en hybrid native app for iOS og Android med
+[Capacitor](https://capacitorjs.com/). Appen er et tynt skall rundt en
+WebView som laster `https://kaupet.no`. Hvis serveren ikke kan nås vises
+en innebygd offline-side (`capacitor-shell/offline.html`).
+
+## Arkitektur
+
+```
+┌──────────────────────────────────┐
+│  Native app (iOS / Android)      │
+│  ┌────────────────────────────┐  │
+│  │  WebView → kaupet.no       │  │
+│  │  Ved feil → offline.html   │  │
+│  └────────────────────────────┘  │
+│  Plugins: Camera, Geolocation,   │
+│           Share, Browser, App    │
+└──────────────────────────────────┘
+```
+
+## Hva er med i POC
+
+- iOS- og Android-prosjekt generert med Capacitor
+- App-ikon og splash (Kaupet-merkevare)
+- Innebygd visuell offline-side med "Prøv igjen"-knapp
+- Toast-varsel ved nettverkstap mens appen kjører
+- Native kamera/galleri i bildevelgeren
+- Native GPS-posisjon i lokasjonsfilteret
+- Native delefunksjon på annonsesider
+- Android: hardware tilbake-knapp navigerer i WebView-historikken
+- Custom URL scheme `no.kaupet.app://` (forberedt, ikke aktivt brukt)
+
+## Ikke med i POC
+
+- Publisering i App Store / Google Play
+- Native push-varsler (krever FCM + APNs)
+- Universal Links / App Links
+- Google OAuth-login i appen (bruk e-post + passord)
+
+---
+
+## Bygg og kjør Android (Windows)
+
+### Førstegangs oppsett
+
+1. Installer [Android Studio](https://developer.android.com/studio)
+   (inkluderer Android SDK).
+2. Opprett en emulator i Android Studio (Device Manager → Create Device).
+3. I prosjektrota:
+   ```
+   bun install
+   npx cap add android         # kun første gang
+   npx cap sync android
+   ```
+
+### Bygg og kjør
+
+```
+npx cap sync android
+npx cap open android
+```
+
+Trykk "Run" i Android Studio og velg emulator eller en tilkoblet enhet
+med USB-debugging.
+
+### Bygg signert debug-APK for sideload
+
+```
+cd android
+gradlew.bat assembleDebug
+```
+
+APK-en havner i `android/app/build/outputs/apk/debug/app-debug.apk` og
+kan installeres med `adb install` eller deles til testere.
+
+---
+
+## Bygg og kjør iOS (macOS)
+
+### Førstegangs oppsett
+
+1. Installer [Xcode](https://apps.apple.com/no/app/xcode/id497799835) fra
+   Mac App Store.
+2. Installer CocoaPods:
+   ```
+   sudo gem install cocoapods
+   ```
+3. Klon prosjektet og kjør:
+   ```
+   bun install
+   npx cap add ios             # kun første gang
+   npx cap sync ios
+   ```
+
+### Bygg og kjør
+
+```
+npx cap sync ios
+npx cap open ios
+```
+
+I Xcode:
+
+1. Velg `App` i prosjekt-treet → fanen "Signing & Capabilities"
+2. Logg inn med Apple-ID under "Team" (gratis-ID fungerer)
+3. Velg iOS Simulator eller koble til en iPhone
+4. Trykk play-knappen
+
+> En gratis Apple-ID lar deg installere appen på din egen enhet i 7 dager
+> om gangen. Ingen Apple Developer Program ($99/år) trengs for POC.
+
+---
+
+## Oppdater appen etter en kaupet.no-endring
+
+Fordi appen laster `https://kaupet.no` direkte trenger du normalt
+**ingenting** å gjøre når web-appen oppdateres — brukerne får siste versjon
+neste gang de starter appen.
+
+Du trenger kun å bygge og distribuere ny app-versjon når:
+
+- Capacitor-konfigurasjonen endres (`capacitor.config.ts`)
+- Offline-siden endres (`capacitor-shell/offline.html`)
+- Native plugins legges til eller fjernes
+- App-ikon eller splash endres
+
+Etter en slik endring:
+```
+npx cap sync
+```
+… og bygg på nytt i Xcode / Android Studio.
+
+---
+
+## Vanlige feil
+
+**Android: `SDK location not found`**
+Lag `android/local.properties` med innholdet:
+```
+sdk.dir=C\:\\Users\\<brukernavn>\\AppData\\Local\\Android\\Sdk
+```
+
+**iOS: `pod install` feiler**
+Kjør `cd ios/App && pod install --repo-update`.
+
+**Build feiler etter ny plugin lagt til**
+Kjør `npx cap sync` på nytt så Capacitor regenererer native-prosjektene.
+
+**WebView viser blank skjerm**
+Sjekk at `https://kaupet.no` er oppe. Hvis offline-siden vises i stedet
+fungerer feilhåndteringen som forventet.

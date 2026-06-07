@@ -302,6 +302,81 @@ export function AdvancedSearchSheet({ open, onOpenChange, initial, categories, o
   );
 }
 
+function CategoryPicker({
+  categories,
+  selected,
+  onChange,
+}: {
+  categories: Category[];
+  selected: string;
+  onChange: (slug: string) => void;
+}) {
+  const ALL = "__all__";
+  const parents = useMemo(
+    () => categories.filter((c) => c.parent_id == null),
+    [categories],
+  );
+  const childrenBySlug = useMemo(() => {
+    const map = new Map<string, Category[]>();
+    for (const p of parents) {
+      map.set(
+        p.slug,
+        categories.filter((c) => c.parent_id === p.id),
+      );
+    }
+    return map;
+  }, [categories, parents]);
+
+  const selectedCat = categories.find((c) => c.slug === selected);
+  const mainSlug = selectedCat
+    ? selectedCat.parent_id == null
+      ? selectedCat.slug
+      : categories.find((c) => c.id === selectedCat.parent_id)?.slug ?? ""
+    : "";
+  const subs = mainSlug ? childrenBySlug.get(mainSlug) ?? [] : [];
+  const subSlug = selectedCat && selectedCat.parent_id != null ? selectedCat.slug : "";
+
+  return (
+    <section className="space-y-2">
+      <Label className="text-sm font-medium">Kategori</Label>
+      <Select
+        value={mainSlug || ALL}
+        onValueChange={(val) => onChange(val === ALL ? "" : val)}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Alle hovedkategorier" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL}>Alle hovedkategorier</SelectItem>
+          {parents.map((p) => (
+            <SelectItem key={p.id} value={p.slug}>
+              {p.name_nb}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {mainSlug && subs.length > 0 && (
+        <Select
+          value={subSlug || ALL}
+          onValueChange={(val) => onChange(val === ALL ? mainSlug : val)}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Alle underkategorier" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>Alle underkategorier</SelectItem>
+            {subs.map((s) => (
+              <SelectItem key={s.id} value={s.slug}>
+                {s.name_nb}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+    </section>
+  );
+}
+
 function ModeToggle({
   value,
   onChange,

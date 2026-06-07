@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ImagePlus, X, GripVertical } from "lucide-react";
+import { Camera, ImagePlus, X, GripVertical } from "lucide-react";
 import { toast } from "sonner";
 import {
   MAX_IMAGES,
@@ -7,6 +7,8 @@ import {
   validateImages,
 } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
+import { isNative, pickNativePhoto } from "@/lib/native";
+
 
 export type PendingImage = {
   id: string;
@@ -117,7 +119,27 @@ export function ImageUploader({
         >
           Velg bilder
         </Button>
+        {isNative() && (
+          <Button
+            type="button"
+            variant="default"
+            size="sm"
+            className="mt-2 gap-2"
+            onClick={async () => {
+              try {
+                const file = await pickNativePhoto();
+                if (file) addFiles([file]);
+              } catch (e: any) {
+                toast.error(e?.message ?? "Kunne ikke åpne kamera");
+              }
+            }}
+            disabled={images.length >= MAX_IMAGES}
+          >
+            <Camera className="size-4" /> Ta bilde / velg fra galleri
+          </Button>
+        )}
       </div>
+
 
       {images.length > 0 && (
         <>

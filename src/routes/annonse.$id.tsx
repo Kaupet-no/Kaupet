@@ -1,15 +1,18 @@
 import { createFileRoute, Link, notFound, useNavigate, useRouter } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { lazy, Suspense, useEffect, useState } from "react";
-import { ArrowLeft, MapPin, MessageCircle, User as UserIcon, Pencil, Eye, Users, Heart, Info, ChevronDown } from "lucide-react";
+import { ArrowLeft, MapPin, MessageCircle, User as UserIcon, Pencil, Eye, Users, Heart, Info, ChevronDown, Share2 } from "lucide-react";
+import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 
 import { signListingImageUrls } from "@/lib/storage";
+import { shareContent } from "@/lib/native";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { FavoriteButton } from "@/components/favorite-button";
+
 
 
 const ListingDetailMap = lazy(() =>
@@ -521,6 +524,28 @@ function ListingDetailPage() {
               </Button>
             )}
             <FavoriteButton listingId={data.id} variant="full" size="lg" className="mt-2" />
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-2 w-full gap-2"
+              onClick={async () => {
+                try {
+                  const result = await shareContent({
+                    title: data.title,
+                    text: `${data.title} — ${priceLabel} på Kaupet.no`,
+                    url: `https://kaupet.no/annonse/${data.id}`,
+                  });
+                  if (result === "clipboard") toast.success("Lenken er kopiert");
+                } catch (e: any) {
+                  if (e?.name !== "AbortError") {
+                    toast.error(e?.message ?? "Kunne ikke dele");
+                  }
+                }
+              }}
+            >
+              <Share2 className="size-4" /> Del annonse
+            </Button>
+
           </div>
         </aside>
       </div>

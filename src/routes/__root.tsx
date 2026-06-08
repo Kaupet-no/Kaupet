@@ -16,6 +16,8 @@ import { ModerationBanner } from "@/components/moderation-banner";
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { initNativeOfflineWatcher } from "@/lib/native-offline";
+import { useIsNative } from "@/lib/use-is-native";
+import { AppBottomNav } from "@/components/app-bottom-nav";
 
 
 function NotFoundComponent() {

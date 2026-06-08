@@ -135,6 +135,47 @@ export type Database = {
           },
         ]
       }
+      favorite_price_drops: {
+        Row: {
+          created_at: string
+          drop_pct: number
+          id: string
+          listing_id: string
+          new_price_nok: number
+          old_price_nok: number
+          read_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          drop_pct: number
+          id?: string
+          listing_id: string
+          new_price_nok: number
+          old_price_nok: number
+          read_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          drop_pct?: number
+          id?: string
+          listing_id?: string
+          new_price_nok?: number
+          old_price_nok?: number
+          read_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "favorite_price_drops_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       favorites: {
         Row: {
           created_at: string
@@ -380,6 +421,7 @@ export type Database = {
           updated_at: string
           user_id: string
           web_push_messages: boolean
+          web_push_price_drops: boolean
           web_push_saved_searches: boolean
         }
         Insert: {
@@ -387,6 +429,7 @@ export type Database = {
           updated_at?: string
           user_id: string
           web_push_messages?: boolean
+          web_push_price_drops?: boolean
           web_push_saved_searches?: boolean
         }
         Update: {
@@ -394,6 +437,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
           web_push_messages?: boolean
+          web_push_price_drops?: boolean
           web_push_saved_searches?: boolean
         }
         Relationships: []

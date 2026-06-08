@@ -151,7 +151,7 @@ export const getFeaturedListings = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: idRows, error: idErr } = await supabaseAdmin.rpc("get_featured_listing_ids", {
-      _category_slug: data.category_slug ?? null,
+      _category_slug: data.category_slug ?? undefined,
       _limit: data.limit ?? 2,
     });
     if (idErr) throw idErr;

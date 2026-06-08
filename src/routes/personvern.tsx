@@ -231,9 +231,6 @@ function PersonvernPage() {
               kontakt@kaupet.no
             </a>
           </p>
-          <p className="mt-1">
-            <strong>Postadresse:</strong> Happy Pixel AS, c/o Kaupet.no
-          </p>
         </section>
 
         <div className="pt-4">

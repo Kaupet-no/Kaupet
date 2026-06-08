@@ -238,10 +238,12 @@ function NewListingPage() {
       return listing.id as string;
     },
     onSuccess: (id) => {
+      void import("@/lib/haptics").then((m) => m.hapticNotification("success"));
       toast.success("Annonsen er publisert");
       navigate({ to: "/annonse/$id", params: { id } });
     },
     onError: (err: Error) => {
+      void import("@/lib/haptics").then((m) => m.hapticNotification("error"));
       const msg = err.message ?? "";
       toast.error(msg.startsWith("[") ? "Sjekk feltene og prøv igjen" : msg || "Kunne ikke publisere annonsen");
     },

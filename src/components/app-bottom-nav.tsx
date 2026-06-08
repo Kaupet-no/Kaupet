@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useUnreadConversationsCount } from "@/lib/use-unread";
 import { useIsAdmin } from "@/lib/use-is-admin";
+import { hapticImpact } from "@/lib/haptics";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -80,6 +81,7 @@ export function AppBottomNav() {
             to={user ? "/ny-annonse" : "/auth"}
             search={user ? undefined : { mode: "signup" as const }}
             aria-label="Ny annonse"
+            onClick={() => void hapticImpact("light")}
             className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background transition active:scale-95"
           >
             <Plus className="size-8" />

@@ -175,7 +175,8 @@ function AdminPromotionsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                (promosQ.data ?? []).map((p: Record<string, unknown> & { id: string; listing_id: string }) => (
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (promosQ.data ?? []).map((p: any) => (
                   <TableRow key={p.id}>
                     <TableCell className="max-w-xs truncate font-medium">
                       <a
@@ -252,7 +253,8 @@ function AdminPromotionsPage() {
                   ) : (giftSearchQ.data ?? []).length === 0 ? (
                     <div className="p-3 text-sm text-muted-foreground">Ingen treff</div>
                   ) : (
-                    (giftSearchQ.data ?? []).map((l: { id: string; title: string }) => (
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    (giftSearchQ.data ?? []).map((l: any) => (
                       <button
                         key={l.id}
                         type="button"

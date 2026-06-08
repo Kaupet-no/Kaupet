@@ -426,6 +426,21 @@ function ListingDetailPage() {
                   <Pencil className="size-4" /> Rediger annonse
                 </Button>
               </Link>
+              {data.status === "active" && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-2 w-full gap-2"
+                  onClick={() => setPromoteOpen(true)}
+                >
+                  <Sparkles className="size-4" /> Fremhev annonse
+                </Button>
+              )}
+              <PromoteListingDialog
+                listingId={data.id}
+                open={promoteOpen}
+                onOpenChange={setPromoteOpen}
+              />
               <dl className="mt-4 grid grid-cols-3 gap-3 text-center">
                 <div className="rounded-lg bg-card p-2">
                   <Eye className="mx-auto size-4 text-muted-foreground" />

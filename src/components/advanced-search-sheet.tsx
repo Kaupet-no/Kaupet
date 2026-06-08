@@ -36,6 +36,7 @@ import type { Category } from "@/components/search-bar";
 import { useAuth } from "@/lib/auth";
 import { createSavedSearch, summarizeCriteria, type SearchCriteria } from "@/lib/saved-searches";
 import { toast } from "sonner";
+import { formatErrorMessage } from "@/lib/errors";
 
 const CONDITIONS: Array<{ value: string; label: string }> = [
   { value: "new", label: "Helt ny" },
@@ -467,7 +468,7 @@ function SaveSearchDialog({
       toast.success("Søk lagret");
       onSaved();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Kunne ikke lagre søk");
+      toast.error(formatErrorMessage(e, "Kunne ikke lagre søket"));
     } finally {
       setSaving(false);
     }
@@ -528,7 +529,7 @@ function PushHintForSavedSearch() {
       await push.enableOnThisDevice("saved_searches");
       toast.success("Push-varsler er aktivert på denne enheten");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Klarte ikke å aktivere varsler");
+      toast.error(formatErrorMessage(e, "Klarte ikke å aktivere varsler"));
     } finally {
       setBusy(false);
     }

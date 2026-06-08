@@ -12,6 +12,7 @@ import { shareContent } from "@/lib/native";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { FavoriteButton } from "@/components/favorite-button";
+import { formatErrorMessage } from "@/lib/errors";
 
 
 
@@ -538,7 +539,7 @@ function ListingDetailPage() {
                   if (result === "clipboard") toast.success("Lenken er kopiert");
                 } catch (e: any) {
                   if (e?.name !== "AbortError") {
-                    toast.error(e?.message ?? "Kunne ikke dele");
+                    toast.error(formatErrorMessage(e, "Kunne ikke dele annonsen"));
                   }
                 }
               }}

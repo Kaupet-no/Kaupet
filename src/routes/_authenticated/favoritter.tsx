@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
 import { Button } from "@/components/ui/button";
+import { formatErrorMessage } from "@/lib/errors";
 
 export const Route = createFileRoute("/_authenticated/favoritter")({
   head: () => ({
@@ -82,7 +83,7 @@ function FavoritesPage() {
       queryClient.invalidateQueries({ queryKey: ["user-favorites", user?.id] });
       toast.success("Fjernet fra favoritter");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke fjerne favoritten")),
   });
 
   return (

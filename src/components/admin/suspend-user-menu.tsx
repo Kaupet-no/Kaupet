@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useIsAdmin } from "@/lib/use-is-admin";
 import {
+import { formatErrorMessage } from "@/lib/errors";
   adminBanUser,
   adminSuspendUser,
 } from "@/lib/admin-moderation.functions";
@@ -55,7 +56,7 @@ export function AdminUserActions({
       setReason("");
       qc.invalidateQueries();
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke svarteliste brukeren")),
   });
 
   const banMut = useMutation({
@@ -66,7 +67,7 @@ export function AdminUserActions({
       setReason("");
       qc.invalidateQueries();
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke utestenge brukeren")),
   });
 
   if (!isAdmin) return null;

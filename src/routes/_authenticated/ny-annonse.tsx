@@ -12,6 +12,7 @@ import { uploadListingImage } from "@/lib/storage";
 import { geocodeNorwayAddress, lookupPostalCode, lookupCity, reverseGeocodeAddress } from "@/lib/geocode";
 import { ImageUploader, type PendingImage } from "@/components/image-uploader";
 import { ListingLocationPicker } from "@/components/listing-location-picker";
+import { PromoteListingDialog } from "@/components/promote-listing-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -80,6 +81,8 @@ export const Route = createFileRoute("/_authenticated/ny-annonse")({
 function NewListingPage() {
   const navigate = useNavigate();
   const [images, setImages] = useState<PendingImage[]>([]);
+  const [publishedId, setPublishedId] = useState<string | null>(null);
+  const [promoteOpen, setPromoteOpen] = useState(false);
 
   const { data: categories } = useQuery({
     queryKey: ["categories", "with-parent"],
@@ -241,7 +244,8 @@ function NewListingPage() {
     onSuccess: (id) => {
       void import("@/lib/haptics").then((m) => m.hapticNotification("success"));
       toast.success("Annonsen er publisert");
-      navigate({ to: "/annonse/$id", params: { id } });
+      setPublishedId(id);
+      setPromoteOpen(true);
     },
     onError: (err: Error) => {
       void import("@/lib/haptics").then((m) => m.hapticNotification("error"));

@@ -120,24 +120,7 @@ export const Route = createFileRoute("/annonse/$id")({
     };
   },
   component: ListingDetailPage,
-  errorComponent: ({ error, reset }) => {
-    const router = useRouter();
-    return (
-      <div className="mx-auto max-w-2xl px-4 py-20 text-center">
-        <h1 className="font-display text-2xl">Kunne ikke laste annonsen</h1>
-        <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
-        <Button
-          className="mt-6"
-          onClick={() => {
-            router.invalidate();
-            reset();
-          }}
-        >
-          Prøv på nytt
-        </Button>
-      </div>
-    );
-  },
+  errorComponent: ListingErrorBoundary,
   notFoundComponent: () => (
     <div className="mx-auto max-w-2xl px-4 py-20 text-center">
       <h1 className="font-display text-2xl">Annonsen finnes ikke</h1>

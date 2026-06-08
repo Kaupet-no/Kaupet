@@ -34,7 +34,7 @@ function PersonvernPage() {
             Hos Kaupet.no lagrer vi kun det som er nødvendig for at tjenesten skal fungere. Vi bruker{" "}
             <strong>ingen tredjepartssporing</strong>, <strong>ingen markedsføringscookies</strong> og{" "}
             <strong>ingen eksterne analyseplattformer</strong>. Derfor benytter vi heller ikke en cookie-banner som ber
-            om samtykke. Standardvalget for alle brukere er "kun nødvendige cookies".
+            om samtykke.
           </p>
         </section>
 

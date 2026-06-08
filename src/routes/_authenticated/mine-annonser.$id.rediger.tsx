@@ -7,7 +7,13 @@ import { toast } from "sonner";
 import { Loader2, ImagePlus, X, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
-import { geocodeNorwayAddress } from "@/lib/geocode";
+import {
+  geocodeNorwayAddress,
+  lookupPostalCode,
+  lookupCity,
+  reverseGeocodeAddress,
+} from "@/lib/geocode";
+import { ListingLocationPicker } from "@/components/listing-location-picker";
 import {
   LISTING_BUCKET,
   MAX_IMAGES,
@@ -140,6 +146,70 @@ function EditListingPage() {
   const isFree = watch("is_free");
   const categoryId = watch("category_id");
   const condition = watch("condition");
+  const postalCode = watch("postal_code");
+  const city = watch("city");
+
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const lastEdited = useRef<"postal_code" | "city" | "map" | null>(null);
+  const markerMoved = useRef(false);
+  const coordsHydratedFor = useRef<string | null>(null);
+
+  // Initialize coords from existing listing
+  useEffect(() => {
+    if (!listing || coordsHydratedFor.current === listing.id) return;
+    coordsHydratedFor.current = listing.id;
+    if (
+      typeof listing.lat === "number" &&
+      typeof listing.lng === "number"
+    ) {
+      setCoords({ lat: listing.lat, lng: listing.lng });
+    }
+  }, [listing]);
+
+  // Auto-fill city from postal code
+  useEffect(() => {
+    if (lastEdited.current !== "postal_code") return;
+    const p = (postalCode ?? "").trim();
+    if (!/^\d{4}$/.test(p)) return;
+    const t = window.setTimeout(async () => {
+      const r = await lookupPostalCode(p);
+      if (!r) return;
+      if (r.city) setValue("city", r.city, { shouldValidate: false });
+      if (!markerMoved.current) setCoords({ lat: r.lat, lng: r.lng });
+    }, 500);
+    return () => window.clearTimeout(t);
+  }, [postalCode, setValue]);
+
+  // Auto-fill postal from city
+  useEffect(() => {
+    if (lastEdited.current !== "city") return;
+    const c = (city ?? "").trim();
+    if (c.length < 2) return;
+    const t = window.setTimeout(async () => {
+      const r = await lookupCity(c);
+      if (!r) return;
+      if (r.postal_code && !(postalCode ?? "").trim()) {
+        setValue("postal_code", r.postal_code, { shouldValidate: false });
+      }
+      if (!markerMoved.current) setCoords({ lat: r.lat, lng: r.lng });
+    }, 500);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [city, setValue]);
+
+  // Reverse-geocode map position back to city/postal
+  useEffect(() => {
+    if (lastEdited.current !== "map" || !coords) return;
+    const t = window.setTimeout(async () => {
+      const r = await reverseGeocodeAddress(coords);
+      if (r.city) setValue("city", r.city, { shouldValidate: false });
+      if (r.postal_code && /^\d{4}$/.test(r.postal_code)) {
+        setValue("postal_code", r.postal_code, { shouldValidate: false });
+      }
+    }, 300);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coords, setValue]);
 
   const parentCategories = (categories ?? []).filter((c) => !c.parent_id);
   const [selectedParentId, setSelectedParentId] = useState<string>("");
@@ -239,15 +309,12 @@ function EditListingPage() {
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
       const parsed = schema.parse(values);
-      const postalChanged = parsed.postal_code !== (listing?.postal_code ?? "");
-      const cityChanged = parsed.city !== (listing?.city ?? "");
-      let coords: { lat: number; lng: number } | null = null;
-      if (postalChanged || cityChanged) {
-        coords = await geocodeNorwayAddress({
+      const finalCoords =
+        coords ??
+        (await geocodeNorwayAddress({
           postal_code: parsed.postal_code,
           city: parsed.city,
-        });
-      }
+        }));
 
       const { error: updErr } = await supabase
         .from("listings")
@@ -264,7 +331,8 @@ function EditListingPage() {
               : null,
           postal_code: parsed.postal_code || null,
           city: parsed.city || null,
-          ...(coords ? { lat: coords.lat, lng: coords.lng } : {}),
+          lat: finalCoords?.lat ?? null,
+          lng: finalCoords?.lng ?? null,
         })
         .eq("id", id);
       if (updErr) throw updErr;
@@ -549,24 +617,56 @@ function EditListingPage() {
           )}
         </section>
 
-        <section className="grid gap-4 md:grid-cols-[160px_1fr]">
-          <div className="space-y-2">
-            <Label htmlFor="postal_code">Postnummer</Label>
-            <Input
-              id="postal_code"
-              inputMode="numeric"
-              maxLength={4}
-              {...register("postal_code")}
-            />
-            {errors.postal_code && (
-              <p className="text-sm text-destructive">{errors.postal_code.message}</p>
-            )}
+        <section className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-[160px_1fr]">
+            <div className="space-y-2">
+              <Label htmlFor="postal_code">Postnummer</Label>
+              <Input
+                id="postal_code"
+                inputMode="numeric"
+                maxLength={4}
+                {...register("postal_code", {
+                  onChange: () => {
+                    lastEdited.current = "postal_code";
+                    markerMoved.current = false;
+                  },
+                })}
+              />
+              {errors.postal_code && (
+                <p className="text-sm text-destructive">{errors.postal_code.message}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="city">Sted</Label>
+              <Input
+                id="city"
+                {...register("city", {
+                  onChange: () => {
+                    lastEdited.current = "city";
+                    markerMoved.current = false;
+                  },
+                })}
+              />
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="city">Sted</Label>
-            <Input id="city" {...register("city")} />
-          </div>
+          {coords && (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Dra markøren for å justere hvor området vises på annonsen.
+              </p>
+              <ListingLocationPicker
+                lat={coords.lat}
+                lng={coords.lng}
+                onChange={(next) => {
+                  markerMoved.current = true;
+                  lastEdited.current = "map";
+                  setCoords(next);
+                }}
+              />
+            </div>
+          )}
         </section>
+
 
         <div className="flex items-center justify-end gap-3 border-t border-border pt-6">
           <Button

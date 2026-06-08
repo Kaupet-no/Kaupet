@@ -133,6 +133,39 @@ npx cap sync
 
 ---
 
+## App-ikon og splash screen
+
+Master-grafikken ligger i `resources/`:
+
+- `resources/icon-only.png` — 1024×1024 app-ikon (grønn bakgrunn + `k.`-logo)
+- `resources/splash.png` — 2732×2732 splash for lys modus
+- `resources/splash-dark.png` — 2732×2732 splash for mørk modus
+
+Etter endring av disse, regenerer alle native-størrelser:
+
+```
+bun run generate:assets
+npx cap sync
+```
+
+Dette produserer automatisk:
+
+- **iOS**: `ios/App/App/Assets.xcassets/AppIcon.appiconset/` + `Splash.imageset/`
+- **Android**: `android/app/src/main/res/mipmap-*/` (adaptive ikoner) +
+  `drawable-*/splash.png`
+
+Fargene som brukes matcher merkevaren på `kaupet.no`:
+
+| Token        | Hex       | Bruk                                |
+| ------------ | --------- | ----------------------------------- |
+| Primary      | `#2f5d44` | Bokstaven `k`, ikon-bakgrunn        |
+| Accent       | `#d97a3c` | Punktum `.` i logoen                |
+| Cream        | `#fbf9f3` | Splash-bakgrunn (lys), `k` på ikon  |
+| Dark green   | `#1d2a22` | Splash-bakgrunn (mørk modus)        |
+
+---
+
+
 ## Vanlige feil
 
 **Android: `SDK location not found`**

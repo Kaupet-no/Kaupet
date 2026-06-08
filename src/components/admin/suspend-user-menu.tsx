@@ -26,10 +26,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useIsAdmin } from "@/lib/use-is-admin";
 import {
-import { formatErrorMessage } from "@/lib/errors";
   adminBanUser,
   adminSuspendUser,
 } from "@/lib/admin-moderation.functions";
+import { formatErrorMessage } from "@/lib/errors";
 
 export function AdminUserActions({
   userId,

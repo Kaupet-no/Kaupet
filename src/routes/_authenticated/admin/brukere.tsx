@@ -18,7 +18,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-import { formatErrorMessage } from "@/lib/errors";
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -28,6 +27,7 @@ import { formatErrorMessage } from "@/lib/errors";
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { formatErrorMessage } from "@/lib/errors";
 
 export const Route = createFileRoute("/_authenticated/admin/brukere")({
   head: () => ({ meta: [{ title: "Brukeradministrasjon — Kaupet.no" }] }),

@@ -25,7 +25,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-import { formatErrorMessage } from "@/lib/errors";
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -35,6 +34,7 @@ import { formatErrorMessage } from "@/lib/errors";
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { formatErrorMessage } from "@/lib/errors";
 
 export const Route = createFileRoute("/_authenticated/admin/kategorier")({
   head: () => ({ meta: [{ title: "Kategoriadministrasjon — Kaupet.no" }] }),

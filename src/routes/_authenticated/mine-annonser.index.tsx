@@ -73,6 +73,20 @@ const STATUS_LABEL: Record<Row["status"], string> = {
 function MyListingsPage() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<"all" | "active" | "sold" | "draft">("all");
+  const [promoteId, setPromoteId] = useState<string | null>(null);
+
+  const fetchPromos = useServerFn(getMyActivePromotions);
+  const { data: promos } = useQuery({
+    queryKey: ["my-promotions"],
+    queryFn: () => fetchPromos(),
+  });
+  const activePromoByListing = new Map<string, { expires_at: string | null; is_gift: boolean }>();
+  for (const p of promos ?? []) {
+    if ((p.status === "active" || p.status === "gifted") && p.expires_at && new Date(p.expires_at) > new Date()) {
+      activePromoByListing.set(p.listing_id, { expires_at: p.expires_at, is_gift: p.is_gift });
+    }
+  }
+
 
   const { data: rows, isLoading } = useQuery({
     queryKey: ["my-listings"],

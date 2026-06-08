@@ -1,4 +1,4 @@
-import { createFileRoute, Link, notFound, useNavigate, useRouter, useSearch } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, useNavigate, useRouter } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { ArrowLeft, MapPin, MessageCircle, User as UserIcon, Pencil, Eye, Users, Heart, Info, ChevronDown, Share2, Sparkles } from "lucide-react";

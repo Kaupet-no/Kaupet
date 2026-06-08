@@ -50,8 +50,7 @@ function FavoritesPage() {
         const imgs = (l.listing_images ?? [])
           .slice()
           .sort(
-            (a: { sort_order: number }, b: { sort_order: number }) =>
-              a.sort_order - b.sort_order,
+            (a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order,
           );
         return {
           kind: "available",
@@ -92,9 +91,7 @@ function FavoritesPage() {
         <Heart className="size-6 text-accent" />
         <h1 className="font-display text-3xl tracking-tight">Mine favoritter</h1>
       </div>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Annonser du har lagret for senere.
-      </p>
+      <p className="mt-1 text-sm text-muted-foreground">Annonser du har lagret for senere.</p>
 
       <div className="mt-8">
         {isLoading ? (

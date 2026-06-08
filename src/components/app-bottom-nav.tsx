@@ -35,11 +35,7 @@ export function AppBottomNav() {
     >
       <div className="pointer-events-auto mx-auto flex max-w-md items-end justify-around gap-1 rounded-3xl border border-border bg-background/95 px-3 pb-3 pt-3 shadow-xl backdrop-blur">
         {/* Hjem */}
-        <Link
-          to="/"
-          className="flex flex-1 flex-col items-center gap-0.5"
-          aria-label="Hjem"
-        >
+        <Link to="/" className="flex flex-1 flex-col items-center gap-0.5" aria-label="Hjem">
           <span className="flex h-11 w-11 items-center justify-center">
             {isActive("/") && pathname === "/" ? (
               <span className="font-display text-2xl font-semibold leading-none text-primary">
@@ -130,9 +126,7 @@ export function AppBottomNav() {
               <LogIn className="size-6" />
             </Link>
           )}
-          <span className="text-[11px] text-muted-foreground">
-            {user ? "Meg" : "Logg inn"}
-          </span>
+          <span className="text-[11px] text-muted-foreground">{user ? "Meg" : "Logg inn"}</span>
         </div>
       </div>
     </nav>
@@ -183,9 +177,7 @@ function UserSheet({
           className="flex h-10 w-10 items-center justify-center"
         >
           <Avatar className="size-8">
-            {profile?.avatar_url && (
-              <AvatarImage src={profile.avatar_url} alt={displayName} />
-            )}
+            {profile?.avatar_url && <AvatarImage src={profile.avatar_url} alt={displayName} />}
             <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
               {initials(profile?.display_name, email ?? "")}
             </AvatarFallback>
@@ -196,9 +188,7 @@ function UserSheet({
         <SheetHeader className="text-left">
           <SheetTitle className="flex items-center gap-3">
             <Avatar className="size-10">
-              {profile?.avatar_url && (
-                <AvatarImage src={profile.avatar_url} alt={displayName} />
-              )}
+              {profile?.avatar_url && <AvatarImage src={profile.avatar_url} alt={displayName} />}
               <AvatarFallback className="bg-primary/10 text-sm font-medium text-primary">
                 {initials(profile?.display_name, email ?? "")}
               </AvatarFallback>
@@ -206,9 +196,7 @@ function UserSheet({
             <span className="flex flex-col">
               <span className="text-base">{displayName}</span>
               {email && (
-                <span className="truncate text-xs font-normal text-muted-foreground">
-                  {email}
-                </span>
+                <span className="truncate text-xs font-normal text-muted-foreground">{email}</span>
               )}
             </span>
           </SheetTitle>
@@ -220,12 +208,8 @@ function UserSheet({
           <SheetItem onClick={() => go(() => navigate({ to: "/favoritter" }))}>
             Favoritter
           </SheetItem>
-          <SheetItem onClick={() => go(() => navigate({ to: "/mine-sok" }))}>
-            Mine søk
-          </SheetItem>
-          <SheetItem onClick={() => go(() => navigate({ to: "/profil" }))}>
-            Min profil
-          </SheetItem>
+          <SheetItem onClick={() => go(() => navigate({ to: "/mine-sok" }))}>Mine søk</SheetItem>
+          <SheetItem onClick={() => go(() => navigate({ to: "/profil" }))}>Min profil</SheetItem>
           <SheetItem
             onClick={() => go(() => navigate({ to: "/profil", search: { tab: "konto" } }))}
           >

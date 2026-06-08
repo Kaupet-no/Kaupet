@@ -267,9 +267,7 @@ function StatCard({
             <div className="text-2xl font-semibold tabular-nums">
               {value !== undefined ? Number(value).toLocaleString("nb-NO") : "—"}
             </div>
-            {subValue && (
-              <div className="mt-1 text-xs text-muted-foreground">{subValue}</div>
-            )}
+            {subValue && <div className="mt-1 text-xs text-muted-foreground">{subValue}</div>}
           </>
         )}
       </CardContent>

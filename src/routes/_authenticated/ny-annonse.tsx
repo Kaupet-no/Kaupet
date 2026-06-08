@@ -9,7 +9,12 @@ import { Loader2 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { uploadListingImage } from "@/lib/storage";
-import { geocodeNorwayAddress, lookupPostalCode, lookupCity, reverseGeocodeAddress } from "@/lib/geocode";
+import {
+  geocodeNorwayAddress,
+  lookupPostalCode,
+  lookupCity,
+  reverseGeocodeAddress,
+} from "@/lib/geocode";
 import { ImageUploader, type PendingImage } from "@/components/image-uploader";
 import { ListingLocationPicker } from "@/components/listing-location-picker";
 import { PromoteListingDialog } from "@/components/promote-listing-dialog";
@@ -37,11 +42,7 @@ const CONDITIONS = [
 
 const listingSchema = z
   .object({
-    title: z
-      .string()
-      .trim()
-      .min(5, "Tittelen må være minst 5 tegn")
-      .max(120, "Maks 120 tegn"),
+    title: z.string().trim().min(5, "Tittelen må være minst 5 tegn").max(120, "Maks 120 tegn"),
     description: z
       .string()
       .trim()
@@ -50,9 +51,7 @@ const listingSchema = z
     category_id: z.string().uuid("Velg en kategori"),
     condition: z.enum(["new", "like_new", "good", "acceptable", "for_parts"]),
     is_free: z.boolean(),
-    price_nok: z
-      .union([z.coerce.number().int().min(0).max(10_000_000), z.literal("")])
-      .optional(),
+    price_nok: z.union([z.coerce.number().int().min(0).max(10_000_000), z.literal("")]).optional(),
     postal_code: z
       .string()
       .trim()
@@ -98,9 +97,7 @@ function NewListingPage() {
 
   const parentCategories = (categories ?? []).filter((c) => !c.parent_id);
   const [selectedParentId, setSelectedParentId] = useState<string>("");
-  const subcategories = (categories ?? []).filter(
-    (c) => c.parent_id === selectedParentId,
-  );
+  const subcategories = (categories ?? []).filter((c) => c.parent_id === selectedParentId);
 
   const {
     register,
@@ -175,7 +172,6 @@ function NewListingPage() {
       }
     }, 300);
     return () => window.clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coords, setValue]);
 
   const mutation = useMutation({
@@ -260,10 +256,7 @@ function NewListingPage() {
         Det er gratis å legge ut annonser. Fyll inn det viktigste — du kan redigere senere.
       </p>
 
-      <form
-        onSubmit={handleSubmit((v) => mutation.mutate(v))}
-        className="mt-8 space-y-8"
-      >
+      <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="mt-8 space-y-8">
         {/* Images */}
         <section className="space-y-2">
           <Label>Bilder</Label>
@@ -278,9 +271,7 @@ function NewListingPage() {
             placeholder="F.eks. Stokke Tripp Trapp barnestol — eik"
             {...register("title")}
           />
-          {errors.title && (
-            <p className="text-sm text-destructive">{errors.title.message}</p>
-          )}
+          {errors.title && <p className="text-sm text-destructive">{errors.title.message}</p>}
         </section>
 
         {/* Description */}
@@ -381,17 +372,12 @@ function NewListingPage() {
               {...register("price_nok")}
             />
             <label className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={isFree}
-                onCheckedChange={(v) => setValue("is_free", Boolean(v))}
-              />
+              <Checkbox checked={isFree} onCheckedChange={(v) => setValue("is_free", Boolean(v))} />
               Gis bort gratis
             </label>
           </div>
           {errors.price_nok && (
-            <p className="text-sm text-destructive">
-              {errors.price_nok.message as string}
-            </p>
+            <p className="text-sm text-destructive">{errors.price_nok.message as string}</p>
           )}
         </section>
 

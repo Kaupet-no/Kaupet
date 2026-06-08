@@ -19,9 +19,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
         const secret = getVippsWebhookSecret();
         if (secret) {
           const sigHeader =
-            request.headers.get("x-ms-signature") ??
-            request.headers.get("authorization") ??
-            "";
+            request.headers.get("x-ms-signature") ?? request.headers.get("authorization") ?? "";
           const expected = createHmac("sha256", secret).update(raw).digest("base64");
           const sigBuf = Buffer.from(sigHeader);
           const expBuf = Buffer.from(expected);
@@ -30,17 +28,25 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
           }
         }
 
-        let payload: any;
+        let payload: Record<string, unknown>;
         try {
-          payload = JSON.parse(raw);
+          payload = JSON.parse(raw) as Record<string, unknown>;
         } catch {
           return new Response("Invalid JSON", { status: 400 });
         }
 
-        const reference: string | undefined = payload?.reference;
-        const eventName: string | undefined = payload?.name ?? payload?.eventName;
+        const reference = typeof payload?.reference === "string" ? payload.reference : undefined;
+        const eventName =
+          typeof payload?.name === "string"
+            ? payload.name
+            : typeof payload?.eventName === "string"
+              ? payload.eventName
+              : undefined;
+        const eventIdRaw = payload?.eventId ?? payload?.id;
         const eventId: string =
-          payload?.eventId ?? payload?.id ?? `${reference ?? "noref"}-${eventName ?? "evt"}-${Date.now()}`;
+          typeof eventIdRaw === "string"
+            ? eventIdRaw
+            : `${reference ?? "noref"}-${eventName ?? "evt"}-${Date.now()}`;
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -58,7 +64,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
             event_id: eventId,
             reference: reference ?? null,
             event_name: eventName ?? null,
-            payload,
+            payload: payload as never,
           });
         }
 

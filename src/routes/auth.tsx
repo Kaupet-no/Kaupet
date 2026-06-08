@@ -11,7 +11,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { isNative } from "@/lib/native";
 import { formatErrorMessage } from "@/lib/errors";
 
-
 const TERMS_VERSION = "1.0";
 
 const searchSchema = z.object({
@@ -77,7 +76,7 @@ function AuthPage() {
         toast.success("Velkommen tilbake!");
         navigate({ to: "/", replace: true });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error(formatErrorMessage(err, "Noe gikk galt. Prøv igjen."));
     } finally {
       setLoading(false);
@@ -140,18 +139,30 @@ function AuthPage() {
               />
               <span>
                 Jeg har lest og godtar{" "}
-                <Link to="/vilkar" target="_blank" className="underline text-foreground hover:text-primary">
+                <Link
+                  to="/vilkar"
+                  target="_blank"
+                  className="underline text-foreground hover:text-primary"
+                >
                   brukervilkårene
                 </Link>{" "}
                 og{" "}
-                <Link to="/personvern" target="_blank" className="underline text-foreground hover:text-primary">
+                <Link
+                  to="/personvern"
+                  target="_blank"
+                  className="underline text-foreground hover:text-primary"
+                >
                   personvernerklæringen
                 </Link>
                 .
               </span>
             </label>
           )}
-          <Button type="submit" className="w-full" disabled={loading || (isSignUp && !acceptedTerms)}>
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={loading || (isSignUp && !acceptedTerms)}
+          >
             {loading ? "Vent litt…" : isSignUp ? "Opprett konto" : "Logg inn"}
           </Button>
         </form>
@@ -169,7 +180,9 @@ function AuthPage() {
       </div>
 
       <p className="mt-6 text-center text-xs text-muted-foreground">
-        <Link to="/" className="hover:underline">← Tilbake til forsiden</Link>
+        <Link to="/" className="hover:underline">
+          ← Tilbake til forsiden
+        </Link>
       </p>
     </div>
   );

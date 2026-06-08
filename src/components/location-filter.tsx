@@ -6,7 +6,6 @@ import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 import { getCurrentPosition } from "@/lib/native";
 
-
 export type LocationValue = {
   lat: number | null;
   lng: number | null;
@@ -98,7 +97,6 @@ export function LocationPicker({ value, onChange, onDone }: LocationPickerProps)
     }
   };
 
-
   const clear = () => {
     onChange({ lat: null, lng: null, radius: value.radius, label: "" });
     setQuery("");
@@ -164,7 +162,11 @@ type RadiusPickerProps = {
   onChange: (v: number) => void;
 };
 
-export function RadiusPicker({ value, onChange, disabled }: RadiusPickerProps & { disabled?: boolean }) {
+export function RadiusPicker({
+  value,
+  onChange,
+  disabled,
+}: RadiusPickerProps & { disabled?: boolean }) {
   return (
     <div className={`w-[260px] space-y-3 p-2 ${disabled ? "opacity-50" : ""}`}>
       <div className="flex items-baseline justify-between">

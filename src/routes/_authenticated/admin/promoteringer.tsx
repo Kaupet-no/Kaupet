@@ -175,24 +175,34 @@ function AdminPromotionsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 (promosQ.data ?? []).map((p: any) => (
                   <TableRow key={p.id}>
                     <TableCell className="max-w-xs truncate font-medium">
-                      <a href={`/annonse/${p.listing_id}`} className="hover:underline" target="_blank" rel="noreferrer">
+                      <a
+                        href={`/annonse/${p.listing_id}`}
+                        className="hover:underline"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
                         {p.listings?.title ?? p.listing_id}
                       </a>
                     </TableCell>
                     <TableCell>{p.profiles?.display_name ?? "—"}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {p.starts_at ? new Date(p.starts_at).toLocaleDateString("nb-NO") : "—"} —{" "}
-                      {p.expires_at ? new Date(p.expires_at).toLocaleDateString("nb-NO") : "—"}{" "}
-                      ({p.duration_days} d)
+                      {p.expires_at ? new Date(p.expires_at).toLocaleDateString("nb-NO") : "—"} (
+                      {p.duration_days} d)
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {p.is_gift ? "Gratis" : `${p.price_nok} kr`}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={p.status === "active" || p.status === "gifted" ? "default" : "secondary"}>
+                      <Badge
+                        variant={
+                          p.status === "active" || p.status === "gifted" ? "default" : "secondary"
+                        }
+                      >
                         {p.status}
                       </Badge>
                     </TableCell>
@@ -243,6 +253,7 @@ function AdminPromotionsPage() {
                   ) : (giftSearchQ.data ?? []).length === 0 ? (
                     <div className="p-3 text-sm text-muted-foreground">Ingen treff</div>
                   ) : (
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     (giftSearchQ.data ?? []).map((l: any) => (
                       <button
                         key={l.id}
@@ -252,7 +263,8 @@ function AdminPromotionsPage() {
                       >
                         <span className="font-medium">{l.title}</span>{" "}
                         <span className="text-xs text-muted-foreground">
-                          — {l.profiles?.display_name ?? "?"}{l.city ? `, ${l.city}` : ""}
+                          — {l.profiles?.display_name ?? "?"}
+                          {l.city ? `, ${l.city}` : ""}
                         </span>
                       </button>
                     ))
@@ -268,7 +280,10 @@ function AdminPromotionsPage() {
 
             <div className="space-y-1.5">
               <Label>Varighet</Label>
-              <Select value={String(giftDays)} onValueChange={(v) => setGiftDays(Number(v) as 3 | 5)}>
+              <Select
+                value={String(giftDays)}
+                onValueChange={(v) => setGiftDays(Number(v) as 3 | 5)}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

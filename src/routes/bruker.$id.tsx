@@ -44,7 +44,9 @@ export const Route = createFileRoute("/bruker/$id")({
     <div className="mx-auto max-w-2xl px-4 py-20 text-center">
       <h1 className="font-display text-2xl">Brukeren finnes ikke</h1>
       <Link to="/">
-        <Button className="mt-6" variant="outline">Til forsiden</Button>
+        <Button className="mt-6" variant="outline">
+          Til forsiden
+        </Button>
       </Link>
     </div>
   ),
@@ -73,10 +75,20 @@ function PublicProfilePage() {
         .order("created_at", { ascending: false })
         .limit(24);
       if (error) throw error;
-      return (data ?? []).map((l: any) => {
+      type ListingImage = { storage_path: string; sort_order: number };
+      type ListingRow = {
+        id: string;
+        title: string;
+        price_nok: number | null;
+        is_free: boolean;
+        city: string | null;
+        created_at: string;
+        listing_images: ListingImage[] | null;
+      };
+      return (data ?? []).map((l: ListingRow) => {
         const imgs = (l.listing_images ?? [])
           .slice()
-          .sort((a: any, b: any) => a.sort_order - b.sort_order);
+          .sort((a: ListingImage, b: ListingImage) => a.sort_order - b.sort_order);
         return {
           id: l.id,
           title: l.title,
@@ -99,7 +111,9 @@ function PublicProfilePage() {
     <div className="mx-auto max-w-4xl px-4 py-10">
       <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-center">
         <Avatar className="size-24">
-          {profile.avatar_url && <AvatarImage src={profile.avatar_url} alt={profile.display_name} />}
+          {profile.avatar_url && (
+            <AvatarImage src={profile.avatar_url} alt={profile.display_name} />
+          )}
           <AvatarFallback className="bg-primary/10 text-2xl font-medium text-primary">
             {profile.display_name?.slice(0, 2).toUpperCase() || "?"}
           </AvatarFallback>
@@ -168,7 +182,11 @@ function PublicProfilePage() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">
                       {r.reviewer?.id ? (
-                        <Link to="/bruker/$id" params={{ id: r.reviewer.id }} className="hover:underline">
+                        <Link
+                          to="/bruker/$id"
+                          params={{ id: r.reviewer.id }}
+                          className="hover:underline"
+                        >
                           {r.reviewer.display_name ?? "Ukjent bruker"}
                         </Link>
                       ) : (
@@ -187,7 +205,11 @@ function PublicProfilePage() {
                       {r.listing && (
                         <>
                           {" · "}
-                          <Link to="/annonse/$id" params={{ id: r.listing.id }} className="hover:underline">
+                          <Link
+                            to="/annonse/$id"
+                            params={{ id: r.listing.id }}
+                            className="hover:underline"
+                          >
                             {r.listing.title}
                           </Link>
                         </>

@@ -25,15 +25,12 @@ export function ModerationBanner() {
             <p className="text-destructive/90">
               {data.ban_reason
                 ? `Begrunnelse: ${data.ban_reason}`
-                : "Du kan ikke opprette annonser, samtaler eller meldinger."}
-              {" "}Ta kontakt på{" "}
-              <a
-                href="mailto:andreas@happypixel.no"
-                className="underline underline-offset-2"
-              >
+                : "Du kan ikke opprette annonser, samtaler eller meldinger."}{" "}
+              Ta kontakt på{" "}
+              <a href="mailto:andreas@happypixel.no" className="underline underline-offset-2">
                 andreas@happypixel.no
-              </a>
-              {" "}hvis du mener dette er en feil.
+              </a>{" "}
+              hvis du mener dette er en feil.
             </p>
           </div>
         </div>
@@ -50,13 +47,8 @@ export function ModerationBanner() {
             <p className="font-medium">Kontoen din er midlertidig svartelistet</p>
             <p>
               Du kan ikke opprette nye annonser eller sende meldinger frem til{" "}
-              <span className="font-medium">
-                {formatDate(data.suspension_expires_at)}
-              </span>
-              .
-              {data.suspension_reason
-                ? ` Begrunnelse: ${data.suspension_reason}`
-                : ""}
+              <span className="font-medium">{formatDate(data.suspension_expires_at)}</span>.
+              {data.suspension_reason ? ` Begrunnelse: ${data.suspension_reason}` : ""}
             </p>
           </div>
         </div>

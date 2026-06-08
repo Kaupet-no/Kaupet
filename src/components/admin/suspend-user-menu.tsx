@@ -25,19 +25,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useIsAdmin } from "@/lib/use-is-admin";
-import {
-  adminBanUser,
-  adminSuspendUser,
-} from "@/lib/admin-moderation.functions";
+import { adminBanUser, adminSuspendUser } from "@/lib/admin-moderation.functions";
 import { formatErrorMessage } from "@/lib/errors";
 
-export function AdminUserActions({
-  userId,
-  displayName,
-}: {
-  userId: string;
-  displayName: string;
-}) {
+export function AdminUserActions({ userId, displayName }: { userId: string; displayName: string }) {
   const { data: isAdmin } = useIsAdmin();
   const qc = useQueryClient();
   const [open, setOpen] = useState<null | "suspend" | "ban">(null);
@@ -48,8 +39,7 @@ export function AdminUserActions({
   const banFn = useServerFn(adminBanUser);
 
   const suspendMut = useMutation({
-    mutationFn: () =>
-      suspendFn({ data: { userId, reason: reason.trim(), days } }),
+    mutationFn: () => suspendFn({ data: { userId, reason: reason.trim(), days } }),
     onSuccess: () => {
       toast.success(`${displayName} er svartelistet i ${days} dager`);
       setOpen(null);
@@ -95,7 +85,15 @@ export function AdminUserActions({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Dialog open={open !== null} onOpenChange={(o) => { if (!o) { setOpen(null); setReason(""); } }}>
+      <Dialog
+        open={open !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setOpen(null);
+            setReason("");
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
@@ -133,14 +131,12 @@ export function AdminUserActions({
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(null)}>Avbryt</Button>
+            <Button variant="outline" onClick={() => setOpen(null)}>
+              Avbryt
+            </Button>
             <Button
               variant="destructive"
-              disabled={
-                reason.trim().length === 0 ||
-                suspendMut.isPending ||
-                banMut.isPending
-              }
+              disabled={reason.trim().length === 0 || suspendMut.isPending || banMut.isPending}
               onClick={() => (open === "ban" ? banMut.mutate() : suspendMut.mutate())}
             >
               {(suspendMut.isPending || banMut.isPending) && (

@@ -10,10 +10,7 @@ export type ImageValidationError =
   | { kind: "too-large"; name: string; bytes: number }
   | { kind: "bad-type"; name: string; type: string };
 
-export function validateImages(
-  files: File[],
-  existingCount = 0,
-): ImageValidationError | null {
+export function validateImages(files: File[], existingCount = 0): ImageValidationError | null {
   if (files.length + existingCount > MAX_IMAGES) {
     return { kind: "too-many", allowed: MAX_IMAGES };
   }
@@ -33,9 +30,7 @@ export function describeImageError(err: ImageValidationError): string {
     case "too-many":
       return `Du kan laste opp maks ${err.allowed} bilder per annonse.`;
     case "too-large":
-      return `"${err.name}" er for stor (maks ${Math.round(
-        MAX_FILE_BYTES / 1024 / 1024,
-      )} MB).`;
+      return `"${err.name}" er for stor (maks ${Math.round(MAX_FILE_BYTES / 1024 / 1024)} MB).`;
     case "bad-type":
       return `"${err.name}" har ikke et støttet format (${err.type}). Bruk JPG, PNG eller WebP.`;
   }
@@ -56,13 +51,11 @@ export async function uploadListingImage(opts: {
 }): Promise<string> {
   const ext = extFromMime(opts.file.type);
   const path = `${opts.userId}/${opts.listingId}/${Date.now()}-${opts.index}.${ext}`;
-  const { error } = await supabase.storage
-    .from(LISTING_BUCKET)
-    .upload(path, opts.file, {
-      contentType: opts.file.type,
-      cacheControl: "31536000",
-      upsert: false,
-    });
+  const { error } = await supabase.storage.from(LISTING_BUCKET).upload(path, opts.file, {
+    contentType: opts.file.type,
+    cacheControl: "31536000",
+    upsert: false,
+  });
   if (error) throw error;
   return path;
 }

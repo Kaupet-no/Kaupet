@@ -85,9 +85,7 @@ export const createReview = createServerFn({ method: "POST" })
 
 export const getMyReviewForListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z.object({ listingId: z.string().uuid() }).parse(input),
-  )
+  .inputValidator((input: unknown) => z.object({ listingId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { data: row, error } = await supabase
@@ -101,9 +99,7 @@ export const getMyReviewForListing = createServerFn({ method: "POST" })
   });
 
 export const getPublicProfile = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) =>
-    z.object({ userId: z.string().uuid() }).parse(input),
-  )
+  .inputValidator((input: unknown) => z.object({ userId: z.string().uuid() }).parse(input))
   .handler(async ({ data }): Promise<PublicProfile | null> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: profile, error } = await supabaseAdmin
@@ -168,7 +164,10 @@ export const listUserReviews = createServerFn({ method: "POST" })
       const ids = Array.from(new Set((plain ?? []).map((r) => r.reviewer_id)));
       const listingIds = Array.from(new Set((plain ?? []).map((r) => r.listing_id)));
       const [{ data: profs }, { data: listings }] = await Promise.all([
-        supabaseAdmin.from("profiles").select("id, display_name, avatar_url, deleted_at").in("id", ids),
+        supabaseAdmin
+          .from("profiles")
+          .select("id, display_name, avatar_url, deleted_at")
+          .in("id", ids),
         supabaseAdmin.from("listings").select("id, title").in("id", listingIds),
       ]);
       const pmap = new Map((profs ?? []).map((p) => [p.id, p]));
@@ -190,6 +189,7 @@ export const listUserReviews = createServerFn({ method: "POST" })
       });
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (rows ?? []).map((r: any) => {
       const reviewer = Array.isArray(r.reviewer) ? r.reviewer[0] : r.reviewer;
       const listing = Array.isArray(r.listing) ? r.listing[0] : r.listing;

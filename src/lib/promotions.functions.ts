@@ -88,7 +88,10 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
       const result = await createVippsPayment({
         reference,
         amountNok: pricing.price_nok,
-        description: `Fremheving av annonse ${data.duration_days} dager — ${listing.title}`.slice(0, 95),
+        description: `Fremheving av annonse ${data.duration_days} dager — ${listing.title}`.slice(
+          0,
+          95,
+        ),
         returnUrl,
         idempotencyKey: promo.id,
       });
@@ -110,9 +113,7 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
 
 export const getPromotionStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z.object({ promotion_id: z.string().uuid() }).parse(input),
-  )
+  .inputValidator((input: unknown) => z.object({ promotion_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { data: promo, error } = await supabase

@@ -1,15 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Camera, ImagePlus, X, GripVertical } from "lucide-react";
 import { toast } from "sonner";
-import {
-  MAX_IMAGES,
-  describeImageError,
-  validateImages,
-} from "@/lib/storage";
+import { MAX_IMAGES, describeImageError, validateImages } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { isNative, pickNativePhoto } from "@/lib/native";
 import { formatErrorMessage } from "@/lib/errors";
-
 
 export type PendingImage = {
   id: string;
@@ -130,7 +125,7 @@ export function ImageUploader({
               try {
                 const file = await pickNativePhoto();
                 if (file) addFiles([file]);
-              } catch (e: any) {
+              } catch (e: unknown) {
                 toast.error(formatErrorMessage(e, "Kunne ikke åpne kameraet"));
               }
             }}
@@ -140,7 +135,6 @@ export function ImageUploader({
           </Button>
         )}
       </div>
-
 
       {images.length > 0 && (
         <>
@@ -155,7 +149,11 @@ export function ImageUploader({
               >
                 <img
                   src={img.previewUrl}
-                  alt={idx === 0 ? `Hovedbilde av annonsen (${img.file.name})` : `Bilde ${idx + 1} av annonsen (${img.file.name})`}
+                  alt={
+                    idx === 0
+                      ? `Hovedbilde av annonsen (${img.file.name})`
+                      : `Bilde ${idx + 1} av annonsen (${img.file.name})`
+                  }
                   className="size-full object-cover"
                 />
                 {idx === 0 && (

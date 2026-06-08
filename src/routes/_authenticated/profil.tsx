@@ -34,14 +34,9 @@ import {
   subscribe as subscribePush,
   unsubscribeThisDevice,
 } from "@/lib/push";
-import {
-  getNotificationPreferences,
-  updateNotificationPreferences,
-} from "@/lib/push.functions";
+import { getNotificationPreferences, updateNotificationPreferences } from "@/lib/push.functions";
 import { listMyBlocks, deleteBlock } from "@/lib/blocks.functions";
 import { formatErrorMessage } from "@/lib/errors";
-
-
 
 const profileSchema = z.object({
   display_name: z.string().trim().min(2, "Minst 2 tegn").max(80),
@@ -74,10 +69,7 @@ export const Route = createFileRoute("/_authenticated/profil")({
   validateSearch: (search: Record<string, unknown>) => {
     const t = search.tab as string;
     return {
-      tab:
-        t === "konto" || t === "varslinger" || t === "blokkerte"
-          ? t
-          : "profil",
+      tab: t === "konto" || t === "varslinger" || t === "blokkerte" ? t : "profil",
     };
   },
   component: ProfilePage,
@@ -86,7 +78,6 @@ export const Route = createFileRoute("/_authenticated/profil")({
 function ProfilePage() {
   const { tab } = Route.useSearch();
   const navigate = Route.useNavigate();
-
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">
@@ -133,7 +124,6 @@ function ProfilePage() {
   );
 }
 
-
 function ProfileSection() {
   const queryClient = useQueryClient();
   const { data: userData } = useQuery({
@@ -144,8 +134,6 @@ function ProfileSection() {
     },
   });
   const userId = userData?.id ?? null;
-  
-
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ["profile-edit", userId],
@@ -197,10 +185,7 @@ function ProfileSection() {
         avatar_url: parsed.avatar_url || null,
         display_name: parsed.display_name,
       };
-      const { error } = await supabase
-        .from("profiles")
-        .update(updates)
-        .eq("id", userId);
+      const { error } = await supabase.from("profiles").update(updates).eq("id", userId);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -374,9 +359,7 @@ function AccountSection() {
 
       <div className="rounded-xl border border-border bg-card p-6">
         <h2 className="text-lg font-medium">Logg ut</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Avslutt økten på denne enheten.
-        </p>
+        <p className="mt-1 text-sm text-muted-foreground">Avslutt økten på denne enheten.</p>
         <div className="mt-4 flex justify-end">
           <Button
             variant="outline"
@@ -404,8 +387,7 @@ function DeleteAccountSection({ currentEmail }: { currentEmail: string }) {
   const [submitting, setSubmitting] = useState(false);
 
   const canConfirm =
-    !!currentEmail &&
-    confirmation.trim().toLowerCase() === currentEmail.trim().toLowerCase();
+    !!currentEmail && confirmation.trim().toLowerCase() === currentEmail.trim().toLowerCase();
 
   async function handleDelete() {
     if (!canConfirm) return;
@@ -431,15 +413,20 @@ function DeleteAccountSection({ currentEmail }: { currentEmail: string }) {
     <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6">
       <h2 className="text-lg font-medium text-destructive">Slett konto</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Sletter kontoen din og dine personopplysninger. Annonsene dine fjernes helt.
-        Tidligere meldinger du har sendt vil fortsatt være synlige for mottakerne,
-        men avsendernavnet endres til «Slettet bruker».
-        Av sikkerhetshensyn settes kontoen først inaktiv i 7 dager. Logger du inn igjen
-        innen denne perioden, avbrytes slettingen automatisk. Etter 7 dager slettes
+        Sletter kontoen din og dine personopplysninger. Annonsene dine fjernes helt. Tidligere
+        meldinger du har sendt vil fortsatt være synlige for mottakerne, men avsendernavnet endres
+        til «Slettet bruker». Av sikkerhetshensyn settes kontoen først inaktiv i 7 dager. Logger du
+        inn igjen innen denne perioden, avbrytes slettingen automatisk. Etter 7 dager slettes
         kontoen permanent og kan ikke gjenopprettes.
       </p>
       <div className="mt-4 flex justify-end">
-        <AlertDialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setConfirmation(""); }}>
+        <AlertDialog
+          open={open}
+          onOpenChange={(v) => {
+            setOpen(v);
+            if (!v) setConfirmation("");
+          }}
+        >
           <AlertDialogTrigger asChild>
             <Button variant="destructive">
               <Trash2 className="size-4" /> Slett konto
@@ -451,18 +438,17 @@ function DeleteAccountSection({ currentEmail }: { currentEmail: string }) {
               <AlertDialogDescription asChild>
                 <div className="space-y-3 text-sm text-muted-foreground">
                   <p>
-                    Kontoen din blir satt inaktiv umiddelbart, og du logges ut. Alle dine
-                    annonser arkiveres og blir ikke lenger synlige for andre.
+                    Kontoen din blir satt inaktiv umiddelbart, og du logges ut. Alle dine annonser
+                    arkiveres og blir ikke lenger synlige for andre.
                   </p>
                   <p>
-                    Innen <strong>7 dager</strong> kan du gjenopprette kontoen ved å logge
-                    inn på nytt. Etter 7 dager slettes profilen din permanent — annonsene
-                    dine fjernes, men meldinger du har sendt blir værende hos mottakerne
-                    med avsendernavnet <em>«Slettet bruker»</em>.
+                    Innen <strong>7 dager</strong> kan du gjenopprette kontoen ved å logge inn på
+                    nytt. Etter 7 dager slettes profilen din permanent — annonsene dine fjernes, men
+                    meldinger du har sendt blir værende hos mottakerne med avsendernavnet{" "}
+                    <em>«Slettet bruker»</em>.
                   </p>
                   <p>
-                    Skriv inn e-postadressen din (<strong>{currentEmail}</strong>) for å
-                    bekrefte:
+                    Skriv inn e-postadressen din (<strong>{currentEmail}</strong>) for å bekrefte:
                   </p>
                 </div>
               </AlertDialogDescription>
@@ -504,8 +490,8 @@ function DeleteAccountSection({ currentEmail }: { currentEmail: string }) {
 function NotificationsSection() {
   const queryClient = useQueryClient();
   const supported = pushSupported();
-  const [permission, setPermission] = useState<NotificationPermission | "unsupported">(
-    () => getPermissionState(),
+  const [permission, setPermission] = useState<NotificationPermission | "unsupported">(() =>
+    getPermissionState(),
   );
   const [endpoint, setEndpoint] = useState<string | null>(null);
   const [busy, setBusy] = useState<null | "subscribe" | "unsubscribe">(null);
@@ -580,14 +566,14 @@ function NotificationsSection() {
           <div className="flex-1">
             <h2 className="text-lg font-medium">Push-varsler i nettleseren</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Få varsler om nye meldinger og treff i lagrede søk selv når Kaupet.no ikke
-              er åpen. På iPhone må du først legge til Kaupet.no på hjem-skjermen.
+              Få varsler om nye meldinger og treff i lagrede søk selv når Kaupet.no ikke er åpen. På
+              iPhone må du først legge til Kaupet.no på hjem-skjermen.
             </p>
 
             {!supported ? (
               <p className="mt-4 text-sm text-muted-foreground">
-                Push-varsler er ikke tilgjengelig i denne nettleseren eller i Lovable-forhåndsvisningen.
-                Åpne <strong>kaupet.no</strong> direkte for å aktivere.
+                Push-varsler er ikke tilgjengelig i denne nettleseren eller i
+                Lovable-forhåndsvisningen. Åpne <strong>kaupet.no</strong> direkte for å aktivere.
               </p>
             ) : permission === "denied" ? (
               <p className="mt-4 text-sm text-destructive">
@@ -597,11 +583,7 @@ function NotificationsSection() {
             ) : (
               <div className="mt-4 flex flex-wrap gap-2">
                 {endpoint ? (
-                  <Button
-                    variant="outline"
-                    onClick={handleUnsubscribe}
-                    disabled={busy !== null}
-                  >
+                  <Button variant="outline" onClick={handleUnsubscribe} disabled={busy !== null}>
                     {busy === "unsubscribe" && <Loader2 className="size-4 animate-spin" />}
                     Deaktiver på denne enheten
                   </Button>
@@ -736,8 +718,8 @@ function BlockedSection() {
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
-        Brukere og samtaler du har blokkert. Opphev blokkeringen for å kunne sende
-        og motta meldinger igjen.
+        Brukere og samtaler du har blokkert. Opphev blokkeringen for å kunne sende og motta
+        meldinger igjen.
       </p>
       <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
         {blocks.map((b) => (
@@ -750,9 +732,7 @@ function BlockedSection() {
                 />
               )}
               <AvatarFallback className="bg-muted text-xs">
-                {(b.blocked_profile?.display_name ?? "?")
-                  .slice(0, 2)
-                  .toUpperCase()}
+                {(b.blocked_profile?.display_name ?? "?").slice(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0 flex-1">
@@ -791,4 +771,3 @@ function BlockedSection() {
     </div>
   );
 }
-

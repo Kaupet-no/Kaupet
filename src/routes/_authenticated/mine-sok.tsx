@@ -49,8 +49,7 @@ function MineSokPage() {
 
   const searches = data ?? [];
   const hasActiveNotify = searches.some((s) => s.notify);
-  const showPushBanner =
-    hasActiveNotify && !push.loading && !push.savedSearchesActive;
+  const showPushBanner = hasActiveNotify && !push.loading && !push.savedSearchesActive;
 
   const enablePush = async () => {
     setEnablingPush(true);
@@ -132,20 +131,20 @@ function MineSokPage() {
           <div className="flex-1 space-y-2 text-sm">
             {!push.supported ? (
               <p className="text-muted-foreground">
-                Push-varsler er ikke tilgjengelig i denne nettleseren. Du vil ikke
-                få varsler her, men kan motta dem på andre enheter der du er logget inn.
+                Push-varsler er ikke tilgjengelig i denne nettleseren. Du vil ikke få varsler her,
+                men kan motta dem på andre enheter der du er logget inn.
               </p>
             ) : push.permission === "denied" ? (
               <p className="text-muted-foreground">
-                Du har blokkert varsler for kaupet.no. Endre tillatelsen i
-                nettleserinnstillingene for å motta varsler her.
+                Du har blokkert varsler for kaupet.no. Endre tillatelsen i nettleserinnstillingene
+                for å motta varsler her.
               </p>
             ) : !push.subscribedHere ? (
               <>
                 <p className="font-medium">Aktiver push-varsler for å motta treffene</p>
                 <p className="text-muted-foreground">
-                  Du har lagrede søk med varsling på, men push-varsler er ikke aktivert
-                  i nettleseren. Du vil ikke få beskjed når en ny annonse matcher.
+                  Du har lagrede søk med varsling på, men push-varsler er ikke aktivert i
+                  nettleseren. Du vil ikke få beskjed når en ny annonse matcher.
                 </p>
                 <Button size="sm" onClick={enablePush} disabled={enablingPush}>
                   {enablingPush && <Loader2 className="size-4 animate-spin" />}
@@ -178,7 +177,6 @@ function MineSokPage() {
       )}
 
       <div className="mt-8">
-
         {isLoading ? (
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, i) => (
@@ -204,10 +202,7 @@ function MineSokPage() {
         ) : (
           <ul className="space-y-3">
             {searches.map((s) => (
-              <li
-                key={s.id}
-                className="rounded-lg border border-border bg-card p-4 shadow-sm"
-              >
+              <li key={s.id} className="rounded-lg border border-border bg-card p-4 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <h3 className="font-medium">{s.name}</h3>

@@ -67,7 +67,6 @@ function ConversationErrorBoundary({ error, reset }: { error: Error; reset: () =
   );
 }
 
-
 type Message = {
   id: string;
   conversation_id: string;

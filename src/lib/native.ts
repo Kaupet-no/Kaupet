@@ -103,7 +103,12 @@ export async function shareContent(opts: {
     });
     return "native";
   }
-  const nav = typeof navigator !== "undefined" ? (navigator as Navigator & { share?: (d: { title?: string; text?: string; url: string }) => Promise<void> }) : null;
+  const nav =
+    typeof navigator !== "undefined"
+      ? (navigator as Navigator & {
+          share?: (d: { title?: string; text?: string; url: string }) => Promise<void>;
+        })
+      : null;
   if (nav && typeof nav.share === "function") {
     await nav.share({ title: opts.title, text: opts.text, url: opts.url });
     return "web";

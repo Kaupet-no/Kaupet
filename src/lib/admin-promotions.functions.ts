@@ -15,15 +15,6 @@ async function requireAdmin(supabase: SupabaseClient<Database>, userId: string) 
   if (error) throw error;
   if (!data) throw new Error("Ikke autorisert");
 }
-  const { data, error } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", userId)
-    .eq("role", "admin")
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) throw new Error("Ikke autorisert");
-}
 
 export const adminListPromotionPricing = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

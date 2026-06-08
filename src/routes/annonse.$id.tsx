@@ -31,6 +31,10 @@ const CONDITION_LABEL: Record<string, string> = {
 };
 
 export const Route = createFileRoute("/annonse/$id")({
+  validateSearch: z.object({
+    promotion: z.string().optional(),
+    promo_id: z.string().optional(),
+  }),
   loader: async ({ params }) => {
     const { data, error } = await supabase
       .from("listings")

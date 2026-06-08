@@ -22,6 +22,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { formatErrorMessage } from "@/lib/errors";
 
 export const Route = createFileRoute("/_authenticated/mine-annonser/")({
   head: () => ({
@@ -128,7 +129,7 @@ function MyListingsPage() {
       queryClient.invalidateQueries({ queryKey: ["my-listings"] });
       toast.success("Status oppdatert");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke oppdatere status")),
   });
 
   const deleteListing = useMutation({
@@ -140,7 +141,7 @@ function MyListingsPage() {
       queryClient.invalidateQueries({ queryKey: ["my-listings"] });
       toast.success("Annonsen er slettet");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke slette annonsen")),
   });
 
   const doRepublish = useServerFn(republishListing);
@@ -152,7 +153,7 @@ function MyListingsPage() {
       queryClient.invalidateQueries({ queryKey: ["my-listings"] });
       toast.success("Annonsen er publisert på nytt i 30 nye dager");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke publisere annonsen på nytt")),
   });
 
   const filtered = (rows ?? []).filter((r) => {

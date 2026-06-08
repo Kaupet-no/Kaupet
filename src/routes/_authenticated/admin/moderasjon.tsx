@@ -43,6 +43,7 @@ import {
   adminBanIp,
   adminUnbanIp,
 } from "@/lib/admin-moderation.functions";
+import { formatErrorMessage } from "@/lib/errors";
 
 export const Route = createFileRoute("/_authenticated/admin/moderasjon")({
   head: () => ({ meta: [{ title: "Moderasjon — Kaupet.no" }] }),
@@ -102,7 +103,7 @@ function ListingsTab() {
       setReason("");
       qc.invalidateQueries({ queryKey: ["admin-listings"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke deaktivere annonsen")),
   });
   const enableMut = useMutation({
     mutationFn: (id: string) => enableFn({ data: { id } }),
@@ -110,7 +111,7 @@ function ListingsTab() {
       toast.success("Annonsen er aktivert");
       qc.invalidateQueries({ queryKey: ["admin-listings"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke aktivere annonsen")),
   });
 
   return (
@@ -270,7 +271,7 @@ function BansTab() {
       toast.success("Utestenging opphevet");
       qc.invalidateQueries({ queryKey: ["admin-bans"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke oppheve utestengingen")),
   });
   return (
     <Card>
@@ -333,7 +334,7 @@ function SuspensionsTab() {
       toast.success("Svarteliste opphevet");
       qc.invalidateQueries({ queryKey: ["admin-suspensions"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke oppheve svartelistingen")),
   });
   return (
     <Card>
@@ -411,7 +412,7 @@ function IpBansTab() {
       setIp(""); setReason(""); setExpiresAt("");
       qc.invalidateQueries({ queryKey: ["admin-ip-bans"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke sperre IP-adressen")),
   });
   const unban = useMutation({
     mutationFn: (id: string) => unbanFn({ data: { id } }),
@@ -419,7 +420,7 @@ function IpBansTab() {
       toast.success("IP-sperre opphevet");
       qc.invalidateQueries({ queryKey: ["admin-ip-bans"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke oppheve IP-sperren")),
   });
 
   return (

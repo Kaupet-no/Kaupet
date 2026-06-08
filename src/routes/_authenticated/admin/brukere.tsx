@@ -27,6 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { formatErrorMessage } from "@/lib/errors";
 
 export const Route = createFileRoute("/_authenticated/admin/brukere")({
   head: () => ({ meta: [{ title: "Brukeradministrasjon — Kaupet.no" }] }),
@@ -69,7 +70,7 @@ function AdminUsers() {
       qc.invalidateQueries({ queryKey: ["admin", "users"] });
       setPending(null);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke tildele administratorrollen")),
   });
 
   const revoke = useMutation({
@@ -82,7 +83,7 @@ function AdminUsers() {
       qc.invalidateQueries({ queryKey: ["admin", "users"] });
       setPending(null);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke fjerne administratorrollen")),
   });
 
   const exportData = useMutation({
@@ -104,7 +105,7 @@ function AdminUsers() {
       URL.revokeObjectURL(url);
     },
     onSuccess: () => toast.success("Brukerdata eksportert"),
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke eksportere brukerdata")),
   });
 
   return (

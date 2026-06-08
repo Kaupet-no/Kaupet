@@ -8,6 +8,7 @@ import {
 } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { isNative, pickNativePhoto } from "@/lib/native";
+import { formatErrorMessage } from "@/lib/errors";
 
 
 export type PendingImage = {
@@ -130,7 +131,7 @@ export function ImageUploader({
                 const file = await pickNativePhoto();
                 if (file) addFiles([file]);
               } catch (e: any) {
-                toast.error(e?.message ?? "Kunne ikke åpne kamera");
+                toast.error(formatErrorMessage(e, "Kunne ikke åpne kameraet"));
               }
             }}
             disabled={images.length >= MAX_IMAGES}

@@ -28,6 +28,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { formatErrorMessage } from "@/lib/errors";
 
 export const Route = createFileRoute("/_authenticated/meldinger/$id")({
   head: () => ({
@@ -274,7 +275,7 @@ function ConversationPage() {
       queryClient.invalidateQueries({ queryKey: ["conversation", id] });
       queryClient.invalidateQueries({ queryKey: ["my-conversations"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke bekrefte kjøper")),
   });
 
   const unconfirmMutation = useMutation({
@@ -285,7 +286,7 @@ function ConversationPage() {
       refetchSale();
       queryClient.invalidateQueries({ queryKey: ["conversation", id] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke angre salget")),
   });
 
   const iBlockedAll = !!(otherId && myBlocks?.some(
@@ -690,7 +691,7 @@ function ReviewForm({
     try {
       await onSubmit(rating, comment.trim());
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Kunne ikke sende vurderingen");
+      toast.error(formatErrorMessage(err, "Kunne ikke sende vurderingen"));
     } finally {
       setSubmitting(false);
     }

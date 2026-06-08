@@ -27,6 +27,7 @@ import {
   type SavedSearch,
   type SearchCriteria,
 } from "@/lib/saved-searches";
+import { formatErrorMessage } from "@/lib/errors";
 
 export const Route = createFileRoute("/_authenticated/mine-sok")({
   head: () => ({ meta: [{ title: "Mine søk — Kaupet.no" }] }),
@@ -57,7 +58,7 @@ function MineSokPage() {
       await push.enableOnThisDevice("saved_searches");
       toast.success("Push-varsler er aktivert på denne enheten");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Klarte ikke å aktivere varsler");
+      toast.error(formatErrorMessage(e, "Klarte ikke å aktivere varsler"));
     } finally {
       setEnablingPush(false);
     }

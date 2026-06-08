@@ -146,6 +146,70 @@ function EditListingPage() {
   const isFree = watch("is_free");
   const categoryId = watch("category_id");
   const condition = watch("condition");
+  const postalCode = watch("postal_code");
+  const city = watch("city");
+
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const lastEdited = useRef<"postal_code" | "city" | "map" | null>(null);
+  const markerMoved = useRef(false);
+  const coordsHydratedFor = useRef<string | null>(null);
+
+  // Initialize coords from existing listing
+  useEffect(() => {
+    if (!listing || coordsHydratedFor.current === listing.id) return;
+    coordsHydratedFor.current = listing.id;
+    if (
+      typeof listing.lat === "number" &&
+      typeof listing.lng === "number"
+    ) {
+      setCoords({ lat: listing.lat, lng: listing.lng });
+    }
+  }, [listing]);
+
+  // Auto-fill city from postal code
+  useEffect(() => {
+    if (lastEdited.current !== "postal_code") return;
+    const p = (postalCode ?? "").trim();
+    if (!/^\d{4}$/.test(p)) return;
+    const t = window.setTimeout(async () => {
+      const r = await lookupPostalCode(p);
+      if (!r) return;
+      if (r.city) setValue("city", r.city, { shouldValidate: false });
+      if (!markerMoved.current) setCoords({ lat: r.lat, lng: r.lng });
+    }, 500);
+    return () => window.clearTimeout(t);
+  }, [postalCode, setValue]);
+
+  // Auto-fill postal from city
+  useEffect(() => {
+    if (lastEdited.current !== "city") return;
+    const c = (city ?? "").trim();
+    if (c.length < 2) return;
+    const t = window.setTimeout(async () => {
+      const r = await lookupCity(c);
+      if (!r) return;
+      if (r.postal_code && !(postalCode ?? "").trim()) {
+        setValue("postal_code", r.postal_code, { shouldValidate: false });
+      }
+      if (!markerMoved.current) setCoords({ lat: r.lat, lng: r.lng });
+    }, 500);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [city, setValue]);
+
+  // Reverse-geocode map position back to city/postal
+  useEffect(() => {
+    if (lastEdited.current !== "map" || !coords) return;
+    const t = window.setTimeout(async () => {
+      const r = await reverseGeocodeAddress(coords);
+      if (r.city) setValue("city", r.city, { shouldValidate: false });
+      if (r.postal_code && /^\d{4}$/.test(r.postal_code)) {
+        setValue("postal_code", r.postal_code, { shouldValidate: false });
+      }
+    }, 300);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coords, setValue]);
 
   const parentCategories = (categories ?? []).filter((c) => !c.parent_id);
   const [selectedParentId, setSelectedParentId] = useState<string>("");

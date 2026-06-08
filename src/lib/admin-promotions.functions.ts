@@ -70,7 +70,11 @@ export const adminListPromotions = createServerFn({ method: "GET" })
       )
       .order("created_at", { ascending: false })
       .limit(200);
-    if (data.status) q = q.eq("status", data.status as string);
+    if (data.status)
+      q = q.eq(
+        "status",
+        data.status as "active" | "expired" | "failed" | "gifted" | "pending" | "refunded",
+      );
     const { data: rows, error } = await q;
     if (error) throw error;
     return rows ?? [];

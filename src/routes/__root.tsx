@@ -262,9 +262,6 @@ function RootComponent() {
                   </p>
                 </div>
               </div>
-              <p className="mt-4 text-center text-xs text-muted-foreground/70">
-                Kaupet.no forvaltes av Happy Pixel AS (org.nr. 933 197 867).
-              </p>
             </div>
           </footer>
         )}

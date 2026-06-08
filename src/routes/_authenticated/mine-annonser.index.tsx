@@ -226,6 +226,8 @@ function MyListingsPage() {
                 <ListingRow
                   key={r.id}
                   row={r}
+                  activePromotion={activePromoByListing.get(r.id) ?? null}
+                  onPromote={() => setPromoteId(r.id)}
                   onMarkSold={() => updateStatus.mutate({ id: r.id, status: "sold" })}
                   onReactivate={() => updateStatus.mutate({ id: r.id, status: "active" })}
                   onRepublish={() => republish.mutate(r.id)}
@@ -237,6 +239,14 @@ function MyListingsPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      {promoteId && (
+        <PromoteListingDialog
+          listingId={promoteId}
+          open={!!promoteId}
+          onOpenChange={(o) => !o && setPromoteId(null)}
+        />
+      )}
     </div>
   );
 }

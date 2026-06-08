@@ -2,7 +2,6 @@ import { useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
-  ArrowRight,
   Baby,
   Car,
   Dumbbell,
@@ -331,5 +330,3 @@ export function AppLanding() {
   );
 }
 
-// Re-export so __root.tsx can import without extra round-trips
-export { ArrowRight };

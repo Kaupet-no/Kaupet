@@ -229,40 +229,42 @@ function RootComponent() {
         </main>
         {!native && (
           <footer className="border-t border-border bg-surface">
-            <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:items-start sm:justify-between">
-              <div className="space-y-1">
-                <p>
-                  © {new Date().getFullYear()} Kaupet.no — Bygget med åpen kildekode,{" "}
-                  <a
-                    href="https://www.gnu.org/licenses/agpl-3.0.html"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline hover:text-foreground transition-colors"
-                  >
-                    AGPL-3.0
-                  </a>
-                  .
-                </p>
-                <p>
-                  Ved å bruke Kaupet.no godtar du våre{" "}
-                  <Link to="/vilkar" className="underline hover:text-foreground transition-colors">
-                    brukervilkår
-                  </Link>
-                  .
-                </p>
+            <div className="mx-auto max-w-6xl px-4 py-8 text-sm text-muted-foreground">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-1">
+                  <p>
+                    © {new Date().getFullYear()} Kaupet.no — Bygget med åpen kildekode,{" "}
+                    <a
+                      href="https://www.gnu.org/licenses/agpl-3.0.html"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-foreground transition-colors"
+                    >
+                      AGPL-3.0
+                    </a>
+                    .
+                  </p>
+                  <p>
+                    Ved å bruke Kaupet.no godtar du våre{" "}
+                    <Link to="/vilkar" className="underline hover:text-foreground transition-colors">
+                      brukervilkår
+                    </Link>
+                    .
+                  </p>
+                </div>
+                <div className="space-y-1 sm:max-w-xl sm:text-right">
+                  <p>
+                    Ditt personvern på internett er viktig. Kaupet.no benytter derfor ingen sporende informasjonskapsler eller tredjeparts analyseverktøy. Les vår{" "}
+                    <Link to="/personvern" className="underline hover:text-foreground transition-colors">
+                      personvernerklæring her
+                    </Link>
+                    .
+                  </p>
+                </div>
               </div>
-              <div className="space-y-1 sm:max-w-xl sm:text-right">
-                <p>
-                  Ditt personvern på internett er viktig. Kaupet.no benytter derfor ingen sporende informasjonskapsler eller tredjeparts analyseverktøy. Les vår{" "}
-                  <Link to="/personvern" className="underline hover:text-foreground transition-colors">
-                    personvernerklæring her
-                  </Link>
-                  .
-                </p>
-                <p className="text-xs text-muted-foreground/70">
-                  Kaupet.no forvaltes av Happy Pixel AS (org.nr. 933 197 867).
-                </p>
-              </div>
+              <p className="mt-4 text-center text-xs text-muted-foreground/70">
+                Kaupet.no forvaltes av Happy Pixel AS (org.nr. 933 197 867).
+              </p>
             </div>
           </footer>
         )}

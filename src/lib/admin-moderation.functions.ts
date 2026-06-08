@@ -3,7 +3,19 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-async function requireAdmin(supabase: any, userId: string) {
+type AdminClient = {
+  from: (table: string) => {
+    select: (cols: string) => {
+      eq: (col: string, val: string) => {
+        eq: (col: string, val: string) => {
+          maybeSingle: () => Promise<{ data: unknown; error: unknown }>;
+        };
+      };
+    };
+  };
+};
+
+async function requireAdmin(supabase: AdminClient, userId: string) {
   const { data, error } = await supabase
     .from("user_roles")
     .select("role")

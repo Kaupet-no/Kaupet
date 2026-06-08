@@ -125,7 +125,7 @@ export function ImageUploader({
               try {
                 const file = await pickNativePhoto();
                 if (file) addFiles([file]);
-              } catch (e: any) {
+              } catch (e: unknown) {
                 toast.error(formatErrorMessage(e, "Kunne ikke åpne kameraet"));
               }
             }}

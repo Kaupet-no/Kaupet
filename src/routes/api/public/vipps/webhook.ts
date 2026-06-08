@@ -28,15 +28,15 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
           }
         }
 
-        let payload: any;
+        let payload: Record<string, unknown>;
         try {
-          payload = JSON.parse(raw);
+          payload = JSON.parse(raw) as Record<string, unknown>;
         } catch {
           return new Response("Invalid JSON", { status: 400 });
         }
 
-        const reference: string | undefined = payload?.reference;
-        const eventName: string | undefined = payload?.name ?? payload?.eventName;
+        const reference = payload?.reference as string | undefined;
+        const eventName = (payload?.name ?? payload?.eventName) as string | undefined;
         const eventId: string =
           payload?.eventId ??
           payload?.id ??

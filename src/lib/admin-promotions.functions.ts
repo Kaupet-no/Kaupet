@@ -3,7 +3,19 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-async function requireAdmin(supabase: any, userId: string) {
+type AdminClient = {
+  from: (table: string) => {
+    select: (cols: string) => {
+      eq: (col: string, val: string) => {
+        eq: (col: string, val: string) => {
+          maybeSingle: () => Promise<{ data: unknown; error: unknown }>;
+        };
+      };
+    };
+  };
+};
+
+async function requireAdmin(supabase: AdminClient, userId: string) {
   const { data, error } = await supabase
     .from("user_roles")
     .select("role")
@@ -68,7 +80,7 @@ export const adminListPromotions = createServerFn({ method: "GET" })
       )
       .order("created_at", { ascending: false })
       .limit(200);
-    if (data.status) q = q.eq("status", data.status as any);
+    if (data.status) q = q.eq("status", data.status as string);
     const { data: rows, error } = await q;
     if (error) throw error;
     return rows ?? [];

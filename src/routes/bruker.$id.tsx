@@ -75,10 +75,20 @@ function PublicProfilePage() {
         .order("created_at", { ascending: false })
         .limit(24);
       if (error) throw error;
-      return (data ?? []).map((l: any) => {
+      type ListingImage = { storage_path: string; sort_order: number };
+      type ListingRow = {
+        id: string;
+        title: string;
+        price_nok: number | null;
+        is_free: boolean;
+        city: string | null;
+        created_at: string;
+        listing_images: ListingImage[] | null;
+      };
+      return (data ?? []).map((l: ListingRow) => {
         const imgs = (l.listing_images ?? [])
           .slice()
-          .sort((a: any, b: any) => a.sort_order - b.sort_order);
+          .sort((a: ListingImage, b: ListingImage) => a.sort_order - b.sort_order);
         return {
           id: l.id,
           title: l.title,

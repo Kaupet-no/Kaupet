@@ -35,24 +35,7 @@ export const Route = createFileRoute("/_authenticated/meldinger/$id")({
     meta: [{ title: "Samtale — Kaupet.no" }],
   }),
   component: ConversationPage,
-  errorComponent: ({ error, reset }) => {
-    const router = useRouter();
-    return (
-      <div className="mx-auto max-w-2xl px-4 py-20 text-center">
-        <h1 className="font-display text-2xl">Kunne ikke laste samtalen</h1>
-        <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
-        <Button
-          className="mt-6"
-          onClick={() => {
-            router.invalidate();
-            reset();
-          }}
-        >
-          Prøv på nytt
-        </Button>
-      </div>
-    );
-  },
+  errorComponent: ConversationErrorBoundary,
   notFoundComponent: () => (
     <div className="mx-auto max-w-2xl px-4 py-20 text-center">
       <h1 className="font-display text-2xl">Samtalen finnes ikke</h1>
@@ -113,9 +96,8 @@ function ConversationPage() {
         .maybeSingle();
       if (error) throw error;
       if (!data) throw new Error("Samtalen finnes ikke");
-      const listing = Array.isArray((data as any).listing)
-        ? (data as any).listing[0]
-        : (data as any).listing;
+      const rawListing = (data as { listing: unknown }).listing;
+      const listing = Array.isArray(rawListing) ? rawListing[0] : rawListing;
       const otherId = user!.id === data.seller_id ? data.buyer_id : data.seller_id;
       const { data: profile } = await supabase
         .from("profiles")
@@ -155,7 +137,7 @@ function ConversationPage() {
   useEffect(() => {
     const imgs = (conv?.listing?.listing_images ?? [])
       .slice()
-      .sort((a: any, b: any) => a.sort_order - b.sort_order);
+      .sort((a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order);
     const path = imgs[0]?.storage_path;
     if (path) {
       signListingImageUrls([path]).then((urls) => setCoverUrl(urls[path] ?? null));

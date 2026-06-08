@@ -54,19 +54,21 @@ export const getNotificationPreferences = createServerFn({ method: "GET" })
     const { supabase, userId } = context;
     const { data, error } = await supabase
       .from("notification_preferences")
-      .select("web_push_messages, web_push_saved_searches")
+      .select("web_push_messages, web_push_saved_searches, web_push_price_drops")
       .eq("user_id", userId)
       .maybeSingle();
     if (error) throw new Error(error.message);
     return {
       web_push_messages: data?.web_push_messages ?? true,
       web_push_saved_searches: data?.web_push_saved_searches ?? true,
+      web_push_price_drops: data?.web_push_price_drops ?? true,
     };
   });
 
 const PrefsSchema = z.object({
   web_push_messages: z.boolean(),
   web_push_saved_searches: z.boolean(),
+  web_push_price_drops: z.boolean(),
 });
 
 export const updateNotificationPreferences = createServerFn({ method: "POST" })
@@ -79,6 +81,7 @@ export const updateNotificationPreferences = createServerFn({ method: "POST" })
         user_id: userId,
         web_push_messages: data.web_push_messages,
         web_push_saved_searches: data.web_push_saved_searches,
+        web_push_price_drops: data.web_push_price_drops,
       },
       { onConflict: "user_id" },
     );

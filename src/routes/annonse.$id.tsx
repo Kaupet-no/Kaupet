@@ -222,7 +222,7 @@ function ListingDetailPage() {
       if (!user) {
         navigate({
           to: "/auth",
-          search: { mode: "signin", redirect: `/annonse/${id}` } as any,
+          search: { mode: "signin", redirect: `/annonse/${id}` } as { mode: string; redirect: string },
         });
         return null;
       }
@@ -381,8 +381,8 @@ function ListingDetailPage() {
                 month: "long",
                 year: "numeric",
               });
-            const publishedRaw = (data as any).published_at as string | null;
-            const updatedRaw = (data as any).updated_at as string | null;
+            const publishedRaw = (data as { published_at: string | null }).published_at;
+            const updatedRaw = (data as { updated_at: string | null }).updated_at;
             const publishedDate = publishedRaw ? new Date(publishedRaw) : new Date(data.created_at);
             const updatedDate = updatedRaw ? new Date(updatedRaw) : null;
 
@@ -580,8 +580,9 @@ function ListingDetailPage() {
                     url: `https://kaupet.no/annonse/${data.id}`,
                   });
                   if (result === "clipboard") toast.success("Lenken er kopiert");
-                } catch (e: any) {
-                  if (e?.name !== "AbortError") {
+                } catch (e: unknown) {
+                  const name = e instanceof Error ? e.name : "";
+                  if (name !== "AbortError") {
                     toast.error(formatErrorMessage(e, "Kunne ikke dele annonsen"));
                   }
                 }

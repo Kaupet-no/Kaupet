@@ -82,7 +82,7 @@ export const Route = createFileRoute("/api/public/push/dispatch")({
           body = (msg.body ?? "").slice(0, 140);
           url = `/meldinger/${msg.conversation_id}`;
           tag = `msg-${msg.conversation_id}`;
-        } else {
+        } else if (payload.type === "saved_search") {
           const { data: notif } = await supabaseAdmin
             .from("saved_search_notifications")
             .select("user_id, listing_id, saved_search_id")
@@ -106,6 +106,26 @@ export const Route = createFileRoute("/api/public/push/dispatch")({
           body = listing?.title ?? "Ny annonse matcher søket ditt";
           url = `/annonse/${notif.listing_id}`;
           tag = `ss-${notif.saved_search_id}-${notif.listing_id}`;
+        } else {
+          const { data: drop } = await supabaseAdmin
+            .from("favorite_price_drops")
+            .select("user_id, listing_id, old_price_nok, new_price_nok, drop_pct")
+            .eq("id", payload.price_drop_id)
+            .maybeSingle();
+          if (!drop) return new Response(null, { status: 204 });
+          userId = drop.user_id;
+
+          const { data: listing } = await supabaseAdmin
+            .from("listings")
+            .select("title")
+            .eq("id", drop.listing_id)
+            .maybeSingle();
+
+          const pct = Number(drop.drop_pct).toFixed(0);
+          title = `Prisfall: ${listing?.title ?? "Favoritten din"}`;
+          body = `Ned ${pct}% · ${formatKr(drop.old_price_nok)} → ${formatKr(drop.new_price_nok)}`;
+          url = `/annonse/${drop.listing_id}`;
+          tag = `price-drop-${drop.listing_id}`;
         }
 
         if (!userId) return new Response(null, { status: 204 });
@@ -113,15 +133,19 @@ export const Route = createFileRoute("/api/public/push/dispatch")({
         // Check per-type preference
         const { data: prefs } = await supabaseAdmin
           .from("notification_preferences")
-          .select("web_push_messages, web_push_saved_searches")
+          .select("web_push_messages, web_push_saved_searches, web_push_price_drops")
           .eq("user_id", userId)
           .maybeSingle();
         const messagesEnabled = prefs?.web_push_messages ?? true;
         const savedSearchEnabled = prefs?.web_push_saved_searches ?? true;
+        const priceDropEnabled = prefs?.web_push_price_drops ?? true;
         if (payload.type === "message" && !messagesEnabled) {
           return new Response(null, { status: 204 });
         }
         if (payload.type === "saved_search" && !savedSearchEnabled) {
+          return new Response(null, { status: 204 });
+        }
+        if (payload.type === "price_drop" && !priceDropEnabled) {
           return new Response(null, { status: 204 });
         }
 

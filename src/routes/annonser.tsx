@@ -29,6 +29,7 @@ import {
 } from "@/components/advanced-search-sheet";
 import type { LocationValue } from "@/components/location-filter";
 import type { MapListing } from "@/components/listings-map";
+import { FeaturedListingsSection } from "@/components/featured-listings-section";
 import { reverseGeocode } from "@/lib/geocode";
 
 const ListingsMap = lazy(() =>
@@ -527,6 +528,9 @@ function BrowsePage() {
 
       <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_420px]">
         <div>
+          <FeaturedListingsSection
+            categorySlug={effectiveCategories.length === 1 ? effectiveCategories[0] : undefined}
+          />
           {isLoading ? (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               {Array.from({ length: 8 }).map((_, i) => (

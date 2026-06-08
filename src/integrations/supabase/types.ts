@@ -261,6 +261,68 @@ export type Database = {
           },
         ]
       }
+      listing_promotions: {
+        Row: {
+          created_at: string
+          duration_days: number
+          expires_at: string | null
+          gift_reason: string | null
+          granted_by: string | null
+          id: string
+          is_gift: boolean
+          listing_id: string
+          price_nok: number
+          starts_at: string | null
+          status: Database["public"]["Enums"]["promotion_status"]
+          updated_at: string
+          user_id: string
+          vipps_psp_reference: string | null
+          vipps_reference: string | null
+        }
+        Insert: {
+          created_at?: string
+          duration_days: number
+          expires_at?: string | null
+          gift_reason?: string | null
+          granted_by?: string | null
+          id?: string
+          is_gift?: boolean
+          listing_id: string
+          price_nok: number
+          starts_at?: string | null
+          status?: Database["public"]["Enums"]["promotion_status"]
+          updated_at?: string
+          user_id: string
+          vipps_psp_reference?: string | null
+          vipps_reference?: string | null
+        }
+        Update: {
+          created_at?: string
+          duration_days?: number
+          expires_at?: string | null
+          gift_reason?: string | null
+          granted_by?: string | null
+          id?: string
+          is_gift?: boolean
+          listing_id?: string
+          price_nok?: number
+          starts_at?: string | null
+          status?: Database["public"]["Enums"]["promotion_status"]
+          updated_at?: string
+          user_id?: string
+          vipps_psp_reference?: string | null
+          vipps_reference?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_promotions_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       listing_sales: {
         Row: {
           buyer_id: string
@@ -471,6 +533,33 @@ export type Database = {
           display_name?: string
           id?: string
           location?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      promotion_pricing: {
+        Row: {
+          active: boolean
+          created_at: string
+          duration_days: number
+          id: string
+          price_nok: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          duration_days: number
+          id?: string
+          price_nok: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          duration_days?: number
+          id?: string
+          price_nok?: number
           updated_at?: string
         }
         Relationships: []
@@ -753,6 +842,36 @@ export type Database = {
         }
         Relationships: []
       }
+      vipps_webhook_events: {
+        Row: {
+          event_id: string
+          event_name: string | null
+          id: string
+          payload: Json
+          processed_at: string | null
+          received_at: string
+          reference: string | null
+        }
+        Insert: {
+          event_id: string
+          event_name?: string | null
+          id?: string
+          payload: Json
+          processed_at?: string | null
+          received_at?: string
+          reference?: string | null
+        }
+        Update: {
+          event_id?: string
+          event_name?: string | null
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          received_at?: string
+          reference?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -888,7 +1007,14 @@ export type Database = {
         }[]
       }
       cancel_account_deletion: { Args: never; Returns: boolean }
+      expire_listing_promotions: { Args: never; Returns: number }
       expire_old_listings: { Args: never; Returns: number }
+      get_featured_listing_ids: {
+        Args: { _category_slug?: string; _limit?: number }
+        Returns: {
+          listing_id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -967,6 +1093,13 @@ export type Database = {
         | "archived"
         | "expired"
         | "disabled"
+      promotion_status:
+        | "pending"
+        | "active"
+        | "expired"
+        | "failed"
+        | "refunded"
+        | "gifted"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1104,6 +1237,14 @@ export const Constants = {
         "archived",
         "expired",
         "disabled",
+      ],
+      promotion_status: [
+        "pending",
+        "active",
+        "expired",
+        "failed",
+        "refunded",
+        "gifted",
       ],
     },
   },

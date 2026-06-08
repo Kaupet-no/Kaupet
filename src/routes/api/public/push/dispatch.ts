@@ -16,7 +16,15 @@ const PayloadSchema = z.discriminatedUnion("type", [
     type: z.literal("saved_search"),
     notification_id: z.string().uuid(),
   }),
+  z.object({
+    type: z.literal("price_drop"),
+    price_drop_id: z.string().uuid(),
+  }),
 ]);
+
+function formatKr(n: number) {
+  return new Intl.NumberFormat("nb-NO").format(n) + " kr";
+}
 
 export const Route = createFileRoute("/api/public/push/dispatch")({
   server: {

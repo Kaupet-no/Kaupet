@@ -111,3 +111,44 @@ export async function deleteNotification(id: string) {
   const { error } = await supabase.from("saved_search_notifications").delete().eq("id", id);
   if (error) throw error;
 }
+
+export type PriceDropNotification = {
+  id: string;
+  listing_id: string;
+  old_price_nok: number;
+  new_price_nok: number;
+  drop_pct: number;
+  read_at: string | null;
+  created_at: string;
+};
+
+export async function listPriceDrops(limit = 30) {
+  const { data, error } = await supabase
+    .from("favorite_price_drops")
+    .select("id, listing_id, old_price_nok, new_price_nok, drop_pct, read_at, created_at")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []) as PriceDropNotification[];
+}
+
+export async function markPriceDropRead(id: string) {
+  const { error } = await supabase
+    .from("favorite_price_drops")
+    .update({ read_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function markAllPriceDropsRead() {
+  const { error } = await supabase
+    .from("favorite_price_drops")
+    .update({ read_at: new Date().toISOString() })
+    .is("read_at", null);
+  if (error) throw error;
+}
+
+export async function deletePriceDrop(id: string) {
+  const { error } = await supabase.from("favorite_price_drops").delete().eq("id", id);
+  if (error) throw error;
+}

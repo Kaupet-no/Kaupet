@@ -74,6 +74,12 @@ export const Route = createFileRoute("/")({
 });
 
 function LandingPage() {
+  const native = useIsNative();
+  if (native) return <AppLanding />;
+  return <WebLanding />;
+}
+
+function WebLanding() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [qDraft, setQDraft] = useState("");

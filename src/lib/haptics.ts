@@ -15,7 +15,7 @@ export async function hapticImpact(style: Impact = "light"): Promise<void> {
   if (!isNative()) return;
   try {
     const { Haptics, ImpactStyle } = await load();
-    const map: Record<Impact, ImpactStyle> = {
+    const map: Record<Impact, (typeof ImpactStyle)[keyof typeof ImpactStyle]> = {
       light: ImpactStyle.Light,
       medium: ImpactStyle.Medium,
       heavy: ImpactStyle.Heavy,
@@ -43,7 +43,7 @@ export async function hapticNotification(
   if (!isNative()) return;
   try {
     const { Haptics, NotificationType } = await load();
-    const map: Record<Notification, NotificationType> = {
+    const map: Record<Notification, (typeof NotificationType)[keyof typeof NotificationType]> = {
       success: NotificationType.Success,
       warning: NotificationType.Warning,
       error: NotificationType.Error,

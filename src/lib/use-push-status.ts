@@ -25,6 +25,7 @@ export type PushStatus = {
   prefs: {
     web_push_messages: boolean;
     web_push_saved_searches: boolean;
+    web_push_price_drops: boolean;
   };
   /** True until we've checked browser + server state once. */
   loading: boolean;
@@ -32,11 +33,13 @@ export type PushStatus = {
   messagesActive: boolean;
   /** Convenience: push will actually deliver saved-search hits on this device. */
   savedSearchesActive: boolean;
+  /** Convenience: push will actually deliver price-drop alerts on this device. */
+  priceDropsActive: boolean;
   /**
    * Subscribe this device and ensure the given per-type pref is on.
    * Returns true on success, throws on failure.
    */
-  enableOnThisDevice: (kind?: "messages" | "saved_searches") => Promise<void>;
+  enableOnThisDevice: (kind?: "messages" | "saved_searches" | "price_drops") => Promise<void>;
   refresh: () => void;
 };
 
@@ -107,11 +110,14 @@ export function usePushStatus(): PushStatus {
   const effectivePrefs = {
     web_push_messages: prefs?.web_push_messages ?? true,
     web_push_saved_searches: prefs?.web_push_saved_searches ?? true,
+    web_push_price_drops: prefs?.web_push_price_drops ?? true,
   };
 
   const subscribedHere = !!endpoint && permission === "granted";
 
-  const enableOnThisDevice = async (kind?: "messages" | "saved_searches") => {
+  const enableOnThisDevice = async (
+    kind?: "messages" | "saved_searches" | "price_drops",
+  ) => {
     await subscribePush();
     await refreshBrowser();
     if (kind) {
@@ -120,10 +126,13 @@ export function usePushStatus(): PushStatus {
           kind === "messages" ? true : effectivePrefs.web_push_messages,
         web_push_saved_searches:
           kind === "saved_searches" ? true : effectivePrefs.web_push_saved_searches,
+        web_push_price_drops:
+          kind === "price_drops" ? true : effectivePrefs.web_push_price_drops,
       };
       if (
         next.web_push_messages !== effectivePrefs.web_push_messages ||
-        next.web_push_saved_searches !== effectivePrefs.web_push_saved_searches
+        next.web_push_saved_searches !== effectivePrefs.web_push_saved_searches ||
+        next.web_push_price_drops !== effectivePrefs.web_push_price_drops
       ) {
         await updatePrefs({ data: next });
         await qc.invalidateQueries({ queryKey: ["notification-preferences"] });
@@ -139,6 +148,7 @@ export function usePushStatus(): PushStatus {
     loading: !browserReady || (!!user && prefsLoading),
     messagesActive: subscribedHere && effectivePrefs.web_push_messages,
     savedSearchesActive: subscribedHere && effectivePrefs.web_push_saved_searches,
+    priceDropsActive: subscribedHere && effectivePrefs.web_push_price_drops,
     enableOnThisDevice,
     refresh: () => {
       void refreshBrowser();

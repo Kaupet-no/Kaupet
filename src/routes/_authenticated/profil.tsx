@@ -532,6 +532,7 @@ function NotificationsSection() {
     mutationFn: async (values: {
       web_push_messages: boolean;
       web_push_saved_searches: boolean;
+      web_push_price_drops: boolean;
     }) => {
       await updatePrefs({ data: values });
     },
@@ -642,6 +643,7 @@ function NotificationsSection() {
                   mutation.mutate({
                     web_push_messages: v,
                     web_push_saved_searches: prefs.web_push_saved_searches,
+                    web_push_price_drops: prefs.web_push_price_drops,
                   })
                 }
               />
@@ -664,6 +666,30 @@ function NotificationsSection() {
                   mutation.mutate({
                     web_push_messages: prefs.web_push_messages,
                     web_push_saved_searches: v,
+                    web_push_price_drops: prefs.web_push_price_drops,
+                  })
+                }
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label htmlFor="pref-price-drops" className="text-sm font-medium">
+                  Prisfall på favoritter
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Varsel når en favoritt-annonse blir satt ned med mer enn 5 %.
+                </p>
+              </div>
+              <Switch
+                id="pref-price-drops"
+                checked={prefs.web_push_price_drops}
+                disabled={mutation.isPending}
+                onCheckedChange={(v) =>
+                  mutation.mutate({
+                    web_push_messages: prefs.web_push_messages,
+                    web_push_saved_searches: prefs.web_push_saved_searches,
+                    web_push_price_drops: v,
                   })
                 }
               />

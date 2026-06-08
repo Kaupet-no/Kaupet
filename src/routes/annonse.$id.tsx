@@ -254,35 +254,33 @@ function ListingDetailPage() {
     signListingImageUrls(images.map((i) => i.storage_path)).then(setImgUrls);
   }, [images.length, data?.id]);
 
-  // Logg visning (én gang per annonse + besøkende-nøkkel per økt)
+  // Logg visning (databasens unike constraint sørger for at samme besøkende
+  // kun telles én gang per annonse)
   useEffect(() => {
     if (!data?.id) return;
     if (user && user.id === data.seller_id) return; // ikke tell egne visninger
     let visitorKey = user?.id ?? null;
     if (!visitorKey) {
       try {
-        const k = "kaupet_session_id";
-        visitorKey = sessionStorage.getItem(k);
+        const k = "kaupet_visitor_id";
+        visitorKey = localStorage.getItem(k);
         if (!visitorKey) {
           visitorKey = crypto.randomUUID();
-          sessionStorage.setItem(k, visitorKey);
+          localStorage.setItem(k, visitorKey);
         }
       } catch {
         visitorKey = crypto.randomUUID();
       }
     }
-    const sessionKey = `kaupet_viewed_${data.id}`;
-    try {
-      if (sessionStorage.getItem(sessionKey)) return;
-      sessionStorage.setItem(sessionKey, "1");
-    } catch {
-      /* ignore */
-    }
     supabase
       .from("listing_views")
-      .insert({ listing_id: data.id, visitor_key: visitorKey, user_id: user?.id ?? null })
+      .upsert(
+        { listing_id: data.id, visitor_key: visitorKey, user_id: user?.id ?? null },
+        { onConflict: "listing_id,visitor_key", ignoreDuplicates: true },
+      )
       .then(() => undefined);
   }, [data?.id, data?.seller_id, user?.id]);
+
 
 
 

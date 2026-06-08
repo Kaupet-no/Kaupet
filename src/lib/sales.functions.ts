@@ -13,9 +13,7 @@ export type ListingSale = {
 
 export const getSaleForListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z.object({ listingId: z.string().uuid() }).parse(input),
-  )
+  .inputValidator((input: unknown) => z.object({ listingId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }): Promise<ListingSale | null> => {
     const { supabase } = context;
     const { data: sale, error } = await supabase
@@ -29,9 +27,7 @@ export const getSaleForListing = createServerFn({ method: "POST" })
 
 export const confirmBuyer = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z.object({ conversationId: z.string().uuid() }).parse(input),
-  )
+  .inputValidator((input: unknown) => z.object({ conversationId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { data: conv, error: convErr } = await supabase
@@ -45,14 +41,12 @@ export const confirmBuyer = createServerFn({ method: "POST" })
       throw new Error("Bare selger kan markere en kjøper");
     }
 
-    const { error: insErr } = await supabase
-      .from("listing_sales")
-      .insert({
-        listing_id: conv.listing_id,
-        seller_id: conv.seller_id,
-        buyer_id: conv.buyer_id,
-        conversation_id: conv.id,
-      });
+    const { error: insErr } = await supabase.from("listing_sales").insert({
+      listing_id: conv.listing_id,
+      seller_id: conv.seller_id,
+      buyer_id: conv.buyer_id,
+      conversation_id: conv.id,
+    });
     if (insErr) {
       if (insErr.code === "23505") {
         throw new Error("Det finnes allerede en bekreftet kjøper for denne annonsen");
@@ -64,9 +58,7 @@ export const confirmBuyer = createServerFn({ method: "POST" })
 
 export const unconfirmBuyer = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z.object({ listingId: z.string().uuid() }).parse(input),
-  )
+  .inputValidator((input: unknown) => z.object({ listingId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { data: sale } = await supabase

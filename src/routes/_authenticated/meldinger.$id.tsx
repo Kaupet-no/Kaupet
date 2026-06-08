@@ -116,8 +116,7 @@ function ConversationPage() {
       const listing = Array.isArray((data as any).listing)
         ? (data as any).listing[0]
         : (data as any).listing;
-      const otherId =
-        user!.id === data.seller_id ? data.buyer_id : data.seller_id;
+      const otherId = user!.id === data.seller_id ? data.buyer_id : data.seller_id;
       const { data: profile } = await supabase
         .from("profiles")
         .select("id, display_name, avatar_url, deleted_at")
@@ -159,9 +158,7 @@ function ConversationPage() {
       .sort((a: any, b: any) => a.sort_order - b.sort_order);
     const path = imgs[0]?.storage_path;
     if (path) {
-      signListingImageUrls([path]).then((urls) =>
-        setCoverUrl(urls[path] ?? null),
-      );
+      signListingImageUrls([path]).then((urls) => setCoverUrl(urls[path] ?? null));
     }
   }, [conv?.listing?.id]);
 
@@ -243,11 +240,7 @@ function ConversationPage() {
       ? `${conv.listing.price_nok.toLocaleString("nb-NO")} kr`
       : "Pris ved henvendelse";
 
-  const otherId = conv
-    ? conv.buyer_id === user?.id
-      ? conv.seller_id
-      : conv.buyer_id
-    : null;
+  const otherId = conv ? (conv.buyer_id === user?.id ? conv.seller_id : conv.buyer_id) : null;
   const isSeller = !!(conv && user && conv.seller_id === user.id);
   const listingId = conv?.listing_id ?? null;
 
@@ -279,8 +272,7 @@ function ConversationPage() {
   });
 
   const unconfirmMutation = useMutation({
-    mutationFn: () =>
-      unconfirmBuyerFn({ data: { listingId: listingId! } }),
+    mutationFn: () => unconfirmBuyerFn({ data: { listingId: listingId! } }),
     onSuccess: () => {
       toast.success("Salget er angret");
       refetchSale();
@@ -289,27 +281,28 @@ function ConversationPage() {
     onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke angre salget")),
   });
 
-  const iBlockedAll = !!(otherId && myBlocks?.some(
-    (b) => b.scope === "all" && b.blocked_id === otherId,
-  ));
+  const iBlockedAll = !!(
+    otherId && myBlocks?.some((b) => b.scope === "all" && b.blocked_id === otherId)
+  );
   const iBlockedConv = !!myBlocks?.some(
     (b) => b.scope === "conversation" && b.conversation_id === id,
   );
   const iBlocked = iBlockedAll || iBlockedConv;
-  const theyBlockedMe = !!(otherId && blocksAgainstMe?.some(
-    (b) =>
-      b.blocker_id === otherId &&
-      (b.scope === "all" || b.conversation_id === id),
-  ));
-  const disabled =
-    !!conv?.otherDeleted || !!conv?.otherPending || iBlocked || theyBlockedMe;
-  const disabledPlaceholder = conv?.otherDeleted || conv?.otherPending
-    ? "Du kan ikke svare denne brukeren"
-    : iBlocked
-      ? "Du har blokkert denne samtalen"
-      : theyBlockedMe
-        ? "Du kan ikke sende meldinger i denne samtalen"
-        : "Skriv en melding…";
+  const theyBlockedMe = !!(
+    otherId &&
+    blocksAgainstMe?.some(
+      (b) => b.blocker_id === otherId && (b.scope === "all" || b.conversation_id === id),
+    )
+  );
+  const disabled = !!conv?.otherDeleted || !!conv?.otherPending || iBlocked || theyBlockedMe;
+  const disabledPlaceholder =
+    conv?.otherDeleted || conv?.otherPending
+      ? "Du kan ikke svare denne brukeren"
+      : iBlocked
+        ? "Du har blokkert denne samtalen"
+        : theyBlockedMe
+          ? "Du kan ikke sende meldinger i denne samtalen"
+          : "Skriv en melding…";
 
   return (
     <div className="mx-auto flex h-[calc(100vh-4rem)] max-w-3xl flex-col px-4 py-4">
@@ -323,9 +316,7 @@ function ConversationPage() {
       {conv && (
         <div className="mt-3 flex items-center gap-3 rounded-xl border border-border bg-card p-3">
           <div className="size-12 shrink-0 overflow-hidden rounded-lg bg-muted">
-            {coverUrl && (
-              <img src={coverUrl} alt="" className="size-full object-cover" />
-            )}
+            {coverUrl && <img src={coverUrl} alt="" className="size-full object-cover" />}
           </div>
           <div className="min-w-0 flex-1">
             {conv.listing ? (
@@ -479,14 +470,11 @@ function ConversationPage() {
         </Button>
       </form>
       {sendMutation.error && (
-        <p className="mt-2 text-xs text-destructive">
-          {(sendMutation.error as Error).message}
-        </p>
+        <p className="mt-2 text-xs text-destructive">{(sendMutation.error as Error).message}</p>
       )}
     </div>
   );
 }
-
 
 function renderWithDayDividers(messages: Message[], myId: string) {
   const out: React.ReactElement[] = [];
@@ -511,15 +499,10 @@ function renderWithDayDividers(messages: Message[], myId: string) {
     }
     const mine = m.sender_id === myId;
     out.push(
-      <div
-        key={m.id}
-        className={`flex ${mine ? "justify-end" : "justify-start"}`}
-      >
+      <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
         <div
           className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${
-            mine
-              ? "bg-primary text-primary-foreground"
-              : "bg-card text-foreground"
+            mine ? "bg-primary text-primary-foreground" : "bg-card text-foreground"
           }`}
         >
           <p className="whitespace-pre-wrap break-words">{m.body}</p>
@@ -625,9 +608,7 @@ function SalePanel(props: SalePanelProps) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="flex items-center gap-2 text-sm font-medium">
           <CheckCircle2 className="size-4 text-primary" />
-          {isSeller
-            ? `Solgt til ${otherName}`
-            : `Du er bekreftet som kjøper av denne annonsen`}
+          {isSeller ? `Solgt til ${otherName}` : `Du er bekreftet som kjøper av denne annonsen`}
         </p>
         {isSeller && !myReview && (
           <Button

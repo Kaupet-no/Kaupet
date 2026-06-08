@@ -51,9 +51,7 @@ const schema = z
     category_id: z.string().uuid(),
     condition: z.enum(["new", "like_new", "good", "acceptable", "for_parts"]),
     is_free: z.boolean(),
-    price_nok: z
-      .union([z.coerce.number().int().min(0).max(10_000_000), z.literal("")])
-      .optional(),
+    price_nok: z.union([z.coerce.number().int().min(0).max(10_000_000), z.literal("")]).optional(),
     postal_code: z
       .string()
       .trim()
@@ -159,10 +157,7 @@ function EditListingPage() {
   useEffect(() => {
     if (!listing || coordsHydratedFor.current === listing.id) return;
     coordsHydratedFor.current = listing.id;
-    if (
-      typeof listing.lat === "number" &&
-      typeof listing.lng === "number"
-    ) {
+    if (typeof listing.lat === "number" && typeof listing.lng === "number") {
       setCoords({ lat: listing.lat, lng: listing.lng });
     }
   }, [listing]);
@@ -209,14 +204,11 @@ function EditListingPage() {
       }
     }, 300);
     return () => window.clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coords, setValue]);
 
   const parentCategories = (categories ?? []).filter((c) => !c.parent_id);
   const [selectedParentId, setSelectedParentId] = useState<string>("");
-  const subcategories = (categories ?? []).filter(
-    (c) => c.parent_id === selectedParentId,
-  );
+  const subcategories = (categories ?? []).filter((c) => c.parent_id === selectedParentId);
   const categoryHydratedFor = useRef<string | null>(null);
 
   // Initialize parent selector from existing category when listing loads (once)
@@ -241,9 +233,7 @@ function EditListingPage() {
 
   useEffect(() => {
     if (!listing || hydratedFor.current === listing.id) return;
-    const sorted = [...(listing.listing_images ?? [])].sort(
-      (a, b) => a.sort_order - b.sort_order,
-    );
+    const sorted = [...(listing.listing_images ?? [])].sort((a, b) => a.sort_order - b.sort_order);
     const initial: EditorItem[] = sorted.map((img) => ({
       kind: "existing",
       key: img.storage_path,
@@ -254,9 +244,7 @@ function EditListingPage() {
     if (sorted.length > 0) {
       signListingImageUrls(sorted.map((i) => i.storage_path)).then((map) => {
         setItems((curr) =>
-          curr.map((it) =>
-            it.kind === "existing" ? { ...it, url: map[it.storage_path] } : it,
-          ),
+          curr.map((it) => (it.kind === "existing" ? { ...it, url: map[it.storage_path] } : it)),
         );
       });
     }
@@ -361,16 +349,12 @@ function EditListingPage() {
       }
 
       // Wipe and re-insert listing_images in new order.
-      const { error: delErr } = await supabase
-        .from("listing_images")
-        .delete()
-        .eq("listing_id", id);
+      const { error: delErr } = await supabase.from("listing_images").delete().eq("listing_id", id);
       if (delErr) throw delErr;
 
       const rows = items.map((it, idx) => ({
         listing_id: id,
-        storage_path:
-          it.kind === "existing" ? it.storage_path : uploadedPaths[it.key],
+        storage_path: it.kind === "existing" ? it.storage_path : uploadedPaths[it.key],
         sort_order: idx,
       }));
       if (rows.length > 0) {
@@ -408,23 +392,19 @@ function EditListingPage() {
         Oppdater detaljer og bilder. Endringene lagres når du trykker «Lagre endringer».
       </p>
 
-      <form
-        onSubmit={handleSubmit((v) => mutation.mutate(v))}
-        className="mt-8 space-y-8"
-      >
+      <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="mt-8 space-y-8">
         {/* Images */}
         <section className="space-y-3">
           <Label>Bilder</Label>
           <p className="text-xs text-muted-foreground">
-            {items.length} av {MAX_IMAGES} bilder. Første bilde er hovedbildet. Bruk
-            pilene for å endre rekkefølge.
+            {items.length} av {MAX_IMAGES} bilder. Første bilde er hovedbildet. Bruk pilene for å
+            endre rekkefølge.
           </p>
 
           {items.length > 0 && (
             <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
               {items.map((it, idx) => {
-                const src =
-                  it.kind === "existing" ? it.url : it.previewUrl;
+                const src = it.kind === "existing" ? it.url : it.previewUrl;
                 return (
                   <li
                     key={it.key}
@@ -516,9 +496,7 @@ function EditListingPage() {
         <section className="space-y-2">
           <Label htmlFor="title">Tittel</Label>
           <Input id="title" {...register("title")} />
-          {errors.title && (
-            <p className="text-sm text-destructive">{errors.title.message}</p>
-          )}
+          {errors.title && <p className="text-sm text-destructive">{errors.title.message}</p>}
         </section>
 
         <section className="space-y-2">
@@ -583,9 +561,7 @@ function EditListingPage() {
                     </SelectContent>
                   </Select>
                 )}
-                {errors.category_id && (
-                  <p className="text-sm text-destructive">Velg en kategori</p>
-                )}
+                {errors.category_id && <p className="text-sm text-destructive">Velg en kategori</p>}
               </>
             )}
           </div>
@@ -623,17 +599,12 @@ function EditListingPage() {
               {...register("price_nok")}
             />
             <label className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={isFree}
-                onCheckedChange={(v) => setValue("is_free", Boolean(v))}
-              />
+              <Checkbox checked={isFree} onCheckedChange={(v) => setValue("is_free", Boolean(v))} />
               Gis bort gratis
             </label>
           </div>
           {errors.price_nok && (
-            <p className="text-sm text-destructive">
-              {errors.price_nok.message as string}
-            </p>
+            <p className="text-sm text-destructive">{errors.price_nok.message as string}</p>
           )}
         </section>
 
@@ -686,7 +657,6 @@ function EditListingPage() {
             </div>
           )}
         </section>
-
 
         <div className="flex items-center justify-end gap-3 border-t border-border pt-6">
           <Button

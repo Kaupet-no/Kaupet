@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MapContainer, TileLayer, Marker, Circle, Popup, useMap, useMapEvents } from "react-leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Circle,
+  Popup,
+  useMap,
+  useMapEvents,
+} from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Link } from "@tanstack/react-router";
@@ -52,11 +60,7 @@ function formatPriceFull(l: MapListing) {
 function makePricePin(l: MapListing, opts: { hovered: boolean; active: boolean }) {
   const label = formatPriceShort(l);
   const isFree = l.is_free;
-  const bg = opts.active
-    ? "hsl(var(--primary))"
-    : isFree
-      ? "hsl(var(--accent))"
-      : "white";
+  const bg = opts.active ? "hsl(var(--primary))" : isFree ? "hsl(var(--accent))" : "white";
   const color = opts.active
     ? "hsl(var(--primary-foreground))"
     : isFree
@@ -124,8 +128,7 @@ function distanceMeters(a: { lat: number; lng: number }, b: { lat: number; lng: 
   const dLng = toRad(b.lng - a.lng);
   const lat1 = toRad(a.lat);
   const lat2 = toRad(b.lat);
-  const h =
-    Math.sin(dLat / 2) ** 2 + Math.sin(dLng / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+  const h = Math.sin(dLat / 2) ** 2 + Math.sin(dLng / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 

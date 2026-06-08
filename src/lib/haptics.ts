@@ -37,9 +37,7 @@ export async function hapticSelection(): Promise<void> {
   }
 }
 
-export async function hapticNotification(
-  type: Notification = "success",
-): Promise<void> {
+export async function hapticNotification(type: Notification = "success"): Promise<void> {
   if (!isNative()) return;
   try {
     const { Haptics, NotificationType } = await load();

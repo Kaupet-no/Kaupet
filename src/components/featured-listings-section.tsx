@@ -14,8 +14,7 @@ export function FeaturedListingsSection({ categorySlug, limit = 2 }: Props) {
   const fetchFeatured = useServerFn(getFeaturedListings);
   const { data } = useQuery({
     queryKey: ["featured-listings", categorySlug ?? null, limit],
-    queryFn: () =>
-      fetchFeatured({ data: { category_slug: categorySlug, limit } }),
+    queryFn: () => fetchFeatured({ data: { category_slug: categorySlug, limit } }),
     staleTime: 60_000,
   });
 

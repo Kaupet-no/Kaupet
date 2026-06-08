@@ -19,9 +19,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
         const secret = getVippsWebhookSecret();
         if (secret) {
           const sigHeader =
-            request.headers.get("x-ms-signature") ??
-            request.headers.get("authorization") ??
-            "";
+            request.headers.get("x-ms-signature") ?? request.headers.get("authorization") ?? "";
           const expected = createHmac("sha256", secret).update(raw).digest("base64");
           const sigBuf = Buffer.from(sigHeader);
           const expBuf = Buffer.from(expected);
@@ -40,7 +38,9 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
         const reference: string | undefined = payload?.reference;
         const eventName: string | undefined = payload?.name ?? payload?.eventName;
         const eventId: string =
-          payload?.eventId ?? payload?.id ?? `${reference ?? "noref"}-${eventName ?? "evt"}-${Date.now()}`;
+          payload?.eventId ??
+          payload?.id ??
+          `${reference ?? "noref"}-${eventName ?? "evt"}-${Date.now()}`;
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 

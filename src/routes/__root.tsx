@@ -20,7 +20,6 @@ import { setupNative } from "@/lib/native-setup";
 import { useIsNative } from "@/lib/use-is-native";
 import { AppBottomNav } from "@/components/app-bottom-nav";
 
-
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -106,11 +105,31 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         name: "twitter:description",
         content: "Kjøp og selg brukte ting lokalt. Åpen kildekode, drevet av fellesskapet.",
       },
-      { name: "description", content: "Kaupet.no er en norsk markedsplass for brukte ting mellom privatpersoner. Ingen mellomledd, ingen reklame." },
-      { property: "og:description", content: "Kaupet.no er en norsk markedsplass for brukte ting mellom privatpersoner. Ingen mellomledd, ingen reklame." },
-      { name: "twitter:description", content: "Kaupet.no er en norsk markedsplass for brukte ting mellom privatpersoner. Ingen mellomledd, ingen reklame." },
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/Zav741ZnKNZxYODrMCRKtvCwST03/social-images/social-1780646011042-Skjermbilde_2026-06-05_kl._09.35.02.webp" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/Zav741ZnKNZxYODrMCRKtvCwST03/social-images/social-1780646011042-Skjermbilde_2026-06-05_kl._09.35.02.webp" },
+      {
+        name: "description",
+        content:
+          "Kaupet.no er en norsk markedsplass for brukte ting mellom privatpersoner. Ingen mellomledd, ingen reklame.",
+      },
+      {
+        property: "og:description",
+        content:
+          "Kaupet.no er en norsk markedsplass for brukte ting mellom privatpersoner. Ingen mellomledd, ingen reklame.",
+      },
+      {
+        name: "twitter:description",
+        content:
+          "Kaupet.no er en norsk markedsplass for brukte ting mellom privatpersoner. Ingen mellomledd, ingen reklame.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://storage.googleapis.com/gpt-engineer-file-uploads/Zav741ZnKNZxYODrMCRKtvCwST03/social-images/social-1780646011042-Skjermbilde_2026-06-05_kl._09.35.02.webp",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://storage.googleapis.com/gpt-engineer-file-uploads/Zav741ZnKNZxYODrMCRKtvCwST03/social-images/social-1780646011042-Skjermbilde_2026-06-05_kl._09.35.02.webp",
+      },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -183,7 +202,9 @@ function RootComponent() {
     // Only invalidate on real sign-in / sign-out — NOT on INITIAL_SESSION or
     // TOKEN_REFRESHED, which fire on every mount/tab-focus and would refetch
     // every query in the app, causing the UI to feel slow and unstable.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
         router.invalidate();
         queryClient.invalidateQueries();
@@ -195,9 +216,7 @@ function RootComponent() {
             const { data } = await supabase.rpc("cancel_account_deletion");
             if (data === true) {
               const { toast } = await import("sonner");
-              toast.success(
-                "Velkommen tilbake! Slettingen av kontoen din er avbrutt.",
-              );
+              toast.success("Velkommen tilbake! Slettingen av kontoen din er avbrutt.");
             }
           } catch {
             // ignore
@@ -213,9 +232,6 @@ function RootComponent() {
     void setupNative();
     return cleanup;
   }, []);
-
-
-
 
   const native = useIsNative();
 
@@ -246,7 +262,10 @@ function RootComponent() {
                   </p>
                   <p>
                     Ved å bruke Kaupet.no godtar du våre{" "}
-                    <Link to="/vilkar" className="underline hover:text-foreground transition-colors">
+                    <Link
+                      to="/vilkar"
+                      className="underline hover:text-foreground transition-colors"
+                    >
                       brukervilkår
                     </Link>
                     .
@@ -254,8 +273,12 @@ function RootComponent() {
                 </div>
                 <div className="space-y-1 sm:max-w-xl sm:text-right">
                   <p>
-                    Ditt personvern på internett er viktig. Kaupet.no benytter derfor ingen sporende informasjonskapsler eller tredjeparts analyseverktøy. Les vår{" "}
-                    <Link to="/personvern" className="underline hover:text-foreground transition-colors">
+                    Ditt personvern på internett er viktig. Kaupet.no benytter derfor ingen sporende
+                    informasjonskapsler eller tredjeparts analyseverktøy. Les vår{" "}
+                    <Link
+                      to="/personvern"
+                      className="underline hover:text-foreground transition-colors"
+                    >
                       personvernerklæring her
                     </Link>
                     .

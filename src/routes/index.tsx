@@ -28,7 +28,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
 import { ChevronLeft } from "lucide-react";
 import { useIsNative } from "@/lib/use-is-native";
@@ -36,7 +42,7 @@ import { AppLanding } from "@/components/app-landing";
 
 const CATEGORY_ICONS: Record<string, LucideIcon> = {
   "mobler-og-interior": Sofa,
-  "elektronikk": Smartphone,
+  elektronikk: Smartphone,
   "klar-og-mote": Shirt,
   "barn-og-baby": Baby,
   "sport-og-friluft": Dumbbell,
@@ -46,7 +52,7 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
   "antikviteter-og-kunst": Palette,
   "deler-bil-og-mc": Car,
   "deler-til-bat": Ship,
-  "annet": Package,
+  annet: Package,
 };
 
 type CategoryRow = {
@@ -134,7 +140,9 @@ function WebLanding() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("listings")
-        .select("id, title, price_nok, is_free, city, created_at, view_count, listing_images(storage_path, sort_order)")
+        .select(
+          "id, title, price_nok, is_free, city, created_at, view_count, listing_images(storage_path, sort_order)",
+        )
         .eq("status", "active")
         .order("view_count", { ascending: false })
         .order("created_at", { ascending: false })
@@ -173,7 +181,8 @@ function WebLanding() {
               Gi tingene dine <span className="italic text-accent">et nytt liv</span>.
             </h1>
             <p className="max-w-lg text-lg text-muted-foreground">
-              Kaupet.no er en norsk markedsplass for brukte ting mellom privatpersoner. Ingen mellomledd, ingen reklame.
+              Kaupet.no er en norsk markedsplass for brukte ting mellom privatpersoner. Ingen
+              mellomledd, ingen reklame.
             </p>
 
             <form onSubmit={submitSearch} className="flex max-w-lg gap-2">
@@ -214,7 +223,9 @@ function WebLanding() {
             <div className="absolute -inset-4 -z-10 rounded-3xl bg-accent/10 blur-2xl" />
             <div className="rounded-2xl border border-border bg-card p-4 shadow-xl">
               <div className="mb-3 flex items-center justify-between px-1">
-                <h2 className="font-display text-sm tracking-tight text-muted-foreground">Populært akkurat nå</h2>
+                <h2 className="font-display text-sm tracking-tight text-muted-foreground">
+                  Populært akkurat nå
+                </h2>
                 <Link
                   to="/annonser"
                   search={{ q: "", category: "", sort: "new" }}
@@ -225,7 +236,11 @@ function WebLanding() {
               </div>
 
               {popular && popular.length > 0 ? (
-                <Carousel opts={{ align: "start", loop: true }} plugins={[autoplay.current]} className="w-full">
+                <Carousel
+                  opts={{ align: "start", loop: true }}
+                  plugins={[autoplay.current]}
+                  className="w-full"
+                >
                   <CarouselContent>
                     {popular.map((listing) => (
                       <CarouselItem key={listing.id} className="basis-full sm:basis-1/2">
@@ -277,47 +292,49 @@ function WebLanding() {
           key={activeCategory?.id ?? "root"}
           className={`grid grid-cols-2 gap-3 duration-300 animate-in fade-in sm:grid-cols-3 lg:grid-cols-4 ${activeCategory ? "slide-in-from-right-8" : "slide-in-from-left-8"}`}
         >
-          {activeCategory ? (() => {
-            const subs = childrenByParent.get(activeCategory.id) ?? [];
-            const allSlugs = [activeCategory.slug, ...subs.map((s) => s.slug)];
-            
-            return (
-              <>
-                <Link
-                  to="/annonser"
-                  search={{
-                    q: "",
-                    category: "",
-                    categories: allSlugs,
-                    catMode: "any",
-                    sort: "new",
-                  }}
-                  className="group flex items-center justify-between gap-3 rounded-xl border border-primary bg-primary/5 px-4 py-5 text-left font-medium text-primary transition hover:bg-primary hover:text-primary-foreground hover:shadow-sm"
-                >
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
-                    <div className="truncate">Alt i {activeCategory.name_nb}</div>
-                  </div>
-                  <ArrowRight className="size-4 shrink-0 transition group-hover:translate-x-0.5" />
-                </Link>
-                {subs.map((sub) => (
+          {activeCategory ? (
+            (() => {
+              const subs = childrenByParent.get(activeCategory.id) ?? [];
+              const allSlugs = [activeCategory.slug, ...subs.map((s) => s.slug)];
+
+              return (
+                <>
                   <Link
-                    key={sub.id}
                     to="/annonser"
-                    search={{ q: "", category: sub.slug, sort: "new" }}
-                    className="group flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-5 text-left transition hover:border-primary hover:shadow-sm"
+                    search={{
+                      q: "",
+                      category: "",
+                      categories: allSlugs,
+                      catMode: "any",
+                      sort: "new",
+                    }}
+                    className="group flex items-center justify-between gap-3 rounded-xl border border-primary bg-primary/5 px-4 py-5 text-left font-medium text-primary transition hover:bg-primary hover:text-primary-foreground hover:shadow-sm"
                   >
-                    <div className="truncate font-medium">{sub.name_nb}</div>
-                    <ArrowRight className="size-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                      <div className="truncate">Alt i {activeCategory.name_nb}</div>
+                    </div>
+                    <ArrowRight className="size-4 shrink-0 transition group-hover:translate-x-0.5" />
                   </Link>
-                ))}
-                {subs.length === 0 && (
-                  <p className="col-span-full text-sm text-muted-foreground">
-                    Ingen underkategorier — trykk over for å se alle annonser.
-                  </p>
-                )}
-              </>
-            );
-          })() : (
+                  {subs.map((sub) => (
+                    <Link
+                      key={sub.id}
+                      to="/annonser"
+                      search={{ q: "", category: sub.slug, sort: "new" }}
+                      className="group flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-5 text-left transition hover:border-primary hover:shadow-sm"
+                    >
+                      <div className="truncate font-medium">{sub.name_nb}</div>
+                      <ArrowRight className="size-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
+                    </Link>
+                  ))}
+                  {subs.length === 0 && (
+                    <p className="col-span-full text-sm text-muted-foreground">
+                      Ingen underkategorier — trykk over for å se alle annonser.
+                    </p>
+                  )}
+                </>
+              );
+            })()
+          ) : (
             <>
               {rootCategories.map((cat) => {
                 const Icon = CATEGORY_ICONS[cat.slug] ?? Package;
@@ -336,7 +353,9 @@ function WebLanding() {
                       <div className="min-w-0">
                         <div className="truncate font-medium">{cat.name_nb}</div>
                         {subCount > 0 && (
-                          <div className="text-xs text-muted-foreground">{subCount} underkategorier</div>
+                          <div className="text-xs text-muted-foreground">
+                            {subCount} underkategorier
+                          </div>
                         )}
                       </div>
                     </div>
@@ -344,12 +363,15 @@ function WebLanding() {
                   </button>
                 );
               })}
-              {!categories && <div className="col-span-full text-sm text-muted-foreground">Laster kategorier…</div>}
+              {!categories && (
+                <div className="col-span-full text-sm text-muted-foreground">
+                  Laster kategorier…
+                </div>
+              )}
             </>
           )}
         </div>
       </section>
-
 
       {/* How it works */}
       <section className="bg-surface">
@@ -390,9 +412,12 @@ function WebLanding() {
         <div className="overflow-hidden rounded-3xl border border-border bg-primary px-8 py-12 text-primary-foreground md:px-16 md:py-16">
           <div className="grid items-center gap-8 md:grid-cols-[1.5fr_1fr]">
             <div>
-              <h2 className="font-display text-3xl tracking-tight md:text-4xl">Et alternativ vi bygger sammen.</h2>
+              <h2 className="font-display text-3xl tracking-tight md:text-4xl">
+                Et alternativ vi bygger sammen.
+              </h2>
               <p className="mt-3 max-w-xl opacity-90">
-                Kaupet.no bygges åpent på GitHub. Frivillige utviklere og designere er hjertelig velkomne.
+                Kaupet.no bygges åpent på GitHub. Frivillige utviklere og designere er hjertelig
+                velkomne.
               </p>
             </div>
             <div className="flex flex-wrap gap-3 md:justify-end">

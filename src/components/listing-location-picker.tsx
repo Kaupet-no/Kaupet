@@ -93,12 +93,7 @@ export function ListingLocationPicker({ lat, lng, onChange }: Props) {
             fillOpacity: 0.15,
           }}
         />
-        <Marker
-          position={[lat, lng]}
-          draggable
-          icon={defaultIcon}
-          eventHandlers={handlers}
-        />
+        <Marker position={[lat, lng]} draggable icon={defaultIcon} eventHandlers={handlers} />
         <MapClickHandler onChange={onChange} />
         <Recenter lat={lat} lng={lng} />
       </MapContainer>

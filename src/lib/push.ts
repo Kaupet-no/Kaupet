@@ -63,7 +63,6 @@ export async function subscribe(): Promise<void> {
     });
   }
 
-
   const json = subscription.toJSON();
   await savePushSubscription({
     data: {

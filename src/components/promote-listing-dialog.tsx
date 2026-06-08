@@ -14,10 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  createPromotionCheckout,
-  getPromotionPricing,
-} from "@/lib/promotions.functions";
+import { createPromotionCheckout, getPromotionPricing } from "@/lib/promotions.functions";
 import { formatErrorMessage } from "@/lib/errors";
 
 type Props = {
@@ -44,8 +41,7 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
     onSuccess: (res) => {
       window.location.href = res.redirect_url;
     },
-    onError: (e: Error) =>
-      toast.error(formatErrorMessage(e, "Kunne ikke starte betalingen")),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke starte betalingen")),
   });
 
   return (
@@ -56,8 +52,8 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
             <Sparkles className="size-5 text-accent" /> Fremhev annonsen
           </DialogTitle>
           <DialogDescription>
-            Fremhevede annonser vises i en egen seksjon øverst i relevante søk og kategorier.
-            Inntil to fremhevede annonser vises om gangen — en av plassene er din.
+            Fremhevede annonser vises i en egen seksjon øverst i relevante søk og kategorier. Inntil
+            to fremhevede annonser vises om gangen — en av plassene er din.
           </DialogDescription>
         </DialogHeader>
 
@@ -100,8 +96,8 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
             <a href="/vilkar#kjopsvilkar" target="_blank" className="underline">
               vilkår for kjøp
             </a>{" "}
-            og samtykker til at fremhevingen leveres umiddelbart, slik at angreretten
-            bortfaller (angrerettloven § 22 bokstav n).
+            og samtykker til at fremhevingen leveres umiddelbart, slik at angreretten bortfaller
+            (angrerettloven § 22 bokstav n).
           </span>
         </label>
 

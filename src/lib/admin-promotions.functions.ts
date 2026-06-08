@@ -41,16 +41,14 @@ export const adminUpdatePromotionPricing = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin
-      .from("promotion_pricing")
-      .upsert(
-        {
-          duration_days: data.duration_days,
-          price_nok: data.price_nok,
-          active: data.active ?? true,
-        },
-        { onConflict: "duration_days" },
-      );
+    const { error } = await supabaseAdmin.from("promotion_pricing").upsert(
+      {
+        duration_days: data.duration_days,
+        price_nok: data.price_nok,
+        active: data.active ?? true,
+      },
+      { onConflict: "duration_days" },
+    );
     if (error) throw error;
     return { ok: true };
   });
@@ -78,9 +76,7 @@ export const adminListPromotions = createServerFn({ method: "GET" })
 
 export const adminRefundPromotion = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z.object({ promotion_id: z.string().uuid() }).parse(input),
-  )
+  .inputValidator((input: unknown) => z.object({ promotion_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -95,11 +91,7 @@ export const adminRefundPromotion = createServerFn({ method: "POST" })
     if (!promo.vipps_reference) throw new Error("Mangler Vipps-referanse");
 
     const { refundVippsPayment } = await import("@/lib/vipps.server");
-    await refundVippsPayment(
-      promo.vipps_reference,
-      promo.price_nok,
-      `refund-${promo.id}`,
-    );
+    await refundVippsPayment(promo.vipps_reference, promo.price_nok, `refund-${promo.id}`);
 
     await supabaseAdmin
       .from("listing_promotions")

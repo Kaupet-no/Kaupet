@@ -23,17 +23,13 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import {
-  LocationPicker,
-  RadiusPicker,
-  type LocationValue,
-} from "@/components/location-filter";
+import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/location-filter";
 import { AnimatedSearchPlaceholder } from "@/components/animated-search-placeholder";
 import { useSavedLocation } from "@/lib/use-saved-location";
 
 const CATEGORY_ICONS: Record<string, LucideIcon> = {
   "mobler-og-interior": Sofa,
-  "elektronikk": Smartphone,
+  elektronikk: Smartphone,
   "klar-og-mote": Shirt,
   "barn-og-baby": Baby,
   "sport-og-friluft": Dumbbell,
@@ -43,7 +39,7 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
   "antikviteter-og-kunst": Palette,
   "deler-bil-og-mc": Car,
   "deler-til-bat": Ship,
-  "annet": Package,
+  annet: Package,
 };
 
 const SUGGESTIONS = [
@@ -116,9 +112,7 @@ export function AppLanding() {
         .limit(10);
       if (error) throw error;
       return (data ?? []).map<ListingCardData>((l) => {
-        const imgs = (l.listing_images ?? [])
-          .slice()
-          .sort((a, b) => a.sort_order - b.sort_order);
+        const imgs = (l.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
         return {
           id: l.id,
           title: l.title,
@@ -212,9 +206,7 @@ export function AppLanding() {
                 >
                   <MapPin className="size-4" />
                   <span className="truncate max-w-[200px]">
-                    {hasLocation
-                      ? `${location.label} · ${location.radius} km`
-                      : "Hvor som helst"}
+                    {hasLocation ? `${location.label} · ${location.radius} km` : "Hvor som helst"}
                   </span>
                   {hasLocation && (
                     <span
@@ -266,10 +258,7 @@ export function AppLanding() {
         <div className="grid grid-cols-2 gap-3">
           {rootCategories.length === 0 &&
             Array.from({ length: 6 }).map((_, i) => (
-              <div
-                key={i}
-                className="aspect-[5/4] animate-pulse rounded-2xl bg-muted"
-              />
+              <div key={i} className="aspect-[5/4] animate-pulse rounded-2xl bg-muted" />
             ))}
           {rootCategories.map((cat) => {
             const Icon = CATEGORY_ICONS[cat.slug] ?? Package;
@@ -283,9 +272,7 @@ export function AppLanding() {
                 <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
                   <Icon className="size-5" />
                 </span>
-                <span className="text-pretty text-sm font-medium leading-tight">
-                  {cat.name_nb}
-                </span>
+                <span className="text-pretty text-sm font-medium leading-tight">{cat.name_nb}</span>
               </button>
             );
           })}
@@ -307,10 +294,7 @@ export function AppLanding() {
         {popular && popular.length > 0 ? (
           <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 pr-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {popular.map((l) => (
-              <div
-                key={l.id}
-                className="w-[60%] shrink-0 snap-start sm:w-[40%]"
-              >
+              <div key={l.id} className="w-[60%] shrink-0 snap-start sm:w-[40%]">
                 <ListingCard listing={l} />
               </div>
             ))}
@@ -329,4 +313,3 @@ export function AppLanding() {
     </div>
   );
 }
-

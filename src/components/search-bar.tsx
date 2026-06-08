@@ -1,5 +1,13 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, MapPin, Search as SearchIcon, SlidersHorizontal, X } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  MapPin,
+  Search as SearchIcon,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,7 +71,8 @@ function categoryLabel(selectedSlugs: string[], tree: CatTree): string {
     if (kids.length === 0) continue;
     const allChildrenSlugs = kids.map((k) => k.slug);
     const hasAll =
-      set.has(root.slug) && allChildrenSlugs.every((s) => set.has(s)) &&
+      set.has(root.slug) &&
+      allChildrenSlugs.every((s) => set.has(s)) &&
       set.size === 1 + allChildrenSlugs.length;
     if (hasAll) return root.name_nb;
   }
@@ -118,8 +127,8 @@ function DesktopBar({
   const sortLabel = SORT_OPTIONS.find((s) => s.value === sort)?.label ?? "Nyeste først";
   const hasCategory = selectedSlugs.length > 0;
 
-  const drillParent = drillParentId ? tree.byId.get(drillParentId) ?? null : null;
-  const drillKids = drillParent ? tree.childrenByParent.get(drillParent.id) ?? [] : [];
+  const drillParent = drillParentId ? (tree.byId.get(drillParentId) ?? null) : null;
+  const drillKids = drillParent ? (tree.childrenByParent.get(drillParent.id) ?? []) : [];
 
   return (
     <form
@@ -233,9 +242,7 @@ function DesktopBar({
                   <span className="font-medium">Alt i {drillParent.name_nb}</span>
                 </PopoverOption>
                 {drillKids.length === 0 ? (
-                  <p className="px-3 py-2 text-xs text-muted-foreground">
-                    Ingen underkategorier
-                  </p>
+                  <p className="px-3 py-2 text-xs text-muted-foreground">Ingen underkategorier</p>
                 ) : (
                   drillKids.map((k) => (
                     <PopoverOption
@@ -331,8 +338,8 @@ function MobileBar(props: Props) {
   const tree = useMemo(() => buildTree(categories), [categories]);
   const hasLocation = location.lat != null && location.lng != null;
   const label = categoryLabel(selectedSlugs, tree);
-  const drillParent = drillParentId ? tree.byId.get(drillParentId) ?? null : null;
-  const drillKids = drillParent ? tree.childrenByParent.get(drillParent.id) ?? [] : [];
+  const drillParent = drillParentId ? (tree.byId.get(drillParentId) ?? null) : null;
+  const drillKids = drillParent ? (tree.childrenByParent.get(drillParent.id) ?? []) : [];
 
   const summary =
     [q || null, location.label || null, selectedSlugs.length > 0 ? label : null]

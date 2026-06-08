@@ -92,7 +92,6 @@ export function AdvancedSearchSheet({ open, onOpenChange, initial, categories, o
 
   const removeTerm = (t: string) => setV({ ...v, terms: v.terms.filter((x) => x !== t) });
 
-
   const toggleCondition = (val: string) =>
     setV({
       ...v,
@@ -192,8 +191,6 @@ export function AdvancedSearchSheet({ open, onOpenChange, initial, categories, o
               onChange={(slugs) => setV({ ...v, categories: slugs, catMode: "any" })}
             />
 
-
-
             {/* Pris */}
             <section className="space-y-2">
               <Label className="text-sm font-medium">Pris (NOK)</Label>
@@ -263,7 +260,9 @@ export function AdvancedSearchSheet({ open, onOpenChange, initial, categories, o
                 />
               </div>
               {v.location.lat == null && (
-                <p className="text-xs text-muted-foreground">Velg sted overfor for å aktivere radius.</p>
+                <p className="text-xs text-muted-foreground">
+                  Velg sted overfor for å aktivere radius.
+                </p>
               )}
             </section>
           </div>
@@ -274,12 +273,7 @@ export function AdvancedSearchSheet({ open, onOpenChange, initial, categories, o
             </Button>
             <div className="flex gap-2">
               {user && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSaveOpen(true)}
-                >
+                <Button type="button" variant="outline" size="sm" onClick={() => setSaveOpen(true)}>
                   <Save className="size-4" /> Lagre søk
                 </Button>
               )}
@@ -314,10 +308,7 @@ function CategoryPicker({
   onChange: (slugs: string[]) => void;
 }) {
   const ALL = "__all__";
-  const parents = useMemo(
-    () => categories.filter((c) => c.parent_id == null),
-    [categories],
-  );
+  const parents = useMemo(() => categories.filter((c) => c.parent_id == null), [categories]);
   const childrenById = useMemo(() => {
     const map = new Map<string, Category[]>();
     for (const p of parents) {
@@ -335,10 +326,10 @@ function CategoryPicker({
   const mainCat = firstSel
     ? firstSel.parent_id == null
       ? firstSel
-      : categories.find((c) => c.id === firstSel.parent_id) ?? null
+      : (categories.find((c) => c.id === firstSel.parent_id) ?? null)
     : null;
   const mainSlug = mainCat?.slug ?? "";
-  const subs = mainCat ? childrenById.get(mainCat.id) ?? [] : [];
+  const subs = mainCat ? (childrenById.get(mainCat.id) ?? []) : [];
   const selectedSubSlugs = new Set(
     selectedCats.filter((c) => c.parent_id != null).map((c) => c.slug),
   );
@@ -398,7 +389,6 @@ function CategoryPicker({
     </section>
   );
 }
-
 
 function ModeToggle({
   value,
@@ -495,10 +485,7 @@ function SaveSearchDialog({
             />
           </div>
           <label className="flex cursor-pointer items-center gap-2 text-sm">
-            <Checkbox
-              checked={notify}
-              onCheckedChange={(c) => setNotify(c === true)}
-            />
+            <Checkbox checked={notify} onCheckedChange={(c) => setNotify(c === true)} />
             Varsle meg om nye treff
           </label>
           {notify && <PushHintForSavedSearch />}
@@ -539,8 +526,8 @@ function PushHintForSavedSearch() {
   if (!push.supported) {
     body = (
       <p>
-        Push-varsler er ikke tilgjengelig i denne nettleseren. Du kan fortsatt lagre søket
-        og motta varsler på andre enheter der du er logget inn.
+        Push-varsler er ikke tilgjengelig i denne nettleseren. Du kan fortsatt lagre søket og motta
+        varsler på andre enheter der du er logget inn.
       </p>
     );
   } else if (push.permission === "denied") {
@@ -566,9 +553,7 @@ function PushHintForSavedSearch() {
     // subscribed but pref off
     body = (
       <div className="space-y-2">
-        <p>
-          Push-varsler for lagrede søk er slått av i profilen din.
-        </p>
+        <p>Push-varsler for lagrede søk er slått av i profilen din.</p>
         <Button size="sm" type="button" onClick={enable} disabled={busy}>
           {busy && <Loader2 className="size-4 animate-spin" />}
           Slå på for lagrede søk
@@ -595,7 +580,6 @@ function PushHintForSavedSearch() {
     </div>
   );
 }
-
 
 export function valueToCriteria(v: AdvancedSearchValue): SearchCriteria {
   return {

@@ -39,8 +39,10 @@ export function summarizeCriteria(c: SearchCriteria): string {
   const parts: string[] = [];
   const terms = c.terms?.length ? c.terms : c.q ? c.q.split(/\s+/).filter(Boolean) : [];
   if (terms.length) parts.push(`"${terms.join(" ")}"`);
-  if (c.categories?.length) parts.push(`${c.categories.length} kategori${c.categories.length === 1 ? "" : "er"}`);
-  if (c.conditions?.length) parts.push(`${c.conditions.length} tilstand${c.conditions.length === 1 ? "" : "er"}`);
+  if (c.categories?.length)
+    parts.push(`${c.categories.length} kategori${c.categories.length === 1 ? "" : "er"}`);
+  if (c.conditions?.length)
+    parts.push(`${c.conditions.length} tilstand${c.conditions.length === 1 ? "" : "er"}`);
   if (c.min != null || c.max != null) {
     const min = c.min != null ? `${c.min} kr` : "0 kr";
     const max = c.max != null ? `${c.max} kr` : "∞";
@@ -71,7 +73,10 @@ export async function createSavedSearch(name: string, criteria: SearchCriteria, 
   return data as SavedSearch;
 }
 
-export async function updateSavedSearch(id: string, patch: Partial<Pick<SavedSearch, "name" | "criteria" | "notify">>) {
+export async function updateSavedSearch(
+  id: string,
+  patch: Partial<Pick<SavedSearch, "name" | "criteria" | "notify">>,
+) {
   const { error } = await supabase.from("saved_searches").update(patch).eq("id", id);
   if (error) throw error;
 }

@@ -47,10 +47,7 @@ export async function geocodeNorwayAddress(input: {
  * Reverse-geocode et punkt til et lesbart stedsnavn i Norge (best-effort).
  * Returnerer f.eks. "Fjellhamar, Lørenskog" eller null hvis ingenting funnet.
  */
-export async function reverseGeocode(input: {
-  lat: number;
-  lng: number;
-}): Promise<string | null> {
+export async function reverseGeocode(input: { lat: number; lng: number }): Promise<string | null> {
   try {
     const url = new URL("https://nominatim.openstreetmap.org/reverse");
     url.searchParams.set("lat", String(input.lat));

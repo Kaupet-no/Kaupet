@@ -23,12 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  createBlock,
-  deleteBlock,
-  listMyBlocks,
-  type BlockRow,
-} from "@/lib/blocks.functions";
+import { createBlock, deleteBlock, listMyBlocks, type BlockRow } from "@/lib/blocks.functions";
 import { formatErrorMessage } from "@/lib/errors";
 
 type Props = {
@@ -39,11 +34,7 @@ type Props = {
 
 type ActiveBlock = { kind: "all" | "conversation"; row: BlockRow } | null;
 
-export function BlockConversationMenu({
-  targetUserId,
-  conversationId,
-  targetName,
-}: Props) {
+export function BlockConversationMenu({ targetUserId, conversationId, targetName }: Props) {
   const qc = useQueryClient();
   const listFn = useServerFn(listMyBlocks);
   const createFn = useServerFn(createBlock);
@@ -56,9 +47,7 @@ export function BlockConversationMenu({
 
   const active: ActiveBlock = (() => {
     if (!blocks) return null;
-    const all = blocks.find(
-      (b) => b.scope === "all" && b.blocked_id === targetUserId,
-    );
+    const all = blocks.find((b) => b.scope === "all" && b.blocked_id === targetUserId);
     if (all) return { kind: "all", row: all };
     const conv = blocks.find(
       (b) => b.scope === "conversation" && b.conversation_id === conversationId,
@@ -80,11 +69,7 @@ export function BlockConversationMenu({
       }),
     onSuccess: (_, scope) => {
       qc.invalidateQueries({ queryKey: ["my-blocks"] });
-      toast.success(
-        scope === "all"
-          ? `${targetName} er blokkert`
-          : "Samtalen er blokkert",
-      );
+      toast.success(scope === "all" ? `${targetName} er blokkert` : "Samtalen er blokkert");
       setConfirm(null);
     },
     onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke blokkere brukeren")),
@@ -145,9 +130,7 @@ export function BlockConversationMenu({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {confirm === "all"
-                ? `Blokker ${targetName}?`
-                : "Blokker denne samtalen?"}
+              {confirm === "all" ? `Blokker ${targetName}?` : "Blokker denne samtalen?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirm === "all"
@@ -156,9 +139,7 @@ export function BlockConversationMenu({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={blockMut.isPending}>
-              Avbryt
-            </AlertDialogCancel>
+            <AlertDialogCancel disabled={blockMut.isPending}>Avbryt</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={blockMut.isPending}
@@ -167,9 +148,7 @@ export function BlockConversationMenu({
                 if (confirm) blockMut.mutate(confirm);
               }}
             >
-              {blockMut.isPending && (
-                <Loader2 className="size-4 animate-spin" />
-              )}
+              {blockMut.isPending && <Loader2 className="size-4 animate-spin" />}
               Blokker
             </AlertDialogAction>
           </AlertDialogFooter>

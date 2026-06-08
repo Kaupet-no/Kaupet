@@ -70,7 +70,8 @@ function AdminUsers() {
       qc.invalidateQueries({ queryKey: ["admin", "users"] });
       setPending(null);
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke tildele administratorrollen")),
+    onError: (e: Error) =>
+      toast.error(formatErrorMessage(e, "Kunne ikke tildele administratorrollen")),
   });
 
   const revoke = useMutation({
@@ -83,7 +84,8 @@ function AdminUsers() {
       qc.invalidateQueries({ queryKey: ["admin", "users"] });
       setPending(null);
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke fjerne administratorrollen")),
+    onError: (e: Error) =>
+      toast.error(formatErrorMessage(e, "Kunne ikke fjerne administratorrollen")),
   });
 
   const exportData = useMutation({
@@ -229,7 +231,9 @@ function AdminUsers() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {pending?.action === "grant" ? "Tildele administratorrolle?" : "Fjerne administratorrolle?"}
+              {pending?.action === "grant"
+                ? "Tildele administratorrolle?"
+                : "Fjerne administratorrolle?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {pending?.action === "grant"

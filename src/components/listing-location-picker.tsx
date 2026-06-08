@@ -69,7 +69,7 @@ export function ListingLocationPicker({ lat, lng, onChange }: Props) {
   );
 
   return (
-    <div className="h-72 w-full overflow-hidden rounded-2xl border border-border">
+    <div className="isolate h-72 w-full overflow-hidden rounded-2xl border border-border">
       <MapContainer
         center={[lat, lng]}
         zoom={13}

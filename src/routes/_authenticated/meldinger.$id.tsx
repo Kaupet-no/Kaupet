@@ -231,6 +231,7 @@ function ConversationPage() {
         return [...prev, m];
       });
       queryClient.invalidateQueries({ queryKey: ["my-conversations"] });
+      void import("@/lib/haptics").then((m) => m.hapticSelection());
       setBody("");
     },
   });

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
+import { hapticImpact, hapticNotification } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 
 type Size = "sm" | "md" | "lg";
@@ -67,10 +68,12 @@ export function FavoriteButton({
     onSuccess: (nowFav) => {
       queryClient.invalidateQueries({ queryKey: ["favorite", listingId, user?.id] });
       queryClient.invalidateQueries({ queryKey: ["user-favorites"] });
+      void hapticImpact("light");
       toast.success(nowFav ? "Lagt til i favoritter" : "Fjernet fra favoritter");
     },
     onError: (e: Error) => {
       if (e.message !== "not-authenticated") {
+        void hapticNotification("error");
         toast.error("Kunne ikke oppdatere favoritter");
       }
     },

@@ -16,6 +16,7 @@ import { ModerationBanner } from "@/components/moderation-banner";
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { initNativeOfflineWatcher } from "@/lib/native-offline";
+import { setupNative } from "@/lib/native-setup";
 import { useIsNative } from "@/lib/use-is-native";
 import { AppBottomNav } from "@/components/app-bottom-nav";
 
@@ -209,6 +210,7 @@ function RootComponent() {
 
   useEffect(() => {
     const cleanup = initNativeOfflineWatcher();
+    void setupNative();
     return cleanup;
   }, []);
 

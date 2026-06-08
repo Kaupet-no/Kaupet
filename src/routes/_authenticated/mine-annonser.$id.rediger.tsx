@@ -531,45 +531,61 @@ function EditListingPage() {
         <section className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label>Kategori</Label>
-            <Select
-              value={selectedParentId || undefined}
-              onValueChange={(v) => {
-                setSelectedParentId(v);
-                const hasSubs = (categories ?? []).some((c) => c.parent_id === v);
-                if (!hasSubs) {
-                  setValue("category_id", v, { shouldValidate: true });
-                } else {
-                  setValue("category_id", "", { shouldValidate: false });
-                }
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Velg hovedkategori" />
-              </SelectTrigger>
-              <SelectContent>
-                {parentCategories.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name_nb}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {selectedParentId && subcategories.length > 0 && (
-              <Select
-                value={categoryId || undefined}
-                onValueChange={(v) => setValue("category_id", v, { shouldValidate: true })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Velg underkategori" />
-                </SelectTrigger>
-                <SelectContent>
-                  {subcategories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name_nb}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {!categories ? (
+              <div className="flex h-10 items-center rounded-md border border-input bg-background px-3 text-sm text-muted-foreground">
+                <Loader2 className="mr-2 size-4 animate-spin" /> Laster kategorier…
+              </div>
+            ) : (
+              <>
+                <Select
+                  value={selectedParentId || undefined}
+                  onValueChange={(v) => {
+                    if (v === selectedParentId) return;
+                    setSelectedParentId(v);
+                    const hasSubs = categories.some((c) => c.parent_id === v);
+                    if (!hasSubs) {
+                      setValue("category_id", v, { shouldValidate: true });
+                    } else {
+                      setValue("category_id", "", { shouldValidate: false });
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Velg hovedkategori" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {parentCategories.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name_nb}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedParentId && subcategories.length > 0 && (
+                  <Select
+                    value={
+                      categoryId && subcategories.some((c) => c.id === categoryId)
+                        ? categoryId
+                        : undefined
+                    }
+                    onValueChange={(v) => setValue("category_id", v, { shouldValidate: true })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Velg underkategori" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {subcategories.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name_nb}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {errors.category_id && (
+                  <p className="text-sm text-destructive">Velg en kategori</p>
+                )}
+              </>
             )}
           </div>
           <div className="space-y-2">

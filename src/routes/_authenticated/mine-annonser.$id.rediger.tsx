@@ -309,15 +309,12 @@ function EditListingPage() {
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
       const parsed = schema.parse(values);
-      const postalChanged = parsed.postal_code !== (listing?.postal_code ?? "");
-      const cityChanged = parsed.city !== (listing?.city ?? "");
-      let coords: { lat: number; lng: number } | null = null;
-      if (postalChanged || cityChanged) {
-        coords = await geocodeNorwayAddress({
+      const finalCoords =
+        coords ??
+        (await geocodeNorwayAddress({
           postal_code: parsed.postal_code,
           city: parsed.city,
-        });
-      }
+        }));
 
       const { error: updErr } = await supabase
         .from("listings")
@@ -334,7 +331,8 @@ function EditListingPage() {
               : null,
           postal_code: parsed.postal_code || null,
           city: parsed.city || null,
-          ...(coords ? { lat: coords.lat, lng: coords.lng } : {}),
+          lat: finalCoords?.lat ?? null,
+          lng: finalCoords?.lng ?? null,
         })
         .eq("id", id);
       if (updErr) throw updErr;

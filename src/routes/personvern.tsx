@@ -50,14 +50,13 @@ function PersonvernPage() {
               forteller når du sist åpnet chatten. Brukes kun til ulest-indikatoren i meldingsinnboksen.
             </li>
             <li>
-              <strong>kaupet_viewed_&lt;id&gt;</strong> — en markering per nettleserfane i <code>sessionStorage</code>{" "}
-              som hindrer at samme annonse telles flere ganger ved refresh. Slettes når fanen lukkes.
+              <strong>kaupet_visitor_id</strong> — en tilfeldig, anonym ID i <code>localStorage</code> som identifiserer
+              nettleseren din uten å være knyttet til navn, e-post eller IP-adresse. Brukes utelukkende for å gi selger
+              en grov teller på unike besøk per annonse, og for å hindre at samme besøkende telles flere ganger ved
+              refresh eller gjenåpning. ID-en deles ikke med tredjepart og brukes ikke til sporing, profilering eller
+              markedsføring.
             </li>
-            <li>
-              <strong>kaupet_session_id</strong> — en anonym ID i <code>sessionStorage</code> som lever kun i én
-              nettleser-økt. Brukes til å gi selger en grov teller på unike besøk per annonse. Slettes når du lukker
-              fanen.
-            </li>
+
             <li>
               <strong>kaupet_push_msg_hint_dismissed_v1</strong> — lagres i <code>localStorage</code> og husker at du
               har lukket informasjonsmeldingen om push-varsler i meldingsoversikten, slik at den ikke vises på nytt.

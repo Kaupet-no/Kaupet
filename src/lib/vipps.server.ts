@@ -43,8 +43,8 @@ async function getAccessToken(): Promise<string> {
   const res = await fetch(`${e.baseUrl}/accesstoken/get`, {
     method: "POST",
     headers: {
-      "client_id": e.clientId,
-      "client_secret": e.clientSecret,
+      client_id: e.clientId,
+      client_secret: e.clientSecret,
       "Ocp-Apim-Subscription-Key": e.subscriptionKey,
     },
   });
@@ -65,7 +65,7 @@ async function vippsHeaders(extra: Record<string, string> = {}) {
   const e = env();
   const token = await getAccessToken();
   return {
-    "Authorization": `Bearer ${token}`,
+    Authorization: `Bearer ${token}`,
     "Ocp-Apim-Subscription-Key": e.subscriptionKey,
     "Merchant-Serial-Number": e.msn,
     "Vipps-System-Name": "kaupet.no",
@@ -112,7 +112,11 @@ export async function createVippsPayment(input: CreatePaymentInput): Promise<Cre
     const text = await res.text();
     throw new Error(`Vipps create-payment feilet: ${res.status} ${text}`);
   }
-  const json = (await res.json()) as { redirectUrl: string; reference: string; pspReference?: string };
+  const json = (await res.json()) as {
+    redirectUrl: string;
+    reference: string;
+    pspReference?: string;
+  };
   return {
     reference: json.reference,
     redirectUrl: json.redirectUrl,
@@ -146,10 +150,18 @@ export async function getVippsPayment(reference: string): Promise<{
     const text = await res.text();
     throw new Error(`Vipps get-payment feilet: ${res.status} ${text}`);
   }
-  return (await res.json()) as { state: VippsPaymentStatus; pspReference?: string; amount?: { value: number; currency: string } };
+  return (await res.json()) as {
+    state: VippsPaymentStatus;
+    pspReference?: string;
+    amount?: { value: number; currency: string };
+  };
 }
 
-export async function captureVippsPayment(reference: string, amountNok: number, idempotencyKey: string) {
+export async function captureVippsPayment(
+  reference: string,
+  amountNok: number,
+  idempotencyKey: string,
+) {
   assertVippsConfigured();
   const e = env();
   const res = await fetch(`${e.baseUrl}/epayment/v1/payments/${reference}/capture`, {
@@ -165,7 +177,11 @@ export async function captureVippsPayment(reference: string, amountNok: number, 
   }
 }
 
-export async function refundVippsPayment(reference: string, amountNok: number, idempotencyKey: string) {
+export async function refundVippsPayment(
+  reference: string,
+  amountNok: number,
+  idempotencyKey: string,
+) {
   assertVippsConfigured();
   const e = env();
   const res = await fetch(`${e.baseUrl}/epayment/v1/payments/${reference}/refund`, {

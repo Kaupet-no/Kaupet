@@ -83,7 +83,9 @@ function fromZodIssue(issue: {
   }
 }
 
-function isZodError(err: AnyError): err is { issues: Array<Record<string, unknown>>; name?: string } {
+function isZodError(
+  err: AnyError,
+): err is { issues: Array<Record<string, unknown>>; name?: string } {
   if (!err || typeof err !== "object") return false;
   const e = err as { name?: string; issues?: unknown };
   if (e.name === "ZodError") return true;
@@ -100,15 +102,18 @@ function isPostgrestError(err: AnyError): err is {
   if (!err || typeof err !== "object") return false;
   const e = err as Record<string, unknown>;
   return (
-    typeof e.code === "string" &&
-    (typeof e.message === "string" || typeof e.details === "string")
+    typeof e.code === "string" && (typeof e.message === "string" || typeof e.details === "string")
   );
 }
 
-function isAuthError(err: AnyError): err is { message: string; status?: number; __isAuthError?: boolean } {
+function isAuthError(
+  err: AnyError,
+): err is { message: string; status?: number; __isAuthError?: boolean } {
   if (!err || typeof err !== "object") return false;
   const e = err as Record<string, unknown>;
-  return e.__isAuthError === true || (typeof e.status === "number" && typeof e.message === "string");
+  return (
+    e.__isAuthError === true || (typeof e.status === "number" && typeof e.message === "string")
+  );
 }
 
 function looksLikeJson(s: string): boolean {
@@ -123,8 +128,8 @@ function looksTechnical(s: string): boolean {
     lower.includes("permission denied") ||
     lower.includes("violates") ||
     lower.includes("syntax error") ||
-    lower.includes("relation \"") ||
-    lower.includes("column \"") ||
+    lower.includes('relation "') ||
+    lower.includes('column "') ||
     lower.includes("null value in column") ||
     lower.includes("foreign key") ||
     lower.includes("postgrest") ||
@@ -164,7 +169,8 @@ function fromAuthMessage(message: string, fallback: string): string {
   if (lower.includes("user already registered") || lower.includes("already been registered"))
     return "Det finnes allerede en konto med denne e-posten";
   if (lower.includes("email not confirmed")) return "Bekreft e-posten din før du logger inn";
-  if (lower.includes("email rate limit")) return "For mange e-poster sendt. Vent litt og prøv igjen";
+  if (lower.includes("email rate limit"))
+    return "For mange e-poster sendt. Vent litt og prøv igjen";
   if (lower.includes("for security purposes") || lower.includes("rate limit"))
     return "For mange forsøk. Vent litt og prøv igjen";
   if (lower.includes("password should be at least")) {

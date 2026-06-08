@@ -8,10 +8,7 @@ import {
   pushSupported,
   subscribe as subscribePush,
 } from "@/lib/push";
-import {
-  getNotificationPreferences,
-  updateNotificationPreferences,
-} from "@/lib/push.functions";
+import { getNotificationPreferences, updateNotificationPreferences } from "@/lib/push.functions";
 import { useAuth } from "@/lib/auth";
 
 export type PushStatus = {
@@ -115,19 +112,15 @@ export function usePushStatus(): PushStatus {
 
   const subscribedHere = !!endpoint && permission === "granted";
 
-  const enableOnThisDevice = async (
-    kind?: "messages" | "saved_searches" | "price_drops",
-  ) => {
+  const enableOnThisDevice = async (kind?: "messages" | "saved_searches" | "price_drops") => {
     await subscribePush();
     await refreshBrowser();
     if (kind) {
       const next = {
-        web_push_messages:
-          kind === "messages" ? true : effectivePrefs.web_push_messages,
+        web_push_messages: kind === "messages" ? true : effectivePrefs.web_push_messages,
         web_push_saved_searches:
           kind === "saved_searches" ? true : effectivePrefs.web_push_saved_searches,
-        web_push_price_drops:
-          kind === "price_drops" ? true : effectivePrefs.web_push_price_drops,
+        web_push_price_drops: kind === "price_drops" ? true : effectivePrefs.web_push_price_drops,
       };
       if (
         next.web_push_messages !== effectivePrefs.web_push_messages ||

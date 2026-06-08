@@ -51,9 +51,7 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
           aria-label="Brukermeny"
         >
           <Avatar className="size-8">
-            {profile?.avatar_url && (
-              <AvatarImage src={profile.avatar_url} alt={displayName} />
-            )}
+            {profile?.avatar_url && <AvatarImage src={profile.avatar_url} alt={displayName} />}
             <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
               {initials(profile?.display_name, email ?? "")}
             </AvatarFallback>
@@ -64,9 +62,7 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
         <DropdownMenuLabel className="flex flex-col gap-0.5">
           <span className="text-sm font-medium">{displayName}</span>
           {email && (
-            <span className="truncate text-xs font-normal text-muted-foreground">
-              {email}
-            </span>
+            <span className="truncate text-xs font-normal text-muted-foreground">{email}</span>
           )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />

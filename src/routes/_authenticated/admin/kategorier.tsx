@@ -194,8 +194,7 @@ function AdminCategories() {
             <AlertDialogCancel>Avbryt</AlertDialogCancel>
             <AlertDialogAction
               disabled={
-                deleteMutation.isPending ||
-                (tree.get(deleting?.id ?? null)?.length ?? 0) > 0
+                deleteMutation.isPending || (tree.get(deleting?.id ?? null)?.length ?? 0) > 0
               }
               onClick={() => deleting && deleteMutation.mutate(deleting.id)}
             >
@@ -290,9 +289,7 @@ function CategoryFormDialog({
   const [name, setName] = useState(category?.name_nb ?? "");
   const [slug, setSlug] = useState(category?.slug ?? "");
   const [sortOrder, setSortOrder] = useState(category?.sort_order ?? 0);
-  const [parent, setParent] = useState<string>(
-    category?.parent_id ?? parentId ?? "__none__",
-  );
+  const [parent, setParent] = useState<string>(category?.parent_id ?? parentId ?? "__none__");
   const [slugTouched, setSlugTouched] = useState(!!category);
 
   const save = useMutation({

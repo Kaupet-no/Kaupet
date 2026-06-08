@@ -38,9 +38,7 @@ export const Route = createFileRoute("/api/public/push/dispatch")({
           return new Response("Invalid payload", { status: 400 });
         }
 
-        const { supabaseAdmin } = await import(
-          "@/integrations/supabase/client.server"
-        );
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
         // Build notification content from authoritative DB rows only.
         let userId: string | null = null;
@@ -64,8 +62,7 @@ export const Route = createFileRoute("/api/public/push/dispatch")({
             .maybeSingle();
           if (!conv) return new Response(null, { status: 204 });
 
-          userId =
-            conv.buyer_id === msg.sender_id ? conv.seller_id : conv.buyer_id;
+          userId = conv.buyer_id === msg.sender_id ? conv.seller_id : conv.buyer_id;
           if (!userId || userId === msg.sender_id) {
             return new Response(null, { status: 204 });
           }
@@ -195,10 +192,7 @@ export const Route = createFileRoute("/api/public/push/dispatch")({
                   ? (err as { statusCode: number }).statusCode
                   : undefined;
               if (statusCode === 404 || statusCode === 410) {
-                await supabaseAdmin
-                  .from("push_subscriptions")
-                  .delete()
-                  .eq("id", s.id);
+                await supabaseAdmin.from("push_subscriptions").delete().eq("id", s.id);
               } else {
                 console.error("Web push error", statusCode);
               }

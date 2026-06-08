@@ -1,7 +1,20 @@
 import { createFileRoute, Link, notFound, useNavigate, useRouter } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { lazy, Suspense, useEffect, useState } from "react";
-import { ArrowLeft, MapPin, MessageCircle, User as UserIcon, Pencil, Eye, Users, Heart, Info, ChevronDown, Share2, Sparkles } from "lucide-react";
+import {
+  ArrowLeft,
+  MapPin,
+  MessageCircle,
+  User as UserIcon,
+  Pencil,
+  Eye,
+  Users,
+  Heart,
+  Info,
+  ChevronDown,
+  Share2,
+  Sparkles,
+} from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -15,8 +28,6 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/component
 import { FavoriteButton } from "@/components/favorite-button";
 import { PromoteListingDialog } from "@/components/promote-listing-dialog";
 import { formatErrorMessage } from "@/lib/errors";
-
-
 
 const ListingDetailMap = lazy(() =>
   import("@/components/listing-detail-map").then((m) => ({ default: m.ListingDetailMap })),
@@ -51,10 +62,7 @@ export const Route = createFileRoute("/annonse/$id")({
     const l = loaderData?.listing;
     if (!l) {
       return {
-        meta: [
-          { title: "Annonse — Kaupet.no" },
-          { name: "robots", content: "noindex" },
-        ],
+        meta: [{ title: "Annonse — Kaupet.no" }, { name: "robots", content: "noindex" }],
       };
     }
     const priceLabel = l.is_free
@@ -133,9 +141,7 @@ export const Route = createFileRoute("/annonse/$id")({
   notFoundComponent: () => (
     <div className="mx-auto max-w-2xl px-4 py-20 text-center">
       <h1 className="font-display text-2xl">Annonsen finnes ikke</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Den kan ha blitt fjernet eller solgt.
-      </p>
+      <p className="mt-2 text-sm text-muted-foreground">Den kan ha blitt fjernet eller solgt.</p>
       <Link to="/annonser" search={{ q: "", category: "", sort: "new" }}>
         <Button className="mt-6" variant="outline">
           Se flere annonser
@@ -245,9 +251,7 @@ function ListingDetailPage() {
     },
   });
 
-  const images = (data?.listing_images ?? [])
-    .slice()
-    .sort((a, b) => a.sort_order - b.sort_order);
+  const images = (data?.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
 
   useEffect(() => {
     if (images.length === 0) return;
@@ -280,9 +284,6 @@ function ListingDetailPage() {
       )
       .then(() => undefined);
   }, [data?.id, data?.seller_id, user?.id]);
-
-
-
 
   if (isLoading) {
     return (
@@ -372,7 +373,11 @@ function ListingDetailPage() {
 
           {(() => {
             const fmt = (s: string) =>
-              new Date(s).toLocaleDateString("nb-NO", { day: "numeric", month: "long", year: "numeric" });
+              new Date(s).toLocaleDateString("nb-NO", {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              });
             const publishedRaw = (data as any).published_at as string | null;
             const updatedRaw = (data as any).updated_at as string | null;
             const publishedDate = publishedRaw ? new Date(publishedRaw) : new Date(data.created_at);
@@ -385,7 +390,8 @@ function ListingDetailPage() {
                 updatedDate.getDate() > publishedDate.getDate());
 
             const label = isEditedLater ? "Sist redigert" : "Publisert";
-            const dateStr = isEditedLater && updatedRaw ? fmt(updatedRaw) : fmt(publishedRaw ?? data.created_at);
+            const dateStr =
+              isEditedLater && updatedRaw ? fmt(updatedRaw) : fmt(publishedRaw ?? data.created_at);
 
             return (
               <dl className="grid grid-cols-2 gap-3 rounded-xl border border-border bg-card p-4 text-sm sm:grid-cols-3">
@@ -415,11 +421,7 @@ function ListingDetailPage() {
               <p className="text-xs font-medium uppercase tracking-wide text-primary">
                 Dette er din annonse
               </p>
-              <Link
-                to="/mine-annonser/$id/rediger"
-                params={{ id: data.id }}
-                className="mt-3 block"
-              >
+              <Link to="/mine-annonser/$id/rediger" params={{ id: data.id }} className="mt-3 block">
                 <Button className="w-full gap-2" variant="default">
                   <Pencil className="size-4" /> Rediger annonse
                 </Button>
@@ -468,14 +470,20 @@ function ListingDetailPage() {
                   </dt>
                 </div>
               </dl>
-              <Collapsible open={statsInfoOpen} onOpenChange={setStatsInfoOpen} className="mt-4 rounded-lg bg-card">
+              <Collapsible
+                open={statsInfoOpen}
+                onOpenChange={setStatsInfoOpen}
+                className="mt-4 rounded-lg bg-card"
+              >
                 <CollapsibleTrigger asChild>
                   <button className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-xs text-muted-foreground transition-colors hover:text-foreground">
                     <span className="flex items-center gap-2 font-medium text-foreground">
                       <Info className="size-3.5 shrink-0 text-primary" />
                       Hva betyr tallene?
                     </span>
-                    <ChevronDown className={`size-3.5 shrink-0 transition-transform ${statsInfoOpen ? "rotate-180" : ""}`} />
+                    <ChevronDown
+                      className={`size-3.5 shrink-0 transition-transform ${statsInfoOpen ? "rotate-180" : ""}`}
+                    />
                   </button>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
@@ -484,24 +492,30 @@ function ListingDetailPage() {
                       <li className="flex gap-2">
                         <span className="mt-0.5 shrink-0 text-primary">•</span>
                         <span>
-                          <strong className="text-foreground">Visninger</strong> — antall ganger annonsen er åpnet (ett oppslag per time).
+                          <strong className="text-foreground">Visninger</strong> — antall ganger
+                          annonsen er åpnet (ett oppslag per time).
                         </span>
                       </li>
                       <li className="flex gap-2">
                         <span className="mt-0.5 shrink-0 text-primary">•</span>
                         <span>
-                          <strong className="text-foreground">Unike besøk</strong> — antall distinkte besøkende. Vi skiller brukere ved innlogget bruker-ID eller en tilfeldig nøkkel i nettleseren. Samme person telles bare én gang.
+                          <strong className="text-foreground">Unike besøk</strong> — antall
+                          distinkte besøkende. Vi skiller brukere ved innlogget bruker-ID eller en
+                          tilfeldig nøkkel i nettleseren. Samme person telles bare én gang.
                         </span>
                       </li>
                       <li className="flex gap-2">
                         <span className="mt-0.5 shrink-0 text-primary">•</span>
                         <span>
-                          <strong className="text-foreground">Favoritter</strong> — antall brukere som har lagt annonsen i favoritter.
+                          <strong className="text-foreground">Favoritter</strong> — antall brukere
+                          som har lagt annonsen i favoritter.
                         </span>
                       </li>
                     </ul>
                     <p className="mt-3 rounded-md bg-muted/60 p-2 text-[11px] leading-relaxed">
-                      Tallene kan være noe unøyaktige fordi vi ikke sporer brukere på tvers av nettlesere eller økter. Bytter noen nettleser eller rydder data, telles de på nytt.
+                      Tallene kan være noe unøyaktige fordi vi ikke sporer brukere på tvers av
+                      nettlesere eller økter. Bytter noen nettleser eller rydder data, telles de på
+                      nytt.
                     </p>
                   </div>
                 </CollapsibleContent>
@@ -509,16 +523,10 @@ function ListingDetailPage() {
             </div>
           )}
 
-
-
           <div className="rounded-xl border border-border bg-card p-4">
             <div className="flex items-center gap-3">
               {user && seller?.avatar_url ? (
-                <img
-                  src={seller.avatar_url}
-                  alt=""
-                  className="size-10 rounded-full object-cover"
-                />
+                <img src={seller.avatar_url} alt="" className="size-10 rounded-full object-cover" />
               ) : (
                 <div className="flex size-10 items-center justify-center rounded-full bg-muted">
                   <UserIcon className="size-5 text-muted-foreground" />
@@ -541,9 +549,7 @@ function ListingDetailPage() {
                     )}
                   </>
                 ) : (
-                  <p className="text-muted-foreground">
-                    Logg inn for å se informasjon om selger
-                  </p>
+                  <p className="text-muted-foreground">Logg inn for å se informasjon om selger</p>
                 )}
               </div>
             </div>
@@ -580,7 +586,6 @@ function ListingDetailPage() {
             >
               <Share2 className="size-4" /> Del annonse
             </Button>
-
           </div>
         </aside>
       </div>
@@ -596,9 +601,7 @@ function ListingDetailPage() {
         <section className="mt-10">
           <div className="h-80 overflow-hidden rounded-2xl border border-border">
             {mounted ? (
-              <Suspense
-                fallback={<div className="h-full w-full animate-pulse bg-muted" />}
-              >
+              <Suspense fallback={<div className="h-full w-full animate-pulse bg-muted" />}>
                 <ListingDetailMap lat={data.lat} lng={data.lng} />
               </Suspense>
             ) : (
@@ -606,11 +609,11 @@ function ListingDetailPage() {
             )}
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            Lokasjonen er omtrentlig. Gjenstanden befinner seg ikke nødvendigvis innenfor det markerte området.
+            Lokasjonen er omtrentlig. Gjenstanden befinner seg ikke nødvendigvis innenfor det
+            markerte området.
           </p>
         </section>
       )}
-
     </div>
   );
 }

@@ -55,13 +55,9 @@ export function useUnreadConversationsCount(): number {
     if (!user) return;
     const channel = supabase
       .channel(`unread:${user.id}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "messages" },
-        () => {
-          refetch();
-        },
-      )
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, () => {
+        refetch();
+      })
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
@@ -88,7 +84,6 @@ export function useUnreadConversationsCount(): number {
   // readVersion brukes for å re-evaluere isUnread når noe markeres som lest
   void readVersion;
 
-  return (data ?? []).filter((c) =>
-    isUnread(c.id, c.last_message_at, c.last_sender_id, user?.id),
-  ).length;
+  return (data ?? []).filter((c) => isUnread(c.id, c.last_message_at, c.last_sender_id, user?.id))
+    .length;
 }

@@ -51,8 +51,7 @@ export const createBlock = createServerFn({ method: "POST" })
       if (conv.buyer_id !== userId && conv.seller_id !== userId) {
         throw new Error("Du er ikke deltaker i denne samtalen");
       }
-      const otherId =
-        conv.buyer_id === userId ? conv.seller_id : conv.buyer_id;
+      const otherId = conv.buyer_id === userId ? conv.seller_id : conv.buyer_id;
       if (otherId !== data.targetUserId) {
         throw new Error("Mottakeren stemmer ikke med samtalen");
       }
@@ -63,8 +62,7 @@ export const createBlock = createServerFn({ method: "POST" })
       blocker_id: userId,
       blocked_id: data.targetUserId,
       scope: data.scope,
-      conversation_id:
-        data.scope === "conversation" ? data.conversationId ?? null : null,
+      conversation_id: data.scope === "conversation" ? (data.conversationId ?? null) : null,
       listing_id: listingId,
       reason: data.reason ?? null,
     });
@@ -80,9 +78,7 @@ export const createBlock = createServerFn({ method: "POST" })
 
 export const deleteBlock = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z.object({ blockId: z.string().uuid() }).parse(input),
-  )
+  .inputValidator((input: unknown) => z.object({ blockId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
       .from("user_blocks")
@@ -112,10 +108,7 @@ export const listMyBlocks = createServerFn({ method: "GET" })
     );
 
     const [{ data: profiles }, listingsRes] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("id, display_name, avatar_url")
-        .in("id", blockedIds),
+      supabase.from("profiles").select("id, display_name, avatar_url").in("id", blockedIds),
       listingIds.length > 0
         ? supabase.from("listings").select("id, title").in("id", listingIds)
         : Promise.resolve({ data: [] as { id: string; title: string }[] }),
@@ -127,7 +120,7 @@ export const listMyBlocks = createServerFn({ method: "GET" })
     return list.map((r) => ({
       ...r,
       blocked_profile: pmap.get(r.blocked_id) ?? null,
-      listing: r.listing_id ? lmap.get(r.listing_id) ?? null : null,
+      listing: r.listing_id ? (lmap.get(r.listing_id) ?? null) : null,
     })) as BlockRow[];
   });
 

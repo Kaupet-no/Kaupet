@@ -8,11 +8,7 @@ import { nb } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   listNotifications,
   listPriceDrops,
@@ -49,15 +45,9 @@ export function NotificationsBell() {
     queryKey: ["notifications", user?.id],
     enabled: !!user,
     queryFn: async (): Promise<Item[]> => {
-      const [notifs, drops] = await Promise.all([
-        listNotifications(30),
-        listPriceDrops(30),
-      ]);
+      const [notifs, drops] = await Promise.all([listNotifications(30), listPriceDrops(30)]);
       const listingIds = Array.from(
-        new Set([
-          ...notifs.map((n) => n.listing_id),
-          ...drops.map((d) => d.listing_id),
-        ]),
+        new Set([...notifs.map((n) => n.listing_id), ...drops.map((d) => d.listing_id)]),
       );
       const searchIds = Array.from(new Set(notifs.map((n) => n.saved_search_id)));
       const [listingsRes, searchesRes] = await Promise.all([
@@ -97,7 +87,12 @@ export function NotificationsBell() {
       .channel(`notifs:${user.id}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "saved_search_notifications", filter: `user_id=eq.${user.id}` },
+        {
+          event: "*",
+          schema: "public",
+          table: "saved_search_notifications",
+          filter: `user_id=eq.${user.id}`,
+        },
         () => {
           qc.invalidateQueries({ queryKey: ["notifications"] });
           void refetch();
@@ -105,7 +100,12 @@ export function NotificationsBell() {
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "favorite_price_drops", filter: `user_id=eq.${user.id}` },
+        {
+          event: "*",
+          schema: "public",
+          table: "favorite_price_drops",
+          filter: `user_id=eq.${user.id}`,
+        },
         () => {
           qc.invalidateQueries({ queryKey: ["notifications"] });
           void refetch();
@@ -216,7 +216,8 @@ export function NotificationsBell() {
                           {n.kind === "price_drop" && (
                             <TrendingDown className="mr-1 inline size-3.5 text-accent" />
                           )}
-                          {n.listing_title ?? (n.kind === "price_drop" ? "Favoritten din" : "Ny annonse")}
+                          {n.listing_title ??
+                            (n.kind === "price_drop" ? "Favoritten din" : "Ny annonse")}
                         </p>
                         <p className="line-clamp-1 text-xs text-muted-foreground">
                           {n.kind === "search" ? (

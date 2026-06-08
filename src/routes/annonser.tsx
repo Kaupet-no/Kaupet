@@ -7,13 +7,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
 import { Button } from "@/components/ui/button";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
   Dialog,
   DialogContent,
@@ -222,13 +216,7 @@ function BrowsePage() {
     (search.includeFree === false ? 1 : 0);
 
   const { data: listings, isLoading } = useQuery({
-    queryKey: [
-      "listings",
-      search,
-      radiusIds,
-      effectiveCategories,
-      terms,
-    ],
+    queryKey: ["listings", search, radiusIds, effectiveCategories, terms],
     enabled:
       (effectiveCategories.length === 0 || !!categories) &&
       (search.lat == null || search.lng == null || radiusIds != null),
@@ -280,7 +268,6 @@ function BrowsePage() {
         qb = qb.in("category_id", Array.from(ids));
       }
 
-
       // Conditions
       if (search.conditions && search.conditions.length > 0) {
         qb = qb.in("condition", search.conditions);
@@ -304,8 +291,10 @@ function BrowsePage() {
         }
       }
 
-      if (search.sort === "price_asc") qb = qb.order("price_nok", { ascending: true, nullsFirst: false });
-      else if (search.sort === "price_desc") qb = qb.order("price_nok", { ascending: false, nullsFirst: false });
+      if (search.sort === "price_asc")
+        qb = qb.order("price_nok", { ascending: true, nullsFirst: false });
+      else if (search.sort === "price_desc")
+        qb = qb.order("price_nok", { ascending: false, nullsFirst: false });
       else qb = qb.order("created_at", { ascending: false });
 
       const { data, error } = await qb.limit(60);
@@ -368,15 +357,11 @@ function BrowsePage() {
     }));
 
   const mapCenter =
-    search.lat != null && search.lng != null
-      ? { lat: search.lat, lng: search.lng }
-      : null;
+    search.lat != null && search.lng != null ? { lat: search.lat, lng: search.lng } : null;
 
   const renderMap = (withAreaSearch: boolean) =>
     mounted ? (
-      <Suspense
-        fallback={<div className="h-full w-full animate-pulse rounded-2xl bg-muted" />}
-      >
+      <Suspense fallback={<div className="h-full w-full animate-pulse rounded-2xl bg-muted" />}>
         <ListingsMap
           center={mapCenter}
           radiusKm={search.radius ?? 10}
@@ -525,7 +510,6 @@ function BrowsePage() {
         }}
       />
 
-
       <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_420px]">
         <div>
           <FeaturedListingsSection
@@ -607,9 +591,7 @@ function BrowsePage() {
             <SheetHeader>
               <SheetTitle>Kart</SheetTitle>
             </SheetHeader>
-            <div className="mt-3 h-[calc(100%-3rem)]">
-              {mobileMapOpen ? renderMap(true) : null}
-            </div>
+            <div className="mt-3 h-[calc(100%-3rem)]">{mobileMapOpen ? renderMap(true) : null}</div>
           </SheetContent>
         </Sheet>
       )}

@@ -36,8 +36,18 @@ type ConversationRow = {
     status: string;
     listing_images: { storage_path: string; sort_order: number }[];
   } | null;
-  buyer: { id: string; display_name: string; avatar_url: string | null; deleted_at: string | null } | null;
-  seller: { id: string; display_name: string; avatar_url: string | null; deleted_at: string | null } | null;
+  buyer: {
+    id: string;
+    display_name: string;
+    avatar_url: string | null;
+    deleted_at: string | null;
+  } | null;
+  seller: {
+    id: string;
+    display_name: string;
+    avatar_url: string | null;
+    deleted_at: string | null;
+  } | null;
   last_message: { body: string; created_at: string; sender_id: string } | null;
 };
 
@@ -109,9 +119,7 @@ function InboxPage() {
       })
       .filter((p): p is string => !!p);
     if (paths.length > 0) {
-      signListingImageUrls(paths).then((urls) =>
-        setImgUrls((prev) => ({ ...prev, ...urls })),
-      );
+      signListingImageUrls(paths).then((urls) => setImgUrls((prev) => ({ ...prev, ...urls })));
     }
   }, [conversations]);
 
@@ -122,10 +130,7 @@ function InboxPage() {
     void readVersion;
     const m = new Map<string, boolean>();
     for (const c of conversations ?? []) {
-      m.set(
-        c.id,
-        isUnread(c.id, c.last_message_at, c.last_message?.sender_id, user?.id),
-      );
+      m.set(c.id, isUnread(c.id, c.last_message_at, c.last_message?.sender_id, user?.id));
     }
     return m;
   }, [conversations, readVersion, user?.id]);
@@ -176,7 +181,6 @@ function InboxPage() {
       <PushHintForMessages />
 
       <div className="mt-8 space-y-3">
-
         {isLoading ? (
           <div className="space-y-3">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -212,24 +216,16 @@ function InboxPage() {
               >
                 <button
                   type="button"
-                  onClick={() =>
-                    setExpanded((p) => ({ ...p, [g.listingId]: !isExpanded }))
-                  }
+                  onClick={() => setExpanded((p) => ({ ...p, [g.listingId]: !isExpanded }))}
                   className="flex w-full items-center gap-3 p-3 text-left hover:bg-muted/40"
                 >
                   <div className="size-14 shrink-0 overflow-hidden rounded-lg bg-muted">
                     {coverUrl ? (
-                      <img
-                        src={coverUrl}
-                        alt=""
-                        className="size-full object-cover"
-                      />
+                      <img src={coverUrl} alt="" className="size-full object-cover" />
                     ) : null}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">
-                      {g.listing?.title ?? "Slettet annonse"}
-                    </p>
+                    <p className="truncate font-medium">{g.listing?.title ?? "Slettet annonse"}</p>
                     <p className="text-xs text-muted-foreground">
                       {priceLabel} · {g.conversations.length}{" "}
                       {g.conversations.length === 1 ? "samtale" : "samtaler"}
@@ -257,14 +253,10 @@ function InboxPage() {
                   <ul className="divide-y divide-border border-t border-border">
                     {g.conversations
                       .slice()
-                      .sort((a, b) =>
-                        a.last_message_at < b.last_message_at ? 1 : -1,
-                      )
+                      .sort((a, b) => (a.last_message_at < b.last_message_at ? 1 : -1))
                       .map((c) => {
-                        const other =
-                          user?.id === c.seller_id ? c.buyer : c.seller;
-                        const lastFromMe =
-                          c.last_message?.sender_id === user?.id;
+                        const other = user?.id === c.seller_id ? c.buyer : c.seller;
+                        const lastFromMe = c.last_message?.sender_id === user?.id;
                         const unread = unreadByConv.get(c.id) ?? false;
                         return (
                           <li key={c.id}>
@@ -281,21 +273,22 @@ function InboxPage() {
                                 />
                               ) : (
                                 <div className="flex size-9 items-center justify-center rounded-full bg-muted text-xs font-medium">
-                                  {(other?.deleted_at
-                                    ? "S"
-                                    : other?.display_name ?? "?"
-                                  )
+                                  {(other?.deleted_at ? "S" : (other?.display_name ?? "?"))
                                     .slice(0, 1)
                                     .toUpperCase()}
                                 </div>
                               )}
                               <div className="min-w-0 flex-1">
-                                <p className={`truncate text-sm ${unread ? "font-semibold" : "font-medium"} ${other?.deleted_at ? "italic text-muted-foreground" : ""}`}>
+                                <p
+                                  className={`truncate text-sm ${unread ? "font-semibold" : "font-medium"} ${other?.deleted_at ? "italic text-muted-foreground" : ""}`}
+                                >
                                   {other?.deleted_at
                                     ? "Slettet bruker"
-                                    : other?.display_name ?? "Ukjent bruker"}
+                                    : (other?.display_name ?? "Ukjent bruker")}
                                 </p>
-                                <p className={`truncate text-xs ${unread ? "text-foreground" : "text-muted-foreground"}`}>
+                                <p
+                                  className={`truncate text-xs ${unread ? "text-foreground" : "text-muted-foreground"}`}
+                                >
                                   {c.last_message
                                     ? `${lastFromMe ? "Du: " : ""}${c.last_message.body}`
                                     : "Ingen meldinger enda"}
@@ -373,16 +366,16 @@ function PushHintForMessages() {
           <>
             <p className="font-medium">Push-varsler er blokkert</p>
             <p className="text-muted-foreground">
-              Du har blokkert varsler for kaupet.no. Endre tillatelsen i
-              nettleserinnstillingene for å få varsel om nye meldinger.
+              Du har blokkert varsler for kaupet.no. Endre tillatelsen i nettleserinnstillingene for
+              å få varsel om nye meldinger.
             </p>
           </>
         ) : !push.subscribedHere ? (
           <>
             <p className="font-medium">Få varsel om nye meldinger</p>
             <p className="text-muted-foreground">
-              Push-varsler er ikke aktivert på denne enheten. Du vil ikke få varsel
-              når Kaupet.no er lukket.
+              Push-varsler er ikke aktivert på denne enheten. Du vil ikke få varsel når Kaupet.no er
+              lukket.
             </p>
             <Button size="sm" onClick={enable} disabled={busy}>
               {busy && <Loader2 className="size-4 animate-spin" />}
@@ -423,10 +416,7 @@ function PushHintForMessages() {
   );
 }
 
-
-async function attachLastMessage(
-  convs: ConversationRow[],
-): Promise<ConversationRow[]> {
+async function attachLastMessage(convs: ConversationRow[]): Promise<ConversationRow[]> {
   if (convs.length === 0) return convs;
   const ids = convs.map((c) => c.id);
   const { data } = await supabase
@@ -434,10 +424,7 @@ async function attachLastMessage(
     .select("conversation_id, body, created_at, sender_id")
     .in("conversation_id", ids)
     .order("created_at", { ascending: false });
-  const lastByConv = new Map<
-    string,
-    { body: string; created_at: string; sender_id: string }
-  >();
+  const lastByConv = new Map<string, { body: string; created_at: string; sender_id: string }>();
   for (const m of data ?? []) {
     if (!lastByConv.has(m.conversation_id)) {
       lastByConv.set(m.conversation_id, {

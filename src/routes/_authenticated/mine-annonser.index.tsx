@@ -2,7 +2,18 @@ import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, Pencil, Trash2, CheckCircle2, RotateCcw, Plus, Eye, Heart, Clock, Sparkles } from "lucide-react";
+import {
+  Loader2,
+  Pencil,
+  Trash2,
+  CheckCircle2,
+  RotateCcw,
+  Plus,
+  Eye,
+  Heart,
+  Clock,
+  Sparkles,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -82,11 +93,14 @@ function MyListingsPage() {
   });
   const activePromoByListing = new Map<string, { expires_at: string | null; is_gift: boolean }>();
   for (const p of promos ?? []) {
-    if ((p.status === "active" || p.status === "gifted") && p.expires_at && new Date(p.expires_at) > new Date()) {
+    if (
+      (p.status === "active" || p.status === "gifted") &&
+      p.expires_at &&
+      new Date(p.expires_at) > new Date()
+    ) {
       activePromoByListing.set(p.listing_id, { expires_at: p.expires_at, is_gift: p.is_gift });
     }
   }
-
 
   const { data: rows, isLoading } = useQuery({
     queryKey: ["my-listings"],
@@ -112,9 +126,9 @@ function MyListingsPage() {
         });
       }
       return (data ?? []).map((l) => {
-        const cover = (l.listing_images ?? [])
-          .slice()
-          .sort((a, b) => a.sort_order - b.sort_order)[0]?.storage_path ?? null;
+        const cover =
+          (l.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order)[0]
+            ?.storage_path ?? null;
         const c = countMap.get(l.id);
         return {
           id: l.id,
@@ -135,10 +149,7 @@ function MyListingsPage() {
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: Row["status"] }) => {
-      const { error } = await supabase
-        .from("listings")
-        .update({ status })
-        .eq("id", id);
+      const { error } = await supabase.from("listings").update({ status }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -169,7 +180,8 @@ function MyListingsPage() {
       queryClient.invalidateQueries({ queryKey: ["my-listings"] });
       toast.success("Annonsen er publisert på nytt i 30 nye dager");
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke publisere annonsen på nytt")),
+    onError: (e: Error) =>
+      toast.error(formatErrorMessage(e, "Kunne ikke publisere annonsen på nytt")),
   });
 
   const filtered = (rows ?? []).filter((r) => {
@@ -211,9 +223,7 @@ function MyListingsPage() {
             </div>
           ) : filtered.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border bg-surface px-6 py-12 text-center">
-              <p className="text-sm text-muted-foreground">
-                Ingen annonser å vise her.
-              </p>
+              <p className="text-sm text-muted-foreground">Ingen annonser å vise her.</p>
               <Link to="/ny-annonse" className="mt-4 inline-block">
                 <Button size="sm" variant="outline">
                   <Plus className="size-4" /> Opprett din første annonse
@@ -302,34 +312,30 @@ function ListingRow({
           >
             {row.title}
           </Link>
-          <Badge
-            variant={row.status === "active" ? "default" : "secondary"}
-            className="text-xs"
-          >
+          <Badge variant={row.status === "active" ? "default" : "secondary"} className="text-xs">
             {STATUS_LABEL[row.status]}
           </Badge>
-          {row.status === "active" && (() => {
-            const d = daysLeft(row.expires_at);
-            if (d == null) return null;
-            const tone =
-              d <= 2
-                ? "border-destructive/40 text-destructive"
-                : d <= 7
-                  ? "border-amber-500/40 text-amber-700 dark:text-amber-400"
-                  : "border-border text-muted-foreground";
-            return (
-              <span
-                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${tone}`}
-              >
-                <Clock className="size-3" />
-                {d === 0 ? "Utløper i dag" : `${d} ${d === 1 ? "dag" : "dager"} igjen`}
-              </span>
-            );
-          })()}
+          {row.status === "active" &&
+            (() => {
+              const d = daysLeft(row.expires_at);
+              if (d == null) return null;
+              const tone =
+                d <= 2
+                  ? "border-destructive/40 text-destructive"
+                  : d <= 7
+                    ? "border-amber-500/40 text-amber-700 dark:text-amber-400"
+                    : "border-border text-muted-foreground";
+              return (
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${tone}`}
+                >
+                  <Clock className="size-3" />
+                  {d === 0 ? "Utløper i dag" : `${d} ${d === 1 ? "dag" : "dager"} igjen`}
+                </span>
+              );
+            })()}
           {row.status === "expired" && (
-            <span className="text-xs text-muted-foreground">
-              Publiser på nytt for 30 nye dager
-            </span>
+            <span className="text-xs text-muted-foreground">Publiser på nytt for 30 nye dager</span>
           )}
           {activePromotion && (
             <span className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-xs text-accent-foreground">
@@ -356,10 +362,7 @@ function ListingRow({
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Link
-          to="/mine-annonser/$id/rediger"
-          params={{ id: row.id }}
-        >
+        <Link to="/mine-annonser/$id/rediger" params={{ id: row.id }}>
           <Button size="sm" variant="outline" disabled={busy}>
             <Pencil className="size-4" /> Rediger
           </Button>

@@ -30,7 +30,9 @@ export function SiteHeader() {
           ) : (
             <>
               <Link to="/auth">
-                <Button size="sm" variant="ghost">Logg inn</Button>
+                <Button size="sm" variant="ghost">
+                  Logg inn
+                </Button>
               </Link>
               <Link to="/auth" search={{ mode: "signup" }}>
                 <Button size="sm">Bli medlem</Button>

@@ -108,9 +108,7 @@ export function FavoriteButton({
         aria-pressed={isFavorite}
         aria-label={isFavorite ? "Fjern fra favoritter" : "Lagre som favoritt"}
       >
-        <Heart
-          className={cn(sizing.icon, isFavorite && "fill-accent text-accent")}
-        />
+        <Heart className={cn(sizing.icon, isFavorite && "fill-accent text-accent")} />
         {isFavorite ? "Lagret som favoritt" : "Lagre som favoritt"}
       </button>
     );
@@ -130,10 +128,7 @@ export function FavoriteButton({
       aria-label={isFavorite ? "Fjern fra favoritter" : "Lagre som favoritt"}
     >
       <Heart
-        className={cn(
-          sizing.icon,
-          isFavorite ? "fill-accent text-accent" : "text-foreground",
-        )}
+        className={cn(sizing.icon, isFavorite ? "fill-accent text-accent" : "text-foreground")}
       />
     </button>
   );

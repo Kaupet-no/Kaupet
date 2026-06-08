@@ -204,7 +204,9 @@ function VilkarPage() {
         <section>
           <h2 className="font-display text-2xl">16. Kontakt</h2>
           <p className="mt-3">
-            Spørsmål om vilkårene kan rettes til kontaktadressen oppgitt i{" "}
+            Kaupet.no forvaltes av <strong>Happy Pixel AS</strong>, organisasjonsnummer{" "}
+            <strong>933 197 867</strong>. Spørsmål om vilkårene kan rettes til kontaktadressen
+            oppgitt i{" "}
             <Link to="/personvern" className="underline hover:text-foreground">
               personvernerklæringen
             </Link>

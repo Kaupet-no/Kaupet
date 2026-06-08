@@ -35,8 +35,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
           return new Response("Invalid JSON", { status: 400 });
         }
 
-        const reference =
-          typeof payload?.reference === "string" ? payload.reference : undefined;
+        const reference = typeof payload?.reference === "string" ? payload.reference : undefined;
         const eventName =
           typeof payload?.name === "string"
             ? payload.name

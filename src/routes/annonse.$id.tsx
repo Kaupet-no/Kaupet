@@ -221,10 +221,7 @@ function ListingDetailPage() {
       if (!user) {
         navigate({
           to: "/auth",
-          search: { mode: "signin", redirect: `/annonse/${id}` } as {
-            mode: string;
-            redirect: string;
-          },
+          search: { mode: "signin" },
         });
         return null;
       }

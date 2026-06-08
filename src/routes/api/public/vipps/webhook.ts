@@ -35,12 +35,19 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
           return new Response("Invalid JSON", { status: 400 });
         }
 
-        const reference = payload?.reference as string | undefined;
-        const eventName = (payload?.name ?? payload?.eventName) as string | undefined;
+        const reference =
+          typeof payload?.reference === "string" ? payload.reference : undefined;
+        const eventName =
+          typeof payload?.name === "string"
+            ? payload.name
+            : typeof payload?.eventName === "string"
+              ? payload.eventName
+              : undefined;
+        const eventIdRaw = payload?.eventId ?? payload?.id;
         const eventId: string =
-          payload?.eventId ??
-          payload?.id ??
-          `${reference ?? "noref"}-${eventName ?? "evt"}-${Date.now()}`;
+          typeof eventIdRaw === "string"
+            ? eventIdRaw
+            : `${reference ?? "noref"}-${eventName ?? "evt"}-${Date.now()}`;
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -58,7 +65,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
             event_id: eventId,
             reference: reference ?? null,
             event_name: eventName ?? null,
-            payload,
+            payload: payload as never,
           });
         }
 

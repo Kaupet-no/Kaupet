@@ -7,7 +7,13 @@ import { toast } from "sonner";
 import { Loader2, ImagePlus, X, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
-import { geocodeNorwayAddress } from "@/lib/geocode";
+import {
+  geocodeNorwayAddress,
+  lookupPostalCode,
+  lookupCity,
+  reverseGeocodeAddress,
+} from "@/lib/geocode";
+import { ListingLocationPicker } from "@/components/listing-location-picker";
 import {
   LISTING_BUCKET,
   MAX_IMAGES,

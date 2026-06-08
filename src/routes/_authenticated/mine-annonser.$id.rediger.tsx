@@ -216,10 +216,12 @@ function EditListingPage() {
   const subcategories = (categories ?? []).filter(
     (c) => c.parent_id === selectedParentId,
   );
+  const categoryHydratedFor = useRef<string | null>(null);
 
-  // Initialize parent selector from existing category when listing loads
+  // Initialize parent selector from existing category when listing loads (once)
   useEffect(() => {
     if (!listing || !categories) return;
+    if (categoryHydratedFor.current === listing.id) return;
     const current = categories.find((c) => c.id === listing.category_id);
     if (!current) return;
     if (current.parent_id) {
@@ -227,6 +229,7 @@ function EditListingPage() {
     } else {
       setSelectedParentId(current.id);
     }
+    categoryHydratedFor.current = listing.id;
   }, [listing, categories]);
 
   // Image editor state

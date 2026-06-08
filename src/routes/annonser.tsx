@@ -36,13 +36,20 @@ const stringArray = z.preprocess((v) => {
   return [];
 }, z.array(z.string()));
 
+const conditionEnum = z.enum(["new", "like_new", "good", "acceptable", "for_parts"]);
+const conditionArray = z.preprocess((v) => {
+  if (Array.isArray(v)) return v;
+  if (typeof v === "string" && v.length > 0) return [v];
+  return [];
+}, z.array(conditionEnum));
+
 const searchSchema = z.object({
   q: z.string().optional().default(""),
   qMode: z.enum(["all", "any"]).optional().default("all"),
   category: z.string().optional().default(""),
   categories: stringArray.optional().default([]),
   catMode: z.enum(["all", "any"]).optional().default("any"),
-  conditions: stringArray.optional().default([]),
+  conditions: conditionArray.optional().default([]),
   includeFree: z.coerce.boolean().optional().default(true),
   min: z.coerce.number().int().min(0).optional(),
   max: z.coerce.number().int().min(0).optional(),

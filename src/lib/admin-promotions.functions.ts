@@ -1,21 +1,20 @@
 import { createServerFn } from "@tanstack/react-start";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Database } from "@/integrations/supabase/types";
 
-type AdminClient = {
-  from: (table: string) => {
-    select: (cols: string) => {
-      eq: (col: string, val: string) => {
-        eq: (col: string, val: string) => {
-          maybeSingle: () => Promise<{ data: unknown; error: unknown }>;
-        };
-      };
-    };
-  };
-};
-
-async function requireAdmin(supabase: AdminClient, userId: string) {
+async function requireAdmin(supabase: SupabaseClient<Database>, userId: string) {
+  const { data, error } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId)
+    .eq("role", "admin")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("Ikke autorisert");
+}
   const { data, error } = await supabase
     .from("user_roles")
     .select("role")

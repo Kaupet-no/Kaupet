@@ -18,7 +18,6 @@ import { StarRating } from "@/components/star-rating";
 import { confirmBuyer, getSaleForListing, unconfirmBuyer } from "@/lib/sales.functions";
 import { createReview, getMyReviewForListing } from "@/lib/reviews.functions";
 import {
-import { formatErrorMessage } from "@/lib/errors";
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -29,6 +28,7 @@ import { formatErrorMessage } from "@/lib/errors";
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { formatErrorMessage } from "@/lib/errors";
 
 export const Route = createFileRoute("/_authenticated/meldinger/$id")({
   head: () => ({

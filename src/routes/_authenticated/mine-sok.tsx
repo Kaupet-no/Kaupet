@@ -20,7 +20,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-import { formatErrorMessage } from "@/lib/errors";
   deleteSavedSearch,
   listSavedSearches,
   summarizeCriteria,
@@ -28,6 +27,7 @@ import { formatErrorMessage } from "@/lib/errors";
   type SavedSearch,
   type SearchCriteria,
 } from "@/lib/saved-searches";
+import { formatErrorMessage } from "@/lib/errors";
 
 export const Route = createFileRoute("/_authenticated/mine-sok")({
   head: () => ({ meta: [{ title: "Mine søk — Kaupet.no" }] }),

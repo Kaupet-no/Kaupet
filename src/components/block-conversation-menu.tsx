@@ -24,12 +24,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-import { formatErrorMessage } from "@/lib/errors";
   createBlock,
   deleteBlock,
   listMyBlocks,
   type BlockRow,
 } from "@/lib/blocks.functions";
+import { formatErrorMessage } from "@/lib/errors";
 
 type Props = {
   targetUserId: string;

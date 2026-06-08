@@ -463,6 +463,17 @@ function NewListingPage() {
           </Button>
         </div>
       </form>
+
+      {publishedId && (
+        <PromoteListingDialog
+          listingId={publishedId}
+          open={promoteOpen}
+          onOpenChange={(o) => {
+            setPromoteOpen(o);
+            if (!o) navigate({ to: "/annonse/$id", params: { id: publishedId } });
+          }}
+        />
+      )}
     </div>
   );
 }

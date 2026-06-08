@@ -29,27 +29,62 @@ export function AppBottomNav() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      className="fixed inset-x-0 bottom-0 z-50 px-3 pointer-events-none"
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)" }}
     >
-      <div className="mx-auto flex max-w-md items-end justify-around px-2 pt-2">
+      <div className="pointer-events-auto mx-auto flex max-w-md items-end justify-around gap-1 rounded-3xl border border-border bg-background/95 px-3 pb-3 pt-3 shadow-xl backdrop-blur">
+        {/* Hjem */}
+        <Link
+          to="/"
+          className="flex flex-1 flex-col items-center gap-0.5"
+          aria-label="Hjem"
+        >
+          <span className="flex h-11 w-11 items-center justify-center">
+            {isActive("/") && pathname === "/" ? (
+              <span className="font-display text-2xl font-semibold leading-none text-primary">
+                k<span className="text-accent">.</span>
+              </span>
+            ) : (
+              <Home className="size-6 text-muted-foreground" />
+            )}
+          </span>
+          <span
+            className={`text-[11px] ${pathname === "/" ? "font-medium text-primary" : "text-muted-foreground"}`}
+          >
+            Hjem
+          </span>
+        </Link>
+
         {/* Varsler */}
         <div className="flex flex-1 flex-col items-center gap-0.5">
           {user ? (
-            <div className="relative flex items-center justify-center">
+            <div className="relative flex h-11 w-11 items-center justify-center">
               <NotificationsBell />
             </div>
           ) : (
             <button
               type="button"
               onClick={() => navigate({ to: "/auth" })}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground"
+              className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground"
               aria-label="Varsler (logg inn)"
             >
-              <Bell className="size-5" />
+              <Bell className="size-6" />
             </button>
           )}
-          <span className="text-[10px] text-muted-foreground">Varsler</span>
+          <span className="text-[11px] text-muted-foreground">Varsler</span>
+        </div>
+
+        {/* Ny annonse (FAB) — midten */}
+        <div className="-mt-7 flex flex-1 flex-col items-center gap-0.5">
+          <Link
+            to={user ? "/ny-annonse" : "/auth"}
+            search={user ? undefined : { mode: "signup" as const }}
+            aria-label="Ny annonse"
+            className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background transition active:scale-95"
+          >
+            <Plus className="size-8" />
+          </Link>
+          <span className="text-[11px] text-muted-foreground">Selg</span>
         </div>
 
         {/* Meldinger */}
@@ -58,9 +93,9 @@ export function AppBottomNav() {
           className="flex flex-1 flex-col items-center gap-0.5"
           aria-label="Meldinger"
         >
-          <span className="relative flex h-10 w-10 items-center justify-center">
+          <span className="relative flex h-11 w-11 items-center justify-center">
             <MessageCircle
-              className={`size-5 ${isActive("/meldinger") ? "text-primary" : "text-muted-foreground"}`}
+              className={`size-6 ${isActive("/meldinger") ? "text-primary" : "text-muted-foreground"}`}
             />
             {unread > 0 && (
               <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-accent-foreground">
@@ -69,24 +104,11 @@ export function AppBottomNav() {
             )}
           </span>
           <span
-            className={`text-[10px] ${isActive("/meldinger") ? "font-medium text-primary" : "text-muted-foreground"}`}
+            className={`text-[11px] ${isActive("/meldinger") ? "font-medium text-primary" : "text-muted-foreground"}`}
           >
             Meldinger
           </span>
         </Link>
-
-        {/* Ny annonse (FAB) */}
-        <div className="-mt-5 flex flex-1 flex-col items-center gap-0.5">
-          <Link
-            to={user ? "/ny-annonse" : "/auth"}
-            search={user ? undefined : { mode: "signup" as const }}
-            aria-label="Ny annonse"
-            className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background transition active:scale-95"
-          >
-            <Plus className="size-7" />
-          </Link>
-          <span className="text-[10px] text-muted-foreground">Selg</span>
-        </div>
 
         {/* Bruker */}
         <div className="flex flex-1 flex-col items-center gap-0.5">
@@ -100,13 +122,13 @@ export function AppBottomNav() {
           ) : (
             <Link
               to="/auth"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground"
+              className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground"
               aria-label="Logg inn"
             >
-              <LogIn className="size-5" />
+              <LogIn className="size-6" />
             </Link>
           )}
-          <span className="text-[10px] text-muted-foreground">
+          <span className="text-[11px] text-muted-foreground">
             {user ? "Meg" : "Logg inn"}
           </span>
         </div>

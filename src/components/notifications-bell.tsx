@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, CheckCheck, X } from "lucide-react";
+import { Bell, CheckCheck, TrendingDown, X } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
 
@@ -15,16 +15,31 @@ import {
 } from "@/components/ui/popover";
 import {
   listNotifications,
+  listPriceDrops,
   markAllNotificationsRead,
+  markAllPriceDropsRead,
   markNotificationRead,
+  markPriceDropRead,
   deleteNotification,
+  deletePriceDrop,
   type SavedSearchNotification,
+  type PriceDropNotification,
 } from "@/lib/saved-searches";
 
-type Enriched = SavedSearchNotification & {
+type SearchItem = SavedSearchNotification & {
+  kind: "search";
   listing_title: string | null;
   search_name: string | null;
 };
+type PriceDropItem = PriceDropNotification & {
+  kind: "price_drop";
+  listing_title: string | null;
+};
+type Item = SearchItem | PriceDropItem;
+
+function formatKr(n: number) {
+  return new Intl.NumberFormat("nb-NO").format(n) + " kr";
+}
 
 export function NotificationsBell() {
   const { user } = useAuth();
@@ -33,22 +48,44 @@ export function NotificationsBell() {
   const { data, refetch } = useQuery({
     queryKey: ["notifications", user?.id],
     enabled: !!user,
-    queryFn: async (): Promise<Enriched[]> => {
-      const notifs = await listNotifications(30);
-      if (notifs.length === 0) return [];
-      const listingIds = Array.from(new Set(notifs.map((n) => n.listing_id)));
+    queryFn: async (): Promise<Item[]> => {
+      const [notifs, drops] = await Promise.all([
+        listNotifications(30),
+        listPriceDrops(30),
+      ]);
+      const listingIds = Array.from(
+        new Set([
+          ...notifs.map((n) => n.listing_id),
+          ...drops.map((d) => d.listing_id),
+        ]),
+      );
       const searchIds = Array.from(new Set(notifs.map((n) => n.saved_search_id)));
       const [listingsRes, searchesRes] = await Promise.all([
-        supabase.from("listings").select("id, title").in("id", listingIds),
-        supabase.from("saved_searches").select("id, name").in("id", searchIds),
+        listingIds.length
+          ? supabase.from("listings").select("id, title").in("id", listingIds)
+          : Promise.resolve({ data: [] as { id: string; title: string }[] }),
+        searchIds.length
+          ? supabase.from("saved_searches").select("id, name").in("id", searchIds)
+          : Promise.resolve({ data: [] as { id: string; name: string }[] }),
       ]);
       const listingMap = new Map((listingsRes.data ?? []).map((l) => [l.id, l.title]));
       const searchMap = new Map((searchesRes.data ?? []).map((s) => [s.id, s.name]));
-      return notifs.map((n) => ({
+
+      const searchItems: SearchItem[] = notifs.map((n) => ({
         ...n,
+        kind: "search",
         listing_title: listingMap.get(n.listing_id) ?? null,
         search_name: searchMap.get(n.saved_search_id) ?? null,
       }));
+      const dropItems: PriceDropItem[] = drops.map((d) => ({
+        ...d,
+        kind: "price_drop",
+        listing_title: listingMap.get(d.listing_id) ?? null,
+      }));
+
+      return [...searchItems, ...dropItems].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
     },
     refetchInterval: 60_000,
   });
@@ -61,6 +98,14 @@ export function NotificationsBell() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "saved_search_notifications", filter: `user_id=eq.${user.id}` },
+        () => {
+          qc.invalidateQueries({ queryKey: ["notifications"] });
+          void refetch();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "favorite_price_drops", filter: `user_id=eq.${user.id}` },
         () => {
           qc.invalidateQueries({ queryKey: ["notifications"] });
           void refetch();
@@ -95,19 +140,20 @@ export function NotificationsBell() {
   const unread = notifications.filter((n) => !n.read_at).length;
 
   const handleMarkAllRead = async () => {
-    await markAllNotificationsRead();
+    await Promise.all([markAllNotificationsRead(), markAllPriceDropsRead()]);
     qc.invalidateQueries({ queryKey: ["notifications"] });
   };
 
-  const handleClick = async (n: Enriched) => {
-    if (!n.read_at) {
-      await markNotificationRead(n.id);
-      qc.invalidateQueries({ queryKey: ["notifications"] });
-    }
+  const handleClick = async (n: Item) => {
+    if (n.read_at) return;
+    if (n.kind === "search") await markNotificationRead(n.id);
+    else await markPriceDropRead(n.id);
+    qc.invalidateQueries({ queryKey: ["notifications"] });
   };
 
-  const handleDelete = async (id: string) => {
-    await deleteNotification(id);
+  const handleDelete = async (n: Item) => {
+    if (n.kind === "search") await deleteNotification(n.id);
+    else await deletePriceDrop(n.id);
     qc.invalidateQueries({ queryKey: ["notifications"] });
   };
 
@@ -151,7 +197,10 @@ export function NotificationsBell() {
           ) : (
             <ul className="divide-y divide-border">
               {notifications.map((n) => (
-                <li key={n.id} className={`group relative ${!n.read_at ? "bg-primary/5" : ""}`}>
+                <li
+                  key={`${n.kind}-${n.id}`}
+                  className={`group relative ${!n.read_at ? "bg-primary/5" : ""}`}
+                >
                   <Link
                     to="/annonse/$id"
                     params={{ id: n.listing_id }}
@@ -164,10 +213,21 @@ export function NotificationsBell() {
                       )}
                       <div className="min-w-0 flex-1">
                         <p className="line-clamp-1 text-sm font-medium">
-                          {n.listing_title ?? "Ny annonse"}
+                          {n.kind === "price_drop" && (
+                            <TrendingDown className="mr-1 inline size-3.5 text-accent" />
+                          )}
+                          {n.listing_title ?? (n.kind === "price_drop" ? "Favoritten din" : "Ny annonse")}
                         </p>
                         <p className="line-clamp-1 text-xs text-muted-foreground">
-                          Treff i "{n.search_name ?? "Lagret søk"}" ·{" "}
+                          {n.kind === "search" ? (
+                            <>Treff i "{n.search_name ?? "Lagret søk"}"</>
+                          ) : (
+                            <>
+                              Prisfall −{Number(n.drop_pct).toFixed(0)} % ·{" "}
+                              {formatKr(n.old_price_nok)} → {formatKr(n.new_price_nok)}
+                            </>
+                          )}{" "}
+                          ·{" "}
                           {formatDistanceToNow(new Date(n.created_at), {
                             addSuffix: true,
                             locale: nb,
@@ -181,7 +241,7 @@ export function NotificationsBell() {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      void handleDelete(n.id);
+                      void handleDelete(n);
                     }}
                     className="absolute right-2 top-2 rounded p-1 text-muted-foreground opacity-0 transition hover:bg-background hover:text-foreground group-hover:opacity-100"
                     aria-label="Slett varsel"

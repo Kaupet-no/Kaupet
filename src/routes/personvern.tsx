@@ -214,6 +214,28 @@ function PersonvernPage() {
           </p>
         </section>
 
+        <section>
+          <h2 className="font-display text-2xl">Behandlingsansvarlig</h2>
+          <p className="mt-3">
+            Kaupet.no forvaltes av <strong>Happy Pixel AS</strong>, organisasjonsnummer{" "}
+            <strong>933 197 867</strong>. Happy Pixel AS er behandlingsansvarlig for
+            personopplysninger som samles inn gjennom tjenesten. Henvendelser om personvern kan
+            sendes til kontaktadressen oppgitt nedenfor.
+          </p>
+          <p className="mt-3">
+            <strong>E-post:</strong>{" "}
+            <a
+              href="mailto:kontakt@kaupet.no"
+              className="text-primary underline underline-offset-2"
+            >
+              kontakt@kaupet.no
+            </a>
+          </p>
+          <p className="mt-1">
+            <strong>Postadresse:</strong> Happy Pixel AS, c/o Kaupet.no
+          </p>
+        </section>
+
         <div className="pt-4">
           <Link to="/" className="text-sm text-primary underline underline-offset-2">
             Tilbake til forsiden

@@ -250,6 +250,9 @@ function RootComponent() {
                   </Link>
                   .
                 </p>
+                <p className="text-xs text-muted-foreground/70">
+                  Kaupet.no forvaltes av Happy Pixel AS (org.nr. 933 197 867).
+                </p>
               </div>
               <p className="sm:max-w-xl sm:text-right">
                 Ditt personvern på internett er viktig. Kaupet.no benytter derfor ingen sporende informasjonskapsler eller tredjeparts analyseverktøy. Les vår{" "}

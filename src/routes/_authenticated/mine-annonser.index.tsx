@@ -253,6 +253,8 @@ function MyListingsPage() {
 
 function ListingRow({
   row,
+  activePromotion,
+  onPromote,
   onMarkSold,
   onReactivate,
   onRepublish,
@@ -260,6 +262,8 @@ function ListingRow({
   busy,
 }: {
   row: Row;
+  activePromotion: { expires_at: string | null; is_gift: boolean } | null;
+  onPromote: () => void;
   onMarkSold: () => void;
   onReactivate: () => void;
   onRepublish: () => void;
@@ -327,6 +331,18 @@ function ListingRow({
               Publiser på nytt for 30 nye dager
             </span>
           )}
+          {activePromotion && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-xs text-accent-foreground">
+              <Sparkles className="size-3" />
+              {activePromotion.is_gift ? "Gratis fremhevet" : "Fremhevet"} til{" "}
+              {activePromotion.expires_at
+                ? new Date(activePromotion.expires_at).toLocaleDateString("nb-NO", {
+                    day: "2-digit",
+                    month: "short",
+                  })
+                : ""}
+            </span>
+          )}
         </div>
         <p className="mt-1 font-display text-sm">{formatPrice(row)}</p>
         <p className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
@@ -349,9 +365,16 @@ function ListingRow({
           </Button>
         </Link>
         {row.status === "active" ? (
-          <Button size="sm" variant="outline" onClick={onMarkSold} disabled={busy}>
-            <CheckCircle2 className="size-4" /> Marker som solgt
-          </Button>
+          <>
+            {!activePromotion && (
+              <Button size="sm" variant="outline" onClick={onPromote} disabled={busy}>
+                <Sparkles className="size-4" /> Fremhev
+              </Button>
+            )}
+            <Button size="sm" variant="outline" onClick={onMarkSold} disabled={busy}>
+              <CheckCircle2 className="size-4" /> Marker som solgt
+            </Button>
+          </>
         ) : row.status === "expired" ? (
           <Button size="sm" variant="outline" onClick={onRepublish} disabled={busy}>
             <RotateCcw className="size-4" /> Publiser på nytt

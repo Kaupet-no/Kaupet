@@ -31,6 +31,8 @@ import { Input } from "@/components/ui/input";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
 import { ChevronLeft } from "lucide-react";
+import { useIsNative } from "@/lib/use-is-native";
+import { AppLanding } from "@/components/app-landing";
 
 const CATEGORY_ICONS: Record<string, LucideIcon> = {
   "mobler-og-interior": Sofa,

@@ -244,8 +244,7 @@ function NewListingPage() {
     },
     onError: (err: Error) => {
       void import("@/lib/haptics").then((m) => m.hapticNotification("error"));
-      const msg = err.message ?? "";
-      toast.error(msg.startsWith("[") ? "Sjekk feltene og prøv igjen" : msg || "Kunne ikke publisere annonsen");
+      toast.error(formatErrorMessage(err, "Kunne ikke publisere annonsen"));
     },
   });
 

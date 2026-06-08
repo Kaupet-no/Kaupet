@@ -218,12 +218,13 @@ function VilkarPage() {
           <h2 className="font-display text-2xl">17. Vilkår for kjøp av fremhevet annonse</h2>
           <p className="mt-3">
             Disse vilkårene gjelder når du som registrert bruker kjøper «fremhevet annonse» fra
-            Kaupet.no via Vipps. Vilkårene er en del av brukervilkårene og gjelder i tillegg til disse.
+            Kaupet.no. Vilkårene er en del av brukervilkårene og gjelder i tillegg til disse.
           </p>
           <ul className="mt-3 space-y-2 list-disc pl-5">
             <li>
-              <strong>Tjenesteleverandør:</strong> Kaupet.no. Kontaktopplysninger og organisasjonsnummer er
-              oppgitt i{" "}
+              <strong>Tjenesteleverandør:</strong> Kaupet.no forvaltes av{" "}
+              <strong>Happy Pixel AS</strong>, organisasjonsnummer <strong>933 197 867</strong>.
+              Kontaktopplysninger er oppgitt i{" "}
               <Link to="/personvern" className="underline hover:text-foreground">
                 personvernerklæringen
               </Link>
@@ -237,11 +238,11 @@ function VilkarPage() {
             </li>
             <li>
               <strong>Pris:</strong> Gjeldende pris vises i kjøpsdialogen før betaling, og er i norske
-              kroner inkludert merverdiavgift. Standardpris er 49 kr for 3 dager og 69 kr for 5 dager.
-              Prisene kan endres — det er prisen du ser i dialogen som gjelder.
+              kroner.
             </li>
             <li>
-              <strong>Betaling:</strong> Betaling skjer med Vipps og belastes umiddelbart ved kjøp.
+              <strong>Betaling:</strong> Betaling skjer gjennom vår transaksjonspartner og belastes
+              umiddelbart ved kjøp.
             </li>
             <li>
               <strong>Levering:</strong> Fremhevingen aktiveres så snart Kaupet mottar bekreftet betaling

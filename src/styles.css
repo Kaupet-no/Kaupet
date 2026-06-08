@@ -107,9 +107,22 @@
   --ring: oklch(0.78 0.09 160);
 }
 
+@supports (padding: max(0px)) {
+  :root {
+    --safe-top: env(safe-area-inset-top);
+    --safe-bottom: env(safe-area-inset-bottom);
+    --safe-left: env(safe-area-inset-left);
+    --safe-right: env(safe-area-inset-right);
+  }
+}
+
 @layer base {
   * {
     border-color: var(--color-border);
+  }
+
+  html, body {
+    min-height: 100dvh;
   }
 
   body {
@@ -124,4 +137,12 @@
     font-weight: 500;
     letter-spacing: -0.01em;
   }
+}
+
+/* Utility: top padding that respects the device safe area (notch / dynamic island). */
+.pt-safe {
+  padding-top: max(0.5rem, env(safe-area-inset-top));
+}
+.pb-safe {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
 }

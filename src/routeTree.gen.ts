@@ -30,6 +30,7 @@ import { Route as AuthenticatedMeldingerIdRouteImport } from './routes/_authenti
 import { Route as AuthenticatedAdminModerasjonRouteImport } from './routes/_authenticated/admin/moderasjon'
 import { Route as AuthenticatedAdminKategorierRouteImport } from './routes/_authenticated/admin/kategorier'
 import { Route as AuthenticatedAdminBrukereRouteImport } from './routes/_authenticated/admin/brukere'
+import { Route as ApiPublicVippsWebhookRouteImport } from './routes/api/public/vipps/webhook'
 import { Route as ApiPublicPushDispatchRouteImport } from './routes/api/public/push/dispatch'
 import { Route as AuthenticatedMineAnnonserIdRedigerRouteImport } from './routes/_authenticated/mine-annonser.$id.rediger'
 
@@ -143,6 +144,11 @@ const AuthenticatedAdminBrukereRoute =
     path: '/brukere',
     getParentRoute: () => AuthenticatedAdminRouteRoute,
   } as any)
+const ApiPublicVippsWebhookRoute = ApiPublicVippsWebhookRouteImport.update({
+  id: '/api/public/vipps/webhook',
+  path: '/api/public/vipps/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicPushDispatchRoute = ApiPublicPushDispatchRouteImport.update({
   id: '/api/public/push/dispatch',
   path: '/api/public/push/dispatch',
@@ -178,6 +184,7 @@ export interface FileRoutesByFullPath {
   '/mine-annonser/': typeof AuthenticatedMineAnnonserIndexRoute
   '/mine-annonser/$id/rediger': typeof AuthenticatedMineAnnonserIdRedigerRoute
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
+  '/api/public/vipps/webhook': typeof ApiPublicVippsWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -201,6 +208,7 @@ export interface FileRoutesByTo {
   '/mine-annonser': typeof AuthenticatedMineAnnonserIndexRoute
   '/mine-annonser/$id/rediger': typeof AuthenticatedMineAnnonserIdRedigerRoute
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
+  '/api/public/vipps/webhook': typeof ApiPublicVippsWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -227,6 +235,7 @@ export interface FileRoutesById {
   '/_authenticated/mine-annonser/': typeof AuthenticatedMineAnnonserIndexRoute
   '/_authenticated/mine-annonser/$id/rediger': typeof AuthenticatedMineAnnonserIdRedigerRoute
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
+  '/api/public/vipps/webhook': typeof ApiPublicVippsWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -253,6 +262,7 @@ export interface FileRouteTypes {
     | '/mine-annonser/'
     | '/mine-annonser/$id/rediger'
     | '/api/public/push/dispatch'
+    | '/api/public/vipps/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -276,6 +286,7 @@ export interface FileRouteTypes {
     | '/mine-annonser'
     | '/mine-annonser/$id/rediger'
     | '/api/public/push/dispatch'
+    | '/api/public/vipps/webhook'
   id:
     | '__root__'
     | '/'
@@ -301,6 +312,7 @@ export interface FileRouteTypes {
     | '/_authenticated/mine-annonser/'
     | '/_authenticated/mine-annonser/$id/rediger'
     | '/api/public/push/dispatch'
+    | '/api/public/vipps/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -314,6 +326,7 @@ export interface RootRouteChildren {
   AnnonseIdRoute: typeof AnnonseIdRoute
   BrukerIdRoute: typeof BrukerIdRoute
   ApiPublicPushDispatchRoute: typeof ApiPublicPushDispatchRoute
+  ApiPublicVippsWebhookRoute: typeof ApiPublicVippsWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -465,6 +478,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminBrukereRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
+    '/api/public/vipps/webhook': {
+      id: '/api/public/vipps/webhook'
+      path: '/api/public/vipps/webhook'
+      fullPath: '/api/public/vipps/webhook'
+      preLoaderRoute: typeof ApiPublicVippsWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/push/dispatch': {
       id: '/api/public/push/dispatch'
       path: '/api/public/push/dispatch'
@@ -541,6 +561,7 @@ const rootRouteChildren: RootRouteChildren = {
   AnnonseIdRoute: AnnonseIdRoute,
   BrukerIdRoute: BrukerIdRoute,
   ApiPublicPushDispatchRoute: ApiPublicPushDispatchRoute,
+  ApiPublicVippsWebhookRoute: ApiPublicVippsWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

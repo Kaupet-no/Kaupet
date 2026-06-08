@@ -147,13 +147,28 @@ export const Route = createFileRoute("/annonse/$id")({
 
 function ListingDetailPage() {
   const { id } = Route.useParams();
+  const search = Route.useSearch();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [activeImage, setActiveImage] = useState(0);
   const [imgUrls, setImgUrls] = useState<Record<string, string>>({});
   const [mounted, setMounted] = useState(false);
   const [statsInfoOpen, setStatsInfoOpen] = useState(false);
+  const [promoteOpen, setPromoteOpen] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    if (search.promotion === "success") {
+      toast.success("Takk! Fremhevingen aktiveres så snart Vipps bekrefter betalingen.");
+      navigate({
+        to: "/annonse/$id",
+        params: { id },
+        search: {},
+        replace: true,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search.promotion]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["listing", id],

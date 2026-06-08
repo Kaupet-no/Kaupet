@@ -1,22 +1,53 @@
 version: 2
 updates:
-  - package-ecosystem: "npm"
-    directory: "/"
+  - package-ecosystem: npm
+    directory: /
     schedule:
-      interval: "weekly"
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Oslo
     open-pull-requests-limit: 5
     labels:
-      - "dependencies"
+      - dependencies
+    # Kun patch- og minor-oppdateringer automatisk.
+    # Major bumps (zod v4, TypeScript v6, recharts v3 osv.) krever manuell gjennomgang.
+    ignore:
+      - dependency-name: zod
+        update-types: ["version-update:semver-major"]
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      - dependency-name: recharts
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitejs/plugin-react"
+        update-types: ["version-update:semver-major"]
     groups:
+      # Slår sammen alle Radix UI-oppdateringer til én PR
+      radix-ui:
+        patterns:
+          - "@radix-ui/*"
+        update-types:
+          - minor
+          - patch
+      # Slår sammen Capacitor-oppdateringer
+      capacitor:
+        patterns:
+          - "@capacitor/*"
+        update-types:
+          - minor
+          - patch
+      # Slår sammen mindre patch/minor-oppdateringer til én PR
       minor-and-patch:
         update-types:
-          - "minor"
-          - "patch"
+          - minor
+          - patch
 
-  - package-ecosystem: "github-actions"
-    directory: "/"
+  - package-ecosystem: github-actions
+    directory: /
     schedule:
-      interval: "monthly"
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Oslo
     labels:
-      - "dependencies"
-      - "github-actions"
+      - dependencies

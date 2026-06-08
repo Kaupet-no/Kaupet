@@ -27,9 +27,11 @@ import { Route as AuthenticatedMineAnnonserIndexRouteImport } from './routes/_au
 import { Route as AuthenticatedMeldingerIndexRouteImport } from './routes/_authenticated/meldinger.index'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedMeldingerIdRouteImport } from './routes/_authenticated/meldinger.$id'
+import { Route as AuthenticatedAdminPromoteringerRouteImport } from './routes/_authenticated/admin/promoteringer'
 import { Route as AuthenticatedAdminModerasjonRouteImport } from './routes/_authenticated/admin/moderasjon'
 import { Route as AuthenticatedAdminKategorierRouteImport } from './routes/_authenticated/admin/kategorier'
 import { Route as AuthenticatedAdminBrukereRouteImport } from './routes/_authenticated/admin/brukere'
+import { Route as ApiPublicVippsWebhookRouteImport } from './routes/api/public/vipps/webhook'
 import { Route as ApiPublicPushDispatchRouteImport } from './routes/api/public/push/dispatch'
 import { Route as AuthenticatedMineAnnonserIdRedigerRouteImport } from './routes/_authenticated/mine-annonser.$id.rediger'
 
@@ -125,6 +127,12 @@ const AuthenticatedMeldingerIdRoute =
     path: '/meldinger/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAdminPromoteringerRoute =
+  AuthenticatedAdminPromoteringerRouteImport.update({
+    id: '/promoteringer',
+    path: '/promoteringer',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
 const AuthenticatedAdminModerasjonRoute =
   AuthenticatedAdminModerasjonRouteImport.update({
     id: '/moderasjon',
@@ -143,6 +151,11 @@ const AuthenticatedAdminBrukereRoute =
     path: '/brukere',
     getParentRoute: () => AuthenticatedAdminRouteRoute,
   } as any)
+const ApiPublicVippsWebhookRoute = ApiPublicVippsWebhookRouteImport.update({
+  id: '/api/public/vipps/webhook',
+  path: '/api/public/vipps/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicPushDispatchRoute = ApiPublicPushDispatchRouteImport.update({
   id: '/api/public/push/dispatch',
   path: '/api/public/push/dispatch',
@@ -172,12 +185,14 @@ export interface FileRoutesByFullPath {
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
+  '/admin/promoteringer': typeof AuthenticatedAdminPromoteringerRoute
   '/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/meldinger/': typeof AuthenticatedMeldingerIndexRoute
   '/mine-annonser/': typeof AuthenticatedMineAnnonserIndexRoute
   '/mine-annonser/$id/rediger': typeof AuthenticatedMineAnnonserIdRedigerRoute
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
+  '/api/public/vipps/webhook': typeof ApiPublicVippsWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -195,12 +210,14 @@ export interface FileRoutesByTo {
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
+  '/admin/promoteringer': typeof AuthenticatedAdminPromoteringerRoute
   '/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/meldinger': typeof AuthenticatedMeldingerIndexRoute
   '/mine-annonser': typeof AuthenticatedMineAnnonserIndexRoute
   '/mine-annonser/$id/rediger': typeof AuthenticatedMineAnnonserIdRedigerRoute
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
+  '/api/public/vipps/webhook': typeof ApiPublicVippsWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -221,12 +238,14 @@ export interface FileRoutesById {
   '/_authenticated/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/_authenticated/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/_authenticated/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
+  '/_authenticated/admin/promoteringer': typeof AuthenticatedAdminPromoteringerRoute
   '/_authenticated/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/meldinger/': typeof AuthenticatedMeldingerIndexRoute
   '/_authenticated/mine-annonser/': typeof AuthenticatedMineAnnonserIndexRoute
   '/_authenticated/mine-annonser/$id/rediger': typeof AuthenticatedMineAnnonserIdRedigerRoute
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
+  '/api/public/vipps/webhook': typeof ApiPublicVippsWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -247,12 +266,14 @@ export interface FileRouteTypes {
     | '/admin/brukere'
     | '/admin/kategorier'
     | '/admin/moderasjon'
+    | '/admin/promoteringer'
     | '/meldinger/$id'
     | '/admin/'
     | '/meldinger/'
     | '/mine-annonser/'
     | '/mine-annonser/$id/rediger'
     | '/api/public/push/dispatch'
+    | '/api/public/vipps/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -270,12 +291,14 @@ export interface FileRouteTypes {
     | '/admin/brukere'
     | '/admin/kategorier'
     | '/admin/moderasjon'
+    | '/admin/promoteringer'
     | '/meldinger/$id'
     | '/admin'
     | '/meldinger'
     | '/mine-annonser'
     | '/mine-annonser/$id/rediger'
     | '/api/public/push/dispatch'
+    | '/api/public/vipps/webhook'
   id:
     | '__root__'
     | '/'
@@ -295,12 +318,14 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/brukere'
     | '/_authenticated/admin/kategorier'
     | '/_authenticated/admin/moderasjon'
+    | '/_authenticated/admin/promoteringer'
     | '/_authenticated/meldinger/$id'
     | '/_authenticated/admin/'
     | '/_authenticated/meldinger/'
     | '/_authenticated/mine-annonser/'
     | '/_authenticated/mine-annonser/$id/rediger'
     | '/api/public/push/dispatch'
+    | '/api/public/vipps/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -314,6 +339,7 @@ export interface RootRouteChildren {
   AnnonseIdRoute: typeof AnnonseIdRoute
   BrukerIdRoute: typeof BrukerIdRoute
   ApiPublicPushDispatchRoute: typeof ApiPublicPushDispatchRoute
+  ApiPublicVippsWebhookRoute: typeof ApiPublicVippsWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -444,6 +470,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMeldingerIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/promoteringer': {
+      id: '/_authenticated/admin/promoteringer'
+      path: '/promoteringer'
+      fullPath: '/admin/promoteringer'
+      preLoaderRoute: typeof AuthenticatedAdminPromoteringerRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
     '/_authenticated/admin/moderasjon': {
       id: '/_authenticated/admin/moderasjon'
       path: '/moderasjon'
@@ -464,6 +497,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/brukere'
       preLoaderRoute: typeof AuthenticatedAdminBrukereRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/api/public/vipps/webhook': {
+      id: '/api/public/vipps/webhook'
+      path: '/api/public/vipps/webhook'
+      fullPath: '/api/public/vipps/webhook'
+      preLoaderRoute: typeof ApiPublicVippsWebhookRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/push/dispatch': {
       id: '/api/public/push/dispatch'
@@ -486,6 +526,7 @@ interface AuthenticatedAdminRouteRouteChildren {
   AuthenticatedAdminBrukereRoute: typeof AuthenticatedAdminBrukereRoute
   AuthenticatedAdminKategorierRoute: typeof AuthenticatedAdminKategorierRoute
   AuthenticatedAdminModerasjonRoute: typeof AuthenticatedAdminModerasjonRoute
+  AuthenticatedAdminPromoteringerRoute: typeof AuthenticatedAdminPromoteringerRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
 }
 
@@ -494,6 +535,7 @@ const AuthenticatedAdminRouteRouteChildren: AuthenticatedAdminRouteRouteChildren
     AuthenticatedAdminBrukereRoute: AuthenticatedAdminBrukereRoute,
     AuthenticatedAdminKategorierRoute: AuthenticatedAdminKategorierRoute,
     AuthenticatedAdminModerasjonRoute: AuthenticatedAdminModerasjonRoute,
+    AuthenticatedAdminPromoteringerRoute: AuthenticatedAdminPromoteringerRoute,
     AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
   }
 
@@ -541,6 +583,7 @@ const rootRouteChildren: RootRouteChildren = {
   AnnonseIdRoute: AnnonseIdRoute,
   BrukerIdRoute: BrukerIdRoute,
   ApiPublicPushDispatchRoute: ApiPublicPushDispatchRoute,
+  ApiPublicVippsWebhookRoute: ApiPublicVippsWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, Pencil, Trash2, CheckCircle2, RotateCcw, Plus, Eye, Heart, Clock } from "lucide-react";
+import { Loader2, Pencil, Trash2, CheckCircle2, RotateCcw, Plus, Eye, Heart, Clock, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { signListingImageUrls } from "@/lib/storage";
 import { republishListing } from "@/lib/listings.functions";
+import { getMyActivePromotions } from "@/lib/promotions.functions";
+import { PromoteListingDialog } from "@/components/promote-listing-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -71,6 +73,20 @@ const STATUS_LABEL: Record<Row["status"], string> = {
 function MyListingsPage() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<"all" | "active" | "sold" | "draft">("all");
+  const [promoteId, setPromoteId] = useState<string | null>(null);
+
+  const fetchPromos = useServerFn(getMyActivePromotions);
+  const { data: promos } = useQuery({
+    queryKey: ["my-promotions"],
+    queryFn: () => fetchPromos(),
+  });
+  const activePromoByListing = new Map<string, { expires_at: string | null; is_gift: boolean }>();
+  for (const p of promos ?? []) {
+    if ((p.status === "active" || p.status === "gifted") && p.expires_at && new Date(p.expires_at) > new Date()) {
+      activePromoByListing.set(p.listing_id, { expires_at: p.expires_at, is_gift: p.is_gift });
+    }
+  }
+
 
   const { data: rows, isLoading } = useQuery({
     queryKey: ["my-listings"],
@@ -210,6 +226,8 @@ function MyListingsPage() {
                 <ListingRow
                   key={r.id}
                   row={r}
+                  activePromotion={activePromoByListing.get(r.id) ?? null}
+                  onPromote={() => setPromoteId(r.id)}
                   onMarkSold={() => updateStatus.mutate({ id: r.id, status: "sold" })}
                   onReactivate={() => updateStatus.mutate({ id: r.id, status: "active" })}
                   onRepublish={() => republish.mutate(r.id)}
@@ -221,12 +239,22 @@ function MyListingsPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      {promoteId && (
+        <PromoteListingDialog
+          listingId={promoteId}
+          open={!!promoteId}
+          onOpenChange={(o) => !o && setPromoteId(null)}
+        />
+      )}
     </div>
   );
 }
 
 function ListingRow({
   row,
+  activePromotion,
+  onPromote,
   onMarkSold,
   onReactivate,
   onRepublish,
@@ -234,6 +262,8 @@ function ListingRow({
   busy,
 }: {
   row: Row;
+  activePromotion: { expires_at: string | null; is_gift: boolean } | null;
+  onPromote: () => void;
   onMarkSold: () => void;
   onReactivate: () => void;
   onRepublish: () => void;
@@ -301,6 +331,18 @@ function ListingRow({
               Publiser på nytt for 30 nye dager
             </span>
           )}
+          {activePromotion && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-xs text-accent-foreground">
+              <Sparkles className="size-3" />
+              {activePromotion.is_gift ? "Gratis fremhevet" : "Fremhevet"} til{" "}
+              {activePromotion.expires_at
+                ? new Date(activePromotion.expires_at).toLocaleDateString("nb-NO", {
+                    day: "2-digit",
+                    month: "short",
+                  })
+                : ""}
+            </span>
+          )}
         </div>
         <p className="mt-1 font-display text-sm">{formatPrice(row)}</p>
         <p className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
@@ -323,9 +365,16 @@ function ListingRow({
           </Button>
         </Link>
         {row.status === "active" ? (
-          <Button size="sm" variant="outline" onClick={onMarkSold} disabled={busy}>
-            <CheckCircle2 className="size-4" /> Marker som solgt
-          </Button>
+          <>
+            {!activePromotion && (
+              <Button size="sm" variant="outline" onClick={onPromote} disabled={busy}>
+                <Sparkles className="size-4" /> Fremhev
+              </Button>
+            )}
+            <Button size="sm" variant="outline" onClick={onMarkSold} disabled={busy}>
+              <CheckCircle2 className="size-4" /> Marker som solgt
+            </Button>
+          </>
         ) : row.status === "expired" ? (
           <Button size="sm" variant="outline" onClick={onRepublish} disabled={busy}>
             <RotateCcw className="size-4" /> Publiser på nytt

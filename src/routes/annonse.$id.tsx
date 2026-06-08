@@ -1,8 +1,9 @@
 import { createFileRoute, Link, notFound, useNavigate, useRouter } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { lazy, Suspense, useEffect, useState } from "react";
-import { ArrowLeft, MapPin, MessageCircle, User as UserIcon, Pencil, Eye, Users, Heart, Info, ChevronDown, Share2 } from "lucide-react";
+import { ArrowLeft, MapPin, MessageCircle, User as UserIcon, Pencil, Eye, Users, Heart, Info, ChevronDown, Share2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -12,6 +13,7 @@ import { shareContent } from "@/lib/native";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { FavoriteButton } from "@/components/favorite-button";
+import { PromoteListingDialog } from "@/components/promote-listing-dialog";
 import { formatErrorMessage } from "@/lib/errors";
 
 
@@ -29,6 +31,10 @@ const CONDITION_LABEL: Record<string, string> = {
 };
 
 export const Route = createFileRoute("/annonse/$id")({
+  validateSearch: z.object({
+    promotion: z.string().optional(),
+    promo_id: z.string().optional(),
+  }),
   loader: async ({ params }) => {
     const { data, error } = await supabase
       .from("listings")
@@ -141,13 +147,28 @@ export const Route = createFileRoute("/annonse/$id")({
 
 function ListingDetailPage() {
   const { id } = Route.useParams();
+  const search = Route.useSearch();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [activeImage, setActiveImage] = useState(0);
   const [imgUrls, setImgUrls] = useState<Record<string, string>>({});
   const [mounted, setMounted] = useState(false);
   const [statsInfoOpen, setStatsInfoOpen] = useState(false);
+  const [promoteOpen, setPromoteOpen] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    if (search.promotion === "success") {
+      toast.success("Takk! Fremhevingen aktiveres så snart Vipps bekrefter betalingen.");
+      navigate({
+        to: "/annonse/$id",
+        params: { id },
+        search: {},
+        replace: true,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search.promotion]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["listing", id],
@@ -155,7 +176,7 @@ function ListingDetailPage() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, title, description, price_nok, is_free, condition, city, postal_code, lat, lng, created_at, updated_at, published_at, seller_id, category_id, listing_images(storage_path, sort_order), categories(name_nb, slug)",
+          "id, title, description, price_nok, is_free, condition, city, postal_code, lat, lng, created_at, updated_at, published_at, status, seller_id, category_id, listing_images(storage_path, sort_order), categories(name_nb, slug)",
         )
         .eq("id", id)
         .maybeSingle();
@@ -405,6 +426,21 @@ function ListingDetailPage() {
                   <Pencil className="size-4" /> Rediger annonse
                 </Button>
               </Link>
+              {data.status === "active" && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-2 w-full gap-2"
+                  onClick={() => setPromoteOpen(true)}
+                >
+                  <Sparkles className="size-4" /> Fremhev annonse
+                </Button>
+              )}
+              <PromoteListingDialog
+                listingId={data.id}
+                open={promoteOpen}
+                onOpenChange={setPromoteOpen}
+              />
               <dl className="mt-4 grid grid-cols-3 gap-3 text-center">
                 <div className="rounded-lg bg-card p-2">
                   <Eye className="mx-auto size-4 text-muted-foreground" />

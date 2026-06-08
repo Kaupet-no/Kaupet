@@ -245,8 +245,7 @@ function VilkarPage() {
               umiddelbart ved kjøp.
             </li>
             <li>
-              <strong>Levering:</strong> Fremhevingen aktiveres så snart Kaupet mottar bekreftet betaling
-              fra Vipps, og varer i valgt antall dager fra aktiveringstidspunktet.
+              <strong>Levering:</strong> Fremhevingen aktiveres så snart Kaupet mottar bekreftet betaling, og varer i valgt antall dager fra aktiveringstidspunktet.
             </li>
             <li>
               <strong>Angrerett:</strong> Tjenesten er digitalt innhold som leveres umiddelbart. Du må

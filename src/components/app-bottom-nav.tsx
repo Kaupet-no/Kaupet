@@ -1,5 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Bell, MessageCircle, Plus, User as UserIcon, LogIn } from "lucide-react";
+import { Bell, MessageCircle, Plus, LogIn } from "lucide-react";
 import { useState } from "react";
 
 import { useAuth } from "@/lib/auth";

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { isNative } from "@/lib/native";
+import { formatErrorMessage } from "@/lib/errors";
 
 
 const TERMS_VERSION = "1.0";
@@ -77,7 +78,7 @@ function AuthPage() {
         navigate({ to: "/", replace: true });
       }
     } catch (err: any) {
-      toast.error(err?.message ?? "Noe gikk galt. Prøv igjen.");
+      toast.error(formatErrorMessage(err, "Noe gikk galt. Prøv igjen."));
     } finally {
       setLoading(false);
     }

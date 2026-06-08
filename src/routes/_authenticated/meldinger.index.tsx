@@ -10,6 +10,7 @@ import { signListingImageUrls } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { isUnread, useReadVersion } from "@/lib/unread";
 import { usePushStatus } from "@/lib/use-push-status";
+import { formatErrorMessage } from "@/lib/errors";
 
 export const Route = createFileRoute("/_authenticated/meldinger/")({
   head: () => ({
@@ -349,7 +350,7 @@ function PushHintForMessages() {
       await push.enableOnThisDevice("messages");
       toast.success("Push-varsler er aktivert på denne enheten");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Klarte ikke å aktivere varsler");
+      toast.error(formatErrorMessage(e, "Klarte ikke å aktivere varsler"));
     } finally {
       setBusy(false);
     }

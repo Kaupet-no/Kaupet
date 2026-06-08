@@ -24,6 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+import { formatErrorMessage } from "@/lib/errors";
   createBlock,
   deleteBlock,
   listMyBlocks,
@@ -86,7 +87,7 @@ export function BlockConversationMenu({
       );
       setConfirm(null);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke blokkere brukeren")),
   });
 
   const unblockMut = useMutation({
@@ -95,7 +96,7 @@ export function BlockConversationMenu({
       qc.invalidateQueries({ queryKey: ["my-blocks"] });
       toast.success("Blokkering opphevet");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke oppheve blokkeringen")),
   });
 
   if (active) {

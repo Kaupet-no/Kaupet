@@ -34,6 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { formatErrorMessage } from "@/lib/errors";
 
 const CONDITIONS = [
   { value: "new", label: "Helt ny" },
@@ -389,7 +390,7 @@ function EditListingPage() {
       toast.success("Endringer lagret");
       navigate({ to: "/mine-annonser" });
     },
-    onError: (e: Error) => toast.error(e.message || "Kunne ikke lagre"),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke lagre endringene")),
   });
 
   if (isLoading) {

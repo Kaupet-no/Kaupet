@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+import { formatErrorMessage } from "@/lib/errors";
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -112,7 +113,7 @@ function AdminCategories() {
       qc.invalidateQueries({ queryKey: ["admin", "categories"] });
       setDeleting(null);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke slette kategorien")),
   });
 
   const roots = tree.get(null) ?? [];
@@ -315,7 +316,7 @@ function CategoryFormDialog({
       onSaved();
       onClose();
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke lagre kategorien")),
   });
 
   const possibleParents = categories.filter(

@@ -39,6 +39,7 @@ import {
   updateNotificationPreferences,
 } from "@/lib/push.functions";
 import { listMyBlocks, deleteBlock } from "@/lib/blocks.functions";
+import { formatErrorMessage } from "@/lib/errors";
 
 
 
@@ -207,7 +208,7 @@ function ProfileSection() {
       queryClient.invalidateQueries({ queryKey: ["profile-menu", userId] });
       toast.success("Profil oppdatert");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke oppdatere profilen")),
   });
 
   const avatarUrl = watch("avatar_url");
@@ -295,7 +296,7 @@ function AccountSection() {
     onSuccess: () => {
       toast.success("Sjekk innboksen din for å bekrefte den nye e-posten");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke endre e-postadressen")),
   });
 
   const passwordMutation = useMutation({
@@ -308,7 +309,7 @@ function AccountSection() {
       passwordForm.reset();
       toast.success("Passordet er oppdatert");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke endre passordet")),
   });
 
   const [signingOut, setSigningOut] = useState(false);
@@ -414,7 +415,7 @@ function DeleteAccountSection({ currentEmail }: { currentEmail: string }) {
     });
     if (error) {
       setSubmitting(false);
-      toast.error(error.message);
+      toast.error(formatErrorMessage(error, "Kunne ikke laste opp profilbildet"));
       return;
     }
     await supabase.auth.signOut();
@@ -540,7 +541,7 @@ function NotificationsSection() {
       queryClient.invalidateQueries({ queryKey: ["notification-preferences"] });
       toast.success("Innstillingene er lagret");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke lagre innstillingene")),
   });
 
   async function handleSubscribe() {
@@ -552,7 +553,7 @@ function NotificationsSection() {
       setEndpoint(ep);
       toast.success("Push-varsler er aktivert på denne enheten");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Klarte ikke å aktivere varsler");
+      toast.error(formatErrorMessage(e, "Klarte ikke å aktivere varsler"));
     } finally {
       setBusy(null);
     }
@@ -565,7 +566,7 @@ function NotificationsSection() {
       setEndpoint(null);
       toast.success("Denne enheten mottar ikke lenger push-varsler");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Klarte ikke å deaktivere");
+      toast.error(formatErrorMessage(e, "Klarte ikke å deaktivere varsler"));
     } finally {
       setBusy(null);
     }
@@ -717,7 +718,7 @@ function BlockedSection() {
       qc.invalidateQueries({ queryKey: ["my-blocks"] });
       toast.success("Blokkering opphevet");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke oppheve blokkeringen")),
   });
 
   if (isLoading) {

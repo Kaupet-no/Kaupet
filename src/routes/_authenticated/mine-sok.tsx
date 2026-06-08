@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+import { formatErrorMessage } from "@/lib/errors";
   deleteSavedSearch,
   listSavedSearches,
   summarizeCriteria,
@@ -57,7 +58,7 @@ function MineSokPage() {
       await push.enableOnThisDevice("saved_searches");
       toast.success("Push-varsler er aktivert på denne enheten");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Klarte ikke å aktivere varsler");
+      toast.error(formatErrorMessage(e, "Klarte ikke å aktivere varsler"));
     } finally {
       setEnablingPush(false);
     }

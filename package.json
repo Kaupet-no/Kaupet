@@ -9,7 +9,8 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "generate:assets": "capacitor-assets generate --iconBackgroundColor #2f5d44 --iconBackgroundColorDark #1d2a22 --splashBackgroundColor #fbf9f3 --splashBackgroundColorDark #1d2a22"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.0",

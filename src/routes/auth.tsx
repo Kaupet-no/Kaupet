@@ -76,7 +76,7 @@ function AuthPage() {
         toast.success("Velkommen tilbake!");
         navigate({ to: "/", replace: true });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error(formatErrorMessage(err, "Noe gikk galt. Prøv igjen."));
     } finally {
       setLoading(false);

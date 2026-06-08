@@ -189,7 +189,7 @@ export const listUserReviews = createServerFn({ method: "POST" })
       });
     }
 
-    return (rows ?? []).map((r: any) => {
+    return (rows ?? []).map((r: Record<string, unknown> & { reviewer?: unknown; listing?: unknown; role: string; listing_id: string }) => {
       const reviewer = Array.isArray(r.reviewer) ? r.reviewer[0] : r.reviewer;
       const listing = Array.isArray(r.listing) ? r.listing[0] : r.listing;
       return {

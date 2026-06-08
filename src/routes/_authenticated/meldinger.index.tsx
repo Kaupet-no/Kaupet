@@ -82,14 +82,14 @@ function InboxPage() {
           .order("last_message_at", { ascending: false });
         if (e2) throw e2;
         const ids = Array.from(
-          new Set((convs ?? []).flatMap((c: any) => [c.buyer_id, c.seller_id])),
+          new Set((convs ?? []).flatMap((c: { buyer_id: string; seller_id: string }) => [c.buyer_id, c.seller_id])),
         );
         const { data: profiles } = await supabase
           .from("profiles")
           .select("id, display_name, avatar_url, deleted_at")
           .in("id", ids);
         const pmap = new Map((profiles ?? []).map((p) => [p.id, p]));
-        const enriched = (convs ?? []).map((c: any) => ({
+        const enriched = (convs ?? []).map((c: Record<string, unknown> & { buyer_id: string; seller_id: string; listing: unknown }) => ({
           ...c,
           listing: Array.isArray(c.listing) ? c.listing[0] : c.listing,
           buyer: pmap.get(c.buyer_id) ?? null,
@@ -97,7 +97,7 @@ function InboxPage() {
         }));
         return await attachLastMessage(enriched);
       }
-      const normalised = (data ?? []).map((c: any) => ({
+      const normalised = (data ?? []).map((c: Record<string, unknown> & { listing: unknown; buyer: unknown; seller: unknown }) => ({
         ...c,
         listing: Array.isArray(c.listing) ? c.listing[0] : c.listing,
         buyer: Array.isArray(c.buyer) ? c.buyer[0] : c.buyer,

@@ -46,9 +46,10 @@ export async function pickNativePhoto(): Promise<File | null> {
     const filename = `photo-${Date.now()}.${ext === "jpeg" ? "jpg" : ext}`;
     const type = blob.type || (ext === "png" ? "image/png" : "image/jpeg");
     return new File([blob], filename, { type });
-  } catch (e: any) {
+  } catch (e: unknown) {
     // User canceled or denied permission
-    if (e?.message?.toLowerCase?.().includes("cancel")) return null;
+    const msg = e instanceof Error ? e.message : "";
+    if (msg.toLowerCase().includes("cancel")) return null;
     throw e;
   }
 }
@@ -102,8 +103,9 @@ export async function shareContent(opts: {
     });
     return "native";
   }
-  if (typeof navigator !== "undefined" && typeof (navigator as any).share === "function") {
-    await (navigator as any).share({ title: opts.title, text: opts.text, url: opts.url });
+  const nav = typeof navigator !== "undefined" ? (navigator as Navigator & { share?: (d: { title?: string; text?: string; url: string }) => Promise<void> }) : null;
+  if (nav && typeof nav.share === "function") {
+    await nav.share({ title: opts.title, text: opts.text, url: opts.url });
     return "web";
   }
   if (typeof navigator !== "undefined" && navigator.clipboard) {

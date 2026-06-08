@@ -79,7 +79,7 @@ export const Route = createFileRoute("/_authenticated/profil")({
 });
 
 function ProfilePage() {
-  const { tab } = Route.useSearch();
+  const { tab = "profil" } = Route.useSearch();
   const navigate = Route.useNavigate();
 
   return (

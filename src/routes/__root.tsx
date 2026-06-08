@@ -16,6 +16,8 @@ import { ModerationBanner } from "@/components/moderation-banner";
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { initNativeOfflineWatcher } from "@/lib/native-offline";
+import { useIsNative } from "@/lib/use-is-native";
+import { AppBottomNav } from "@/components/app-bottom-nav";
 
 
 function NotFoundComponent() {
@@ -213,46 +215,51 @@ function RootComponent() {
 
 
 
+  const native = useIsNative();
+
   return (
     <QueryClientProvider client={queryClient}>
       <div className="flex min-h-screen flex-col bg-background">
-        <SiteHeader />
+        {!native && <SiteHeader />}
         <ModerationBanner />
         <main className="flex-1">
           <Outlet />
         </main>
-        <footer className="border-t border-border bg-surface">
-          <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:items-start sm:justify-between">
-            <div className="space-y-1">
-              <p>
-                © {new Date().getFullYear()} Kaupet.no — Bygget med åpen kildekode,{" "}
-                <a
-                  href="https://www.gnu.org/licenses/agpl-3.0.html"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline hover:text-foreground transition-colors"
-                >
-                  AGPL-3.0
-                </a>
-                .
-              </p>
-              <p>
-                Ved å bruke Kaupet.no godtar du våre{" "}
-                <Link to="/vilkar" className="underline hover:text-foreground transition-colors">
-                  brukervilkår
+        {!native && (
+          <footer className="border-t border-border bg-surface">
+            <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:items-start sm:justify-between">
+              <div className="space-y-1">
+                <p>
+                  © {new Date().getFullYear()} Kaupet.no — Bygget med åpen kildekode,{" "}
+                  <a
+                    href="https://www.gnu.org/licenses/agpl-3.0.html"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-foreground transition-colors"
+                  >
+                    AGPL-3.0
+                  </a>
+                  .
+                </p>
+                <p>
+                  Ved å bruke Kaupet.no godtar du våre{" "}
+                  <Link to="/vilkar" className="underline hover:text-foreground transition-colors">
+                    brukervilkår
+                  </Link>
+                  .
+                </p>
+              </div>
+              <p className="sm:max-w-xl sm:text-right">
+                Ditt personvern på internett er viktig. Kaupet.no benytter derfor ingen sporende informasjonskapsler eller tredjeparts analyseverktøy. Les vår{" "}
+                <Link to="/personvern" className="underline hover:text-foreground transition-colors">
+                  personvernerklæring her
                 </Link>
                 .
               </p>
             </div>
-            <p className="sm:max-w-xl sm:text-right">
-              Ditt personvern på internett er viktig. Kaupet.no benytter derfor ingen sporende informasjonskapsler eller tredjeparts analyseverktøy. Les vår{" "}
-              <Link to="/personvern" className="underline hover:text-foreground transition-colors">
-                personvernerklæring her
-              </Link>
-              .
-            </p>
-          </div>
-        </footer>
+          </footer>
+        )}
+        {native && <AppBottomNav />}
       </div>
       <Toaster />
     </QueryClientProvider>

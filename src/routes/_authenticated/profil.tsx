@@ -66,11 +66,14 @@ export const Route = createFileRoute("/_authenticated/profil")({
   head: () => ({
     meta: [{ title: "Min profil — Kaupet.no" }],
   }),
-  validateSearch: (search: Record<string, unknown>) => {
-    const t = search.tab as string;
-    return {
-      tab: t === "konto" || t === "varslinger" || t === "blokkerte" ? t : "profil",
-    };
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { tab?: "profil" | "konto" | "varslinger" | "blokkerte" } => {
+    const t = search.tab;
+    if (t === "konto" || t === "varslinger" || t === "blokkerte" || t === "profil") {
+      return { tab: t };
+    }
+    return {};
   },
   component: ProfilePage,
 });

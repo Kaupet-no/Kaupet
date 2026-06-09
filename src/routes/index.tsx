@@ -411,6 +411,11 @@ function WebLanding() {
         </div>
       </section>
 
+      {/* Populært akkurat nå — mobil/tablet under kategorier */}
+      <section className="mx-auto max-w-6xl px-4 pb-16 md:hidden">
+        <PopularCarousel />
+      </section>
+
       {/* How it works */}
       <section className="bg-surface">
         <div className="mx-auto max-w-6xl px-4 py-16">

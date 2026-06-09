@@ -1,7 +1,7 @@
 # Kaupet.no
 
 [![Lisens: AGPL-3.0](https://img.shields.io/badge/lisens-AGPL--3.0-blue.svg)](LICENSE)
-[![CI](https://github.com/Kaupet-no/kaupet/actions/workflows/ci.yml/badge.svg)](https://github.com/Kaupet-no/kaupet/actions/workflows/ci.yml)
+[![CI](https://github.com/Kaupet-no/Kaupet/actions/workflows/ci.yml/badge.svg)](https://github.com/Kaupet-no/Kaupet/actions/workflows/ci.yml)
 
 Kaupet.no er en åpen markedsplass for kjøp og salg av brukte ting. Ingen sporing, ingen lukket plattform. Koden er fri, og alle forbedringer kommer fellesskapet til gode.
 

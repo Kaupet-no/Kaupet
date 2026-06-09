@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "generate:assets": "capacitor-assets generate --iconBackgroundColor #2f5d44 --iconBackgroundColorDark #1d2a22 --splashBackgroundColor #fbf9f3 --splashBackgroundColorDark #1d2a22"
+    "generate:assets": "capacitor-assets generate --iconBackgroundColor #2f5d44 --iconBackgroundColorDark #1d2a22 --splashBackgroundColor #fbf9f3 --splashBackgroundColorDark #1d2a22",
+    "postinstall": "lefthook install"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.0",
@@ -102,6 +103,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^15.15.0",
+    "lefthook": "^2.1.9",
     "nitro": "3.0.260603-beta",
     "prettier": "^3.7.3",
     "typescript": "^5.8.3",

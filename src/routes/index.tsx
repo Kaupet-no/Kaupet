@@ -163,6 +163,50 @@ function WebLanding() {
     },
   });
 
+  const PopularCarousel = () => (
+    <div className="relative">
+      <div className="absolute -inset-4 -z-10 rounded-3xl bg-accent/10 blur-2xl" />
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-xl">
+        <div className="mb-3 flex items-center justify-between px-1">
+          <h2 className="font-display text-sm tracking-tight text-muted-foreground">
+            Populært akkurat nå
+          </h2>
+          <Link
+            to="/annonser"
+            search={{ q: "", category: "", sort: "new" }}
+            className="text-xs text-primary hover:underline"
+          >
+            Se alle →
+          </Link>
+        </div>
+
+        {popular && popular.length > 0 ? (
+          <Carousel
+            opts={{ align: "start", loop: true }}
+            plugins={[autoplay.current]}
+            className="w-full"
+          >
+            <CarouselContent>
+              {popular.map((listing) => (
+                <CarouselItem key={listing.id} className="basis-full sm:basis-1/2">
+                  <ListingCard listing={listing} />
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+            <CarouselPrevious className="-left-3" />
+            <CarouselNext className="-right-3" />
+          </Carousel>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            {Array.from({ length: 2 }).map((_, i) => (
+              <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-muted" />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   const submitSearch = (e: React.FormEvent) => {
     e.preventDefault();
     navigate({
@@ -218,47 +262,9 @@ function WebLanding() {
             </div>
           </div>
 
-          {/* Popular listings carousel */}
-          <div className="relative">
-            <div className="absolute -inset-4 -z-10 rounded-3xl bg-accent/10 blur-2xl" />
-            <div className="rounded-2xl border border-border bg-card p-4 shadow-xl">
-              <div className="mb-3 flex items-center justify-between px-1">
-                <h2 className="font-display text-sm tracking-tight text-muted-foreground">
-                  Populært akkurat nå
-                </h2>
-                <Link
-                  to="/annonser"
-                  search={{ q: "", category: "", sort: "new" }}
-                  className="text-xs text-primary hover:underline"
-                >
-                  Se alle →
-                </Link>
-              </div>
-
-              {popular && popular.length > 0 ? (
-                <Carousel
-                  opts={{ align: "start", loop: true }}
-                  plugins={[autoplay.current]}
-                  className="w-full"
-                >
-                  <CarouselContent>
-                    {popular.map((listing) => (
-                      <CarouselItem key={listing.id} className="basis-full sm:basis-1/2">
-                        <ListingCard listing={listing} />
-                      </CarouselItem>
-                    ))}
-                  </CarouselContent>
-                  <CarouselPrevious className="-left-3" />
-                  <CarouselNext className="-right-3" />
-                </Carousel>
-              ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  {Array.from({ length: 2 }).map((_, i) => (
-                    <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-muted" />
-                  ))}
-                </div>
-              )}
-            </div>
+          {/* Popular listings carousel — desktop only */}
+          <div className="hidden md:block">
+            <PopularCarousel />
           </div>
         </div>
       </section>
@@ -403,6 +409,11 @@ function WebLanding() {
             </>
           )}
         </div>
+      </section>
+
+      {/* Populært akkurat nå — mobil/tablet under kategorier */}
+      <section className="mx-auto max-w-6xl px-4 pb-16 md:hidden">
+        <PopularCarousel />
       </section>
 
       {/* How it works */}

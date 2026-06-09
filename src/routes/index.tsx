@@ -288,9 +288,40 @@ function WebLanding() {
           )}
         </div>
 
+        {/* Mobil: horisontal sveipbar rad (kun for rotkategorier) */}
+        {!activeCategory && (
+          <div
+            key="root-mobile"
+            className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 duration-300 animate-in fade-in slide-in-from-left-8 sm:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {rootCategories.length === 0 &&
+              Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-24 w-20 shrink-0 animate-pulse rounded-2xl bg-muted" />
+              ))}
+            {rootCategories.map((cat) => {
+              const Icon = CATEGORY_ICONS[cat.slug] ?? Package;
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => handlePickCategory(cat)}
+                  className="group flex w-20 shrink-0 snap-start flex-col items-center gap-2 active:opacity-80"
+                >
+                  <span className="flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
+                    <Icon className="size-7" />
+                  </span>
+                  <span className="line-clamp-2 text-pretty text-center text-xs font-medium leading-tight">
+                    {cat.name_nb}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         <div
           key={activeCategory?.id ?? "root"}
-          className={`grid grid-cols-2 gap-3 duration-300 animate-in fade-in sm:grid-cols-3 lg:grid-cols-4 ${activeCategory ? "slide-in-from-right-8" : "slide-in-from-left-8"}`}
+          className={`grid grid-cols-2 gap-3 duration-300 animate-in fade-in sm:grid-cols-3 lg:grid-cols-4 ${activeCategory ? "slide-in-from-right-8" : "hidden sm:grid slide-in-from-left-8"}`}
         >
           {activeCategory ? (
             (() => {

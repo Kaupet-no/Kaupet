@@ -253,9 +253,37 @@ export function AppLanding() {
       </section>
 
       {/* Kategorier */}
-      <section className="px-5 pt-2">
-        <h2 className="mb-3 font-display text-lg tracking-tight">Kategorier</h2>
-        <div className="grid grid-cols-2 gap-3">
+      <section className="pt-2 sm:px-5">
+        <h2 className="mb-3 px-5 font-display text-lg tracking-tight sm:px-0">Kategorier</h2>
+
+        {/* Mobil: horisontal sveipbar rad */}
+        <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2 sm:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {rootCategories.length === 0 &&
+            Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-24 w-20 shrink-0 animate-pulse rounded-2xl bg-muted" />
+            ))}
+          {rootCategories.map((cat) => {
+            const Icon = CATEGORY_ICONS[cat.slug] ?? Package;
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => pickCategory(cat)}
+                className="group flex w-20 shrink-0 snap-start flex-col items-center gap-2 active:opacity-80"
+              >
+                <span className="flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
+                  <Icon className="size-7" />
+                </span>
+                <span className="line-clamp-2 text-pretty text-center text-xs font-medium leading-tight">
+                  {cat.name_nb}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Tablet/desktop: grid */}
+        <div className="hidden grid-cols-2 gap-3 sm:grid md:grid-cols-3 lg:grid-cols-4">
           {rootCategories.length === 0 &&
             Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="aspect-[5/4] animate-pulse rounded-2xl bg-muted" />
@@ -278,6 +306,7 @@ export function AppLanding() {
           })}
         </div>
       </section>
+
 
       {/* Populært nå */}
       <section className="mt-8 pl-5">

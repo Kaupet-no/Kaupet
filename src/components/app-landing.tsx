@@ -307,7 +307,6 @@ export function AppLanding() {
         </div>
       </section>
 
-
       {/* Populært nå */}
       <section className="mt-8 pl-5">
         <div className="mb-3 flex items-center justify-between pr-5">

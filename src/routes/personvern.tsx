@@ -28,7 +28,7 @@ function PersonvernPage() {
           Personvernerklæring
         </h1>
         <p className="mt-3 text-sm text-muted-foreground">
-          Versjon 1.5 — sist oppdatert 6. juni 2026
+          Sist oppdatert 9. juni 2026
         </p>
       </header>
 
@@ -65,6 +65,12 @@ function PersonvernPage() {
               profilering eller markedsføring.
             </li>
 
+            <li>
+              <strong>kaupet.app.location</strong> — lagres i <code>localStorage</code> og husker
+              posisjonen og søkeradius du sist brukte i stedsfilteret (koordinater, radius i km og
+              stedsnavn). Gjør at filteret er forhåndsutfylt neste gang du besøker siden. Dataene
+              forlater ikke nettleseren din og brukes ikke til sporing.
+            </li>
             <li>
               <strong>kaupet_push_msg_hint_dismissed_v1</strong> — lagres i{" "}
               <code>localStorage</code> og husker at du har lukket informasjonsmeldingen om

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Loader2, Search, Shield, ShieldOff } from "lucide-react";
+import { Download, FlaskConical, Loader2, Search, Shield, ShieldOff } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -40,14 +40,15 @@ type FoundUser = {
   display_name: string | null;
   created_at: string;
   is_admin: boolean;
+  is_demo: boolean;
 };
+
+type PendingAction = "grant" | "revoke" | "grant_demo" | "revoke_demo";
 
 function AdminUsers() {
   const [input, setInput] = useState("");
   const [query, setQuery] = useState("");
-  const [pending, setPending] = useState<{ user: FoundUser; action: "grant" | "revoke" } | null>(
-    null,
-  );
+  const [pending, setPending] = useState<{ user: FoundUser; action: PendingAction } | null>(null);
   const qc = useQueryClient();
 
   const search = useQuery({
@@ -86,6 +87,32 @@ function AdminUsers() {
     },
     onError: (e: Error) =>
       toast.error(formatErrorMessage(e, "Kunne ikke fjerne administratorrollen")),
+  });
+
+  const grantDemo = useMutation({
+    mutationFn: async (userId: string) => {
+      const { error } = await supabase.rpc("admin_grant_demo_role", { _user_id: userId });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Demo-tilgang tildelt");
+      qc.invalidateQueries({ queryKey: ["admin", "users"] });
+      setPending(null);
+    },
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke tildele demo-tilgang")),
+  });
+
+  const revokeDemo = useMutation({
+    mutationFn: async (userId: string) => {
+      const { error } = await supabase.rpc("admin_revoke_demo_role", { _user_id: userId });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Demo-tilgang fjernet");
+      qc.invalidateQueries({ queryKey: ["admin", "users"] });
+      setPending(null);
+    },
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke fjerne demo-tilgang")),
   });
 
   const exportData = useMutation({
@@ -171,11 +198,14 @@ function AdminUsers() {
                         {new Date(u.created_at).toLocaleDateString("nb-NO")}
                       </TableCell>
                       <TableCell>
-                        {u.is_admin ? (
-                          <Badge>Administrator</Badge>
-                        ) : (
-                          <Badge variant="secondary">Bruker</Badge>
-                        )}
+                        <div className="flex flex-wrap gap-1">
+                          {u.is_admin ? (
+                            <Badge>Administrator</Badge>
+                          ) : (
+                            <Badge variant="secondary">Bruker</Badge>
+                          )}
+                          {u.is_demo && <Badge variant="outline">Demo</Badge>}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">

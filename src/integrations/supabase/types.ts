@@ -898,9 +898,11 @@ export type Database = {
           display_name: string
           email: string
           is_admin: boolean
+          is_demo: boolean
           user_id: string
         }[]
       }
+      admin_grant_demo_role: { Args: { _user_id: string }; Returns: undefined }
       admin_grant_role: { Args: { _user_id: string }; Returns: undefined }
       admin_list_bans: {
         Args: never
@@ -980,6 +982,7 @@ export type Database = {
           view_count: number
         }[]
       }
+      admin_revoke_demo_role: { Args: { _user_id: string }; Returns: undefined }
       admin_revoke_role: { Args: { _user_id: string }; Returns: undefined }
       admin_search_listings: {
         Args: { _limit?: number; _query?: string; _status?: string }
@@ -1007,6 +1010,10 @@ export type Database = {
         }[]
       }
       cancel_account_deletion: { Args: never; Returns: boolean }
+      demo_activate_promotion: {
+        Args: { _duration_days: number; _listing_id: string }
+        Returns: string
+      }
       expire_listing_promotions: { Args: never; Returns: number }
       expire_old_listings: { Args: never; Returns: number }
       get_featured_listing_ids: {

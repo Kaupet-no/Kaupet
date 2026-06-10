@@ -1,5 +1,5 @@
 import { createFileRoute, Link, notFound, useNavigate, useRouter } from "@tanstack/react-router";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { lazy, Suspense, useEffect, useState } from "react";
 import {
   ArrowLeft,
@@ -14,6 +14,7 @@ import {
   ChevronDown,
   Share2,
   Sparkles,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -158,6 +159,7 @@ function ListingDetailPage() {
   const search = Route.useSearch();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [activeImage, setActiveImage] = useState(0);
   const [imgUrls, setImgUrls] = useState<Record<string, string>>({});
   const [mounted, setMounted] = useState(false);
@@ -168,6 +170,7 @@ function ListingDetailPage() {
   useEffect(() => {
     if (search.promotion === "success") {
       toast.success("Takk! Fremhevingen aktiveres så snart Vipps bekrefter betalingen.");
+      queryClient.invalidateQueries({ queryKey: ["listing-active-promotion", id] });
       navigate({
         to: "/annonse/$id",
         params: { id },
@@ -213,6 +216,25 @@ function ListingDetailPage() {
         unique_visitors: Number(row?.unique_visitors ?? 0),
         favorite_count: Number(row?.favorite_count ?? 0),
       };
+    },
+  });
+
+  const { data: activePromotion } = useQuery({
+    queryKey: ["listing-active-promotion", id],
+    enabled: isOwner,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("listing_promotions")
+        .select("id, status, expires_at")
+        .eq("listing_id", id)
+        .in("status", ["active", "pending", "gifted"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      if (data.expires_at && new Date(data.expires_at) <= new Date()) return null;
+      return data;
     },
   });
 
@@ -428,16 +450,26 @@ function ListingDetailPage() {
                   <Pencil className="size-4" /> Rediger annonse
                 </Button>
               </Link>
-              {data.status === "active" && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="mt-2 w-full gap-2"
-                  onClick={() => setPromoteOpen(true)}
-                >
-                  <Sparkles className="size-4" /> Fremhev annonse
-                </Button>
-              )}
+              {data.status === "active" &&
+                (activePromotion ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-2 w-full gap-2 border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-400"
+                    disabled
+                  >
+                    <Check className="size-4" /> Annonse fremhevet
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-2 w-full gap-2"
+                    onClick={() => setPromoteOpen(true)}
+                  >
+                    <Sparkles className="size-4" /> Fremhev annonse
+                  </Button>
+                ))}
               <PromoteListingDialog
                 listingId={data.id}
                 open={promoteOpen}

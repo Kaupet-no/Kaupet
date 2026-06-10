@@ -13,6 +13,7 @@ import {
   Heart,
   Clock,
   Sparkles,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -374,11 +375,21 @@ function ListingRow({
         </Link>
         {row.status === "active" ? (
           <>
-            {!activePromotion && isDemo && (
-              <Button size="sm" variant="outline" onClick={onPromote} disabled={busy}>
-                <Sparkles className="size-4" /> Fremhev annonse
-              </Button>
-            )}
+            {isDemo &&
+              (activePromotion ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled
+                  className="border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-400"
+                >
+                  <Check className="size-4" /> Annonse fremhevet
+                </Button>
+              ) : (
+                <Button size="sm" variant="outline" onClick={onPromote} disabled={busy}>
+                  <Sparkles className="size-4" /> Fremhev annonse
+                </Button>
+              ))}
             <Button size="sm" variant="outline" onClick={onMarkSold} disabled={busy}>
               <CheckCircle2 className="size-4" /> Marker som solgt
             </Button>

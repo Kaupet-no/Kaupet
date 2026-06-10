@@ -35,17 +35,12 @@ export function FeaturedListingsSection({ categorySlug, limit = 2 }: Props) {
       <div className="mb-3 flex items-center gap-2">
         <Sparkles className="size-4 text-accent" />
         <h2 className="font-display text-sm uppercase tracking-wide text-muted-foreground">
-          Fremhevet
+          Promoterte annonser
         </h2>
       </div>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-2">
         {cards.map((l) => (
-          <div key={l.id} className="relative">
-            <ListingCard listing={l} />
-            <span className="pointer-events-none absolute left-2 top-2 z-10 inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent-foreground shadow">
-              <Sparkles className="size-3" /> Fremhevet
-            </span>
-          </div>
+          <ListingCard key={l.id} listing={l} />
         ))}
       </div>
     </section>

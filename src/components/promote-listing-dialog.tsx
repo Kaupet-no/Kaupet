@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useIsDemo } from "@/lib/use-is-demo";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2, MapPin, Sparkles } from "lucide-react";
 import { toast } from "sonner";
@@ -16,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { createPromotionCheckout, getPromotionPricing } from "@/lib/promotions.functions";
+import { activateDemoPromotion, createPromotionCheckout, getPromotionPricing } from "@/lib/promotions.functions";
 import { formatErrorMessage } from "@/lib/errors";
 
 type Props = {
@@ -43,6 +44,9 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
   const [selected, setSelected] = useState<number | null>(null);
   const [accepted, setAccepted] = useState(false);
   const [imgUrl, setImgUrl] = useState<string | null>(null);
+
+  const { data: isDemo = false } = useIsDemo();
+  const queryClient = useQueryClient();
 
   const fetchPricing = useServerFn(getPromotionPricing);
   const { data: pricing } = useQuery({
@@ -100,6 +104,22 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
     },
     onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke starte betalingen")),
   });
+
+  const activateDemo = useServerFn(activateDemoPromotion);
+  const demoActivate = useMutation({
+    mutationFn: async (duration_days: number) =>
+      activateDemo({ data: { listing_id: listingId, duration_days } }),
+    onSuccess: () => {
+      toast.success("Fremhevingen er aktivert (demo)");
+      queryClient.invalidateQueries({ queryKey: ["listing-active-promotion", listingId] });
+      queryClient.invalidateQueries({ queryKey: ["my-listings"] });
+      queryClient.invalidateQueries({ queryKey: ["featured-listings"] });
+      onOpenChange(false);
+    },
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke aktivere fremheving")),
+  });
+
+  const isPending = checkout.isPending || demoActivate.isPending;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -197,11 +217,15 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
             Avbryt
           </Button>
           <Button
-            disabled={!selected || !accepted || checkout.isPending}
-            onClick={() => selected && checkout.mutate(selected)}
+            disabled={!selected || !accepted || isPending}
+            onClick={() => {
+              if (!selected) return;
+              if (isDemo) demoActivate.mutate(selected);
+              else checkout.mutate(selected);
+            }}
           >
-            {checkout.isPending && <Loader2 className="size-4 animate-spin" />}
-            Betal med Vipps
+            {isPending && <Loader2 className="size-4 animate-spin" />}
+            {isDemo ? "Aktiver fremheving (demo)" : "Betal med Vipps"}
           </Button>
         </DialogFooter>
       </DialogContent>

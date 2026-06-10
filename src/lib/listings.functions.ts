@@ -11,12 +11,15 @@ export const republishListing = createServerFn({ method: "POST" })
 
     const { data: listing, error: fetchError } = await supabase
       .from("listings")
-      .select("id, seller_id")
+      .select("id, seller_id, status")
       .eq("id", data.id)
       .single();
     if (fetchError) throw fetchError;
     if (!listing || listing.seller_id !== userId) {
       throw new Error("Du har ikke tilgang til denne annonsen");
+    }
+    if (listing.status === "disabled") {
+      throw new Error("Denne annonsen er deaktivert av moderator og kan ikke reaktiveres");
     }
 
     const now = new Date().toISOString();

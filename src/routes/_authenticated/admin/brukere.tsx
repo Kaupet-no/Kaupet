@@ -335,6 +335,16 @@ function AdminUsers() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <CreateDemoUserDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={(email) => {
+          setInput(email);
+          setQuery(email);
+          qc.invalidateQueries({ queryKey: ["admin", "users"] });
+        }}
+      />
     </div>
   );
 }

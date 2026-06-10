@@ -105,6 +105,22 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
     onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke starte betalingen")),
   });
 
+  const activateDemo = useServerFn(activateDemoPromotion);
+  const demoActivate = useMutation({
+    mutationFn: async (duration_days: number) =>
+      activateDemo({ data: { listing_id: listingId, duration_days } }),
+    onSuccess: () => {
+      toast.success("Fremhevingen er aktivert (demo)");
+      queryClient.invalidateQueries({ queryKey: ["listing-active-promotion", listingId] });
+      queryClient.invalidateQueries({ queryKey: ["my-listings"] });
+      queryClient.invalidateQueries({ queryKey: ["featured-listings"] });
+      onOpenChange(false);
+    },
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke aktivere fremheving")),
+  });
+
+  const isPending = checkout.isPending || demoActivate.isPending;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">

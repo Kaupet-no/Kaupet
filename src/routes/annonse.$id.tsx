@@ -450,16 +450,26 @@ function ListingDetailPage() {
                   <Pencil className="size-4" /> Rediger annonse
                 </Button>
               </Link>
-              {data.status === "active" && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="mt-2 w-full gap-2"
-                  onClick={() => setPromoteOpen(true)}
-                >
-                  <Sparkles className="size-4" /> Fremhev annonse
-                </Button>
-              )}
+              {data.status === "active" &&
+                (activePromotion ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-2 w-full gap-2 border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-400"
+                    disabled
+                  >
+                    <Check className="size-4" /> Annonse fremhevet
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-2 w-full gap-2"
+                    onClick={() => setPromoteOpen(true)}
+                  >
+                    <Sparkles className="size-4" /> Fremhev annonse
+                  </Button>
+                ))}
               <PromoteListingDialog
                 listingId={data.id}
                 open={promoteOpen}

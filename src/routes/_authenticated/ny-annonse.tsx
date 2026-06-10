@@ -18,6 +18,7 @@ import {
 import { ImageUploader, type PendingImage } from "@/components/image-uploader";
 import { ListingLocationPicker } from "@/components/listing-location-picker";
 import { PromotionPreviewDialog } from "@/components/promotion-preview-dialog";
+import { PublishedListingDialog } from "@/components/published-listing-dialog";
 import { useIsDemo } from "@/lib/use-is-demo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,6 +83,7 @@ function NewListingPage() {
   const navigate = useNavigate();
   const [images, setImages] = useState<PendingImage[]>([]);
   const [publishedId, setPublishedId] = useState<string | null>(null);
+  const [publishedOpen, setPublishedOpen] = useState(false);
   const [promoteOpen, setPromoteOpen] = useState(false);
   const { data: isDemo = false } = useIsDemo();
 
@@ -243,11 +245,7 @@ function NewListingPage() {
       void import("@/lib/haptics").then((m) => m.hapticNotification("success"));
       toast.success("Annonsen er publisert");
       setPublishedId(id);
-      if (isDemo) {
-        setPromoteOpen(true);
-      } else {
-        navigate({ to: "/annonse/$id", params: { id } });
-      }
+      setPublishedOpen(true);
     },
     onError: (err: Error) => {
       void import("@/lib/haptics").then((m) => m.hapticNotification("error"));
@@ -456,13 +454,33 @@ function NewListingPage() {
         </div>
       </form>
 
-      {publishedId && isDemo && (
+      {publishedId && (
+        <PublishedListingDialog
+          listingId={publishedId}
+          open={publishedOpen}
+          onOpenChange={setPublishedOpen}
+          canPromote={isDemo}
+          onView={() => {
+            setPublishedOpen(false);
+            navigate({ to: "/annonse/$id", params: { id: publishedId } });
+          }}
+          onPromote={() => {
+            setPublishedOpen(false);
+            setPromoteOpen(true);
+          }}
+          onClose={() => {
+            if (!promoteOpen) navigate({ to: "/mine-annonser" });
+          }}
+        />
+      )}
+
+      {publishedId && (
         <PromotionPreviewDialog
           listingId={publishedId}
           open={promoteOpen}
           onOpenChange={(o) => {
             setPromoteOpen(o);
-            if (!o) navigate({ to: "/annonse/$id", params: { id: publishedId } });
+            if (!o) navigate({ to: "/mine-annonser" });
           }}
         />
       )}

@@ -18,6 +18,7 @@ import {
 import { ImageUploader, type PendingImage } from "@/components/image-uploader";
 import { ListingLocationPicker } from "@/components/listing-location-picker";
 import { PromotionPreviewDialog } from "@/components/promotion-preview-dialog";
+import { PublishedListingDialog } from "@/components/published-listing-dialog";
 import { useIsDemo } from "@/lib/use-is-demo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

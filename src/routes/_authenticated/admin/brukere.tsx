@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, FlaskConical, Loader2, Search, Shield, ShieldOff } from "lucide-react";
+import { Download, FlaskConical, Loader2, Plus, Search, Shield, ShieldOff } from "lucide-react";
+import { CreateDemoUserDialog } from "@/components/create-demo-user-dialog";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";

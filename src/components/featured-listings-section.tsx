@@ -34,8 +34,6 @@ export function FeaturedListingsSection({ categorySlug, limit = 2, allowedIds }:
     cover_path: l.cover_path,
   }));
 
-  const gridCols = cards.length === 1 ? "grid-cols-1" : "grid-cols-2 sm:grid-cols-2";
-
   return (
     <section className="mb-2">
       <div className="mb-2 flex items-center gap-1.5">
@@ -44,7 +42,7 @@ export function FeaturedListingsSection({ categorySlug, limit = 2, allowedIds }:
           Promoterte annonser
         </span>
       </div>
-      <div className={`grid gap-4 ${gridCols}`}>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         {cards.map((l) => (
           <ListingCard key={l.id} listing={l} />
         ))}

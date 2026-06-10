@@ -50,6 +50,7 @@ function AdminUsers() {
   const [input, setInput] = useState("");
   const [query, setQuery] = useState("");
   const [pending, setPending] = useState<{ user: FoundUser; action: PendingAction } | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
   const qc = useQueryClient();
 
   const search = useQuery({

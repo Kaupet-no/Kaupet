@@ -45,6 +45,9 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
   const [accepted, setAccepted] = useState(false);
   const [imgUrl, setImgUrl] = useState<string | null>(null);
 
+  const { data: isDemo = false } = useIsDemo();
+  const queryClient = useQueryClient();
+
   const fetchPricing = useServerFn(getPromotionPricing);
   const { data: pricing } = useQuery({
     queryKey: ["promotion-pricing"],

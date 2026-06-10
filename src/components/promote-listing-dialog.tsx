@@ -217,11 +217,15 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
             Avbryt
           </Button>
           <Button
-            disabled={!selected || !accepted || checkout.isPending}
-            onClick={() => selected && checkout.mutate(selected)}
+            disabled={!selected || !accepted || isPending}
+            onClick={() => {
+              if (!selected) return;
+              if (isDemo) demoActivate.mutate(selected);
+              else checkout.mutate(selected);
+            }}
           >
-            {checkout.isPending && <Loader2 className="size-4 animate-spin" />}
-            Betal med Vipps
+            {isPending && <Loader2 className="size-4 animate-spin" />}
+            {isDemo ? "Aktiver fremheving (demo)" : "Betal med Vipps"}
           </Button>
         </DialogFooter>
       </DialogContent>

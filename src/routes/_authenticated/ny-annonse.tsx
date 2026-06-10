@@ -17,7 +17,8 @@ import {
 } from "@/lib/geocode";
 import { ImageUploader, type PendingImage } from "@/components/image-uploader";
 import { ListingLocationPicker } from "@/components/listing-location-picker";
-import { PromoteListingDialog } from "@/components/promote-listing-dialog";
+import { PromotionPreviewDialog } from "@/components/promotion-preview-dialog";
+import { useIsDemo } from "@/lib/use-is-demo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -241,7 +242,11 @@ function NewListingPage() {
       void import("@/lib/haptics").then((m) => m.hapticNotification("success"));
       toast.success("Annonsen er publisert");
       setPublishedId(id);
-      setPromoteOpen(true);
+      if (isDemo) {
+        setPromoteOpen(true);
+      } else {
+        navigate({ to: "/annonse/$id", params: { id } });
+      }
     },
     onError: (err: Error) => {
       void import("@/lib/haptics").then((m) => m.hapticNotification("error"));
@@ -450,8 +455,8 @@ function NewListingPage() {
         </div>
       </form>
 
-      {publishedId && (
-        <PromoteListingDialog
+      {publishedId && isDemo && (
+        <PromotionPreviewDialog
           listingId={publishedId}
           open={promoteOpen}
           onOpenChange={(o) => {

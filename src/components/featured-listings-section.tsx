@@ -35,17 +35,19 @@ export function FeaturedListingsSection({ categorySlug, limit = 2, allowedIds }:
   }));
 
   return (
-    <section className="mb-2">
-      <div className="mb-2 flex items-center gap-1.5">
-        <Sparkles className="size-3 text-accent" />
-        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-          Promoterte annonser
-        </span>
-      </div>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-        {cards.map((l) => (
-          <ListingCard key={l.id} listing={l} />
-        ))}
+    <section className="mb-6">
+      <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="mb-3 flex items-center gap-1.5">
+          <Sparkles className="size-3 text-accent" />
+          <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            Promoterte annonser
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+          {cards.map((l) => (
+            <ListingCard key={l.id} listing={l} />
+          ))}
+        </div>
       </div>
     </section>
   );

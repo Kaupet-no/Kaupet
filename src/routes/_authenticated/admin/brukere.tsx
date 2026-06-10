@@ -223,6 +223,23 @@ function AdminUsers() {
                             )}
                             Eksporter data
                           </Button>
+                          {u.is_demo ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setPending({ user: u, action: "revoke_demo" })}
+                            >
+                              <FlaskConical className="size-4" /> Fjern demo
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setPending({ user: u, action: "grant_demo" })}
+                            >
+                              <FlaskConical className="size-4" /> Gjør til demo
+                            </Button>
+                          )}
                           {u.is_admin ? (
                             <Button
                               variant="outline"
@@ -263,12 +280,20 @@ function AdminUsers() {
             <AlertDialogTitle>
               {pending?.action === "grant"
                 ? "Tildele administratorrolle?"
-                : "Fjerne administratorrolle?"}
+                : pending?.action === "revoke"
+                  ? "Fjerne administratorrolle?"
+                  : pending?.action === "grant_demo"
+                    ? "Tildele demo-tilgang?"
+                    : "Fjerne demo-tilgang?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {pending?.action === "grant"
                 ? `${pending.user.email} vil få full tilgang til administrasjonsgrensesnittet.`
-                : `${pending?.user.email} vil miste tilgang til administrasjonsgrensesnittet.`}
+                : pending?.action === "revoke"
+                  ? `${pending?.user.email} vil miste tilgang til administrasjonsgrensesnittet.`
+                  : pending?.action === "grant_demo"
+                    ? `${pending.user.email} vil få tilgang til å teste nye funksjoner før de lanseres for ordinære brukere.`
+                    : `${pending?.user.email} mister tilgang til demo-funksjoner.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -277,13 +302,24 @@ function AdminUsers() {
               onClick={() => {
                 if (!pending) return;
                 if (pending.action === "grant") grant.mutate(pending.user.user_id);
-                else revoke.mutate(pending.user.user_id);
+                else if (pending.action === "revoke") revoke.mutate(pending.user.user_id);
+                else if (pending.action === "grant_demo")
+                  grantDemo.mutate(pending.user.user_id);
+                else revokeDemo.mutate(pending.user.user_id);
               }}
-              disabled={grant.isPending || revoke.isPending}
+              disabled={
+                grant.isPending ||
+                revoke.isPending ||
+                grantDemo.isPending ||
+                revokeDemo.isPending
+              }
             >
-              {grant.isPending || revoke.isPending ? (
+              {grant.isPending ||
+              revoke.isPending ||
+              grantDemo.isPending ||
+              revokeDemo.isPending ? (
                 <Loader2 className="size-4 animate-spin" />
-              ) : pending?.action === "grant" ? (
+              ) : pending?.action === "grant" || pending?.action === "grant_demo" ? (
                 "Tildel"
               ) : (
                 "Fjern"

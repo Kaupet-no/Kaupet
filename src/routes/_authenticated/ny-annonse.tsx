@@ -83,6 +83,7 @@ function NewListingPage() {
   const [images, setImages] = useState<PendingImage[]>([]);
   const [publishedId, setPublishedId] = useState<string | null>(null);
   const [promoteOpen, setPromoteOpen] = useState(false);
+  const { data: isDemo = false } = useIsDemo();
 
   const { data: categories } = useQuery({
     queryKey: ["categories", "with-parent"],

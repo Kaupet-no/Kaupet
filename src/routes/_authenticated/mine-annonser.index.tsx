@@ -343,7 +343,7 @@ function ListingRow({
             <span className="text-xs text-muted-foreground">Publiser på nytt for 30 nye dager</span>
           )}
           {activePromotion && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-xs text-accent-foreground">
+            <span className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-xs text-accent">
               <Sparkles className="size-3" />
               {activePromotion.is_gift ? "Gratis fremhevet" : "Fremhevet"} til{" "}
               {activePromotion.expires_at

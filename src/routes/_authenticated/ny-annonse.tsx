@@ -245,11 +245,7 @@ function NewListingPage() {
       void import("@/lib/haptics").then((m) => m.hapticNotification("success"));
       toast.success("Annonsen er publisert");
       setPublishedId(id);
-      if (isDemo) {
-        setPromoteOpen(true);
-      } else {
-        navigate({ to: "/annonse/$id", params: { id } });
-      }
+      setPublishedOpen(true);
     },
     onError: (err: Error) => {
       void import("@/lib/haptics").then((m) => m.hapticNotification("error"));

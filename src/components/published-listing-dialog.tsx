@@ -168,7 +168,7 @@ export function PublishedListingDialog({
               onClick={onPromote}
               className="flex-1 border-accent/40 text-accent hover:bg-accent/10 hover:text-accent"
             >
-              <Sparkles className="size-4" /> Promoter
+              <Sparkles className="size-4" /> Fremhev annonse
             </Button>
           )}
         </div>

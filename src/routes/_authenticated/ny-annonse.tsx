@@ -17,7 +17,7 @@ import {
 } from "@/lib/geocode";
 import { ImageUploader, type PendingImage } from "@/components/image-uploader";
 import { ListingLocationPicker } from "@/components/listing-location-picker";
-import { PromotionPreviewDialog } from "@/components/promotion-preview-dialog";
+import { PromoteListingDialog } from "@/components/promote-listing-dialog";
 import { PublishedListingDialog } from "@/components/published-listing-dialog";
 import { useIsDemo } from "@/lib/use-is-demo";
 import { Button } from "@/components/ui/button";
@@ -475,7 +475,7 @@ function NewListingPage() {
       )}
 
       {publishedId && (
-        <PromotionPreviewDialog
+        <PromoteListingDialog
           listingId={publishedId}
           open={promoteOpen}
           onOpenChange={(o) => {

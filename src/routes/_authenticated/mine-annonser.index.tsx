@@ -20,7 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { signListingImageUrls } from "@/lib/storage";
 import { republishListing } from "@/lib/listings.functions";
 import { getMyActivePromotions } from "@/lib/promotions.functions";
-import { PromotionPreviewDialog } from "@/components/promotion-preview-dialog";
+import { PromoteListingDialog } from "@/components/promote-listing-dialog";
 import { useIsDemo } from "@/lib/use-is-demo";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -254,7 +254,7 @@ function MyListingsPage() {
       </Tabs>
 
       {promoteId && (
-        <PromotionPreviewDialog
+        <PromoteListingDialog
           listingId={promoteId}
           open={!!promoteId}
           onOpenChange={(o) => !o && setPromoteId(null)}
@@ -376,7 +376,7 @@ function ListingRow({
           <>
             {!activePromotion && isDemo && (
               <Button size="sm" variant="outline" onClick={onPromote} disabled={busy}>
-                <Sparkles className="size-4" /> Promoter
+                <Sparkles className="size-4" /> Fremhev annonse
               </Button>
             )}
             <Button size="sm" variant="outline" onClick={onMarkSold} disabled={busy}>

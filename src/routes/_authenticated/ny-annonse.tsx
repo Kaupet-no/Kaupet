@@ -83,6 +83,7 @@ function NewListingPage() {
   const navigate = useNavigate();
   const [images, setImages] = useState<PendingImage[]>([]);
   const [publishedId, setPublishedId] = useState<string | null>(null);
+  const [publishedOpen, setPublishedOpen] = useState(false);
   const [promoteOpen, setPromoteOpen] = useState(false);
   const { data: isDemo = false } = useIsDemo();
 

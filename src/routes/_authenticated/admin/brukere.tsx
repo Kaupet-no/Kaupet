@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Loader2, Search, Shield, ShieldOff } from "lucide-react";
+import { Download, FlaskConical, Loader2, Search, Shield, ShieldOff } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -40,14 +40,15 @@ type FoundUser = {
   display_name: string | null;
   created_at: string;
   is_admin: boolean;
+  is_demo: boolean;
 };
+
+type PendingAction = "grant" | "revoke" | "grant_demo" | "revoke_demo";
 
 function AdminUsers() {
   const [input, setInput] = useState("");
   const [query, setQuery] = useState("");
-  const [pending, setPending] = useState<{ user: FoundUser; action: "grant" | "revoke" } | null>(
-    null,
-  );
+  const [pending, setPending] = useState<{ user: FoundUser; action: PendingAction } | null>(null);
   const qc = useQueryClient();
 
   const search = useQuery({
@@ -86,6 +87,32 @@ function AdminUsers() {
     },
     onError: (e: Error) =>
       toast.error(formatErrorMessage(e, "Kunne ikke fjerne administratorrollen")),
+  });
+
+  const grantDemo = useMutation({
+    mutationFn: async (userId: string) => {
+      const { error } = await supabase.rpc("admin_grant_demo_role", { _user_id: userId });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Demo-tilgang tildelt");
+      qc.invalidateQueries({ queryKey: ["admin", "users"] });
+      setPending(null);
+    },
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke tildele demo-tilgang")),
+  });
+
+  const revokeDemo = useMutation({
+    mutationFn: async (userId: string) => {
+      const { error } = await supabase.rpc("admin_revoke_demo_role", { _user_id: userId });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Demo-tilgang fjernet");
+      qc.invalidateQueries({ queryKey: ["admin", "users"] });
+      setPending(null);
+    },
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke fjerne demo-tilgang")),
   });
 
   const exportData = useMutation({
@@ -171,11 +198,14 @@ function AdminUsers() {
                         {new Date(u.created_at).toLocaleDateString("nb-NO")}
                       </TableCell>
                       <TableCell>
-                        {u.is_admin ? (
-                          <Badge>Administrator</Badge>
-                        ) : (
-                          <Badge variant="secondary">Bruker</Badge>
-                        )}
+                        <div className="flex flex-wrap gap-1">
+                          {u.is_admin ? (
+                            <Badge>Administrator</Badge>
+                          ) : (
+                            <Badge variant="secondary">Bruker</Badge>
+                          )}
+                          {u.is_demo && <Badge variant="outline">Demo</Badge>}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
@@ -193,6 +223,23 @@ function AdminUsers() {
                             )}
                             Eksporter data
                           </Button>
+                          {u.is_demo ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setPending({ user: u, action: "revoke_demo" })}
+                            >
+                              <FlaskConical className="size-4" /> Fjern demo
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setPending({ user: u, action: "grant_demo" })}
+                            >
+                              <FlaskConical className="size-4" /> Gjør til demo
+                            </Button>
+                          )}
                           {u.is_admin ? (
                             <Button
                               variant="outline"
@@ -233,12 +280,20 @@ function AdminUsers() {
             <AlertDialogTitle>
               {pending?.action === "grant"
                 ? "Tildele administratorrolle?"
-                : "Fjerne administratorrolle?"}
+                : pending?.action === "revoke"
+                  ? "Fjerne administratorrolle?"
+                  : pending?.action === "grant_demo"
+                    ? "Tildele demo-tilgang?"
+                    : "Fjerne demo-tilgang?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {pending?.action === "grant"
                 ? `${pending.user.email} vil få full tilgang til administrasjonsgrensesnittet.`
-                : `${pending?.user.email} vil miste tilgang til administrasjonsgrensesnittet.`}
+                : pending?.action === "revoke"
+                  ? `${pending?.user.email} vil miste tilgang til administrasjonsgrensesnittet.`
+                  : pending?.action === "grant_demo"
+                    ? `${pending.user.email} vil få tilgang til å teste nye funksjoner før de lanseres for ordinære brukere.`
+                    : `${pending?.user.email} mister tilgang til demo-funksjoner.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -247,13 +302,24 @@ function AdminUsers() {
               onClick={() => {
                 if (!pending) return;
                 if (pending.action === "grant") grant.mutate(pending.user.user_id);
-                else revoke.mutate(pending.user.user_id);
+                else if (pending.action === "revoke") revoke.mutate(pending.user.user_id);
+                else if (pending.action === "grant_demo")
+                  grantDemo.mutate(pending.user.user_id);
+                else revokeDemo.mutate(pending.user.user_id);
               }}
-              disabled={grant.isPending || revoke.isPending}
+              disabled={
+                grant.isPending ||
+                revoke.isPending ||
+                grantDemo.isPending ||
+                revokeDemo.isPending
+              }
             >
-              {grant.isPending || revoke.isPending ? (
+              {grant.isPending ||
+              revoke.isPending ||
+              grantDemo.isPending ||
+              revokeDemo.isPending ? (
                 <Loader2 className="size-4 animate-spin" />
-              ) : pending?.action === "grant" ? (
+              ) : pending?.action === "grant" || pending?.action === "grant_demo" ? (
                 "Tildel"
               ) : (
                 "Fjern"

@@ -20,7 +20,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { signListingImageUrls } from "@/lib/storage";
 import { republishListing } from "@/lib/listings.functions";
 import { getMyActivePromotions } from "@/lib/promotions.functions";
-import { PromoteListingDialog } from "@/components/promote-listing-dialog";
+import { PromotionPreviewDialog } from "@/components/promotion-preview-dialog";
+import { useIsDemo } from "@/lib/use-is-demo";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -85,6 +86,7 @@ function MyListingsPage() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<"all" | "active" | "sold" | "draft">("all");
   const [promoteId, setPromoteId] = useState<string | null>(null);
+  const { data: isDemo = false } = useIsDemo();
 
   const fetchPromos = useServerFn(getMyActivePromotions);
   const { data: promos } = useQuery({
@@ -236,6 +238,7 @@ function MyListingsPage() {
                 <ListingRow
                   key={r.id}
                   row={r}
+                  isDemo={isDemo}
                   activePromotion={activePromoByListing.get(r.id) ?? null}
                   onPromote={() => setPromoteId(r.id)}
                   onMarkSold={() => updateStatus.mutate({ id: r.id, status: "sold" })}
@@ -251,7 +254,7 @@ function MyListingsPage() {
       </Tabs>
 
       {promoteId && (
-        <PromoteListingDialog
+        <PromotionPreviewDialog
           listingId={promoteId}
           open={!!promoteId}
           onOpenChange={(o) => !o && setPromoteId(null)}
@@ -263,6 +266,7 @@ function MyListingsPage() {
 
 function ListingRow({
   row,
+  isDemo,
   activePromotion,
   onPromote,
   onMarkSold,
@@ -272,6 +276,7 @@ function ListingRow({
   busy,
 }: {
   row: Row;
+  isDemo: boolean;
   activePromotion: { expires_at: string | null; is_gift: boolean } | null;
   onPromote: () => void;
   onMarkSold: () => void;
@@ -369,9 +374,9 @@ function ListingRow({
         </Link>
         {row.status === "active" ? (
           <>
-            {!activePromotion && (
+            {!activePromotion && isDemo && (
               <Button size="sm" variant="outline" onClick={onPromote} disabled={busy}>
-                <Sparkles className="size-4" /> Fremhev
+                <Sparkles className="size-4" /> Promoter
               </Button>
             )}
             <Button size="sm" variant="outline" onClick={onMarkSold} disabled={busy}>

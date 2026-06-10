@@ -3,6 +3,27 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+export const activateDemoPromotion = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        listing_id: z.string().uuid(),
+        duration_days: z.number().int().positive().max(60),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: promoId, error } = await supabase.rpc("demo_activate_promotion", {
+      _listing_id: data.listing_id,
+      _duration_days: data.duration_days,
+    });
+    if (error) throw error;
+    return { promotion_id: promoId as string };
+  });
+
+
 export const getPromotionPricing = createServerFn({ method: "GET" }).handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin

@@ -1,5 +1,5 @@
 import { createFileRoute, Link, notFound, useNavigate, useRouter } from "@tanstack/react-router";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { lazy, Suspense, useEffect, useState } from "react";
 import {
   ArrowLeft,
@@ -159,6 +159,7 @@ function ListingDetailPage() {
   const search = Route.useSearch();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [activeImage, setActiveImage] = useState(0);
   const [imgUrls, setImgUrls] = useState<Record<string, string>>({});
   const [mounted, setMounted] = useState(false);
@@ -169,6 +170,7 @@ function ListingDetailPage() {
   useEffect(() => {
     if (search.promotion === "success") {
       toast.success("Takk! Fremhevingen aktiveres så snart Vipps bekrefter betalingen.");
+      queryClient.invalidateQueries({ queryKey: ["listing-active-promotion", id] });
       navigate({
         to: "/annonse/$id",
         params: { id },

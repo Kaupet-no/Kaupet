@@ -143,26 +143,31 @@ function AdminUsers() {
     <div className="space-y-6">
       <Card>
         <CardContent className="pt-6">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              setQuery(input.trim());
-            }}
-            className="flex gap-2"
-          >
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Søk på e-postadresse…"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <Button type="submit" disabled={input.trim().length < 2}>
-              Søk
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                setQuery(input.trim());
+              }}
+              className="flex flex-1 gap-2 min-w-[260px]"
+            >
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Søk på e-postadresse…"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Button type="submit" disabled={input.trim().length < 2}>
+                Søk
+              </Button>
+            </form>
+            <Button variant="outline" onClick={() => setCreateOpen(true)}>
+              <Plus className="size-4" /> Opprett demo-bruker
             </Button>
-          </form>
+          </div>
           <p className="mt-2 text-xs text-muted-foreground">
             Skriv inn hele eller deler av en e-postadresse.
           </p>

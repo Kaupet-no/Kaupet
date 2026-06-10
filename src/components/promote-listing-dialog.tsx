@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { createPromotionCheckout, getPromotionPricing } from "@/lib/promotions.functions";
+import { activateDemoPromotion, createPromotionCheckout, getPromotionPricing } from "@/lib/promotions.functions";
 import { formatErrorMessage } from "@/lib/errors";
 
 type Props = {

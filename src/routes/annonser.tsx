@@ -519,9 +519,12 @@ function BrowsePage() {
 
       <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_420px]">
         <div>
-          <FeaturedListingsSection
-            categorySlug={effectiveCategories.length === 1 ? effectiveCategories[0] : undefined}
-          />
+          {!isLoading && (
+            <FeaturedListingsSection
+              categorySlug={effectiveCategories.length === 1 ? effectiveCategories[0] : undefined}
+              allowedIds={new Set((listings ?? []).map((l) => l.id))}
+            />
+          )}
           {isLoading ? (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               {Array.from({ length: 8 }).map((_, i) => (

@@ -37,12 +37,12 @@ export function FeaturedListingsSection({ categorySlug, limit = 2, allowedIds }:
   const gridCols = cards.length === 1 ? "grid-cols-1" : "grid-cols-2 sm:grid-cols-2";
 
   return (
-    <section className="mb-4 rounded-2xl border border-accent/30 bg-accent/5 p-4">
-      <div className="mb-3 flex items-center gap-2">
-        <Sparkles className="size-4 text-accent" />
-        <h2 className="font-display text-sm uppercase tracking-wide text-muted-foreground">
+    <section className="mb-2">
+      <div className="mb-2 flex items-center gap-1.5">
+        <Sparkles className="size-3 text-accent" />
+        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           Promoterte annonser
-        </h2>
+        </span>
       </div>
       <div className={`grid gap-4 ${gridCols}`}>
         {cards.map((l) => (

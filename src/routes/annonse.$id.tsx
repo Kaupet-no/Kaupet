@@ -217,6 +217,25 @@ function ListingDetailPage() {
     },
   });
 
+  const { data: activePromotion } = useQuery({
+    queryKey: ["listing-active-promotion", id],
+    enabled: isOwner,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("listing_promotions")
+        .select("id, status, expires_at")
+        .eq("listing_id", id)
+        .in("status", ["active", "pending", "gifted"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      if (data.expires_at && new Date(data.expires_at) <= new Date()) return null;
+      return data;
+    },
+  });
+
   const contactMutation = useMutation({
     mutationFn: async () => {
       if (!user) {

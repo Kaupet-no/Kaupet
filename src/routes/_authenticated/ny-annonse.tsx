@@ -454,13 +454,33 @@ function NewListingPage() {
         </div>
       </form>
 
-      {publishedId && isDemo && (
+      {publishedId && (
+        <PublishedListingDialog
+          listingId={publishedId}
+          open={publishedOpen}
+          onOpenChange={setPublishedOpen}
+          canPromote={isDemo}
+          onView={() => {
+            setPublishedOpen(false);
+            navigate({ to: "/annonse/$id", params: { id: publishedId } });
+          }}
+          onPromote={() => {
+            setPublishedOpen(false);
+            setPromoteOpen(true);
+          }}
+          onClose={() => {
+            if (!promoteOpen) navigate({ to: "/mine-annonser" });
+          }}
+        />
+      )}
+
+      {publishedId && (
         <PromotionPreviewDialog
           listingId={publishedId}
           open={promoteOpen}
           onOpenChange={(o) => {
             setPromoteOpen(o);
-            if (!o) navigate({ to: "/annonse/$id", params: { id: publishedId } });
+            if (!o) navigate({ to: "/mine-annonser" });
           }}
         />
       )}

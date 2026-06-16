@@ -2,7 +2,15 @@ import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, Sparkles, Gift, RefreshCcw } from "lucide-react";
+import {
+  Loader2,
+  Sparkles,
+  Gift,
+  RefreshCcw,
+  AlertTriangle,
+  Search,
+  Info,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -12,6 +20,7 @@ import {
   adminRefundPromotion,
   adminGiftPromotion,
   adminSearchListingsForGift,
+  adminGetVippsPaymentStatus,
 } from "@/lib/admin-promotions.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,6 +57,34 @@ export const Route = createFileRoute("/_authenticated/admin/promoteringer")({
   component: AdminPromotionsPage,
 });
 
+type PromoRow = {
+  id: string;
+  listing_id: string;
+  user_id: string;
+  duration_days: number;
+  price_nok: number;
+  status: string;
+  is_gift: boolean;
+  starts_at: string | null;
+  expires_at: string | null;
+  created_at: string;
+  refunded_at: string | null;
+  vipps_reference: string | null;
+  vipps_psp_reference: string | null;
+  listings: { title: string | null; kaupet_code: string | null } | null;
+  profiles: { display_name: string | null } | null;
+};
+
+const STATUS_OPTIONS = [
+  { value: "all", label: "Alle statuser" },
+  { value: "pending", label: "Venter" },
+  { value: "active", label: "Aktiv" },
+  { value: "gifted", label: "Gave" },
+  { value: "expired", label: "Utløpt" },
+  { value: "refunded", label: "Refundert" },
+  { value: "failed", label: "Mislyktes" },
+];
+
 function AdminPromotionsPage() {
   const qc = useQueryClient();
   const listPricing = useServerFn(adminListPromotionPricing);
@@ -57,10 +94,21 @@ function AdminPromotionsPage() {
   const giftPromo = useServerFn(adminGiftPromotion);
   const searchListings = useServerFn(adminSearchListingsForGift);
 
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [detailPromo, setDetailPromo] = useState<PromoRow | null>(null);
+
   const pricingQ = useQuery({ queryKey: ["admin-promo-pricing"], queryFn: () => listPricing() });
   const promosQ = useQuery({
-    queryKey: ["admin-promotions"],
-    queryFn: () => listPromos({ data: {} }),
+    queryKey: ["admin-promotions", statusFilter, search],
+    queryFn: () =>
+      listPromos({
+        data: {
+          status: statusFilter === "all" ? undefined : statusFilter,
+          q: search || undefined,
+        },
+      }),
   });
 
   const savePricing = useMutation({
@@ -79,6 +127,7 @@ function AdminPromotionsPage() {
     onSuccess: () => {
       toast.success("Refundert");
       qc.invalidateQueries({ queryKey: ["admin-promotions"] });
+      setDetailPromo(null);
     },
     onError: (e: Error) => toast.error(formatErrorMessage(e, "Refusjon feilet")),
   });
@@ -115,6 +164,8 @@ function AdminPromotionsPage() {
     onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke gi fremheving")),
   });
 
+  const rows = (promosQ.data ?? []) as unknown as PromoRow[];
+
   return (
     <div className="space-y-8">
       <Card>
@@ -143,90 +194,169 @@ function AdminPromotionsPage() {
       </Card>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Fremhevinger</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between gap-3">
+          <CardTitle>Transaksjoner</CardTitle>
           <Button onClick={() => setGiftOpen(true)} variant="outline">
             <Gift className="size-4" /> Gi gratis fremheving
           </Button>
         </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Annonse</TableHead>
-                <TableHead>Selger</TableHead>
-                <TableHead>Periode</TableHead>
-                <TableHead className="text-right">Beløp</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Handling</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {promosQ.isLoading ? (
+        <CardContent className="space-y-4 p-4 sm:p-6">
+          <form
+            className="flex flex-wrap items-end gap-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setSearch(searchInput.trim());
+            }}
+          >
+            <div className="w-44">
+              <Label className="text-xs">Status</Label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex-1 min-w-[220px]">
+              <Label className="text-xs">Søk (Vipps-referanse / PSP)</Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="f.eks. promo-xxxx eller PSP-ID"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                />
+                <Button type="submit" variant="outline" size="icon" aria-label="Søk">
+                  <Search className="size-4" />
+                </Button>
+                {search && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSearch("");
+                      setSearchInput("");
+                    }}
+                  >
+                    Tøm
+                  </Button>
+                )}
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => qc.invalidateQueries({ queryKey: ["admin-promotions"] })}
+            >
+              <RefreshCcw className="size-4" /> Oppdater
+            </Button>
+          </form>
+
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={6} className="py-6 text-center">
-                    <Loader2 className="mx-auto size-5 animate-spin text-muted-foreground" />
-                  </TableCell>
+                  <TableHead>Annonse</TableHead>
+                  <TableHead>Selger</TableHead>
+                  <TableHead>Opprettet</TableHead>
+                  <TableHead>Periode</TableHead>
+                  <TableHead className="text-right">Beløp</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Vipps-ref</TableHead>
+                  <TableHead className="text-right">Handling</TableHead>
                 </TableRow>
-              ) : (promosQ.data ?? []).length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">
-                    Ingen fremhevinger ennå
-                  </TableCell>
-                </TableRow>
-              ) : (
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (promosQ.data ?? []).map((p: any) => (
-                  <TableRow key={p.id}>
-                    <TableCell className="max-w-xs truncate font-medium">
-                      <a
-                        href={`/annonse/${p.listing_id}`}
-                        className="hover:underline"
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {p.listings?.title ?? p.listing_id}
-                      </a>
+              </TableHeader>
+              <TableBody>
+                {promosQ.isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="py-6 text-center">
+                      <Loader2 className="mx-auto size-5 animate-spin text-muted-foreground" />
                     </TableCell>
-                    <TableCell>{p.profiles?.display_name ?? "—"}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {p.starts_at ? new Date(p.starts_at).toLocaleDateString("nb-NO") : "—"} —{" "}
-                      {p.expires_at ? new Date(p.expires_at).toLocaleDateString("nb-NO") : "—"} (
-                      {p.duration_days} d)
+                  </TableRow>
+                ) : rows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="py-6 text-center text-muted-foreground">
+                      Ingen treff
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {p.is_gift ? "Gratis" : `${p.price_nok} kr`}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          p.status === "active" || p.status === "gifted" ? "default" : "secondary"
-                        }
-                      >
-                        {p.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {p.status === "active" && !p.is_gift && (
+                  </TableRow>
+                ) : (
+                  rows.map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell className="max-w-[220px] truncate font-medium">
+                        {p.listings?.kaupet_code ? (
+                          <a
+                            href={`/${p.listings.kaupet_code}`}
+                            className="hover:underline"
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {p.listings?.title ?? p.listing_id}
+                          </a>
+                        ) : (
+                          (p.listings?.title ?? p.listing_id)
+                        )}
+                      </TableCell>
+                      <TableCell>{p.profiles?.display_name ?? "—"}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {new Date(p.created_at).toLocaleString("nb-NO")}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {p.starts_at ? new Date(p.starts_at).toLocaleDateString("nb-NO") : "—"} —{" "}
+                        {p.expires_at ? new Date(p.expires_at).toLocaleDateString("nb-NO") : "—"} (
+                        {p.duration_days} d)
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {p.is_gift ? "Gratis" : `${p.price_nok} kr`}
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge status={p.status} />
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {p.vipps_reference ? (
+                          <span title={p.vipps_reference}>
+                            {p.vipps_reference.length > 16
+                              ? `${p.vipps_reference.slice(0, 14)}…`
+                              : p.vipps_reference}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => {
-                            if (confirm("Refundere denne fremhevingen?")) refund.mutate(p.id);
-                          }}
-                          disabled={refund.isPending}
+                          onClick={() => setDetailPromo(p)}
                         >
-                          <RefreshCcw className="size-4" /> Refunder
+                          <Info className="size-4" /> Detaljer
                         </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
+
+      <DetailDialog
+        promo={detailPromo}
+        onClose={() => setDetailPromo(null)}
+        onRefund={(id) => {
+          if (confirm("Refundere denne fremhevingen? Beløpet føres tilbake i Vipps.")) {
+            refund.mutate(id);
+          }
+        }}
+        refunding={refund.isPending}
+      />
 
       <Dialog open={giftOpen} onOpenChange={setGiftOpen}>
         <DialogContent className="sm:max-w-lg">
@@ -318,6 +448,170 @@ function AdminPromotionsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const variant: "default" | "secondary" | "destructive" | "outline" =
+    status === "active" || status === "gifted"
+      ? "default"
+      : status === "failed"
+        ? "destructive"
+        : status === "refunded"
+          ? "outline"
+          : "secondary";
+  return <Badge variant={variant}>{status}</Badge>;
+}
+
+function DetailDialog({
+  promo,
+  onClose,
+  onRefund,
+  refunding,
+}: {
+  promo: PromoRow | null;
+  onClose: () => void;
+  onRefund: (id: string) => void;
+  refunding: boolean;
+}) {
+  const getVippsStatus = useServerFn(adminGetVippsPaymentStatus);
+  const vippsQ = useQuery({
+    queryKey: ["admin-vipps-status", promo?.id],
+    queryFn: () => getVippsStatus({ data: { promotion_id: promo!.id } }),
+    enabled: !!promo && !promo.is_gift && !!promo.vipps_reference,
+  });
+
+  const canRefund =
+    !!promo && !promo.is_gift && !!promo.vipps_reference && promo.status !== "refunded";
+
+  return (
+    <Dialog open={!!promo} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Transaksjonsdetaljer</DialogTitle>
+        </DialogHeader>
+        {promo && (
+          <div className="space-y-4 text-sm">
+            <div className="grid grid-cols-2 gap-3">
+              <DetailField label="Annonse" value={promo.listings?.title ?? promo.listing_id} />
+              <DetailField label="Selger" value={promo.profiles?.display_name ?? "—"} />
+              <DetailField
+                label="Beløp"
+                value={promo.is_gift ? "Gratis (gave)" : `${promo.price_nok} kr`}
+              />
+              <DetailField label="Varighet" value={`${promo.duration_days} dager`} />
+              <DetailField
+                label="Opprettet"
+                value={new Date(promo.created_at).toLocaleString("nb-NO")}
+              />
+              <DetailField
+                label="Intern status"
+                value={<StatusBadge status={promo.status} />}
+              />
+              {promo.refunded_at && (
+                <DetailField
+                  label="Refundert"
+                  value={new Date(promo.refunded_at).toLocaleString("nb-NO")}
+                />
+              )}
+            </div>
+
+            {promo.is_gift ? (
+              <div className="rounded-lg border border-border bg-muted/40 p-3 text-muted-foreground">
+                Dette er en gratis fremheving — ingen Vipps-betaling tilknyttet.
+              </div>
+            ) : (
+              <div className="rounded-lg border border-border p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium">Vipps-betaling</h4>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => vippsQ.refetch()}
+                    disabled={vippsQ.isFetching}
+                  >
+                    {vippsQ.isFetching ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <RefreshCcw className="size-4" />
+                    )}
+                    Oppdater
+                  </Button>
+                </div>
+                <DetailField
+                  label="Vipps-referanse"
+                  value={
+                    <code className="text-xs">{promo.vipps_reference ?? "—"}</code>
+                  }
+                />
+                {promo.vipps_psp_reference && (
+                  <DetailField
+                    label="PSP-referanse"
+                    value={<code className="text-xs">{promo.vipps_psp_reference}</code>}
+                  />
+                )}
+                {vippsQ.isLoading ? (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="size-4 animate-spin" /> Henter status fra Vipps…
+                  </div>
+                ) : vippsQ.data && "error" in vippsQ.data && vippsQ.data.error ? (
+                  <div className="rounded border border-destructive/40 bg-destructive/5 p-2 text-destructive">
+                    {vippsQ.data.error}
+                  </div>
+                ) : vippsQ.data && vippsQ.data.hasVipps ? (
+                  <div className="space-y-2">
+                    <DetailField label="Miljø" value={vippsQ.data.mode} />
+                    {"state" in vippsQ.data && (
+                      <DetailField
+                        label="Vipps-status"
+                        value={<Badge variant="secondary">{vippsQ.data.state}</Badge>}
+                      />
+                    )}
+                    {"amountNok" in vippsQ.data && vippsQ.data.amountNok !== undefined && (
+                      <DetailField label="Beløp hos Vipps" value={`${vippsQ.data.amountNok} kr`} />
+                    )}
+                    {"mismatch" in vippsQ.data && vippsQ.data.mismatch && (
+                      <div className="flex items-start gap-2 rounded border border-warning/40 bg-warning/5 p-2 text-warning-foreground">
+                        <AlertTriangle className="size-4 mt-0.5 text-warning" />
+                        <div>
+                          Intern status og Vipps-status er ulik. Sjekk webhook-leveranse og
+                          vurder å oppdatere manuelt.
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>
+            Lukk
+          </Button>
+          {canRefund && promo && (
+            <Button
+              variant="destructive"
+              onClick={() => onRefund(promo.id)}
+              disabled={refunding}
+            >
+              {refunding && <Loader2 className="size-4 animate-spin" />}
+              <RefreshCcw className="size-4" /> Refunder {promo.price_nok} kr
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DetailField({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="space-y-0.5">
+      <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div>{value}</div>
     </div>
   );
 }

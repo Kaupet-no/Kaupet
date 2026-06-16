@@ -96,7 +96,7 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
       ? `https://${host}`
       : (process.env.PUBLIC_SITE_URL ??
         (isTestHost(host) ? "https://test.kaupet.no" : "https://kaupet.no"));
-    const returnUrl = `${origin}/annonse/${data.listing_id}?promotion=success&promo_id=${promo.id}`;
+    const returnUrl = `${origin}/kvittering/${promo.id}`;
 
     console.log("[promotions] createPromotionCheckout", {
       promotion_id: promo.id,
@@ -163,6 +163,39 @@ export const getPromotionStatus = createServerFn({ method: "GET" })
     if (!promo) throw new Error("Fant ikke fremheving");
     if (promo.user_id !== userId) throw new Error("Ikke tilgang");
     return promo;
+  });
+
+export const getPromotionReceipt = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ promotion_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: promo, error } = await supabase
+      .from("listing_promotions")
+      .select(
+        "id, status, duration_days, price_nok, starts_at, expires_at, created_at, vipps_reference, user_id, listing_id, listings:listings!inner(id, title, kaupet_code)",
+      )
+      .eq("id", data.promotion_id)
+      .maybeSingle();
+    if (error) throw error;
+    if (!promo) throw new Error("Fant ikke kvittering");
+    if (promo.user_id !== userId) throw new Error("Ikke tilgang");
+    const listing = Array.isArray(promo.listings) ? promo.listings[0] : promo.listings;
+    return {
+      id: promo.id,
+      status: promo.status,
+      duration_days: promo.duration_days,
+      price_nok: promo.price_nok,
+      starts_at: promo.starts_at,
+      expires_at: promo.expires_at,
+      created_at: promo.created_at,
+      vipps_reference: promo.vipps_reference,
+      listing: {
+        id: listing?.id ?? promo.listing_id,
+        title: listing?.title ?? "",
+        kaupet_code: listing?.kaupet_code ?? "",
+      },
+    };
   });
 
 export const reconcilePromotionPayment = createServerFn({ method: "POST" })

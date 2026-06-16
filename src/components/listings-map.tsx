@@ -45,50 +45,24 @@ type Props = {
   className?: string;
 };
 
-function formatPriceShort(l: MapListing) {
-  if (l.is_free) return "Gratis";
-  if (l.price_nok == null) return "Spør";
-  if (l.price_nok >= 1000) return `${Math.round(l.price_nok / 100) / 10}k kr`;
-  return `${l.price_nok} kr`;
-}
-
-function formatPriceFull(l: MapListing) {
-  if (l.is_free) return "Gis bort";
-  if (l.price_nok == null) return "Pris ved henvendelse";
-  return `${l.price_nok.toLocaleString("nb-NO")} kr`;
-}
-
-function makePricePin(l: MapListing, opts: { hovered: boolean; active: boolean }) {
-  const label = formatPriceShort(l);
-  const isFree = l.is_free;
-  const bg = opts.active ? "hsl(var(--primary))" : isFree ? "hsl(var(--accent))" : "white";
-  const color = opts.active
-    ? "hsl(var(--primary-foreground))"
-    : isFree
-      ? "hsl(var(--accent-foreground))"
-      : "hsl(var(--foreground))";
-  const border = opts.active ? "hsl(var(--primary))" : "hsl(var(--border))";
-  const scale = opts.hovered || opts.active ? 1.08 : 1;
+function makeLocationPin(_l: MapListing, opts: { hovered: boolean; active: boolean }) {
+  const scale = opts.hovered || opts.active ? 1.25 : 1;
   const z = opts.active ? 1000 : opts.hovered ? 900 : 1;
   return L.divIcon({
-    className: "kpt-price-pin",
+    className: "kpt-location-pin",
     html: `<div style="
       transform:scale(${scale});
       transition:transform 140ms ease;
-      background:${bg};
-      color:${color};
-      border:1.5px solid ${border};
-      box-shadow:0 4px 14px hsl(0 0% 0% / 0.18);
-      padding:4px 10px;
+      width:16px;
+      height:16px;
       border-radius:9999px;
-      font-size:12px;
-      font-weight:600;
-      white-space:nowrap;
-      font-family:inherit;
+      background:hsl(var(--primary));
+      border:3px solid white;
+      box-shadow:0 2px 10px hsl(0 0% 0% / 0.28),0 0 0 1.5px hsl(var(--primary)/0.4);
       z-index:${z};
-    ">${label}</div>`,
-    iconSize: [0, 0],
-    iconAnchor: [0, 12],
+    "></div>`,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
   });
 }
 
@@ -261,7 +235,7 @@ function PriceMarker({
   onSelect?: (id: string | null) => void;
 }) {
   const icon = useMemo(
-    () => makePricePin(listing, { hovered, active }),
+    () => makeLocationPin(listing, { hovered, active }),
     [listing, hovered, active],
   );
   return (
@@ -307,7 +281,6 @@ function PopupCard({ listing }: { listing: MapListing }) {
         )}
       </div>
       <p className="line-clamp-2 text-sm font-medium leading-snug">{listing.title}</p>
-      <p className="mt-1 font-display text-sm">{formatPriceFull(listing)}</p>
       <Link
         to="/$kaupetCode"
         params={{ kaupetCode: listing.kaupet_code }}

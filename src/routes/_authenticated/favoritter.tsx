@@ -34,7 +34,7 @@ function FavoritesPage() {
       const { data, error } = await supabase
         .from("favorites")
         .select(
-          "listing_id, created_at, listings(id, title, price_nok, is_free, city, created_at, status, listing_images(storage_path, sort_order))",
+          "listing_id, created_at, listings(id, kaupet_code, title, price_nok, is_free, city, created_at, status, listing_images(storage_path, sort_order))",
         )
         .eq("user_id", user!.id)
         .order("created_at", { ascending: false });
@@ -57,6 +57,7 @@ function FavoritesPage() {
           listing_id: row.listing_id,
           card: {
             id: l.id,
+            kaupet_code: l.kaupet_code,
             title: l.title,
             price_nok: l.price_nok,
             is_free: l.is_free,

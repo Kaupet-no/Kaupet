@@ -168,7 +168,7 @@ export const listUserReviews = createServerFn({ method: "POST" })
           .from("profiles")
           .select("id, display_name, avatar_url, deleted_at")
           .in("id", ids),
-        supabaseAdmin.from("listings").select("id, title").in("id", listingIds),
+        supabaseAdmin.from("listings").select("id, kaupet_code, title").in("id", listingIds),
       ]);
       const pmap = new Map((profs ?? []).map((p) => [p.id, p]));
       const lmap = new Map((listings ?? []).map((l) => [l.id, l]));

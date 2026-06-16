@@ -194,7 +194,7 @@ export const getFeaturedListings = createServerFn({ method: "GET" })
     const { data: listings, error } = await supabaseAdmin
       .from("listings")
       .select(
-        "id, title, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order)",
+        "id, kaupet_code, title, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order)",
       )
       .in("id", ids)
       .eq("status", "active");
@@ -203,6 +203,7 @@ export const getFeaturedListings = createServerFn({ method: "GET" })
       const imgs = (l.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
       return {
         id: l.id,
+        kaupet_code: l.kaupet_code,
         title: l.title,
         price_nok: l.price_nok,
         is_free: l.is_free,

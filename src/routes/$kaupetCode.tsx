@@ -610,27 +610,20 @@ function ListingDetailPage() {
               type="button"
               variant="outline"
               className="mt-2 w-full gap-2"
-              onClick={async () => {
-                try {
-                  const result = await shareContent({
-                    title: data.title,
-                    text: `${data.title} — ${priceLabel} på Kaupet.no`,
-                    url: `https://kaupet.no/${data.kaupet_code}`,
-                  });
-                  if (result === "clipboard") toast.success("Lenken er kopiert");
-                } catch (e: unknown) {
-                  const name = e instanceof Error ? e.name : "";
-                  if (name !== "AbortError") {
-                    toast.error(formatErrorMessage(e, "Kunne ikke dele annonsen"));
-                  }
-                }
-              }}
+              onClick={() => setShareOpen(true)}
             >
               <Share2 className="size-4" /> Del annonse
             </Button>
+            <ShareListingDialog
+              open={shareOpen}
+              onOpenChange={setShareOpen}
+              kaupetCode={data.kaupet_code}
+              title={data.title}
+            />
           </div>
         </aside>
       </div>
+
 
       <section className={`max-w-2xl ${isOwner ? "mt-4" : "mt-10"}`}>
         <h2 className="font-display text-xl">Beskrivelse</h2>

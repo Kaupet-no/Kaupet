@@ -120,15 +120,14 @@ function VippsWebhooksPage() {
             </Button>
           </div>
 
-          {secret && (
-            <div className="rounded-md border border-yellow-400 bg-yellow-50 p-4">
-              <p className="text-sm font-semibold text-yellow-900">
-                Kopier denne secret-en NÅ — den vises bare én gang
+          {savedId && (
+            <div className="rounded-md border border-green-500 bg-green-50 p-4">
+              <p className="text-sm font-semibold text-green-900">
+                Webhook registrert og secret lagret automatisk
               </p>
-              <pre className="mt-2 break-all rounded bg-white p-2 text-xs">{secret}</pre>
-              <p className="mt-2 text-xs text-yellow-900">
-                Lagre som <code>{mode === "test" ? "VIPPS_TEST_WEBHOOK_SECRET" : "VIPPS_WEBHOOK_SECRET"}</code>{" "}
-                i prosjektets env-variabler.
+              <p className="mt-1 text-xs text-green-900">
+                Webhook-id: <code className="rounded bg-white px-1">{savedId}</code>. Signaturen
+                verifiseres heretter mot lagret secret i Lovable Cloud.
               </p>
             </div>
           )}

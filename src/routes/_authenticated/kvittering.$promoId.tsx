@@ -37,7 +37,7 @@ function ReceiptError({ error, reset }: { error: Error; reset: () => void }) {
     <div className="mx-auto max-w-2xl px-4 py-16 text-center">
       <AlertCircle className="mx-auto size-10 text-destructive" />
       <h1 className="mt-4 font-display text-2xl">Kunne ikke laste kvittering</h1>
-      <p className="mt-2 text-muted-foreground">{formatErrorMessage(error)}</p>
+      <p className="mt-2 text-muted-foreground">{formatErrorMessage(error, "Ukjent feil")}</p>
       <div className="mt-6 flex justify-center gap-3">
         <Button
           variant="outline"

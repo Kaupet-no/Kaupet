@@ -47,11 +47,9 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
     try {
       await callSetTestMode({ data: { enabled: next } });
       toast.success(next ? "Test-modus aktivert" : "Test-modus deaktivert");
-      await queryClient.invalidateQueries();
-      router.invalidate();
+      window.location.reload();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Kunne ikke endre test-modus");
-    } finally {
       setToggling(false);
     }
   }

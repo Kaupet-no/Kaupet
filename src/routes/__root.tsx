@@ -241,12 +241,46 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="flex min-h-screen flex-col bg-background">
-        {!native && <SiteHeader />}
-        <ModerationBanner />
-        <main className="flex-1">
-          <Outlet />
-        </main>
+      <RootBody native={native} />
+      <Toaster />
+    </QueryClientProvider>
+  );
+}
+
+function RootBody({ native }: { native: boolean }) {
+  const isTest = useIsTestEnv();
+
+  useEffect(() => {
+    if (!isTest) return;
+    const original = document.title;
+    if (!original.startsWith("[TEST]")) {
+      document.title = `[TEST] ${original}`;
+    }
+    let meta = document.querySelector('meta[name="robots"]') as HTMLMetaElement | null;
+    const created = !meta;
+    if (!meta) {
+      meta = document.createElement("meta");
+      meta.name = "robots";
+      document.head.appendChild(meta);
+    }
+    const prevContent = meta.content;
+    meta.content = "noindex, nofollow";
+    return () => {
+      document.title = original;
+      if (created) meta?.remove();
+      else if (meta) meta.content = prevContent;
+    };
+  }, [isTest]);
+
+  const content = (
+    <div className="flex min-h-screen flex-col bg-background">
+      {isTest && <TestEnvBanner />}
+      {!native && <SiteHeader />}
+      <ModerationBanner />
+      <main className="flex-1">
+        <Outlet />
+      </main>
+
         {!native && (
           <footer className="border-t border-border bg-surface">
             <div className="mx-auto max-w-6xl px-4 py-8 text-sm text-muted-foreground">

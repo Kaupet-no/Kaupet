@@ -17,3 +17,15 @@ export function isTestEnvClient(): boolean {
   if (typeof window === "undefined") return false;
   return isTestHost(window.location.hostname);
 }
+
+import { useEffect, useState } from "react";
+
+/** React hook — returns false on first render (SSR-safe), true after mount if on test host. */
+export function useIsTestEnv(): boolean {
+  const [isTest, setIsTest] = useState(false);
+  useEffect(() => {
+    setIsTest(isTestEnvClient());
+  }, []);
+  return isTest;
+}
+

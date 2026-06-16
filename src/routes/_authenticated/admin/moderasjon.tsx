@@ -176,6 +176,7 @@ function ListingsTab() {
                 (
                   search.data as Array<{
                     id: string;
+                    kaupet_code: string;
                     title: string;
                     status: string;
                     seller_id: string;
@@ -185,8 +186,8 @@ function ListingsTab() {
                   <TableRow key={l.id}>
                     <TableCell>
                       <Link
-                        to="/annonse/$id"
-                        params={{ id: l.id }}
+                        to="/$kaupetCode"
+                        params={{ kaupetCode: l.kaupet_code }}
                         className="font-medium hover:underline"
                       >
                         {l.title}

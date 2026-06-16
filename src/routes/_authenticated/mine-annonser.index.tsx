@@ -314,8 +314,8 @@ function ListingRow({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <Link
-            to="/annonse/$id"
-            params={{ id: row.id }}
+            to="/$kaupetCode"
+            params={{ kaupetCode: row.kaupet_code }}
             className="truncate text-base font-medium hover:underline"
           >
             {row.title}

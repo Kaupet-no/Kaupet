@@ -1,13 +1,13 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useQuery, useServerFn } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 
 import { getPromotionReceipt } from "@/lib/promotions.functions";
 import { Button } from "@/components/ui/button";
 import { formatErrorMessage } from "@/lib/errors";
 
-// Note: useServerFn lives in @tanstack/react-start, not react-query.
-// Re-import correctly below.
+
 export const Route = createFileRoute("/_authenticated/kvittering/$promoId")({
   head: () => ({
     meta: [

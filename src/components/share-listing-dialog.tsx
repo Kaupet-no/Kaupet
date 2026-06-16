@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Check, Copy, Download } from "lucide-react";
-import QRCode from "qrcode/lib/browser.js";
+import { useEffect, useState } from "react";
+import { Check, Copy, Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -14,7 +13,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -24,58 +22,53 @@ type Props = {
 
 const QR_SIZE = 320;
 
-async function drawQrWithLogo(canvas: HTMLCanvasElement, url: string) {
-  const primaryColor = "#2f5d44"; // matches k-logo.svg
-
-  await QRCode.toCanvas(canvas, url, {
-    errorCorrectionLevel: "H",
+async function generateQrDataUrl(url: string): Promise<string> {
+  // Dynamic import keeps the qrcode library out of SSR and lets Vite
+  // resolve the browser build at runtime.
+  const mod: any = await import("qrcode/lib/browser.js");
+  const toDataURL: (text: string, opts?: unknown) => Promise<string> =
+    mod.toDataURL ?? mod.default?.toDataURL;
+  if (typeof toDataURL !== "function") {
+    throw new Error("QR-bibliotek mangler toDataURL");
+  }
+  return toDataURL(url, {
+    errorCorrectionLevel: "M",
     margin: 2,
     width: QR_SIZE,
     color: { dark: "#0b1f17", light: "#ffffff" },
   });
-
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  const size = canvas.width;
-  const badge = Math.round(size * 0.22);
-  const x = (size - badge) / 2;
-  const y = (size - badge) / 2;
-  const radius = Math.round(badge * 0.22);
-
-  // white rounded square behind the K
-  ctx.fillStyle = "#ffffff";
-  ctx.beginPath();
-  ctx.moveTo(x + radius, y);
-  ctx.lineTo(x + badge - radius, y);
-  ctx.quadraticCurveTo(x + badge, y, x + badge, y + radius);
-  ctx.lineTo(x + badge, y + badge - radius);
-  ctx.quadraticCurveTo(x + badge, y + badge, x + badge - radius, y + badge);
-  ctx.lineTo(x + radius, y + badge);
-  ctx.quadraticCurveTo(x, y + badge, x, y + badge - radius);
-  ctx.lineTo(x, y + radius);
-  ctx.quadraticCurveTo(x, y, x + radius, y);
-  ctx.closePath();
-  ctx.fill();
-
-  // K letter (matches k-logo.svg style)
-  ctx.fillStyle = primaryColor;
-  ctx.font = `600 ${Math.round(badge * 0.78)}px Georgia, "Times New Roman", serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("k", size / 2, size / 2 + badge * 0.04);
 }
 
-export function ShareListingDialog({ open, onOpenChange, kaupetCode, title }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+export function ShareListingDialog({ open, onOpenChange, kaupetCode }: Props) {
   const [codeCopied, setCodeCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [qrSrc, setQrSrc] = useState<string | null>(null);
+  const [qrError, setQrError] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
   const url = `https://kaupet.no/${kaupetCode}`;
 
   useEffect(() => {
-    if (!open || !canvasRef.current) return;
-    drawQrWithLogo(canvasRef.current, url).catch(() => {
-      toast.error("Kunne ikke generere QR-kode");
-    });
+    if (!open) return;
+    let cancelled = false;
+    setGenerating(true);
+    setQrError(null);
+    setQrSrc(null);
+    generateQrDataUrl(url)
+      .then((dataUrl) => {
+        if (cancelled) return;
+        setQrSrc(dataUrl);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error("QR generation failed", err);
+        setQrError("Kunne ikke generere QR-kode");
+      })
+      .finally(() => {
+        if (!cancelled) setGenerating(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [open, url]);
 
   async function copy(text: string, kind: "code" | "link") {
@@ -95,23 +88,14 @@ export function ShareListingDialog({ open, onOpenChange, kaupetCode, title }: Pr
     }
   }
 
-  async function downloadQr() {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        toast.error("Kunne ikke lagre QR-kode");
-        return;
-      }
-      const objectUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = objectUrl;
-      a.download = `kaupet-${kaupetCode}.png`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-    }, "image/png");
+  function downloadQr() {
+    if (!qrSrc) return;
+    const a = document.createElement("a");
+    a.href = qrSrc;
+    a.download = `kaupet-${kaupetCode}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   }
 
   return (
@@ -127,14 +111,35 @@ export function ShareListingDialog({ open, onOpenChange, kaupetCode, title }: Pr
         <div className="space-y-4">
           {/* QR */}
           <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-4">
-            <canvas
-              ref={canvasRef}
-              width={QR_SIZE}
-              height={QR_SIZE}
-              className="h-56 w-56 rounded-md"
-              aria-label="QR-kode til annonsen"
-            />
-            <Button variant="outline" size="sm" onClick={downloadQr} className="gap-2">
+            <div
+              className="flex h-56 w-56 items-center justify-center rounded-md bg-white"
+              aria-live="polite"
+            >
+              {generating && (
+                <Loader2 className="size-6 animate-spin text-muted-foreground" />
+              )}
+              {!generating && qrError && (
+                <span className="px-3 text-center text-sm text-destructive">
+                  {qrError}
+                </span>
+              )}
+              {!generating && qrSrc && (
+                <img
+                  src={qrSrc}
+                  alt="QR-kode til annonsen"
+                  width={QR_SIZE}
+                  height={QR_SIZE}
+                  className="h-56 w-56 rounded-md"
+                />
+              )}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={downloadQr}
+              disabled={!qrSrc}
+              className="gap-2"
+            >
               <Download className="size-4" /> Last ned QR-kode
             </Button>
           </div>

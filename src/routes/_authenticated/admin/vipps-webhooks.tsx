@@ -26,7 +26,7 @@ function VippsWebhooksPage() {
   const [mode, setMode] = useState<"test" | "production">("test");
   const [url, setUrl] = useState("https://test.kaupet.no/api/public/vipps/webhook");
   const [hooks, setHooks] = useState<Array<{ id: string; url: string; events: string[] }>>([]);
-  const [secret, setSecret] = useState<string | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const refresh = async (m: "test" | "production" = mode) => {

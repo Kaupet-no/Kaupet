@@ -231,7 +231,7 @@ function BrowsePage() {
       let qb = supabase
         .from("listings")
         .select(
-          "id, title, price_nok, is_free, city, lat, lng, created_at, listing_images(storage_path, sort_order)",
+          "id, kaupet_code, title, price_nok, is_free, city, lat, lng, created_at, listing_images(storage_path, sort_order)",
         )
         .eq("status", "active");
 

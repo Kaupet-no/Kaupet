@@ -146,3 +146,10 @@
 .pb-safe {
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
 }
+
+/* Isoler Leaflet sin interne z-index-stack slik at panene (z-index 400–700)
+   ikke bryter ut over modal-overlays (Radix Dialog bruker z-50). */
+.leaflet-container {
+  isolation: isolate;
+  z-index: 0;
+}

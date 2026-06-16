@@ -625,7 +625,7 @@ function ListingDetailPage() {
         </aside>
       </div>
 
-      <section className="mt-10 max-w-2xl">
+      <section className={`max-w-2xl ${isOwner ? "mt-4" : "mt-10"}`}>
         <h2 className="font-display text-xl">Beskrivelse</h2>
         <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
           {data.description}

@@ -74,13 +74,15 @@ const DEFAULT_EVENTS = [
   "epayments.payment.terminated.v1",
 ];
 
-async function assertAdmin(context: { supabase: { rpc: (fn: "has_role", args: { _user_id: string; _role: "admin" }) => Promise<{ data: boolean | null }> }; userId: string }) {
+type AuthCtx = { supabase: { rpc: (fn: "has_role", args: { _user_id: string; _role: "admin" }) => PromiseLike<{ data: boolean | null }> }; userId: string };
+async function assertAdmin(context: AuthCtx) {
   const { data: isAdmin } = await context.supabase.rpc("has_role", {
     _user_id: context.userId,
     _role: "admin",
   });
   if (!isAdmin) throw new Error("Kun administrator kan registrere Vipps-webhooks");
 }
+
 
 
 

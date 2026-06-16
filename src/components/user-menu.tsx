@@ -126,32 +126,32 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
             <Settings className="size-4" /> Kontoinnstillinger
           </Link>
         </DropdownMenuItem>
+        {(isAdmin || canToggleTest) && <DropdownMenuSeparator />}
+        {isAdmin && (
+          <DropdownMenuItem asChild>
+            <Link to="/admin" className="cursor-pointer">
+              <Shield className="size-4" /> Administrasjon
+            </Link>
+          </DropdownMenuItem>
+        )}
         {canToggleTest && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link to="/admin" className="cursor-pointer">
-                <Shield className="size-4" /> Administrasjon
-              </Link>
-            </DropdownMenuItem>
-            <div
-              className="flex items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-sm"
-              onClick={(e) => e.stopPropagation()}
-              onKeyDown={(e) => e.stopPropagation()}
-            >
-              <label htmlFor="test-mode-toggle" className="flex items-center gap-2 cursor-pointer">
-                <FlaskConical className="size-4" />
-                <span>Test-modus</span>
-              </label>
-              <Switch
-                id="test-mode-toggle"
-                checked={isTest}
-                disabled={toggling}
-                onCheckedChange={handleToggleTest}
-                aria-label="Aktiver test-modus for denne sesjonen"
-              />
-            </div>
-          </>
+          <div
+            className="flex items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-sm"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            <label htmlFor="test-mode-toggle" className="flex items-center gap-2 cursor-pointer">
+              <FlaskConical className="size-4" />
+              <span>Test-modus</span>
+            </label>
+            <Switch
+              id="test-mode-toggle"
+              checked={isTest}
+              disabled={toggling}
+              onCheckedChange={handleToggleTest}
+              aria-label="Aktiver test-modus for denne sesjonen"
+            />
+          </div>
         )}
         <DropdownMenuSeparator />
         <DropdownMenuItem

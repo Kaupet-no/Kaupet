@@ -159,6 +159,97 @@ export const getPromotionStatus = createServerFn({ method: "GET" })
     return promo;
   });
 
+export const reconcilePromotionPayment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ promotion_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: promo, error } = await supabaseAdmin
+      .from("listing_promotions")
+      .select("id, user_id, status, duration_days, price_nok, vipps_reference, expires_at")
+      .eq("id", data.promotion_id)
+      .maybeSingle();
+    if (error) throw error;
+    if (!promo) throw new Error("Fant ikke fremheving");
+    if (promo.user_id !== userId) throw new Error("Ikke tilgang");
+
+    if (promo.status !== "pending") {
+      return { status: promo.status, expires_at: promo.expires_at };
+    }
+    if (!promo.vipps_reference) {
+      return { status: promo.status, expires_at: promo.expires_at };
+    }
+
+    const host = (() => {
+      try {
+        return getRequestHost();
+      } catch {
+        return null;
+      }
+    })();
+
+    const { getVippsPayment, captureVippsPayment } = await import("@/lib/vipps.server");
+    const payment = await getVippsPayment(promo.vipps_reference, host);
+
+    if (payment.state === "AUTHORIZED" || payment.state === "CAPTURED") {
+      const now = new Date();
+      const expires = new Date(now.getTime() + promo.duration_days * 24 * 60 * 60 * 1000);
+      const { error: uerr } = await supabaseAdmin
+        .from("listing_promotions")
+        .update({
+          status: "active",
+          starts_at: now.toISOString(),
+          expires_at: expires.toISOString(),
+          vipps_psp_reference: payment.pspReference ?? null,
+        })
+        .eq("id", promo.id)
+        .eq("status", "pending");
+      if (uerr) throw uerr;
+
+      if (payment.state === "AUTHORIZED") {
+        try {
+          await captureVippsPayment(
+            promo.vipps_reference,
+            promo.price_nok,
+            `capture-${promo.id}`,
+            host,
+          );
+        } catch (e) {
+          console.error("[reconcilePromotionPayment] capture failed", e);
+        }
+      }
+      return { status: "active" as const, expires_at: expires.toISOString() };
+    }
+
+    if (
+      payment.state === "CANCELLED" ||
+      payment.state === "EXPIRED" ||
+      payment.state === "TERMINATED" ||
+      payment.state === "ABORTED" ||
+      payment.state === "FAILED"
+    ) {
+      await supabaseAdmin
+        .from("listing_promotions")
+        .update({ status: "failed" })
+        .eq("id", promo.id)
+        .eq("status", "pending");
+      return { status: "failed" as const, expires_at: null };
+    }
+
+    if (payment.state === "REFUNDED") {
+      await supabaseAdmin
+        .from("listing_promotions")
+        .update({ status: "refunded" })
+        .eq("id", promo.id);
+      return { status: "refunded" as const, expires_at: promo.expires_at };
+    }
+
+    // CREATED — Vipps har ikke autorisert ennå.
+    return { status: "pending" as const, expires_at: promo.expires_at };
+  });
+
 export const getMyActivePromotions = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {

@@ -629,13 +629,6 @@ function ListingDetailPage() {
       </div>
 
 
-      <section className={`max-w-2xl ${isOwner ? "mt-4" : "mt-10"}`}>
-        <h2 className="font-display text-xl">Beskrivelse</h2>
-        <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
-          {data.description}
-        </p>
-      </section>
-
       {data.lat != null && data.lng != null && (
         <section className="mt-10">
           <div className="h-80 overflow-hidden rounded-2xl border border-border">

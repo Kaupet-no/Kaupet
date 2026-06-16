@@ -272,6 +272,7 @@ export type Database = {
           is_gift: boolean
           listing_id: string
           price_nok: number
+          refunded_at: string | null
           starts_at: string | null
           status: Database["public"]["Enums"]["promotion_status"]
           updated_at: string
@@ -289,6 +290,7 @@ export type Database = {
           is_gift?: boolean
           listing_id: string
           price_nok: number
+          refunded_at?: string | null
           starts_at?: string | null
           status?: Database["public"]["Enums"]["promotion_status"]
           updated_at?: string
@@ -306,6 +308,7 @@ export type Database = {
           is_gift?: boolean
           listing_id?: string
           price_nok?: number
+          refunded_at?: string | null
           starts_at?: string | null
           status?: Database["public"]["Enums"]["promotion_status"]
           updated_at?: string

@@ -92,7 +92,7 @@ export const listVippsWebhooks = createServerFn({ method: "POST" })
     z.object({ mode: z.enum(["test", "production"]) }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdmin(context as unknown as AuthCtx);
     const c = creds(data.mode);
     const token = await getToken(c);
     const res = await fetch(`${c.baseUrl}/webhooks/v1/webhooks`, {
@@ -114,7 +114,7 @@ export const registerVippsWebhook = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdmin(context as unknown as AuthCtx);
     const c = creds(data.mode);
     const token = await getToken(c);
     const res = await fetch(`${c.baseUrl}/webhooks/v1/webhooks`, {
@@ -136,7 +136,7 @@ export const deleteVippsWebhook = createServerFn({ method: "POST" })
     z.object({ mode: z.enum(["test", "production"]), id: z.string() }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdmin(context as unknown as AuthCtx);
     const c = creds(data.mode);
     const token = await getToken(c);
     const res = await fetch(`${c.baseUrl}/webhooks/v1/webhooks/${data.id}`, {

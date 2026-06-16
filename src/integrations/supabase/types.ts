@@ -872,6 +872,36 @@ export type Database = {
         }
         Relationships: []
       }
+      vipps_webhook_secrets: {
+        Row: {
+          created_at: string
+          id: string
+          mode: string
+          secret: string
+          updated_at: string
+          url: string
+          webhook_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mode: string
+          secret: string
+          updated_at?: string
+          url: string
+          webhook_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mode?: string
+          secret?: string
+          updated_at?: string
+          url?: string
+          webhook_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

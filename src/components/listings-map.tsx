@@ -16,7 +16,7 @@ import { signListingImageUrls } from "@/lib/storage";
 
 const centerIcon = L.divIcon({
   className: "",
-  html: `<div style="width:18px;height:18px;border-radius:9999px;background:hsl(var(--primary));border:3px solid white;box-shadow:0 0 0 2px hsl(var(--primary)/0.4),0 4px 14px hsl(var(--primary)/0.35);"></div>`,
+  html: `<div style="width:18px;height:18px;border-radius:9999px;background:var(--primary);border:3px solid white;box-shadow:0 0 0 2px var(--primary),0 4px 14px var(--primary);"></div>`,
   iconSize: [18, 18],
   iconAnchor: [9, 9],
 });
@@ -56,8 +56,8 @@ function makeLocationPin(_l: MapListing, opts: { hovered: boolean; active: boole
       width:20px;
       height:20px;
       border-radius:9999px;
-      background:hsl(var(--primary));
-      border:2px solid hsl(var(--primary));
+      background:var(--primary);
+      border:2px solid var(--primary);
       box-shadow:0 2px 10px hsl(0 0% 0% / 0.32),0 0 0 1.5px white;
       display:flex;
       align-items:center;

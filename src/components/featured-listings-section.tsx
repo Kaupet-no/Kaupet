@@ -26,6 +26,7 @@ export function FeaturedListingsSection({ categorySlug, limit = 2, allowedIds }:
 
   const cards: ListingCardData[] = filtered.map((l) => ({
     id: l.id,
+    kaupet_code: l.kaupet_code,
     title: l.title,
     price_nok: l.price_nok,
     is_free: l.is_free,

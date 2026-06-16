@@ -6,6 +6,7 @@ import { FavoriteButton } from "@/components/favorite-button";
 
 export type ListingCardData = {
   id: string;
+  kaupet_code: string;
   title: string;
   price_nok: number | null;
   is_free: boolean;

@@ -96,7 +96,7 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
       ? `https://${host}`
       : (process.env.PUBLIC_SITE_URL ??
         (isTestHost(host) ? "https://test.kaupet.no" : "https://kaupet.no"));
-    const returnUrl = `${origin}/annonse/${data.listing_id}?promotion=success&promo_id=${promo.id}`;
+    const returnUrl = `${origin}/kvittering/${promo.id}`;
 
     console.log("[promotions] createPromotionCheckout", {
       promotion_id: promo.id,

@@ -1022,6 +1022,7 @@ export type Database = {
         Returns: {
           created_at: string
           id: string
+          kaupet_code: string
           seller_id: string
           seller_name: string
           status: Database["public"]["Enums"]["listing_status"]

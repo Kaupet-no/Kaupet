@@ -43,8 +43,8 @@ export function ListingCard({ listing, highlighted, onHoverChange }: Props) {
 
   return (
     <Link
-      to="/annonse/$id"
-      params={{ id: listing.id }}
+      to="/$kaupetCode"
+      params={{ kaupetCode: listing.kaupet_code }}
       onMouseEnter={onHoverChange ? () => onHoverChange(listing.id) : undefined}
       onMouseLeave={onHoverChange ? () => onHoverChange(null) : undefined}
       className={`group block overflow-hidden rounded-xl border bg-card transition hover:shadow-md ${

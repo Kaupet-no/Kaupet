@@ -21,10 +21,9 @@ type Props = {
 };
 
 const QR_SIZE = 320;
+const BRAND_COLOR = "#2f5d44";
 
 async function generateQrDataUrl(url: string): Promise<string> {
-  // Dynamic import keeps the qrcode library out of SSR and lets Vite
-  // resolve the browser build at runtime.
   const mod: any = await import("qrcode/lib/browser.js");
   const toDataURL: (text: string, opts?: unknown) => Promise<string> =
     mod.toDataURL ?? mod.default?.toDataURL;
@@ -32,12 +31,76 @@ async function generateQrDataUrl(url: string): Promise<string> {
     throw new Error("QR-bibliotek mangler toDataURL");
   }
   return toDataURL(url, {
-    errorCorrectionLevel: "M",
+    errorCorrectionLevel: "H",
     margin: 2,
     width: QR_SIZE,
     color: { dark: "#0b1f17", light: "#ffffff" },
   });
 }
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Kunne ikke laste QR-bilde"));
+    img.src = src;
+  });
+}
+
+function drawRoundedRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+async function generateBrandedQrDataUrl(url: string): Promise<string> {
+  const qrDataUrl = await generateQrDataUrl(url);
+  try {
+    const img = await loadImage(qrDataUrl);
+    const canvas = document.createElement("canvas");
+    canvas.width = QR_SIZE;
+    canvas.height = QR_SIZE;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return qrDataUrl;
+
+    ctx.drawImage(img, 0, 0, QR_SIZE, QR_SIZE);
+
+    const badge = Math.round(QR_SIZE * 0.22);
+    const bx = (QR_SIZE - badge) / 2;
+    const by = (QR_SIZE - badge) / 2;
+    const radius = Math.round(badge * 0.22);
+
+    ctx.fillStyle = "#ffffff";
+    drawRoundedRect(ctx, bx, by, badge, badge, radius);
+    ctx.fill();
+
+    ctx.fillStyle = BRAND_COLOR;
+    ctx.font = `600 ${Math.round(badge * 0.78)}px Georgia, "Times New Roman", serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("k", QR_SIZE / 2, QR_SIZE / 2 + badge * 0.04);
+
+    return canvas.toDataURL("image/png");
+  } catch {
+    return qrDataUrl;
+  }
+}
+
 
 export function ShareListingDialog({ open, onOpenChange, kaupetCode }: Props) {
   const [codeCopied, setCodeCopied] = useState(false);

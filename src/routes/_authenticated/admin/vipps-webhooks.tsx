@@ -75,10 +75,9 @@ function VippsWebhooksPage() {
       <div>
         <h1 className="text-2xl font-semibold">Vipps webhooks</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Registrer webhook hos Vipps for å motta betalingshendelser. Vipps genererer en{" "}
-          <code className="rounded bg-muted px-1">secret</code> som vises én gang og må lagres som
-          env-variabel: <code>VIPPS_TEST_WEBHOOK_SECRET</code> (test) eller{" "}
-          <code>VIPPS_WEBHOOK_SECRET</code> (produksjon).
+          Registrer webhook hos Vipps for å motta betalingshendelser. Den genererte secret-en
+          lagres automatisk i Lovable Cloud og brukes av webhook-handleren for å verifisere
+          signaturen — ingen manuelle env-variabler nødvendig.
         </p>
       </div>
 

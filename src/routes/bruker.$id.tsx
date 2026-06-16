@@ -208,8 +208,8 @@ function PublicProfilePage() {
                         <>
                           {" · "}
                           <Link
-                            to="/annonse/$id"
-                            params={{ id: r.listing.id }}
+                            to="/$kaupetCode"
+                            params={{ kaupetCode: r.listing.kaupet_code }}
                             className="hover:underline"
                           >
                             {r.listing.title}

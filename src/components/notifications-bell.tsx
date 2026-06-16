@@ -25,11 +25,13 @@ import {
 type SearchItem = SavedSearchNotification & {
   kind: "search";
   listing_title: string | null;
+  listing_code: string | null;
   search_name: string | null;
 };
 type PriceDropItem = PriceDropNotification & {
   kind: "price_drop";
   listing_title: string | null;
+  listing_code: string | null;
 };
 type Item = SearchItem | PriceDropItem;
 

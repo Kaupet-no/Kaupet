@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Copy, Download } from "lucide-react";
-import QRCode from "qrcode";
+import QRCode from "qrcode/lib/browser";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";

@@ -309,8 +309,8 @@ function PopupCard({ listing }: { listing: MapListing }) {
       <p className="line-clamp-2 text-sm font-medium leading-snug">{listing.title}</p>
       <p className="mt-1 font-display text-sm">{formatPriceFull(listing)}</p>
       <Link
-        to="/annonse/$id"
-        params={{ id: listing.id }}
+        to="/$kaupetCode"
+        params={{ kaupetCode: listing.kaupet_code }}
         className="mt-2 inline-block text-xs font-medium text-primary hover:underline"
       >
         Se annonse →

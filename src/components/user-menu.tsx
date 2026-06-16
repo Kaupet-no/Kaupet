@@ -1,12 +1,19 @@
-import { Link, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { User, ListChecks, Plus, Heart, Bell, Settings, LogOut, Shield } from "lucide-react";
+import { Link, useNavigate, useRouter } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { useState } from "react";
+import { User, ListChecks, Plus, Heart, Bell, Settings, LogOut, Shield, FlaskConical } from "lucide-react";
 
 import { useIsAdmin } from "@/lib/use-is-admin";
+import { useIsDemo } from "@/lib/use-is-demo";
+import { useIsTestEnv } from "@/lib/env";
+import { setTestMode } from "@/lib/test-mode.functions";
+import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,7 +32,29 @@ function initials(name: string | null | undefined, fallback: string) {
 
 export function UserMenu({ userId, email }: { userId: string; email: string | null }) {
   const navigate = useNavigate();
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: isAdmin } = useIsAdmin();
+  const { data: isDemo } = useIsDemo();
+  const canToggleTest = !!(isAdmin || isDemo);
+  const isTest = useIsTestEnv();
+  const [toggling, setToggling] = useState(false);
+  const callSetTestMode = useServerFn(setTestMode);
+
+  async function handleToggleTest(next: boolean) {
+    if (toggling) return;
+    setToggling(true);
+    try {
+      await callSetTestMode({ data: { enabled: next } });
+      toast.success(next ? "Test-modus aktivert" : "Test-modus deaktivert");
+      await queryClient.invalidateQueries();
+      router.invalidate();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Kunne ikke endre test-modus");
+    } finally {
+      setToggling(false);
+    }
+  }
 
   const { data: profile } = useQuery({
     queryKey: ["profile-menu", userId],
@@ -97,7 +126,7 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
             <Settings className="size-4" /> Kontoinnstillinger
           </Link>
         </DropdownMenuItem>
-        {isAdmin && (
+        {canToggleTest && (
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
@@ -105,6 +134,23 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
                 <Shield className="size-4" /> Administrasjon
               </Link>
             </DropdownMenuItem>
+            <div
+              className="flex items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-sm"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              <label htmlFor="test-mode-toggle" className="flex items-center gap-2 cursor-pointer">
+                <FlaskConical className="size-4" />
+                <span>Test-modus</span>
+              </label>
+              <Switch
+                id="test-mode-toggle"
+                checked={isTest}
+                disabled={toggling}
+                onCheckedChange={handleToggleTest}
+                aria-label="Aktiver test-modus for denne sesjonen"
+              />
+            </div>
           </>
         )}
         <DropdownMenuSeparator />

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Copy, Download, Share2 } from "lucide-react";
+import { Check, Copy, Download } from "lucide-react";
 import QRCode from "qrcode";
 import { toast } from "sonner";
 
@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { shareContent } from "@/lib/native";
+
 
 type Props = {
   open: boolean;
@@ -114,20 +114,6 @@ export function ShareListingDialog({ open, onOpenChange, kaupetCode, title }: Pr
     }, "image/png");
   }
 
-  async function systemShare() {
-    try {
-      const result = await shareContent({
-        title,
-        text: `${title} — kaupet.no/${kaupetCode}`,
-        url,
-      });
-      if (result === "clipboard") toast.success("Lenken er kopiert");
-    } catch (e: unknown) {
-      const name = e instanceof Error ? e.name : "";
-      if (name !== "AbortError") toast.error("Kunne ikke dele");
-    }
-  }
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -189,9 +175,6 @@ export function ShareListingDialog({ open, onOpenChange, kaupetCode, title }: Pr
             </div>
           </div>
 
-          <Button type="button" variant="secondary" onClick={systemShare} className="w-full gap-2">
-            <Share2 className="size-4" /> Del via …
-          </Button>
         </div>
       </DialogContent>
     </Dialog>

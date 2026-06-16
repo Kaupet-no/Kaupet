@@ -403,7 +403,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           is_free?: boolean
-          kaupet_code: string
+          kaupet_code?: string
           lat?: number | null
           lng?: number | null
           postal_code?: string | null

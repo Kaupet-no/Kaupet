@@ -1,7 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequestHost } from "@tanstack/react-start/server";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { isTestHost } from "@/lib/env";
+
 
 export const activateDemoPromotion = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -98,11 +101,17 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
     if (ierr) throw ierr;
 
     const { createVippsPayment } = await import("@/lib/vipps.server");
-    const origin =
-      process.env.PUBLIC_SITE_URL ??
-      (process.env.VIPPS_ENVIRONMENT === "production"
-        ? "https://kaupet.no"
-        : "https://kaupet-no.lovable.app");
+    const host = (() => {
+      try {
+        return getRequestHost();
+      } catch {
+        return null;
+      }
+    })();
+    const origin = host
+      ? `https://${host}`
+      : (process.env.PUBLIC_SITE_URL ??
+        (isTestHost(host) ? "https://test.kaupet.no" : "https://kaupet.no"));
     const returnUrl = `${origin}/annonse/${data.listing_id}?promotion=success&promo_id=${promo.id}`;
 
     try {
@@ -115,6 +124,7 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
         ),
         returnUrl,
         idempotencyKey: promo.id,
+        host,
       });
       if (result.pspReference) {
         await supabaseAdmin
@@ -123,6 +133,7 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
           .eq("id", promo.id);
       }
       return { promotion_id: promo.id, redirect_url: result.redirectUrl };
+
     } catch (err) {
       await supabaseAdmin
         .from("listing_promotions")

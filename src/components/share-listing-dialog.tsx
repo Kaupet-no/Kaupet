@@ -25,12 +25,7 @@ type Props = {
 const QR_SIZE = 320;
 
 async function drawQrWithLogo(canvas: HTMLCanvasElement, url: string) {
-  // Resolve "K" colour from CSS custom property so it matches the theme
-  const root = getComputedStyle(document.documentElement);
-  const primary = root.getPropertyValue("--primary").trim() || "#2f5d44";
-  const primaryColor = primary.startsWith("oklch") || primary.startsWith("#") || primary.startsWith("rgb")
-    ? `${primary.startsWith("oklch") ? `oklch(${primary.replace(/^oklch\(?/, "").replace(/\)$/, "")})` : primary}`
-    : `#${primary}`;
+  const primaryColor = "#2f5d44"; // matches k-logo.svg
 
   await QRCode.toCanvas(canvas, url, {
     errorCorrectionLevel: "H",

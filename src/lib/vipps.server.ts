@@ -234,6 +234,18 @@ export async function refundVippsPayment(
   }
 }
 
-export function getVippsWebhookSecret(host?: string | null): string {
-  return hostAwareEnv(host).webhookSecret;
+export async function getVippsWebhookSecret(host?: string | null): Promise<string> {
+  const env = hostAwareEnv(host);
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("vipps_webhook_secrets")
+      .select("secret")
+      .eq("mode", env.mode)
+      .maybeSingle();
+    if (data?.secret) return data.secret;
+  } catch (e) {
+    console.error("[vipps] could not read webhook secret from DB", e);
+  }
+  return env.webhookSecret;
 }

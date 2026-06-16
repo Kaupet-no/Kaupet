@@ -248,7 +248,7 @@ function PriceMarker({
   onSelect?: (id: string | null) => void;
 }) {
   const icon = useMemo(
-    () => makePricePin(listing, { hovered, active }),
+    () => makeLocationPin(listing, { hovered, active }),
     [listing, hovered, active],
   );
   return (
@@ -294,7 +294,6 @@ function PopupCard({ listing }: { listing: MapListing }) {
         )}
       </div>
       <p className="line-clamp-2 text-sm font-medium leading-snug">{listing.title}</p>
-      <p className="mt-1 font-display text-sm">{formatPriceFull(listing)}</p>
       <Link
         to="/$kaupetCode"
         params={{ kaupetCode: listing.kaupet_code }}

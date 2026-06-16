@@ -398,6 +398,27 @@ function ListingDetailPage() {
               {data.title}
             </h1>
             <p className="mt-3 font-display text-3xl text-primary">{priceLabel}</p>
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(data.kaupet_code);
+                  setCodeCopied(true);
+                  setTimeout(() => setCodeCopied(false), 1500);
+                  toast.success("Kaupet-kode kopiert");
+                } catch {
+                  toast.error("Kunne ikke kopiere koden");
+                }
+              }}
+              className="mt-3 inline-flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-1.5 text-xs hover:bg-muted"
+              aria-label="Kopier Kaupet-kode"
+            >
+              <span className="font-medium text-muted-foreground">Kaupet-kode</span>
+              <span className="font-mono text-sm tracking-wider text-foreground">
+                {data.kaupet_code}
+              </span>
+              {codeCopied ? <Check className="size-3.5" /> : <Share2 className="size-3.5" />}
+            </button>
           </div>
 
           {(() => {

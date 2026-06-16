@@ -43,11 +43,11 @@ function VippsWebhooksPage() {
 
   const onRegister = async () => {
     setBusy(true);
-    setSecret(null);
+    setSavedId(null);
     try {
       const res = await register({ data: { mode, url } });
-      setSecret(res.secret);
-      toast.success("Webhook registrert. Kopier secret nedenfor og legg inn som env-variabel.");
+      setSavedId(res.id);
+      toast.success("Webhook registrert og secret lagret automatisk i Lovable Cloud.");
       await refresh(mode);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Registrering feilet");

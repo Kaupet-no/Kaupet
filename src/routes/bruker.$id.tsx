@@ -68,7 +68,7 @@ function PublicProfilePage() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, title, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order)",
+          "id, kaupet_code, title, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order)",
         )
         .eq("seller_id", id)
         .eq("status", "active")
@@ -78,6 +78,7 @@ function PublicProfilePage() {
       type ListingImage = { storage_path: string; sort_order: number };
       type ListingRow = {
         id: string;
+        kaupet_code: string;
         title: string;
         price_nok: number | null;
         is_free: boolean;
@@ -91,6 +92,7 @@ function PublicProfilePage() {
           .sort((a: ListingImage, b: ListingImage) => a.sort_order - b.sort_order);
         return {
           id: l.id,
+          kaupet_code: l.kaupet_code,
           title: l.title,
           price_nok: l.price_nok,
           is_free: l.is_free,
@@ -206,8 +208,8 @@ function PublicProfilePage() {
                         <>
                           {" · "}
                           <Link
-                            to="/annonse/$id"
-                            params={{ id: r.listing.id }}
+                            to="/$kaupetCode"
+                            params={{ kaupetCode: r.listing.kaupet_code }}
                             className="hover:underline"
                           >
                             {r.listing.title}

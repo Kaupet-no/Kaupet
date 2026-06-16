@@ -231,7 +231,7 @@ function BrowsePage() {
       let qb = supabase
         .from("listings")
         .select(
-          "id, title, price_nok, is_free, city, lat, lng, created_at, listing_images(storage_path, sort_order)",
+          "id, kaupet_code, title, price_nok, is_free, city, lat, lng, created_at, listing_images(storage_path, sort_order)",
         )
         .eq("status", "active");
 
@@ -310,6 +310,7 @@ function BrowsePage() {
         const imgs = (l.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
         return {
           id: l.id,
+          kaupet_code: l.kaupet_code,
           title: l.title,
           price_nok: l.price_nok,
           is_free: l.is_free,
@@ -343,6 +344,7 @@ function BrowsePage() {
 
   const cards: ListingCardData[] = (listings ?? []).map((l) => ({
     id: l.id,
+    kaupet_code: l.kaupet_code,
     title: l.title,
     price_nok: l.price_nok,
     is_free: l.is_free,
@@ -355,6 +357,7 @@ function BrowsePage() {
     .filter((l): l is typeof l & { lat: number; lng: number } => l.lat != null && l.lng != null)
     .map((l) => ({
       id: l.id,
+      kaupet_code: l.kaupet_code,
       title: l.title,
       price_nok: l.price_nok,
       is_free: l.is_free,

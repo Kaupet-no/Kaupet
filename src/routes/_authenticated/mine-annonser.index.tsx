@@ -51,6 +51,7 @@ export const Route = createFileRoute("/_authenticated/mine-annonser/")({
 
 type Row = {
   id: string;
+  kaupet_code: string;
   title: string;
   status: "draft" | "active" | "sold" | "archived" | "expired";
   price_nok: number | null;
@@ -114,7 +115,7 @@ function MyListingsPage() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, title, status, price_nok, is_free, city, created_at, expires_at, listing_images(storage_path, sort_order)",
+          "id, kaupet_code, title, status, price_nok, is_free, city, created_at, expires_at, listing_images(storage_path, sort_order)",
         )
         .eq("seller_id", userId)
         .order("created_at", { ascending: false });
@@ -135,6 +136,7 @@ function MyListingsPage() {
         const c = countMap.get(l.id);
         return {
           id: l.id,
+          kaupet_code: l.kaupet_code,
           title: l.title,
           status: l.status as Row["status"],
           price_nok: l.price_nok,
@@ -312,8 +314,8 @@ function ListingRow({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <Link
-            to="/annonse/$id"
-            params={{ id: row.id }}
+            to="/$kaupetCode"
+            params={{ kaupetCode: row.kaupet_code }}
             className="truncate text-base font-medium hover:underline"
           >
             {row.title}

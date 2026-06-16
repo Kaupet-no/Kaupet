@@ -25,12 +25,12 @@ export const Route = createFileRoute("/sitemap.xml")({
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
           const { data } = await supabaseAdmin
             .from("listings")
-            .select("id, updated_at")
+            .select("kaupet_code, updated_at")
             .eq("status", "active")
             .order("updated_at", { ascending: false })
             .limit(5000);
           listingEntries = (data ?? []).map((l) => ({
-            path: `/annonse/${l.id}`,
+            path: `/${l.kaupet_code}`,
             lastmod: l.updated_at ? new Date(l.updated_at).toISOString() : undefined,
             changefreq: "weekly",
             priority: "0.7",

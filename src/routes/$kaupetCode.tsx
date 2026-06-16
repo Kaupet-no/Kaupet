@@ -42,18 +42,19 @@ const CONDITION_LABEL: Record<string, string> = {
   for_parts: "Må repareres",
 };
 
-export const Route = createFileRoute("/annonse/$id")({
+export const Route = createFileRoute("/$kaupetCode")({
   validateSearch: z.object({
     promotion: z.string().optional(),
     promo_id: z.string().optional(),
   }),
   loader: async ({ params }) => {
+    if (!/^[0-9]{8}$/.test(params.kaupetCode)) throw notFound();
     const { data, error } = await supabase
       .from("listings")
       .select(
-        "id, title, description, price_nok, is_free, condition, city, updated_at, published_at, status",
+        "id, kaupet_code, title, description, price_nok, is_free, condition, city, updated_at, published_at, status",
       )
-      .eq("id", params.id)
+      .eq("kaupet_code", params.kaupetCode)
       .maybeSingle();
     if (error) throw error;
     if (!data) throw notFound();
@@ -82,7 +83,7 @@ export const Route = createFileRoute("/annonse/$id")({
       : `${l.title}${place}. ${priceLabel} på Kaupet.no.`;
     const description =
       descCore.length < 60 ? `${descCore} ${priceLabel}${place}. Selges på Kaupet.no.` : descCore;
-    const url = `https://kaupet.no/annonse/${params.id}`;
+    const url = `https://kaupet.no/${params.kaupetCode}`;
     const isActive = (l.status as string | undefined) === "active";
     return {
       meta: [
@@ -155,7 +156,7 @@ function ListingErrorBoundary({ error, reset }: { error: Error; reset: () => voi
 }
 
 function ListingDetailPage() {
-  const { id } = Route.useParams();
+  const { kaupetCode } = Route.useParams();
   const search = Route.useSearch();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -165,15 +166,16 @@ function ListingDetailPage() {
   const [mounted, setMounted] = useState(false);
   const [statsInfoOpen, setStatsInfoOpen] = useState(false);
   const [promoteOpen, setPromoteOpen] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     if (search.promotion === "success") {
       toast.success("Takk! Fremhevingen aktiveres så snart Vipps bekrefter betalingen.");
-      queryClient.invalidateQueries({ queryKey: ["listing-active-promotion", id] });
+      queryClient.invalidateQueries({ queryKey: ["listing-active-promotion", kaupetCode] });
       navigate({
-        to: "/annonse/$id",
-        params: { id },
+        to: "/$kaupetCode",
+        params: { kaupetCode },
         search: {},
         replace: true,
       });
@@ -182,14 +184,14 @@ function ListingDetailPage() {
   }, [search.promotion]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["listing", id],
+    queryKey: ["listing", kaupetCode],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, title, description, price_nok, is_free, condition, city, postal_code, lat, lng, created_at, updated_at, published_at, status, seller_id, category_id, listing_images(storage_path, sort_order), categories(name_nb, slug)",
+          "id, kaupet_code, title, description, price_nok, is_free, condition, city, postal_code, lat, lng, created_at, updated_at, published_at, status, seller_id, category_id, listing_images(storage_path, sort_order), categories(name_nb, slug)",
         )
-        .eq("id", id)
+        .eq("kaupet_code", kaupetCode)
         .maybeSingle();
       if (error) throw error;
       if (!data) throw new Error("Annonsen finnes ikke");
@@ -202,15 +204,18 @@ function ListingDetailPage() {
     },
   });
 
+  const listingId = data?.id;
   const isOwner = !!user && !!data && user.id === data.seller_id;
 
   const { data: stats } = useQuery({
-    queryKey: ["listing-stats", id],
-    enabled: isOwner,
+    queryKey: ["listing-stats", listingId],
+    enabled: isOwner && !!listingId,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("listing_stats", { _listing_id: id });
+      const { data: rows, error } = await supabase.rpc("listing_stats", {
+        _listing_id: listingId!,
+      });
       if (error) throw error;
-      const row = Array.isArray(data) ? data[0] : data;
+      const row = Array.isArray(rows) ? rows[0] : rows;
       return {
         total_views: Number(row?.total_views ?? 0),
         unique_visitors: Number(row?.unique_visitors ?? 0),
@@ -220,13 +225,13 @@ function ListingDetailPage() {
   });
 
   const { data: activePromotion } = useQuery({
-    queryKey: ["listing-active-promotion", id],
-    enabled: isOwner,
+    queryKey: ["listing-active-promotion", listingId],
+    enabled: isOwner && !!listingId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("listing_promotions")
         .select("id, status, expires_at")
-        .eq("listing_id", id)
+        .eq("listing_id", listingId!)
         .in("status", ["active", "pending", "gifted"])
         .order("created_at", { ascending: false })
         .limit(1)
@@ -393,6 +398,27 @@ function ListingDetailPage() {
               {data.title}
             </h1>
             <p className="mt-3 font-display text-3xl text-primary">{priceLabel}</p>
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(data.kaupet_code);
+                  setCodeCopied(true);
+                  setTimeout(() => setCodeCopied(false), 1500);
+                  toast.success("Kaupet-kode kopiert");
+                } catch {
+                  toast.error("Kunne ikke kopiere koden");
+                }
+              }}
+              className="mt-3 inline-flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-1.5 text-xs hover:bg-muted"
+              aria-label="Kopier Kaupet-kode"
+            >
+              <span className="font-medium text-muted-foreground">Kaupet-kode</span>
+              <span className="font-mono text-sm tracking-wider text-foreground">
+                {data.kaupet_code}
+              </span>
+              {codeCopied ? <Check className="size-3.5" /> : <Share2 className="size-3.5" />}
+            </button>
           </div>
 
           {(() => {
@@ -608,7 +634,7 @@ function ListingDetailPage() {
                   const result = await shareContent({
                     title: data.title,
                     text: `${data.title} — ${priceLabel} på Kaupet.no`,
-                    url: `https://kaupet.no/annonse/${data.id}`,
+                    url: `https://kaupet.no/${data.kaupet_code}`,
                   });
                   if (result === "clipboard") toast.success("Lenken er kopiert");
                 } catch (e: unknown) {

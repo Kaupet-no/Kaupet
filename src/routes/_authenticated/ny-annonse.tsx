@@ -83,6 +83,7 @@ function NewListingPage() {
   const navigate = useNavigate();
   const [images, setImages] = useState<PendingImage[]>([]);
   const [publishedId, setPublishedId] = useState<string | null>(null);
+  const [publishedCode, setPublishedCode] = useState<string | null>(null);
   const [publishedOpen, setPublishedOpen] = useState(false);
   const [promoteOpen, setPromoteOpen] = useState(false);
   const { data: isDemo = false } = useIsDemo();
@@ -214,7 +215,7 @@ function NewListingPage() {
           status: "active",
           published_at: new Date().toISOString(),
         })
-        .select("id")
+        .select("id, kaupet_code")
         .single();
       if (insertErr) throw insertErr;
 
@@ -239,12 +240,13 @@ function NewListingPage() {
         );
         if (imgErr) throw imgErr;
       }
-      return listing.id as string;
+      return { id: listing.id as string, kaupet_code: listing.kaupet_code as string };
     },
-    onSuccess: (id) => {
+    onSuccess: (result) => {
       void import("@/lib/haptics").then((m) => m.hapticNotification("success"));
       toast.success("Annonsen er publisert");
-      setPublishedId(id);
+      setPublishedId(result.id);
+      setPublishedCode(result.kaupet_code);
       setPublishedOpen(true);
     },
     onError: (err: Error) => {
@@ -462,7 +464,7 @@ function NewListingPage() {
           canPromote={isDemo}
           onView={() => {
             setPublishedOpen(false);
-            navigate({ to: "/annonse/$id", params: { id: publishedId } });
+            if (publishedCode) navigate({ to: "/$kaupetCode", params: { kaupetCode: publishedCode } });
           }}
           onPromote={() => {
             setPublishedOpen(false);

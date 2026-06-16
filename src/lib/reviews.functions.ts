@@ -17,7 +17,7 @@ export type ReviewRow = {
     display_name: string | null;
     avatar_url: string | null;
   } | null;
-  listing: { id: string; title: string } | null;
+  listing: { id: string; kaupet_code: string; title: string } | null;
 };
 
 export type PublicProfile = {
@@ -146,7 +146,7 @@ export const listUserReviews = createServerFn({ method: "POST" })
       .select(
         `id, listing_id, reviewer_id, reviewee_id, role, rating, comment, created_at,
          reviewer:profiles!user_reviews_reviewer_id_fkey(id, display_name, avatar_url),
-         listing:listings(id, title)`,
+         listing:listings(id, kaupet_code, title)`,
       )
       .eq("reviewee_id", data.userId)
       .order("created_at", { ascending: false })
@@ -168,7 +168,7 @@ export const listUserReviews = createServerFn({ method: "POST" })
           .from("profiles")
           .select("id, display_name, avatar_url, deleted_at")
           .in("id", ids),
-        supabaseAdmin.from("listings").select("id, title").in("id", listingIds),
+        supabaseAdmin.from("listings").select("id, kaupet_code, title").in("id", listingIds),
       ]);
       const pmap = new Map((profs ?? []).map((p) => [p.id, p]));
       const lmap = new Map((listings ?? []).map((l) => [l.id, l]));

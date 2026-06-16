@@ -39,6 +39,7 @@ import { ListingCard, type ListingCardData } from "@/components/listing-card";
 import { ChevronLeft } from "lucide-react";
 import { useIsNative } from "@/lib/use-is-native";
 import { AppLanding } from "@/components/app-landing";
+import { KaupetCodeDialog } from "@/components/kaupet-code-dialog";
 
 const CATEGORY_ICONS: Record<string, LucideIcon> = {
   "mobler-og-interior": Sofa,
@@ -141,7 +142,7 @@ function WebLanding() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, title, price_nok, is_free, city, created_at, view_count, listing_images(storage_path, sort_order)",
+          "id, kaupet_code, title, price_nok, is_free, city, created_at, view_count, listing_images(storage_path, sort_order)",
         )
         .eq("status", "active")
         .order("view_count", { ascending: false })
@@ -152,6 +153,7 @@ function WebLanding() {
         const imgs = (l.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
         return {
           id: l.id,
+          kaupet_code: l.kaupet_code,
           title: l.title,
           price_nok: l.price_nok,
           is_free: l.is_free,
@@ -259,6 +261,7 @@ function WebLanding() {
                   </Button>
                 </Link>
               )}
+              <KaupetCodeDialog />
             </div>
           </div>
 

@@ -42,7 +42,7 @@ const CONDITION_LABEL: Record<string, string> = {
   for_parts: "Må repareres",
 };
 
-export const Route = createFileRoute("/annonse/$id")({
+export const Route = createFileRoute("/$kaupetCode")({
   validateSearch: z.object({
     promotion: z.string().optional(),
     promo_id: z.string().optional(),

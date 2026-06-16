@@ -36,3 +36,18 @@ export const republishListing = createServerFn({ method: "POST" })
 
     return updated;
   });
+
+export const getListingKaupetCodeById = createServerFn({ method: "GET" })
+  .inputValidator((input: unknown) =>
+    z.object({ listing_id: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error } = await supabaseAdmin
+      .from("listings")
+      .select("kaupet_code")
+      .eq("id", data.listing_id)
+      .maybeSingle();
+    if (error) throw error;
+    return { kaupet_code: row?.kaupet_code ?? null };
+  });

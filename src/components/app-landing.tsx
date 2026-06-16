@@ -22,6 +22,7 @@ import {
 
 import { supabase } from "@/integrations/supabase/client";
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
+import { KaupetCodeDialog } from "@/components/kaupet-code-dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/location-filter";
 import { AnimatedSearchPlaceholder } from "@/components/animated-search-placeholder";

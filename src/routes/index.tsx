@@ -260,6 +260,7 @@ function WebLanding() {
                   </Button>
                 </Link>
               )}
+              <KaupetCodeDialog />
             </div>
           </div>
 

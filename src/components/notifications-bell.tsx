@@ -206,10 +206,11 @@ export function NotificationsBell() {
                   className={`group relative ${!n.read_at ? "bg-primary/5" : ""}`}
                 >
                   <Link
-                    to="/annonse/$id"
-                    params={{ id: n.listing_id }}
+                    to="/$kaupetCode"
+                    params={{ kaupetCode: n.listing_code ?? "" }}
+                    disabled={!n.listing_code}
                     onClick={() => handleClick(n)}
-                    className="block px-3 py-2.5 pr-9 hover:bg-muted"
+                    className="block px-3 py-2.5 pr-9 hover:bg-muted aria-disabled:pointer-events-none aria-disabled:opacity-60"
                   >
                     <div className="flex items-start gap-2">
                       {!n.read_at && (

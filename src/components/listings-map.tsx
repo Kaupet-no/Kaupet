@@ -23,6 +23,7 @@ const centerIcon = L.divIcon({
 
 export type MapListing = {
   id: string;
+  kaupet_code: string;
   title: string;
   price_nok: number | null;
   is_free: boolean;

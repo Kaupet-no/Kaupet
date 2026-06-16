@@ -52,7 +52,12 @@ function hostAwareEnv(host?: string | null): VippsEnv {
   };
 }
 
+export function getVippsMode(host?: string | null): "test" | "production" {
+  return hostAwareEnv(host).mode;
+}
+
 export function assertVippsConfigured(host?: string | null) {
+
   const e = hostAwareEnv(host);
   const prefix = e.mode === "test" ? "VIPPS_TEST_" : "VIPPS_";
   const missing: string[] = [];

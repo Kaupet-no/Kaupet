@@ -189,12 +189,12 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
             disabled={!selected || !accepted || isPending}
             onClick={() => {
               if (!selected) return;
-              if (isDemo) demoActivate.mutate(selected);
-              else checkout.mutate(selected);
+              checkout.mutate(selected);
             }}
           >
             {isPending && <Loader2 className="size-4 animate-spin" />}
-            {isDemo ? "Aktiver fremheving (demo)" : "Betal med Vipps"}
+            Betal med Vipps
+
           </Button>
         </DialogFooter>
       </DialogContent>

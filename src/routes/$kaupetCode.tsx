@@ -184,14 +184,14 @@ function ListingDetailPage() {
   }, [search.promotion]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["listing", id],
+    queryKey: ["listing", kaupetCode],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, title, description, price_nok, is_free, condition, city, postal_code, lat, lng, created_at, updated_at, published_at, status, seller_id, category_id, listing_images(storage_path, sort_order), categories(name_nb, slug)",
+          "id, kaupet_code, title, description, price_nok, is_free, condition, city, postal_code, lat, lng, created_at, updated_at, published_at, status, seller_id, category_id, listing_images(storage_path, sort_order), categories(name_nb, slug)",
         )
-        .eq("id", id)
+        .eq("kaupet_code", kaupetCode)
         .maybeSingle();
       if (error) throw error;
       if (!data) throw new Error("Annonsen finnes ikke");
@@ -204,15 +204,18 @@ function ListingDetailPage() {
     },
   });
 
+  const listingId = data?.id;
   const isOwner = !!user && !!data && user.id === data.seller_id;
 
   const { data: stats } = useQuery({
-    queryKey: ["listing-stats", id],
-    enabled: isOwner,
+    queryKey: ["listing-stats", listingId],
+    enabled: isOwner && !!listingId,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("listing_stats", { _listing_id: id });
+      const { data: rows, error } = await supabase.rpc("listing_stats", {
+        _listing_id: listingId!,
+      });
       if (error) throw error;
-      const row = Array.isArray(data) ? data[0] : data;
+      const row = Array.isArray(rows) ? rows[0] : rows;
       return {
         total_views: Number(row?.total_views ?? 0),
         unique_visitors: Number(row?.unique_visitors ?? 0),
@@ -222,13 +225,13 @@ function ListingDetailPage() {
   });
 
   const { data: activePromotion } = useQuery({
-    queryKey: ["listing-active-promotion", id],
-    enabled: isOwner,
+    queryKey: ["listing-active-promotion", listingId],
+    enabled: isOwner && !!listingId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("listing_promotions")
         .select("id, status, expires_at")
-        .eq("listing_id", id)
+        .eq("listing_id", listingId!)
         .in("status", ["active", "pending", "gifted"])
         .order("created_at", { ascending: false })
         .limit(1)

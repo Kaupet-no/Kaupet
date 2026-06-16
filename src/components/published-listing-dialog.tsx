@@ -30,6 +30,7 @@ type PreviewData = {
   is_free: boolean;
   city: string | null;
   cover_path: string | null;
+  kaupet_code: string | null;
 };
 
 function formatPrice(p: { price_nok: number | null; is_free: boolean }) {
@@ -48,6 +49,7 @@ export function PublishedListingDialog({
   canPromote = false,
 }: Props) {
   const [imgUrl, setImgUrl] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const { data: listing } = useQuery({
     queryKey: ["listing-preview", listingId],
@@ -56,7 +58,7 @@ export function PublishedListingDialog({
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "title, price_nok, is_free, city, listing_images(storage_path, sort_order)",
+          "title, price_nok, is_free, city, kaupet_code, listing_images(storage_path, sort_order)",
         )
         .eq("id", listingId)
         .maybeSingle();
@@ -71,6 +73,7 @@ export function PublishedListingDialog({
         is_free: data.is_free,
         city: data.city,
         cover_path: cover,
+        kaupet_code: data.kaupet_code,
       };
     },
   });
@@ -89,28 +92,8 @@ export function PublishedListingDialog({
     };
   }, [listing?.cover_path]);
 
-  async function handleShare() {
-    const url = `${window.location.origin}/annonse/${listingId}`;
-    const shareData = {
-      title: listing?.title ?? "Annonse på Kaupet.no",
-      text: listing?.title ?? "Se annonsen min på Kaupet.no",
-      url,
-    };
-    try {
-      if (typeof navigator !== "undefined" && "share" in navigator) {
-        await navigator.share(shareData);
-        return;
-      }
-    } catch {
-      // user cancelled or share failed — fall through to copy
-    }
-    try {
-      await navigator.clipboard.writeText(url);
-      toast.success("Lenken er kopiert til utklippstavlen");
-    } catch {
-      toast.error("Kunne ikke dele annonsen");
-    }
-  }
+
+
 
   return (
     <Dialog
@@ -159,7 +142,12 @@ export function PublishedListingDialog({
           <Button onClick={onView} className="flex-1">
             <Eye className="size-4" /> Se annonsen
           </Button>
-          <Button variant="secondary" onClick={handleShare} className="flex-1">
+          <Button
+            variant="secondary"
+            onClick={() => setShareOpen(true)}
+            disabled={!listing?.kaupet_code}
+            className="flex-1"
+          >
             <Share2 className="size-4" /> Del annonsen
           </Button>
           {canPromote && onPromote && (

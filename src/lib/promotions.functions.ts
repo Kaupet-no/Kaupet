@@ -83,7 +83,7 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
       .single();
     if (ierr) throw ierr;
 
-    const { createVippsPayment } = await import("@/lib/vipps.server");
+    const { createVippsPayment, getVippsMode } = await import("@/lib/vipps.server");
     const host = (() => {
       try {
         return getRequestHost();
@@ -91,11 +91,23 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
         return null;
       }
     })();
+    const vippsMode = getVippsMode(host);
     const origin = host
       ? `https://${host}`
       : (process.env.PUBLIC_SITE_URL ??
         (isTestHost(host) ? "https://test.kaupet.no" : "https://kaupet.no"));
     const returnUrl = `${origin}/annonse/${data.listing_id}?promotion=success&promo_id=${promo.id}`;
+
+    console.log("[promotions] createPromotionCheckout", {
+      promotion_id: promo.id,
+      listing_id: data.listing_id,
+      user_id: userId,
+      duration_days: data.duration_days,
+      price_nok: pricing.price_nok,
+      vipps_mode: vippsMode,
+      host,
+      reference,
+    });
 
     try {
       const result = await createVippsPayment({
@@ -115,9 +127,19 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
           .update({ vipps_psp_reference: result.pspReference })
           .eq("id", promo.id);
       }
+      console.log("[promotions] createPromotionCheckout ok", {
+        promotion_id: promo.id,
+        vipps_mode: vippsMode,
+        psp_reference: result.pspReference ?? null,
+      });
       return { promotion_id: promo.id, redirect_url: result.redirectUrl };
-
     } catch (err) {
+      console.error("[promotions] createPromotionCheckout failed", {
+        promotion_id: promo.id,
+        vipps_mode: vippsMode,
+        host,
+        error: err instanceof Error ? err.message : String(err),
+      });
       await supabaseAdmin
         .from("listing_promotions")
         .update({ status: "failed" })
@@ -125,6 +147,7 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
       throw err;
     }
   });
+
 
 export const getPromotionStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

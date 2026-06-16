@@ -14,7 +14,6 @@ import {
   ChevronDown,
   Share2,
   Sparkles,
-  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";

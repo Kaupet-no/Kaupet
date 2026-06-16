@@ -116,7 +116,7 @@ export function ShareListingDialog({ open, onOpenChange, kaupetCode }: Props) {
     setGenerating(true);
     setQrError(null);
     setQrSrc(null);
-    generateQrDataUrl(url)
+    generateBrandedQrDataUrl(url)
       .then((dataUrl) => {
         if (cancelled) return;
         setQrSrc(dataUrl);

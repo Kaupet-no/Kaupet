@@ -380,6 +380,12 @@ function ListingDetailPage() {
               ))}
             </div>
           )}
+          <section className="mt-8">
+            <h2 className="font-display text-xl">Beskrivelse</h2>
+            <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+              {data.description}
+            </p>
+          </section>
         </div>
 
         <aside className="space-y-5">

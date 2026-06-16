@@ -17,7 +17,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
 
         // Verify HMAC signature if a secret is configured.
         const { getVippsWebhookSecret, getVippsPayment } = await import("@/lib/vipps.server");
-        const secret = getVippsWebhookSecret(host);
+        const secret = await getVippsWebhookSecret(host);
         if (secret) {
           const sigHeader =
             request.headers.get("x-ms-signature") ?? request.headers.get("authorization") ?? "";

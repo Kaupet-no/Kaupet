@@ -26,7 +26,7 @@ function VippsWebhooksPage() {
   const [mode, setMode] = useState<"test" | "production">("test");
   const [url, setUrl] = useState("https://test.kaupet.no/api/public/vipps/webhook");
   const [hooks, setHooks] = useState<Array<{ id: string; url: string; events: string[] }>>([]);
-  const [secret, setSecret] = useState<string | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const refresh = async (m: "test" | "production" = mode) => {
@@ -43,11 +43,11 @@ function VippsWebhooksPage() {
 
   const onRegister = async () => {
     setBusy(true);
-    setSecret(null);
+    setSavedId(null);
     try {
       const res = await register({ data: { mode, url } });
-      setSecret(res.secret);
-      toast.success("Webhook registrert. Kopier secret nedenfor og legg inn som env-variabel.");
+      setSavedId(res.id);
+      toast.success("Webhook registrert og secret lagret automatisk i Lovable Cloud.");
       await refresh(mode);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Registrering feilet");
@@ -75,10 +75,9 @@ function VippsWebhooksPage() {
       <div>
         <h1 className="text-2xl font-semibold">Vipps webhooks</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Registrer webhook hos Vipps for å motta betalingshendelser. Vipps genererer en{" "}
-          <code className="rounded bg-muted px-1">secret</code> som vises én gang og må lagres som
-          env-variabel: <code>VIPPS_TEST_WEBHOOK_SECRET</code> (test) eller{" "}
-          <code>VIPPS_WEBHOOK_SECRET</code> (produksjon).
+          Registrer webhook hos Vipps for å motta betalingshendelser. Den genererte secret-en
+          lagres automatisk i Lovable Cloud og brukes av webhook-handleren for å verifisere
+          signaturen — ingen manuelle env-variabler nødvendig.
         </p>
       </div>
 
@@ -121,15 +120,14 @@ function VippsWebhooksPage() {
             </Button>
           </div>
 
-          {secret && (
-            <div className="rounded-md border border-yellow-400 bg-yellow-50 p-4">
-              <p className="text-sm font-semibold text-yellow-900">
-                Kopier denne secret-en NÅ — den vises bare én gang
+          {savedId && (
+            <div className="rounded-md border border-green-500 bg-green-50 p-4">
+              <p className="text-sm font-semibold text-green-900">
+                Webhook registrert og secret lagret automatisk
               </p>
-              <pre className="mt-2 break-all rounded bg-white p-2 text-xs">{secret}</pre>
-              <p className="mt-2 text-xs text-yellow-900">
-                Lagre som <code>{mode === "test" ? "VIPPS_TEST_WEBHOOK_SECRET" : "VIPPS_WEBHOOK_SECRET"}</code>{" "}
-                i prosjektets env-variabler.
+              <p className="mt-1 text-xs text-green-900">
+                Webhook-id: <code className="rounded bg-white px-1">{savedId}</code>. Signaturen
+                verifiseres heretter mot lagret secret i Lovable Cloud.
               </p>
             </div>
           )}

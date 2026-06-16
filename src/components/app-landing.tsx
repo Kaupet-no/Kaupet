@@ -250,6 +250,10 @@ export function AppLanding() {
               </SheetContent>
             </Sheet>
           </div>
+
+          <div className="mt-3 flex justify-center">
+            <KaupetCodeDialog />
+          </div>
         </form>
       </section>
 

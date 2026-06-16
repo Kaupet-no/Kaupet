@@ -613,7 +613,7 @@ function ListingDetailPage() {
                   const result = await shareContent({
                     title: data.title,
                     text: `${data.title} — ${priceLabel} på Kaupet.no`,
-                    url: `https://kaupet.no/annonse/${data.id}`,
+                    url: `https://kaupet.no/${data.kaupet_code}`,
                   });
                   if (result === "clipboard") toast.success("Lenken er kopiert");
                 } catch (e: unknown) {

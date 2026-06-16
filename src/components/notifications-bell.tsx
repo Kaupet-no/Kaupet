@@ -66,13 +66,15 @@ export function NotificationsBell() {
       const searchItems: SearchItem[] = notifs.map((n) => ({
         ...n,
         kind: "search",
-        listing_title: listingMap.get(n.listing_id) ?? null,
+        listing_title: listingMap.get(n.listing_id)?.title ?? null,
+        listing_code: listingMap.get(n.listing_id)?.kaupet_code ?? null,
         search_name: searchMap.get(n.saved_search_id) ?? null,
       }));
       const dropItems: PriceDropItem[] = drops.map((d) => ({
         ...d,
         kind: "price_drop",
-        listing_title: listingMap.get(d.listing_id) ?? null,
+        listing_title: listingMap.get(d.listing_id)?.title ?? null,
+        listing_code: listingMap.get(d.listing_id)?.kaupet_code ?? null,
       }));
 
       return [...searchItems, ...dropItems].sort(

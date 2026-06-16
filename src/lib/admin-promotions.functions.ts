@@ -58,7 +58,14 @@ export const adminUpdatePromotionPricing = createServerFn({ method: "POST" })
 export const adminListPromotions = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ status: z.string().optional() }).parse(input ?? {}),
+    z
+      .object({
+        status: z.string().optional(),
+        q: z.string().trim().max(120).optional(),
+        from: z.string().datetime().optional(),
+        to: z.string().datetime().optional(),
+      })
+      .parse(input ?? {}),
   )
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
@@ -66,7 +73,7 @@ export const adminListPromotions = createServerFn({ method: "GET" })
     let q = supabaseAdmin
       .from("listing_promotions")
       .select(
-        "id, listing_id, user_id, duration_days, price_nok, status, is_gift, starts_at, expires_at, created_at, vipps_reference, listings(title), profiles:user_id(display_name)",
+        "id, listing_id, user_id, duration_days, price_nok, status, is_gift, starts_at, expires_at, created_at, refunded_at, vipps_reference, vipps_psp_reference, listings(title, kaupet_code), profiles:user_id(display_name)",
       )
       .order("created_at", { ascending: false })
       .limit(200);
@@ -75,9 +82,64 @@ export const adminListPromotions = createServerFn({ method: "GET" })
         "status",
         data.status as "active" | "expired" | "failed" | "gifted" | "pending" | "refunded",
       );
+    if (data.from) q = q.gte("created_at", data.from);
+    if (data.to) q = q.lte("created_at", data.to);
+    if (data.q && data.q.length > 0) {
+      const term = data.q.replace(/[%,()]/g, "");
+      q = q.or(`vipps_reference.ilike.%${term}%,vipps_psp_reference.ilike.%${term}%`);
+    }
     const { data: rows, error } = await q;
     if (error) throw error;
     return rows ?? [];
+  });
+
+export const adminGetVippsPaymentStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ promotion_id: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: promo, error } = await supabaseAdmin
+      .from("listing_promotions")
+      .select("id, status, price_nok, vipps_reference, is_gift")
+      .eq("id", data.promotion_id)
+      .maybeSingle();
+    if (error) throw error;
+    if (!promo) throw new Error("Fant ikke fremheving");
+    if (promo.is_gift || !promo.vipps_reference) {
+      return { hasVipps: false as const };
+    }
+    const { getVippsPayment, getVippsMode } = await import("@/lib/vipps.server");
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const host = getRequest().headers.get("host");
+    const mode = getVippsMode(host);
+    try {
+      const result = await getVippsPayment(promo.vipps_reference, host);
+      const captured = result.state === "CAPTURED" || result.state === "AUTHORIZED";
+      const failedStates = ["ABORTED", "EXPIRED", "CANCELLED", "TERMINATED", "FAILED"];
+      const mismatch =
+        (captured && (promo.status === "pending" || promo.status === "failed")) ||
+        (result.state === "REFUNDED" && promo.status !== "refunded") ||
+        (failedStates.includes(result.state) && promo.status === "active");
+      return {
+        hasVipps: true as const,
+        mode,
+        reference: promo.vipps_reference,
+        state: result.state,
+        pspReference: result.pspReference,
+        amountNok: result.amount ? result.amount.value / 100 : undefined,
+        mismatch,
+      };
+    } catch (e) {
+      return {
+        hasVipps: true as const,
+        mode,
+        reference: promo.vipps_reference,
+        error: e instanceof Error ? e.message : "Ukjent feil fra Vipps",
+      };
+    }
   });
 
 export const adminRefundPromotion = createServerFn({ method: "POST" })
@@ -95,13 +157,21 @@ export const adminRefundPromotion = createServerFn({ method: "POST" })
     if (!promo) throw new Error("Fant ikke fremheving");
     if (promo.is_gift) throw new Error("Gratis fremheving kan ikke refunderes");
     if (!promo.vipps_reference) throw new Error("Mangler Vipps-referanse");
+    if (promo.status === "refunded") throw new Error("Allerede refundert");
 
     const { refundVippsPayment } = await import("@/lib/vipps.server");
-    await refundVippsPayment(promo.vipps_reference, promo.price_nok, `refund-${promo.id}`);
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const host = getRequest().headers.get("host");
+    await refundVippsPayment(
+      promo.vipps_reference,
+      promo.price_nok,
+      `refund-${promo.id}-${Date.now()}`,
+      host,
+    );
 
     await supabaseAdmin
       .from("listing_promotions")
-      .update({ status: "refunded" })
+      .update({ status: "refunded", refunded_at: new Date().toISOString() })
       .eq("id", promo.id);
 
     await supabaseAdmin.from("admin_moderation_log").insert({
@@ -112,6 +182,8 @@ export const adminRefundPromotion = createServerFn({ method: "POST" })
     });
     return { ok: true };
   });
+
+
 
 export const adminGiftPromotion = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

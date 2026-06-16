@@ -168,19 +168,73 @@ function ListingDetailPage() {
   const [shareOpen, setShareOpen] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  const reconcilePromotion = useServerFn(reconcilePromotionPayment);
   useEffect(() => {
-    if (search.promotion === "success") {
-      toast.success("Takk! Fremhevingen aktiveres så snart Vipps bekrefter betalingen.");
-      queryClient.invalidateQueries({ queryKey: ["listing-active-promotion", kaupetCode] });
+    if (search.promotion !== "success" || !search.promo_id) return;
+    const promoId = search.promo_id;
+    let cancelled = false;
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    const finish = () => {
+      if (cancelled) return;
       navigate({
         to: "/$kaupetCode",
         params: { kaupetCode },
         search: {},
         replace: true,
       });
-    }
+    };
+
+    const poll = async () => {
+      attempts += 1;
+      try {
+        const res = await reconcilePromotion({ data: { promotion_id: promoId } });
+        if (cancelled) return;
+        if (res.status === "active" || res.status === "gifted") {
+          toast.success("Fremhevingen er aktivert");
+          queryClient.invalidateQueries({ queryKey: ["listing-active-promotion"] });
+          queryClient.invalidateQueries({ queryKey: ["featured-listings"] });
+          queryClient.invalidateQueries({ queryKey: ["my-listings"] });
+          finish();
+          return;
+        }
+        if (res.status === "failed") {
+          toast.error("Betalingen ble ikke fullført. Fremhevingen er ikke aktivert.");
+          finish();
+          return;
+        }
+        if (res.status === "refunded") {
+          toast.message("Betalingen er refundert.");
+          finish();
+          return;
+        }
+        if (attempts >= maxAttempts) {
+          toast.message(
+            "Vi venter på bekreftelse fra Vipps. Siden oppdateres så snart betalingen er bekreftet.",
+          );
+          finish();
+          return;
+        }
+        setTimeout(poll, 1500);
+      } catch (e) {
+        if (cancelled) return;
+        console.error("[promotion reconcile]", e);
+        if (attempts >= maxAttempts) {
+          toast.error("Kunne ikke bekrefte betalingen. Prøv igjen senere.");
+          finish();
+          return;
+        }
+        setTimeout(poll, 1500);
+      }
+    };
+
+    poll();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search.promotion]);
+  }, [search.promotion, search.promo_id]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["listing", kaupetCode],

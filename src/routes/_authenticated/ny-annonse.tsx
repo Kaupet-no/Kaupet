@@ -214,7 +214,7 @@ function NewListingPage() {
           status: "active",
           published_at: new Date().toISOString(),
         })
-        .select("id")
+        .select("id, kaupet_code")
         .single();
       if (insertErr) throw insertErr;
 

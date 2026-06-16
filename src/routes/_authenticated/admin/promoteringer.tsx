@@ -164,7 +164,7 @@ function AdminPromotionsPage() {
     onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke gi fremheving")),
   });
 
-  const rows = (promosQ.data ?? []) as PromoRow[];
+  const rows = (promosQ.data ?? []) as unknown as PromoRow[];
 
   return (
     <div className="space-y-8">

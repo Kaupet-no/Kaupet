@@ -17,7 +17,7 @@ export type ReviewRow = {
     display_name: string | null;
     avatar_url: string | null;
   } | null;
-  listing: { id: string; title: string } | null;
+  listing: { id: string; kaupet_code: string; title: string } | null;
 };
 
 export type PublicProfile = {

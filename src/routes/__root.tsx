@@ -19,6 +19,10 @@ import { initNativeOfflineWatcher } from "@/lib/native-offline";
 import { setupNative } from "@/lib/native-setup";
 import { useIsNative } from "@/lib/use-is-native";
 import { AppBottomNav } from "@/components/app-bottom-nav";
+import { TestEnvBanner } from "@/components/test-env-banner";
+import { TestEnvGate } from "@/components/test-env-gate";
+import { isTestEnvClient } from "@/lib/env";
+
 
 function NotFoundComponent() {
   return (

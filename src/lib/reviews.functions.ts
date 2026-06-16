@@ -146,7 +146,7 @@ export const listUserReviews = createServerFn({ method: "POST" })
       .select(
         `id, listing_id, reviewer_id, reviewee_id, role, rating, comment, created_at,
          reviewer:profiles!user_reviews_reviewer_id_fkey(id, display_name, avatar_url),
-         listing:listings(id, title)`,
+         listing:listings(id, kaupet_code, title)`,
       )
       .eq("reviewee_id", data.userId)
       .order("created_at", { ascending: false })

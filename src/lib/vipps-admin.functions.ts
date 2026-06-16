@@ -74,14 +74,14 @@ const DEFAULT_EVENTS = [
   "epayments.payment.terminated.v1",
 ];
 
-async function assertAdmin(context: { supabase: ReturnType<typeof Object>; userId: string }) {
-  // @ts-expect-error supabase is the authenticated client
+async function assertAdmin(context: { supabase: { rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown }> }; userId: string }) {
   const { data: isAdmin } = await context.supabase.rpc("has_role", {
     _user_id: context.userId,
     _role: "admin",
   });
   if (!isAdmin) throw new Error("Kun administrator kan registrere Vipps-webhooks");
 }
+
 
 export const listVippsWebhooks = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

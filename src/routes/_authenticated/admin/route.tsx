@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
-import { BarChart3, Users, FolderTree, ShieldAlert, Sparkles } from "lucide-react";
+import { BarChart3, Users, FolderTree, ShieldAlert, Sparkles, Webhook } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -45,7 +45,13 @@ function AdminLayout() {
           icon={<Sparkles className="size-4" />}
           label="Fremhevinger"
         />
+        <NavTab
+          to="/admin/vipps-webhooks"
+          icon={<Webhook className="size-4" />}
+          label="Vipps webhooks"
+        />
       </nav>
+
       <Outlet />
     </div>
   );

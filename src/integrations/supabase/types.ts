@@ -381,6 +381,7 @@ export type Database = {
           expires_at: string | null
           id: string
           is_free: boolean
+          kaupet_code: string
           lat: number | null
           lng: number | null
           postal_code: string | null
@@ -402,6 +403,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           is_free?: boolean
+          kaupet_code: string
           lat?: number | null
           lng?: number | null
           postal_code?: string | null
@@ -423,6 +425,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           is_free?: boolean
+          kaupet_code?: string
           lat?: number | null
           lng?: number | null
           postal_code?: string | null
@@ -1046,6 +1049,7 @@ export type Database = {
       }
       expire_listing_promotions: { Args: never; Returns: number }
       expire_old_listings: { Args: never; Returns: number }
+      generate_kaupet_code: { Args: never; Returns: string }
       get_featured_listing_ids: {
         Args: { _category_slug?: string; _limit?: number }
         Returns: {

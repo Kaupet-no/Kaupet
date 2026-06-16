@@ -48,12 +48,13 @@ export const Route = createFileRoute("/$kaupetCode")({
     promo_id: z.string().optional(),
   }),
   loader: async ({ params }) => {
+    if (!/^[0-9]{8}$/.test(params.kaupetCode)) throw notFound();
     const { data, error } = await supabase
       .from("listings")
       .select(
-        "id, title, description, price_nok, is_free, condition, city, updated_at, published_at, status",
+        "id, kaupet_code, title, description, price_nok, is_free, condition, city, updated_at, published_at, status",
       )
-      .eq("id", params.id)
+      .eq("kaupet_code", params.kaupetCode)
       .maybeSingle();
     if (error) throw error;
     if (!data) throw notFound();

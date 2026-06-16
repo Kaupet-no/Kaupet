@@ -1,5 +1,4 @@
 import { createFileRoute, Link, notFound, redirect } from "@tanstack/react-router";
-import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 
 import { getListingKaupetCodeById } from "@/lib/listings.functions";
@@ -8,12 +7,15 @@ import { formatErrorMessage } from "@/lib/errors";
 import { AlertCircle } from "lucide-react";
 
 const searchSchema = z.object({
-  promotion: fallback(z.enum(["success"]).optional(), undefined),
-  promo_id: fallback(z.string().uuid().optional(), undefined),
+  promotion: z.enum(["success"]).optional(),
+  promo_id: z.string().uuid().optional(),
 });
 
 export const Route = createFileRoute("/annonse/$listingId")({
-  validateSearch: zodValidator(searchSchema),
+  validateSearch: (input: Record<string, unknown>) => {
+    const parsed = searchSchema.safeParse(input);
+    return parsed.success ? parsed.data : {};
+  },
   head: () => ({
     meta: [
       { title: "Videresender — Kaupet.no" },

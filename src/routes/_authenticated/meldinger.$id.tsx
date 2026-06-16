@@ -109,7 +109,7 @@ function ConversationPage() {
         .from("conversations")
         .select(
           `id, buyer_id, seller_id, listing_id,
-           listing:listings(id, title, price_nok, is_free, listing_images(storage_path, sort_order))`,
+           listing:listings(id, kaupet_code, title, price_nok, is_free, listing_images(storage_path, sort_order))`,
         )
         .eq("id", id)
         .maybeSingle();

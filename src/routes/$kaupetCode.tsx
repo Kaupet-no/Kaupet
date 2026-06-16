@@ -23,13 +23,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 
 import { signListingImageUrls } from "@/lib/storage";
-import { shareContent } from "@/lib/native";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { FavoriteButton } from "@/components/favorite-button";
 import { PromoteListingDialog } from "@/components/promote-listing-dialog";
 import { ShareListingDialog } from "@/components/share-listing-dialog";
-import { formatErrorMessage } from "@/lib/errors";
 
 const ListingDetailMap = lazy(() =>
   import("@/components/listing-detail-map").then((m) => ({ default: m.ListingDetailMap })),

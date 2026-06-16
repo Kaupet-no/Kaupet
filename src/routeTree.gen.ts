@@ -14,10 +14,10 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as PersonvernRouteImport } from './routes/personvern'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AnnonserRouteImport } from './routes/annonser'
+import { Route as KaupetCodeRouteImport } from './routes/$kaupetCode'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BrukerIdRouteImport } from './routes/bruker.$id'
-import { Route as AnnonseIdRouteImport } from './routes/annonse.$id'
 import { Route as AuthenticatedProfilRouteImport } from './routes/_authenticated/profil'
 import { Route as AuthenticatedNyAnnonseRouteImport } from './routes/_authenticated/ny-annonse'
 import { Route as AuthenticatedMineSokRouteImport } from './routes/_authenticated/mine-sok'
@@ -61,6 +61,11 @@ const AnnonserRoute = AnnonserRouteImport.update({
   path: '/annonser',
   getParentRoute: () => rootRouteImport,
 } as any)
+const KaupetCodeRoute = KaupetCodeRouteImport.update({
+  id: '/$kaupetCode',
+  path: '/$kaupetCode',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
@@ -73,11 +78,6 @@ const IndexRoute = IndexRouteImport.update({
 const BrukerIdRoute = BrukerIdRouteImport.update({
   id: '/bruker/$id',
   path: '/bruker/$id',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AnnonseIdRoute = AnnonseIdRouteImport.update({
-  id: '/annonse/$id',
-  path: '/annonse/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedProfilRoute = AuthenticatedProfilRouteImport.update({
@@ -177,6 +177,7 @@ const AuthenticatedMineAnnonserIdRedigerRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/$kaupetCode': typeof KaupetCodeRoute
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
   '/personvern': typeof PersonvernRoute
@@ -187,7 +188,6 @@ export interface FileRoutesByFullPath {
   '/mine-sok': typeof AuthenticatedMineSokRoute
   '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
-  '/annonse/$id': typeof AnnonseIdRoute
   '/bruker/$id': typeof BrukerIdRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
@@ -204,6 +204,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/$kaupetCode': typeof KaupetCodeRoute
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
   '/personvern': typeof PersonvernRoute
@@ -213,7 +214,6 @@ export interface FileRoutesByTo {
   '/mine-sok': typeof AuthenticatedMineSokRoute
   '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
-  '/annonse/$id': typeof AnnonseIdRoute
   '/bruker/$id': typeof BrukerIdRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
@@ -232,6 +232,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/$kaupetCode': typeof KaupetCodeRoute
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
   '/personvern': typeof PersonvernRoute
@@ -242,7 +243,6 @@ export interface FileRoutesById {
   '/_authenticated/mine-sok': typeof AuthenticatedMineSokRoute
   '/_authenticated/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/_authenticated/profil': typeof AuthenticatedProfilRoute
-  '/annonse/$id': typeof AnnonseIdRoute
   '/bruker/$id': typeof BrukerIdRoute
   '/_authenticated/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/_authenticated/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
@@ -261,6 +261,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/$kaupetCode'
     | '/annonser'
     | '/auth'
     | '/personvern'
@@ -271,7 +272,6 @@ export interface FileRouteTypes {
     | '/mine-sok'
     | '/ny-annonse'
     | '/profil'
-    | '/annonse/$id'
     | '/bruker/$id'
     | '/admin/brukere'
     | '/admin/kategorier'
@@ -288,6 +288,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/$kaupetCode'
     | '/annonser'
     | '/auth'
     | '/personvern'
@@ -297,7 +298,6 @@ export interface FileRouteTypes {
     | '/mine-sok'
     | '/ny-annonse'
     | '/profil'
-    | '/annonse/$id'
     | '/bruker/$id'
     | '/admin/brukere'
     | '/admin/kategorier'
@@ -315,6 +315,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authenticated'
+    | '/$kaupetCode'
     | '/annonser'
     | '/auth'
     | '/personvern'
@@ -325,7 +326,6 @@ export interface FileRouteTypes {
     | '/_authenticated/mine-sok'
     | '/_authenticated/ny-annonse'
     | '/_authenticated/profil'
-    | '/annonse/$id'
     | '/bruker/$id'
     | '/_authenticated/admin/brukere'
     | '/_authenticated/admin/kategorier'
@@ -344,12 +344,12 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  KaupetCodeRoute: typeof KaupetCodeRoute
   AnnonserRoute: typeof AnnonserRoute
   AuthRoute: typeof AuthRoute
   PersonvernRoute: typeof PersonvernRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   VilkarRoute: typeof VilkarRoute
-  AnnonseIdRoute: typeof AnnonseIdRoute
   BrukerIdRoute: typeof BrukerIdRoute
   ApiPublicPushDispatchRoute: typeof ApiPublicPushDispatchRoute
   ApiPublicVippsWebhookRoute: typeof ApiPublicVippsWebhookRoute
@@ -392,6 +392,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AnnonserRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/$kaupetCode': {
+      id: '/$kaupetCode'
+      path: '/$kaupetCode'
+      fullPath: '/$kaupetCode'
+      preLoaderRoute: typeof KaupetCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated': {
       id: '/_authenticated'
       path: ''
@@ -411,13 +418,6 @@ declare module '@tanstack/react-router' {
       path: '/bruker/$id'
       fullPath: '/bruker/$id'
       preLoaderRoute: typeof BrukerIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/annonse/$id': {
-      id: '/annonse/$id'
-      path: '/annonse/$id'
-      fullPath: '/annonse/$id'
-      preLoaderRoute: typeof AnnonseIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/profil': {
@@ -597,12 +597,12 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  KaupetCodeRoute: KaupetCodeRoute,
   AnnonserRoute: AnnonserRoute,
   AuthRoute: AuthRoute,
   PersonvernRoute: PersonvernRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   VilkarRoute: VilkarRoute,
-  AnnonseIdRoute: AnnonseIdRoute,
   BrukerIdRoute: BrukerIdRoute,
   ApiPublicPushDispatchRoute: ApiPublicPushDispatchRoute,
   ApiPublicVippsWebhookRoute: ApiPublicVippsWebhookRoute,

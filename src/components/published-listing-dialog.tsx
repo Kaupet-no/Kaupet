@@ -172,6 +172,15 @@ export function PublishedListingDialog({
           <X className="size-4" /> Lukk og gå til mine annonser
         </Button>
       </DialogContent>
+      {listing?.kaupet_code && (
+        <ShareListingDialog
+          open={shareOpen}
+          onOpenChange={setShareOpen}
+          kaupetCode={listing.kaupet_code}
+          title={listing.title}
+        />
+      )}
     </Dialog>
   );
 }
+

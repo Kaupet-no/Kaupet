@@ -53,16 +53,24 @@ function makeLocationPin(_l: MapListing, opts: { hovered: boolean; active: boole
     html: `<div style="
       transform:scale(${scale});
       transition:transform 140ms ease;
-      width:16px;
-      height:16px;
+      width:20px;
+      height:20px;
       border-radius:9999px;
       background:hsl(var(--primary));
-      border:3px solid white;
-      box-shadow:0 2px 10px hsl(0 0% 0% / 0.28),0 0 0 1.5px hsl(var(--primary)/0.4);
+      border:2px solid hsl(var(--primary));
+      box-shadow:0 2px 10px hsl(0 0% 0% / 0.32),0 0 0 1.5px white;
+      display:flex;
+      align-items:center;
+      justify-content:center;
       z-index:${z};
-    "></div>`,
-    iconSize: [16, 16],
-    iconAnchor: [8, 8],
+    "><div style="
+      width:8px;
+      height:8px;
+      border-radius:9999px;
+      background:white;
+    "></div></div>`,
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
   });
 }
 

@@ -156,7 +156,7 @@ function ListingErrorBoundary({ error, reset }: { error: Error; reset: () => voi
 }
 
 function ListingDetailPage() {
-  const { id } = Route.useParams();
+  const { kaupetCode } = Route.useParams();
   const search = Route.useSearch();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -166,15 +166,16 @@ function ListingDetailPage() {
   const [mounted, setMounted] = useState(false);
   const [statsInfoOpen, setStatsInfoOpen] = useState(false);
   const [promoteOpen, setPromoteOpen] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     if (search.promotion === "success") {
       toast.success("Takk! Fremhevingen aktiveres så snart Vipps bekrefter betalingen.");
-      queryClient.invalidateQueries({ queryKey: ["listing-active-promotion", id] });
+      queryClient.invalidateQueries({ queryKey: ["listing-active-promotion", kaupetCode] });
       navigate({
-        to: "/annonse/$id",
-        params: { id },
+        to: "/$kaupetCode",
+        params: { kaupetCode },
         search: {},
         replace: true,
       });

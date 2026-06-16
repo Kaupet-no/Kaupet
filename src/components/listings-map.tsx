@@ -45,19 +45,6 @@ type Props = {
   className?: string;
 };
 
-function formatPriceShort(l: MapListing) {
-  if (l.is_free) return "Gratis";
-  if (l.price_nok == null) return "Spør";
-  if (l.price_nok >= 1000) return `${Math.round(l.price_nok / 100) / 10}k kr`;
-  return `${l.price_nok} kr`;
-}
-
-function formatPriceFull(l: MapListing) {
-  if (l.is_free) return "Gis bort";
-  if (l.price_nok == null) return "Pris ved henvendelse";
-  return `${l.price_nok.toLocaleString("nb-NO")} kr`;
-}
-
 function makeLocationPin(_l: MapListing, opts: { hovered: boolean; active: boolean }) {
   const scale = opts.hovered || opts.active ? 1.25 : 1;
   const z = opts.active ? 1000 : opts.hovered ? 900 : 1;

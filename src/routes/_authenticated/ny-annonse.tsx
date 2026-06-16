@@ -240,12 +240,13 @@ function NewListingPage() {
         );
         if (imgErr) throw imgErr;
       }
-      return listing.id as string;
+      return { id: listing.id as string, kaupet_code: listing.kaupet_code as string };
     },
-    onSuccess: (id) => {
+    onSuccess: (result) => {
       void import("@/lib/haptics").then((m) => m.hapticNotification("success"));
       toast.success("Annonsen er publisert");
-      setPublishedId(id);
+      setPublishedId(result.id);
+      setPublishedCode(result.kaupet_code);
       setPublishedOpen(true);
     },
     onError: (err: Error) => {

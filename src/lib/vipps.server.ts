@@ -1,44 +1,74 @@
 /**
  * Vipps ePayment API helpers (server-only).
+ * Host-aware: requests on test.kaupet.no use Vipps test API + VIPPS_TEST_* secrets;
+ * everything else uses production API + VIPPS_* secrets.
  * https://developer.vippsmobilepay.com/docs/APIs/epayment-api/
  */
+import { isTestHost } from "./env";
+
+type VippsEnv = {
+  baseUrl: string;
+  clientId: string;
+  clientSecret: string;
+  subscriptionKey: string;
+  msn: string;
+  webhookSecret: string;
+  mode: "test" | "production";
+};
 
 type TokenCache = { token: string; expires_at: number } | null;
-let tokenCache: TokenCache = null;
+const tokenCache: { test: TokenCache; production: TokenCache } = {
+  test: null,
+  production: null,
+};
 
-function env() {
-  const environment = process.env.VIPPS_ENVIRONMENT ?? "test";
-  const baseUrl =
-    environment === "production" ? "https://api.vipps.no" : "https://apitest.vipps.no";
+function hostAwareEnv(host?: string | null): VippsEnv {
+  // Explicit override (local dev): VIPPS_ENVIRONMENT=test|production wins.
+  const override = process.env.VIPPS_ENVIRONMENT;
+  const useTest =
+    override === "test" || (override !== "production" && isTestHost(host));
+
+  if (useTest) {
+    return {
+      baseUrl: "https://apitest.vipps.no",
+      clientId: process.env.VIPPS_TEST_CLIENT_ID ?? "",
+      clientSecret: process.env.VIPPS_TEST_CLIENT_SECRET ?? "",
+      subscriptionKey: process.env.VIPPS_TEST_SUBSCRIPTION_KEY ?? "",
+      msn: process.env.VIPPS_TEST_MSN ?? "",
+      webhookSecret: process.env.VIPPS_TEST_WEBHOOK_SECRET ?? "",
+      mode: "test",
+    };
+  }
   return {
-    baseUrl,
+    baseUrl: "https://api.vipps.no",
     clientId: process.env.VIPPS_CLIENT_ID ?? "",
     clientSecret: process.env.VIPPS_CLIENT_SECRET ?? "",
     subscriptionKey: process.env.VIPPS_SUBSCRIPTION_KEY ?? "",
     msn: process.env.VIPPS_MSN ?? "",
     webhookSecret: process.env.VIPPS_WEBHOOK_SECRET ?? "",
-    environment,
+    mode: "production",
   };
 }
 
-export function assertVippsConfigured() {
-  const e = env();
+export function assertVippsConfigured(host?: string | null) {
+  const e = hostAwareEnv(host);
+  const prefix = e.mode === "test" ? "VIPPS_TEST_" : "VIPPS_";
   const missing: string[] = [];
-  if (!e.clientId) missing.push("VIPPS_CLIENT_ID");
-  if (!e.clientSecret) missing.push("VIPPS_CLIENT_SECRET");
-  if (!e.subscriptionKey) missing.push("VIPPS_SUBSCRIPTION_KEY");
-  if (!e.msn) missing.push("VIPPS_MSN");
+  if (!e.clientId) missing.push(`${prefix}CLIENT_ID`);
+  if (!e.clientSecret) missing.push(`${prefix}CLIENT_SECRET`);
+  if (!e.subscriptionKey) missing.push(`${prefix}SUBSCRIPTION_KEY`);
+  if (!e.msn) missing.push(`${prefix}MSN`);
   if (missing.length) {
     throw new Error(
-      `Vipps er ikke konfigurert. Mangler: ${missing.join(", ")}. Be administrator legge inn nøklene.`,
+      `Vipps (${e.mode}) er ikke konfigurert. Mangler: ${missing.join(", ")}. Be administrator legge inn nøklene.`,
     );
   }
 }
 
-async function getAccessToken(): Promise<string> {
-  const e = env();
+async function getAccessToken(e: VippsEnv): Promise<string> {
   const now = Date.now();
-  if (tokenCache && tokenCache.expires_at > now + 30_000) return tokenCache.token;
+  const cached = tokenCache[e.mode];
+  if (cached && cached.expires_at > now + 30_000) return cached.token;
 
   const res = await fetch(`${e.baseUrl}/accesstoken/get`, {
     method: "POST",
@@ -54,16 +84,15 @@ async function getAccessToken(): Promise<string> {
   }
   const json = (await res.json()) as { access_token: string; expires_on: string };
   const expiresAt = Number(json.expires_on) * 1000;
-  tokenCache = {
+  tokenCache[e.mode] = {
     token: json.access_token,
     expires_at: Number.isFinite(expiresAt) ? expiresAt : now + 50 * 60 * 1000,
   };
-  return tokenCache.token;
+  return json.access_token;
 }
 
-async function vippsHeaders(extra: Record<string, string> = {}) {
-  const e = env();
-  const token = await getAccessToken();
+async function vippsHeaders(e: VippsEnv, extra: Record<string, string> = {}) {
+  const token = await getAccessToken(e);
   return {
     Authorization: `Bearer ${token}`,
     "Ocp-Apim-Subscription-Key": e.subscriptionKey,
@@ -83,6 +112,7 @@ export type CreatePaymentInput = {
   description: string;
   returnUrl: string;
   idempotencyKey: string;
+  host?: string | null;
 };
 
 export type CreatePaymentResult = {
@@ -92,8 +122,8 @@ export type CreatePaymentResult = {
 };
 
 export async function createVippsPayment(input: CreatePaymentInput): Promise<CreatePaymentResult> {
-  assertVippsConfigured();
-  const e = env();
+  assertVippsConfigured(input.host);
+  const e = hostAwareEnv(input.host);
   const body = {
     amount: { currency: "NOK", value: Math.round(input.amountNok * 100) },
     paymentMethod: { type: "WALLET" },
@@ -105,7 +135,7 @@ export async function createVippsPayment(input: CreatePaymentInput): Promise<Cre
   };
   const res = await fetch(`${e.baseUrl}/epayment/v1/payments`, {
     method: "POST",
-    headers: await vippsHeaders({ "Idempotency-Key": input.idempotencyKey }),
+    headers: await vippsHeaders(e, { "Idempotency-Key": input.idempotencyKey }),
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -136,15 +166,18 @@ export type VippsPaymentStatus =
   | "REFUNDED"
   | "PARTIALLY_REFUNDED";
 
-export async function getVippsPayment(reference: string): Promise<{
+export async function getVippsPayment(
+  reference: string,
+  host?: string | null,
+): Promise<{
   state: VippsPaymentStatus;
   pspReference?: string;
   amount?: { value: number; currency: string };
 }> {
-  assertVippsConfigured();
-  const e = env();
+  assertVippsConfigured(host);
+  const e = hostAwareEnv(host);
   const res = await fetch(`${e.baseUrl}/epayment/v1/payments/${reference}`, {
-    headers: await vippsHeaders(),
+    headers: await vippsHeaders(e),
   });
   if (!res.ok) {
     const text = await res.text();
@@ -161,12 +194,13 @@ export async function captureVippsPayment(
   reference: string,
   amountNok: number,
   idempotencyKey: string,
+  host?: string | null,
 ) {
-  assertVippsConfigured();
-  const e = env();
+  assertVippsConfigured(host);
+  const e = hostAwareEnv(host);
   const res = await fetch(`${e.baseUrl}/epayment/v1/payments/${reference}/capture`, {
     method: "POST",
-    headers: await vippsHeaders({ "Idempotency-Key": idempotencyKey }),
+    headers: await vippsHeaders(e, { "Idempotency-Key": idempotencyKey }),
     body: JSON.stringify({
       modificationAmount: { currency: "NOK", value: Math.round(amountNok * 100) },
     }),
@@ -181,12 +215,13 @@ export async function refundVippsPayment(
   reference: string,
   amountNok: number,
   idempotencyKey: string,
+  host?: string | null,
 ) {
-  assertVippsConfigured();
-  const e = env();
+  assertVippsConfigured(host);
+  const e = hostAwareEnv(host);
   const res = await fetch(`${e.baseUrl}/epayment/v1/payments/${reference}/refund`, {
     method: "POST",
-    headers: await vippsHeaders({ "Idempotency-Key": idempotencyKey }),
+    headers: await vippsHeaders(e, { "Idempotency-Key": idempotencyKey }),
     body: JSON.stringify({
       modificationAmount: { currency: "NOK", value: Math.round(amountNok * 100) },
     }),
@@ -197,6 +232,6 @@ export async function refundVippsPayment(
   }
 }
 
-export function getVippsWebhookSecret(): string {
-  return env().webhookSecret;
+export function getVippsWebhookSecret(host?: string | null): string {
+  return hostAwareEnv(host).webhookSecret;
 }

@@ -326,9 +326,10 @@ function RootBody({ native }: { native: boolean }) {
             </div>
           </footer>
         )}
-        {native && <AppBottomNav />}
-      </div>
-      <Toaster />
-    </QueryClientProvider>
+      {native && <AppBottomNav />}
+    </div>
   );
+
+  return isTest ? <TestEnvGate>{content}</TestEnvGate> : content;
 }
+

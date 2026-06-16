@@ -126,8 +126,28 @@ export const registerVippsWebhook = createServerFn({ method: "POST" })
       }),
     });
     if (!res.ok) throw new Error(`Register webhook feilet: ${res.status} ${await res.text()}`);
-    // Response inneholder { id, secret } — secret må lagres som env var.
-    return (await res.json()) as { id: string; secret: string };
+    const result = (await res.json()) as { id: string; secret: string };
+
+    // Lagre secret i DB slik at webhook-handleren kan verifisere signaturen
+    // automatisk uten manuell env-variabel.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error: upsertError } = await supabaseAdmin
+      .from("vipps_webhook_secrets")
+      .upsert(
+        {
+          mode: data.mode,
+          webhook_id: result.id,
+          url: data.url,
+          secret: result.secret,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "mode" },
+      );
+    if (upsertError) {
+      throw new Error(`Webhook registrert hos Vipps, men lagring i DB feilet: ${upsertError.message}`);
+    }
+
+    return { id: result.id, stored: true as const };
   });
 
 export const deleteVippsWebhook = createServerFn({ method: "POST" })
@@ -146,5 +166,11 @@ export const deleteVippsWebhook = createServerFn({ method: "POST" })
     if (!res.ok && res.status !== 204) {
       throw new Error(`Delete webhook feilet: ${res.status} ${await res.text()}`);
     }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin
+      .from("vipps_webhook_secrets")
+      .delete()
+      .eq("mode", data.mode)
+      .eq("webhook_id", data.id);
     return { ok: true };
   });

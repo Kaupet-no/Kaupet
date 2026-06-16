@@ -52,13 +52,13 @@ export function NotificationsBell() {
       const searchIds = Array.from(new Set(notifs.map((n) => n.saved_search_id)));
       const [listingsRes, searchesRes] = await Promise.all([
         listingIds.length
-          ? supabase.from("listings").select("id, title").in("id", listingIds)
-          : Promise.resolve({ data: [] as { id: string; title: string }[] }),
+          ? supabase.from("listings").select("id, title, kaupet_code").in("id", listingIds)
+          : Promise.resolve({ data: [] as { id: string; title: string; kaupet_code: string }[] }),
         searchIds.length
           ? supabase.from("saved_searches").select("id, name").in("id", searchIds)
           : Promise.resolve({ data: [] as { id: string; name: string }[] }),
       ]);
-      const listingMap = new Map((listingsRes.data ?? []).map((l) => [l.id, l.title]));
+      const listingMap = new Map((listingsRes.data ?? []).map((l) => [l.id, l]));
       const searchMap = new Map((searchesRes.data ?? []).map((s) => [s.id, s.name]));
 
       const searchItems: SearchItem[] = notifs.map((n) => ({

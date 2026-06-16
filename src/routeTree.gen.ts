@@ -18,6 +18,7 @@ import { Route as KaupetCodeRouteImport } from './routes/$kaupetCode'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BrukerIdRouteImport } from './routes/bruker.$id'
+import { Route as AnnonseListingIdRouteImport } from './routes/annonse.$listingId'
 import { Route as AuthenticatedProfilRouteImport } from './routes/_authenticated/profil'
 import { Route as AuthenticatedNyAnnonseRouteImport } from './routes/_authenticated/ny-annonse'
 import { Route as AuthenticatedMineSokRouteImport } from './routes/_authenticated/mine-sok'
@@ -80,6 +81,11 @@ const IndexRoute = IndexRouteImport.update({
 const BrukerIdRoute = BrukerIdRouteImport.update({
   id: '/bruker/$id',
   path: '/bruker/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AnnonseListingIdRoute = AnnonseListingIdRouteImport.update({
+  id: '/annonse/$listingId',
+  path: '/annonse/$listingId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedProfilRoute = AuthenticatedProfilRouteImport.update({
@@ -202,6 +208,7 @@ export interface FileRoutesByFullPath {
   '/mine-sok': typeof AuthenticatedMineSokRoute
   '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
+  '/annonse/$listingId': typeof AnnonseListingIdRoute
   '/bruker/$id': typeof BrukerIdRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
@@ -230,6 +237,7 @@ export interface FileRoutesByTo {
   '/mine-sok': typeof AuthenticatedMineSokRoute
   '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
+  '/annonse/$listingId': typeof AnnonseListingIdRoute
   '/bruker/$id': typeof BrukerIdRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
@@ -261,6 +269,7 @@ export interface FileRoutesById {
   '/_authenticated/mine-sok': typeof AuthenticatedMineSokRoute
   '/_authenticated/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/_authenticated/profil': typeof AuthenticatedProfilRoute
+  '/annonse/$listingId': typeof AnnonseListingIdRoute
   '/bruker/$id': typeof BrukerIdRoute
   '/_authenticated/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/_authenticated/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
@@ -292,6 +301,7 @@ export interface FileRouteTypes {
     | '/mine-sok'
     | '/ny-annonse'
     | '/profil'
+    | '/annonse/$listingId'
     | '/bruker/$id'
     | '/admin/brukere'
     | '/admin/kategorier'
@@ -320,6 +330,7 @@ export interface FileRouteTypes {
     | '/mine-sok'
     | '/ny-annonse'
     | '/profil'
+    | '/annonse/$listingId'
     | '/bruker/$id'
     | '/admin/brukere'
     | '/admin/kategorier'
@@ -350,6 +361,7 @@ export interface FileRouteTypes {
     | '/_authenticated/mine-sok'
     | '/_authenticated/ny-annonse'
     | '/_authenticated/profil'
+    | '/annonse/$listingId'
     | '/bruker/$id'
     | '/_authenticated/admin/brukere'
     | '/_authenticated/admin/kategorier'
@@ -376,6 +388,7 @@ export interface RootRouteChildren {
   PersonvernRoute: typeof PersonvernRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   VilkarRoute: typeof VilkarRoute
+  AnnonseListingIdRoute: typeof AnnonseListingIdRoute
   BrukerIdRoute: typeof BrukerIdRoute
   ApiPublicPushDispatchRoute: typeof ApiPublicPushDispatchRoute
   ApiPublicVippsWebhookRoute: typeof ApiPublicVippsWebhookRoute
@@ -444,6 +457,13 @@ declare module '@tanstack/react-router' {
       path: '/bruker/$id'
       fullPath: '/bruker/$id'
       preLoaderRoute: typeof BrukerIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/annonse/$listingId': {
+      id: '/annonse/$listingId'
+      path: '/annonse/$listingId'
+      fullPath: '/annonse/$listingId'
+      preLoaderRoute: typeof AnnonseListingIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/profil': {
@@ -647,6 +667,7 @@ const rootRouteChildren: RootRouteChildren = {
   PersonvernRoute: PersonvernRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   VilkarRoute: VilkarRoute,
+  AnnonseListingIdRoute: AnnonseListingIdRoute,
   BrukerIdRoute: BrukerIdRoute,
   ApiPublicPushDispatchRoute: ApiPublicPushDispatchRoute,
   ApiPublicVippsWebhookRoute: ApiPublicVippsWebhookRoute,

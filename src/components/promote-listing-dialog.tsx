@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useIsDemo } from "@/lib/use-is-demo";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2, MapPin, Sparkles } from "lucide-react";
 import { toast } from "sonner";
@@ -17,8 +16,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { activateDemoPromotion, createPromotionCheckout, getPromotionPricing } from "@/lib/promotions.functions";
+import { createPromotionCheckout, getPromotionPricing } from "@/lib/promotions.functions";
 import { formatErrorMessage } from "@/lib/errors";
+
 
 type Props = {
   listingId: string;

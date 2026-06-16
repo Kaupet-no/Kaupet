@@ -5,6 +5,7 @@
  * https://developer.vippsmobilepay.com/docs/APIs/epayment-api/
  */
 import { isTestHost } from "./env";
+import { getRequestIsTest } from "./env.server";
 
 type VippsEnv = {
   baseUrl: string;
@@ -26,7 +27,8 @@ function hostAwareEnv(host?: string | null): VippsEnv {
   // Explicit override (local dev): VIPPS_ENVIRONMENT=test|production wins.
   const override = process.env.VIPPS_ENVIRONMENT;
   const useTest =
-    override === "test" || (override !== "production" && isTestHost(host));
+    override === "test" ||
+    (override !== "production" && (isTestHost(host) || getRequestIsTest()));
 
   if (useTest) {
     return {

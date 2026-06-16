@@ -56,8 +56,8 @@ function makeLocationPin(_l: MapListing, opts: { hovered: boolean; active: boole
       width:20px;
       height:20px;
       border-radius:9999px;
-      background:hsl(var(--primary));
-      border:2px solid hsl(var(--primary));
+      background:var(--primary);
+      border:2px solid var(--primary);
       box-shadow:0 2px 10px hsl(0 0% 0% / 0.32),0 0 0 1.5px white;
       display:flex;
       align-items:center;

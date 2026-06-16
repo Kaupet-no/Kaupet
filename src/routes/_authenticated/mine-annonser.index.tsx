@@ -51,6 +51,7 @@ export const Route = createFileRoute("/_authenticated/mine-annonser/")({
 
 type Row = {
   id: string;
+  kaupet_code: string;
   title: string;
   status: "draft" | "active" | "sold" | "archived" | "expired";
   price_nok: number | null;

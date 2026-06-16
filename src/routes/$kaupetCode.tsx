@@ -83,7 +83,7 @@ export const Route = createFileRoute("/$kaupetCode")({
       : `${l.title}${place}. ${priceLabel} på Kaupet.no.`;
     const description =
       descCore.length < 60 ? `${descCore} ${priceLabel}${place}. Selges på Kaupet.no.` : descCore;
-    const url = `https://kaupet.no/annonse/${params.id}`;
+    const url = `https://kaupet.no/${params.kaupetCode}`;
     const isActive = (l.status as string | undefined) === "active";
     return {
       meta: [

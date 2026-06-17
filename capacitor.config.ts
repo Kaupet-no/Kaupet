@@ -37,7 +37,12 @@ const config: CapacitorConfig = {
       splashImmersive: true,
     },
     Keyboard: {
-      resize: "body",
+      // "body" only resizes the <body> element for scrolling purposes —
+      // the viewport itself (and vh/dvh units) never actually change, so
+      // `position: fixed` sheets anchored to the bottom stay pinned behind
+      // where the keyboard now covers. "native" resizes the WebView frame
+      // itself, so fixed/dvh-based UI reflows above the keyboard correctly.
+      resize: "native",
       resizeOnFullScreen: true,
     },
     StatusBar: {

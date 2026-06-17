@@ -272,6 +272,7 @@ export type Database = {
           is_gift: boolean
           listing_id: string
           price_nok: number
+          refunded_at: string | null
           starts_at: string | null
           status: Database["public"]["Enums"]["promotion_status"]
           updated_at: string
@@ -289,6 +290,7 @@ export type Database = {
           is_gift?: boolean
           listing_id: string
           price_nok: number
+          refunded_at?: string | null
           starts_at?: string | null
           status?: Database["public"]["Enums"]["promotion_status"]
           updated_at?: string
@@ -306,6 +308,7 @@ export type Database = {
           is_gift?: boolean
           listing_id?: string
           price_nok?: number
+          refunded_at?: string | null
           starts_at?: string | null
           status?: Database["public"]["Enums"]["promotion_status"]
           updated_at?: string
@@ -381,6 +384,7 @@ export type Database = {
           expires_at: string | null
           id: string
           is_free: boolean
+          kaupet_code: string
           lat: number | null
           lng: number | null
           postal_code: string | null
@@ -402,6 +406,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           is_free?: boolean
+          kaupet_code?: string
           lat?: number | null
           lng?: number | null
           postal_code?: string | null
@@ -423,6 +428,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           is_free?: boolean
+          kaupet_code?: string
           lat?: number | null
           lng?: number | null
           postal_code?: string | null
@@ -872,6 +878,36 @@ export type Database = {
         }
         Relationships: []
       }
+      vipps_webhook_secrets: {
+        Row: {
+          created_at: string
+          id: string
+          mode: string
+          secret: string
+          updated_at: string
+          url: string
+          webhook_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mode: string
+          secret: string
+          updated_at?: string
+          url: string
+          webhook_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mode?: string
+          secret?: string
+          updated_at?: string
+          url?: string
+          webhook_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -898,9 +934,11 @@ export type Database = {
           display_name: string
           email: string
           is_admin: boolean
+          is_demo: boolean
           user_id: string
         }[]
       }
+      admin_grant_demo_role: { Args: { _user_id: string }; Returns: undefined }
       admin_grant_role: { Args: { _user_id: string }; Returns: undefined }
       admin_list_bans: {
         Args: never
@@ -980,12 +1018,14 @@ export type Database = {
           view_count: number
         }[]
       }
+      admin_revoke_demo_role: { Args: { _user_id: string }; Returns: undefined }
       admin_revoke_role: { Args: { _user_id: string }; Returns: undefined }
       admin_search_listings: {
         Args: { _limit?: number; _query?: string; _status?: string }
         Returns: {
           created_at: string
           id: string
+          kaupet_code: string
           seller_id: string
           seller_name: string
           status: Database["public"]["Enums"]["listing_status"]
@@ -1007,8 +1047,13 @@ export type Database = {
         }[]
       }
       cancel_account_deletion: { Args: never; Returns: boolean }
+      demo_activate_promotion: {
+        Args: { _duration_days: number; _listing_id: string }
+        Returns: string
+      }
       expire_listing_promotions: { Args: never; Returns: number }
       expire_old_listings: { Args: never; Returns: number }
+      generate_kaupet_code: { Args: never; Returns: string }
       get_featured_listing_ids: {
         Args: { _category_slug?: string; _limit?: number }
         Returns: {
@@ -1078,7 +1123,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "user"
+      app_role: "admin" | "user" | "demo"
       block_scope: "all" | "conversation"
       listing_condition:
         | "new"
@@ -1227,7 +1272,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user"],
+      app_role: ["admin", "user", "demo"],
       block_scope: ["all", "conversation"],
       listing_condition: ["new", "like_new", "good", "acceptable", "for_parts"],
       listing_status: [

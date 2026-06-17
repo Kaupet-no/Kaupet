@@ -25,11 +25,13 @@ import {
 type SearchItem = SavedSearchNotification & {
   kind: "search";
   listing_title: string | null;
+  listing_code: string | null;
   search_name: string | null;
 };
 type PriceDropItem = PriceDropNotification & {
   kind: "price_drop";
   listing_title: string | null;
+  listing_code: string | null;
 };
 type Item = SearchItem | PriceDropItem;
 
@@ -52,25 +54,27 @@ export function NotificationsBell() {
       const searchIds = Array.from(new Set(notifs.map((n) => n.saved_search_id)));
       const [listingsRes, searchesRes] = await Promise.all([
         listingIds.length
-          ? supabase.from("listings").select("id, title").in("id", listingIds)
-          : Promise.resolve({ data: [] as { id: string; title: string }[] }),
+          ? supabase.from("listings").select("id, title, kaupet_code").in("id", listingIds)
+          : Promise.resolve({ data: [] as { id: string; title: string; kaupet_code: string }[] }),
         searchIds.length
           ? supabase.from("saved_searches").select("id, name").in("id", searchIds)
           : Promise.resolve({ data: [] as { id: string; name: string }[] }),
       ]);
-      const listingMap = new Map((listingsRes.data ?? []).map((l) => [l.id, l.title]));
+      const listingMap = new Map((listingsRes.data ?? []).map((l) => [l.id, l]));
       const searchMap = new Map((searchesRes.data ?? []).map((s) => [s.id, s.name]));
 
       const searchItems: SearchItem[] = notifs.map((n) => ({
         ...n,
         kind: "search",
-        listing_title: listingMap.get(n.listing_id) ?? null,
+        listing_title: listingMap.get(n.listing_id)?.title ?? null,
+        listing_code: listingMap.get(n.listing_id)?.kaupet_code ?? null,
         search_name: searchMap.get(n.saved_search_id) ?? null,
       }));
       const dropItems: PriceDropItem[] = drops.map((d) => ({
         ...d,
         kind: "price_drop",
-        listing_title: listingMap.get(d.listing_id) ?? null,
+        listing_title: listingMap.get(d.listing_id)?.title ?? null,
+        listing_code: listingMap.get(d.listing_id)?.kaupet_code ?? null,
       }));
 
       return [...searchItems, ...dropItems].sort(
@@ -202,10 +206,11 @@ export function NotificationsBell() {
                   className={`group relative ${!n.read_at ? "bg-primary/5" : ""}`}
                 >
                   <Link
-                    to="/annonse/$id"
-                    params={{ id: n.listing_id }}
+                    to="/$kaupetCode"
+                    params={{ kaupetCode: n.listing_code ?? "" }}
+                    disabled={!n.listing_code}
                     onClick={() => handleClick(n)}
-                    className="block px-3 py-2.5 pr-9 hover:bg-muted"
+                    className="block px-3 py-2.5 pr-9 hover:bg-muted aria-disabled:pointer-events-none aria-disabled:opacity-60"
                   >
                     <div className="flex items-start gap-2">
                       {!n.read_at && (

@@ -13,10 +13,11 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
     handlers: {
       POST: async ({ request }) => {
         const raw = await request.text();
+        const host = request.headers.get("host");
 
         // Verify HMAC signature if a secret is configured.
         const { getVippsWebhookSecret, getVippsPayment } = await import("@/lib/vipps.server");
-        const secret = getVippsWebhookSecret();
+        const secret = await getVippsWebhookSecret(host);
         if (secret) {
           const sigHeader =
             request.headers.get("x-ms-signature") ?? request.headers.get("authorization") ?? "";
@@ -27,6 +28,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
             return new Response("Invalid signature", { status: 401 });
           }
         }
+
 
         let payload: Record<string, unknown>;
         try {
@@ -93,7 +95,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
 
         // Re-fetch authoritative state from Vipps
         try {
-          const payment = await getVippsPayment(reference);
+          const payment = await getVippsPayment(reference, host);
           if (payment.state === "AUTHORIZED" || payment.state === "CAPTURED") {
             if (promo.status === "pending") {
               const now = new Date();
@@ -112,13 +114,19 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
               if (payment.state === "AUTHORIZED") {
                 try {
                   const { captureVippsPayment } = await import("@/lib/vipps.server");
-                  await captureVippsPayment(reference, promo.price_nok, `capture-${promo.id}`);
+                  await captureVippsPayment(
+                    reference,
+                    promo.price_nok,
+                    `capture-${promo.id}`,
+                    host,
+                  );
                 } catch (e) {
                   console.error("[vipps webhook] capture failed", e);
                 }
               }
             }
           } else if (
+
             payment.state === "CANCELLED" ||
             payment.state === "EXPIRED" ||
             payment.state === "TERMINATED" ||

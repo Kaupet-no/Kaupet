@@ -1,7 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequestHost } from "@tanstack/react-start/server";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { isTestHost } from "@/lib/env";
+
+
+
+
+
 
 export const getPromotionPricing = createServerFn({ method: "GET" }).handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -76,13 +83,31 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
       .single();
     if (ierr) throw ierr;
 
-    const { createVippsPayment } = await import("@/lib/vipps.server");
-    const origin =
-      process.env.PUBLIC_SITE_URL ??
-      (process.env.VIPPS_ENVIRONMENT === "production"
-        ? "https://kaupet.no"
-        : "https://kaupet-no.lovable.app");
-    const returnUrl = `${origin}/annonse/${data.listing_id}?promotion=success&promo_id=${promo.id}`;
+    const { createVippsPayment, getVippsMode } = await import("@/lib/vipps.server");
+    const host = (() => {
+      try {
+        return getRequestHost();
+      } catch {
+        return null;
+      }
+    })();
+    const vippsMode = getVippsMode(host);
+    const origin = host
+      ? `https://${host}`
+      : (process.env.PUBLIC_SITE_URL ??
+        (isTestHost(host) ? "https://test.kaupet.no" : "https://kaupet.no"));
+    const returnUrl = `${origin}/bekrefter/${promo.id}`;
+
+    console.log("[promotions] createPromotionCheckout", {
+      promotion_id: promo.id,
+      listing_id: data.listing_id,
+      user_id: userId,
+      duration_days: data.duration_days,
+      price_nok: pricing.price_nok,
+      vipps_mode: vippsMode,
+      host,
+      reference,
+    });
 
     try {
       const result = await createVippsPayment({
@@ -94,6 +119,7 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
         ),
         returnUrl,
         idempotencyKey: promo.id,
+        host,
       });
       if (result.pspReference) {
         await supabaseAdmin
@@ -101,8 +127,19 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
           .update({ vipps_psp_reference: result.pspReference })
           .eq("id", promo.id);
       }
+      console.log("[promotions] createPromotionCheckout ok", {
+        promotion_id: promo.id,
+        vipps_mode: vippsMode,
+        psp_reference: result.pspReference ?? null,
+      });
       return { promotion_id: promo.id, redirect_url: result.redirectUrl };
     } catch (err) {
+      console.error("[promotions] createPromotionCheckout failed", {
+        promotion_id: promo.id,
+        vipps_mode: vippsMode,
+        host,
+        error: err instanceof Error ? err.message : String(err),
+      });
       await supabaseAdmin
         .from("listing_promotions")
         .update({ status: "failed" })
@@ -110,6 +147,7 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
       throw err;
     }
   });
+
 
 export const getPromotionStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -125,6 +163,130 @@ export const getPromotionStatus = createServerFn({ method: "GET" })
     if (!promo) throw new Error("Fant ikke fremheving");
     if (promo.user_id !== userId) throw new Error("Ikke tilgang");
     return promo;
+  });
+
+export const getPromotionReceipt = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ promotion_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: promo, error } = await supabase
+      .from("listing_promotions")
+      .select(
+        "id, status, duration_days, price_nok, starts_at, expires_at, created_at, vipps_reference, user_id, listing_id, listings:listings!inner(id, title, kaupet_code)",
+      )
+      .eq("id", data.promotion_id)
+      .maybeSingle();
+    if (error) throw error;
+    if (!promo) throw new Error("Fant ikke kvittering");
+    if (promo.user_id !== userId) throw new Error("Ikke tilgang");
+    const listing = Array.isArray(promo.listings) ? promo.listings[0] : promo.listings;
+    return {
+      id: promo.id,
+      status: promo.status,
+      duration_days: promo.duration_days,
+      price_nok: promo.price_nok,
+      starts_at: promo.starts_at,
+      expires_at: promo.expires_at,
+      created_at: promo.created_at,
+      vipps_reference: promo.vipps_reference,
+      listing: {
+        id: listing?.id ?? promo.listing_id,
+        title: listing?.title ?? "",
+        kaupet_code: listing?.kaupet_code ?? "",
+      },
+    };
+  });
+
+export const reconcilePromotionPayment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ promotion_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: promo, error } = await supabaseAdmin
+      .from("listing_promotions")
+      .select("id, user_id, status, duration_days, price_nok, vipps_reference, expires_at")
+      .eq("id", data.promotion_id)
+      .maybeSingle();
+    if (error) throw error;
+    if (!promo) throw new Error("Fant ikke fremheving");
+    if (promo.user_id !== userId) throw new Error("Ikke tilgang");
+
+    if (promo.status !== "pending") {
+      return { status: promo.status, expires_at: promo.expires_at };
+    }
+    if (!promo.vipps_reference) {
+      return { status: promo.status, expires_at: promo.expires_at };
+    }
+
+    const host = (() => {
+      try {
+        return getRequestHost();
+      } catch {
+        return null;
+      }
+    })();
+
+    const { getVippsPayment, captureVippsPayment } = await import("@/lib/vipps.server");
+    const payment = await getVippsPayment(promo.vipps_reference, host);
+
+    if (payment.state === "AUTHORIZED" || payment.state === "CAPTURED") {
+      const now = new Date();
+      const expires = new Date(now.getTime() + promo.duration_days * 24 * 60 * 60 * 1000);
+      const { error: uerr } = await supabaseAdmin
+        .from("listing_promotions")
+        .update({
+          status: "active",
+          starts_at: now.toISOString(),
+          expires_at: expires.toISOString(),
+          vipps_psp_reference: payment.pspReference ?? null,
+        })
+        .eq("id", promo.id)
+        .eq("status", "pending");
+      if (uerr) throw uerr;
+
+      if (payment.state === "AUTHORIZED") {
+        try {
+          await captureVippsPayment(
+            promo.vipps_reference,
+            promo.price_nok,
+            `capture-${promo.id}`,
+            host,
+          );
+        } catch (e) {
+          console.error("[reconcilePromotionPayment] capture failed", e);
+        }
+      }
+      return { status: "active" as const, expires_at: expires.toISOString() };
+    }
+
+    if (
+      payment.state === "CANCELLED" ||
+      payment.state === "EXPIRED" ||
+      payment.state === "TERMINATED" ||
+      payment.state === "ABORTED" ||
+      payment.state === "FAILED"
+    ) {
+      await supabaseAdmin
+        .from("listing_promotions")
+        .update({ status: "failed" })
+        .eq("id", promo.id)
+        .eq("status", "pending");
+      return { status: "failed" as const, expires_at: null };
+    }
+
+    if (payment.state === "REFUNDED") {
+      await supabaseAdmin
+        .from("listing_promotions")
+        .update({ status: "refunded" })
+        .eq("id", promo.id);
+      return { status: "refunded" as const, expires_at: promo.expires_at };
+    }
+
+    // CREATED — Vipps har ikke autorisert ennå.
+    return { status: "pending" as const, expires_at: promo.expires_at };
   });
 
 export const getMyActivePromotions = createServerFn({ method: "GET" })
@@ -162,7 +324,7 @@ export const getFeaturedListings = createServerFn({ method: "GET" })
     const { data: listings, error } = await supabaseAdmin
       .from("listings")
       .select(
-        "id, title, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order)",
+        "id, kaupet_code, title, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order)",
       )
       .in("id", ids)
       .eq("status", "active");
@@ -171,6 +333,7 @@ export const getFeaturedListings = createServerFn({ method: "GET" })
       const imgs = (l.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
       return {
         id: l.id,
+        kaupet_code: l.kaupet_code,
         title: l.title,
         price_nok: l.price_nok,
         is_free: l.is_free,

@@ -1,0 +1,1 @@
+ALTER TABLE public.listing_promotions ADD COLUMN IF NOT EXISTS refunded_at timestamptz;

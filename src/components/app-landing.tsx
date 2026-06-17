@@ -22,6 +22,7 @@ import {
 
 import { supabase } from "@/integrations/supabase/client";
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
+import { KaupetCodeDialog } from "@/components/kaupet-code-dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/location-filter";
 import { AnimatedSearchPlaceholder } from "@/components/animated-search-placeholder";
@@ -104,7 +105,7 @@ export function AppLanding() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, title, price_nok, is_free, city, created_at, view_count, listing_images(storage_path, sort_order)",
+          "id, kaupet_code, title, price_nok, is_free, city, created_at, view_count, listing_images(storage_path, sort_order)",
         )
         .eq("status", "active")
         .order("view_count", { ascending: false })
@@ -115,6 +116,7 @@ export function AppLanding() {
         const imgs = (l.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
         return {
           id: l.id,
+          kaupet_code: l.kaupet_code,
           title: l.title,
           price_nok: l.price_nok,
           is_free: l.is_free,
@@ -248,6 +250,10 @@ export function AppLanding() {
                 </div>
               </SheetContent>
             </Sheet>
+          </div>
+
+          <div className="mt-3 flex justify-center">
+            <KaupetCodeDialog />
           </div>
         </form>
       </section>

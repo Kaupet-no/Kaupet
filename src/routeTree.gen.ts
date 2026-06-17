@@ -14,10 +14,11 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as PersonvernRouteImport } from './routes/personvern'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AnnonserRouteImport } from './routes/annonser'
+import { Route as KaupetCodeRouteImport } from './routes/$kaupetCode'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BrukerIdRouteImport } from './routes/bruker.$id'
-import { Route as AnnonseIdRouteImport } from './routes/annonse.$id'
+import { Route as AnnonseListingIdRouteImport } from './routes/annonse.$listingId'
 import { Route as AuthenticatedProfilRouteImport } from './routes/_authenticated/profil'
 import { Route as AuthenticatedNyAnnonseRouteImport } from './routes/_authenticated/ny-annonse'
 import { Route as AuthenticatedMineSokRouteImport } from './routes/_authenticated/mine-sok'
@@ -27,6 +28,9 @@ import { Route as AuthenticatedMineAnnonserIndexRouteImport } from './routes/_au
 import { Route as AuthenticatedMeldingerIndexRouteImport } from './routes/_authenticated/meldinger.index'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedMeldingerIdRouteImport } from './routes/_authenticated/meldinger.$id'
+import { Route as AuthenticatedKvitteringPromoIdRouteImport } from './routes/_authenticated/kvittering.$promoId'
+import { Route as AuthenticatedBekrefterPromoIdRouteImport } from './routes/_authenticated/bekrefter.$promoId'
+import { Route as AuthenticatedAdminVippsWebhooksRouteImport } from './routes/_authenticated/admin/vipps-webhooks'
 import { Route as AuthenticatedAdminPromoteringerRouteImport } from './routes/_authenticated/admin/promoteringer'
 import { Route as AuthenticatedAdminModerasjonRouteImport } from './routes/_authenticated/admin/moderasjon'
 import { Route as AuthenticatedAdminKategorierRouteImport } from './routes/_authenticated/admin/kategorier'
@@ -60,6 +64,11 @@ const AnnonserRoute = AnnonserRouteImport.update({
   path: '/annonser',
   getParentRoute: () => rootRouteImport,
 } as any)
+const KaupetCodeRoute = KaupetCodeRouteImport.update({
+  id: '/$kaupetCode',
+  path: '/$kaupetCode',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
@@ -74,9 +83,9 @@ const BrukerIdRoute = BrukerIdRouteImport.update({
   path: '/bruker/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AnnonseIdRoute = AnnonseIdRouteImport.update({
-  id: '/annonse/$id',
-  path: '/annonse/$id',
+const AnnonseListingIdRoute = AnnonseListingIdRouteImport.update({
+  id: '/annonse/$listingId',
+  path: '/annonse/$listingId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedProfilRoute = AuthenticatedProfilRouteImport.update({
@@ -127,6 +136,24 @@ const AuthenticatedMeldingerIdRoute =
     path: '/meldinger/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedKvitteringPromoIdRoute =
+  AuthenticatedKvitteringPromoIdRouteImport.update({
+    id: '/kvittering/$promoId',
+    path: '/kvittering/$promoId',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedBekrefterPromoIdRoute =
+  AuthenticatedBekrefterPromoIdRouteImport.update({
+    id: '/bekrefter/$promoId',
+    path: '/bekrefter/$promoId',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAdminVippsWebhooksRoute =
+  AuthenticatedAdminVippsWebhooksRouteImport.update({
+    id: '/vipps-webhooks',
+    path: '/vipps-webhooks',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
 const AuthenticatedAdminPromoteringerRoute =
   AuthenticatedAdminPromoteringerRouteImport.update({
     id: '/promoteringer',
@@ -170,6 +197,7 @@ const AuthenticatedMineAnnonserIdRedigerRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/$kaupetCode': typeof KaupetCodeRoute
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
   '/personvern': typeof PersonvernRoute
@@ -180,12 +208,15 @@ export interface FileRoutesByFullPath {
   '/mine-sok': typeof AuthenticatedMineSokRoute
   '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
-  '/annonse/$id': typeof AnnonseIdRoute
+  '/annonse/$listingId': typeof AnnonseListingIdRoute
   '/bruker/$id': typeof BrukerIdRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
   '/admin/promoteringer': typeof AuthenticatedAdminPromoteringerRoute
+  '/admin/vipps-webhooks': typeof AuthenticatedAdminVippsWebhooksRoute
+  '/bekrefter/$promoId': typeof AuthenticatedBekrefterPromoIdRoute
+  '/kvittering/$promoId': typeof AuthenticatedKvitteringPromoIdRoute
   '/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/meldinger/': typeof AuthenticatedMeldingerIndexRoute
@@ -196,6 +227,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/$kaupetCode': typeof KaupetCodeRoute
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
   '/personvern': typeof PersonvernRoute
@@ -205,12 +237,15 @@ export interface FileRoutesByTo {
   '/mine-sok': typeof AuthenticatedMineSokRoute
   '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
-  '/annonse/$id': typeof AnnonseIdRoute
+  '/annonse/$listingId': typeof AnnonseListingIdRoute
   '/bruker/$id': typeof BrukerIdRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
   '/admin/promoteringer': typeof AuthenticatedAdminPromoteringerRoute
+  '/admin/vipps-webhooks': typeof AuthenticatedAdminVippsWebhooksRoute
+  '/bekrefter/$promoId': typeof AuthenticatedBekrefterPromoIdRoute
+  '/kvittering/$promoId': typeof AuthenticatedKvitteringPromoIdRoute
   '/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/meldinger': typeof AuthenticatedMeldingerIndexRoute
@@ -223,6 +258,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/$kaupetCode': typeof KaupetCodeRoute
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
   '/personvern': typeof PersonvernRoute
@@ -233,12 +269,15 @@ export interface FileRoutesById {
   '/_authenticated/mine-sok': typeof AuthenticatedMineSokRoute
   '/_authenticated/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/_authenticated/profil': typeof AuthenticatedProfilRoute
-  '/annonse/$id': typeof AnnonseIdRoute
+  '/annonse/$listingId': typeof AnnonseListingIdRoute
   '/bruker/$id': typeof BrukerIdRoute
   '/_authenticated/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/_authenticated/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/_authenticated/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
   '/_authenticated/admin/promoteringer': typeof AuthenticatedAdminPromoteringerRoute
+  '/_authenticated/admin/vipps-webhooks': typeof AuthenticatedAdminVippsWebhooksRoute
+  '/_authenticated/bekrefter/$promoId': typeof AuthenticatedBekrefterPromoIdRoute
+  '/_authenticated/kvittering/$promoId': typeof AuthenticatedKvitteringPromoIdRoute
   '/_authenticated/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/meldinger/': typeof AuthenticatedMeldingerIndexRoute
@@ -251,6 +290,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/$kaupetCode'
     | '/annonser'
     | '/auth'
     | '/personvern'
@@ -261,12 +301,15 @@ export interface FileRouteTypes {
     | '/mine-sok'
     | '/ny-annonse'
     | '/profil'
-    | '/annonse/$id'
+    | '/annonse/$listingId'
     | '/bruker/$id'
     | '/admin/brukere'
     | '/admin/kategorier'
     | '/admin/moderasjon'
     | '/admin/promoteringer'
+    | '/admin/vipps-webhooks'
+    | '/bekrefter/$promoId'
+    | '/kvittering/$promoId'
     | '/meldinger/$id'
     | '/admin/'
     | '/meldinger/'
@@ -277,6 +320,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/$kaupetCode'
     | '/annonser'
     | '/auth'
     | '/personvern'
@@ -286,12 +330,15 @@ export interface FileRouteTypes {
     | '/mine-sok'
     | '/ny-annonse'
     | '/profil'
-    | '/annonse/$id'
+    | '/annonse/$listingId'
     | '/bruker/$id'
     | '/admin/brukere'
     | '/admin/kategorier'
     | '/admin/moderasjon'
     | '/admin/promoteringer'
+    | '/admin/vipps-webhooks'
+    | '/bekrefter/$promoId'
+    | '/kvittering/$promoId'
     | '/meldinger/$id'
     | '/admin'
     | '/meldinger'
@@ -303,6 +350,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authenticated'
+    | '/$kaupetCode'
     | '/annonser'
     | '/auth'
     | '/personvern'
@@ -313,12 +361,15 @@ export interface FileRouteTypes {
     | '/_authenticated/mine-sok'
     | '/_authenticated/ny-annonse'
     | '/_authenticated/profil'
-    | '/annonse/$id'
+    | '/annonse/$listingId'
     | '/bruker/$id'
     | '/_authenticated/admin/brukere'
     | '/_authenticated/admin/kategorier'
     | '/_authenticated/admin/moderasjon'
     | '/_authenticated/admin/promoteringer'
+    | '/_authenticated/admin/vipps-webhooks'
+    | '/_authenticated/bekrefter/$promoId'
+    | '/_authenticated/kvittering/$promoId'
     | '/_authenticated/meldinger/$id'
     | '/_authenticated/admin/'
     | '/_authenticated/meldinger/'
@@ -331,12 +382,13 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  KaupetCodeRoute: typeof KaupetCodeRoute
   AnnonserRoute: typeof AnnonserRoute
   AuthRoute: typeof AuthRoute
   PersonvernRoute: typeof PersonvernRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   VilkarRoute: typeof VilkarRoute
-  AnnonseIdRoute: typeof AnnonseIdRoute
+  AnnonseListingIdRoute: typeof AnnonseListingIdRoute
   BrukerIdRoute: typeof BrukerIdRoute
   ApiPublicPushDispatchRoute: typeof ApiPublicPushDispatchRoute
   ApiPublicVippsWebhookRoute: typeof ApiPublicVippsWebhookRoute
@@ -379,6 +431,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AnnonserRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/$kaupetCode': {
+      id: '/$kaupetCode'
+      path: '/$kaupetCode'
+      fullPath: '/$kaupetCode'
+      preLoaderRoute: typeof KaupetCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated': {
       id: '/_authenticated'
       path: ''
@@ -400,11 +459,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BrukerIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/annonse/$id': {
-      id: '/annonse/$id'
-      path: '/annonse/$id'
-      fullPath: '/annonse/$id'
-      preLoaderRoute: typeof AnnonseIdRouteImport
+    '/annonse/$listingId': {
+      id: '/annonse/$listingId'
+      path: '/annonse/$listingId'
+      fullPath: '/annonse/$listingId'
+      preLoaderRoute: typeof AnnonseListingIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/profil': {
@@ -470,6 +529,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMeldingerIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/kvittering/$promoId': {
+      id: '/_authenticated/kvittering/$promoId'
+      path: '/kvittering/$promoId'
+      fullPath: '/kvittering/$promoId'
+      preLoaderRoute: typeof AuthenticatedKvitteringPromoIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/bekrefter/$promoId': {
+      id: '/_authenticated/bekrefter/$promoId'
+      path: '/bekrefter/$promoId'
+      fullPath: '/bekrefter/$promoId'
+      preLoaderRoute: typeof AuthenticatedBekrefterPromoIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/vipps-webhooks': {
+      id: '/_authenticated/admin/vipps-webhooks'
+      path: '/vipps-webhooks'
+      fullPath: '/admin/vipps-webhooks'
+      preLoaderRoute: typeof AuthenticatedAdminVippsWebhooksRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
     '/_authenticated/admin/promoteringer': {
       id: '/_authenticated/admin/promoteringer'
       path: '/promoteringer'
@@ -527,6 +607,7 @@ interface AuthenticatedAdminRouteRouteChildren {
   AuthenticatedAdminKategorierRoute: typeof AuthenticatedAdminKategorierRoute
   AuthenticatedAdminModerasjonRoute: typeof AuthenticatedAdminModerasjonRoute
   AuthenticatedAdminPromoteringerRoute: typeof AuthenticatedAdminPromoteringerRoute
+  AuthenticatedAdminVippsWebhooksRoute: typeof AuthenticatedAdminVippsWebhooksRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
 }
 
@@ -536,6 +617,7 @@ const AuthenticatedAdminRouteRouteChildren: AuthenticatedAdminRouteRouteChildren
     AuthenticatedAdminKategorierRoute: AuthenticatedAdminKategorierRoute,
     AuthenticatedAdminModerasjonRoute: AuthenticatedAdminModerasjonRoute,
     AuthenticatedAdminPromoteringerRoute: AuthenticatedAdminPromoteringerRoute,
+    AuthenticatedAdminVippsWebhooksRoute: AuthenticatedAdminVippsWebhooksRoute,
     AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
   }
 
@@ -550,6 +632,8 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedMineSokRoute: typeof AuthenticatedMineSokRoute
   AuthenticatedNyAnnonseRoute: typeof AuthenticatedNyAnnonseRoute
   AuthenticatedProfilRoute: typeof AuthenticatedProfilRoute
+  AuthenticatedBekrefterPromoIdRoute: typeof AuthenticatedBekrefterPromoIdRoute
+  AuthenticatedKvitteringPromoIdRoute: typeof AuthenticatedKvitteringPromoIdRoute
   AuthenticatedMeldingerIdRoute: typeof AuthenticatedMeldingerIdRoute
   AuthenticatedMeldingerIndexRoute: typeof AuthenticatedMeldingerIndexRoute
   AuthenticatedMineAnnonserIndexRoute: typeof AuthenticatedMineAnnonserIndexRoute
@@ -562,6 +646,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedMineSokRoute: AuthenticatedMineSokRoute,
   AuthenticatedNyAnnonseRoute: AuthenticatedNyAnnonseRoute,
   AuthenticatedProfilRoute: AuthenticatedProfilRoute,
+  AuthenticatedBekrefterPromoIdRoute: AuthenticatedBekrefterPromoIdRoute,
+  AuthenticatedKvitteringPromoIdRoute: AuthenticatedKvitteringPromoIdRoute,
   AuthenticatedMeldingerIdRoute: AuthenticatedMeldingerIdRoute,
   AuthenticatedMeldingerIndexRoute: AuthenticatedMeldingerIndexRoute,
   AuthenticatedMineAnnonserIndexRoute: AuthenticatedMineAnnonserIndexRoute,
@@ -575,12 +661,13 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  KaupetCodeRoute: KaupetCodeRoute,
   AnnonserRoute: AnnonserRoute,
   AuthRoute: AuthRoute,
   PersonvernRoute: PersonvernRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   VilkarRoute: VilkarRoute,
-  AnnonseIdRoute: AnnonseIdRoute,
+  AnnonseListingIdRoute: AnnonseListingIdRoute,
   BrukerIdRoute: BrukerIdRoute,
   ApiPublicPushDispatchRoute: ApiPublicPushDispatchRoute,
   ApiPublicVippsWebhookRoute: ApiPublicVippsWebhookRoute,
@@ -588,13 +675,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

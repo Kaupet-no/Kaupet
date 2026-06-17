@@ -8,9 +8,10 @@ import { getFeaturedListings } from "@/lib/promotions.functions";
 type Props = {
   categorySlug?: string;
   limit?: number;
+  allowedIds?: Set<string>;
 };
 
-export function FeaturedListingsSection({ categorySlug, limit = 2 }: Props) {
+export function FeaturedListingsSection({ categorySlug, limit = 2, allowedIds }: Props) {
   const fetchFeatured = useServerFn(getFeaturedListings);
   const { data } = useQuery({
     queryKey: ["featured-listings", categorySlug ?? null, limit],
@@ -20,8 +21,12 @@ export function FeaturedListingsSection({ categorySlug, limit = 2 }: Props) {
 
   if (!data || data.length === 0) return null;
 
-  const cards: ListingCardData[] = data.map((l) => ({
+  const filtered = allowedIds ? data.filter((l) => allowedIds.has(l.id)) : data;
+  if (filtered.length === 0) return null;
+
+  const cards: ListingCardData[] = filtered.map((l) => ({
     id: l.id,
+    kaupet_code: l.kaupet_code,
     title: l.title,
     price_nok: l.price_nok,
     is_free: l.is_free,
@@ -31,22 +36,19 @@ export function FeaturedListingsSection({ categorySlug, limit = 2 }: Props) {
   }));
 
   return (
-    <section className="mb-4 rounded-2xl border border-accent/30 bg-accent/5 p-4">
-      <div className="mb-3 flex items-center gap-2">
-        <Sparkles className="size-4 text-accent" />
-        <h2 className="font-display text-sm uppercase tracking-wide text-muted-foreground">
-          Fremhevet
-        </h2>
-      </div>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-2">
-        {cards.map((l) => (
-          <div key={l.id} className="relative">
-            <ListingCard listing={l} />
-            <span className="pointer-events-none absolute left-2 top-2 z-10 inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent-foreground shadow">
-              <Sparkles className="size-3" /> Fremhevet
-            </span>
-          </div>
-        ))}
+    <section className="mb-6">
+      <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="mb-3 flex items-center gap-1.5">
+          <Sparkles className="size-3 text-accent" />
+          <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            Promoterte annonser
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+          {cards.map((l) => (
+            <ListingCard key={l.id} listing={l} />
+          ))}
+        </div>
       </div>
     </section>
   );

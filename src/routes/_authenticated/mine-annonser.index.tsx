@@ -13,6 +13,7 @@ import {
   Heart,
   Clock,
   Sparkles,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -21,6 +22,7 @@ import { signListingImageUrls } from "@/lib/storage";
 import { republishListing } from "@/lib/listings.functions";
 import { getMyActivePromotions } from "@/lib/promotions.functions";
 import { PromoteListingDialog } from "@/components/promote-listing-dialog";
+import { useIsDemo } from "@/lib/use-is-demo";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -49,6 +51,7 @@ export const Route = createFileRoute("/_authenticated/mine-annonser/")({
 
 type Row = {
   id: string;
+  kaupet_code: string;
   title: string;
   status: "draft" | "active" | "sold" | "archived" | "expired";
   price_nok: number | null;
@@ -85,6 +88,7 @@ function MyListingsPage() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<"all" | "active" | "sold" | "draft">("all");
   const [promoteId, setPromoteId] = useState<string | null>(null);
+  const { data: isDemo = false } = useIsDemo();
 
   const fetchPromos = useServerFn(getMyActivePromotions);
   const { data: promos } = useQuery({
@@ -111,7 +115,7 @@ function MyListingsPage() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, title, status, price_nok, is_free, city, created_at, expires_at, listing_images(storage_path, sort_order)",
+          "id, kaupet_code, title, status, price_nok, is_free, city, created_at, expires_at, listing_images(storage_path, sort_order)",
         )
         .eq("seller_id", userId)
         .order("created_at", { ascending: false });
@@ -132,6 +136,7 @@ function MyListingsPage() {
         const c = countMap.get(l.id);
         return {
           id: l.id,
+          kaupet_code: l.kaupet_code,
           title: l.title,
           status: l.status as Row["status"],
           price_nok: l.price_nok,
@@ -236,6 +241,7 @@ function MyListingsPage() {
                 <ListingRow
                   key={r.id}
                   row={r}
+                  isDemo={isDemo}
                   activePromotion={activePromoByListing.get(r.id) ?? null}
                   onPromote={() => setPromoteId(r.id)}
                   onMarkSold={() => updateStatus.mutate({ id: r.id, status: "sold" })}
@@ -263,6 +269,7 @@ function MyListingsPage() {
 
 function ListingRow({
   row,
+  isDemo,
   activePromotion,
   onPromote,
   onMarkSold,
@@ -272,6 +279,7 @@ function ListingRow({
   busy,
 }: {
   row: Row;
+  isDemo: boolean;
   activePromotion: { expires_at: string | null; is_gift: boolean } | null;
   onPromote: () => void;
   onMarkSold: () => void;
@@ -306,8 +314,8 @@ function ListingRow({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <Link
-            to="/annonse/$id"
-            params={{ id: row.id }}
+            to="/$kaupetCode"
+            params={{ kaupetCode: row.kaupet_code }}
             className="truncate text-base font-medium hover:underline"
           >
             {row.title}
@@ -338,7 +346,7 @@ function ListingRow({
             <span className="text-xs text-muted-foreground">Publiser på nytt for 30 nye dager</span>
           )}
           {activePromotion && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-xs text-accent-foreground">
+            <span className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-xs text-accent">
               <Sparkles className="size-3" />
               {activePromotion.is_gift ? "Gratis fremhevet" : "Fremhevet"} til{" "}
               {activePromotion.expires_at
@@ -369,11 +377,21 @@ function ListingRow({
         </Link>
         {row.status === "active" ? (
           <>
-            {!activePromotion && (
-              <Button size="sm" variant="outline" onClick={onPromote} disabled={busy}>
-                <Sparkles className="size-4" /> Fremhev
-              </Button>
-            )}
+            {isDemo &&
+              (activePromotion ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled
+                  className="border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-400"
+                >
+                  <Check className="size-4" /> Annonse fremhevet
+                </Button>
+              ) : (
+                <Button size="sm" variant="outline" onClick={onPromote} disabled={busy}>
+                  <Sparkles className="size-4" /> Fremhev annonse
+                </Button>
+              ))}
             <Button size="sm" variant="outline" onClick={onMarkSold} disabled={busy}>
               <CheckCircle2 className="size-4" /> Marker som solgt
             </Button>

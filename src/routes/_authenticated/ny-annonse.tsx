@@ -18,6 +18,8 @@ import {
 import { ImageUploader, type PendingImage } from "@/components/image-uploader";
 import { ListingLocationPicker } from "@/components/listing-location-picker";
 import { PromoteListingDialog } from "@/components/promote-listing-dialog";
+import { PublishedListingDialog } from "@/components/published-listing-dialog";
+import { useIsDemo } from "@/lib/use-is-demo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -81,7 +83,10 @@ function NewListingPage() {
   const navigate = useNavigate();
   const [images, setImages] = useState<PendingImage[]>([]);
   const [publishedId, setPublishedId] = useState<string | null>(null);
+  const [publishedCode, setPublishedCode] = useState<string | null>(null);
+  const [publishedOpen, setPublishedOpen] = useState(false);
   const [promoteOpen, setPromoteOpen] = useState(false);
+  const { data: isDemo = false } = useIsDemo();
 
   const { data: categories } = useQuery({
     queryKey: ["categories", "with-parent"],
@@ -210,7 +215,7 @@ function NewListingPage() {
           status: "active",
           published_at: new Date().toISOString(),
         })
-        .select("id")
+        .select("id, kaupet_code")
         .single();
       if (insertErr) throw insertErr;
 
@@ -235,13 +240,14 @@ function NewListingPage() {
         );
         if (imgErr) throw imgErr;
       }
-      return listing.id as string;
+      return { id: listing.id as string, kaupet_code: listing.kaupet_code as string };
     },
-    onSuccess: (id) => {
+    onSuccess: (result) => {
       void import("@/lib/haptics").then((m) => m.hapticNotification("success"));
       toast.success("Annonsen er publisert");
-      setPublishedId(id);
-      setPromoteOpen(true);
+      setPublishedId(result.id);
+      setPublishedCode(result.kaupet_code);
+      setPublishedOpen(true);
     },
     onError: (err: Error) => {
       void import("@/lib/haptics").then((m) => m.hapticNotification("error"));
@@ -451,12 +457,32 @@ function NewListingPage() {
       </form>
 
       {publishedId && (
+        <PublishedListingDialog
+          listingId={publishedId}
+          open={publishedOpen}
+          onOpenChange={setPublishedOpen}
+          canPromote={isDemo}
+          onView={() => {
+            setPublishedOpen(false);
+            if (publishedCode) navigate({ to: "/$kaupetCode", params: { kaupetCode: publishedCode } });
+          }}
+          onPromote={() => {
+            setPublishedOpen(false);
+            setPromoteOpen(true);
+          }}
+          onClose={() => {
+            if (!promoteOpen) navigate({ to: "/mine-annonser" });
+          }}
+        />
+      )}
+
+      {publishedId && (
         <PromoteListingDialog
           listingId={publishedId}
           open={promoteOpen}
           onOpenChange={(o) => {
             setPromoteOpen(o);
-            if (!o) navigate({ to: "/annonse/$id", params: { id: publishedId } });
+            if (!o) navigate({ to: "/mine-annonser" });
           }}
         />
       )}

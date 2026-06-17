@@ -1,5 +1,7 @@
 import { createFileRoute, Link, notFound, useNavigate, useRouter } from "@tanstack/react-router";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { reconcilePromotionPayment } from "@/lib/promotions.functions";
 import { lazy, Suspense, useEffect, useState } from "react";
 import {
   ArrowLeft,
@@ -14,6 +16,7 @@ import {
   ChevronDown,
   Share2,
   Sparkles,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -22,12 +25,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 
 import { signListingImageUrls } from "@/lib/storage";
-import { shareContent } from "@/lib/native";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { FavoriteButton } from "@/components/favorite-button";
 import { PromoteListingDialog } from "@/components/promote-listing-dialog";
-import { formatErrorMessage } from "@/lib/errors";
+import { ShareListingDialog } from "@/components/share-listing-dialog";
 
 const ListingDetailMap = lazy(() =>
   import("@/components/listing-detail-map").then((m) => ({ default: m.ListingDetailMap })),
@@ -41,18 +43,19 @@ const CONDITION_LABEL: Record<string, string> = {
   for_parts: "Må repareres",
 };
 
-export const Route = createFileRoute("/annonse/$id")({
+export const Route = createFileRoute("/$kaupetCode")({
   validateSearch: z.object({
     promotion: z.string().optional(),
     promo_id: z.string().optional(),
   }),
   loader: async ({ params }) => {
+    if (!/^[0-9]{8}$/.test(params.kaupetCode)) throw notFound();
     const { data, error } = await supabase
       .from("listings")
       .select(
-        "id, title, description, price_nok, is_free, condition, city, updated_at, published_at, status",
+        "id, kaupet_code, title, description, price_nok, is_free, condition, city, updated_at, published_at, status",
       )
-      .eq("id", params.id)
+      .eq("kaupet_code", params.kaupetCode)
       .maybeSingle();
     if (error) throw error;
     if (!data) throw notFound();
@@ -81,7 +84,7 @@ export const Route = createFileRoute("/annonse/$id")({
       : `${l.title}${place}. ${priceLabel} på Kaupet.no.`;
     const description =
       descCore.length < 60 ? `${descCore} ${priceLabel}${place}. Selges på Kaupet.no.` : descCore;
-    const url = `https://kaupet.no/annonse/${params.id}`;
+    const url = `https://kaupet.no/${params.kaupetCode}`;
     const isActive = (l.status as string | undefined) === "active";
     return {
       meta: [
@@ -154,39 +157,96 @@ function ListingErrorBoundary({ error, reset }: { error: Error; reset: () => voi
 }
 
 function ListingDetailPage() {
-  const { id } = Route.useParams();
+  const { kaupetCode } = Route.useParams();
   const search = Route.useSearch();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [activeImage, setActiveImage] = useState(0);
   const [imgUrls, setImgUrls] = useState<Record<string, string>>({});
   const [mounted, setMounted] = useState(false);
   const [statsInfoOpen, setStatsInfoOpen] = useState(false);
   const [promoteOpen, setPromoteOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  const reconcilePromotion = useServerFn(reconcilePromotionPayment);
   useEffect(() => {
-    if (search.promotion === "success") {
-      toast.success("Takk! Fremhevingen aktiveres så snart Vipps bekrefter betalingen.");
+    if (search.promotion !== "success" || !search.promo_id) return;
+    const promoId = search.promo_id;
+    let cancelled = false;
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    const finish = () => {
+      if (cancelled) return;
       navigate({
-        to: "/annonse/$id",
-        params: { id },
+        to: "/$kaupetCode",
+        params: { kaupetCode },
         search: {},
         replace: true,
       });
-    }
+    };
+
+    const poll = async () => {
+      attempts += 1;
+      try {
+        const res = await reconcilePromotion({ data: { promotion_id: promoId } });
+        if (cancelled) return;
+        if (res.status === "active" || res.status === "gifted") {
+          toast.success("Fremhevingen er aktivert");
+          queryClient.invalidateQueries({ queryKey: ["listing-active-promotion"] });
+          queryClient.invalidateQueries({ queryKey: ["featured-listings"] });
+          queryClient.invalidateQueries({ queryKey: ["my-listings"] });
+          finish();
+          return;
+        }
+        if (res.status === "failed") {
+          toast.error("Betalingen ble ikke fullført. Fremhevingen er ikke aktivert.");
+          finish();
+          return;
+        }
+        if (res.status === "refunded") {
+          toast.message("Betalingen er refundert.");
+          finish();
+          return;
+        }
+        if (attempts >= maxAttempts) {
+          toast.message(
+            "Vi venter på bekreftelse fra Vipps. Siden oppdateres så snart betalingen er bekreftet.",
+          );
+          finish();
+          return;
+        }
+        setTimeout(poll, 1500);
+      } catch (e) {
+        if (cancelled) return;
+        console.error("[promotion reconcile]", e);
+        if (attempts >= maxAttempts) {
+          toast.error("Kunne ikke bekrefte betalingen. Prøv igjen senere.");
+          finish();
+          return;
+        }
+        setTimeout(poll, 1500);
+      }
+    };
+
+    poll();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search.promotion]);
+  }, [search.promotion, search.promo_id]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["listing", id],
+    queryKey: ["listing", kaupetCode],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, title, description, price_nok, is_free, condition, city, postal_code, lat, lng, created_at, updated_at, published_at, status, seller_id, category_id, listing_images(storage_path, sort_order), categories(name_nb, slug)",
+          "id, kaupet_code, title, description, price_nok, is_free, condition, city, postal_code, lat, lng, created_at, updated_at, published_at, status, seller_id, category_id, listing_images(storage_path, sort_order), categories(name_nb, slug)",
         )
-        .eq("id", id)
+        .eq("kaupet_code", kaupetCode)
         .maybeSingle();
       if (error) throw error;
       if (!data) throw new Error("Annonsen finnes ikke");
@@ -199,20 +259,42 @@ function ListingDetailPage() {
     },
   });
 
+  const listingId = data?.id;
   const isOwner = !!user && !!data && user.id === data.seller_id;
 
   const { data: stats } = useQuery({
-    queryKey: ["listing-stats", id],
-    enabled: isOwner,
+    queryKey: ["listing-stats", listingId],
+    enabled: isOwner && !!listingId,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("listing_stats", { _listing_id: id });
+      const { data: rows, error } = await supabase.rpc("listing_stats", {
+        _listing_id: listingId!,
+      });
       if (error) throw error;
-      const row = Array.isArray(data) ? data[0] : data;
+      const row = Array.isArray(rows) ? rows[0] : rows;
       return {
         total_views: Number(row?.total_views ?? 0),
         unique_visitors: Number(row?.unique_visitors ?? 0),
         favorite_count: Number(row?.favorite_count ?? 0),
       };
+    },
+  });
+
+  const { data: activePromotion } = useQuery({
+    queryKey: ["listing-active-promotion", listingId],
+    enabled: isOwner && !!listingId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("listing_promotions")
+        .select("id, status, expires_at")
+        .eq("listing_id", listingId!)
+        .in("status", ["active", "pending", "gifted"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      if (data.expires_at && new Date(data.expires_at) <= new Date()) return null;
+      return data;
     },
   });
 
@@ -354,6 +436,12 @@ function ListingDetailPage() {
               ))}
             </div>
           )}
+          <section className="mt-8">
+            <h2 className="font-display text-xl">Beskrivelse</h2>
+            <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+              {data.description}
+            </p>
+          </section>
         </div>
 
         <aside className="space-y-5">
@@ -372,6 +460,7 @@ function ListingDetailPage() {
             </h1>
             <p className="mt-3 font-display text-3xl text-primary">{priceLabel}</p>
           </div>
+
 
           {(() => {
             const fmt = (s: string) =>
@@ -428,16 +517,26 @@ function ListingDetailPage() {
                   <Pencil className="size-4" /> Rediger annonse
                 </Button>
               </Link>
-              {data.status === "active" && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="mt-2 w-full gap-2"
-                  onClick={() => setPromoteOpen(true)}
-                >
-                  <Sparkles className="size-4" /> Fremhev annonse
-                </Button>
-              )}
+              {data.status === "active" &&
+                (activePromotion ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-2 w-full gap-2 border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-400"
+                    disabled
+                  >
+                    <Check className="size-4" /> Annonse fremhevet
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-2 w-full gap-2"
+                    onClick={() => setPromoteOpen(true)}
+                  >
+                    <Sparkles className="size-4" /> Fremhev annonse
+                  </Button>
+                ))}
               <PromoteListingDialog
                 listingId={data.id}
                 open={promoteOpen}
@@ -571,34 +670,20 @@ function ListingDetailPage() {
               type="button"
               variant="outline"
               className="mt-2 w-full gap-2"
-              onClick={async () => {
-                try {
-                  const result = await shareContent({
-                    title: data.title,
-                    text: `${data.title} — ${priceLabel} på Kaupet.no`,
-                    url: `https://kaupet.no/annonse/${data.id}`,
-                  });
-                  if (result === "clipboard") toast.success("Lenken er kopiert");
-                } catch (e: unknown) {
-                  const name = e instanceof Error ? e.name : "";
-                  if (name !== "AbortError") {
-                    toast.error(formatErrorMessage(e, "Kunne ikke dele annonsen"));
-                  }
-                }
-              }}
+              onClick={() => setShareOpen(true)}
             >
               <Share2 className="size-4" /> Del annonse
             </Button>
+            <ShareListingDialog
+              open={shareOpen}
+              onOpenChange={setShareOpen}
+              kaupetCode={data.kaupet_code}
+              title={data.title}
+            />
           </div>
         </aside>
       </div>
 
-      <section className="mt-10 max-w-2xl">
-        <h2 className="font-display text-xl">Beskrivelse</h2>
-        <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
-          {data.description}
-        </p>
-      </section>
 
       {data.lat != null && data.lng != null && (
         <section className="mt-10">

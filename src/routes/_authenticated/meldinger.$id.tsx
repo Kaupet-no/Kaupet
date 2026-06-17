@@ -109,7 +109,7 @@ function ConversationPage() {
         .from("conversations")
         .select(
           `id, buyer_id, seller_id, listing_id,
-           listing:listings(id, title, price_nok, is_free, listing_images(storage_path, sort_order))`,
+           listing:listings(id, kaupet_code, title, price_nok, is_free, listing_images(storage_path, sort_order))`,
         )
         .eq("id", id)
         .maybeSingle();
@@ -322,8 +322,8 @@ function ConversationPage() {
           <div className="min-w-0 flex-1">
             {conv.listing ? (
               <Link
-                to="/annonse/$id"
-                params={{ id: conv.listing_id }}
+                to="/$kaupetCode"
+                params={{ kaupetCode: (conv.listing as { kaupet_code: string }).kaupet_code }}
                 className="block truncate font-medium hover:underline"
               >
                 {conv.listing.title}

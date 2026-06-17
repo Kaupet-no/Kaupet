@@ -366,7 +366,9 @@ function ListingDetailPage() {
         { listing_id: data.id, visitor_key: visitorKey, user_id: user?.id ?? null },
         { onConflict: "listing_id,visitor_key", ignoreDuplicates: true },
       )
-      .then(() => undefined);
+      .then(({ error }) => {
+        if (error) console.warn("[listing_views] insert failed", error);
+      });
   }, [data?.id, data?.seller_id, user?.id]);
 
   if (isLoading) {

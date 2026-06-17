@@ -156,7 +156,6 @@ function WebLanding() {
     },
   });
 
-
   const PopularCarousel = () => (
     <div className="relative">
       <div className="absolute -inset-4 -z-10 rounded-3xl bg-accent/10 blur-2xl" />

@@ -23,6 +23,7 @@ import { z } from "zod";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
+import { readLastSearchContext, type LastSearchContext } from "@/lib/last-search-context";
 
 import { signListingImageUrls } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
@@ -156,11 +157,17 @@ function ListingErrorBoundary({ error, reset }: { error: Error; reset: () => voi
   );
 }
 
+type BackTarget =
+  | { mode: "history"; label: string }
+  | { mode: "search"; label: string; search: LastSearchContext["search"] }
+  | { mode: "default" };
+
 function ListingDetailPage() {
   const { kaupetCode } = Route.useParams();
   const search = Route.useSearch();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [activeImage, setActiveImage] = useState(0);
   const [imgUrls, setImgUrls] = useState<Record<string, string>>({});
@@ -168,7 +175,19 @@ function ListingDetailPage() {
   const [statsInfoOpen, setStatsInfoOpen] = useState(false);
   const [promoteOpen, setPromoteOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [backTarget, setBackTarget] = useState<BackTarget>({ mode: "default" });
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    const last = readLastSearchContext();
+    if (router.history.canGoBack() && last) {
+      setBackTarget({ mode: "history", label: last.label });
+    } else if (last) {
+      setBackTarget({ mode: "search", label: last.label, search: last.search });
+    } else {
+      setBackTarget({ mode: "default" });
+    }
+  }, [router]);
 
   const reconcilePromotion = useServerFn(reconcilePromotionPayment);
   useEffect(() => {
@@ -387,13 +406,31 @@ function ListingDetailPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
-      <Link
-        to="/annonser"
-        search={{ q: "", category: "", sort: "new" }}
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="size-4" /> Tilbake til annonser
-      </Link>
+      {backTarget.mode === "history" ? (
+        <button
+          type="button"
+          onClick={() => router.history.back()}
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" /> Tilbake til {backTarget.label}
+        </button>
+      ) : backTarget.mode === "search" ? (
+        <Link
+          to="/annonser"
+          search={backTarget.search as never}
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" /> Tilbake til {backTarget.label}
+        </Link>
+      ) : (
+        <Link
+          to="/annonser"
+          search={{ q: "", category: "", sort: "new" }}
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" /> Tilbake til annonser
+        </Link>
+      )}
 
       <div className="mt-4 grid gap-8 md:grid-cols-[1.4fr_1fr]">
         <div>

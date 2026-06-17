@@ -29,6 +29,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { formatErrorMessage } from "@/lib/errors";
+import { useIsNative } from "@/lib/use-is-native";
 
 export const Route = createFileRoute("/_authenticated/meldinger/$id")({
   head: () => ({
@@ -76,6 +77,7 @@ type Message = {
 };
 
 function ConversationPage() {
+  const native = useIsNative();
   const { id } = Route.useParams();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -306,7 +308,12 @@ function ConversationPage() {
           : "Skriv en melding…";
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-4rem)] max-w-3xl flex-col px-4 py-4">
+    <div
+      className="mx-auto flex max-w-3xl flex-col px-4 py-4"
+      style={{
+        height: native ? "calc(100vh - 4rem - var(--app-bottom-nav-h))" : "calc(100vh - 4rem)",
+      }}
+    >
       <Link
         to="/meldinger"
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"

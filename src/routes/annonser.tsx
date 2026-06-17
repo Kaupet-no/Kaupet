@@ -25,6 +25,8 @@ import type { LocationValue } from "@/components/location-filter";
 import type { MapListing } from "@/components/listings-map";
 import { FeaturedListingsSection } from "@/components/featured-listings-section";
 import { reverseGeocode } from "@/lib/geocode";
+import { saveLastSearchContext } from "@/lib/last-search-context";
+import { useIsNative } from "@/lib/use-is-native";
 
 const ListingsMap = lazy(() =>
   import("@/components/listings-map").then((m) => ({ default: m.ListingsMap })),
@@ -107,6 +109,7 @@ export const Route = createFileRoute("/annonser")({
 });
 
 function BrowsePage() {
+  const native = useIsNative();
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/annonser" });
   const [qDraft, setQDraft] = useState(search.q);
@@ -214,6 +217,22 @@ function BrowsePage() {
       search.loc,
     ],
   );
+
+  useEffect(() => {
+    if (!mounted) return;
+    const categoryNames = effectiveCategories
+      .map((slug: string) => categories?.find((c) => c.slug === slug)?.name_nb)
+      .filter((n: string | undefined): n is string => !!n);
+    let label = "annonser";
+    if (search.q) {
+      label = `søket «${search.q}»`;
+    } else if (categoryNames.length === 1) {
+      label = categoryNames[0];
+    } else if (categoryNames.length > 1) {
+      label = "valgte kategorier";
+    }
+    saveLastSearchContext({ search, label });
+  }, [mounted, search, effectiveCategories, categories]);
 
   const advancedFilterCount =
     (effectiveCategories.length > 0 ? 1 : 0) +
@@ -596,7 +615,8 @@ function BrowsePage() {
             <Button
               type="button"
               size="lg"
-              className="fixed bottom-5 right-5 z-40 rounded-full shadow-lg"
+              className="fixed right-5 z-40 rounded-full shadow-lg"
+              style={{ bottom: native ? "var(--app-bottom-nav-h)" : "1.25rem" }}
             >
               <MapIcon className="size-4" /> Kart
             </Button>

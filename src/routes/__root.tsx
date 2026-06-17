@@ -276,7 +276,7 @@ function RootBody({ native }: { native: boolean }) {
       {isTest && <TestEnvBanner />}
       {!native && <SiteHeader />}
       <ModerationBanner />
-      <main className="flex-1">
+      <main className={`flex-1${native ? " pb-bottom-nav" : ""}`}>
         <Outlet />
       </main>
 

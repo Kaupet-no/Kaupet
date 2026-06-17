@@ -150,6 +150,15 @@
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
 }
 
+/* Height reserved for the fixed bottom nav in native apps (AppBottomNav),
+   plus a margin so scrolled content/floating buttons never sit under it. */
+:root {
+  --app-bottom-nav-h: calc(6rem + env(safe-area-inset-bottom));
+}
+.pb-bottom-nav {
+  padding-bottom: var(--app-bottom-nav-h);
+}
+
 /* Isoler Leaflet sin interne z-index-stack slik at panene (z-index 400–700)
    ikke bryter ut over modal-overlays (Radix Dialog bruker z-50). */
 .leaflet-container {

@@ -1,11 +1,15 @@
 import { Toaster as Sonner } from "sonner";
 
+import { useIsNative } from "@/lib/use-is-native";
+
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 
 const Toaster = ({ ...props }: ToasterProps) => {
+  const native = useIsNative();
   return (
     <Sonner
       className="toaster group"
+      mobileOffset={native ? { bottom: "var(--app-bottom-nav-h)" } : undefined}
       toastOptions={{
         classNames: {
           toast:

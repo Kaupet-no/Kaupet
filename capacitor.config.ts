@@ -4,6 +4,10 @@ const config: CapacitorConfig = {
   appId: "no.kaupet.app",
   appName: "Kaupet",
   webDir: "capacitor-shell",
+  // Matches the app's --background (src/styles.css). Without this, the
+  // WebView falls back to plain white, which flashes at the edges during
+  // the iOS/Android overscroll bounce when scrolling past the top/bottom.
+  backgroundColor: "#fbf9f3",
   server: {
     url: "https://kaupet.no",
     errorPath: "offline.html",

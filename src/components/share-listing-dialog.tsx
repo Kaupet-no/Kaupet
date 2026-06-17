@@ -24,9 +24,11 @@ const QR_SIZE = 320;
 const BRAND_COLOR = "#2f5d44";
 
 async function generateQrDataUrl(url: string): Promise<string> {
-  const mod: any = await import("qrcode/lib/browser.js");
-  const toDataURL: (text: string, opts?: unknown) => Promise<string> =
-    mod.toDataURL ?? mod.default?.toDataURL;
+  const mod = (await import("qrcode/lib/browser.js")) as {
+    toDataURL?: (text: string, opts?: unknown) => Promise<string>;
+    default?: { toDataURL?: (text: string, opts?: unknown) => Promise<string> };
+  };
+  const toDataURL = mod.toDataURL ?? mod.default?.toDataURL;
   if (typeof toDataURL !== "function") {
     throw new Error("QR-bibliotek mangler toDataURL");
   }

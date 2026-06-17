@@ -365,7 +365,7 @@ function MobileBar(props: Props) {
             <SlidersHorizontal className="size-4 text-muted-foreground" />
           </button>
         </SheetTrigger>
-        <SheetContent side="bottom" className="h-[90vh] overflow-y-auto p-4">
+        <SheetContent side="bottom" className="h-[90dvh] overflow-y-auto p-4">
           <SheetHeader>
             <SheetTitle>Søk</SheetTitle>
           </SheetHeader>
@@ -386,7 +386,7 @@ function MobileBar(props: Props) {
             <div>
               <label className="text-xs font-medium text-muted-foreground">Hvor</label>
               <div className="mt-1 rounded-md border border-border p-1">
-                <LocationPicker value={location} onChange={onLocationChange} />
+                <LocationPicker value={location} onChange={onLocationChange} autoFocus={false} />
               </div>
             </div>
 

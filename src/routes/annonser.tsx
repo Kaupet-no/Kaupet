@@ -26,7 +26,6 @@ import type { MapListing } from "@/components/listings-map";
 import { FeaturedListingsSection } from "@/components/featured-listings-section";
 import { reverseGeocode } from "@/lib/geocode";
 import { saveLastSearchContext } from "@/lib/last-search-context";
-import { useIsNative } from "@/lib/use-is-native";
 
 const ListingsMap = lazy(() =>
   import("@/components/listings-map").then((m) => ({ default: m.ListingsMap })),
@@ -109,7 +108,6 @@ export const Route = createFileRoute("/annonser")({
 });
 
 function BrowsePage() {
-  const native = useIsNative();
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/annonser" });
   const [qDraft, setQDraft] = useState(search.q);
@@ -495,20 +493,39 @@ function BrowsePage() {
         <span>
           {isLoading ? "Søker…" : `${cards.length} annonse${cards.length === 1 ? "" : "r"}`}
         </span>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => setAdvOpen(true)}
-          className="gap-1.5"
-        >
-          <SlidersHorizontal className="size-4" /> Avansert søk
-          {advancedFilterCount > 0 && (
-            <span className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
-              {advancedFilterCount}
-            </span>
+        <div className="flex items-center gap-2">
+          {!isDesktop && (
+            <Sheet open={mobileMapOpen} onOpenChange={setMobileMapOpen}>
+              <SheetTrigger asChild>
+                <Button type="button" variant="outline" size="sm" className="gap-1.5">
+                  <MapIcon className="size-4" /> Kart
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="bottom" className="h-[88vh] p-4">
+                <SheetHeader>
+                  <SheetTitle>Kart</SheetTitle>
+                </SheetHeader>
+                <div className="mt-3 h-[calc(100%-3rem)]">
+                  {mobileMapOpen ? renderMap(true) : null}
+                </div>
+              </SheetContent>
+            </Sheet>
           )}
-        </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setAdvOpen(true)}
+            className="gap-1.5"
+          >
+            <SlidersHorizontal className="size-4" /> Avansert søk
+            {advancedFilterCount > 0 && (
+              <span className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
+                {advancedFilterCount}
+              </span>
+            )}
+          </Button>
+        </div>
       </div>
 
       <AdvancedSearchSheet
@@ -608,27 +625,6 @@ function BrowsePage() {
           </aside>
         )}
       </div>
-
-      {!isDesktop && (
-        <Sheet open={mobileMapOpen} onOpenChange={setMobileMapOpen}>
-          <SheetTrigger asChild>
-            <Button
-              type="button"
-              size="lg"
-              className="fixed right-5 z-40 rounded-full shadow-lg"
-              style={{ bottom: native ? "var(--app-bottom-nav-h)" : "1.25rem" }}
-            >
-              <MapIcon className="size-4" /> Kart
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="bottom" className="h-[88vh] p-4">
-            <SheetHeader>
-              <SheetTitle>Kart</SheetTitle>
-            </SheetHeader>
-            <div className="mt-3 h-[calc(100%-3rem)]">{mobileMapOpen ? renderMap(true) : null}</div>
-          </SheetContent>
-        </Sheet>
-      )}
     </div>
   );
 }

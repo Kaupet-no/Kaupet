@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { MapPin } from "lucide-react";
+import { Eye, MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 import { signListingImageUrls } from "@/lib/storage";
 import { FavoriteButton } from "@/components/favorite-button";
@@ -13,6 +13,8 @@ export type ListingCardData = {
   city: string | null;
   created_at: string;
   cover_path: string | null;
+  total_views?: number;
+  views_last_week?: number;
 };
 
 function formatPrice(p: ListingCardData) {
@@ -74,6 +76,18 @@ export function ListingCard({ listing, highlighted, onHoverChange }: Props) {
         {listing.city && (
           <p className="flex items-center gap-1 text-xs text-muted-foreground">
             <MapPin className="size-3" /> {listing.city}
+          </p>
+        )}
+        {typeof listing.total_views === "number" && (
+          <p
+            className="flex items-center gap-1 text-xs text-muted-foreground"
+            title={`${listing.total_views.toLocaleString("nb-NO")} visninger totalt · ${(listing.views_last_week ?? 0).toLocaleString("nb-NO")} siste uke`}
+          >
+            <Eye className="size-3" />
+            <span>{listing.total_views.toLocaleString("nb-NO")}</span>
+            <span className="text-muted-foreground/70">
+              · {(listing.views_last_week ?? 0).toLocaleString("nb-NO")} siste uke
+            </span>
           </p>
         )}
       </div>

@@ -33,12 +33,13 @@ export async function setupNative(): Promise<void> {
     /* plugin unavailable */
   }
 
-  // Keyboard — resize body so inputs aren't covered, and scroll focused
-  // field into view when keyboard appears.
+  // Keyboard — resize the native WebView (not just <body>) so vh/dvh units
+  // and `position: fixed` sheets actually reflow above the keyboard instead
+  // of staying pinned behind it, and scroll the focused field into view.
   try {
     const { Keyboard, KeyboardResize } = await import("@capacitor/keyboard");
     if (nativePlatform() === "ios") {
-      await Keyboard.setResizeMode({ mode: KeyboardResize.Body });
+      await Keyboard.setResizeMode({ mode: KeyboardResize.Native });
       await Keyboard.setScroll({ isDisabled: false }).catch(() => {});
     }
     // keyboardDidShow (not keyboardWillShow) so the resize has already

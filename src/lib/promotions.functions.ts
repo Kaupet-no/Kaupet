@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isTestHost } from "@/lib/env";
+import { logServerError } from "@/lib/server-error-log";
 
 export const getPromotionPricing = createServerFn({ method: "GET" }).handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -117,10 +118,15 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
         host,
       });
       if (result.pspReference) {
-        await supabaseAdmin
+        const { error: pspErr } = await supabaseAdmin
           .from("listing_promotions")
           .update({ vipps_psp_reference: result.pspReference })
           .eq("id", promo.id);
+        if (pspErr) {
+          await logServerError("createPromotionCheckout.updatePspReference", pspErr, {
+            promotion_id: promo.id,
+          });
+        }
       }
       console.log("[promotions] createPromotionCheckout ok", {
         promotion_id: promo.id,
@@ -135,10 +141,15 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
         host,
         error: err instanceof Error ? err.message : String(err),
       });
-      await supabaseAdmin
+      const { error: failErr } = await supabaseAdmin
         .from("listing_promotions")
         .update({ status: "failed" })
         .eq("id", promo.id);
+      if (failErr) {
+        await logServerError("createPromotionCheckout.markFailed", failErr, {
+          promotion_id: promo.id,
+        });
+      }
       throw err;
     }
   });
@@ -263,19 +274,29 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
       payment.state === "ABORTED" ||
       payment.state === "FAILED"
     ) {
-      await supabaseAdmin
+      const { error: failErr } = await supabaseAdmin
         .from("listing_promotions")
         .update({ status: "failed" })
         .eq("id", promo.id)
         .eq("status", "pending");
+      if (failErr) {
+        await logServerError("reconcilePromotionPayment.markFailed", failErr, {
+          promotion_id: promo.id,
+        });
+      }
       return { status: "failed" as const, expires_at: null };
     }
 
     if (payment.state === "REFUNDED") {
-      await supabaseAdmin
+      const { error: refundErr } = await supabaseAdmin
         .from("listing_promotions")
         .update({ status: "refunded" })
         .eq("id", promo.id);
+      if (refundErr) {
+        await logServerError("reconcilePromotionPayment.markRefunded", refundErr, {
+          promotion_id: promo.id,
+        });
+      }
       return { status: "refunded" as const, expires_at: promo.expires_at };
     }
 

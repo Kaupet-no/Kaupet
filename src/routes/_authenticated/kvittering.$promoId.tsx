@@ -7,7 +7,6 @@ import { getPromotionReceipt } from "@/lib/promotions.functions";
 import { Button } from "@/components/ui/button";
 import { formatErrorMessage } from "@/lib/errors";
 
-
 export const Route = createFileRoute("/_authenticated/kvittering/$promoId")({
   head: () => ({
     meta: [

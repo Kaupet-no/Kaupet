@@ -24,9 +24,11 @@ const QR_SIZE = 320;
 const BRAND_COLOR = "#2f5d44";
 
 async function generateQrDataUrl(url: string): Promise<string> {
-  const mod: any = await import("qrcode/lib/browser.js");
-  const toDataURL: (text: string, opts?: unknown) => Promise<string> =
-    mod.toDataURL ?? mod.default?.toDataURL;
+  const mod = (await import("qrcode/lib/browser.js")) as {
+    toDataURL?: (text: string, opts?: unknown) => Promise<string>;
+    default?: { toDataURL?: (text: string, opts?: unknown) => Promise<string> };
+  };
+  const toDataURL = mod.toDataURL ?? mod.default?.toDataURL;
   if (typeof toDataURL !== "function") {
     throw new Error("QR-bibliotek mangler toDataURL");
   }
@@ -101,7 +103,6 @@ async function generateBrandedQrDataUrl(url: string): Promise<string> {
   }
 }
 
-
 export function ShareListingDialog({ open, onOpenChange, kaupetCode }: Props) {
   const [codeCopied, setCodeCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -166,9 +167,7 @@ export function ShareListingDialog({ open, onOpenChange, kaupetCode }: Props) {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Del annonse</DialogTitle>
-          <DialogDescription>
-            Del annonsen med Kaupet-kode, lenke eller QR-kode.
-          </DialogDescription>
+          <DialogDescription>Del annonsen med Kaupet-kode, lenke eller QR-kode.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -178,13 +177,9 @@ export function ShareListingDialog({ open, onOpenChange, kaupetCode }: Props) {
               className="flex h-56 w-56 items-center justify-center rounded-md bg-white"
               aria-live="polite"
             >
-              {generating && (
-                <Loader2 className="size-6 animate-spin text-muted-foreground" />
-              )}
+              {generating && <Loader2 className="size-6 animate-spin text-muted-foreground" />}
               {!generating && qrError && (
-                <span className="px-3 text-center text-sm text-destructive">
-                  {qrError}
-                </span>
+                <span className="px-3 text-center text-sm text-destructive">{qrError}</span>
               )}
               {!generating && qrSrc && (
                 <img
@@ -242,7 +237,6 @@ export function ShareListingDialog({ open, onOpenChange, kaupetCode }: Props) {
               </Button>
             </div>
           </div>
-
         </div>
       </DialogContent>
     </Dialog>

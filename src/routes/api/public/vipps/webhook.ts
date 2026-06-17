@@ -29,7 +29,6 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
           }
         }
 
-
         let payload: Record<string, unknown>;
         try {
           payload = JSON.parse(raw) as Record<string, unknown>;
@@ -126,7 +125,6 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
               }
             }
           } else if (
-
             payment.state === "CANCELLED" ||
             payment.state === "EXPIRED" ||
             payment.state === "TERMINATED" ||

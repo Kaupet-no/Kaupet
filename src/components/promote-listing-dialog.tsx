@@ -19,7 +19,6 @@ import {
 import { createPromotionCheckout, getPromotionPricing } from "@/lib/promotions.functions";
 import { formatErrorMessage } from "@/lib/errors";
 
-
 type Props = {
   listingId: string;
   open: boolean;
@@ -64,7 +63,8 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
       if (error) throw error;
       if (!data) return null;
       const cover =
-        (data.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order)[0]?.storage_path ?? null;
+        (data.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order)[0]
+          ?.storage_path ?? null;
       return {
         title: data.title,
         price_nok: data.price_nok,
@@ -91,7 +91,8 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
 
   const startCheckout = useServerFn(createPromotionCheckout);
   const checkout = useMutation({
-    mutationFn: async (duration_days: number) => startCheckout({ data: { listing_id: listingId, duration_days } }),
+    mutationFn: async (duration_days: number) =>
+      startCheckout({ data: { listing_id: listingId, duration_days } }),
     onSuccess: (res) => {
       window.location.href = res.redirect_url;
     },
@@ -99,7 +100,6 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
   });
 
   const isPending = checkout.isPending;
-
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -109,9 +109,9 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
             <Sparkles className="size-5 text-accent" /> Fremhev annonsen
           </DialogTitle>
           <DialogDescription>
-            Fremhevede annonser vises i en egen seksjon øverst i relevante søk og kategorier. Inntil to til tre
-            fremhevede annonser vises om gangen. Dersom et søk genererer flere fremhevede annonser, vises et tilfeldig
-            utvalg.
+            Fremhevede annonser vises i en egen seksjon øverst i relevante søk og kategorier. Inntil
+            to til tre fremhevede annonser vises om gangen. Dersom et søk genererer flere fremhevede
+            annonser, vises et tilfeldig utvalg.
           </DialogDescription>
         </DialogHeader>
 
@@ -119,7 +119,9 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
         <div className="rounded-2xl border border-accent/30 bg-accent/5 p-3">
           <div className="mb-2 flex items-center gap-2">
             <Sparkles className="size-4 text-accent" />
-            <p className="font-display text-xs uppercase tracking-wide text-muted-foreground">Promoterte annonser</p>
+            <p className="font-display text-xs uppercase tracking-wide text-muted-foreground">
+              Promoterte annonser
+            </p>
           </div>
           <div className="overflow-hidden rounded-xl border border-border bg-card">
             <div className="aspect-[4/3] bg-muted">
@@ -132,7 +134,9 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
               )}
             </div>
             <div className="space-y-1 p-3">
-              <h3 className="line-clamp-2 text-sm font-medium leading-snug">{listing?.title ?? "—"}</h3>
+              <h3 className="line-clamp-2 text-sm font-medium leading-snug">
+                {listing?.title ?? "—"}
+              </h3>
               <p className="font-display text-base">{listing ? formatPrice(listing) : ""}</p>
               {listing?.city && (
                 <p className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -157,7 +161,9 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
             >
               <div>
                 <div className="font-medium">{p.duration_days} dager fremhevet</div>
-                <div className="text-xs text-muted-foreground">Aktiveres umiddelbart etter betaling</div>
+                <div className="text-xs text-muted-foreground">
+                  Aktiveres umiddelbart etter betaling
+                </div>
               </div>
               <div className="font-display text-xl">{p.price_nok} kr</div>
             </button>
@@ -170,14 +176,18 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
         </div>
 
         <label className="mt-2 flex items-start gap-2 text-xs text-muted-foreground">
-          <Checkbox checked={accepted} onCheckedChange={(v) => setAccepted(Boolean(v))} className="mt-0.5" />
+          <Checkbox
+            checked={accepted}
+            onCheckedChange={(v) => setAccepted(Boolean(v))}
+            className="mt-0.5"
+          />
           <span>
             Jeg har lest{" "}
             <a href="/vilkar#kjopsvilkar" target="_blank" className="underline">
               vilkår for kjøp
             </a>{" "}
-            og samtykker til at fremhevingen leveres umiddelbart, slik at angreretten bortfaller (angrerettloven § 22
-            bokstav n).
+            og samtykker til at fremhevingen leveres umiddelbart, slik at angreretten bortfaller
+            (angrerettloven § 22 bokstav n).
           </span>
         </label>
 
@@ -194,7 +204,6 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
           >
             {isPending && <Loader2 className="size-4 animate-spin" />}
             Betal med Vipps
-
           </Button>
         </DialogFooter>
       </DialogContent>

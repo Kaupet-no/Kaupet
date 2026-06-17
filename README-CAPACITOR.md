@@ -126,9 +126,11 @@ Du trenger kun å bygge og distribuere ny app-versjon når:
 - App-ikon eller splash endres
 
 Etter en slik endring:
+
 ```
 npx cap sync
 ```
+
 … og bygg på nytt i Xcode / Android Studio.
 
 ---
@@ -156,20 +158,20 @@ Dette produserer automatisk:
 
 Fargene som brukes matcher merkevaren på `kaupet.no`:
 
-| Token        | Hex       | Bruk                                |
-| ------------ | --------- | ----------------------------------- |
-| Primary      | `#2f5d44` | Bokstaven `k`, ikon-bakgrunn        |
-| Accent       | `#d97a3c` | Punktum `.` i logoen                |
-| Cream        | `#fbf9f3` | Splash-bakgrunn (lys), `k` på ikon  |
-| Dark green   | `#1d2a22` | Splash-bakgrunn (mørk modus)        |
+| Token      | Hex       | Bruk                               |
+| ---------- | --------- | ---------------------------------- |
+| Primary    | `#2f5d44` | Bokstaven `k`, ikon-bakgrunn       |
+| Accent     | `#d97a3c` | Punktum `.` i logoen               |
+| Cream      | `#fbf9f3` | Splash-bakgrunn (lys), `k` på ikon |
+| Dark green | `#1d2a22` | Splash-bakgrunn (mørk modus)       |
 
 ---
-
 
 ## Vanlige feil
 
 **Android: `SDK location not found`**
 Lag `android/local.properties` med innholdet:
+
 ```
 sdk.dir=C\:\\Users\\<brukernavn>\\AppData\\Local\\Android\\Sdk
 ```

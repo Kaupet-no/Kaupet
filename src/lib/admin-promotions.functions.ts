@@ -73,7 +73,7 @@ export const adminListPromotions = createServerFn({ method: "GET" })
     let q = supabaseAdmin
       .from("listing_promotions")
       .select(
-        "id, listing_id, user_id, duration_days, price_nok, status, is_gift, starts_at, expires_at, created_at, refunded_at, vipps_reference, vipps_psp_reference, listings(title, kaupet_code), profiles:user_id(display_name)",
+        "id, listing_id, user_id, duration_days, price_nok, status, is_gift, starts_at, expires_at, created_at, refunded_at, vipps_reference, vipps_psp_reference, listings(title, kaupet_code)",
       )
       .order("created_at", { ascending: false })
       .limit(200);
@@ -90,14 +90,25 @@ export const adminListPromotions = createServerFn({ method: "GET" })
     }
     const { data: rows, error } = await q;
     if (error) throw error;
-    return rows ?? [];
+    const userIds = Array.from(new Set((rows ?? []).map((r) => r.user_id).filter(Boolean)));
+    let profilesById = new Map<string, { display_name: string | null }>();
+    if (userIds.length > 0) {
+      const { data: profs, error: perr } = await supabaseAdmin
+        .from("profiles")
+        .select("id, display_name")
+        .in("id", userIds);
+      if (perr) throw perr;
+      profilesById = new Map((profs ?? []).map((p) => [p.id, { display_name: p.display_name }]));
+    }
+    return (rows ?? []).map((r) => ({
+      ...r,
+      profiles: profilesById.get(r.user_id) ?? null,
+    }));
   });
 
 export const adminGetVippsPaymentStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z.object({ promotion_id: z.string().uuid() }).parse(input),
-  )
+  .inputValidator((input: unknown) => z.object({ promotion_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -183,8 +194,6 @@ export const adminRefundPromotion = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-
-
 export const adminGiftPromotion = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
@@ -254,10 +263,23 @@ export const adminSearchListingsForGift = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: rows, error } = await supabaseAdmin
       .from("listings")
-      .select("id, title, city, status, profiles:seller_id(display_name)")
+      .select("id, title, city, status, seller_id")
       .eq("status", "active")
       .ilike("title", `%${data.q}%`)
       .limit(20);
     if (error) throw error;
-    return rows ?? [];
+    const sellerIds = Array.from(new Set((rows ?? []).map((r) => r.seller_id).filter(Boolean)));
+    let profilesById = new Map<string, { display_name: string | null }>();
+    if (sellerIds.length > 0) {
+      const { data: profs, error: perr } = await supabaseAdmin
+        .from("profiles")
+        .select("id, display_name")
+        .in("id", sellerIds);
+      if (perr) throw perr;
+      profilesById = new Map((profs ?? []).map((p) => [p.id, { display_name: p.display_name }]));
+    }
+    return (rows ?? []).map((r) => ({
+      ...r,
+      profiles: profilesById.get(r.seller_id) ?? null,
+    }));
   });

@@ -64,7 +64,7 @@ type CategoryRow = {
 };
 
 const searchSchema = z.object({
-  q: z.string().optional().default(""),
+  q: z.string().optional(),
 });
 
 export const Route = createFileRoute("/")({
@@ -137,33 +137,25 @@ function WebLanding() {
   };
 
   const { data: popular } = useQuery({
-    queryKey: ["popular-listings"],
+    queryKey: ["popular-listings-last-week"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("listings")
-        .select(
-          "id, kaupet_code, title, price_nok, is_free, city, created_at, view_count, listing_images(storage_path, sort_order)",
-        )
-        .eq("status", "active")
-        .order("view_count", { ascending: false })
-        .order("created_at", { ascending: false })
-        .limit(8);
+      const { data, error } = await supabase.rpc("popular_listings_last_week", { _limit: 8 });
       if (error) throw error;
-      return (data ?? []).map<ListingCardData>((l) => {
-        const imgs = (l.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
-        return {
-          id: l.id,
-          kaupet_code: l.kaupet_code,
-          title: l.title,
-          price_nok: l.price_nok,
-          is_free: l.is_free,
-          city: l.city,
-          created_at: l.created_at,
-          cover_path: imgs[0]?.storage_path ?? null,
-        };
-      });
+      return (data ?? []).map<ListingCardData>((l) => ({
+        id: l.listing_id,
+        kaupet_code: l.kaupet_code,
+        title: l.title,
+        price_nok: l.price_nok,
+        is_free: l.is_free,
+        city: l.city,
+        created_at: l.created_at,
+        cover_path: l.cover_path,
+        total_views: Number(l.total_views ?? 0),
+        views_last_week: Number(l.views_last_week ?? 0),
+      }));
     },
   });
+
 
   const PopularCarousel = () => (
     <div className="relative">

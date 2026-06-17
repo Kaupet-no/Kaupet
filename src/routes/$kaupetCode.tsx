@@ -366,7 +366,9 @@ function ListingDetailPage() {
         { listing_id: data.id, visitor_key: visitorKey, user_id: user?.id ?? null },
         { onConflict: "listing_id,visitor_key", ignoreDuplicates: true },
       )
-      .then(() => undefined);
+      .then(({ error }) => {
+        if (error) console.warn("[listing_views] insert failed", error);
+      });
   }, [data?.id, data?.seller_id, user?.id]);
 
   if (isLoading) {
@@ -460,7 +462,6 @@ function ListingDetailPage() {
             </h1>
             <p className="mt-3 font-display text-3xl text-primary">{priceLabel}</p>
           </div>
-
 
           {(() => {
             const fmt = (s: string) =>
@@ -683,7 +684,6 @@ function ListingDetailPage() {
           </div>
         </aside>
       </div>
-
 
       {data.lat != null && data.lng != null && (
         <section className="mt-10">

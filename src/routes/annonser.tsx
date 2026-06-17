@@ -526,6 +526,7 @@ function BrowsePage() {
             <FeaturedListingsSection
               categorySlug={effectiveCategories.length === 1 ? effectiveCategories[0] : undefined}
               allowedIds={new Set((listings ?? []).map((l) => l.id))}
+              limit={3}
             />
           )}
           {isLoading ? (

@@ -11,7 +11,7 @@ type Props = {
   allowedIds?: Set<string>;
 };
 
-export function FeaturedListingsSection({ categorySlug, limit = 2, allowedIds }: Props) {
+export function FeaturedListingsSection({ categorySlug, limit = 3, allowedIds }: Props) {
   const fetchFeatured = useServerFn(getFeaturedListings);
   const { data } = useQuery({
     queryKey: ["featured-listings", categorySlug ?? null, limit],
@@ -45,8 +45,10 @@ export function FeaturedListingsSection({ categorySlug, limit = 2, allowedIds }:
           </span>
         </div>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-          {cards.map((l) => (
-            <ListingCard key={l.id} listing={l} />
+          {cards.map((l, i) => (
+            <div key={l.id} className={i >= 2 ? "hidden sm:block" : undefined}>
+              <ListingCard listing={l} />
+            </div>
           ))}
         </div>
       </div>

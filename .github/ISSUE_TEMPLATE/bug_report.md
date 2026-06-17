@@ -3,7 +3,7 @@ name: Bug-rapport
 about: Rapporter en feil slik at vi kan rette den
 title: "[bug] "
 labels: bug
-assignees: ''
+assignees: ""
 ---
 
 ## Beskrivelse

@@ -239,6 +239,7 @@ export function AppLanding() {
                     value={location}
                     onChange={setLocation}
                     onDone={() => setLocOpen(false)}
+                    autoFocus={false}
                   />
                   {hasLocation && (
                     <RadiusPicker

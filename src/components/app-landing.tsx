@@ -230,7 +230,20 @@ export function AppLanding() {
                   )}
                 </button>
               </SheetTrigger>
-              <SheetContent side="bottom" className="rounded-t-2xl">
+              <SheetContent
+                side="bottom"
+                className="rounded-t-2xl"
+                tabIndex={-1}
+                onOpenAutoFocus={(e) => {
+                  // Radix focuses the first focusable element (the location
+                  // input) on mount by default, which pops the keyboard
+                  // while the sheet is still animating in and pushes it
+                  // off-screen. Keep focus on the sheet itself instead;
+                  // the keyboard only opens once the user taps the input.
+                  e.preventDefault();
+                  (e.target as HTMLElement)?.focus();
+                }}
+              >
                 <SheetHeader className="text-left">
                   <SheetTitle>Velg sted</SheetTitle>
                 </SheetHeader>

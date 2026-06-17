@@ -27,7 +27,7 @@ function PersonvernPage() {
         <h1 className="mt-2 font-display text-4xl leading-tight tracking-tight">
           Personvernerklæring
         </h1>
-        <p className="mt-3 text-sm text-muted-foreground">Sist oppdatert 9. juni 2026</p>
+        <p className="mt-3 text-sm text-muted-foreground">Sist oppdatert 17. juni 2026</p>
       </header>
 
       <div className="space-y-10 text-sm leading-relaxed text-foreground/90">
@@ -116,8 +116,9 @@ function PersonvernPage() {
               partene i salget.
             </li>
             <li>
-              <strong>Anonyme visninger</strong> av annonser, for å gi selger statistikk. Disse
-              knyttes til en sesjons-ID, ikke til personlige opplysninger.
+              <strong>Visninger</strong> av annonser, for å gi selger statistikk. Hvis du er
+              innlogget når du ser en annonse, knyttes visningen til brukeren din. Hvis du ikke er
+              innlogget, knyttes den kun til en anonym sesjons-ID.
             </li>
             <li>
               <strong>Push-varslinger</strong> — hvis du slår på varsler, lagrer vi et kryptografisk
@@ -125,9 +126,24 @@ function PersonvernPage() {
               hva du vil varsles om (nye meldinger, lagrede søk).
             </li>
             <li>
+              <strong>Verifisering</strong> — hvis du verifiserer identiteten din, lagres
+              opplysninger knyttet til verifiseringen.
+            </li>
+            <li>
+              <strong>Betaling og annonsepromotering</strong> — hvis du betaler for å fremheve en
+              annonse, lagres transaksjonsdata fra betalingsleverandøren Vipps, samt hvilken annonse
+              betalingen gjelder.
+            </li>
+            <li>
+              <strong>Varsler om prisendringer</strong> — hvis du har lagt til en annonse som
+              favoritt eller har et lagret søk, kan vi lagre at det er sendt varsel til deg om
+              prisendring eller nytt treff, slik at du ikke varsles flere ganger om det samme.
+            </li>
+            <li>
               <strong>Moderering</strong> — ved brudd på reglene kan administrator registrere en{" "}
               <em>utestengelse</em>, <em>midlertidig suspensjon</em> eller <em>IP-blokkering</em>.
-              Slike administrative handlinger logges internt med tidspunkt og årsak.
+              Ved IP-blokkering lagres IP-adressen som er blokkert. Slike administrative handlinger
+              logges internt med tidspunkt og årsak.
             </li>
             <li>
               <strong>Sletteforespørsler</strong> — når du ber om å slette kontoen, lagrer vi e-post
@@ -217,6 +233,20 @@ function PersonvernPage() {
             <li>
               <strong>Supabase</strong> — databehandler for autentisering, database og fillagring.
               Servere i EU.
+            </li>
+            <li>
+              <strong>Vipps</strong> — betalingsleverandør for kjøp av annonsepromotering. Vipps
+              behandler betalingsopplysninger som navn og telefonnummer i forbindelse med
+              transaksjonen. Du kan lese Vipps sin personvernerklæring på{" "}
+              <a
+                href="https://www.vipps.no/personvern/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary underline underline-offset-2"
+              >
+                vipps.no/personvern
+              </a>
+              .
             </li>
             <li>
               <strong>Google Fonts</strong> — skrifttyper lastes direkte fra Googles servere.

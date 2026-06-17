@@ -1112,6 +1112,21 @@ export type Database = {
           suspension_reason: string
         }[]
       }
+      popular_listings_last_week: {
+        Args: { _limit?: number }
+        Returns: {
+          city: string
+          cover_path: string
+          created_at: string
+          is_free: boolean
+          kaupet_code: string
+          listing_id: string
+          price_nok: number
+          title: string
+          total_views: number
+          views_last_week: number
+        }[]
+      }
       purge_expired_accounts: { Args: never; Returns: number }
       request_account_deletion: { Args: { _email: string }; Returns: undefined }
       user_review_summary: {

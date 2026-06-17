@@ -41,9 +41,7 @@ export const republishListing = createServerFn({ method: "POST" })
   });
 
 export const getListingKaupetCodeById = createServerFn({ method: "GET" })
-  .inputValidator((input: unknown) =>
-    z.object({ listing_id: z.string().uuid() }).parse(input),
-  )
+  .inputValidator((input: unknown) => z.object({ listing_id: z.string().uuid() }).parse(input))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row, error } = await supabaseAdmin

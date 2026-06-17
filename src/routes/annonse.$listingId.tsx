@@ -17,10 +17,7 @@ export const Route = createFileRoute("/annonse/$listingId")({
     return parsed.success ? parsed.data : {};
   },
   head: () => ({
-    meta: [
-      { title: "Videresender — Kaupet.no" },
-      { name: "robots", content: "noindex" },
-    ],
+    meta: [{ title: "Videresender — Kaupet.no" }, { name: "robots", content: "noindex" }],
   }),
   beforeLoad: async ({ params, search }) => {
     // Legacy Vipps return-URL: send brukeren til den nye bekreftelsessiden.
@@ -61,9 +58,7 @@ export const Route = createFileRoute("/annonse/$listingId")({
     <div className="mx-auto max-w-md px-4 py-16 text-center">
       <AlertCircle className="mx-auto size-10 text-destructive" />
       <h1 className="mt-4 font-display text-2xl">Kunne ikke åpne annonsen</h1>
-      <p className="mt-2 text-muted-foreground">
-        {formatErrorMessage(error, "Ukjent feil")}
-      </p>
+      <p className="mt-2 text-muted-foreground">{formatErrorMessage(error, "Ukjent feil")}</p>
       <Button asChild className="mt-6">
         <Link to="/annonser" search={{ q: "", category: "", sort: "new" }}>
           Til alle annonser

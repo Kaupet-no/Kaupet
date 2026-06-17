@@ -5,11 +5,6 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isTestHost } from "@/lib/env";
 
-
-
-
-
-
 export const getPromotionPricing = createServerFn({ method: "GET" }).handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin
@@ -147,7 +142,6 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
       throw err;
     }
   });
-
 
 export const getPromotionStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

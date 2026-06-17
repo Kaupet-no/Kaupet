@@ -92,9 +92,6 @@ export function PublishedListingDialog({
     };
   }, [listing?.cover_path]);
 
-
-
-
   return (
     <Dialog
       open={open}
@@ -108,9 +105,7 @@ export function PublishedListingDialog({
           <DialogTitle className="font-display text-2xl">
             Annonsen din er publisert, bra jobba! 🎉
           </DialogTitle>
-          <DialogDescription>
-            Annonsen er nå synlig for kjøpere i hele Norge.
-          </DialogDescription>
+          <DialogDescription>Annonsen er nå synlig for kjøpere i hele Norge.</DialogDescription>
         </DialogHeader>
 
         {/* Preview card */}
@@ -183,4 +178,3 @@ export function PublishedListingDialog({
     </Dialog>
   );
 }
-

@@ -64,10 +64,12 @@ function PersonvernPage() {
             </li>
 
             <li>
-              <strong>kaupet.app.location</strong> — lagres i <code>localStorage</code> og husker
-              posisjonen og søkeradius du sist brukte i stedsfilteret (koordinater, radius i km og
-              stedsnavn). Gjør at filteret er forhåndsutfylt neste gang du besøker siden. Dataene
-              forlater ikke nettleseren din og brukes ikke til sporing.
+              <strong>kaupet.app.location</strong> — benyttes kun i Kaupet-appen for iOS og Android,
+              ikke på nettsiden. Lagres i <code>localStorage</code> og husker posisjonen og
+              søkeradius du sist brukte i stedsfilteret (koordinater, radius i km og stedsnavn),
+              slik at filteret er forhåndsutfylt og søkeresultatene er forhåndsfiltrert på sted
+              neste gang du åpner appen. Dataene forlater ikke enheten din og brukes ikke til
+              sporing.
             </li>
             <li>
               <strong>kaupet_push_msg_hint_dismissed_v1</strong> — lagres i{" "}

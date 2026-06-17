@@ -119,21 +119,34 @@ export function AppLanding() {
     },
   });
 
-
   const submitSearch = (e: React.FormEvent) => {
     e.preventDefault();
     navigate({
       to: "/annonser",
-      search: { q: q.trim(), category: "", sort: "new" },
+      search: {
+        q: q.trim(),
+        category: "",
+        sort: "new",
+        lat: location.lat ?? undefined,
+        lng: location.lng ?? undefined,
+        radius: location.lat != null ? location.radius : undefined,
+        loc: location.label || undefined,
+      },
     });
   };
 
   const pickCategory = (cat: CategoryRow) => {
+    const locationSearch = {
+      lat: location.lat ?? undefined,
+      lng: location.lng ?? undefined,
+      radius: location.lat != null ? location.radius : undefined,
+      loc: location.label || undefined,
+    };
     const subs = childrenByParent.get(cat.id) ?? [];
     if (subs.length === 0) {
       navigate({
         to: "/annonser",
-        search: { q: "", category: cat.slug, sort: "new" },
+        search: { q: "", category: cat.slug, sort: "new", ...locationSearch },
       });
       return;
     }
@@ -146,6 +159,7 @@ export function AppLanding() {
         categories: allSlugs,
         catMode: "any",
         sort: "new",
+        ...locationSearch,
       },
     });
   };

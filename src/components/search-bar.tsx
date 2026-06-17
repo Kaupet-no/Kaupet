@@ -365,7 +365,19 @@ function MobileBar(props: Props) {
             <SlidersHorizontal className="size-4 text-muted-foreground" />
           </button>
         </SheetTrigger>
-        <SheetContent side="bottom" className="h-[90dvh] overflow-y-auto p-4">
+        <SheetContent
+          side="bottom"
+          className="h-[90dvh] overflow-y-auto p-4"
+          tabIndex={-1}
+          onOpenAutoFocus={(e) => {
+            // Radix focuses the first focusable element (the "Hva" input)
+            // on mount by default, which pops the keyboard while the sheet
+            // is still animating in. Keep focus on the sheet itself instead;
+            // the keyboard only opens once the user taps a field.
+            e.preventDefault();
+            (e.target as HTMLElement)?.focus();
+          }}
+        >
           <SheetHeader>
             <SheetTitle>Søk</SheetTitle>
           </SheetHeader>

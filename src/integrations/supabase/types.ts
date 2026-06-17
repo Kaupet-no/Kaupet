@@ -65,6 +65,36 @@ export type Database = {
         }
         Relationships: []
       }
+      error_log: {
+        Row: {
+          context: Json | null
+          created_at: string
+          error_code: string | null
+          error_message: string
+          function_name: string
+          id: string
+          user_id: string | null
+        }
+        Insert: {
+          context?: Json | null
+          created_at?: string
+          error_code?: string | null
+          error_message: string
+          function_name: string
+          id?: string
+          user_id?: string | null
+        }
+        Update: {
+          context?: Json | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string
+          function_name?: string
+          id?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           created_at: string
@@ -959,6 +989,18 @@ export type Database = {
           id: string
           ip_address: unknown
           reason: string
+        }[]
+      }
+      admin_list_error_log: {
+        Args: { _limit?: number }
+        Returns: {
+          context: Json | null
+          created_at: string
+          error_code: string | null
+          error_message: string
+          function_name: string
+          id: string
+          user_id: string | null
         }[]
       }
       admin_list_moderation_log: {

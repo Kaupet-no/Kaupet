@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { logServerError } from "@/lib/server-error-log";
 
 export type ListingSale = {
   listing_id: string;
@@ -61,11 +62,15 @@ export const unconfirmBuyer = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ listingId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { data: sale } = await supabase
+    const { data: sale, error: saleErr } = await supabase
       .from("listing_sales")
       .select("listing_id, seller_id")
       .eq("listing_id", data.listingId)
       .maybeSingle();
+    if (saleErr) {
+      await logServerError("unconfirmBuyer", saleErr, { listingId: data.listingId, userId });
+      throw saleErr;
+    }
     if (!sale) throw new Error("Salget finnes ikke");
     if (sale.seller_id !== userId) {
       throw new Error("Bare selger kan angre salget");

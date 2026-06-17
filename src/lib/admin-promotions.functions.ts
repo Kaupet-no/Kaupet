@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { logServerError } from "@/lib/server-error-log";
 import type { Database } from "@/integrations/supabase/types";
 
 async function requireAdmin(supabase: SupabaseClient<Database>, userId: string) {
@@ -180,17 +181,23 @@ export const adminRefundPromotion = createServerFn({ method: "POST" })
       host,
     );
 
-    await supabaseAdmin
+    const { error: refundErr } = await supabaseAdmin
       .from("listing_promotions")
       .update({ status: "refunded", refunded_at: new Date().toISOString() })
       .eq("id", promo.id);
+    if (refundErr) {
+      await logServerError("refundPromotion.updateStatus", refundErr, { promotion_id: promo.id });
+    }
 
-    await supabaseAdmin.from("admin_moderation_log").insert({
+    const { error: logErr } = await supabaseAdmin.from("admin_moderation_log").insert({
       admin_id: context.userId,
       action: "refund_promotion",
       target_type: "promotion",
       target_id: promo.id,
     });
+    if (logErr) {
+      await logServerError("refundPromotion.moderationLog", logErr, { promotion_id: promo.id });
+    }
     return { ok: true };
   });
 
@@ -243,13 +250,18 @@ export const adminGiftPromotion = createServerFn({ method: "POST" })
     });
     if (error) throw error;
 
-    await supabaseAdmin.from("admin_moderation_log").insert({
+    const { error: logErr } = await supabaseAdmin.from("admin_moderation_log").insert({
       admin_id: context.userId,
       action: "gift_promotion",
       target_type: "listing",
       target_id: data.listing_id,
       reason: `${data.duration_days} dager — ${data.reason}`,
     });
+    if (logErr) {
+      await logServerError("adminGiftPromotion.moderationLog", logErr, {
+        listing_id: data.listing_id,
+      });
+    }
     return { ok: true };
   });
 

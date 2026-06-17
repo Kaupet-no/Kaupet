@@ -17,6 +17,10 @@
 
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <item name="android:background">@drawable/splash</item>
+        <!-- Theme.SplashScreen ignores android:background; it only reads
+             windowSplashScreenBackground (a color), and shows the launcher
+             icon centered on top of it (the OS-mandated pattern on Android
+             12+, also used as fallback on older versions via core-splashscreen). -->
+        <item name="windowSplashScreenBackground">@color/splashBackground</item>
     </style>
 </resources>

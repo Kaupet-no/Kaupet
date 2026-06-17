@@ -25,9 +25,11 @@ type LocationPickerProps = {
   onChange: (v: LocationValue) => void;
   /** Called after the popover should close (user picked or cleared). */
   onDone?: () => void;
+  /** Focus the input as soon as it mounts. Default true. */
+  autoFocus?: boolean;
 };
 
-export function LocationPicker({ value, onChange, onDone }: LocationPickerProps) {
+export function LocationPicker({ value, onChange, onDone, autoFocus = true }: LocationPickerProps) {
   const [query, setQuery] = useState(value.label ?? "");
   const [results, setResults] = useState<NominatimResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -110,7 +112,7 @@ export function LocationPicker({ value, onChange, onDone }: LocationPickerProps)
       <div className="relative">
         <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          autoFocus
+          autoFocus={autoFocus}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Sted (f.eks. Oslo, Bergen, 7030)"

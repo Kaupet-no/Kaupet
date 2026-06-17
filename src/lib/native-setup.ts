@@ -41,12 +41,14 @@ export async function setupNative(): Promise<void> {
       await Keyboard.setResizeMode({ mode: KeyboardResize.Body });
       await Keyboard.setScroll({ isDisabled: false }).catch(() => {});
     }
-    Keyboard.addListener("keyboardWillShow", () => {
+    // keyboardDidShow (not keyboardWillShow) so the resize has already
+    // happened before we measure/scroll — otherwise the focused field's
+    // container (e.g. a bottom sheet) may not have settled into its final
+    // size yet and the scroll lands in the wrong place.
+    Keyboard.addListener("keyboardDidShow", () => {
       const el = document.activeElement as HTMLElement | null;
       if (el && typeof el.scrollIntoView === "function") {
-        setTimeout(() => {
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
-        }, 100);
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
       }
     });
   } catch {

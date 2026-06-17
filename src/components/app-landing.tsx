@@ -2,8 +2,10 @@ import { useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
+  ArrowRight,
   Baby,
   Car,
+  ChevronLeft,
   Dumbbell,
   Gamepad2,
   Home,
@@ -135,33 +137,24 @@ export function AppLanding() {
     });
   };
 
+  const [activeCategory, setActiveCategory] = useState<CategoryRow | null>(null);
+
   const pickCategory = (cat: CategoryRow) => {
-    const locationSearch = {
-      lat: location.lat ?? undefined,
-      lng: location.lng ?? undefined,
-      radius: location.lat != null ? location.radius : undefined,
-      loc: location.label || undefined,
-    };
     const subs = childrenByParent.get(cat.id) ?? [];
     if (subs.length === 0) {
+      const locationSearch = {
+        lat: location.lat ?? undefined,
+        lng: location.lng ?? undefined,
+        radius: location.lat != null ? location.radius : undefined,
+        loc: location.label || undefined,
+      };
       navigate({
         to: "/annonser",
         search: { q: "", category: cat.slug, sort: "new", ...locationSearch },
       });
       return;
     }
-    const allSlugs = [cat.slug, ...subs.map((s) => s.slug)];
-    navigate({
-      to: "/annonser",
-      search: {
-        q: "",
-        category: "",
-        categories: allSlugs,
-        catMode: "any",
-        sort: "new",
-        ...locationSearch,
-      },
-    });
+    setActiveCategory(cat);
   };
 
   const hasLocation = location.lat != null && location.lng != null;
@@ -265,58 +258,127 @@ export function AppLanding() {
       </section>
 
       {/* Kategorier */}
-      <section className="pt-2 sm:px-5">
-        <h2 className="mb-3 px-5 font-display text-lg tracking-tight sm:px-0">Kategorier</h2>
-
-        {/* Mobil: horisontal sveipbar rad */}
-        <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2 sm:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {rootCategories.length === 0 &&
-            Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-24 w-20 shrink-0 animate-pulse rounded-2xl bg-muted" />
-            ))}
-          {rootCategories.map((cat) => {
-            const Icon = CATEGORY_ICONS[cat.slug] ?? Package;
-            return (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => pickCategory(cat)}
-                className="group flex w-20 shrink-0 snap-start flex-col items-center gap-2 active:opacity-80"
-              >
-                <span className="flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
-                  <Icon className="size-7" />
-                </span>
-                <span className="line-clamp-2 text-pretty text-center text-xs font-medium leading-tight">
-                  {cat.name_nb}
-                </span>
-              </button>
-            );
-          })}
+      <section className="overflow-hidden pt-2 sm:px-5">
+        <div className="mb-3 flex items-center justify-between gap-3 px-5 sm:px-0">
+          <h2 className="font-display text-lg tracking-tight">
+            {activeCategory ? activeCategory.name_nb : "Kategorier"}
+          </h2>
+          {activeCategory && (
+            <button
+              type="button"
+              onClick={() => setActiveCategory(null)}
+              className="flex shrink-0 items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium transition hover:border-primary hover:text-primary"
+            >
+              <ChevronLeft className="size-3.5" />
+              Tilbake
+            </button>
+          )}
         </div>
 
-        {/* Tablet/desktop: grid */}
-        <div className="hidden grid-cols-2 gap-3 sm:grid md:grid-cols-3 lg:grid-cols-4">
-          {rootCategories.length === 0 &&
-            Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="aspect-[5/4] animate-pulse rounded-2xl bg-muted" />
-            ))}
-          {rootCategories.map((cat) => {
-            const Icon = CATEGORY_ICONS[cat.slug] ?? Package;
+        {!activeCategory ? (
+          <div className="duration-300 animate-out fade-out animate-in fade-in">
+            {/* Mobil: horisontal sveipbar rad */}
+            <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2 sm:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {rootCategories.length === 0 &&
+                Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="h-24 w-20 shrink-0 animate-pulse rounded-2xl bg-muted" />
+                ))}
+              {rootCategories.map((cat) => {
+                const Icon = CATEGORY_ICONS[cat.slug] ?? Package;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => pickCategory(cat)}
+                    className="group flex w-20 shrink-0 snap-start flex-col items-center gap-2 active:opacity-80"
+                  >
+                    <span className="flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
+                      <Icon className="size-7" />
+                    </span>
+                    <span className="line-clamp-2 text-pretty text-center text-xs font-medium leading-tight">
+                      {cat.name_nb}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Tablet/desktop: grid */}
+            <div className="hidden grid-cols-2 gap-3 sm:grid md:grid-cols-3 lg:grid-cols-4">
+              {rootCategories.length === 0 &&
+                Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="aspect-[5/4] animate-pulse rounded-2xl bg-muted" />
+                ))}
+              {rootCategories.map((cat) => {
+                const Icon = CATEGORY_ICONS[cat.slug] ?? Package;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => pickCategory(cat)}
+                    className="group flex aspect-[5/4] flex-col items-center justify-center gap-2 rounded-2xl border border-border bg-card p-3 text-center transition active:scale-[0.98] hover:border-primary"
+                  >
+                    <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
+                      <Icon className="size-5" />
+                    </span>
+                    <span className="text-pretty text-sm font-medium leading-tight">
+                      {cat.name_nb}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          (() => {
+            const subs = childrenByParent.get(activeCategory.id) ?? [];
+            const allSlugs = [activeCategory.slug, ...subs.map((s) => s.slug)];
+            const locationSearch = {
+              lat: location.lat ?? undefined,
+              lng: location.lng ?? undefined,
+              radius: location.lat != null ? location.radius : undefined,
+              loc: location.label || undefined,
+            };
             return (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => pickCategory(cat)}
-                className="group flex aspect-[5/4] flex-col items-center justify-center gap-2 rounded-2xl border border-border bg-card p-3 text-center transition active:scale-[0.98] hover:border-primary"
+              <div
+                key={activeCategory.id}
+                className="flex flex-col gap-2 px-5 duration-300 animate-in fade-in slide-in-from-bottom-8 sm:px-0"
               >
-                <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
-                  <Icon className="size-5" />
-                </span>
-                <span className="text-pretty text-sm font-medium leading-tight">{cat.name_nb}</span>
-              </button>
+                <Link
+                  to="/annonser"
+                  search={{
+                    q: "",
+                    category: "",
+                    categories: allSlugs,
+                    catMode: "any",
+                    sort: "new",
+                    ...locationSearch,
+                  }}
+                  className="group flex items-center justify-between gap-3 rounded-xl border border-primary bg-primary/5 px-4 py-4 text-left font-medium text-primary transition active:scale-[0.98]"
+                >
+                  <span className="truncate">Alt i {activeCategory.name_nb}</span>
+                  <ArrowRight className="size-4 shrink-0 transition group-hover:translate-x-0.5" />
+                </Link>
+                {subs.map((sub) => (
+                  <Link
+                    key={sub.id}
+                    to="/annonser"
+                    search={{ q: "", category: sub.slug, sort: "new", ...locationSearch }}
+                    className="group flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-4 text-left transition active:scale-[0.98]"
+                  >
+                    <span className="truncate font-medium">{sub.name_nb}</span>
+                    <ArrowRight className="size-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
+                  </Link>
+                ))}
+                {subs.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Ingen underkategorier — trykk over for å se alle annonser.
+                  </p>
+                )}
+              </div>
             );
-          })}
-        </div>
+          })()
+        )}
       </section>
 
       {/* Populært nå */}

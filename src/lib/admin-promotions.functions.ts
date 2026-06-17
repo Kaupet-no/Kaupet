@@ -95,9 +95,7 @@ export const adminListPromotions = createServerFn({ method: "GET" })
 
 export const adminGetVippsPaymentStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z.object({ promotion_id: z.string().uuid() }).parse(input),
-  )
+  .inputValidator((input: unknown) => z.object({ promotion_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -182,8 +180,6 @@ export const adminRefundPromotion = createServerFn({ method: "POST" })
     });
     return { ok: true };
   });
-
-
 
 export const adminGiftPromotion = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

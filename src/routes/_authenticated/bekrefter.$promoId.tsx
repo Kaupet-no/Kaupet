@@ -52,7 +52,11 @@ function ConfirmPage() {
       try {
         const result = await mutation.mutateAsync();
         if (cancelled) return;
-        if (result.status === "active" || result.status === "gifted" || result.status === "failed") {
+        if (
+          result.status === "active" ||
+          result.status === "gifted" ||
+          result.status === "failed"
+        ) {
           goToReceipt();
           return;
         }

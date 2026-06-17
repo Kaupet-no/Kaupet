@@ -2,7 +2,17 @@ import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { User, ListChecks, Plus, Heart, Bell, Settings, LogOut, Shield, FlaskConical } from "lucide-react";
+import {
+  User,
+  ListChecks,
+  Plus,
+  Heart,
+  Bell,
+  Settings,
+  LogOut,
+  Shield,
+  FlaskConical,
+} from "lucide-react";
 
 import { useIsAdmin } from "@/lib/use-is-admin";
 import { useIsDemo } from "@/lib/use-is-demo";

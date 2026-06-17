@@ -3,7 +3,7 @@ name: Funksjonsforslag
 about: Foreslå en idé til Kaupet.no
 title: "[idé] "
 labels: enhancement
-assignees: ''
+assignees: ""
 ---
 
 ## Problemet

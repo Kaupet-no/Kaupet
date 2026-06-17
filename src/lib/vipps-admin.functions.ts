@@ -74,7 +74,15 @@ const DEFAULT_EVENTS = [
   "epayments.payment.terminated.v1",
 ];
 
-type AuthCtx = { supabase: { rpc: (fn: "has_role", args: { _user_id: string; _role: "admin" }) => PromiseLike<{ data: boolean | null }> }; userId: string };
+type AuthCtx = {
+  supabase: {
+    rpc: (
+      fn: "has_role",
+      args: { _user_id: string; _role: "admin" },
+    ) => PromiseLike<{ data: boolean | null }>;
+  };
+  userId: string;
+};
 async function assertAdmin(context: AuthCtx) {
   const { data: isAdmin } = await context.supabase.rpc("has_role", {
     _user_id: context.userId,
@@ -82,9 +90,6 @@ async function assertAdmin(context: AuthCtx) {
   });
   if (!isAdmin) throw new Error("Kun administrator kan registrere Vipps-webhooks");
 }
-
-
-
 
 export const listVippsWebhooks = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -131,20 +136,20 @@ export const registerVippsWebhook = createServerFn({ method: "POST" })
     // Lagre secret i DB slik at webhook-handleren kan verifisere signaturen
     // automatisk uten manuell env-variabel.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error: upsertError } = await supabaseAdmin
-      .from("vipps_webhook_secrets")
-      .upsert(
-        {
-          mode: data.mode,
-          webhook_id: result.id,
-          url: data.url,
-          secret: result.secret,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "mode" },
-      );
+    const { error: upsertError } = await supabaseAdmin.from("vipps_webhook_secrets").upsert(
+      {
+        mode: data.mode,
+        webhook_id: result.id,
+        url: data.url,
+        secret: result.secret,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "mode" },
+    );
     if (upsertError) {
-      throw new Error(`Webhook registrert hos Vipps, men lagring i DB feilet: ${upsertError.message}`);
+      throw new Error(
+        `Webhook registrert hos Vipps, men lagring i DB feilet: ${upsertError.message}`,
+      );
     }
 
     return { id: result.id, stored: true as const };

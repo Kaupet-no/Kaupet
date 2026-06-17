@@ -27,8 +27,7 @@ function hostAwareEnv(host?: string | null): VippsEnv {
   // Explicit override (local dev): VIPPS_ENVIRONMENT=test|production wins.
   const override = process.env.VIPPS_ENVIRONMENT;
   const useTest =
-    override === "test" ||
-    (override !== "production" && (isTestHost(host) || getRequestIsTest()));
+    override === "test" || (override !== "production" && (isTestHost(host) || getRequestIsTest()));
 
   if (useTest) {
     return {
@@ -57,7 +56,6 @@ export function getVippsMode(host?: string | null): "test" | "production" {
 }
 
 export function assertVippsConfigured(host?: string | null) {
-
   const e = hostAwareEnv(host);
   const prefix = e.mode === "test" ? "VIPPS_TEST_" : "VIPPS_";
   const missing: string[] = [];

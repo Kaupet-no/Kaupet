@@ -464,7 +464,8 @@ function NewListingPage() {
           canPromote={isDemo}
           onView={() => {
             setPublishedOpen(false);
-            if (publishedCode) navigate({ to: "/$kaupetCode", params: { kaupetCode: publishedCode } });
+            if (publishedCode)
+              navigate({ to: "/$kaupetCode", params: { kaupetCode: publishedCode } });
           }}
           onPromote={() => {
             setPublishedOpen(false);

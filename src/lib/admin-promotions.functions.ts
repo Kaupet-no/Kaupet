@@ -177,7 +177,7 @@ export const adminRefundPromotion = createServerFn({ method: "POST" })
     await refundVippsPayment(
       promo.vipps_reference,
       promo.price_nok,
-      `refund-${promo.id}-${Date.now()}`,
+      `r-${promo.id.replace(/-/g, "")}-${Date.now().toString(36)}`,
       host,
     );
 

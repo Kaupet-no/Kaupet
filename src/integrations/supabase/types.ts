@@ -135,6 +135,36 @@ export type Database = {
           },
         ]
       }
+      error_log: {
+        Row: {
+          context: Json | null
+          created_at: string
+          error_code: string | null
+          error_message: string
+          function_name: string
+          id: string
+          user_id: string | null
+        }
+        Insert: {
+          context?: Json | null
+          created_at?: string
+          error_code?: string | null
+          error_message: string
+          function_name: string
+          id?: string
+          user_id?: string | null
+        }
+        Update: {
+          context?: Json | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string
+          function_name?: string
+          id?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       favorite_price_drops: {
         Row: {
           created_at: string
@@ -971,6 +1001,18 @@ export type Database = {
           created_at: string
           display_name: string
           reason: string
+          user_id: string
+        }[]
+      }
+      admin_list_error_log: {
+        Args: { _limit?: number }
+        Returns: {
+          context: Json
+          created_at: string
+          error_code: string
+          error_message: string
+          function_name: string
+          id: string
           user_id: string
         }[]
       }

@@ -64,7 +64,7 @@ type CategoryRow = {
 };
 
 const searchSchema = z.object({
-  q: z.string().optional().default(""),
+  q: z.string().optional(),
 });
 
 export const Route = createFileRoute("/")({

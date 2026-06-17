@@ -350,6 +350,30 @@ export type Database = {
         }
         Relationships: []
       }
+      listing_view_events: {
+        Row: {
+          created_at: string
+          id: string
+          listing_id: string
+          user_id: string | null
+          visitor_key: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          listing_id: string
+          user_id?: string | null
+          visitor_key: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          listing_id?: string
+          user_id?: string | null
+          visitor_key?: string
+        }
+        Relationships: []
+      }
       listing_views: {
         Row: {
           created_at: string

@@ -361,13 +361,9 @@ function ListingDetailPage() {
       }
     }
     supabase
-      .from("listing_views")
-      .upsert(
-        { listing_id: data.id, visitor_key: visitorKey, user_id: user?.id ?? null },
-        { onConflict: "listing_id,visitor_key", ignoreDuplicates: true },
-      )
+      .rpc("log_listing_view", { _listing_id: data.id, _visitor_key: visitorKey })
       .then(({ error }) => {
-        if (error) console.warn("[listing_views] insert failed", error);
+        if (error) console.warn("[listing_views] log failed", error);
       });
   }, [data?.id, data?.seller_id, user?.id]);
 

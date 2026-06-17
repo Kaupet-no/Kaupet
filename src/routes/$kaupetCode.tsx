@@ -461,7 +461,6 @@ function ListingDetailPage() {
             <p className="mt-3 font-display text-3xl text-primary">{priceLabel}</p>
           </div>
 
-
           {(() => {
             const fmt = (s: string) =>
               new Date(s).toLocaleDateString("nb-NO", {
@@ -683,7 +682,6 @@ function ListingDetailPage() {
           </div>
         </aside>
       </div>
-
 
       {data.lat != null && data.lng != null && (
         <section className="mt-10">

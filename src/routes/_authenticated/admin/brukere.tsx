@@ -310,15 +310,11 @@ function AdminUsers() {
                 if (!pending) return;
                 if (pending.action === "grant") grant.mutate(pending.user.user_id);
                 else if (pending.action === "revoke") revoke.mutate(pending.user.user_id);
-                else if (pending.action === "grant_demo")
-                  grantDemo.mutate(pending.user.user_id);
+                else if (pending.action === "grant_demo") grantDemo.mutate(pending.user.user_id);
                 else revokeDemo.mutate(pending.user.user_id);
               }}
               disabled={
-                grant.isPending ||
-                revoke.isPending ||
-                grantDemo.isPending ||
-                revokeDemo.isPending
+                grant.isPending || revoke.isPending || grantDemo.isPending || revokeDemo.isPending
               }
             >
               {grant.isPending ||

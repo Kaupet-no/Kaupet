@@ -10,10 +10,7 @@ declare module "qrcode/lib/browser.js" {
     text: string,
     options?: QRCodeRenderOptions,
   ): Promise<HTMLCanvasElement>;
-  export function toDataURL(
-    text: string,
-    options?: QRCodeRenderOptions,
-  ): Promise<string>;
+  export function toDataURL(text: string, options?: QRCodeRenderOptions): Promise<string>;
   const QRCode: {
     toCanvas: typeof toCanvas;
     toDataURL: typeof toDataURL;

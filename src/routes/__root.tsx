@@ -23,7 +23,6 @@ import { TestEnvBanner } from "@/components/test-env-banner";
 import { TestEnvGate } from "@/components/test-env-gate";
 import { useIsTestEnv } from "@/lib/env";
 
-
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -281,55 +280,51 @@ function RootBody({ native }: { native: boolean }) {
         <Outlet />
       </main>
 
-        {!native && (
-          <footer className="border-t border-border bg-surface">
-            <div className="mx-auto max-w-6xl px-4 py-8 text-sm text-muted-foreground">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="space-y-1">
-                  <p>
-                    © {new Date().getFullYear()} Kaupet.no — Bygget med åpen kildekode,{" "}
-                    <a
-                      href="https://www.gnu.org/licenses/agpl-3.0.html"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline hover:text-foreground transition-colors"
-                    >
-                      AGPL-3.0
-                    </a>
-                    .
-                  </p>
-                  <p>
-                    Ved å bruke Kaupet.no godtar du våre{" "}
-                    <Link
-                      to="/vilkar"
-                      className="underline hover:text-foreground transition-colors"
-                    >
-                      brukervilkår
-                    </Link>
-                    .
-                  </p>
-                </div>
-                <div className="space-y-1 sm:max-w-xl sm:text-right">
-                  <p>
-                    Ditt personvern på internett er viktig. Kaupet.no benytter derfor ingen sporende
-                    informasjonskapsler eller tredjeparts analyseverktøy. Les vår{" "}
-                    <Link
-                      to="/personvern"
-                      className="underline hover:text-foreground transition-colors"
-                    >
-                      personvernerklæring her
-                    </Link>
-                    .
-                  </p>
-                </div>
+      {!native && (
+        <footer className="border-t border-border bg-surface">
+          <div className="mx-auto max-w-6xl px-4 py-8 text-sm text-muted-foreground">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="space-y-1">
+                <p>
+                  © {new Date().getFullYear()} Kaupet.no — Bygget med åpen kildekode,{" "}
+                  <a
+                    href="https://www.gnu.org/licenses/agpl-3.0.html"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-foreground transition-colors"
+                  >
+                    AGPL-3.0
+                  </a>
+                  .
+                </p>
+                <p>
+                  Ved å bruke Kaupet.no godtar du våre{" "}
+                  <Link to="/vilkar" className="underline hover:text-foreground transition-colors">
+                    brukervilkår
+                  </Link>
+                  .
+                </p>
+              </div>
+              <div className="space-y-1 sm:max-w-xl sm:text-right">
+                <p>
+                  Ditt personvern på internett er viktig. Kaupet.no benytter derfor ingen sporende
+                  informasjonskapsler eller tredjeparts analyseverktøy. Les vår{" "}
+                  <Link
+                    to="/personvern"
+                    className="underline hover:text-foreground transition-colors"
+                  >
+                    personvernerklæring her
+                  </Link>
+                  .
+                </p>
               </div>
             </div>
-          </footer>
-        )}
+          </div>
+        </footer>
+      )}
       {native && <AppBottomNav />}
     </div>
   );
 
   return isTest ? <TestEnvGate>{content}</TestEnvGate> : content;
 }
-

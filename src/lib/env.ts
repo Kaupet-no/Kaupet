@@ -16,9 +16,7 @@ export function isTestHost(host?: string | null): boolean {
 
 function hasTestModeCookie(): boolean {
   if (typeof document === "undefined") return false;
-  return document.cookie
-    .split(";")
-    .some((c) => c.trim().startsWith(`${TEST_MODE_COOKIE}=1`));
+  return document.cookie.split(";").some((c) => c.trim().startsWith(`${TEST_MODE_COOKIE}=1`));
 }
 
 /** Client-side check. Returns false during SSR. */

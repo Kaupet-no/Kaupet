@@ -2,15 +2,7 @@ import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import {
-  Loader2,
-  Sparkles,
-  Gift,
-  RefreshCcw,
-  AlertTriangle,
-  Search,
-  Info,
-} from "lucide-react";
+import { Loader2, Sparkles, Gift, RefreshCcw, AlertTriangle, Search, Info } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -330,11 +322,7 @@ function AdminPromotionsPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setDetailPromo(p)}
-                        >
+                        <Button size="sm" variant="ghost" onClick={() => setDetailPromo(p)}>
                           <Info className="size-4" /> Detaljer
                         </Button>
                       </TableCell>
@@ -505,10 +493,7 @@ function DetailDialog({
                 label="Opprettet"
                 value={new Date(promo.created_at).toLocaleString("nb-NO")}
               />
-              <DetailField
-                label="Intern status"
-                value={<StatusBadge status={promo.status} />}
-              />
+              <DetailField label="Intern status" value={<StatusBadge status={promo.status} />} />
               {promo.refunded_at && (
                 <DetailField
                   label="Refundert"
@@ -542,9 +527,7 @@ function DetailDialog({
                 </div>
                 <DetailField
                   label="Vipps-referanse"
-                  value={
-                    <code className="text-xs">{promo.vipps_reference ?? "—"}</code>
-                  }
+                  value={<code className="text-xs">{promo.vipps_reference ?? "—"}</code>}
                 />
                 {promo.vipps_psp_reference && (
                   <DetailField
@@ -576,8 +559,8 @@ function DetailDialog({
                       <div className="flex items-start gap-2 rounded border border-warning/40 bg-warning/5 p-2 text-warning-foreground">
                         <AlertTriangle className="size-4 mt-0.5 text-warning" />
                         <div>
-                          Intern status og Vipps-status er ulik. Sjekk webhook-leveranse og
-                          vurder å oppdatere manuelt.
+                          Intern status og Vipps-status er ulik. Sjekk webhook-leveranse og vurder å
+                          oppdatere manuelt.
                         </div>
                       </div>
                     )}
@@ -592,11 +575,7 @@ function DetailDialog({
             Lukk
           </Button>
           {canRefund && promo && (
-            <Button
-              variant="destructive"
-              onClick={() => onRefund(promo.id)}
-              disabled={refunding}
-            >
+            <Button variant="destructive" onClick={() => onRefund(promo.id)} disabled={refunding}>
               {refunding && <Loader2 className="size-4 animate-spin" />}
               <RefreshCcw className="size-4" /> Refunder {promo.price_nok} kr
             </Button>

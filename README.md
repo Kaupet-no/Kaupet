@@ -20,7 +20,7 @@ Appen kjører deretter på `http://localhost:3000`.
 
 ### Variabler
 
-Backenden (database, auth, filer) leveres av Supabase. Variabler i `.env` genereres automatisk i Lovable. Lokal kjøring mot egen Supabase-instans krever:
+Backenden (database, auth, filer) leveres av Supabase. Kopier `.env.example` til `.env` og fyll inn verdiene for ditt eget Supabase-prosjekt. Lokal kjøring mot egen Supabase-instans krever:
 
 ```
 VITE_SUPABASE_URL=...
@@ -34,7 +34,7 @@ VITE_SUPABASE_PROJECT_ID=...
 - [Tailwind CSS v4](https://tailwindcss.com)
 - [shadcn/ui](https://ui.shadcn.com) komponenter
 - [Supabase](https://supabase.com) — database, auth, storage
-- Hostet på Cloudflare Workers via [Lovable](https://lovable.dev)
+- Hostet på Cloudflare Workers
 
 ## Bidra
 

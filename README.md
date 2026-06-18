@@ -30,7 +30,7 @@ VITE_SUPABASE_PROJECT_ID=...
 
 ## Staging-miljø
 
-Endringer skal ikke testes direkte i produksjon. Push til `staging`-branchen deployer automatisk til **https://staging.kaupet.no** — en egen Cloudflare Worker med eget Supabase-prosjekt, helt atskilt fra produksjon.
+Endringer skal ikke testes direkte i produksjon. Push til `staging`-branchen deployer automatisk til **https://staging.kaupet.no** — en egen Cloudflare Worker med eget Supabase-prosjekt, adskilt fra produksjon.
 
 Domenet ligger bak Cloudflare Access, så alle besøkende må logge inn med en godkjent e-post før de når appen. Detaljert oppsett (Supabase-migrasjoner, secrets, Access-policy) er dokumentert i README på `staging`-branchen.
 

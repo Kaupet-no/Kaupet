@@ -3,12 +3,9 @@
   // Nitro fills in compatibility_date, main, assets and nodejs_compat
   // automatically at build time — this file only pins the stable bits
   // we don't want to depend on inference (like the git remote).
+  // Worker name for staging is overridden at build time via the
+  // CLOUDFLARE_WORKER_NAME env var (see vite.config.ts) — Wrangler's
+  // redirected-config mode used by Nitro's deployConfig rejects `env.*`
+  // blocks, so a plain `wrangler.jsonc` env can't be used here.
   "name": "kaupet-no",
-  // Deploy to staging with: bun run deploy -- --env staging
-  // (build the staging bundle first with the staging VITE_* vars set).
-  "env": {
-    "staging": {
-      "name": "kaupet-no-staging",
-    },
-  },
 }

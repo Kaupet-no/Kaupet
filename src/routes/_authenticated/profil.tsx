@@ -1,14 +1,26 @@
 import { useEffect, useRef, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Bell, ImagePlus, Loader2, LogOut, Trash2, ShieldOff } from "lucide-react";
+import {
+  Bell,
+  Calendar,
+  Camera,
+  ListChecks,
+  Loader2,
+  LogOut,
+  ShoppingBag,
+  Star,
+  Trash2,
+  ShieldOff,
+} from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -84,9 +96,6 @@ function ProfilePage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">
       <h1 className="font-display text-3xl tracking-tight">Min profil</h1>
-      <p className="mt-1 text-muted-foreground">
-        Administrer profilen og kontoinnstillingene dine.
-      </p>
 
       <Tabs
         value={tab}
@@ -101,7 +110,7 @@ function ProfilePage() {
             replace: true,
           })
         }
-        className="mt-8"
+        className="mt-6"
       >
         <TabsList>
           <TabsTrigger value="profil">Profilinfo</TabsTrigger>
@@ -109,7 +118,7 @@ function ProfilePage() {
           <TabsTrigger value="blokkerte">Blokkerte</TabsTrigger>
           <TabsTrigger value="konto">Konto</TabsTrigger>
         </TabsList>
-        <TabsContent value="profil" className="mt-6 space-y-6">
+        <TabsContent value="profil" className="mt-6">
           <ProfileSection />
         </TabsContent>
         <TabsContent value="varslinger" className="mt-6">
@@ -151,6 +160,12 @@ function ProfileSection() {
       if (error) throw error;
       return data;
     },
+  });
+
+  const getStats = useServerFn(getMyProfileStats);
+  const { data: stats } = useQuery({
+    queryKey: ["my-profile-stats"],
+    queryFn: () => getStats({}),
   });
 
   const {
@@ -216,67 +231,106 @@ function ProfileSection() {
   }
 
   const displayName = profile?.display_name ?? "";
+  const memberSince = stats
+    ? new Date(stats.created_at).toLocaleDateString("nb-NO", { month: "long", year: "numeric" })
+    : null;
 
   if (isLoading) return <Loader2 className="size-5 animate-spin text-muted-foreground" />;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4 rounded-xl border border-border bg-card p-6">
-        <Avatar className="size-16">
-          {profile?.avatar_url && <AvatarImage src={profile.avatar_url} alt={displayName} />}
-          <AvatarFallback className="bg-primary/10 text-base font-medium text-primary">
-            {displayName?.slice(0, 2).toUpperCase() || "?"}
-          </AvatarFallback>
-        </Avatar>
-        <div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleAvatarFile(file);
-              e.target.value = "";
-            }}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={uploadingAvatar}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            {uploadingAvatar ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <ImagePlus className="size-4" />
-            )}
-            Last opp profilbilde
-          </Button>
-        </div>
-      </div>
-
-      <form
-        onSubmit={handleSubmit((v) => mutation.mutate(v))}
-        className="space-y-6 rounded-xl border border-border bg-card p-6"
-      >
-        <div className="space-y-2">
-          <Label htmlFor="display_name">Visningsnavn</Label>
-          <Input id="display_name" {...register("display_name")} />
-          {errors.display_name && (
-            <p className="text-sm text-destructive">{errors.display_name.message}</p>
-          )}
-        </div>
-        <div className="flex justify-end">
-          <Button type="submit" disabled={mutation.isPending}>
-            {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
-            Lagre profil
-          </Button>
-        </div>
-      </form>
+    <div className="space-y-8">
+      <Card>
+        <CardHeader>
+          <CardTitle>Profilinfo</CardTitle>
+        </CardHeader>
+        <form onSubmit={handleSubmit((v) => mutation.mutate(v))}>
+          <CardContent className="flex items-center gap-5">
+            <div className="flex shrink-0 flex-col items-center gap-2">
+              <div className="relative">
+                <Avatar className="size-20">
+                  {profile?.avatar_url && (
+                    <AvatarImage src={profile.avatar_url} alt={displayName} />
+                  )}
+                  <AvatarFallback className="bg-primary/10 text-lg font-medium text-primary">
+                    {displayName?.slice(0, 2).toUpperCase() || "?"}
+                  </AvatarFallback>
+                </Avatar>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleAvatarFile(file);
+                    e.target.value = "";
+                  }}
+                />
+                <button
+                  type="button"
+                  aria-label="Last opp profilbilde"
+                  disabled={uploadingAvatar}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute -bottom-1 -right-1 flex size-7 items-center justify-center rounded-full border-2 border-card bg-primary text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {uploadingAvatar ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Camera className="size-3.5" />
+                  )}
+                </button>
+              </div>
+              {memberSince && (
+                <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Calendar className="size-3" /> Siden {memberSince}
+                </p>
+              )}
+            </div>
+            <div className="max-w-xs flex-1 space-y-2">
+              <Label htmlFor="display_name">Visningsnavn</Label>
+              <Input id="display_name" {...register("display_name")} />
+              {errors.display_name && (
+                <p className="text-sm text-destructive">{errors.display_name.message}</p>
+              )}
+            </div>
+          </CardContent>
+          <CardFooter className="justify-end border-t pt-6">
+            <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
+              Lagre profil
+            </Button>
+          </CardFooter>
+        </form>
+      </Card>
 
       <ProfileStats />
+    </div>
+  );
+}
+
+function StatCell({
+  label,
+  value,
+  icon,
+  children,
+}: {
+  label: string;
+  value?: string;
+  icon: React.ReactNode;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-1.5 px-4 py-5 text-center">
+      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+        {icon} {label}
+      </span>
+      <div className="flex min-h-7 items-center justify-center">
+        {value !== undefined ? (
+          <span className="text-xl font-semibold tabular-nums">{value}</span>
+        ) : (
+          children
+        )}
+      </div>
     </div>
   );
 }
@@ -289,40 +343,59 @@ function ProfileStats() {
   });
 
   if (isLoading || !stats) {
-    return <Loader2 className="size-5 animate-spin text-muted-foreground" />;
+    return (
+      <Card>
+        <CardContent className="grid grid-cols-3 divide-x divide-border p-0">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="flex items-center justify-center py-8">
+              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    );
   }
 
-  const memberSince = new Date(stats.created_at).toLocaleDateString("nb-NO", {
-    month: "long",
-    year: "numeric",
-  });
-
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-      <div className="rounded-xl border border-border bg-card p-4">
-        <p className="text-xs text-muted-foreground">Medlem siden</p>
-        <p className="mt-1 text-lg font-medium capitalize">{memberSince}</p>
-      </div>
-      <div className="rounded-xl border border-border bg-card p-4">
-        <p className="text-xs text-muted-foreground">Opprettede annonser</p>
-        <p className="mt-1 text-lg font-medium">{stats.listings_count}</p>
-      </div>
-      <div className="rounded-xl border border-border bg-card p-4">
-        <p className="text-xs text-muted-foreground">Salg</p>
-        <p className="mt-1 text-lg font-medium">{stats.sales_count}</p>
-      </div>
-      <div className="rounded-xl border border-border bg-card p-4">
-        <p className="text-xs text-muted-foreground">Gjennomsnittlig vurdering</p>
-        {stats.review_count > 0 ? (
-          <div className="mt-1 flex items-center gap-2">
-            <StarRating value={stats.avg_rating} readOnly size={16} />
-            <span className="text-lg font-medium">{stats.avg_rating.toFixed(1)}</span>
-          </div>
-        ) : (
-          <p className="mt-1 text-sm text-muted-foreground">Ingen vurderinger ennå</p>
-        )}
-      </div>
-    </div>
+    <Card>
+      <CardContent className="grid grid-cols-3 divide-x divide-border p-0">
+        <StatCell label="Annonser" icon={<ListChecks className="size-3.5" />}>
+          {stats.listings_count > 0 ? (
+            <span className="text-xl font-semibold tabular-nums">
+              {stats.listings_count.toLocaleString("nb-NO")}
+            </span>
+          ) : (
+            <Link
+              to="/ny-annonse"
+              className="text-xs font-medium text-primary underline-offset-2 hover:underline"
+            >
+              Opprett din første
+            </Link>
+          )}
+        </StatCell>
+        <StatCell label="Salg" icon={<ShoppingBag className="size-3.5" />}>
+          {stats.sales_count > 0 ? (
+            <span className="text-xl font-semibold tabular-nums">
+              {stats.sales_count.toLocaleString("nb-NO")}
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground">Ingen ennå</span>
+          )}
+        </StatCell>
+        <StatCell label="Vurdering" icon={<Star className="size-3.5" />}>
+          {stats.review_count > 0 ? (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xl font-semibold tabular-nums">
+                {stats.avg_rating.toFixed(1)}
+              </span>
+              <StarRating value={stats.avg_rating} readOnly size={14} />
+            </div>
+          ) : (
+            <span className="text-xs text-muted-foreground">Ingen ennå</span>
+          )}
+        </StatCell>
+      </CardContent>
+    </Card>
   );
 }
 

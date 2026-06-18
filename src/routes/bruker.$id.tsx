@@ -1,7 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { MapPin, User as UserIcon } from "lucide-react";
+import { User as UserIcon } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -124,11 +124,6 @@ function PublicProfilePage() {
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="font-display text-3xl tracking-tight">{profile.display_name}</h1>
           </div>
-          {profile.location && (
-            <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
-              <MapPin className="size-4" /> {profile.location}
-            </p>
-          )}
           <p className="text-xs text-muted-foreground">Medlem siden {memberSince}</p>
           <div className="mt-3 flex items-center gap-2">
             {profile.review_count > 0 ? (
@@ -146,12 +141,6 @@ function PublicProfilePage() {
         </div>
         <AdminUserActions userId={id} displayName={profile.display_name ?? "brukeren"} />
       </div>
-
-      {profile.bio && (
-        <p className="mt-6 whitespace-pre-wrap rounded-xl border border-border bg-card p-4 text-sm text-foreground">
-          {profile.bio}
-        </p>
-      )}
 
       <section className="mt-10">
         <h2 className="font-display text-2xl tracking-tight">Vurderinger</h2>

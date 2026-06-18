@@ -1,20 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Bell, Loader2, LogOut, Trash2, ShieldOff } from "lucide-react";
+import { Bell, ImagePlus, Loader2, LogOut, Trash2, ShieldOff } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { StarRating } from "@/components/star-rating";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,13 +36,12 @@ import {
 } from "@/lib/push";
 import { getNotificationPreferences, updateNotificationPreferences } from "@/lib/push.functions";
 import { listMyBlocks, deleteBlock } from "@/lib/blocks.functions";
+import { getMyProfileStats } from "@/lib/reviews.functions";
 import { formatErrorMessage } from "@/lib/errors";
+import { describeImageError, uploadAvatarImage, validateAvatarImage } from "@/lib/storage";
 
 const profileSchema = z.object({
   display_name: z.string().trim().min(2, "Minst 2 tegn").max(80),
-  bio: z.string().trim().max(500).optional().or(z.literal("")),
-  location: z.string().trim().max(100).optional().or(z.literal("")),
-  avatar_url: z.string().trim().url("Må være en gyldig URL").optional().or(z.literal("")),
 });
 type ProfileForm = z.infer<typeof profileSchema>;
 
@@ -129,6 +128,8 @@ function ProfilePage() {
 
 function ProfileSection() {
   const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const { data: userData } = useQuery({
     queryKey: ["current-user"],
     queryFn: async () => {
@@ -144,7 +145,7 @@ function ProfileSection() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("display_name, bio, location, avatar_url")
+        .select("display_name, avatar_url")
         .eq("id", userId!)
         .maybeSingle();
       if (error) throw error;
@@ -156,20 +157,14 @@ function ProfileSection() {
     register,
     handleSubmit,
     reset,
-    watch,
     formState: { errors },
   } = useForm<ProfileForm>({
-    defaultValues: { display_name: "", bio: "", location: "", avatar_url: "" },
+    defaultValues: { display_name: "" },
   });
 
   useEffect(() => {
     if (profile) {
-      reset({
-        display_name: profile.display_name ?? "",
-        bio: profile.bio ?? "",
-        location: profile.location ?? "",
-        avatar_url: profile.avatar_url ?? "",
-      });
+      reset({ display_name: profile.display_name ?? "" });
     }
   }, [profile, reset]);
 
@@ -177,18 +172,10 @@ function ProfileSection() {
     mutationFn: async (values: ProfileForm) => {
       if (!userId) throw new Error("Ikke innlogget");
       const parsed = profileSchema.parse(values);
-      const updates: {
-        bio: string | null;
-        location: string | null;
-        avatar_url: string | null;
-        display_name?: string;
-      } = {
-        bio: parsed.bio || null,
-        location: parsed.location || null,
-        avatar_url: parsed.avatar_url || null,
-        display_name: parsed.display_name,
-      };
-      const { error } = await supabase.from("profiles").update(updates).eq("id", userId);
+      const { error } = await supabase
+        .from("profiles")
+        .update({ display_name: parsed.display_name })
+        .eq("id", userId);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -199,57 +186,143 @@ function ProfileSection() {
     onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke oppdatere profilen")),
   });
 
-  const avatarUrl = watch("avatar_url");
-  const displayName = watch("display_name");
+  const avatarMutation = useMutation({
+    mutationFn: async (file: File) => {
+      if (!userId) throw new Error("Ikke innlogget");
+      const avatarUrl = await uploadAvatarImage({ userId, file });
+      const { error } = await supabase
+        .from("profiles")
+        .update({ avatar_url: avatarUrl })
+        .eq("id", userId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile-edit", userId] });
+      queryClient.invalidateQueries({ queryKey: ["profile-menu", userId] });
+      toast.success("Profilbilde oppdatert");
+    },
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke laste opp profilbildet")),
+    onSettled: () => setUploadingAvatar(false),
+  });
+
+  function handleAvatarFile(file: File) {
+    const err = validateAvatarImage(file);
+    if (err) {
+      toast.error(describeImageError(err));
+      return;
+    }
+    setUploadingAvatar(true);
+    avatarMutation.mutate(file);
+  }
+
+  const displayName = profile?.display_name ?? "";
 
   if (isLoading) return <Loader2 className="size-5 animate-spin text-muted-foreground" />;
 
   return (
-    <form
-      onSubmit={handleSubmit((v) => mutation.mutate(v))}
-      className="space-y-6 rounded-xl border border-border bg-card p-6"
-    >
-      <div className="flex items-center gap-4">
+    <div className="space-y-6">
+      <div className="flex items-center gap-4 rounded-xl border border-border bg-card p-6">
         <Avatar className="size-16">
-          {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
+          {profile?.avatar_url && <AvatarImage src={profile.avatar_url} alt={displayName} />}
           <AvatarFallback className="bg-primary/10 text-base font-medium text-primary">
             {displayName?.slice(0, 2).toUpperCase() || "?"}
           </AvatarFallback>
         </Avatar>
-        <div className="text-sm text-muted-foreground">
-          Lim inn en bilde-URL nedenfor for å oppdatere avataren.
+        <div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleAvatarFile(file);
+              e.target.value = "";
+            }}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={uploadingAvatar}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {uploadingAvatar ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <ImagePlus className="size-4" />
+            )}
+            Last opp profilbilde
+          </Button>
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="display_name">Visningsnavn</Label>
-        <Input id="display_name" {...register("display_name")} />
-        {errors.display_name && (
-          <p className="text-sm text-destructive">{errors.display_name.message}</p>
+      <form
+        onSubmit={handleSubmit((v) => mutation.mutate(v))}
+        className="space-y-6 rounded-xl border border-border bg-card p-6"
+      >
+        <div className="space-y-2">
+          <Label htmlFor="display_name">Visningsnavn</Label>
+          <Input id="display_name" {...register("display_name")} />
+          {errors.display_name && (
+            <p className="text-sm text-destructive">{errors.display_name.message}</p>
+          )}
+        </div>
+        <div className="flex justify-end">
+          <Button type="submit" disabled={mutation.isPending}>
+            {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
+            Lagre profil
+          </Button>
+        </div>
+      </form>
+
+      <ProfileStats />
+    </div>
+  );
+}
+
+function ProfileStats() {
+  const getStats = useServerFn(getMyProfileStats);
+  const { data: stats, isLoading } = useQuery({
+    queryKey: ["my-profile-stats"],
+    queryFn: () => getStats({}),
+  });
+
+  if (isLoading || !stats) {
+    return <Loader2 className="size-5 animate-spin text-muted-foreground" />;
+  }
+
+  const memberSince = new Date(stats.created_at).toLocaleDateString("nb-NO", {
+    month: "long",
+    year: "numeric",
+  });
+
+  return (
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="rounded-xl border border-border bg-card p-4">
+        <p className="text-xs text-muted-foreground">Medlem siden</p>
+        <p className="mt-1 text-lg font-medium capitalize">{memberSince}</p>
+      </div>
+      <div className="rounded-xl border border-border bg-card p-4">
+        <p className="text-xs text-muted-foreground">Opprettede annonser</p>
+        <p className="mt-1 text-lg font-medium">{stats.listings_count}</p>
+      </div>
+      <div className="rounded-xl border border-border bg-card p-4">
+        <p className="text-xs text-muted-foreground">Salg</p>
+        <p className="mt-1 text-lg font-medium">{stats.sales_count}</p>
+      </div>
+      <div className="rounded-xl border border-border bg-card p-4">
+        <p className="text-xs text-muted-foreground">Gjennomsnittlig vurdering</p>
+        {stats.review_count > 0 ? (
+          <div className="mt-1 flex items-center gap-2">
+            <StarRating value={stats.avg_rating} readOnly size={16} />
+            <span className="text-lg font-medium">{stats.avg_rating.toFixed(1)}</span>
+          </div>
+        ) : (
+          <p className="mt-1 text-sm text-muted-foreground">Ingen vurderinger ennå</p>
         )}
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="avatar_url">Avatar-URL</Label>
-        <Input id="avatar_url" placeholder="https://…" {...register("avatar_url")} />
-        {errors.avatar_url && (
-          <p className="text-sm text-destructive">{errors.avatar_url.message}</p>
-        )}
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="location">Sted</Label>
-        <Input id="location" placeholder="Oslo" {...register("location")} />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="bio">Om meg</Label>
-        <Textarea id="bio" rows={4} {...register("bio")} />
-      </div>
-      <div className="flex justify-end">
-        <Button type="submit" disabled={mutation.isPending}>
-          {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
-          Lagre profil
-        </Button>
-      </div>
-    </form>
+    </div>
   );
 }
 

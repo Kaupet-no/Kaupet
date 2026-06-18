@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export const LISTING_BUCKET = "listing-images";
+export const AVATAR_BUCKET = "avatars";
 export const MAX_IMAGES = 8;
 export const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB
 export const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp"] as const;
@@ -58,6 +59,31 @@ export async function uploadListingImage(opts: {
   });
   if (error) throw error;
   return path;
+}
+
+export function validateAvatarImage(file: File): ImageValidationError | null {
+  if (!ALLOWED_MIME.includes(file.type as (typeof ALLOWED_MIME)[number])) {
+    return { kind: "bad-type", name: file.name, type: file.type || "ukjent" };
+  }
+  if (file.size > MAX_FILE_BYTES) {
+    return { kind: "too-large", name: file.name, bytes: file.size };
+  }
+  return null;
+}
+
+export async function uploadAvatarImage(opts: { userId: string; file: File }): Promise<string> {
+  const ext = extFromMime(opts.file.type);
+  const path = `${opts.userId}/avatar-${Date.now()}.${ext}`;
+  const { error } = await supabase.storage.from(AVATAR_BUCKET).upload(path, opts.file, {
+    contentType: opts.file.type,
+    cacheControl: "31536000",
+    upsert: false,
+  });
+  if (error) throw error;
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path);
+  return publicUrl;
 }
 
 const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();

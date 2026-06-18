@@ -4,4 +4,11 @@
   // automatically at build time — this file only pins the stable bits
   // we don't want to depend on inference (like the git remote).
   "name": "kaupet-no",
+  // Deploy to staging with: bun run deploy -- --env staging
+  // (build the staging bundle first with the staging VITE_* vars set).
+  "env": {
+    "staging": {
+      "name": "kaupet-no-staging",
+    },
+  },
 }

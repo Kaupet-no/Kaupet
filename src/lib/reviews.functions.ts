@@ -24,10 +24,16 @@ export type PublicProfile = {
   id: string;
   display_name: string;
   avatar_url: string | null;
-  location: string | null;
-  bio: string | null;
   created_at: string;
   deleted_at: string | null;
+  avg_rating: number;
+  review_count: number;
+};
+
+export type MyProfileStats = {
+  created_at: string;
+  listings_count: number;
+  sales_count: number;
   avg_rating: number;
   review_count: number;
 };
@@ -104,7 +110,7 @@ export const getPublicProfile = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: profile, error } = await supabaseAdmin
       .from("profiles")
-      .select("id, display_name, avatar_url, location, bio, created_at, deleted_at")
+      .select("id, display_name, avatar_url, created_at, deleted_at")
       .eq("id", data.userId)
       .maybeSingle();
     if (error) throw new Error(error.message);
@@ -118,10 +124,42 @@ export const getPublicProfile = createServerFn({ method: "POST" })
       id: profile.id,
       display_name: profile.deleted_at ? "Slettet bruker" : profile.display_name,
       avatar_url: profile.deleted_at ? null : profile.avatar_url,
-      location: profile.deleted_at ? null : profile.location,
-      bio: profile.deleted_at ? null : profile.bio,
       created_at: profile.created_at,
       deleted_at: profile.deleted_at,
+      avg_rating: Number(row?.avg_rating ?? 0),
+      review_count: Number(row?.review_count ?? 0),
+    };
+  });
+
+export const getMyProfileStats = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<MyProfileStats> => {
+    const { supabase, userId } = context;
+
+    const [
+      { data: profile, error: profileErr },
+      { count: listingsCount },
+      { count: salesCount },
+      { data: summary },
+    ] = await Promise.all([
+      supabase.from("profiles").select("created_at").eq("id", userId).maybeSingle(),
+      supabase
+        .from("listings")
+        .select("id", { count: "exact", head: true })
+        .eq("seller_id", userId),
+      supabase
+        .from("listing_sales")
+        .select("listing_id", { count: "exact", head: true })
+        .eq("seller_id", userId),
+      supabase.rpc("user_review_summary", { _user_id: userId }),
+    ]);
+    if (profileErr) throw new Error(profileErr.message);
+
+    const row = Array.isArray(summary) ? summary[0] : summary;
+    return {
+      created_at: profile?.created_at ?? new Date().toISOString(),
+      listings_count: listingsCount ?? 0,
+      sales_count: salesCount ?? 0,
       avg_rating: Number(row?.avg_rating ?? 0),
       review_count: Number(row?.review_count ?? 0),
     };

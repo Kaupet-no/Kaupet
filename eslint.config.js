@@ -13,6 +13,9 @@ export default tseslint.config(
       ".vinxi",
       "src/integrations/supabase/types.ts",
       "src/routeTree.gen.ts",
+      "android/.gradle/**",
+      "android/app/build/**",
+      "android/build/**",
     ],
   },
   {

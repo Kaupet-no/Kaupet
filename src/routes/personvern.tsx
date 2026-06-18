@@ -153,8 +153,8 @@ function PersonvernPage() {
             </li>
           </ul>
           <p className="mt-4">
-            Data lagres og behandles av <strong>Supabase</strong> på servere i EU. Supabase er vår
-            databehandler. Du kan lese deres personvernerklæring her:{" "}
+            Data lagres og behandles av <strong>Supabase</strong> på servere i Europa. Supabase er
+            vår databehandler. Du kan lese deres personvernerklæring her:{" "}
             <a
               href="https://supabase.com/privacy"
               target="_blank"
@@ -234,7 +234,7 @@ function PersonvernPage() {
           <ul className="mt-3 space-y-2 list-disc pl-5">
             <li>
               <strong>Supabase</strong> — databehandler for autentisering, database og fillagring.
-              Servere i EU.
+              Servere i Europa.
             </li>
             <li>
               <strong>Vipps</strong> — betalingsleverandør for kjøp av annonsepromotering. Vipps

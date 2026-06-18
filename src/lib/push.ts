@@ -1,11 +1,15 @@
 // Client-side Web Push helpers.
-// Service worker registration is restricted to production (not Lovable preview/iframe).
+// Service worker registration is restricted to top-level documents — push
+// subscriptions are unreliable (and often blocked outright) inside an iframe.
 
 import { savePushSubscription, deletePushSubscription } from "./push.functions";
 
 // Public VAPID key — safe to expose to the browser.
+// Rotated as part of the Lovable migration (old private key wasn't retrievable).
+// All push subscriptions created against the previous key stop working once
+// this ships to production — existing subscribers must re-enable push.
 export const VAPID_PUBLIC_KEY =
-  "BMRQX3t2gjuYxtGw6f9TNJdz41nQWWd4zyPSBYNAaMNiYsRi73VVBpU6wb0xJ2m1R7MT7De-HQxl-hWbTy5fJbA";
+  "BPFo1ygL7dxhxhtTCPbE6b4qYkP9webql5QNaJuCReVeko8mzNCVyFunhDwIV95v4lKjHttAFgjxTN1zvsVvJnc";
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -18,11 +22,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 
 function isAllowedEnvironment(): boolean {
   if (typeof window === "undefined") return false;
-  if (window.self !== window.top) return false; // no iframe / Lovable preview
-  const host = window.location.hostname;
-  if (host.startsWith("id-preview--") || host.startsWith("preview--")) return false;
-  if (host === "lovableproject.com" || host.endsWith(".lovableproject.com")) return false;
-  if (host === "lovableproject-dev.com" || host.endsWith(".lovableproject-dev.com")) return false;
+  if (window.self !== window.top) return false; // no iframe
   return true;
 }
 

@@ -31,8 +31,12 @@ dist-ssr
 *.sln
 *.sw?
 .env
+.env.migration.local
 
 .lovable/
+
+# Supabase CLI local state
+supabase/.temp/
 
 # App
 ios/App/Pods/

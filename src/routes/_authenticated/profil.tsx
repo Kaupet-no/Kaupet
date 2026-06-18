@@ -575,8 +575,8 @@ function NotificationsSection() {
 
             {!supported ? (
               <p className="mt-4 text-sm text-muted-foreground">
-                Push-varsler er ikke tilgjengelig i denne nettleseren eller i
-                Lovable-forhåndsvisningen. Åpne <strong>kaupet.no</strong> direkte for å aktivere.
+                Push-varsler er ikke tilgjengelig i denne nettleseren eller i en innebygd
+                forhåndsvisning. Åpne <strong>kaupet.no</strong> direkte for å aktivere.
               </p>
             ) : permission === "denied" ? (
               <p className="mt-4 text-sm text-destructive">

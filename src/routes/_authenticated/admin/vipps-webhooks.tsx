@@ -47,7 +47,7 @@ function VippsWebhooksPage() {
     try {
       const res = await register({ data: { mode, url } });
       setSavedId(res.id);
-      toast.success("Webhook registrert og secret lagret automatisk i Lovable Cloud.");
+      toast.success("Webhook registrert og secret lagret automatisk i databasen.");
       await refresh(mode);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Registrering feilet");
@@ -76,8 +76,8 @@ function VippsWebhooksPage() {
         <h1 className="text-2xl font-semibold">Vipps webhooks</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Registrer webhook hos Vipps for å motta betalingshendelser. Den genererte secret-en lagres
-          automatisk i Lovable Cloud og brukes av webhook-handleren for å verifisere signaturen —
-          ingen manuelle env-variabler nødvendig.
+          automatisk i databasen og brukes av webhook-handleren for å verifisere signaturen — ingen
+          manuelle env-variabler nødvendig.
         </p>
       </div>
 
@@ -127,7 +127,7 @@ function VippsWebhooksPage() {
               </p>
               <p className="mt-1 text-xs text-green-900">
                 Webhook-id: <code className="rounded bg-white px-1">{savedId}</code>. Signaturen
-                verifiseres heretter mot lagret secret i Lovable Cloud.
+                verifiseres heretter mot lagret secret i databasen.
               </p>
             </div>
           )}

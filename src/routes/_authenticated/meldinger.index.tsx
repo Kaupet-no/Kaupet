@@ -337,7 +337,7 @@ function PushHintForMessages() {
   }, []);
 
   if (push.loading || push.messagesActive || dismissed) return null;
-  // Hide silently when the env doesn't support push (e.g. Lovable preview iframe)
+  // Hide silently when the env doesn't support push (e.g. an embedded iframe)
   if (!push.supported) return null;
 
   const enable = async () => {

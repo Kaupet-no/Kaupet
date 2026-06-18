@@ -51,7 +51,14 @@ export default defineConfig(({ command, mode }) => {
             nitro({
               preset: NITRO_PRESET,
               output: { dir: "dist", serverDir: "dist/server", publicDir: "dist/client" },
-              cloudflare: { nodeCompat: true, deployConfig: true },
+              cloudflare: {
+                nodeCompat: true,
+                deployConfig: true,
+                // Wrangler's redirected-config mode (used by Nitro's
+                // deployConfig) rejects `env.*` blocks, so the worker name
+                // for non-prod targets is selected via env var instead.
+                wrangler: { name: process.env.CLOUDFLARE_WORKER_NAME || "kaupet-no" },
+              },
             }),
           ]
         : []),

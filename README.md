@@ -34,16 +34,11 @@ Endringer skal ikke testes direkte i produksjon. Push til `staging`-branchen for
 
 Domenet ligger bak [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/) — alle besøkende møter en innloggingsside (engangskode på e-post) før de når appen, uavhengig av appens egen autentisering. Kun e-postadresser på allowlisten i Access-policyen "Kaupet team" slipper gjennom. Legg til flere testere via Cloudflare Zero Trust-dashbordet → Access → Applications → Kaupet Staging.
 
-Oppsett fra bunnen av:
+Staging kjører mot et eget Supabase-prosjekt. Konfigurasjonen styres av et GitHub Environment kalt `staging`, med egne `vars` (`VITE_SUPABASE_*`) og `secrets` (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`) — se `.env.staging.example` for full liste. Push til `staging`-branchen trigger CI, som bygger og kjører `bun run deploy` med `CLOUDFLARE_WORKER_NAME=kaupet-no-staging` mot denne separate workeren.
 
-1. Opprett et eget Supabase-prosjekt for staging og kjør migrasjonene i `supabase/migrations` mot det (`supabase link` + `supabase db push`).
-2. Sett opp et GitHub Environment kalt `staging` i repo-innstillingene med egne `vars` (`VITE_SUPABASE_*`) og `secrets` (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`) som peker på staging-prosjektet — se `.env.staging.example` for full liste over variabler.
-3. Push til `staging`-branchen. CI bygger og kjører `bun run deploy` med `CLOUDFLARE_WORKER_NAME=kaupet-no-staging`, som deployer til en egen worker uten å påvirke prod.
-4. Sett server-side secrets direkte på workeren med `wrangler secret put <NAVN> --name kaupet-no-staging` (service role key, Vipps-test-nøkler, VAPID-nøkler, `PUBLIC_SITE_URL=https://staging.kaupet.no`) — disse bygges ikke inn av CI, kun `VITE_*`-variablene gjør det.
-5. Koble domenet via `wrangler.jsonc`/Cloudflare Workers custom domains (`staging.kaupet.no` → `kaupet-no-staging`), og sett opp en Cloudflare Access-applikasjon med allowlist for teamet.
-6. Vipps-betalinger i staging skal alltid bruke `VIPPS_ENVIRONMENT=test` og `VIPPS_TEST_*`-nøklene.
+Server-side secrets (service role key, Vipps-test-nøkler, VAPID-nøkler, `PUBLIC_SITE_URL`) settes direkte på workeren med `wrangler secret put <NAVN> --name kaupet-no-staging`, siden de ikke bygges inn av CI slik `VITE_*`-variablene gjør. Domenet kobles via `wrangler.jsonc`/Cloudflare Workers custom domains, og Vipps-betalinger i staging skal alltid kjøre mot `VIPPS_ENVIRONMENT=test`.
 
-Produksjon (`main`) er uberørt av dette — `deploy`-jobben der fortsetter å bruke GitHub Environment `production` som før.
+Produksjon (`main`) er uberørt av dette — `deploy`-jobben der bruker fortsatt GitHub Environment `production` som før.
 
 ## Teknologi
 

@@ -50,7 +50,12 @@ import { getNotificationPreferences, updateNotificationPreferences } from "@/lib
 import { listMyBlocks, deleteBlock } from "@/lib/blocks.functions";
 import { getMyProfileStats } from "@/lib/reviews.functions";
 import { formatErrorMessage } from "@/lib/errors";
-import { describeImageError, uploadAvatarImage, validateAvatarImage } from "@/lib/storage";
+import {
+  deletePreviousAvatarImage,
+  describeImageError,
+  uploadAvatarImage,
+  validateAvatarImage,
+} from "@/lib/storage";
 
 const profileSchema = z.object({
   display_name: z.string().trim().min(2, "Minst 2 tegn").max(80),
@@ -204,12 +209,14 @@ function ProfileSection() {
   const avatarMutation = useMutation({
     mutationFn: async (file: File) => {
       if (!userId) throw new Error("Ikke innlogget");
+      const previousUrl = profile?.avatar_url ?? null;
       const avatarUrl = await uploadAvatarImage({ userId, file });
       const { error } = await supabase
         .from("profiles")
         .update({ avatar_url: avatarUrl })
         .eq("id", userId);
       if (error) throw error;
+      await deletePreviousAvatarImage(previousUrl);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile-edit", userId] });

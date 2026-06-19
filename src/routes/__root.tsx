@@ -14,6 +14,7 @@ import { SiteHeader } from "@/components/site-header";
 import { ModerationBanner } from "@/components/moderation-banner";
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { AuthProvider } from "@/lib/auth";
 import { initNativeOfflineWatcher } from "@/lib/native-offline";
 import { setupNative } from "@/lib/native-setup";
 import { useIsNative } from "@/lib/use-is-native";
@@ -236,8 +237,10 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <RootBody native={native} />
-      <Toaster />
+      <AuthProvider>
+        <RootBody native={native} />
+        <Toaster />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

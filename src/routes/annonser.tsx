@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
-import { Expand, Map as MapIcon, SlidersHorizontal } from "lucide-react";
+import { Expand, Map as MapIcon, Save, SlidersHorizontal } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -18,6 +18,7 @@ import {
 import { SearchBar } from "@/components/search-bar";
 import {
   AdvancedSearchSheet,
+  SaveSearchDialog,
   valueToCriteria,
   type AdvancedSearchValue,
 } from "@/components/advanced-search-sheet";
@@ -26,6 +27,8 @@ import type { MapListing } from "@/components/listings-map";
 import { FeaturedListingsSection } from "@/components/featured-listings-section";
 import { reverseGeocode } from "@/lib/geocode";
 import { saveLastSearchContext } from "@/lib/last-search-context";
+import { summarizeCriteria } from "@/lib/saved-searches";
+import { useAuth } from "@/lib/auth";
 
 const ListingsMap = lazy(() =>
   import("@/components/listings-map").then((m) => ({ default: m.ListingsMap })),
@@ -110,6 +113,7 @@ export const Route = createFileRoute("/annonser")({
 function BrowsePage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/annonser" });
+  const { user } = useAuth();
   const [qDraft, setQDraft] = useState(search.q);
   const [mounted, setMounted] = useState(false);
   const [mobileMapOpen, setMobileMapOpen] = useState(false);
@@ -118,6 +122,7 @@ function BrowsePage() {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [advOpen, setAdvOpen] = useState(false);
+  const [saveSearchOpen, setSaveSearchOpen] = useState(false);
 
   useEffect(() => setMounted(true), []);
   useEffect(() => {
@@ -214,6 +219,11 @@ function BrowsePage() {
       search.radius,
       search.loc,
     ],
+  );
+
+  const currentCriteria = useMemo(
+    () => ({ ...valueToCriteria(advancedInitial), sort: search.sort }),
+    [advancedInitial, search.sort],
   );
 
   useEffect(() => {
@@ -525,14 +535,36 @@ function BrowsePage() {
               </span>
             )}
           </Button>
+          {user && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setSaveSearchOpen(true)}
+              className="gap-1.5"
+            >
+              <Save className="size-4" /> Lagre søk
+            </Button>
+          )}
         </div>
       </div>
+
+      {user && (
+        <SaveSearchDialog
+          open={saveSearchOpen}
+          onOpenChange={setSaveSearchOpen}
+          defaultName={summarizeCriteria(currentCriteria)}
+          criteria={currentCriteria}
+          onSaved={() => setSaveSearchOpen(false)}
+        />
+      )}
 
       <AdvancedSearchSheet
         open={advOpen}
         onOpenChange={setAdvOpen}
         initial={advancedInitial}
         categories={categories ?? []}
+        currentSort={search.sort}
         onApply={(v) => {
           const c = valueToCriteria(v);
           navigate({

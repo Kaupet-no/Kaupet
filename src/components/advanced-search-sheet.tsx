@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
-import { X, Plus, Save, Search as SearchIcon, RotateCcw, BellRing, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { X, Plus, Save, Search as SearchIcon, RotateCcw } from "lucide-react";
 
-import { usePushStatus } from "@/lib/use-push-status";
+import { PushEnablePrompt } from "@/components/push-enable-prompt";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,9 +63,26 @@ type Props = {
   initial: AdvancedSearchValue;
   categories: Category[];
   onApply: (v: AdvancedSearchValue) => void;
+  /** Current sort order, included in criteria handed to the save-search dialog. */
+  currentSort?: SearchCriteria["sort"];
+  /** Label for the primary footer action (default "Bruk søk"). */
+  applyLabel?: string;
+  /** Hide the internal "Lagre søk" action — used when this sheet is already
+   * editing the filters of an existing saved search, where "save as new"
+   * doesn't make sense. */
+  hideSaveAction?: boolean;
 };
 
-export function AdvancedSearchSheet({ open, onOpenChange, initial, categories, onApply }: Props) {
+export function AdvancedSearchSheet({
+  open,
+  onOpenChange,
+  initial,
+  categories,
+  onApply,
+  currentSort,
+  applyLabel = "Bruk søk",
+  hideSaveAction = false,
+}: Props) {
   const { user } = useAuth();
   const [v, setV] = useState<AdvancedSearchValue>(initial);
   const [termDraft, setTermDraft] = useState("");
@@ -121,7 +137,7 @@ export function AdvancedSearchSheet({ open, onOpenChange, initial, categories, o
     onOpenChange(false);
   };
 
-  const criteria: SearchCriteria = valueToCriteria(v);
+  const criteria: SearchCriteria = { ...valueToCriteria(v), sort: currentSort };
   const defaultName = summarizeCriteria(criteria);
 
   return (
@@ -272,28 +288,30 @@ export function AdvancedSearchSheet({ open, onOpenChange, initial, categories, o
               <RotateCcw className="size-4" /> Nullstill
             </Button>
             <div className="flex gap-2">
-              {user && (
+              {user && !hideSaveAction && (
                 <Button type="button" variant="outline" size="sm" onClick={() => setSaveOpen(true)}>
                   <Save className="size-4" /> Lagre søk
                 </Button>
               )}
               <Button type="button" size="sm" onClick={handleApply}>
-                <SearchIcon className="size-4" /> Bruk søk
+                <SearchIcon className="size-4" /> {applyLabel}
               </Button>
             </div>
           </SheetFooter>
         </SheetContent>
       </Sheet>
 
-      <SaveSearchDialog
-        open={saveOpen}
-        onOpenChange={setSaveOpen}
-        defaultName={defaultName}
-        criteria={criteria}
-        onSaved={() => {
-          setSaveOpen(false);
-        }}
-      />
+      {!hideSaveAction && (
+        <SaveSearchDialog
+          open={saveOpen}
+          onOpenChange={setSaveOpen}
+          defaultName={defaultName}
+          criteria={criteria}
+          onSaved={() => {
+            setSaveOpen(false);
+          }}
+        />
+      )}
     </>
   );
 }
@@ -423,7 +441,19 @@ function ModeToggle({
   );
 }
 
-function SaveSearchDialog({
+function hasNoFilters(c: SearchCriteria): boolean {
+  const hasTerms = (c.terms?.length ?? 0) > 0 || !!c.q?.trim();
+  return (
+    !hasTerms &&
+    !(c.categories?.length ?? 0) &&
+    !(c.conditions?.length ?? 0) &&
+    c.min == null &&
+    c.max == null &&
+    !c.loc
+  );
+}
+
+export function SaveSearchDialog({
   open,
   onOpenChange,
   defaultName,
@@ -488,7 +518,13 @@ function SaveSearchDialog({
             <Checkbox checked={notify} onCheckedChange={(c) => setNotify(c === true)} />
             Varsle meg om nye treff
           </label>
-          {notify && <PushHintForSavedSearch />}
+          {hasNoFilters(criteria) && (
+            <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-800">
+              Dette søket har ingen filtre og vil varsle deg om <strong>alle</strong> nye annonser på
+              Kaupet.
+            </p>
+          )}
+          {notify && <PushEnablePrompt variant="inline" />}
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
@@ -500,84 +536,6 @@ function SaveSearchDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function PushHintForSavedSearch() {
-  const push = usePushStatus();
-  const [busy, setBusy] = useState(false);
-
-  if (push.loading) return null;
-  if (push.savedSearchesActive) return null;
-
-  const enable = async () => {
-    setBusy(true);
-    try {
-      await push.enableOnThisDevice("saved_searches");
-      toast.success("Push-varsler er aktivert på denne enheten");
-    } catch (e) {
-      toast.error(formatErrorMessage(e, "Klarte ikke å aktivere varsler"));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  let body: ReactNode;
-  if (!push.supported) {
-    body = (
-      <p>
-        Push-varsler er ikke tilgjengelig i denne nettleseren. Du kan fortsatt lagre søket og motta
-        varsler på andre enheter der du er logget inn.
-      </p>
-    );
-  } else if (push.permission === "denied") {
-    body = (
-      <p>
-        Du har blokkert varsler for kaupet.no i nettleseren. Endre tillatelsen i
-        nettleserinnstillingene for å motta varsler her.
-      </p>
-    );
-  } else if (!push.subscribedHere) {
-    body = (
-      <div className="space-y-2">
-        <p>
-          For å få varsler om nye treff på denne enheten må du aktivere push-varsler i nettleseren.
-        </p>
-        <Button size="sm" type="button" onClick={enable} disabled={busy}>
-          {busy && <Loader2 className="size-4 animate-spin" />}
-          Aktiver push-varsler
-        </Button>
-      </div>
-    );
-  } else {
-    // subscribed but pref off
-    body = (
-      <div className="space-y-2">
-        <p>Push-varsler for lagrede søk er slått av i profilen din.</p>
-        <Button size="sm" type="button" onClick={enable} disabled={busy}>
-          {busy && <Loader2 className="size-4 animate-spin" />}
-          Slå på for lagrede søk
-        </Button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex gap-2 rounded-md border border-border bg-muted/50 p-3 text-xs text-muted-foreground">
-      <BellRing className="mt-0.5 size-4 shrink-0 text-primary" />
-      <div className="flex-1 space-y-1">
-        {body}
-        <p>
-          <Link
-            to="/profil"
-            search={{ tab: "varslinger" } as never}
-            className="underline underline-offset-2"
-          >
-            Administrer varsler
-          </Link>
-        </p>
-      </div>
-    </div>
   );
 }
 
@@ -595,5 +553,25 @@ export function valueToCriteria(v: AdvancedSearchValue): SearchCriteria {
     lng: v.location.lng,
     radius: v.location.lat != null ? v.location.radius : null,
     loc: v.location.label || undefined,
+  };
+}
+
+export function criteriaToValue(c: SearchCriteria): AdvancedSearchValue {
+  const terms = c.terms?.length ? c.terms : c.q ? c.q.split(/\s+/).filter(Boolean) : [];
+  return {
+    terms,
+    qMode: c.qMode ?? "all",
+    categories: c.categories ?? [],
+    catMode: c.catMode ?? "any",
+    conditions: c.conditions ?? [],
+    min: c.min ?? null,
+    max: c.max ?? null,
+    includeFree: c.includeFree ?? true,
+    location: {
+      lat: c.lat ?? null,
+      lng: c.lng ?? null,
+      radius: c.radius ?? 10,
+      label: c.loc ?? "",
+    },
   };
 }

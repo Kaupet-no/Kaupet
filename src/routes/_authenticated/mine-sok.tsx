@@ -1,14 +1,25 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Bell, BellOff, Trash2, Search as SearchIcon, Plus, BellRing, Loader2 } from "lucide-react";
+import {
+  Bell,
+  BellOff,
+  Trash2,
+  Search as SearchIcon,
+  Plus,
+  Pencil,
+  SlidersHorizontal,
+} from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
 import { toast } from "sonner";
 
 import { usePushStatus } from "@/lib/use-push-status";
+import { supabase } from "@/integrations/supabase/client";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,8 +31,22 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { PushEnablePrompt } from "@/components/push-enable-prompt";
+import {
+  AdvancedSearchSheet,
+  criteriaToValue,
+  valueToCriteria,
+} from "@/components/advanced-search-sheet";
+import {
   deleteSavedSearch,
   listSavedSearches,
+  listUnreadCountsBySearch,
   summarizeCriteria,
   updateSavedSearch,
   type SavedSearch,
@@ -38,30 +63,38 @@ function MineSokPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [editingSearch, setEditingSearch] = useState<SavedSearch | null>(null);
+  const [renamingSearch, setRenamingSearch] = useState<SavedSearch | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [renaming, setRenaming] = useState(false);
 
   const push = usePushStatus();
-  const [enablingPush, setEnablingPush] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["saved-searches"],
     queryFn: listSavedSearches,
   });
 
+  const { data: unreadCounts } = useQuery({
+    queryKey: ["saved-search-unread-counts"],
+    queryFn: listUnreadCountsBySearch,
+  });
+
+  const { data: categories } = useQuery({
+    queryKey: ["categories"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("categories")
+        .select("id, slug, name_nb, parent_id")
+        .order("sort_order")
+        .order("name_nb");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const searches = data ?? [];
   const hasActiveNotify = searches.some((s) => s.notify);
-  const showPushBanner = hasActiveNotify && !push.loading && !push.savedSearchesActive;
-
-  const enablePush = async () => {
-    setEnablingPush(true);
-    try {
-      await push.enableOnThisDevice("saved_searches");
-      toast.success("Push-varsler er aktivert på denne enheten");
-    } catch (e) {
-      toast.error(formatErrorMessage(e, "Klarte ikke å aktivere varsler"));
-    } finally {
-      setEnablingPush(false);
-    }
-  };
 
   const toggleNotify = async (s: SavedSearch) => {
     await updateSavedSearch(s.id, { notify: !s.notify });
@@ -85,7 +118,28 @@ function MineSokPage() {
     setDeleteId(null);
     qc.invalidateQueries({ queryKey: ["saved-searches"] });
     qc.invalidateQueries({ queryKey: ["notifications"] });
+    qc.invalidateQueries({ queryKey: ["saved-search-unread-counts"] });
     toast.success("Søk slettet");
+  };
+
+  const handleRename = async () => {
+    if (!renamingSearch) return;
+    const name = renameValue.trim();
+    if (!name) {
+      toast.error("Navnet kan ikke være tomt");
+      return;
+    }
+    setRenaming(true);
+    try {
+      await updateSavedSearch(renamingSearch.id, { name });
+      qc.invalidateQueries({ queryKey: ["saved-searches"] });
+      setRenamingSearch(null);
+      toast.success("Navn oppdatert");
+    } catch (e) {
+      toast.error(formatErrorMessage(e, "Kunne ikke endre navn"));
+    } finally {
+      setRenaming(false);
+    }
   };
 
   const runSearch = (c: SearchCriteria) => {
@@ -125,54 +179,9 @@ function MineSokPage() {
         </Link>
       </div>
 
-      {showPushBanner && (
-        <div className="mt-6 flex gap-3 rounded-xl border border-border bg-card p-4">
-          <BellRing className="mt-0.5 size-5 shrink-0 text-primary" />
-          <div className="flex-1 space-y-2 text-sm">
-            {!push.supported ? (
-              <p className="text-muted-foreground">
-                Push-varsler er ikke tilgjengelig i denne nettleseren. Du vil ikke få varsler her,
-                men kan motta dem på andre enheter der du er logget inn.
-              </p>
-            ) : push.permission === "denied" ? (
-              <p className="text-muted-foreground">
-                Du har blokkert varsler for kaupet.no. Endre tillatelsen i nettleserinnstillingene
-                for å motta varsler her.
-              </p>
-            ) : !push.subscribedHere ? (
-              <>
-                <p className="font-medium">Aktiver push-varsler for å motta treffene</p>
-                <p className="text-muted-foreground">
-                  Du har lagrede søk med varsling på, men push-varsler er ikke aktivert i
-                  nettleseren. Du vil ikke få beskjed når en ny annonse matcher.
-                </p>
-                <Button size="sm" onClick={enablePush} disabled={enablingPush}>
-                  {enablingPush && <Loader2 className="size-4 animate-spin" />}
-                  Aktiver push-varsler
-                </Button>
-              </>
-            ) : (
-              <>
-                <p className="font-medium">Push-varsler for lagrede søk er av</p>
-                <p className="text-muted-foreground">
-                  Slå på i profilen for å motta dem på denne enheten.
-                </p>
-                <Button size="sm" onClick={enablePush} disabled={enablingPush}>
-                  {enablingPush && <Loader2 className="size-4 animate-spin" />}
-                  Slå på for lagrede søk
-                </Button>
-              </>
-            )}
-            <p>
-              <Link
-                to="/profil"
-                search={{ tab: "varslinger" } as never}
-                className="text-xs underline underline-offset-2 text-muted-foreground"
-              >
-                Administrer varsler
-              </Link>
-            </p>
-          </div>
+      {hasActiveNotify && (
+        <div className="mt-6">
+          <PushEnablePrompt variant="banner" />
         </div>
       )}
 
@@ -201,56 +210,88 @@ function MineSokPage() {
           </div>
         ) : (
           <ul className="space-y-3">
-            {searches.map((s) => (
-              <li key={s.id} className="rounded-lg border border-border bg-card p-4 shadow-sm">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-medium">{s.name}</h3>
-                    <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">
-                      {summarizeCriteria(s.criteria)}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Opprettet{" "}
-                      {formatDistanceToNow(new Date(s.created_at), {
-                        addSuffix: true,
-                        locale: nb,
-                      })}
-                      {s.notify ? " · Varsler på" : " · Varsler av"}
-                    </p>
+            {searches.map((s) => {
+              const unread = unreadCounts?.get(s.id) ?? 0;
+              return (
+                <li key={s.id} className="rounded-lg border border-border bg-card p-4 shadow-sm">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-medium">{s.name}</h3>
+                        {unread > 0 && (
+                          <Link
+                            to="/varsler"
+                            className="inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-accent-foreground hover:opacity-90"
+                          >
+                            {unread} {unread === 1 ? "nytt treff" : "nye treff"}
+                          </Link>
+                        )}
+                      </div>
+                      <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">
+                        {summarizeCriteria(s.criteria)}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Opprettet{" "}
+                        {formatDistanceToNow(new Date(s.created_at), {
+                          addSuffix: true,
+                          locale: nb,
+                        })}
+                        {s.notify ? " · Varsler på" : " · Varsler av"}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" onClick={() => runSearch(s.criteria)}>
+                        <SearchIcon className="size-4" /> Kjør søk
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setEditingSearch(s)}
+                        aria-label="Rediger filtre"
+                      >
+                        <SlidersHorizontal className="size-4" /> Rediger filtre
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setRenamingSearch(s);
+                          setRenameValue(s.name);
+                        }}
+                        aria-label="Endre navn"
+                      >
+                        <Pencil className="size-4" /> Endre navn
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => toggleNotify(s)}
+                        aria-label={s.notify ? "Slå av varsler" : "Slå på varsler"}
+                      >
+                        {s.notify ? (
+                          <>
+                            <BellOff className="size-4" /> Pause
+                          </>
+                        ) : (
+                          <>
+                            <Bell className="size-4" /> Aktiver
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setDeleteId(s.id)}
+                        aria-label="Slett søk"
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" onClick={() => runSearch(s.criteria)}>
-                      <SearchIcon className="size-4" /> Kjør søk
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => toggleNotify(s)}
-                      aria-label={s.notify ? "Slå av varsler" : "Slå på varsler"}
-                    >
-                      {s.notify ? (
-                        <>
-                          <BellOff className="size-4" /> Pause
-                        </>
-                      ) : (
-                        <>
-                          <Bell className="size-4" /> Aktiver
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setDeleteId(s.id)}
-                      aria-label="Slett søk"
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div>
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
@@ -269,6 +310,57 @@ function MineSokPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={renamingSearch !== null}
+        onOpenChange={(o) => !o && setRenamingSearch(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Endre navn på søk</DialogTitle>
+          </DialogHeader>
+          <div>
+            <Label htmlFor="rename-search-input">Navn</Label>
+            <Input
+              id="rename-search-input"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              className="mt-1"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRenamingSearch(null)}>
+              Avbryt
+            </Button>
+            <Button onClick={handleRename} disabled={renaming}>
+              {renaming ? "Lagrer…" : "Lagre"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {editingSearch && (
+        <AdvancedSearchSheet
+          open={editingSearch !== null}
+          onOpenChange={(o) => !o && setEditingSearch(null)}
+          initial={criteriaToValue(editingSearch.criteria)}
+          categories={categories ?? []}
+          currentSort={editingSearch.criteria.sort}
+          applyLabel="Lagre endringer"
+          hideSaveAction
+          onApply={async (v) => {
+            try {
+              await updateSavedSearch(editingSearch.id, { criteria: valueToCriteria(v) });
+              qc.invalidateQueries({ queryKey: ["saved-searches"] });
+              toast.success("Søket er oppdatert");
+            } catch (e) {
+              toast.error(formatErrorMessage(e, "Kunne ikke oppdatere søket"));
+            } finally {
+              setEditingSearch(null);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

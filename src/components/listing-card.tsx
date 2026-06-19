@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Eye, MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 import { signListingImageUrls } from "@/lib/storage";
+import { formatPrice } from "@/lib/format";
 import { FavoriteButton } from "@/components/favorite-button";
 
 export type ListingCardData = {
@@ -16,12 +17,6 @@ export type ListingCardData = {
   total_views?: number;
   views_last_week?: number;
 };
-
-function formatPrice(p: ListingCardData) {
-  if (p.is_free) return "Gis bort";
-  if (p.price_nok == null) return "Pris ved henvendelse";
-  return `${p.price_nok.toLocaleString("nb-NO")} kr`;
-}
 
 type Props = {
   listing: ListingCardData;
@@ -59,7 +54,7 @@ export function ListingCard({ listing, highlighted, onHoverChange }: Props) {
         {imgUrl ? (
           <img
             src={imgUrl}
-            alt={listing.title}
+            alt={`${listing.title} — ${formatPrice(listing)}`}
             className="size-full object-cover transition group-hover:scale-[1.02]"
             loading="lazy"
           />

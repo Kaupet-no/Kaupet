@@ -117,6 +117,7 @@ export function LocationPicker({ value, onChange, onDone, autoFocus = true }: Lo
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Sted (f.eks. Oslo, Bergen, 7030)"
           className="pl-8 pr-8"
+          aria-label="Søk etter sted"
         />
         {hasLocation && (
           <button
@@ -182,6 +183,7 @@ export function RadiusPicker({
         step={1}
         onValueChange={([v]) => onChange(v)}
         disabled={disabled}
+        aria-label="Søkeradius i kilometer"
       />
       <div className="flex justify-between text-xs text-muted-foreground">
         <span>1 km</span>

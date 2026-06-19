@@ -15,9 +15,11 @@ export type PendingImage = {
 export function ImageUploader({
   images,
   onChange,
+  uploadProgress,
 }: {
   images: PendingImage[];
   onChange: (next: PendingImage[]) => void;
+  uploadProgress?: { done: number; total: number } | null;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -93,7 +95,9 @@ export function ImageUploader({
         }`}
       >
         <ImagePlus className="mb-2 size-7 text-muted-foreground" />
-        <p className="text-sm font-medium">Slipp bilder her eller velg fra enheten</p>
+        <p className="text-sm font-medium">
+          {dragOver ? "Slipp her for å laste opp" : "Slipp bilder her eller velg fra enheten"}
+        </p>
         <p className="mt-1 text-xs text-muted-foreground">
           JPG, PNG eller WebP. Maks {MAX_IMAGES} bilder, 5 MB per bilde.
         </p>
@@ -136,6 +140,12 @@ export function ImageUploader({
         )}
       </div>
 
+      {uploadProgress && (
+        <p className="text-sm font-medium text-primary" role="status" aria-live="polite">
+          Laster opp bilde {uploadProgress.done} av {uploadProgress.total}…
+        </p>
+      )}
+
       {images.length > 0 && (
         <>
           <p className="text-xs text-muted-foreground">
@@ -161,7 +171,7 @@ export function ImageUploader({
                     Hoved
                   </span>
                 )}
-                <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent p-1 opacity-0 transition group-hover:opacity-100">
+                <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent p-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100">
                   <div className="flex">
                     <button
                       type="button"

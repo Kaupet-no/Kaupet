@@ -33,14 +33,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatErrorMessage } from "@/lib/errors";
-
-const CONDITIONS = [
-  { value: "new", label: "Helt ny" },
-  { value: "like_new", label: "Som ny" },
-  { value: "good", label: "Pent brukt" },
-  { value: "acceptable", label: "Brukt med slitasje" },
-  { value: "for_parts", label: "Må repareres" },
-] as const;
+import { CONDITIONS } from "@/lib/constants";
 
 const listingSchema = z
   .object({
@@ -86,6 +79,9 @@ function NewListingPage() {
   const [publishedCode, setPublishedCode] = useState<string | null>(null);
   const [publishedOpen, setPublishedOpen] = useState(false);
   const [promoteOpen, setPromoteOpen] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(
+    null,
+  );
   const { data: isDemo = false } = useIsDemo();
 
   const { data: categories } = useQuery({
@@ -130,6 +126,8 @@ function NewListingPage() {
   const condition = watch("condition");
   const postalCode = watch("postal_code");
   const city = watch("city");
+  const title = watch("title");
+  const description = watch("description");
 
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const lastEdited = useRef<"postal_code" | "city" | "map" | null>(null);
@@ -221,6 +219,7 @@ function NewListingPage() {
 
       // Upload images sequentially to avoid hammering storage
       const uploaded: { storage_path: string; sort_order: number }[] = [];
+      if (images.length > 0) setUploadProgress({ done: 0, total: images.length });
       for (let i = 0; i < images.length; i++) {
         const path = await uploadListingImage({
           userId,
@@ -229,7 +228,9 @@ function NewListingPage() {
           file: images[i].file,
         });
         uploaded.push({ storage_path: path, sort_order: i });
+        setUploadProgress({ done: i + 1, total: images.length });
       }
+      setUploadProgress(null);
       if (uploaded.length > 0) {
         const { error: imgErr } = await supabase.from("listing_images").insert(
           uploaded.map((u) => ({
@@ -250,6 +251,7 @@ function NewListingPage() {
       setPublishedOpen(true);
     },
     onError: (err: Error) => {
+      setUploadProgress(null);
       void import("@/lib/haptics").then((m) => m.hapticNotification("error"));
       toast.error(formatErrorMessage(err, "Kunne ikke publisere annonsen"));
     },
@@ -266,31 +268,49 @@ function NewListingPage() {
         {/* Images */}
         <section className="space-y-2">
           <Label>Bilder</Label>
-          <ImageUploader images={images} onChange={setImages} />
+          <ImageUploader images={images} onChange={setImages} uploadProgress={uploadProgress} />
         </section>
 
         {/* Title */}
         <section className="space-y-2">
-          <Label htmlFor="title">Tittel</Label>
+          <div className="flex items-baseline justify-between">
+            <Label htmlFor="title">Tittel</Label>
+            <span className="text-xs text-muted-foreground">{(title ?? "").length} / 120</span>
+          </div>
           <Input
             id="title"
             placeholder="F.eks. Stokke Tripp Trapp barnestol — eik"
+            aria-invalid={!!errors.title}
+            aria-describedby={errors.title ? "title-error" : undefined}
             {...register("title")}
           />
-          {errors.title && <p className="text-sm text-destructive">{errors.title.message}</p>}
+          {errors.title && (
+            <p id="title-error" className="text-sm text-destructive">
+              {errors.title.message}
+            </p>
+          )}
         </section>
 
         {/* Description */}
         <section className="space-y-2">
-          <Label htmlFor="description">Beskrivelse</Label>
+          <div className="flex items-baseline justify-between">
+            <Label htmlFor="description">Beskrivelse</Label>
+            <span className="text-xs text-muted-foreground">
+              {(description ?? "").length} / 4000
+            </span>
+          </div>
           <Textarea
             id="description"
             rows={8}
             placeholder="Beskriv tilstand, alder, hvorfor du selger, og om henting/sending."
+            aria-invalid={!!errors.description}
+            aria-describedby={errors.description ? "description-error" : undefined}
             {...register("description")}
           />
           {errors.description && (
-            <p className="text-sm text-destructive">{errors.description.message}</p>
+            <p id="description-error" className="text-sm text-destructive">
+              {errors.description.message}
+            </p>
           )}
         </section>
 
@@ -311,7 +331,10 @@ function NewListingPage() {
                 }
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger
+                aria-invalid={!!errors.category_id}
+                aria-describedby={errors.category_id ? "category-error" : undefined}
+              >
                 <SelectValue placeholder="Velg hovedkategori" />
               </SelectTrigger>
               <SelectContent>
@@ -327,7 +350,10 @@ function NewListingPage() {
                 value={categoryId}
                 onValueChange={(v) => setValue("category_id", v, { shouldValidate: true })}
               >
-                <SelectTrigger>
+                <SelectTrigger
+                  aria-invalid={!!errors.category_id}
+                  aria-describedby={errors.category_id ? "category-error" : undefined}
+                >
                   <SelectValue placeholder="Velg underkategori" />
                 </SelectTrigger>
                 <SelectContent>
@@ -340,7 +366,9 @@ function NewListingPage() {
               </Select>
             )}
             {errors.category_id && (
-              <p className="text-sm text-destructive">{errors.category_id.message}</p>
+              <p id="category-error" className="text-sm text-destructive">
+                {errors.category_id.message}
+              </p>
             )}
           </div>
           <div className="space-y-2">
@@ -375,6 +403,8 @@ function NewListingPage() {
               placeholder="kr"
               disabled={isFree}
               className="max-w-[200px]"
+              aria-invalid={!!errors.price_nok}
+              aria-describedby={errors.price_nok ? "price-error" : undefined}
               {...register("price_nok")}
             />
             <label className="flex items-center gap-2 text-sm">
@@ -383,7 +413,9 @@ function NewListingPage() {
             </label>
           </div>
           {errors.price_nok && (
-            <p className="text-sm text-destructive">{errors.price_nok.message as string}</p>
+            <p id="price-error" className="text-sm text-destructive">
+              {errors.price_nok.message as string}
+            </p>
           )}
         </section>
 
@@ -397,6 +429,8 @@ function NewListingPage() {
                 inputMode="numeric"
                 maxLength={4}
                 placeholder="0150"
+                aria-invalid={!!errors.postal_code}
+                aria-describedby={errors.postal_code ? "postal-code-error" : undefined}
                 {...register("postal_code", {
                   onChange: () => {
                     lastEdited.current = "postal_code";
@@ -405,7 +439,9 @@ function NewListingPage() {
                 })}
               />
               {errors.postal_code && (
-                <p className="text-sm text-destructive">{errors.postal_code.message}</p>
+                <p id="postal-code-error" className="text-sm text-destructive">
+                  {errors.postal_code.message}
+                </p>
               )}
             </div>
             <div className="space-y-2">

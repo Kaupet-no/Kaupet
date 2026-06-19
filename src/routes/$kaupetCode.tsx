@@ -26,6 +26,7 @@ import { useAuth } from "@/lib/auth";
 import { readLastSearchContext, type LastSearchContext } from "@/lib/last-search-context";
 
 import { signListingImageUrls } from "@/lib/storage";
+import { CONDITION_LABEL } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { FavoriteButton } from "@/components/favorite-button";
@@ -35,14 +36,6 @@ import { ShareListingDialog } from "@/components/share-listing-dialog";
 const ListingDetailMap = lazy(() =>
   import("@/components/listing-detail-map").then((m) => ({ default: m.ListingDetailMap })),
 );
-
-const CONDITION_LABEL: Record<string, string> = {
-  new: "Helt ny",
-  like_new: "Som ny",
-  good: "Pent brukt",
-  acceptable: "Brukt med slitasje",
-  for_parts: "Må repareres",
-};
 
 export const Route = createFileRoute("/$kaupetCode")({
   validateSearch: z.object({

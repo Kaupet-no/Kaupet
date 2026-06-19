@@ -1,20 +1,32 @@
-import { useEffect, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Bell, Loader2, LogOut, Trash2, ShieldOff } from "lucide-react";
+import {
+  Bell,
+  Calendar,
+  Camera,
+  ListChecks,
+  Loader2,
+  LogOut,
+  ShoppingBag,
+  Star,
+  Trash2,
+  ShieldOff,
+} from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { StarRating } from "@/components/star-rating";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,13 +48,12 @@ import {
 } from "@/lib/push";
 import { getNotificationPreferences, updateNotificationPreferences } from "@/lib/push.functions";
 import { listMyBlocks, deleteBlock } from "@/lib/blocks.functions";
+import { getMyProfileStats } from "@/lib/reviews.functions";
 import { formatErrorMessage } from "@/lib/errors";
+import { describeImageError, uploadAvatarImage, validateAvatarImage } from "@/lib/storage";
 
 const profileSchema = z.object({
   display_name: z.string().trim().min(2, "Minst 2 tegn").max(80),
-  bio: z.string().trim().max(500).optional().or(z.literal("")),
-  location: z.string().trim().max(100).optional().or(z.literal("")),
-  avatar_url: z.string().trim().url("Må være en gyldig URL").optional().or(z.literal("")),
 });
 type ProfileForm = z.infer<typeof profileSchema>;
 
@@ -85,9 +96,6 @@ function ProfilePage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">
       <h1 className="font-display text-3xl tracking-tight">Min profil</h1>
-      <p className="mt-1 text-muted-foreground">
-        Administrer profilen og kontoinnstillingene dine.
-      </p>
 
       <Tabs
         value={tab}
@@ -102,7 +110,7 @@ function ProfilePage() {
             replace: true,
           })
         }
-        className="mt-8"
+        className="mt-6"
       >
         <TabsList>
           <TabsTrigger value="profil">Profilinfo</TabsTrigger>
@@ -110,7 +118,7 @@ function ProfilePage() {
           <TabsTrigger value="blokkerte">Blokkerte</TabsTrigger>
           <TabsTrigger value="konto">Konto</TabsTrigger>
         </TabsList>
-        <TabsContent value="profil" className="mt-6 space-y-6">
+        <TabsContent value="profil" className="mt-6">
           <ProfileSection />
         </TabsContent>
         <TabsContent value="varslinger" className="mt-6">
@@ -129,6 +137,8 @@ function ProfilePage() {
 
 function ProfileSection() {
   const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const { data: userData } = useQuery({
     queryKey: ["current-user"],
     queryFn: async () => {
@@ -144,7 +154,7 @@ function ProfileSection() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("display_name, bio, location, avatar_url")
+        .select("display_name, avatar_url")
         .eq("id", userId!)
         .maybeSingle();
       if (error) throw error;
@@ -152,24 +162,24 @@ function ProfileSection() {
     },
   });
 
+  const getStats = useServerFn(getMyProfileStats);
+  const { data: stats } = useQuery({
+    queryKey: ["my-profile-stats"],
+    queryFn: () => getStats({}),
+  });
+
   const {
     register,
     handleSubmit,
     reset,
-    watch,
     formState: { errors },
   } = useForm<ProfileForm>({
-    defaultValues: { display_name: "", bio: "", location: "", avatar_url: "" },
+    defaultValues: { display_name: "" },
   });
 
   useEffect(() => {
     if (profile) {
-      reset({
-        display_name: profile.display_name ?? "",
-        bio: profile.bio ?? "",
-        location: profile.location ?? "",
-        avatar_url: profile.avatar_url ?? "",
-      });
+      reset({ display_name: profile.display_name ?? "" });
     }
   }, [profile, reset]);
 
@@ -177,18 +187,10 @@ function ProfileSection() {
     mutationFn: async (values: ProfileForm) => {
       if (!userId) throw new Error("Ikke innlogget");
       const parsed = profileSchema.parse(values);
-      const updates: {
-        bio: string | null;
-        location: string | null;
-        avatar_url: string | null;
-        display_name?: string;
-      } = {
-        bio: parsed.bio || null,
-        location: parsed.location || null,
-        avatar_url: parsed.avatar_url || null,
-        display_name: parsed.display_name,
-      };
-      const { error } = await supabase.from("profiles").update(updates).eq("id", userId);
+      const { error } = await supabase
+        .from("profiles")
+        .update({ display_name: parsed.display_name })
+        .eq("id", userId);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -199,57 +201,213 @@ function ProfileSection() {
     onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke oppdatere profilen")),
   });
 
-  const avatarUrl = watch("avatar_url");
-  const displayName = watch("display_name");
+  const avatarMutation = useMutation({
+    mutationFn: async (file: File) => {
+      if (!userId) throw new Error("Ikke innlogget");
+      const avatarUrl = await uploadAvatarImage({ userId, file });
+      const { error } = await supabase
+        .from("profiles")
+        .update({ avatar_url: avatarUrl })
+        .eq("id", userId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile-edit", userId] });
+      queryClient.invalidateQueries({ queryKey: ["profile-menu", userId] });
+      toast.success("Profilbilde oppdatert");
+    },
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke laste opp profilbildet")),
+    onSettled: () => setUploadingAvatar(false),
+  });
 
-  if (isLoading) return <Loader2 className="size-5 animate-spin text-muted-foreground" />;
+  function handleAvatarFile(file: File) {
+    const err = validateAvatarImage(file);
+    if (err) {
+      toast.error(describeImageError(err));
+      return;
+    }
+    setUploadingAvatar(true);
+    avatarMutation.mutate(file);
+  }
+
+  const displayName = profile?.display_name ?? "";
+  const memberSince = stats
+    ? new Date(stats.created_at).toLocaleDateString("nb-NO", { month: "long", year: "numeric" })
+    : null;
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="flex items-center gap-5 py-6">
+          <div className="size-20 shrink-0 animate-pulse rounded-full bg-muted" />
+          <div className="max-w-xs flex-1 space-y-2">
+            <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+            <div className="h-9 w-full animate-pulse rounded bg-muted" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <form
-      onSubmit={handleSubmit((v) => mutation.mutate(v))}
-      className="space-y-6 rounded-xl border border-border bg-card p-6"
-    >
-      <div className="flex items-center gap-4">
-        <Avatar className="size-16">
-          {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
-          <AvatarFallback className="bg-primary/10 text-base font-medium text-primary">
-            {displayName?.slice(0, 2).toUpperCase() || "?"}
-          </AvatarFallback>
-        </Avatar>
-        <div className="text-sm text-muted-foreground">
-          Lim inn en bilde-URL nedenfor for å oppdatere avataren.
-        </div>
-      </div>
+    <div className="space-y-8">
+      <Card>
+        <CardHeader>
+          <CardTitle>Profilinfo</CardTitle>
+        </CardHeader>
+        <form onSubmit={handleSubmit((v) => mutation.mutate(v))}>
+          <CardContent className="flex items-center gap-5">
+            <div className="flex shrink-0 flex-col items-center gap-2">
+              <div className="relative">
+                <Avatar className="size-20">
+                  {profile?.avatar_url && (
+                    <AvatarImage src={profile.avatar_url} alt={displayName} />
+                  )}
+                  <AvatarFallback className="bg-primary/10 text-lg font-medium text-primary">
+                    {displayName?.slice(0, 2).toUpperCase() || "?"}
+                  </AvatarFallback>
+                </Avatar>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleAvatarFile(file);
+                    e.target.value = "";
+                  }}
+                />
+                <button
+                  type="button"
+                  aria-label="Last opp profilbilde"
+                  disabled={uploadingAvatar}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute -bottom-1 -right-1 flex size-7 items-center justify-center rounded-full border-2 border-card bg-primary text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {uploadingAvatar ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Camera className="size-3.5" />
+                  )}
+                </button>
+              </div>
+              {memberSince && (
+                <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Calendar className="size-3" /> Siden {memberSince}
+                </p>
+              )}
+            </div>
+            <div className="max-w-xs flex-1 space-y-2">
+              <Label htmlFor="display_name">Visningsnavn</Label>
+              <Input id="display_name" {...register("display_name")} />
+              {errors.display_name && (
+                <p className="text-sm text-destructive">{errors.display_name.message}</p>
+              )}
+            </div>
+          </CardContent>
+          <CardFooter className="justify-end border-t pt-6">
+            <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
+              Lagre profil
+            </Button>
+          </CardFooter>
+        </form>
+      </Card>
 
-      <div className="space-y-2">
-        <Label htmlFor="display_name">Visningsnavn</Label>
-        <Input id="display_name" {...register("display_name")} />
-        {errors.display_name && (
-          <p className="text-sm text-destructive">{errors.display_name.message}</p>
+      <ProfileStats />
+    </div>
+  );
+}
+
+function StatCell({
+  label,
+  value,
+  icon,
+  children,
+}: {
+  label: string;
+  value?: string;
+  icon: React.ReactNode;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-1.5 px-4 py-5 text-center">
+      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+        {icon} {label}
+      </span>
+      <div className="flex min-h-7 items-center justify-center">
+        {value !== undefined ? (
+          <span className="text-xl font-semibold tabular-nums">{value}</span>
+        ) : (
+          children
         )}
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="avatar_url">Avatar-URL</Label>
-        <Input id="avatar_url" placeholder="https://…" {...register("avatar_url")} />
-        {errors.avatar_url && (
-          <p className="text-sm text-destructive">{errors.avatar_url.message}</p>
-        )}
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="location">Sted</Label>
-        <Input id="location" placeholder="Oslo" {...register("location")} />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="bio">Om meg</Label>
-        <Textarea id="bio" rows={4} {...register("bio")} />
-      </div>
-      <div className="flex justify-end">
-        <Button type="submit" disabled={mutation.isPending}>
-          {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
-          Lagre profil
-        </Button>
-      </div>
-    </form>
+    </div>
+  );
+}
+
+function ProfileStats() {
+  const getStats = useServerFn(getMyProfileStats);
+  const { data: stats, isLoading } = useQuery({
+    queryKey: ["my-profile-stats"],
+    queryFn: () => getStats({}),
+  });
+
+  if (isLoading || !stats) {
+    return (
+      <Card>
+        <CardContent className="grid grid-cols-3 divide-x divide-border p-0">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="flex items-center justify-center py-8">
+              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardContent className="grid grid-cols-3 divide-x divide-border p-0">
+        <StatCell label="Annonser" icon={<ListChecks className="size-3.5" />}>
+          {stats.listings_count > 0 ? (
+            <span className="text-xl font-semibold tabular-nums">
+              {stats.listings_count.toLocaleString("nb-NO")}
+            </span>
+          ) : (
+            <Link
+              to="/ny-annonse"
+              className="text-xs font-medium text-primary underline-offset-2 hover:underline"
+            >
+              Opprett din første
+            </Link>
+          )}
+        </StatCell>
+        <StatCell label="Salg" icon={<ShoppingBag className="size-3.5" />}>
+          {stats.sales_count > 0 ? (
+            <span className="text-xl font-semibold tabular-nums">
+              {stats.sales_count.toLocaleString("nb-NO")}
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground">Ingen ennå</span>
+          )}
+        </StatCell>
+        <StatCell label="Vurdering" icon={<Star className="size-3.5" />}>
+          {stats.review_count > 0 ? (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xl font-semibold tabular-nums">
+                {stats.avg_rating.toFixed(1)}
+              </span>
+              <StarRating value={stats.avg_rating} readOnly size={14} />
+            </div>
+          ) : (
+            <span className="text-xs text-muted-foreground">Ingen ennå</span>
+          )}
+        </StatCell>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -707,7 +865,19 @@ function BlockedSection() {
   });
 
   if (isLoading) {
-    return <Loader2 className="size-5 animate-spin text-muted-foreground" />;
+    return (
+      <div className="space-y-3 overflow-hidden rounded-xl border border-border bg-card p-4">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="flex animate-pulse items-center gap-3">
+            <div className="size-10 rounded-full bg-muted" />
+            <div className="flex-1 space-y-1.5">
+              <div className="h-3.5 w-1/3 rounded bg-muted" />
+              <div className="h-3 w-1/2 rounded bg-muted" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   }
 
   if (!blocks || blocks.length === 0) {

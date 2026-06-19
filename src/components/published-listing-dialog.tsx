@@ -4,6 +4,7 @@ import { Eye, MapPin, Share2, Sparkles, X } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { signListingImageUrls } from "@/lib/storage";
+import { formatPrice } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -32,12 +33,6 @@ type PreviewData = {
   cover_path: string | null;
   kaupet_code: string | null;
 };
-
-function formatPrice(p: { price_nok: number | null; is_free: boolean }) {
-  if (p.is_free) return "Gis bort";
-  if (p.price_nok == null) return "Pris ved henvendelse";
-  return `${p.price_nok.toLocaleString("nb-NO")} kr`;
-}
 
 export function PublishedListingDialog({
   listingId,

@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,17 @@ import { isNative } from "@/lib/native";
 import { formatErrorMessage } from "@/lib/errors";
 
 const TERMS_VERSION = "1.0";
+
+function passwordStrength(password: string): { label: string; score: 0 | 1 | 2 | 3 } {
+  if (password.length < 6) return { label: "For kort", score: 0 };
+  let score = 0;
+  if (password.length >= 10) score++;
+  if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score++;
+  if (/[0-9]/.test(password) || /[^A-Za-z0-9]/.test(password)) score++;
+  if (score <= 1) return { label: "Svakt", score: 1 };
+  if (score === 2) return { label: "Middels", score: 2 };
+  return { label: "Sterkt", score: 3 };
+}
 
 const searchSchema = z.object({
   mode: z.enum(["signin", "signup"]).optional().default("signin"),
@@ -128,6 +140,23 @@ function AuthPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
+            {isSignUp && password.length > 0 && (
+              <div className="space-y-1">
+                <div className="flex gap-1">
+                  {[1, 2, 3].map((i) => (
+                    <div
+                      key={i}
+                      className={`h-1 flex-1 rounded-full ${
+                        passwordStrength(password).score >= i ? "bg-primary" : "bg-muted"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Passordstyrke: {passwordStrength(password).label}
+                </p>
+              </div>
+            )}
           </div>
           {isSignUp && (
             <label className="flex items-start gap-2 text-sm text-muted-foreground">
@@ -160,10 +189,11 @@ function AuthPage() {
           )}
           <Button
             type="submit"
-            className="w-full"
+            className="w-full gap-2"
             disabled={loading || (isSignUp && !acceptedTerms)}
           >
-            {loading ? "Vent litt…" : isSignUp ? "Opprett konto" : "Logg inn"}
+            {loading && <Loader2 className="size-4 animate-spin" />}
+            {isSignUp ? "Opprett konto" : "Logg inn"}
           </Button>
         </form>
 

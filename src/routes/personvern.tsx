@@ -27,7 +27,7 @@ function PersonvernPage() {
         <h1 className="mt-2 font-display text-4xl leading-tight tracking-tight">
           Personvernerklæring
         </h1>
-        <p className="mt-3 text-sm text-muted-foreground">Sist oppdatert 17. juni 2026</p>
+        <p className="mt-3 text-sm text-muted-foreground">Sist oppdatert 19. juni 2026</p>
       </header>
 
       <div className="space-y-10 text-sm leading-relaxed text-foreground/90">
@@ -83,8 +83,9 @@ function PersonvernPage() {
           <h2 className="font-display text-2xl">Hva lagres på serveren</h2>
           <ul className="mt-3 space-y-2 list-disc pl-5">
             <li>
-              <strong>Brukerprofil</strong>: navn, e-postadresse og eventuelt profilbilde, bio og
-              lokasjon.
+              <strong>Brukerprofil</strong>: navn og eventuelt profilbilde. Visningsnavn og
+              profilbilde er <strong>offentlig synlig</strong> for alle besøkende på din profilside.
+              E-postadressen er privat og vises ikke offentlig.
             </li>
             <li>
               <strong>Annonser</strong> du har lagt ut, med tilhørende bilder, beskrivelse, kategori
@@ -128,10 +129,6 @@ function PersonvernPage() {
               hva du vil varsles om (nye meldinger, lagrede søk).
             </li>
             <li>
-              <strong>Verifisering</strong> — hvis du verifiserer identiteten din, lagres
-              opplysninger knyttet til verifiseringen.
-            </li>
-            <li>
               <strong>Betaling og annonsepromotering</strong> — hvis du betaler for å fremheve en
               annonse, lagres transaksjonsdata fra betalingsleverandøren Vipps, samt hvilken annonse
               betalingen gjelder.
@@ -153,8 +150,8 @@ function PersonvernPage() {
             </li>
           </ul>
           <p className="mt-4">
-            Data lagres og behandles av <strong>Supabase</strong> på servere i EU. Supabase er vår
-            databehandler. Du kan lese deres personvernerklæring her:{" "}
+            Data lagres og behandles av <strong>Supabase</strong> på servere i Europa. Supabase er
+            vår databehandler. Du kan lese deres personvernerklæring her:{" "}
             <a
               href="https://supabase.com/privacy"
               target="_blank"
@@ -223,9 +220,9 @@ function PersonvernPage() {
           </p>
           <p className="mt-3">
             For å bevare samtalehistorikken for andre brukere blir profilen din{" "}
-            <strong>anonymisert</strong> ved permanent sletting: navn, profilbilde, bio og lokasjon
-            fjernes, og du vises som "Slettet bruker" i tidligere meldinger. Annonsene dine slettes.
-            E-postadresse og innloggingsdata fjernes fullstendig.
+            <strong>anonymisert</strong> ved permanent sletting: navn og profilbilde fjernes, og du
+            vises som "Slettet bruker" i tidligere meldinger. Annonsene dine slettes. E-postadresse
+            og innloggingsdata fjernes fullstendig.
           </p>
         </section>
 
@@ -234,7 +231,21 @@ function PersonvernPage() {
           <ul className="mt-3 space-y-2 list-disc pl-5">
             <li>
               <strong>Supabase</strong> — databehandler for autentisering, database og fillagring.
-              Servere i EU.
+            </li>
+            <li>
+              <strong>Cloudflare</strong> — vi bruker Cloudflare Workers som driftsplattform. Det
+              betyr at trafikk til og fra Kaupet.no går gjennom Cloudflare sin infrastruktur, som
+              dermed ser IP-adressen din og annen teknisk informasjon om forespørselen din. Du kan
+              lese Cloudflares personvernerklæring på{" "}
+              <a
+                href="https://www.cloudflare.com/privacypolicy/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary underline underline-offset-2"
+              >
+                cloudflare.com/privacypolicy
+              </a>
+              .
             </li>
             <li>
               <strong>Vipps</strong> — betalingsleverandør for kjøp av annonsepromotering. Vipps

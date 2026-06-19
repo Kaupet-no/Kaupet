@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { signListingImageUrls } from "@/lib/storage";
+import { formatPrice } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -32,12 +33,6 @@ type PreviewData = {
   city: string | null;
   cover_path: string | null;
 };
-
-function formatPrice(p: { price_nok: number | null; is_free: boolean }) {
-  if (p.is_free) return "Gis bort";
-  if (p.price_nok == null) return "Pris ved henvendelse";
-  return `${p.price_nok.toLocaleString("nb-NO")} kr`;
-}
 
 export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
   const [selected, setSelected] = useState<number | null>(null);

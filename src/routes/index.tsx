@@ -1,25 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import {
-  ArrowRight,
-  Baby,
-  Car,
-  Dumbbell,
-  Gamepad2,
-  Heart,
-  Home,
-  type LucideIcon,
-  MapPin,
-  Package,
-  Palette,
-  Search,
-  ShieldCheck,
-  Shirt,
-  Ship,
-  Smartphone,
-  Sofa,
-  Wrench,
-} from "lucide-react";
+import { ArrowRight, Heart, MapPin, Search, ShieldCheck } from "lucide-react";
 import { z } from "zod";
 import { useMemo, useRef, useState } from "react";
 import Autoplay from "embla-carousel-autoplay";
@@ -40,27 +21,14 @@ import { ChevronLeft } from "lucide-react";
 import { useIsNative } from "@/lib/use-is-native";
 import { AppLanding } from "@/components/app-landing";
 import { KaupetCodeDialog } from "@/components/kaupet-code-dialog";
-
-const CATEGORY_ICONS: Record<string, LucideIcon> = {
-  "mobler-og-interior": Sofa,
-  elektronikk: Smartphone,
-  "klar-og-mote": Shirt,
-  "barn-og-baby": Baby,
-  "sport-og-friluft": Dumbbell,
-  "hus-og-hage": Home,
-  "verktoy-og-byggvarer": Wrench,
-  "hobby-fritid-og-underholdning": Gamepad2,
-  "antikviteter-og-kunst": Palette,
-  "deler-bil-og-mc": Car,
-  "deler-til-bat": Ship,
-  annet: Package,
-};
+import { getCategoryIcon } from "@/lib/category-icons";
 
 type CategoryRow = {
   id: string;
   slug: string;
   name_nb: string;
   parent_id: string | null;
+  icon: string | null;
 };
 
 const searchSchema = z.object({
@@ -99,7 +67,7 @@ function WebLanding() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
-        .select("id, slug, name_nb, parent_id")
+        .select("id, slug, name_nb, parent_id, icon")
         .order("sort_order")
         .order("name_nb");
       if (error) throw error;
@@ -290,14 +258,18 @@ function WebLanding() {
 
         {/* Mobil: horisontal sveipbar rad (kun for rotkategorier) */}
         {!activeCategory && (
-          <div className="-mx-4 duration-300 animate-in fade-in slide-in-from-left-8 sm:hidden">
+          <div className="relative -mx-4 duration-300 animate-in fade-in slide-in-from-left-8 sm:hidden">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-background to-transparent"
+            />
             <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain touch-pan-x px-4 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {rootCategories.length === 0 &&
                 Array.from({ length: 6 }).map((_, i) => (
                   <div key={i} className="h-24 w-20 shrink-0 animate-pulse rounded-2xl bg-muted" />
                 ))}
               {rootCategories.map((cat) => {
-                const Icon = CATEGORY_ICONS[cat.slug] ?? Package;
+                const Icon = getCategoryIcon(cat.icon);
                 return (
                   <button
                     key={cat.id}
@@ -367,7 +339,7 @@ function WebLanding() {
           ) : (
             <>
               {rootCategories.map((cat) => {
-                const Icon = CATEGORY_ICONS[cat.slug] ?? Package;
+                const Icon = getCategoryIcon(cat.icon);
                 const subCount = childrenByParent.get(cat.id)?.length ?? 0;
                 return (
                   <button

@@ -38,6 +38,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { formatErrorMessage } from "@/lib/errors";
+import { formatPrice } from "@/lib/format";
+import { STATUS_LABEL } from "@/lib/constants";
 
 export const Route = createFileRoute("/_authenticated/mine-annonser/")({
   head: () => ({
@@ -64,25 +66,11 @@ type Row = {
   cover_path: string | null;
 };
 
-function formatPrice(r: Row) {
-  if (r.is_free) return "Gis bort";
-  if (r.price_nok == null) return "Pris ved henvendelse";
-  return `${r.price_nok.toLocaleString("nb-NO")} kr`;
-}
-
 function daysLeft(expires_at: string | null): number | null {
   if (!expires_at) return null;
   const ms = new Date(expires_at).getTime() - Date.now();
   return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)));
 }
-
-const STATUS_LABEL: Record<Row["status"], string> = {
-  draft: "Utkast",
-  active: "Aktiv",
-  sold: "Solgt",
-  archived: "Arkivert",
-  expired: "Utløpt",
-};
 
 function MyListingsPage() {
   const queryClient = useQueryClient();

@@ -1,26 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import {
-  ArrowRight,
-  Baby,
-  Car,
-  ChevronLeft,
-  Dumbbell,
-  Gamepad2,
-  Home,
-  type LucideIcon,
-  MapPin,
-  Package,
-  Palette,
-  Search as SearchIcon,
-  Ship,
-  Shirt,
-  Smartphone,
-  Sofa,
-  Wrench,
-  X,
-} from "lucide-react";
+import { ArrowRight, ChevronLeft, MapPin, Search as SearchIcon, X } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
@@ -29,21 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/location-filter";
 import { AnimatedSearchPlaceholder } from "@/components/animated-search-placeholder";
 import { useSavedLocation } from "@/lib/use-saved-location";
-
-const CATEGORY_ICONS: Record<string, LucideIcon> = {
-  "mobler-og-interior": Sofa,
-  elektronikk: Smartphone,
-  "klar-og-mote": Shirt,
-  "barn-og-baby": Baby,
-  "sport-og-friluft": Dumbbell,
-  "hus-og-hage": Home,
-  "verktoy-og-byggvarer": Wrench,
-  "hobby-fritid-og-underholdning": Gamepad2,
-  "antikviteter-og-kunst": Palette,
-  "deler-bil-og-mc": Car,
-  "deler-til-bat": Ship,
-  annet: Package,
-};
+import { getCategoryIcon } from "@/lib/category-icons";
 
 const SUGGESTIONS = [
   "sykkel",
@@ -63,6 +30,7 @@ type CategoryRow = {
   slug: string;
   name_nb: string;
   parent_id: string | null;
+  icon: string | null;
 };
 
 export function AppLanding() {
@@ -78,7 +46,7 @@ export function AppLanding() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
-        .select("id, slug, name_nb, parent_id")
+        .select("id, slug, name_nb, parent_id, icon")
         .order("sort_order")
         .order("name_nb");
       if (error) throw error;
@@ -298,7 +266,7 @@ export function AppLanding() {
                   <div key={i} className="h-24 w-20 shrink-0 animate-pulse rounded-2xl bg-muted" />
                 ))}
               {rootCategories.map((cat) => {
-                const Icon = CATEGORY_ICONS[cat.slug] ?? Package;
+                const Icon = getCategoryIcon(cat.icon);
                 return (
                   <button
                     key={cat.id}
@@ -324,7 +292,7 @@ export function AppLanding() {
                   <div key={i} className="aspect-[5/4] animate-pulse rounded-2xl bg-muted" />
                 ))}
               {rootCategories.map((cat) => {
-                const Icon = CATEGORY_ICONS[cat.slug] ?? Package;
+                const Icon = getCategoryIcon(cat.icon);
                 return (
                   <button
                     key={cat.id}

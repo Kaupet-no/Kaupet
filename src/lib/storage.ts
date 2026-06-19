@@ -86,6 +86,24 @@ export async function uploadAvatarImage(opts: { userId: string; file: File }): P
   return publicUrl;
 }
 
+// Avatar uploads use timestamped filenames, so the previous file is never
+// implicitly overwritten — call this after a successful re-upload (and DB
+// update) to avoid leaving orphaned files behind. Best-effort: failures are
+// swallowed since the new avatar is already live either way.
+export async function deletePreviousAvatarImage(previousPublicUrl: string | null | undefined) {
+  if (!previousPublicUrl) return;
+  const marker = `/${AVATAR_BUCKET}/`;
+  const idx = previousPublicUrl.indexOf(marker);
+  if (idx === -1) return;
+  const path = previousPublicUrl.slice(idx + marker.length).split("?")[0];
+  if (!path) return;
+  try {
+    await supabase.storage.from(AVATAR_BUCKET).remove([path]);
+  } catch {
+    // best-effort cleanup
+  }
+}
+
 const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
 
 export async function signListingImageUrls(

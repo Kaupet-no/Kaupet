@@ -2,7 +2,7 @@ import { createFileRoute, Link, notFound, useNavigate, useRouter } from "@tansta
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { reconcilePromotionPayment } from "@/lib/promotions.functions";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   MapPin,
@@ -347,12 +347,15 @@ function ListingDetailPage() {
     },
   });
 
-  const images = (data?.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
+  const images = useMemo(
+    () => (data?.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order),
+    [data?.listing_images],
+  );
 
   useEffect(() => {
     if (images.length === 0) return;
     signListingImageUrls(images.map((i) => i.storage_path)).then(setImgUrls);
-  }, [images.length, data?.id]);
+  }, [images]);
 
   // Logg visning (databasens unike constraint sørger for at samme besøkende
   // kun telles én gang per annonse)
@@ -377,7 +380,7 @@ function ListingDetailPage() {
       .then(({ error }) => {
         if (error) console.warn("[listing_views] log failed", error);
       });
-  }, [data?.id, data?.seller_id, user?.id]);
+  }, [data?.id, data?.seller_id, user]);
 
   if (isLoading) {
     return (

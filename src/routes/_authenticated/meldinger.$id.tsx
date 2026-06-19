@@ -163,7 +163,7 @@ function ConversationPage() {
     if (path) {
       signListingImageUrls([path]).then((urls) => setCoverUrl(urls[path] ?? null));
     }
-  }, [conv?.listing?.id]);
+  }, [conv?.listing?.id, conv?.listing?.listing_images]);
 
   // Realtime
   useEffect(() => {

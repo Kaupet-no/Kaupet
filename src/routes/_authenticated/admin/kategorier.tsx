@@ -1,8 +1,31 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  ChevronRight,
+  ChevronsUpDown,
+  GripVertical,
+  Loader2,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
+import {
+  closestCenter,
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -34,7 +57,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { formatErrorMessage } from "@/lib/errors";
+import { CATEGORY_ICON_OPTIONS, getCategoryIcon } from "@/lib/category-icons";
 
 export const Route = createFileRoute("/_authenticated/admin/kategorier")({
   head: () => ({ meta: [{ title: "Kategoriadministrasjon — Kaupet.no" }] }),
@@ -47,6 +80,7 @@ type Category = {
   slug: string;
   parent_id: string | null;
   sort_order: number;
+  icon: string | null;
 };
 
 function slugify(s: string) {
@@ -65,19 +99,36 @@ function AdminCategories() {
   const [editing, setEditing] = useState<Category | null>(null);
   const [creating, setCreating] = useState<{ parentId: string | null } | null>(null);
   const [deleting, setDeleting] = useState<Category | null>(null);
+  const [replacementId, setReplacementId] = useState<string>("__none__");
+  const [search, setSearch] = useState("");
 
   const { data: categories, isLoading } = useQuery({
     queryKey: ["admin", "categories"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
-        .select("id, name_nb, slug, parent_id, sort_order")
+        .select("id, name_nb, slug, parent_id, sort_order, icon")
         .order("sort_order")
         .order("name_nb");
       if (error) throw error;
       return (data ?? []) as Category[];
     },
   });
+
+  const { data: popularCategories } = useQuery({
+    queryKey: ["admin", "category-counts"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_popular_categories");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const countsById = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const c of popularCategories ?? []) map.set(c.id, c.listing_count);
+    return map;
+  }, [popularCategories]);
 
   const tree = useMemo(() => {
     const all = categories ?? [];
@@ -89,6 +140,39 @@ function AdminCategories() {
     }
     return byParent;
   }, [categories]);
+
+  const filteredTree = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return tree;
+    const all = categories ?? [];
+    const byId = new Map(all.map((c) => [c.id, c]));
+    const matchedIds = all.filter(
+      (c) => c.name_nb.toLowerCase().includes(term) || c.slug.toLowerCase().includes(term),
+    );
+    const visible = new Set<string>();
+    for (const match of matchedIds) {
+      let cur: Category | undefined = match;
+      while (cur) {
+        visible.add(cur.id);
+        cur = cur.parent_id ? byId.get(cur.parent_id) : undefined;
+      }
+    }
+    const addDescendants = (id: string) => {
+      for (const child of tree.get(id) ?? []) {
+        visible.add(child.id);
+        addDescendants(child.id);
+      }
+    };
+    for (const match of matchedIds) addDescendants(match.id);
+    const filtered = new Map<string | null, Category[]>();
+    for (const [parentId, kids] of tree.entries()) {
+      filtered.set(
+        parentId,
+        kids.filter((k) => visible.has(k.id)),
+      );
+    }
+    return filtered;
+  }, [tree, categories, search]);
 
   const usageQuery = useQuery({
     queryKey: ["admin", "category-usage", deleting?.id],
@@ -104,23 +188,63 @@ function AdminCategories() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, replaceWith }: { id: string; replaceWith: string | null }) => {
+      if (replaceWith) {
+        const { error: moveError } = await supabase
+          .from("listings")
+          .update({ category_id: replaceWith })
+          .eq("category_id", id);
+        if (moveError) throw moveError;
+      }
       const { error } = await supabase.from("categories").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Kategori slettet");
       qc.invalidateQueries({ queryKey: ["admin", "categories"] });
+      qc.invalidateQueries({ queryKey: ["admin", "category-counts"] });
       setDeleting(null);
+      setReplacementId("__none__");
     },
     onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke slette kategorien")),
   });
 
-  const roots = tree.get(null) ?? [];
+  const reorderMutation = useMutation({
+    mutationFn: async (updates: { id: string; sort_order: number }[]) => {
+      const results = await Promise.all(
+        updates.map((u) =>
+          supabase.from("categories").update({ sort_order: u.sort_order }).eq("id", u.id),
+        ),
+      );
+      const failed = results.find((r) => r.error);
+      if (failed?.error) throw failed.error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "categories"] }),
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke lagre rekkefølgen")),
+  });
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const all = categories ?? [];
+    const activeCat = all.find((c) => c.id === active.id);
+    const overCat = all.find((c) => c.id === over.id);
+    if (!activeCat || !overCat || activeCat.parent_id !== overCat.parent_id) return;
+    const siblings = tree.get(activeCat.parent_id) ?? [];
+    const oldIndex = siblings.findIndex((c) => c.id === active.id);
+    const newIndex = siblings.findIndex((c) => c.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(siblings, oldIndex, newIndex);
+    reorderMutation.mutate(reordered.map((c, i) => ({ id: c.id, sort_order: (i + 1) * 10 })));
+  }
+
+  const roots = filteredTree.get(null) ?? [];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <p className="text-sm text-muted-foreground">
           Administrer kategorier og underkategorier. Endringer påvirker alle annonser.
         </p>
@@ -129,6 +253,13 @@ function AdminCategories() {
         </Button>
       </div>
 
+      <Input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Søk etter kategori…"
+        className="max-w-sm"
+      />
+
       <Card>
         <CardContent className="p-2 sm:p-4">
           {isLoading ? (
@@ -136,21 +267,25 @@ function AdminCategories() {
               <Loader2 className="size-5 animate-spin text-muted-foreground" />
             </div>
           ) : roots.length === 0 ? (
-            <p className="py-8 text-center text-muted-foreground">Ingen kategorier ennå</p>
+            <p className="py-8 text-center text-muted-foreground">
+              {search.trim() ? "Ingen kategorier matcher søket" : "Ingen kategorier ennå"}
+            </p>
           ) : (
-            <ul className="space-y-1">
-              {roots.map((c) => (
-                <CategoryRow
-                  key={c.id}
-                  category={c}
-                  childrenMap={tree}
-                  depth={0}
-                  onEdit={setEditing}
-                  onDelete={setDeleting}
-                  onAddChild={(parent) => setCreating({ parentId: parent.id })}
-                />
-              ))}
-            </ul>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <CategoryList
+                categories={roots}
+                childrenMap={filteredTree}
+                countsById={countsById}
+                depth={0}
+                onEdit={setEditing}
+                onDelete={setDeleting}
+                onAddChild={(parent) => setCreating({ parentId: parent.id })}
+              />
+            </DndContext>
           )}
         </CardContent>
       </Card>
@@ -168,7 +303,15 @@ function AdminCategories() {
         />
       )}
 
-      <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
+      <AlertDialog
+        open={!!deleting}
+        onOpenChange={(o) => {
+          if (!o) {
+            setDeleting(null);
+            setReplacementId("__none__");
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Slette «{deleting?.name_nb}»?</AlertDialogTitle>
@@ -177,8 +320,8 @@ function AdminCategories() {
                 "Sjekker bruk…"
               ) : usageQuery.data && usageQuery.data > 0 ? (
                 <>
-                  <strong>{usageQuery.data}</strong> annonser er knyttet til denne kategorien.
-                  Annonsene mister kategorien sin (verdien blir satt til ingen kategori).
+                  <strong>{usageQuery.data}</strong> annonser er knyttet til denne kategorien. Velg
+                  en erstatningskategori under, eller la annonsene miste kategorien sin.
                 </>
               ) : (
                 "Kategorien er ikke i bruk og kan trygt slettes."
@@ -190,13 +333,39 @@ function AdminCategories() {
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {!usageQuery.isLoading && (usageQuery.data ?? 0) > 0 && (
+            <div className="space-y-2">
+              <Label>Erstatningskategori</Label>
+              <Select value={replacementId} onValueChange={setReplacementId}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Ingen (fjern kategori fra annonsene)</SelectItem>
+                  {(categories ?? [])
+                    .filter((c) => c.id !== deleting?.id && c.parent_id !== deleting?.id)
+                    .map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.parent_id ? `↳ ${c.name_nb}` : c.name_nb}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel>Avbryt</AlertDialogCancel>
             <AlertDialogAction
               disabled={
                 deleteMutation.isPending || (tree.get(deleting?.id ?? null)?.length ?? 0) > 0
               }
-              onClick={() => deleting && deleteMutation.mutate(deleting.id)}
+              onClick={() =>
+                deleting &&
+                deleteMutation.mutate({
+                  id: deleting.id,
+                  replaceWith: replacementId === "__none__" ? null : replacementId,
+                })
+              }
             >
               {deleteMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : "Slett"}
             </AlertDialogAction>
@@ -207,9 +376,47 @@ function AdminCategories() {
   );
 }
 
-function CategoryRow({
+function CategoryList({
+  categories,
+  childrenMap,
+  countsById,
+  depth,
+  onEdit,
+  onDelete,
+  onAddChild,
+}: {
+  categories: Category[];
+  childrenMap: Map<string | null, Category[]>;
+  countsById: Map<string, number>;
+  depth: number;
+  onEdit: (c: Category) => void;
+  onDelete: (c: Category) => void;
+  onAddChild: (c: Category) => void;
+}) {
+  return (
+    <SortableContext items={categories.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+      <ul className="space-y-1">
+        {categories.map((c) => (
+          <SortableCategoryRow
+            key={c.id}
+            category={c}
+            childrenMap={childrenMap}
+            countsById={countsById}
+            depth={depth}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onAddChild={onAddChild}
+          />
+        ))}
+      </ul>
+    </SortableContext>
+  );
+}
+
+function SortableCategoryRow({
   category,
   childrenMap,
+  countsById,
   depth,
   onEdit,
   onDelete,
@@ -217,22 +424,47 @@ function CategoryRow({
 }: {
   category: Category;
   childrenMap: Map<string | null, Category[]>;
+  countsById: Map<string, number>;
   depth: number;
   onEdit: (c: Category) => void;
   onDelete: (c: Category) => void;
   onAddChild: (c: Category) => void;
 }) {
   const kids = childrenMap.get(category.id) ?? [];
+  const Icon = getCategoryIcon(category.icon);
+  const listingCount = countsById.get(category.id) ?? 0;
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: category.id,
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
   return (
-    <li>
+    <li ref={setNodeRef} style={style}>
       <div
         className="flex items-center justify-between gap-2 rounded-md px-2 py-2 hover:bg-accent/40"
         style={{ paddingLeft: `${depth * 20 + 8}px` }}
       >
         <div className="flex min-w-0 items-center gap-2">
+          <button
+            type="button"
+            {...attributes}
+            {...listeners}
+            className="cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
+            aria-label="Dra for å endre rekkefølge"
+          >
+            <GripVertical className="size-4" />
+          </button>
           {depth > 0 && <ChevronRight className="size-3 text-muted-foreground" />}
+          <Icon className="size-4 shrink-0 text-muted-foreground" />
           <span className="truncate font-medium">{category.name_nb}</span>
           <span className="truncate text-xs text-muted-foreground">/{category.slug}</span>
+          <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+            {listingCount} annonser
+          </span>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {depth === 0 && (
@@ -255,19 +487,15 @@ function CategoryRow({
         </div>
       </div>
       {kids.length > 0 && (
-        <ul className="space-y-1">
-          {kids.map((k) => (
-            <CategoryRow
-              key={k.id}
-              category={k}
-              childrenMap={childrenMap}
-              depth={depth + 1}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              onAddChild={onAddChild}
-            />
-          ))}
-        </ul>
+        <CategoryList
+          categories={kids}
+          childrenMap={childrenMap}
+          countsById={countsById}
+          depth={depth + 1}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onAddChild={onAddChild}
+        />
       )}
     </li>
   );
@@ -291,6 +519,8 @@ function CategoryFormDialog({
   const [sortOrder, setSortOrder] = useState(category?.sort_order ?? 0);
   const [parent, setParent] = useState<string>(category?.parent_id ?? parentId ?? "__none__");
   const [slugTouched, setSlugTouched] = useState(!!category);
+  const [icon, setIcon] = useState<string | null>(category?.icon ?? null);
+  const [iconPickerOpen, setIconPickerOpen] = useState(false);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -299,6 +529,7 @@ function CategoryFormDialog({
         slug: slug.trim() || slugify(name),
         sort_order: sortOrder,
         parent_id: parent === "__none__" ? null : parent,
+        icon,
       };
       if (category) {
         const { error } = await supabase.from("categories").update(payload).eq("id", category.id);
@@ -365,6 +596,52 @@ function CategoryFormDialog({
               maxLength={80}
               placeholder="auto-generert fra navn"
             />
+          </div>
+          <div className="space-y-2">
+            <Label>Ikon</Label>
+            <Popover open={iconPickerOpen} onOpenChange={setIconPickerOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={iconPickerOpen}
+                  className="w-full justify-between"
+                >
+                  <span className="flex items-center gap-2">
+                    {(() => {
+                      const SelectedIcon = getCategoryIcon(icon);
+                      return <SelectedIcon className="size-4" />;
+                    })()}
+                    {icon ?? "Velg ikon"}
+                  </span>
+                  <ChevronsUpDown className="size-4 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-(--radix-popover-trigger-width) p-0">
+                <Command>
+                  <CommandInput placeholder="Søk etter ikon…" />
+                  <CommandList>
+                    <CommandEmpty>Ingen ikoner funnet</CommandEmpty>
+                    <CommandGroup>
+                      {CATEGORY_ICON_OPTIONS.map(({ name: iconName, icon: IconComponent }) => (
+                        <CommandItem
+                          key={iconName}
+                          value={iconName}
+                          onSelect={() => {
+                            setIcon(iconName);
+                            setIconPickerOpen(false);
+                          }}
+                        >
+                          <IconComponent className="size-4" />
+                          {iconName}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">

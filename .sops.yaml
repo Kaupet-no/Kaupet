@@ -11,7 +11,8 @@
 # noen som allerede har tilgang.
 
 keys:
-  - &andreas age109lmrhdpc5wz2m6p26eyhq28kf2jxsfd2xv3ykvufc7jk534pfksg89gqf
+  - &andreas-laptop1 age109lmrhdpc5wz2m6p26eyhq28kf2jxsfd2xv3ykvufc7jk534pfksg89gqf
+  - &andreas-laptop2 age1ga96k068k044hnpd4pyjxq7g0eq43svfx09ml65t9z82sjghw9zsmdrhkl
   # - &CI age1...   # legg til CI-nøkkelen her når GitHub Actions skal dekryptere
 
 creation_rules:
@@ -20,5 +21,6 @@ creation_rules:
     output_type: dotenv
     key_groups:
       - age:
-          - *andreas
+          - *andreas-laptop1
+          - *andreas-laptop2
           # - *CI

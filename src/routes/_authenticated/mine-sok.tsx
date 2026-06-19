@@ -311,10 +311,7 @@ function MineSokPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog
-        open={renamingSearch !== null}
-        onOpenChange={(o) => !o && setRenamingSearch(null)}
-      >
+      <Dialog open={renamingSearch !== null} onOpenChange={(o) => !o && setRenamingSearch(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Endre navn på søk</DialogTitle>

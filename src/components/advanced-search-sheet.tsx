@@ -520,8 +520,8 @@ export function SaveSearchDialog({
           </label>
           {hasNoFilters(criteria) && (
             <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-800">
-              Dette søket har ingen filtre og vil varsle deg om <strong>alle</strong> nye annonser på
-              Kaupet.
+              Dette søket har ingen filtre og vil varsle deg om <strong>alle</strong> nye annonser
+              på Kaupet.
             </p>
           )}
           {notify && <PushEnablePrompt variant="inline" />}

@@ -424,14 +424,14 @@ async function attachLastMessage(convs: ConversationRow[]): Promise<Conversation
   const ids = convs.map((c) => c.id);
   const { data } = await supabase
     .from("messages")
-    .select("conversation_id, body, created_at, sender_id")
+    .select("conversation_id, body, created_at, sender_id, deleted_at")
     .in("conversation_id", ids)
     .order("created_at", { ascending: false });
   const lastByConv = new Map<string, { body: string; created_at: string; sender_id: string }>();
   for (const m of data ?? []) {
     if (!lastByConv.has(m.conversation_id)) {
       lastByConv.set(m.conversation_id, {
-        body: m.body,
+        body: m.deleted_at ? "Melding slettet" : m.body,
         created_at: m.created_at,
         sender_id: m.sender_id,
       });

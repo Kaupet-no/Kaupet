@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import * as React from "react";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, CheckCircle2, Loader2, Send, User as UserIcon } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Loader2, Send, Trash2, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -74,6 +74,7 @@ type Message = {
   sender_id: string;
   body: string;
   created_at: string;
+  deleted_at: string | null;
 };
 
 function ConversationPage() {
@@ -146,7 +147,7 @@ function ConversationPage() {
     queryFn: async (): Promise<Message[]> => {
       const { data, error } = await supabase
         .from("messages")
-        .select("id, conversation_id, sender_id, body, created_at")
+        .select("id, conversation_id, sender_id, body, created_at, deleted_at")
         .eq("conversation_id", id)
         .order("created_at", { ascending: true });
       if (error) throw error;
@@ -216,7 +217,7 @@ function ConversationPage() {
           sender_id: user!.id,
           body: trimmed,
         })
-        .select("id, conversation_id, sender_id, body, created_at")
+        .select("id, conversation_id, sender_id, body, created_at, deleted_at")
         .single();
       if (error) throw error;
       await supabase
@@ -235,6 +236,23 @@ function ConversationPage() {
       void import("@/lib/haptics").then((m) => m.hapticSelection());
       setBody("");
     },
+  });
+
+  const deleteMessageMutation = useMutation({
+    mutationFn: async (messageId: string) => {
+      const { error } = await supabase
+        .from("messages")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", messageId);
+      if (error) throw error;
+      return messageId;
+    },
+    onSuccess: (messageId) => {
+      queryClient.setQueryData<Message[]>(["messages", id], (prev) =>
+        prev?.map((m) => (m.id === messageId ? { ...m, deleted_at: new Date().toISOString() } : m)),
+      );
+    },
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke slette meldingen")),
   });
 
   const priceLabel = conv?.listing?.is_free
@@ -441,7 +459,9 @@ function ConversationPage() {
             Send den første meldingen for å starte samtalen.
           </p>
         ) : (
-          renderWithDayDividers(messages ?? [], user?.id ?? "")
+          renderWithDayDividers(messages ?? [], user?.id ?? "", (messageId) =>
+            deleteMessageMutation.mutate(messageId),
+          )
         )}
       </div>
 
@@ -484,7 +504,11 @@ function ConversationPage() {
   );
 }
 
-function renderWithDayDividers(messages: Message[], myId: string) {
+function renderWithDayDividers(
+  messages: Message[],
+  myId: string,
+  onDelete: (messageId: string) => void,
+) {
   const out: React.ReactElement[] = [];
   let lastDay = "";
   for (const m of messages) {
@@ -506,17 +530,50 @@ function renderWithDayDividers(messages: Message[], myId: string) {
       lastDay = day;
     }
     const mine = m.sender_id === myId;
+    const deleted = !!m.deleted_at;
     out.push(
-      <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+      <div
+        key={m.id}
+        className={`group flex items-end gap-1 ${mine ? "justify-end" : "justify-start"}`}
+      >
+        {mine && !deleted && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <button
+                type="button"
+                aria-label="Slett melding"
+                className="mb-1 shrink-0 rounded p-1 text-muted-foreground opacity-0 transition hover:text-destructive group-hover:opacity-100"
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Slett melding</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Meldingen erstattes med «Melding slettet» for begge parter. Dette kan ikke angres.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                <AlertDialogAction onClick={() => onDelete(m.id)}>Slett</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
         <div
           className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${
-            mine ? "bg-primary text-primary-foreground" : "bg-card text-foreground"
+            deleted
+              ? "bg-muted/40 italic text-muted-foreground"
+              : mine
+                ? "bg-primary text-primary-foreground"
+                : "bg-card text-foreground"
           }`}
         >
-          <p className="whitespace-pre-wrap break-words">{m.body}</p>
+          <p className="whitespace-pre-wrap break-words">{deleted ? "Melding slettet" : m.body}</p>
           <p
             className={`mt-1 text-[10px] ${
-              mine ? "text-primary-foreground/70" : "text-muted-foreground"
+              mine && !deleted ? "text-primary-foreground/70" : "text-muted-foreground"
             }`}
           >
             {d.toLocaleTimeString("nb-NO", {

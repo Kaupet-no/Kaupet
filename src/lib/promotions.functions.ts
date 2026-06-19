@@ -96,8 +96,6 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
 
     console.log("[promotions] createPromotionCheckout", {
       promotion_id: promo.id,
-      listing_id: data.listing_id,
-      user_id: userId,
       duration_days: data.duration_days,
       price_nok: pricing.price_nok,
       vipps_mode: vippsMode,

@@ -27,7 +27,7 @@ function PersonvernPage() {
         <h1 className="mt-2 font-display text-4xl leading-tight tracking-tight">
           Personvernerklæring
         </h1>
-        <p className="mt-3 text-sm text-muted-foreground">Sist oppdatert 17. juni 2026</p>
+        <p className="mt-3 text-sm text-muted-foreground">Sist oppdatert 19. juni 2026</p>
       </header>
 
       <div className="space-y-10 text-sm leading-relaxed text-foreground/90">
@@ -83,8 +83,9 @@ function PersonvernPage() {
           <h2 className="font-display text-2xl">Hva lagres på serveren</h2>
           <ul className="mt-3 space-y-2 list-disc pl-5">
             <li>
-              <strong>Brukerprofil</strong>: navn, e-postadresse og eventuelt profilbilde, bio og
-              lokasjon.
+              <strong>Brukerprofil</strong>: navn og eventuelt profilbilde. Visningsnavn og
+              profilbilde er <strong>offentlig synlig</strong> for alle besøkende på din profilside.
+              E-postadressen er privat og vises ikke offentlig.
             </li>
             <li>
               <strong>Annonser</strong> du har lagt ut, med tilhørende bilder, beskrivelse, kategori
@@ -126,10 +127,6 @@ function PersonvernPage() {
               <strong>Push-varslinger</strong> — hvis du slår på varsler, lagrer vi et kryptografisk
               abonnementsnøkkelpar (offentlig/privat), nettleserinformasjon og dine preferanser for
               hva du vil varsles om (nye meldinger, lagrede søk).
-            </li>
-            <li>
-              <strong>Verifisering</strong> — hvis du verifiserer identiteten din, lagres
-              opplysninger knyttet til verifiseringen.
             </li>
             <li>
               <strong>Betaling og annonsepromotering</strong> — hvis du betaler for å fremheve en
@@ -223,9 +220,9 @@ function PersonvernPage() {
           </p>
           <p className="mt-3">
             For å bevare samtalehistorikken for andre brukere blir profilen din{" "}
-            <strong>anonymisert</strong> ved permanent sletting: navn, profilbilde, bio og lokasjon
-            fjernes, og du vises som "Slettet bruker" i tidligere meldinger. Annonsene dine slettes.
-            E-postadresse og innloggingsdata fjernes fullstendig.
+            <strong>anonymisert</strong> ved permanent sletting: navn og profilbilde fjernes, og du
+            vises som "Slettet bruker" i tidligere meldinger. Annonsene dine slettes. E-postadresse
+            og innloggingsdata fjernes fullstendig.
           </p>
         </section>
 

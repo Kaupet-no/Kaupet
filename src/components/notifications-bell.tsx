@@ -119,7 +119,7 @@ export function NotificationsBell() {
     return () => {
       supabase.removeChannel(ch);
     };
-  }, [user?.id, refetch, qc]);
+  }, [user, refetch, qc]);
 
   // Fallback: refresh når fanen får fokus igjen
   useEffect(() => {
@@ -136,7 +136,7 @@ export function NotificationsBell() {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [user?.id, qc]);
+  }, [user, qc]);
 
   if (!user) return null;
 

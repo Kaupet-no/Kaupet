@@ -62,7 +62,7 @@ export function useUnreadConversationsCount(): number {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id, refetch]);
+  }, [user, refetch]);
 
   // Fallback: refresh når fanen får fokus igjen (i tilfelle realtime ikke leverer)
   useEffect(() => {
@@ -79,7 +79,7 @@ export function useUnreadConversationsCount(): number {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [user?.id, qc]);
+  }, [user, qc]);
 
   // readVersion brukes for å re-evaluere isUnread når noe markeres som lest
   void readVersion;

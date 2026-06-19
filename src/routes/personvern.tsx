@@ -231,7 +231,21 @@ function PersonvernPage() {
           <ul className="mt-3 space-y-2 list-disc pl-5">
             <li>
               <strong>Supabase</strong> — databehandler for autentisering, database og fillagring.
-              Servere i Europa.
+            </li>
+            <li>
+              <strong>Cloudflare</strong> — vi bruker Cloudflare Workers som driftsplattform. Det
+              betyr at trafikk til og fra Kaupet.no går gjennom Cloudflare sin infrastruktur, som
+              dermed ser IP-adressen din og annen teknisk informasjon om forespørselen din. Du kan
+              lese Cloudflares personvernerklæring på{" "}
+              <a
+                href="https://www.cloudflare.com/privacypolicy/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary underline underline-offset-2"
+              >
+                cloudflare.com/privacypolicy
+              </a>
+              .
             </li>
             <li>
               <strong>Vipps</strong> — betalingsleverandør for kjøp av annonsepromotering. Vipps

@@ -5,6 +5,8 @@ mot [age](https://github.com/FiloSottile/age)-nøkler, og kan trygt committes ti
 
 - `dev.env` — lokale utviklingshemmeligheter
 - `staging.env` — hemmeligheter for staging-miljøet
+- `cloudflare.env` — Cloudflare API-token og account ID
+- `migration.env` — hemmeligheter brukt under Supabase-prosjektmigrering
 
 ## Førstegangsoppsett (ny maskin / ny utvikler)
 
@@ -15,7 +17,8 @@ mot [age](https://github.com/FiloSottile/age)-nøkler, og kan trygt committes ti
 
 2. Generer din egen age-nøkkel (kun én gang per maskin):
    - Windows: `age-keygen -o "$env:APPDATA\sops\age\keys.txt"`
-   - macOS/Linux: `age-keygen -o ~/.config/sops/age/keys.txt`
+   - macOS: `age-keygen -o "$HOME/Library/Application Support/sops/age/keys.txt"`
+   - Linux: `age-keygen -o ~/.config/sops/age/keys.txt`
 
 3. Send den offentlige nøkkelen (linjen `Public key: age1...`) til noen
    som allerede har tilgang. De legger den til i [`.sops.yaml`](../.sops.yaml)

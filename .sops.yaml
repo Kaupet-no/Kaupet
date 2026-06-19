@@ -4,13 +4,14 @@
 # tilgang kjøre `bun run secrets:rekey` for å re-kryptere mot den nye nøkkelen.
 #
 # Generer din egen nøkkel med:
-#   age-keygen -o "%APPDATA%\sops\age\keys.txt"   (Windows)
-#   age-keygen -o ~/.config/sops/age/keys.txt      (macOS/Linux)
+#   age-keygen -o "%APPDATA%\sops\age\keys.txt"                                  (Windows)
+#   age-keygen -o "$HOME/Library/Application Support/sops/age/keys.txt"          (macOS)
+#   age-keygen -o ~/.config/sops/age/keys.txt                                    (Linux)
 # og send den offentlige nøkkelen (linjen som starter med "age1...") til
 # noen som allerede har tilgang.
 
 keys:
-  - &andreas age1ga96k068k044hnpd4pyjxq7g0eq43svfx09ml65t9z82sjghw9zsmdrhkl
+  - &andreas age109lmrhdpc5wz2m6p26eyhq28kf2jxsfd2xv3ykvufc7jk534pfksg89gqf
   # - &CI age1...   # legg til CI-nøkkelen her når GitHub Actions skal dekryptere
 
 creation_rules:

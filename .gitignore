@@ -47,3 +47,7 @@ android/.gradle/
 android/app/build/
 android/build/
 android/local.properties
+
+# SOPS / age — privatnøkler skal ALDRI committes
+*.agekey
+keys.txt

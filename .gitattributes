@@ -1,4 +1,7 @@
 * text=auto eol=lf
 
+# Windows batch-skript trenger CRLF for å kjøre pålitelig i cmd.exe.
+*.bat text eol=crlf
+
 # SOPS sin dotenv-parser feiler på CRLF — tving LF uansett autocrlf-innstilling.
 secrets/*.env text eol=lf

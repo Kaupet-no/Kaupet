@@ -1,12 +1,23 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 
-// The endpoint is invoked by an internal Postgres trigger via pg_net.
-// It is intentionally unauthenticated (no auth header), but it is also
-// hardened against abuse: callers cannot supply user_id, conversation_id
-// or message body. Only an id is accepted, and everything else is
-// re-derived from the database. A forged request that references a
-// non-existent row simply does nothing.
+// The endpoint is invoked by an internal Postgres trigger via pg_net, which
+// sends a shared secret in the X-Push-Dispatch-Secret header (see the
+// dispatch_push_for_* trigger functions). As defense in depth, callers
+// cannot supply user_id, conversation_id or message body even if the
+// secret leaked: only an id is accepted, and everything else is re-derived
+// from the database. A forged request that references a non-existent row
+// simply does nothing.
+function isAuthorized(request: Request): boolean {
+  const expected = process.env.PUSH_DISPATCH_SECRET;
+  if (!expected) return false;
+  const provided = request.headers.get("x-push-dispatch-secret") ?? "";
+  const expectedBuf = Buffer.from(expected);
+  const providedBuf = Buffer.from(provided);
+  if (expectedBuf.length !== providedBuf.length) return false;
+  return timingSafeEqual(expectedBuf, providedBuf);
+}
 const PayloadSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("message"),
@@ -30,6 +41,10 @@ export const Route = createFileRoute("/api/public/push/dispatch")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        if (!isAuthorized(request)) {
+          return new Response("Unauthorized", { status: 401 });
+        }
+
         const raw = await request.text();
         let payload: z.infer<typeof PayloadSchema>;
         try {

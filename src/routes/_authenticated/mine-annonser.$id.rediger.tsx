@@ -98,13 +98,19 @@ function EditListingPage() {
   const { data: listing, isLoading } = useQuery({
     queryKey: ["listing-edit", id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("listings")
-        .select("*, listing_images(id, storage_path, sort_order)")
-        .eq("id", id)
-        .single();
+      const [{ data, error }, { data: loc, error: locError }] = await Promise.all([
+        supabase
+          .from("listings")
+          .select(
+            "id, title, description, category_id, condition, is_free, price_nok, postal_code, city, listing_images(id, storage_path, sort_order)",
+          )
+          .eq("id", id)
+          .single(),
+        supabase.rpc("get_listing_owner_location", { _listing_id: id }).maybeSingle(),
+      ]);
       if (error) throw error;
-      return data;
+      if (locError) throw locError;
+      return { ...data, lat: loc?.lat ?? null, lng: loc?.lng ?? null };
     },
   });
 

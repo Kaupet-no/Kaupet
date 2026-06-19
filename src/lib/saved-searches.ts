@@ -86,14 +86,26 @@ export async function deleteSavedSearch(id: string) {
   if (error) throw error;
 }
 
-export async function listNotifications(limit = 30) {
+export async function listNotifications(limit = 30, offset = 0) {
   const { data, error } = await supabase
     .from("saved_search_notifications")
     .select("id, saved_search_id, listing_id, read_at, created_at")
     .order("created_at", { ascending: false })
-    .limit(limit);
+    .range(offset, offset + limit - 1);
   if (error) throw error;
   return (data ?? []) as SavedSearchNotification[];
+}
+
+export type UnreadCountBySearch = { saved_search_id: string; unread_count: number };
+
+export async function listUnreadCountsBySearch() {
+  const { data, error } = await supabase.rpc("saved_search_unread_counts");
+  if (error) throw error;
+  const map = new Map<string, number>();
+  for (const row of (data ?? []) as UnreadCountBySearch[]) {
+    map.set(row.saved_search_id, Number(row.unread_count));
+  }
+  return map;
 }
 
 export async function markNotificationRead(id: string) {
@@ -127,12 +139,12 @@ export type PriceDropNotification = {
   created_at: string;
 };
 
-export async function listPriceDrops(limit = 30) {
+export async function listPriceDrops(limit = 30, offset = 0) {
   const { data, error } = await supabase
     .from("favorite_price_drops")
     .select("id, listing_id, old_price_nok, new_price_nok, drop_pct, read_at, created_at")
     .order("created_at", { ascending: false })
-    .limit(limit);
+    .range(offset, offset + limit - 1);
   if (error) throw error;
   return (data ?? []) as PriceDropNotification[];
 }

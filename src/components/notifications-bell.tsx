@@ -259,10 +259,16 @@ export function NotificationsBell() {
             </ul>
           )}
         </div>
-        <div className="border-t border-border px-3 py-2">
+        <div className="flex divide-x divide-border border-t border-border">
+          <Link
+            to="/varsler"
+            className="flex-1 rounded px-2 py-2 text-center text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            Se alle varsler
+          </Link>
           <Link
             to="/mine-sok"
-            className="block rounded px-2 py-1 text-center text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="flex-1 rounded px-2 py-2 text-center text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             Administrer lagrede søk
           </Link>

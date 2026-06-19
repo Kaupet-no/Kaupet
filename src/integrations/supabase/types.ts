@@ -1202,6 +1202,13 @@ export type Database = {
       }
       purge_expired_accounts: { Args: never; Returns: number }
       request_account_deletion: { Args: { _email: string }; Returns: undefined }
+      saved_search_unread_counts: {
+        Args: never
+        Returns: {
+          saved_search_id: string
+          unread_count: number
+        }[]
+      }
       user_review_summary: {
         Args: { _user_id: string }
         Returns: {

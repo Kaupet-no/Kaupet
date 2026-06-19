@@ -290,7 +290,11 @@ function WebLanding() {
 
         {/* Mobil: horisontal sveipbar rad (kun for rotkategorier) */}
         {!activeCategory && (
-          <div className="-mx-4 duration-300 animate-in fade-in slide-in-from-left-8 sm:hidden">
+          <div className="relative -mx-4 duration-300 animate-in fade-in slide-in-from-left-8 sm:hidden">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-background to-transparent"
+            />
             <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain touch-pan-x px-4 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {rootCategories.length === 0 &&
                 Array.from({ length: 6 }).map((_, i) => (

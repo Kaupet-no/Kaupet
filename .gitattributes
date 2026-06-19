@@ -1,0 +1,2 @@
+# SOPS sin dotenv-parser feiler på CRLF — tving LF uansett autocrlf-innstilling.
+secrets/*.env text eol=lf

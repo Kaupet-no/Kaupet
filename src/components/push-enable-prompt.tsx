@@ -57,7 +57,10 @@ export function PushEnablePrompt({ variant = "inline", showManageLink = true }: 
   } else if (!push.subscribedHere) {
     heading = "Aktiver push-varsler for å motta treffene";
     body = (
-      <p>Push-varsler er ikke aktivert i nettleseren. Du vil ikke få beskjed når en ny annonse matcher.</p>
+      <p>
+        Push-varsler er ikke aktivert i nettleseren. Du vil ikke få beskjed når en ny annonse
+        matcher.
+      </p>
     );
     actionLabel = "Aktiver push-varsler";
   } else {

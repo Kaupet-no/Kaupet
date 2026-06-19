@@ -159,7 +159,10 @@ function VarslerPage() {
         ) : (
           <ul className="divide-y divide-border rounded-xl border border-border bg-card">
             {items.map((n) => (
-              <li key={`${n.kind}-${n.id}`} className={`group relative ${!n.read_at ? "bg-primary/5" : ""}`}>
+              <li
+                key={`${n.kind}-${n.id}`}
+                className={`group relative ${!n.read_at ? "bg-primary/5" : ""}`}
+              >
                 <Link
                   to="/$kaupetCode"
                   params={{ kaupetCode: n.listing_code ?? "" }}
@@ -168,24 +171,31 @@ function VarslerPage() {
                   className="block px-4 py-3 pr-10 hover:bg-muted aria-disabled:pointer-events-none aria-disabled:opacity-60"
                 >
                   <div className="flex items-start gap-2">
-                    {!n.read_at && <span className="mt-1.5 size-2 shrink-0 rounded-full bg-accent" />}
+                    {!n.read_at && (
+                      <span className="mt-1.5 size-2 shrink-0 rounded-full bg-accent" />
+                    )}
                     <div className="min-w-0 flex-1">
                       <p className="line-clamp-1 text-sm font-medium">
                         {n.kind === "price_drop" && (
                           <TrendingDown className="mr-1 inline size-3.5 text-accent" />
                         )}
-                        {n.listing_title ?? (n.kind === "price_drop" ? "Favoritten din" : "Ny annonse")}
+                        {n.listing_title ??
+                          (n.kind === "price_drop" ? "Favoritten din" : "Ny annonse")}
                       </p>
                       <p className="line-clamp-1 text-xs text-muted-foreground">
                         {n.kind === "search" ? (
                           <>Treff i "{n.search_name ?? "Lagret søk"}"</>
                         ) : (
                           <>
-                            Prisfall −{Number(n.drop_pct).toFixed(0)} % · {formatKr(n.old_price_nok)} →{" "}
-                            {formatKr(n.new_price_nok)}
+                            Prisfall −{Number(n.drop_pct).toFixed(0)} % ·{" "}
+                            {formatKr(n.old_price_nok)} → {formatKr(n.new_price_nok)}
                           </>
                         )}{" "}
-                        · {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: nb })}
+                        ·{" "}
+                        {formatDistanceToNow(new Date(n.created_at), {
+                          addSuffix: true,
+                          locale: nb,
+                        })}
                       </p>
                     </div>
                   </div>

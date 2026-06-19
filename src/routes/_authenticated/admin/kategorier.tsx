@@ -237,7 +237,9 @@ function AdminCategories() {
     const newIndex = siblings.findIndex((c) => c.id === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
     const reordered = arrayMove(siblings, oldIndex, newIndex);
-    reorderMutation.mutate(reordered.map((c, i) => ({ id: c.id, sort_order: (i + 1) * 10 })));
+    reorderMutation.mutate(
+      reordered.map((c: Category, i: number) => ({ id: c.id, sort_order: (i + 1) * 10 })),
+    );
   }
 
   const roots = filteredTree.get(null) ?? [];

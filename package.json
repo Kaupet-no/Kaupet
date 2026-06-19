@@ -16,9 +16,13 @@
     "postinstall": "lefthook install",
     "secrets:edit": "sops secrets/dev.env",
     "secrets:edit:staging": "sops secrets/staging.env",
+    "secrets:edit:cloudflare": "sops secrets/cloudflare.env",
+    "secrets:edit:migration": "sops secrets/migration.env",
     "secrets:decrypt": "sops --decrypt secrets/dev.env > .env",
     "secrets:decrypt:staging": "sops --decrypt secrets/staging.env > .env.staging.local",
-    "secrets:rekey": "sops updatekeys secrets/dev.env && sops updatekeys secrets/staging.env"
+    "secrets:decrypt:cloudflare": "sops --decrypt secrets/cloudflare.env > .env.cloudflare.local",
+    "secrets:decrypt:migration": "sops --decrypt secrets/migration.env > .env.migration.local",
+    "secrets:rekey": "sops updatekeys secrets/dev.env && sops updatekeys secrets/staging.env && sops updatekeys secrets/cloudflare.env && sops updatekeys secrets/migration.env"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.0",

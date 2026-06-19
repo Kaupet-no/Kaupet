@@ -256,7 +256,7 @@ function ListingDetailPage() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, description, price_nok, is_free, condition, city, postal_code, lat, lng, created_at, updated_at, published_at, status, seller_id, category_id, listing_images(storage_path, sort_order), categories(name_nb, slug)",
+          "id, kaupet_code, title, description, price_nok, is_free, condition, city, postal_code, display_lat, display_lng, created_at, updated_at, published_at, status, seller_id, category_id, listing_images(storage_path, sort_order), categories(name_nb, slug)",
         )
         .eq("kaupet_code", kaupetCode)
         .maybeSingle();
@@ -714,12 +714,12 @@ function ListingDetailPage() {
         </aside>
       </div>
 
-      {data.lat != null && data.lng != null && (
+      {data.display_lat != null && data.display_lng != null && (
         <section className="mt-10">
           <div className="h-80 overflow-hidden rounded-2xl border border-border">
             {mounted ? (
               <Suspense fallback={<div className="h-full w-full animate-pulse bg-muted" />}>
-                <ListingDetailMap lat={data.lat} lng={data.lng} />
+                <ListingDetailMap lat={data.display_lat} lng={data.display_lng} />
               </Suspense>
             ) : (
               <div className="h-full w-full animate-pulse bg-muted" />

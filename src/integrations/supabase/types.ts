@@ -438,6 +438,8 @@ export type Database = {
           condition: Database["public"]["Enums"]["listing_condition"]
           created_at: string
           description: string
+          display_lat: number | null
+          display_lng: number | null
           expires_at: string | null
           id: string
           is_free: boolean
@@ -460,6 +462,8 @@ export type Database = {
           condition?: Database["public"]["Enums"]["listing_condition"]
           created_at?: string
           description?: string
+          display_lat?: number | null
+          display_lng?: number | null
           expires_at?: string | null
           id?: string
           is_free?: boolean
@@ -482,6 +486,8 @@ export type Database = {
           condition?: Database["public"]["Enums"]["listing_condition"]
           created_at?: string
           description?: string
+          display_lat?: number | null
+          display_lng?: number | null
           expires_at?: string | null
           id?: string
           is_free?: boolean
@@ -1127,6 +1133,13 @@ export type Database = {
         Args: { _category_slug?: string; _limit?: number }
         Returns: {
           listing_id: string
+        }[]
+      }
+      get_listing_owner_location: {
+        Args: { _listing_id: string }
+        Returns: {
+          lat: number
+          lng: number
         }[]
       }
       has_role: {

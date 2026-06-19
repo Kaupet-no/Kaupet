@@ -13,7 +13,12 @@
     "format:check": "prettier --check .",
     "generate:assets": "capacitor-assets generate --iconBackgroundColor #2f5d44 --iconBackgroundColorDark #1d2a22 --splashBackgroundColor #fbf9f3 --splashBackgroundColorDark #1d2a22",
     "deploy": "nitro deploy --prebuilt",
-    "postinstall": "lefthook install"
+    "postinstall": "lefthook install",
+    "secrets:edit": "sops secrets/dev.env",
+    "secrets:edit:staging": "sops secrets/staging.env",
+    "secrets:decrypt": "sops --decrypt secrets/dev.env > .env",
+    "secrets:decrypt:staging": "sops --decrypt secrets/staging.env > .env.staging.local",
+    "secrets:rekey": "sops updatekeys secrets/dev.env && sops updatekeys secrets/staging.env"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.0",

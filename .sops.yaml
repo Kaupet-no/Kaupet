@@ -1,0 +1,23 @@
+# SOPS-konfigurasjon for Kaupet.
+# Hver utvikler legger sin age-offentlige nøkkel til i listen under for å få
+# lese/skrivetilgang. Etter at en nøkkel er lagt til, må noen med eksisterende
+# tilgang kjøre `bun run secrets:rekey` for å re-kryptere mot den nye nøkkelen.
+#
+# Generer din egen nøkkel med:
+#   age-keygen -o "%APPDATA%\sops\age\keys.txt"   (Windows)
+#   age-keygen -o ~/.config/sops/age/keys.txt      (macOS/Linux)
+# og send den offentlige nøkkelen (linjen som starter med "age1...") til
+# noen som allerede har tilgang.
+
+keys:
+  - &andreas age1ga96k068k044hnpd4pyjxq7g0eq43svfx09ml65t9z82sjghw9zsmdrhkl
+  # - &CI age1...   # legg til CI-nøkkelen her når GitHub Actions skal dekryptere
+
+creation_rules:
+  - path_regex: secrets[/\\].*\.env$
+    input_type: dotenv
+    output_type: dotenv
+    key_groups:
+      - age:
+          - *andreas
+          # - *CI

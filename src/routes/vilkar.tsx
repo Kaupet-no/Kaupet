@@ -27,9 +27,7 @@ function VilkarPage() {
         <h1 className="mt-2 font-display text-4xl leading-tight tracking-tight">
           Brukervilkår for Kaupet.no
         </h1>
-        <p className="mt-3 text-sm text-muted-foreground">
-          Versjon 1.1 — sist oppdatert 8. juni 2026
-        </p>
+        <p className="mt-3 text-sm text-muted-foreground">Sist oppdatert 20. juni 2026</p>
       </header>
 
       <div className="space-y-10 text-sm leading-relaxed text-foreground/90">
@@ -44,9 +42,9 @@ function VilkarPage() {
         <section>
           <h2 className="font-display text-2xl">1. Om Kaupet.no</h2>
           <p className="mt-3">
-            Kaupet.no er en norsk markedsplass for kjøp og salg av varer og tjenester mellom
-            privatpersoner og næringsdrivende. Kaupet formidler kontakt mellom kjøper og selger, men
-            er <strong>ikke part</strong> i avtalen som inngås mellom brukerne. Vi tilbyr ikke
+            Kaupet.no er en norsk markedsplass for kjøp og salg av brukte varer mellom
+            privatpersoner. Kaupet formidler kontakt mellom kjøper og selger, men er{" "}
+            <strong>ikke part</strong> i avtalen som inngås mellom brukerne. Vi tilbyr ikke
             betalingsformidling, frakttjenester eller garanti for handler som gjennomføres via
             tjenesten.
           </p>
@@ -56,10 +54,7 @@ function VilkarPage() {
           <h2 className="font-display text-2xl">2. Hvem kan bruke tjenesten</h2>
           <ul className="mt-3 space-y-2 list-disc pl-5">
             <li>Du må være minst 15 år. Er du under 18 må du ha samtykke fra foresatte.</li>
-            <li>
-              Du kan ha kun én personlig konto. Næringsdrivende kan i tillegg ha én konto per
-              virksomhet.
-            </li>
+            <li>Du kan ha kun én personlig konto.</li>
             <li>Opplysningene du oppgir om deg selv skal være korrekte og oppdaterte.</li>
             <li>
               Du er ansvarlig for å holde innloggingsinformasjonen hemmelig. All aktivitet på
@@ -93,7 +88,7 @@ function VilkarPage() {
         <section>
           <h2 className="font-display text-2xl">4. Annonseregler</h2>
           <ul className="mt-3 space-y-2 list-disc pl-5">
-            <li>Annonsen skal gjelde en reell vare eller tjeneste som du har rett til å selge.</li>
+            <li>Annonsen skal gjelde en reell vare som du har rett til å selge.</li>
             <li>Velg riktig kategori og oppgi pris i norske kroner.</li>
             <li>Bruk egne bilder eller bilder du har rett til å bruke.</li>
             <li>Ikke legg inn kontaktinformasjon eller eksterne lenker i tittel eller bilder.</li>

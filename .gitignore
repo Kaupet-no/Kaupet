@@ -35,8 +35,6 @@ dist-ssr
 .env.migration.local
 .env.cloudflare.local
 
-.lovable/
-
 # Supabase CLI local state
 supabase/.temp/
 

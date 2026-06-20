@@ -31,13 +31,18 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/location-filter";
-import type { Category } from "@/components/search-bar";
+import { ModeToggle } from "@/components/mode-toggle";
+import { TermGroupEditor } from "@/components/term-group-editor";
+import type { Category, SortValue } from "@/lib/categories";
+import { mergeTermGroups, type TermGroup } from "@/lib/term-groups";
 import { useAuth } from "@/lib/auth";
 import { createSavedSearch, summarizeCriteria, type SearchCriteria } from "@/lib/saved-searches";
 import { toast } from "sonner";
 import { formatErrorMessage } from "@/lib/errors";
 
-const CONDITIONS: Array<{ value: string; label: string }> = [
+export { ModeToggle };
+
+export const CONDITIONS: Array<{ value: string; label: string }> = [
   { value: "new", label: "Helt ny" },
   { value: "like_new", label: "Som ny" },
   { value: "good", label: "Pent brukt" },
@@ -55,7 +60,25 @@ export type AdvancedSearchValue = {
   max: number | null;
   includeFree: boolean;
   location: LocationValue;
+  sort: SortValue;
+  extraGroups: TermGroup[];
 };
+
+export function defaultAdvancedSearchValue(): AdvancedSearchValue {
+  return {
+    terms: [],
+    qMode: "all",
+    categories: [],
+    catMode: "any",
+    conditions: [],
+    min: null,
+    max: null,
+    includeFree: true,
+    location: { lat: null, lng: null, radius: 10, label: "" },
+    sort: "new",
+    extraGroups: [],
+  };
+}
 
 type Props = {
   open: boolean;
@@ -116,28 +139,13 @@ export function AdvancedSearchSheet({
         : [...v.conditions, val],
     });
 
-  const reset: AdvancedSearchValue = useMemo(
-    () => ({
-      terms: [],
-      qMode: "all",
-      categories: [],
-      catMode: "any",
-      conditions: [],
-      min: null,
-      max: null,
-      includeFree: true,
-      location: { lat: null, lng: null, radius: 10, label: "" },
-    }),
-    [],
-  );
-
-  const handleReset = () => setV(reset);
+  const handleReset = () => setV({ ...defaultAdvancedSearchValue(), sort: v.sort });
   const handleApply = () => {
-    onApply(v);
+    onApply({ ...v, extraGroups: mergeTermGroups(v.extraGroups) });
     onOpenChange(false);
   };
 
-  const criteria: SearchCriteria = { ...valueToCriteria(v), sort: currentSort };
+  const criteria: SearchCriteria = { ...valueToCriteria(v), sort: currentSort ?? v.sort };
   const defaultName = summarizeCriteria(criteria);
 
   return (
@@ -198,6 +206,15 @@ export function AdvancedSearchSheet({
                   ))}
                 </div>
               )}
+            </section>
+
+            {/* Flere søkelinjer (inkluder/ekskluder) */}
+            <section className="space-y-2">
+              <Label className="text-sm font-medium">Flere søkelinjer</Label>
+              <TermGroupEditor
+                groups={v.extraGroups}
+                onChange={(extraGroups) => setV({ ...v, extraGroups })}
+              />
             </section>
 
             {/* Kategori */}
@@ -316,7 +333,7 @@ export function AdvancedSearchSheet({
   );
 }
 
-function CategoryPicker({
+export function CategoryPicker({
   categories,
   selected,
   onChange,
@@ -408,43 +425,11 @@ function CategoryPicker({
   );
 }
 
-function ModeToggle({
-  value,
-  onChange,
-  labels,
-}: {
-  value: "all" | "any";
-  onChange: (v: "all" | "any") => void;
-  labels: [string, string];
-}) {
-  return (
-    <div className="inline-flex rounded-full border border-border bg-card p-0.5 text-xs">
-      <button
-        type="button"
-        onClick={() => onChange("all")}
-        className={`rounded-full px-2.5 py-1 transition ${
-          value === "all" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
-        }`}
-      >
-        {labels[0]}
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange("any")}
-        className={`rounded-full px-2.5 py-1 transition ${
-          value === "any" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
-        }`}
-      >
-        {labels[1]}
-      </button>
-    </div>
-  );
-}
-
 function hasNoFilters(c: SearchCriteria): boolean {
   const hasTerms = (c.terms?.length ?? 0) > 0 || !!c.q?.trim();
   return (
     !hasTerms &&
+    !(c.extraGroups?.length ?? 0) &&
     !(c.categories?.length ?? 0) &&
     !(c.conditions?.length ?? 0) &&
     c.min == null &&
@@ -549,6 +534,8 @@ export function valueToCriteria(v: AdvancedSearchValue): SearchCriteria {
     min: v.min,
     max: v.max,
     includeFree: v.includeFree,
+    sort: v.sort,
+    extraGroups: v.extraGroups,
     lat: v.location.lat,
     lng: v.location.lng,
     radius: v.location.lat != null ? v.location.radius : null,
@@ -567,6 +554,8 @@ export function criteriaToValue(c: SearchCriteria): AdvancedSearchValue {
     min: c.min ?? null,
     max: c.max ?? null,
     includeFree: c.includeFree ?? true,
+    sort: c.sort ?? "new",
+    extraGroups: c.extraGroups ?? [],
     location: {
       lat: c.lat ?? null,
       lng: c.lng ?? null,

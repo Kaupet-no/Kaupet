@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
-import { Expand, Map as MapIcon, Save, SlidersHorizontal } from "lucide-react";
+import { Expand, Map as MapIcon, Save } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -17,12 +17,15 @@ import {
 } from "@/components/ui/dialog";
 import { SearchBar } from "@/components/search-bar";
 import {
-  AdvancedSearchSheet,
   SaveSearchDialog,
   valueToCriteria,
   type AdvancedSearchValue,
 } from "@/components/advanced-search-sheet";
+import { AdvancedSearchPanel } from "@/components/advanced-search-panel";
+import { ActiveFilters } from "@/components/active-filters";
+import { SortControl } from "@/components/sort-control";
 import type { LocationValue } from "@/components/location-filter";
+import type { TermGroup } from "@/lib/term-groups";
 import type { MapListing } from "@/components/listings-map";
 import { FeaturedListingsSection } from "@/components/featured-listings-section";
 import { reverseGeocode } from "@/lib/geocode";
@@ -47,9 +50,29 @@ const conditionArray = z.preprocess((v) => {
   return [];
 }, z.array(conditionEnum));
 
+function rowContainsTerm(
+  l: { title: string | null; description: string | null; city: string | null },
+  term: string,
+): boolean {
+  const needle = term.toLowerCase();
+  return (
+    !!l.title?.toLowerCase().includes(needle) ||
+    !!l.description?.toLowerCase().includes(needle) ||
+    !!l.city?.toLowerCase().includes(needle)
+  );
+}
+
+const termGroupSchema = z.object({
+  id: z.string(),
+  mode: z.enum(["all", "any"]),
+  exclude: z.boolean(),
+  terms: z.array(z.string()),
+});
+
 const searchSchema = z.object({
   q: z.string().optional().default(""),
   qMode: z.enum(["all", "any"]).optional().default("all"),
+  extraGroups: z.array(termGroupSchema).optional().default([]),
   category: z.string().optional().default(""),
   categories: stringArray.optional().default([]),
   catMode: z.enum(["all", "any"]).optional().default("any"),
@@ -192,12 +215,14 @@ function BrowsePage() {
     () => ({
       terms,
       qMode: search.qMode ?? "all",
+      extraGroups: search.extraGroups ?? [],
       categories: effectiveCategories,
       catMode: search.catMode ?? "any",
       conditions: search.conditions ?? [],
       min: typeof search.min === "number" ? search.min : null,
       max: typeof search.max === "number" ? search.max : null,
       includeFree: search.includeFree ?? true,
+      sort: search.sort,
       location: {
         lat: search.lat ?? null,
         lng: search.lng ?? null,
@@ -208,12 +233,14 @@ function BrowsePage() {
     [
       terms,
       search.qMode,
+      search.extraGroups,
       effectiveCategories,
       search.catMode,
       search.conditions,
       search.min,
       search.max,
       search.includeFree,
+      search.sort,
       search.lat,
       search.lng,
       search.radius,
@@ -242,23 +269,29 @@ function BrowsePage() {
     saveLastSearchContext({ search, label });
   }, [mounted, search, effectiveCategories, categories]);
 
-  const advancedFilterCount =
-    (effectiveCategories.length > 0 ? 1 : 0) +
-    ((search.conditions?.length ?? 0) > 0 ? 1 : 0) +
-    (typeof search.min === "number" || typeof search.max === "number" ? 1 : 0) +
-    (search.lat != null && search.lng != null ? 1 : 0) +
-    (search.includeFree === false ? 1 : 0);
-
   const { data: listings, isLoading } = useQuery({
     queryKey: ["listings", search, radiusIds, effectiveCategories, terms],
     enabled:
       (effectiveCategories.length === 0 || !!categories) &&
       (search.lat == null || search.lng == null || radiusIds != null),
     queryFn: async () => {
+      const extraGroups = search.extraGroups ?? [];
+      const includeGroups = [
+        { mode: search.qMode ?? "all", terms },
+        ...extraGroups.filter((g) => !g.exclude),
+      ];
+      const excludeAnyGroups = extraGroups.filter((g) => g.exclude && g.mode === "any");
+      const excludeAllGroups = extraGroups.filter((g) => g.exclude && g.mode === "all");
+      // "exclude if ALL words present" needs a row-level AND-then-negate that
+      // PostgREST/supabase-js can't express via chained filters, so it's
+      // applied client-side below — fetch a larger buffer to compensate for
+      // rows trimmed after that pass.
+      const needsClientExclude = excludeAllGroups.length > 0;
+
       let qb = supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, price_nok, is_free, city, display_lat, display_lng, created_at, listing_images(storage_path, sort_order)",
+          "id, kaupet_code, title, description, price_nok, is_free, city, display_lat, display_lng, created_at, listing_images(storage_path, sort_order)",
         )
         .eq("status", "active");
 
@@ -268,20 +301,31 @@ function BrowsePage() {
         qb = qb.in("id", ids);
       }
 
-      // Search terms with AND/OR logic
-      if (terms.length > 0) {
-        const qMode = search.qMode ?? "all";
-        if (qMode === "all") {
-          for (const term of terms) {
+      // Include groups: AND between groups (each chained .or() call is ANDed
+      // by PostgREST), OR within a group's own words ("any") or AND of
+      // per-word .or() calls within a group ("all").
+      for (const g of includeGroups) {
+        if (g.terms.length === 0) continue;
+        if (g.mode === "all") {
+          for (const term of g.terms) {
             const p = `%${term}%`;
             qb = qb.or(`title.ilike.${p},description.ilike.${p},city.ilike.${p}`);
           }
         } else {
-          const parts = terms.flatMap((t: string) => {
+          const parts = g.terms.flatMap((t: string) => {
             const p = `%${t}%`;
             return [`title.ilike.${p}`, `description.ilike.${p}`, `city.ilike.${p}`];
           });
           qb = qb.or(parts.join(","));
+        }
+      }
+
+      // Exclude groups (mode "any"): exclude rows where any word matches any
+      // field — AND of NOT-ilike per (word × field), chainable directly.
+      for (const g of excludeAnyGroups) {
+        for (const term of g.terms) {
+          const p = `%${term}%`;
+          qb = qb.not("title", "ilike", p).not("description", "ilike", p).not("city", "ilike", p);
         }
       }
 
@@ -331,9 +375,21 @@ function BrowsePage() {
         qb = qb.order("price_nok", { ascending: false, nullsFirst: false });
       else qb = qb.order("created_at", { ascending: false });
 
-      const { data, error } = await qb.limit(60);
+      const { data, error } = await qb.limit(needsClientExclude ? 200 : 60);
       if (error) throw error;
-      return (data ?? []).map((l) => {
+
+      let rows = data ?? [];
+      if (needsClientExclude) {
+        rows = rows.filter(
+          (l) =>
+            !excludeAllGroups.some(
+              (g) => g.terms.length > 0 && g.terms.every((t) => rowContainsTerm(l, t)),
+            ),
+        );
+        rows = rows.slice(0, 60);
+      }
+
+      return rows.map((l) => {
         const imgs = (l.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
         return {
           id: l.id,
@@ -353,6 +409,25 @@ function BrowsePage() {
 
   const updateSearch = (patch: Partial<z.infer<typeof searchSchema>>) => {
     navigate({ search: (prev: z.infer<typeof searchSchema>) => ({ ...prev, ...patch }) });
+  };
+
+  // Applies only the fields owned by the advanced panel (category, price,
+  // condition, extra search lines). Query text, qMode, location and sort are
+  // owned by the search bar and already applied directly to the URL as the
+  // user edits them, so re-patching them here from the panel's draft would
+  // clobber any bar edits made while the panel was open.
+  const handleApply = (v: AdvancedSearchValue) => {
+    const c = valueToCriteria(v);
+    updateSearch({
+      extraGroups: c.extraGroups,
+      categories: c.categories,
+      catMode: c.catMode,
+      conditions: c.conditions as z.infer<typeof conditionEnum>[] | undefined,
+      includeFree: c.includeFree,
+      min: c.min ?? undefined,
+      max: c.max ?? undefined,
+      category: "",
+    });
   };
 
   const handleLocationChange = (v: LocationValue) => {
@@ -478,7 +553,7 @@ function BrowsePage() {
     <div className="mx-auto max-w-7xl px-4 py-8 md:py-10">
       <h1 className="font-display text-3xl tracking-tight">Annonser</h1>
 
-      <div className="mt-6">
+      <div className="mt-6 space-y-2">
         <SearchBar
           q={qDraft}
           onQChange={setQDraft}
@@ -494,12 +569,37 @@ function BrowsePage() {
             updateSearch({ category: "", categories: slugs, catMode: "any" })
           }
           categories={categories ?? []}
-          sort={search.sort}
-          onSortChange={(s) => updateSearch({ sort: s })}
+          hideCategory={advOpen}
+          qMode={search.qMode}
+          onQModeChange={(m) => updateSearch({ qMode: m })}
+          showQMode={advOpen}
+        />
+        <AdvancedSearchPanel
+          open={advOpen}
+          onOpenChange={setAdvOpen}
+          initial={advancedInitial}
+          categories={categories ?? []}
+          onApply={handleApply}
+          sortControl={
+            <SortControl sort={search.sort} onSortChange={(s) => updateSearch({ sort: s })} />
+          }
         />
       </div>
 
-      <div className="mt-2 flex items-center justify-between gap-2 text-sm text-muted-foreground">
+      <ActiveFilters
+        search={search}
+        categories={categories ?? []}
+        terms={terms}
+        effectiveCategories={effectiveCategories}
+        onUpdate={(patch) =>
+          updateSearch({
+            ...patch,
+            conditions: patch.conditions as z.infer<typeof conditionEnum>[] | undefined,
+          })
+        }
+      />
+
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
         <span>
           {isLoading ? "Søker…" : `${cards.length} annonse${cards.length === 1 ? "" : "r"}`}
         </span>
@@ -521,20 +621,6 @@ function BrowsePage() {
               </SheetContent>
             </Sheet>
           )}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setAdvOpen(true)}
-            className="gap-1.5"
-          >
-            <SlidersHorizontal className="size-4" /> Avansert søk
-            {advancedFilterCount > 0 && (
-              <span className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
-                {advancedFilterCount}
-              </span>
-            )}
-          </Button>
           {user && (
             <Button
               type="button"
@@ -558,35 +644,6 @@ function BrowsePage() {
           onSaved={() => setSaveSearchOpen(false)}
         />
       )}
-
-      <AdvancedSearchSheet
-        open={advOpen}
-        onOpenChange={setAdvOpen}
-        initial={advancedInitial}
-        categories={categories ?? []}
-        currentSort={search.sort}
-        onApply={(v) => {
-          const c = valueToCriteria(v);
-          navigate({
-            search: (prev: z.infer<typeof searchSchema>) => ({
-              ...prev,
-              q: (c.terms ?? []).join(" "),
-              qMode: c.qMode,
-              categories: c.categories,
-              catMode: c.catMode,
-              conditions: c.conditions,
-              includeFree: c.includeFree,
-              min: c.min ?? undefined,
-              max: c.max ?? undefined,
-              lat: c.lat ?? undefined,
-              lng: c.lng ?? undefined,
-              radius: c.radius ?? undefined,
-              loc: c.loc,
-              category: "",
-            }),
-          });
-        }}
-      />
 
       <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_420px]">
         <div>

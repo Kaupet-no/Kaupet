@@ -1,9 +1,11 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { TermGroup } from "@/lib/term-groups";
 
 export type SearchCriteria = {
   q?: string;
   terms?: string[];
   qMode?: "all" | "any";
+  extraGroups?: TermGroup[];
   categories?: string[];
   catMode?: "all" | "any";
   conditions?: string[];
@@ -38,7 +40,16 @@ export type SavedSearchNotification = {
 export function summarizeCriteria(c: SearchCriteria): string {
   const parts: string[] = [];
   const terms = c.terms?.length ? c.terms : c.q ? c.q.split(/\s+/).filter(Boolean) : [];
-  if (terms.length) parts.push(`"${terms.join(" ")}"`);
+  if (terms.length) {
+    const joiner = c.qMode === "any" ? " ELLER " : " OG ";
+    parts.push(`"${terms.join(terms.length > 1 ? joiner : " ")}"`);
+  }
+  for (const g of c.extraGroups ?? []) {
+    if (g.terms.length === 0) continue;
+    const joiner = g.mode === "all" ? " OG " : " ELLER ";
+    const sign = g.exclude ? "−" : "+";
+    parts.push(`${sign}${g.terms.join(joiner)}`);
+  }
   if (c.categories?.length)
     parts.push(`${c.categories.length} kategori${c.categories.length === 1 ? "" : "er"}`);
   if (c.conditions?.length)

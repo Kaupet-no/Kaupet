@@ -19,7 +19,11 @@ test("logger inn og publiserer en annonse", async ({ page }) => {
   await page.goto("/auth");
   await page.getByLabel("E-post").fill(email);
   await page.getByLabel("Passord").fill(password);
-  page.on("console", (msg) => console.log(`[browser ${msg.type()}] ${msg.text()}`));
+  page.on("response", async (res) => {
+    if (res.url().includes("/auth/v1/token")) {
+      console.log(`[auth response] ${res.status()} ${await res.text().catch(() => "<no body>")}`);
+    }
+  });
   await page.getByRole("main").getByRole("button", { name: "Logg inn" }).click();
   await expect(page).toHaveURL("/", { timeout: 10_000 });
 

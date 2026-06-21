@@ -3,7 +3,7 @@
 [![Lisens: AGPL-3.0](https://img.shields.io/badge/lisens-AGPL--3.0-blue.svg)](LICENSE)
 [![CI](https://github.com/Kaupet-no/Kaupet/actions/workflows/ci.yml/badge.svg)](https://github.com/Kaupet-no/Kaupet/actions/workflows/ci.yml)
 
-Kaupet.no er en åpen markedsplass for kjøp og salg av brukte ting. Ingen sporing, ingen lukket plattform. Koden er fri, og alle forbedringer kommer fellesskapet til gode.
+Dette er et fellesskapsdrevet prosjekt der vi sammen bygger Norges ledende markedsplass for kjøp og salg av brukte ting. Kaupet.no fungerer som showcase-plattform for kildekoden og er direkte integrert med Main-branchen. Våre viktigste utviklingsprinsipper er: Ingen sporing, ingen lukket plattform. Personvern skal være en selvfølge, all kildekode skal forbli er fri, og alle forbedringer skal komme fellesskapet til gode.
 
 ## Slik kjører du prosjektet lokalt
 
@@ -71,4 +71,4 @@ Funnet en sårbarhet? Se [SECURITY.md](SECURITY.md) — ikke åpne en offentlig 
 
 ## Lisens
 
-Kaupet.no er lisensiert under [GNU Affero General Public License v3.0](LICENSE). Se [NOTICE](NOTICE) for hva det betyr i praksis — særlig at modifiserte nettverkstjenester må dele kildekoden sin tilbake til fellesskapet.
+Kaupet.no og tilhørende kildekode er lisensiert under [GNU Affero General Public License v3.0](LICENSE). Se [NOTICE](NOTICE) for hva det betyr i praksis — særlig at om du gjør endringer eller videreutvikler kildekoden, må du dele all kode tilbake til fellesskapet under samme vilkår. Dette gjelder også for SaaS-tjenester.

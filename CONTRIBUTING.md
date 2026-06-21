@@ -1,6 +1,6 @@
 # Bidra til Kaupet.no
 
-Tusen takk for at du vurderer å bidra! Kaupet.no er et fellesskapsdrevet prosjekt, og hvert bidrag — fra skrivefeil til nye funksjoner — gjør tjenesten bedre for alle.
+Tusen takk for at du vurderer å bidra! Kaupet.no er et fellesskapsdrevet prosjekt, og hvert bidrag, fra rettelse av skrivefeil til nye funksjoner, gjør tjenesten bedre for alle.
 
 ## Slik foreslår du en endring
 
@@ -15,7 +15,7 @@ Tusen takk for at du vurderer å bidra! Kaupet.no er et fellesskapsdrevet prosje
    ```
 5. **Åpne en pull request** mot `main`. Beskriv hva du har endret og hvorfor. Skjermbilder er gull for UI-endringer.
 
-En vedlikeholder vil se på PR-en så snart som mulig. CI må være grønn og minst én vedlikeholder må godkjenne før merge.
+En moderator vil se på PR-en så snart som mulig. CI må være grønn og minst én moderator må godkjenne før merge.
 
 ## Rapportere bugs og foreslå funksjoner
 
@@ -43,7 +43,7 @@ docs: oppdater README med Bun-versjon
 chore: oppgrader Tailwind til 4.1
 ```
 
-## Arkitektur i et nøtteskall
+## Overordnet arkitektur
 
 - `src/routes/` — sider (file-based routing via TanStack Start)
 - `src/components/` — gjenbrukbare UI-komponenter
@@ -53,8 +53,8 @@ chore: oppgrader Tailwind til 4.1
 
 Server-side logikk skrives som TanStack `createServerFn`, ikke som Supabase Edge Functions.
 
-## Lisens på bidrag
+## Lisensiering og rettigheter for bidrag
 
 Ved å sende en pull request samtykker du i at bidraget ditt lisensieres under [AGPL-3.0](LICENSE), samme lisens som resten av prosjektet.
 
-Takk! ❤️
+Takk! Sammen bygger vi Norges beste markedsplass for brukte ting! ❤️

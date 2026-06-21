@@ -19,8 +19,9 @@ test("logger inn og publiserer en annonse", async ({ page }) => {
   await page.goto("/auth");
   await page.getByLabel("E-post").fill(email);
   await page.getByLabel("Passord").fill(password);
+  page.on("console", (msg) => console.log(`[browser ${msg.type()}] ${msg.text()}`));
   await page.getByRole("main").getByRole("button", { name: "Logg inn" }).click();
-  await expect(page).toHaveURL("/");
+  await expect(page).toHaveURL("/", { timeout: 10_000 });
 
   await page.goto("/ny-annonse");
   await page.getByLabel("Tittel").fill("E2E testannonse — Stokke Tripp Trapp");

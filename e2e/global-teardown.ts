@@ -1,8 +1,9 @@
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 
-const AUTH_FILE = path.join(__dirname, ".auth", "user.json");
+const AUTH_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), ".auth", "user.json");
 
 export default async function globalTeardown() {
   if (!existsSync(AUTH_FILE)) return;

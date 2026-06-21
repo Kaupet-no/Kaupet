@@ -5,10 +5,14 @@
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 
 const { email, password } = JSON.parse(
-  readFileSync(path.join(__dirname, ".auth", "user.json"), "utf-8"),
+  readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), ".auth", "user.json"),
+    "utf-8",
+  ),
 ) as { email: string; password: string };
 
 test("logger inn og publiserer en annonse", async ({ page }) => {

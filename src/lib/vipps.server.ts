@@ -4,8 +4,21 @@
  * everything else uses production API + VIPPS_* secrets.
  * https://developer.vippsmobilepay.com/docs/APIs/epayment-api/
  */
+import { createHmac, timingSafeEqual } from "crypto";
 import { isTestHost } from "./env";
 import { getRequestIsTest } from "./env.server";
+
+/** Constant-time HMAC-SHA256 signature check for the Vipps webhook. */
+export function verifyVippsWebhookSignature(
+  secret: string,
+  signatureHeader: string,
+  rawBody: string,
+): boolean {
+  const expected = createHmac("sha256", secret).update(rawBody).digest("base64");
+  const sigBuf = Buffer.from(signatureHeader);
+  const expBuf = Buffer.from(expected);
+  return sigBuf.length === expBuf.length && timingSafeEqual(sigBuf, expBuf);
+}
 
 type VippsEnv = {
   baseUrl: string;

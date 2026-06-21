@@ -64,3 +64,42 @@ export function selectAllForParent(parent: Category, tree: CatTree): string[] {
   const kids = tree.childrenByParent.get(parent.id) ?? [];
   return [parent.slug, ...kids.map((k) => k.slug)];
 }
+
+/**
+ * Finds the best category to suggest for a free-text search query, e.g. for
+ * an autocomplete hint while the user types in a search field.
+ *
+ * Plain `.find()`-style substring matching tends to surface an arbitrary
+ * niche subcategory whose name happens to contain the query (e.g. "møb"
+ * matching "Antikke møbler" before "Møbler og interiør"). This instead
+ * scores candidates so a name that *starts with* the query wins over one
+ * that merely contains it, and a main category wins over a subcategory at
+ * the same match quality — closer to what a user typing a short prefix
+ * actually expects.
+ */
+export function findCategorySuggestion<T extends { name_nb: string; parent_id: string | null }>(
+  categories: T[],
+  query: string,
+): T | null {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return null;
+
+  let best: T | null = null;
+  let bestScore = -Infinity;
+  for (const c of categories) {
+    const name = c.name_nb.toLowerCase();
+    if (name === needle) continue; // already an exact match — nothing to suggest
+    if (!name.includes(needle)) continue;
+
+    let score = 0;
+    if (name.startsWith(needle)) score += 100;
+    if (c.parent_id == null) score += 10;
+    score -= name.length; // prefer the more specific (shorter) name among ties
+
+    if (score > bestScore) {
+      bestScore = score;
+      best = c;
+    }
+  }
+  return best;
+}

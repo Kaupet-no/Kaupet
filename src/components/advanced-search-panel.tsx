@@ -6,18 +6,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { CategoryPicker, SaveSearchDialog } from "@/components/advanced-search-sheet";
 import {
-  CategoryPicker,
   CONDITIONS,
-  SaveSearchDialog,
   defaultAdvancedSearchValue,
   valueToCriteria,
   type AdvancedSearchValue,
-} from "@/components/advanced-search-sheet";
+} from "@/components/advanced-search-value";
 import { TermGroupEditor } from "@/components/term-group-editor";
 import type { Category } from "@/lib/categories";
 import { mergeTermGroups } from "@/lib/term-groups";
-import { useAuth } from "@/lib/auth";
+import { useAuth } from "@/lib/use-auth";
 import { summarizeCriteria, type SearchCriteria } from "@/lib/saved-searches";
 
 type Props = {

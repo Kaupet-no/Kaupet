@@ -11,19 +11,7 @@ import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/l
 import { AnimatedSearchPlaceholder } from "@/components/animated-search-placeholder";
 import { useSavedLocation } from "@/lib/use-saved-location";
 import { getCategoryIcon } from "@/lib/category-icons";
-
-const SUGGESTIONS = [
-  "sykkel",
-  "sofa",
-  "iPhone",
-  "kommode",
-  "ski",
-  "barnevogn",
-  "stuebord",
-  "kjøleskap",
-  "klokke",
-  "spillkonsoll",
-];
+import { SEARCH_SUGGESTIONS } from "@/lib/search-suggestions";
 
 type CategoryRow = {
   id: string;
@@ -153,7 +141,7 @@ export function AppLanding() {
             {!placeholderPaused && (
               <div className="pointer-events-none absolute inset-y-0 left-12 right-4 flex items-center">
                 <AnimatedSearchPlaceholder
-                  words={SUGGESTIONS}
+                  words={SEARCH_SUGGESTIONS}
                   paused={placeholderPaused}
                   className="text-base"
                 />

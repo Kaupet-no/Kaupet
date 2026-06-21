@@ -9,7 +9,7 @@ import {
   subscribe as subscribePush,
 } from "@/lib/push";
 import { getNotificationPreferences, updateNotificationPreferences } from "@/lib/push.functions";
-import { useAuth } from "@/lib/auth";
+import { useAuth } from "@/lib/use-auth";
 
 export type PushStatus = {
   /** Browser supports push and we're in an allowed environment. */

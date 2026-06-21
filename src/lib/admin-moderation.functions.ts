@@ -1,20 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type { Database } from "@/integrations/supabase/types";
-
-async function requireAdmin(supabase: SupabaseClient<Database>, userId: string) {
-  const { data, error } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", userId)
-    .eq("role", "admin")
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) throw new Error("Ikke autorisert");
-}
+import { requireAdminRole as requireAdmin } from "@/lib/admin-auth.server";
 
 const reason = z.string().trim().min(1, "Begrunnelse er påkrevd").max(500);
 const uuid = z.string().uuid();

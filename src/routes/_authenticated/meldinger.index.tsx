@@ -5,7 +5,7 @@ import { MessageCircle, ChevronDown, ChevronRight, BellRing, Loader2, X } from "
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/lib/auth";
+import { useAuth } from "@/lib/use-auth";
 import { signListingImageUrls } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { isUnread, useReadVersion } from "@/lib/unread";
@@ -51,6 +51,33 @@ type ConversationRow = {
   last_message: { body: string; created_at: string; sender_id: string } | null;
 };
 
+// Raw shapes before flattening relations — Supabase-js can't infer relation
+// cardinality for these joins, so each comes back as object, array, or null.
+type RawProfile = {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+  deleted_at: string | null;
+};
+type RawListingRel = {
+  id: string;
+  title: string;
+  price_nok: number | null;
+  is_free: boolean;
+  status: string;
+  listing_images: { storage_path: string; sort_order: number }[];
+};
+type RawConv = {
+  id: string;
+  buyer_id: string;
+  seller_id: string;
+  listing_id: string;
+  last_message_at: string;
+  listing: RawListingRel | RawListingRel[] | null;
+  buyer?: RawProfile | RawProfile[] | null;
+  seller?: RawProfile | RawProfile[] | null;
+};
+
 function InboxPage() {
   const { user } = useAuth();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -81,17 +108,14 @@ function InboxPage() {
           .or(`buyer_id.eq.${user!.id},seller_id.eq.${user!.id}`)
           .order("last_message_at", { ascending: false });
         if (e2) throw e2;
-        const ids = Array.from(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          new Set((convs ?? []).flatMap((c: any) => [c.buyer_id, c.seller_id])),
-        );
+        const rawConvs = (convs ?? []) as unknown as RawConv[];
+        const ids = Array.from(new Set(rawConvs.flatMap((c) => [c.buyer_id, c.seller_id])));
         const { data: profiles } = await supabase
           .from("profiles")
           .select("id, display_name, avatar_url, deleted_at")
           .in("id", ids);
         const pmap = new Map((profiles ?? []).map((p) => [p.id, p]));
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const enriched = (convs ?? []).map((c: any) => ({
+        const enriched = rawConvs.map((c) => ({
           ...c,
           listing: Array.isArray(c.listing) ? c.listing[0] : c.listing,
           buyer: pmap.get(c.buyer_id) ?? null,
@@ -99,12 +123,11 @@ function InboxPage() {
         }));
         return await attachLastMessage(enriched);
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const normalised = (data ?? []).map((c: any) => ({
+      const normalised = ((data ?? []) as unknown as RawConv[]).map((c) => ({
         ...c,
         listing: Array.isArray(c.listing) ? c.listing[0] : c.listing,
-        buyer: Array.isArray(c.buyer) ? c.buyer[0] : c.buyer,
-        seller: Array.isArray(c.seller) ? c.seller[0] : c.seller,
+        buyer: (Array.isArray(c.buyer) ? c.buyer[0] : c.buyer) ?? null,
+        seller: (Array.isArray(c.seller) ? c.seller[0] : c.seller) ?? null,
       }));
       return await attachLastMessage(normalised);
     },
@@ -419,8 +442,10 @@ function PushHintForMessages() {
   );
 }
 
-async function attachLastMessage(convs: ConversationRow[]): Promise<ConversationRow[]> {
-  if (convs.length === 0) return convs;
+async function attachLastMessage(
+  convs: Omit<ConversationRow, "last_message">[],
+): Promise<ConversationRow[]> {
+  if (convs.length === 0) return [];
   const ids = convs.map((c) => c.id);
   const { data } = await supabase
     .from("messages")

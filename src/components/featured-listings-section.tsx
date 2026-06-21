@@ -55,7 +55,3 @@ export function FeaturedListingsSection({ categorySlug, limit = 3, allowedIds }:
     </section>
   );
 }
-
-export function getFeaturedIds(data: { id: string }[] | undefined): string[] {
-  return (data ?? []).map((d) => d.id);
-}

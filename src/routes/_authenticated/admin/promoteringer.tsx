@@ -371,8 +371,7 @@ function AdminPromotionsPage() {
                   ) : (giftSearchQ.data ?? []).length === 0 ? (
                     <div className="p-3 text-sm text-muted-foreground">Ingen treff</div>
                   ) : (
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    (giftSearchQ.data ?? []).map((l: any) => (
+                    (giftSearchQ.data ?? []).map((l) => (
                       <button
                         key={l.id}
                         type="button"

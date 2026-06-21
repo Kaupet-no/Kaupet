@@ -19,7 +19,7 @@ med programvaren (se filen LICENSE). Hvis ikke, se
 
 Viktig om AGPL-3.0 og nettverksbruk (§13):
 
-Hvis du modifiserer Kaupet.no og kjører det som en nettverkstjeneste
+Hvis du modifiserer koden og kjører det som en nettverkstjeneste
 (f.eks. en konkurrerende markedsplass), MÅ du tilby kildekoden til
 din modifiserte versjon til alle brukerne av tjenesten, under samme
 AGPL-3.0-lisens.

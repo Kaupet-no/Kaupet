@@ -20,6 +20,7 @@ import {
   uploadAvatarImage,
   validateAvatarImage,
 } from "@/lib/storage";
+import { compressImage } from "@/lib/image-compression";
 import { ProfileStats } from "@/components/profil/profile-stats";
 
 const profileSchema = z.object({
@@ -114,14 +115,16 @@ export function ProfileSection() {
     onSettled: () => setUploadingAvatar(false),
   });
 
-  function handleAvatarFile(file: File) {
-    const err = validateAvatarImage(file);
+  async function handleAvatarFile(file: File) {
+    setUploadingAvatar(true);
+    const compressed = await compressImage(file, "avatar");
+    const err = validateAvatarImage(compressed);
     if (err) {
       toast.error(describeImageError(err));
+      setUploadingAvatar(false);
       return;
     }
-    setUploadingAvatar(true);
-    avatarMutation.mutate(file);
+    avatarMutation.mutate(compressed);
   }
 
   const displayName = profile?.display_name ?? "";
@@ -168,7 +171,7 @@ export function ProfileSection() {
                   className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) handleAvatarFile(file);
+                    if (file) void handleAvatarFile(file);
                     e.target.value = "";
                   }}
                 />

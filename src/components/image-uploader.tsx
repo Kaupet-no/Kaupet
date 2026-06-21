@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Camera, ImagePlus, X, GripVertical } from "lucide-react";
 import { toast } from "sonner";
 import { MAX_IMAGES, describeImageError, validateImages } from "@/lib/storage";
+import { compressImage } from "@/lib/image-compression";
 import { Button } from "@/components/ui/button";
 import { isNative, pickNativePhoto } from "@/lib/native";
 import { formatErrorMessage } from "@/lib/errors";
@@ -23,6 +24,7 @@ export function ImageUploader({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [processing, setProcessing] = useState(false);
 
   // Revoke object URLs on unmount
   useEffect(() => {
@@ -33,18 +35,29 @@ export function ImageUploader({
   }, []);
 
   const addFiles = useCallback(
-    (files: File[]) => {
-      const err = validateImages(files, images.length);
-      if (err) {
-        toast.error(describeImageError(err));
+    async (files: File[]) => {
+      // Sjekk antall først (billig, og uavhengig av komprimering).
+      if (files.length + images.length > MAX_IMAGES) {
+        toast.error(describeImageError({ kind: "too-many", allowed: MAX_IMAGES }));
         return;
       }
-      const next: PendingImage[] = files.map((file) => ({
-        id: crypto.randomUUID(),
-        file,
-        previewUrl: URL.createObjectURL(file),
-      }));
-      onChange([...images, ...next]);
+      setProcessing(true);
+      try {
+        const compressed = await Promise.all(files.map((file) => compressImage(file, "listing")));
+        const err = validateImages(compressed, images.length);
+        if (err) {
+          toast.error(describeImageError(err));
+          return;
+        }
+        const next: PendingImage[] = compressed.map((file) => ({
+          id: crypto.randomUUID(),
+          file,
+          previewUrl: URL.createObjectURL(file),
+        }));
+        onChange([...images, ...next]);
+      } finally {
+        setProcessing(false);
+      }
     },
     [images, onChange],
   );
@@ -52,14 +65,14 @@ export function ImageUploader({
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const fl = e.target.files;
     if (!fl) return;
-    addFiles(Array.from(fl));
+    void addFiles(Array.from(fl));
     e.target.value = "";
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
-    addFiles(Array.from(e.dataTransfer.files));
+    void addFiles(Array.from(e.dataTransfer.files));
   };
 
   const remove = (id: string) => {
@@ -99,7 +112,7 @@ export function ImageUploader({
           {dragOver ? "Slipp her for å laste opp" : "Slipp bilder her eller velg fra enheten"}
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
-          JPG, PNG eller WebP. Maks {MAX_IMAGES} bilder, 5 MB per bilde.
+          JPG, PNG eller WebP. Maks {MAX_IMAGES} bilder. Store bilder komprimeres automatisk.
         </p>
         <input
           ref={inputRef}
@@ -115,7 +128,7 @@ export function ImageUploader({
           size="sm"
           className="mt-4"
           onClick={() => inputRef.current?.click()}
-          disabled={images.length >= MAX_IMAGES}
+          disabled={images.length >= MAX_IMAGES || processing}
         >
           Velg bilder
         </Button>
@@ -133,12 +146,18 @@ export function ImageUploader({
                 toast.error(formatErrorMessage(e, "Kunne ikke åpne kameraet"));
               }
             }}
-            disabled={images.length >= MAX_IMAGES}
+            disabled={images.length >= MAX_IMAGES || processing}
           >
             <Camera className="size-4" /> Ta bilde / velg fra galleri
           </Button>
         )}
       </div>
+
+      {processing && (
+        <p className="text-sm font-medium text-primary" role="status" aria-live="polite">
+          Behandler bilder…
+        </p>
+      )}
 
       {uploadProgress && (
         <p className="text-sm font-medium text-primary" role="status" aria-live="polite">

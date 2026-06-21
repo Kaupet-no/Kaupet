@@ -3,7 +3,13 @@
 [![Lisens: AGPL-3.0](https://img.shields.io/badge/lisens-AGPL--3.0-blue.svg)](LICENSE)
 [![CI](https://github.com/Kaupet-no/Kaupet/actions/workflows/ci.yml/badge.svg)](https://github.com/Kaupet-no/Kaupet/actions/workflows/ci.yml)
 
-Dette er et fellesskapsdrevet prosjekt der vi sammen bygger Norges ledende markedsplass for kjøp og salg av brukte ting. Kaupet.no fungerer som showcase-plattform for kildekoden og er direkte integrert med Main-branchen. Våre viktigste utviklingsprinsipper er: Ingen sporing, ingen lukket plattform. Personvern skal være en selvfølge, all kildekode skal forbli er fri, og alle forbedringer skal komme fellesskapet til gode.
+Dette er et fellesskapsdrevet prosjekt der vi sammen bygger Norges ledende markedsplass for kjøp og salg av brukte ting. Kaupet.no fungerer som showcase-plattform for kildekoden og er direkte integrert med Main-branchen.
+
+Våre viktigste utviklingsprinsipper er:
+
+- Ingen sporing, ingen lukket plattform.
+- Personvern skal være en selvfølge, all kildekode skal forbli åpen og fri.
+- Alle forbedringer skal komme fellesskapet til gode - ingen unntak.
 
 ## Slik kjører du prosjektet lokalt
 

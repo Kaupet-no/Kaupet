@@ -9,9 +9,10 @@
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 
-const AUTH_FILE = path.join(__dirname, ".auth", "user.json");
+const AUTH_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), ".auth", "user.json");
 
 export default async function globalSetup() {
   const url = process.env.SUPABASE_URL;

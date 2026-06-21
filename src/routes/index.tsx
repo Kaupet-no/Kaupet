@@ -1,6 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Heart, MapPin, Search, ShieldCheck } from "lucide-react";
+import {
+  ArrowRight,
+  ChevronDown,
+  FolderOpen,
+  Heart,
+  MapPin,
+  Search,
+  ShieldCheck,
+} from "lucide-react";
 import { z } from "zod";
 import { useMemo, useRef, useState } from "react";
 import Autoplay from "embla-carousel-autoplay";
@@ -9,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Carousel,
   CarouselContent,
@@ -22,6 +31,9 @@ import { useIsNative } from "@/lib/use-is-native";
 import { AppLanding } from "@/components/app-landing";
 import { KaupetCodeDialog } from "@/components/kaupet-code-dialog";
 import { getCategoryIcon } from "@/lib/category-icons";
+import { findCategorySuggestion } from "@/lib/categories";
+import { useTypewriterText } from "@/lib/use-typewriter-text";
+import { SEARCH_SUGGESTIONS } from "@/lib/search-suggestions";
 
 type CategoryRow = {
   id: string;
@@ -54,6 +66,62 @@ function LandingPage() {
   const native = useIsNative();
   if (native) return <AppLanding />;
   return <WebLanding />;
+}
+
+// Defined at module scope (not inside WebLanding's render body) so it keeps
+// a stable component identity across re-renders — e.g. while the hero's
+// typewriter placeholder updates state every ~40-90ms. A component defined
+// inline inside another component's render is a *new* function on every
+// render, which makes React unmount and remount the whole subtree (every
+// <img> included) instead of just re-rendering it, causing visible flicker.
+function PopularCarousel({
+  popular,
+  autoplay,
+}: {
+  popular: ListingCardData[] | undefined;
+  autoplay: React.RefObject<ReturnType<typeof Autoplay>>;
+}) {
+  return (
+    <div>
+      <div className="mb-6 flex items-end justify-between gap-4">
+        <h2 className="font-display text-2xl tracking-tight">Populært akkurat nå</h2>
+        <Link
+          to="/annonser"
+          search={{ q: "", category: "", sort: "new" }}
+          className="text-sm text-primary hover:underline"
+        >
+          Se alle →
+        </Link>
+      </div>
+
+      {popular && popular.length > 0 ? (
+        <Carousel
+          opts={{ align: "start", loop: true }}
+          plugins={[autoplay.current]}
+          className="w-full"
+        >
+          <CarouselContent>
+            {popular.map((listing) => (
+              <CarouselItem
+                key={listing.id}
+                className="basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5"
+              >
+                <ListingCard listing={listing} />
+              </CarouselItem>
+            ))}
+          </CarouselContent>
+          <CarouselPrevious className="-left-3" />
+          <CarouselNext className="-right-3" />
+        </Carousel>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-muted" />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function WebLanding() {
@@ -91,6 +159,24 @@ function WebLanding() {
   }, [categories]);
 
   const [activeCategory, setActiveCategory] = useState<CategoryRow | null>(null);
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
+
+  const [qFocused, setQFocused] = useState(false);
+  const typewriterPlaceholder = useTypewriterText(SEARCH_SUGGESTIONS, {
+    paused: qFocused || qDraft.length > 0,
+  });
+
+  // Suggest a matching category while the user types in the hero search, so
+  // people who type a category name (e.g. "sykkel") discover that browsing by
+  // category is also possible from the same field.
+  const heroSuggestion = useMemo(
+    () => findCategorySuggestion(categories ?? [], qDraft),
+    [qDraft, categories],
+  );
+
+  const goToCategory = (cat: CategoryRow) => {
+    navigate({ to: "/annonser", search: { q: "", category: cat.slug, sort: "new" } });
+  };
 
   const handlePickCategory = (cat: CategoryRow) => {
     const subs = childrenByParent.get(cat.id) ?? [];
@@ -124,50 +210,6 @@ function WebLanding() {
     },
   });
 
-  const PopularCarousel = () => (
-    <div className="relative">
-      <div className="absolute -inset-4 -z-10 rounded-3xl bg-accent/10 blur-2xl" />
-      <div className="rounded-2xl border border-border bg-card p-4 shadow-xl">
-        <div className="mb-3 flex items-center justify-between px-1">
-          <h2 className="font-display text-sm tracking-tight text-muted-foreground">
-            Populært akkurat nå
-          </h2>
-          <Link
-            to="/annonser"
-            search={{ q: "", category: "", sort: "new" }}
-            className="text-xs text-primary hover:underline"
-          >
-            Se alle →
-          </Link>
-        </div>
-
-        {popular && popular.length > 0 ? (
-          <Carousel
-            opts={{ align: "start", loop: true }}
-            plugins={[autoplay.current]}
-            className="w-full"
-          >
-            <CarouselContent>
-              {popular.map((listing) => (
-                <CarouselItem key={listing.id} className="basis-full sm:basis-1/2">
-                  <ListingCard listing={listing} />
-                </CarouselItem>
-              ))}
-            </CarouselContent>
-            <CarouselPrevious className="-left-3" />
-            <CarouselNext className="-right-3" />
-          </Carousel>
-        ) : (
-          <div className="grid grid-cols-2 gap-3">
-            {Array.from({ length: 2 }).map((_, i) => (
-              <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-muted" />
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
   const submitSearch = (e: React.FormEvent) => {
     e.preventDefault();
     navigate({
@@ -178,206 +220,203 @@ function WebLanding() {
 
   return (
     <div>
-      {/* Hero */}
+      {/* Hero — søkefeltet får all oppmerksomheten, som en søkemotor */}
       <section className="relative overflow-hidden bg-surface">
-        <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-16 md:grid-cols-[1.05fr_1fr] md:py-24">
-          <div className="space-y-6">
-            <h1 className="font-display text-5xl leading-[1.05] tracking-tight md:text-6xl">
-              Gi tingene dine <span className="italic text-accent">et nytt liv</span>.
-            </h1>
-            <p className="max-w-lg text-lg text-muted-foreground">
-              Kaupet.no er en norsk markedsplass for brukte ting mellom privatpersoner. Ingen
-              mellomledd, ingen reklame.
-            </p>
+        <div className="mx-auto max-w-2xl px-4 py-16 text-center md:py-24">
+          <h1 className="font-display text-5xl leading-[1.05] tracking-tight md:text-6xl">
+            Gi tingene dine <span className="italic text-accent">et nytt liv</span>.
+          </h1>
+          <p className="mx-auto mt-4 max-w-lg text-lg text-muted-foreground">
+            Kaupet.no er en norsk markedsplass for brukte ting mellom privatpersoner. Ingen
+            mellomledd, ingen reklame.
+          </p>
 
-            <form onSubmit={submitSearch} className="flex max-w-lg gap-2">
-              <div className="relative flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={qDraft}
-                  onChange={(e) => setQDraft(e.target.value)}
-                  placeholder="Hva leter du etter? F.eks. sykkel, sofa, iPhone…"
-                  className="h-12 pl-9 text-base"
-                  aria-label="Søk i annonser"
-                />
-              </div>
-              <Button type="submit" size="lg" className="gap-2">
-                Søk <ArrowRight className="size-4" />
-              </Button>
-            </form>
-
-            <div className="flex flex-wrap gap-3">
-              {user ? (
-                <Link to="/ny-annonse">
-                  <Button size="lg" variant="outline">
-                    Opprett en annonse
-                  </Button>
-                </Link>
-              ) : (
-                <Link to="/auth" search={{ mode: "signup" }}>
-                  <Button size="lg" variant="outline">
-                    Kom i gang gratis
-                  </Button>
-                </Link>
-              )}
-              <KaupetCodeDialog />
-            </div>
-          </div>
-
-          {/* Popular listings carousel — desktop only */}
-          <div className="hidden md:block">
-            <PopularCarousel />
-          </div>
-        </div>
-      </section>
-
-      {/* Categories */}
-      <section className="mx-auto max-w-6xl px-4 py-16">
-        <div className="mb-8 flex items-end justify-between gap-4">
-          <div className="min-w-0">
-            <h2 className="font-display text-3xl tracking-tight">
-              {activeCategory ? activeCategory.name_nb : "Utforsk kategorier"}
-            </h2>
-            <p className="mt-1 text-muted-foreground">
-              {activeCategory
-                ? "Velg en underkategori."
-                : "Bla gjennom det folk i nærheten selger akkurat nå."}
-            </p>
-          </div>
-          {activeCategory && (
-            <button
-              type="button"
-              onClick={() => setActiveCategory(null)}
-              className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-card px-4 py-2 text-sm font-medium transition hover:border-primary hover:text-primary"
-            >
-              <ChevronLeft className="size-4" />
-              Tilbake
-            </button>
-          )}
-        </div>
-
-        {/* Mobil: horisontal sveipbar rad (kun for rotkategorier) */}
-        {!activeCategory && (
-          <div className="relative -mx-4 duration-300 animate-in fade-in slide-in-from-left-8 sm:hidden">
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-background to-transparent"
-            />
-            <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain touch-pan-x px-4 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {rootCategories.length === 0 &&
-                Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="h-24 w-20 shrink-0 animate-pulse rounded-2xl bg-muted" />
-                ))}
-              {rootCategories.map((cat) => {
-                const Icon = getCategoryIcon(cat.icon);
-                return (
+          <form onSubmit={submitSearch} className="mx-auto mt-8 flex max-w-lg gap-2">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={qDraft}
+                onChange={(e) => setQDraft(e.target.value)}
+                onFocus={() => setQFocused(true)}
+                onBlur={() => setQFocused(false)}
+                placeholder={typewriterPlaceholder}
+                className="h-12 border-border bg-card pl-9 text-base shadow-md"
+                aria-label="Søk i annonser"
+              />
+              {qFocused && heroSuggestion && (
+                <div className="absolute left-0 top-[calc(100%+0.5rem)] z-50 w-full overflow-hidden rounded-xl border border-border bg-card p-1 text-left shadow-md">
                   <button
-                    key={cat.id}
                     type="button"
-                    onClick={() => handlePickCategory(cat)}
-                    className="group flex w-20 shrink-0 snap-start flex-col items-center gap-2 active:opacity-80"
-                  >
-                    <span className="flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
-                      <Icon className="size-7" />
-                    </span>
-                    <span className="line-clamp-2 text-pretty text-center text-xs font-medium leading-tight">
-                      {cat.name_nb}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        <div
-          key={activeCategory?.id ?? "root"}
-          className={`grid grid-cols-2 gap-3 duration-300 animate-in fade-in sm:grid-cols-3 lg:grid-cols-4 ${activeCategory ? "slide-in-from-right-8" : "hidden sm:grid slide-in-from-left-8"}`}
-        >
-          {activeCategory ? (
-            (() => {
-              const subs = childrenByParent.get(activeCategory.id) ?? [];
-              const allSlugs = [activeCategory.slug, ...subs.map((s) => s.slug)];
-
-              return (
-                <>
-                  <Link
-                    to="/annonser"
-                    search={{
-                      q: "",
-                      category: "",
-                      categories: allSlugs,
-                      catMode: "any",
-                      sort: "new",
+                    // Mouse-down fires before the input's blur, so the click
+                    // registers instead of being lost when focus leaves the field.
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      goToCategory(heroSuggestion);
                     }}
-                    className="group flex items-center justify-between gap-3 rounded-xl border border-primary bg-primary/5 px-4 py-5 text-left font-medium text-primary transition hover:bg-primary hover:text-primary-foreground hover:shadow-sm"
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted"
                   >
-                    <div className="flex min-w-0 flex-1 items-center gap-3">
-                      <div className="truncate">Alt i {activeCategory.name_nb}</div>
-                    </div>
-                    <ArrowRight className="size-4 shrink-0 transition group-hover:translate-x-0.5" />
-                  </Link>
-                  {subs.map((sub) => (
-                    <Link
-                      key={sub.id}
-                      to="/annonser"
-                      search={{ q: "", category: sub.slug, sort: "new" }}
-                      className="group flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-5 text-left transition hover:border-primary hover:shadow-sm"
-                    >
-                      <div className="truncate font-medium">{sub.name_nb}</div>
-                      <ArrowRight className="size-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
-                    </Link>
-                  ))}
-                  {subs.length === 0 && (
-                    <p className="col-span-full text-sm text-muted-foreground">
-                      Ingen underkategorier — trykk over for å se alle annonser.
-                    </p>
-                  )}
-                </>
-              );
-            })()
-          ) : (
-            <>
-              {rootCategories.map((cat) => {
-                const Icon = getCategoryIcon(cat.icon);
-                const subCount = childrenByParent.get(cat.id)?.length ?? 0;
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => handlePickCategory(cat)}
-                    className="group flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-5 text-left transition hover:border-primary hover:shadow-sm"
-                  >
-                    <div className="flex min-w-0 flex-1 items-center gap-3">
-                      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
-                        <Icon className="size-5" />
-                      </span>
-                      <div className="min-w-0">
-                        <div className="truncate font-medium">{cat.name_nb}</div>
-                        {subCount > 0 && (
-                          <div className="text-xs text-muted-foreground">
-                            {subCount} underkategorier
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <ArrowRight className="size-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
+                    <FolderOpen className="size-4 shrink-0 text-muted-foreground" />
+                    <span>
+                      Gå til kategori: <span className="font-medium">{heroSuggestion.name_nb}</span>
+                    </span>
                   </button>
-                );
-              })}
-              {!categories && (
-                <div className="col-span-full text-sm text-muted-foreground">
-                  Laster kategorier…
                 </div>
               )}
-            </>
-          )}
+            </div>
+            <Button type="submit" size="lg" className="gap-2">
+              Søk <ArrowRight className="size-4" />
+            </Button>
+          </form>
+
+          {/* "Utforsk kategorier" — slider rett under knappen, ikke en egen
+              seksjon lenger ned, så sammenhengen mellom trykk og resultat er
+              tydelig. */}
+          <Collapsible
+            open={categoriesOpen}
+            onOpenChange={(o) => {
+              setCategoriesOpen(o);
+              if (!o) setActiveCategory(null);
+            }}
+          >
+            <div className="flex justify-center">
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="group mt-3 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <FolderOpen className="size-3.5 transition-transform duration-200 group-hover:-translate-y-0.5" />
+                  Utforsk kategorier
+                  <ChevronDown className="size-3.5 transition-transform duration-200 group-hover:translate-y-0.5 group-data-[state=open]:rotate-180" />
+                </button>
+              </CollapsibleTrigger>
+            </div>
+
+            <CollapsibleContent>
+              <div className="mx-auto mt-3 max-w-xl rounded-2xl border border-border bg-card p-4 text-left shadow-sm">
+                {activeCategory && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveCategory(null)}
+                    className="mb-3 flex items-center gap-1 rounded px-1.5 py-1 text-left text-xs text-muted-foreground hover:bg-muted"
+                  >
+                    <ChevronLeft className="size-3.5" />
+                    Tilbake til hovedkategorier
+                  </button>
+                )}
+
+                <div
+                  key={activeCategory?.id ?? "root"}
+                  className={`grid grid-cols-3 gap-1 duration-200 animate-in fade-in sm:grid-cols-4 md:grid-cols-6 ${activeCategory ? "slide-in-from-right-4" : "slide-in-from-left-4"}`}
+                >
+                  {activeCategory ? (
+                    (() => {
+                      const subs = childrenByParent.get(activeCategory.id) ?? [];
+                      const allSlugs = [activeCategory.slug, ...subs.map((s) => s.slug)];
+                      const AllIcon = getCategoryIcon(activeCategory.icon);
+
+                      return (
+                        <>
+                          <Link
+                            to="/annonser"
+                            search={{
+                              q: "",
+                              category: "",
+                              categories: allSlugs,
+                              catMode: "any",
+                              sort: "new",
+                            }}
+                            className="group flex flex-col items-center gap-1.5 rounded-xl p-2 text-center transition hover:bg-muted"
+                          >
+                            <span className="flex size-11 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                              <AllIcon className="size-5" />
+                            </span>
+                            <span className="line-clamp-2 text-pretty text-xs font-medium leading-tight">
+                              Alt i {activeCategory.name_nb}
+                            </span>
+                          </Link>
+                          {subs.map((sub) => {
+                            const Icon = getCategoryIcon(sub.icon);
+                            return (
+                              <Link
+                                key={sub.id}
+                                to="/annonser"
+                                search={{ q: "", category: sub.slug, sort: "new" }}
+                                className="group flex flex-col items-center gap-1.5 rounded-xl p-2 text-center transition hover:bg-muted"
+                              >
+                                <span className="flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
+                                  <Icon className="size-5" />
+                                </span>
+                                <span className="line-clamp-2 text-pretty text-xs font-medium leading-tight">
+                                  {sub.name_nb}
+                                </span>
+                              </Link>
+                            );
+                          })}
+                          {subs.length === 0 && (
+                            <p className="col-span-full text-sm text-muted-foreground">
+                              Ingen underkategorier — trykk over for å se alle annonser.
+                            </p>
+                          )}
+                        </>
+                      );
+                    })()
+                  ) : (
+                    <>
+                      {rootCategories.length === 0 &&
+                        Array.from({ length: 6 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className="aspect-square animate-pulse rounded-xl bg-muted"
+                          />
+                        ))}
+                      {rootCategories.map((cat) => {
+                        const Icon = getCategoryIcon(cat.icon);
+                        return (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() => handlePickCategory(cat)}
+                            className="group flex flex-col items-center gap-1.5 rounded-xl p-2 text-center transition hover:bg-muted"
+                          >
+                            <span className="flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
+                              <Icon className="size-5" />
+                            </span>
+                            <span className="line-clamp-2 text-pretty text-xs font-medium leading-tight">
+                              {cat.name_nb}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </>
+                  )}
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            {user ? (
+              <Link to="/ny-annonse">
+                <Button size="lg" variant="outline">
+                  Opprett en annonse
+                </Button>
+              </Link>
+            ) : (
+              <Link to="/auth" search={{ mode: "signup" }}>
+                <Button size="lg" variant="outline">
+                  Kom i gang gratis
+                </Button>
+              </Link>
+            )}
+            <KaupetCodeDialog />
+          </div>
         </div>
       </section>
 
-      {/* Populært akkurat nå — mobil/tablet under kategorier */}
-      <section className="mx-auto max-w-6xl px-4 pb-16 md:hidden">
-        <PopularCarousel />
+      {/* Populært akkurat nå — egen seksjon, lenger ned slik at søkefeltet
+          eier hero-seksjonen alene */}
+      <section className="mx-auto max-w-6xl px-4 pb-16">
+        <PopularCarousel popular={popular} autoplay={autoplay} />
       </section>
 
       {/* How it works */}

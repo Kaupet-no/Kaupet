@@ -3,35 +3,20 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { reconcilePromotionPayment } from "@/lib/promotions.functions";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import {
-  ArrowLeft,
-  MapPin,
-  MessageCircle,
-  User as UserIcon,
-  Pencil,
-  Eye,
-  Users,
-  Heart,
-  Info,
-  ChevronDown,
-  Share2,
-  Sparkles,
-  Check,
-} from "lucide-react";
+import { ArrowLeft, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/lib/auth";
+import { useAuth } from "@/lib/use-auth";
 import { readLastSearchContext, type LastSearchContext } from "@/lib/last-search-context";
 
 import { signListingImageUrls } from "@/lib/storage";
 import { CONDITION_LABEL } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
-import { FavoriteButton } from "@/components/favorite-button";
-import { PromoteListingDialog } from "@/components/promote-listing-dialog";
-import { ShareListingDialog } from "@/components/share-listing-dialog";
+import { ImageGallery } from "@/components/listing-detail/image-gallery";
+import { OwnerStatsPanel } from "@/components/listing-detail/owner-stats-panel";
+import { SellerContactPanel } from "@/components/listing-detail/seller-contact-panel";
 
 const ListingDetailMap = lazy(() =>
   import("@/components/listing-detail-map").then((m) => ({ default: m.ListingDetailMap })),
@@ -430,43 +415,13 @@ function ListingDetailPage() {
 
       <div className="mt-4 grid gap-8 md:grid-cols-[1.4fr_1fr]">
         <div>
-          <div className="aspect-[4/3] overflow-hidden rounded-xl border border-border bg-muted">
-            {images.length > 0 ? (
-              <img
-                src={imgUrls[images[activeImage].storage_path]}
-                alt={data.title}
-                className="size-full object-contain"
-              />
-            ) : (
-              <div className="flex size-full items-center justify-center text-sm text-muted-foreground">
-                Ingen bilder
-              </div>
-            )}
-          </div>
-          {images.length > 1 && (
-            <div className="mt-3 flex gap-2 overflow-x-auto" role="list">
-              {images.map((img, i) => (
-                <button
-                  key={img.storage_path}
-                  type="button"
-                  onClick={() => setActiveImage(i)}
-                  aria-label={`Vis bilde ${i + 1} av ${images.length} for «${data.title}»`}
-                  aria-pressed={i === activeImage}
-                  className={`size-20 shrink-0 overflow-hidden rounded-lg border-2 ${
-                    i === activeImage ? "border-primary" : "border-transparent"
-                  }`}
-                >
-                  {imgUrls[img.storage_path] && (
-                    <img
-                      src={imgUrls[img.storage_path]}
-                      alt=""
-                      className="size-full object-cover"
-                    />
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
+          <ImageGallery
+            images={images}
+            imgUrls={imgUrls}
+            activeImage={activeImage}
+            onSelect={setActiveImage}
+            title={data.title}
+          />
           <section className="mt-8">
             <h2 className="font-display text-xl">Beskrivelse</h2>
             <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
@@ -538,179 +493,30 @@ function ListingDetailPage() {
           })()}
 
           {isOwner && (
-            <div className="rounded-xl border border-primary/40 bg-primary/5 p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-primary">
-                Dette er din annonse
-              </p>
-              <Link to="/mine-annonser/$id/rediger" params={{ id: data.id }} className="mt-3 block">
-                <Button className="w-full gap-2" variant="default">
-                  <Pencil className="size-4" /> Rediger annonse
-                </Button>
-              </Link>
-              {data.status === "active" &&
-                (activePromotion ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="mt-2 w-full gap-2 border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-400"
-                    disabled
-                  >
-                    <Check className="size-4" /> Annonse fremhevet
-                  </Button>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="mt-2 w-full gap-2"
-                    onClick={() => setPromoteOpen(true)}
-                  >
-                    <Sparkles className="size-4" /> Fremhev annonse
-                  </Button>
-                ))}
-              <PromoteListingDialog
-                listingId={data.id}
-                open={promoteOpen}
-                onOpenChange={setPromoteOpen}
-              />
-              <dl className="mt-4 grid grid-cols-3 gap-3 text-center">
-                <div className="rounded-lg bg-card p-2">
-                  <Eye className="mx-auto size-4 text-muted-foreground" />
-                  <dd className="mt-1 font-display text-lg leading-none">
-                    {stats?.total_views ?? "–"}
-                  </dd>
-                  <dt className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                    Visninger
-                  </dt>
-                </div>
-                <div className="rounded-lg bg-card p-2">
-                  <Users className="mx-auto size-4 text-muted-foreground" />
-                  <dd className="mt-1 font-display text-lg leading-none">
-                    {stats?.unique_visitors ?? "–"}
-                  </dd>
-                  <dt className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                    Unike besøk
-                  </dt>
-                </div>
-                <div className="rounded-lg bg-card p-2">
-                  <Heart className="mx-auto size-4 text-muted-foreground" />
-                  <dd className="mt-1 font-display text-lg leading-none">
-                    {stats?.favorite_count ?? "–"}
-                  </dd>
-                  <dt className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                    Favoritter
-                  </dt>
-                </div>
-              </dl>
-              <Collapsible
-                open={statsInfoOpen}
-                onOpenChange={setStatsInfoOpen}
-                className="mt-4 rounded-lg bg-card"
-              >
-                <CollapsibleTrigger asChild>
-                  <button className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-xs text-muted-foreground transition-colors hover:text-foreground">
-                    <span className="flex items-center gap-2 font-medium text-foreground">
-                      <Info className="size-3.5 shrink-0 text-primary" />
-                      Hva betyr tallene?
-                    </span>
-                    <ChevronDown
-                      className={`size-3.5 shrink-0 transition-transform ${statsInfoOpen ? "rotate-180" : ""}`}
-                    />
-                  </button>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="border-t border-border px-3 pb-3 pt-2 text-xs text-muted-foreground">
-                    <ul className="space-y-2">
-                      <li className="flex gap-2">
-                        <span className="mt-0.5 shrink-0 text-primary">•</span>
-                        <span>
-                          <strong className="text-foreground">Visninger</strong> — antall ganger
-                          annonsen er åpnet (ett oppslag per time).
-                        </span>
-                      </li>
-                      <li className="flex gap-2">
-                        <span className="mt-0.5 shrink-0 text-primary">•</span>
-                        <span>
-                          <strong className="text-foreground">Unike besøk</strong> — antall
-                          distinkte besøkende. Vi skiller brukere ved innlogget bruker-ID eller en
-                          tilfeldig nøkkel i nettleseren. Samme person telles bare én gang.
-                        </span>
-                      </li>
-                      <li className="flex gap-2">
-                        <span className="mt-0.5 shrink-0 text-primary">•</span>
-                        <span>
-                          <strong className="text-foreground">Favoritter</strong> — antall brukere
-                          som har lagt annonsen i favoritter.
-                        </span>
-                      </li>
-                    </ul>
-                    <p className="mt-3 rounded-md bg-muted/60 p-2 text-[11px] leading-relaxed">
-                      Tallene kan være noe unøyaktige fordi vi ikke sporer brukere på tvers av
-                      nettlesere eller økter. Bytter noen nettleser eller rydder data, telles de på
-                      nytt.
-                    </p>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            </div>
+            <OwnerStatsPanel
+              listingId={data.id}
+              status={data.status}
+              stats={stats}
+              activePromotion={activePromotion}
+              promoteOpen={promoteOpen}
+              onPromoteOpenChange={setPromoteOpen}
+              statsInfoOpen={statsInfoOpen}
+              onStatsInfoOpenChange={setStatsInfoOpen}
+            />
           )}
 
-          <div className="rounded-xl border border-border bg-card p-4">
-            <div className="flex items-center gap-3">
-              {user && seller?.avatar_url ? (
-                <img src={seller.avatar_url} alt="" className="size-10 rounded-full object-cover" />
-              ) : (
-                <div className="flex size-10 items-center justify-center rounded-full bg-muted">
-                  <UserIcon className="size-5 text-muted-foreground" />
-                </div>
-              )}
-              <div className="text-sm">
-                {user ? (
-                  <>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <p className="font-medium">{seller?.display_name ?? "Selger"}</p>
-                    </div>
-                    {seller?.created_at && (
-                      <p className="text-xs text-muted-foreground">
-                        Medlem siden{" "}
-                        {new Date(seller.created_at).toLocaleDateString("nb-NO", {
-                          month: "long",
-                          year: "numeric",
-                        })}
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-muted-foreground">Logg inn for å se informasjon om selger</p>
-                )}
-              </div>
-            </div>
-
-            {!isOwner && (
-              <Button
-                className="mt-4 w-full gap-2"
-                onClick={() => contactMutation.mutate()}
-                disabled={contactMutation.isPending}
-              >
-                <MessageCircle className="size-4" />
-                {contactMutation.isPending ? "Åpner samtale…" : "Send melding til selger"}
-              </Button>
-            )}
-            <FavoriteButton listingId={data.id} variant="full" size="lg" className="mt-2" />
-            <Button
-              type="button"
-              variant="outline"
-              className="mt-2 w-full gap-2"
-              onClick={() => setShareOpen(true)}
-            >
-              <Share2 className="size-4" /> Del annonse
-            </Button>
-            <ShareListingDialog
-              open={shareOpen}
-              onOpenChange={setShareOpen}
-              kaupetCode={data.kaupet_code}
-              title={data.title}
-            />
-          </div>
+          <SellerContactPanel
+            isLoggedIn={!!user}
+            seller={seller ?? null}
+            isOwner={isOwner}
+            listingId={data.id}
+            kaupetCode={data.kaupet_code}
+            title={data.title}
+            onContact={() => contactMutation.mutate()}
+            contacting={contactMutation.isPending}
+            shareOpen={shareOpen}
+            onShareOpenChange={setShareOpen}
+          />
         </aside>
       </div>
 

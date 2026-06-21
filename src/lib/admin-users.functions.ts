@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAdminRole } from "@/lib/admin-auth.server";
 
 const schema = z.object({
   email: z.string().trim().toLowerCase().email("Ugyldig e-postadresse").max(255),
@@ -13,15 +14,7 @@ export const createDemoUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => schema.parse(i))
   .handler(async ({ data, context }) => {
-    // Verify caller is admin
-    const { data: roleRow, error: roleErr } = await context.supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", context.userId)
-      .eq("role", "admin")
-      .maybeSingle();
-    if (roleErr) throw roleErr;
-    if (!roleRow) throw new Error("Ikke autorisert");
+    await requireAdminRole(context.supabase, context.userId);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 

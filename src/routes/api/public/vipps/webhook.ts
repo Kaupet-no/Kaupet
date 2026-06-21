@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { createHmac, timingSafeEqual } from "crypto";
 
 /**
  * Vipps webhook handler — receives payment state changes.
@@ -15,18 +14,20 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
         const raw = await request.text();
         const host = request.headers.get("host");
 
-        // Verify HMAC signature if a secret is configured.
-        const { getVippsWebhookSecret, getVippsPayment } = await import("@/lib/vipps.server");
+        const { getVippsWebhookSecret, getVippsPayment, verifyVippsWebhookSignature } =
+          await import("@/lib/vipps.server");
         const secret = await getVippsWebhookSecret(host);
-        if (secret) {
-          const sigHeader =
-            request.headers.get("x-ms-signature") ?? request.headers.get("authorization") ?? "";
-          const expected = createHmac("sha256", secret).update(raw).digest("base64");
-          const sigBuf = Buffer.from(sigHeader);
-          const expBuf = Buffer.from(expected);
-          if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) {
-            return new Response("Invalid signature", { status: 401 });
-          }
+        // Fail closed: an endpoint with no configured secret must not accept
+        // unverified requests, since that would let anyone trigger processing
+        // of arbitrary payment references.
+        if (!secret) {
+          console.error("[vipps webhook] no webhook secret configured, rejecting request");
+          return new Response("Webhook not configured", { status: 401 });
+        }
+        const sigHeader =
+          request.headers.get("x-ms-signature") ?? request.headers.get("authorization") ?? "";
+        if (!verifyVippsWebhookSignature(secret, sigHeader, raw)) {
+          return new Response("Invalid signature", { status: 401 });
         }
 
         let payload: Record<string, unknown>;

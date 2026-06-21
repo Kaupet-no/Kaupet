@@ -1,35 +1,25 @@
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import * as React from "react";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, CheckCircle2, Loader2, Send, Trash2, User as UserIcon } from "lucide-react";
+import { ArrowLeft, Send, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/lib/auth";
+import { useAuth } from "@/lib/use-auth";
 import { signListingImageUrls } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { markRead } from "@/lib/unread";
 import { Textarea } from "@/components/ui/textarea";
 import { BlockConversationMenu } from "@/components/block-conversation-menu";
 import { listMyBlocks, listBlocksAgainstMe } from "@/lib/blocks.functions";
-import { StarRating } from "@/components/star-rating";
 import { confirmBuyer, getSaleForListing, unconfirmBuyer } from "@/lib/sales.functions";
 import { createReview, getMyReviewForListing } from "@/lib/reviews.functions";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { formatErrorMessage } from "@/lib/errors";
 import { useIsNative } from "@/lib/use-is-native";
+import { ConversationErrorBoundary } from "@/components/meldinger/conversation-error-boundary";
+import { renderWithDayDividers, type Message } from "@/components/meldinger/message-list";
+import { SalePanel } from "@/components/meldinger/sale-panel";
 
 export const Route = createFileRoute("/_authenticated/meldinger/$id")({
   head: () => ({
@@ -48,34 +38,6 @@ export const Route = createFileRoute("/_authenticated/meldinger/$id")({
     </div>
   ),
 });
-
-function ConversationErrorBoundary({ error, reset }: { error: Error; reset: () => void }) {
-  const router = useRouter();
-  return (
-    <div className="mx-auto max-w-2xl px-4 py-20 text-center">
-      <h1 className="font-display text-2xl">Kunne ikke laste samtalen</h1>
-      <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
-      <Button
-        className="mt-6"
-        onClick={() => {
-          router.invalidate();
-          reset();
-        }}
-      >
-        Prøv på nytt
-      </Button>
-    </div>
-  );
-}
-
-type Message = {
-  id: string;
-  conversation_id: string;
-  sender_id: string;
-  body: string;
-  created_at: string;
-  deleted_at: string | null;
-};
 
 function ConversationPage() {
   const native = useIsNative();
@@ -501,270 +463,5 @@ function ConversationPage() {
         <p className="mt-2 text-xs text-destructive">{(sendMutation.error as Error).message}</p>
       )}
     </div>
-  );
-}
-
-function renderWithDayDividers(
-  messages: Message[],
-  myId: string,
-  onDelete: (messageId: string) => void,
-) {
-  const out: React.ReactElement[] = [];
-  let lastDay = "";
-  for (const m of messages) {
-    const d = new Date(m.created_at);
-    const day = d.toLocaleDateString("nb-NO", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-    if (day !== lastDay) {
-      out.push(
-        <div
-          key={`d-${m.id}`}
-          className="my-2 text-center text-[11px] uppercase tracking-wide text-muted-foreground"
-        >
-          {day}
-        </div>,
-      );
-      lastDay = day;
-    }
-    const mine = m.sender_id === myId;
-    const deleted = !!m.deleted_at;
-    out.push(
-      <div
-        key={m.id}
-        className={`group flex items-end gap-1 ${mine ? "justify-end" : "justify-start"}`}
-      >
-        {mine && !deleted && (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <button
-                type="button"
-                aria-label="Slett melding"
-                className="mb-1 shrink-0 rounded p-1 text-muted-foreground opacity-0 transition hover:text-destructive group-hover:opacity-100"
-              >
-                <Trash2 className="size-3.5" />
-              </button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Slett melding</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Meldingen erstattes med «Melding slettet» for begge parter. Dette kan ikke angres.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Avbryt</AlertDialogCancel>
-                <AlertDialogAction onClick={() => onDelete(m.id)}>Slett</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
-        <div
-          className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${
-            deleted
-              ? "bg-muted/40 italic text-muted-foreground"
-              : mine
-                ? "bg-primary text-primary-foreground"
-                : "bg-card text-foreground"
-          }`}
-        >
-          <p className="whitespace-pre-wrap break-words">{deleted ? "Melding slettet" : m.body}</p>
-          <p
-            className={`mt-1 text-[10px] ${
-              mine && !deleted ? "text-primary-foreground/70" : "text-muted-foreground"
-            }`}
-          >
-            {d.toLocaleTimeString("nb-NO", {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </p>
-        </div>
-      </div>,
-    );
-  }
-  return out;
-}
-
-type SalePanelProps = {
-  isSeller: boolean;
-  sale: { listing_id: string; buyer_id: string; seller_id: string; conversation_id: string } | null;
-  saleIsForThisConversation: boolean;
-  saleConfirmedForOtherBuyer: boolean;
-  iAmInSale: boolean;
-  otherName: string;
-  otherDeleted: boolean;
-  myReview: { id: string; rating: number; comment: string | null } | null;
-  onConfirm: () => void;
-  onUnconfirm: () => void;
-  confirming: boolean;
-  unconfirming: boolean;
-  onSubmitReview: (rating: number, comment: string) => Promise<void>;
-};
-
-function SalePanel(props: SalePanelProps) {
-  const {
-    isSeller,
-    sale,
-    saleIsForThisConversation,
-    saleConfirmedForOtherBuyer,
-    iAmInSale,
-    otherName,
-    otherDeleted,
-    myReview,
-    onConfirm,
-    onUnconfirm,
-    confirming,
-    unconfirming,
-    onSubmitReview,
-  } = props;
-
-  if (otherDeleted) return null;
-
-  // No sale yet
-  if (!sale) {
-    if (!isSeller) return null;
-    return (
-      <div className="mt-3 flex flex-col gap-2 rounded-xl border border-border bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="text-sm">
-          <p className="font-medium">Solgte du gjenstanden til {otherName}?</p>
-          <p className="text-xs text-muted-foreground">
-            Marker som solgt for å låse annonsen og åpne for vurdering av kjøperen.
-          </p>
-        </div>
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button size="sm" className="gap-2" disabled={confirming}>
-              {confirming && <Loader2 className="size-4 animate-spin" />}
-              <CheckCircle2 className="size-4" /> Marker som solgt
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Bekreft kjøper</AlertDialogTitle>
-              <AlertDialogDescription>
-                {`Marker ${otherName} som kjøper av denne annonsen? Annonsen settes til «solgt» og kan ikke vises som aktiv igjen før salget eventuelt angres.`}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Avbryt</AlertDialogCancel>
-              <AlertDialogAction onClick={onConfirm}>Bekreft</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
-    );
-  }
-
-  // Sale exists but is for a different conversation/buyer
-  if (saleConfirmedForOtherBuyer) {
-    return (
-      <div className="mt-3 rounded-xl border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-        Denne annonsen er allerede markert som solgt til en annen kjøper.
-      </div>
-    );
-  }
-
-  // Sale is for this conversation
-  return (
-    <div className="mt-3 space-y-3 rounded-xl border border-primary/30 bg-primary/5 p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="flex items-center gap-2 text-sm font-medium">
-          <CheckCircle2 className="size-4 text-primary" />
-          {isSeller ? `Solgt til ${otherName}` : `Du er bekreftet som kjøper av denne annonsen`}
-        </p>
-        {isSeller && !myReview && (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={onUnconfirm}
-            disabled={unconfirming}
-            className="text-xs"
-          >
-            {unconfirming && <Loader2 className="size-3 animate-spin" />}
-            Angre salg
-          </Button>
-        )}
-      </div>
-
-      {iAmInSale && (
-        <ReviewForm myReview={myReview} otherName={otherName} onSubmit={onSubmitReview} />
-      )}
-    </div>
-  );
-}
-
-function ReviewForm({
-  myReview,
-  otherName,
-  onSubmit,
-}: {
-  myReview: { rating: number; comment: string | null } | null;
-  otherName: string;
-  onSubmit: (rating: number, comment: string) => Promise<void>;
-}) {
-  const [rating, setRating] = useState(myReview?.rating ?? 0);
-  const [comment, setComment] = useState(myReview?.comment ?? "");
-  const [submitting, setSubmitting] = useState(false);
-
-  if (myReview) {
-    return (
-      <div className="rounded-lg border border-border bg-card p-3">
-        <p className="text-xs font-medium text-muted-foreground">Din vurdering</p>
-        <div className="mt-1 flex items-center gap-2">
-          <StarRating value={myReview.rating} readOnly size={18} />
-          <span className="text-sm font-medium">{myReview.rating} / 5</span>
-        </div>
-        {myReview.comment && (
-          <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">{myReview.comment}</p>
-        )}
-        <p className="mt-2 text-xs text-muted-foreground">
-          Vurderinger er endelige og kan ikke endres etter publisering.
-        </p>
-      </div>
-    );
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (rating < 1) {
-      toast.error("Velg minst én stjerne");
-      return;
-    }
-    setSubmitting(true);
-    try {
-      await onSubmit(rating, comment.trim());
-    } catch (err) {
-      toast.error(formatErrorMessage(err, "Kunne ikke sende vurderingen"));
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-3 rounded-lg border border-border bg-card p-3">
-      <div>
-        <p className="text-sm font-medium">Gi {otherName} en vurdering</p>
-        <p className="text-xs text-muted-foreground">
-          1–5 stjerner og en kort kommentar (valgfri). Vurderingen er endelig.
-        </p>
-      </div>
-      <StarRating value={rating} onChange={setRating} size={28} />
-      <Textarea
-        value={comment}
-        onChange={(e) => setComment(e.target.value)}
-        placeholder="Kort kommentar (valgfri)"
-        rows={3}
-        maxLength={500}
-      />
-      <div className="flex justify-end">
-        <Button type="submit" size="sm" disabled={submitting || rating < 1} className="gap-2">
-          {submitting && <Loader2 className="size-4 animate-spin" />}
-          Publiser vurdering
-        </Button>
-      </div>
-    </form>
   );
 }

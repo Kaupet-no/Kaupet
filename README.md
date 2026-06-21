@@ -40,6 +40,21 @@ Server-side secrets (service role key, Vipps-test-nøkler, VAPID-nøkler, `PUBLI
 
 Produksjon (`main`) er uberørt av dette — `deploy`-jobben der bruker fortsatt GitHub Environment `production` som før.
 
+## Testing
+
+- `bun run test` — kjører unittester (Vitest). Inngår i CI.
+- `bun run test:e2e` — kjører Playwright-e2e-tester. Starter selv en lokal dev-server mot Supabase-prosjektet i din `.env` (krever `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`, samme variabler som resten av appen bruker server-side, for å opprette en bekreftet testbruker). Ikke en del av vanlig CI; trigges manuelt via `workflow_dispatch` på `e2e`-jobben i `ci.yml`, som kjører mot staging-Supabase-prosjektet. **Forutsetning:** den jobben trenger en `SUPABASE_SERVICE_ROLE_KEY`-secret i GitHub Environment `staging` (ikke satt opp i dag — service role key ligger i dag kun på selve workeren, ikke som GitHub-secret. Legg den til manuelt i repo-innstillingene før jobben kan kjøre).
+- `bun run test:rls` — kjører RLS-integrasjonstester mot en lokal Supabase-stack. Krever Docker:
+  ```bash
+  supabase start
+  supabase status   # gir API URL, anon key og service_role key
+  LOCAL_SUPABASE_URL=http://127.0.0.1:54321 \
+  LOCAL_SUPABASE_ANON_KEY=... \
+  LOCAL_SUPABASE_SERVICE_ROLE_KEY=... \
+  bun run test:rls
+  ```
+  `src/lib/rls.integration.test.ts` er ett representativt eksempel (synlighet av samtaler/meldinger via RLS) — bruk samme mønster for å dekke flere policyer over tid.
+
 ## Teknologi
 
 - [TanStack Start](https://tanstack.com/start) (React 19, SSR) + Vite 7

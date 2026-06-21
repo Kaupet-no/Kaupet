@@ -1,7 +1,7 @@
 import { X } from "lucide-react";
 
 import { TermGroupChips } from "@/components/term-group-editor";
-import { CONDITIONS } from "@/components/advanced-search-sheet";
+import { CONDITIONS } from "@/components/advanced-search-value";
 import type { Category } from "@/lib/categories";
 import type { TermGroup } from "@/lib/term-groups";
 

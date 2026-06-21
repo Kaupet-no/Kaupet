@@ -2,7 +2,7 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Bell, MessageCircle, Plus, LogIn, Home } from "lucide-react";
 import { useState } from "react";
 
-import { useAuth } from "@/lib/auth";
+import { useAuth } from "@/lib/use-auth";
 import { useUnreadConversationsCount } from "@/lib/use-unread";
 import { useIsAdmin } from "@/lib/use-is-admin";
 import { hapticImpact } from "@/lib/haptics";

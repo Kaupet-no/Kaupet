@@ -16,11 +16,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { SearchBar } from "@/components/search-bar";
-import {
-  SaveSearchDialog,
-  valueToCriteria,
-  type AdvancedSearchValue,
-} from "@/components/advanced-search-sheet";
+import { SaveSearchDialog } from "@/components/advanced-search-sheet";
+import { valueToCriteria, type AdvancedSearchValue } from "@/components/advanced-search-value";
 import { AdvancedSearchPanel } from "@/components/advanced-search-panel";
 import { ActiveFilters } from "@/components/active-filters";
 import { SortControl } from "@/components/sort-control";
@@ -31,7 +28,7 @@ import { FeaturedListingsSection } from "@/components/featured-listings-section"
 import { reverseGeocode } from "@/lib/geocode";
 import { saveLastSearchContext } from "@/lib/last-search-context";
 import { summarizeCriteria } from "@/lib/saved-searches";
-import { useAuth } from "@/lib/auth";
+import { useAuth } from "@/lib/use-auth";
 
 const ListingsMap = lazy(() =>
   import("@/components/listings-map").then((m) => ({ default: m.ListingsMap })),

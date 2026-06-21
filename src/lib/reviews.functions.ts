@@ -3,6 +3,28 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+// Raw shape of a user_reviews row joined with its FK-aliased relations
+// (`reviewer:profiles!...`, `listing:listings(...)`). Supabase-js can't infer
+// cardinality for FK-aliased relations, so it comes back as object or array.
+type RawReviewRow = {
+  id: string;
+  listing_id: string;
+  reviewer_id: string;
+  reviewee_id: string;
+  role: string;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+  reviewer:
+    | { id: string; display_name: string | null; avatar_url: string | null }
+    | { id: string; display_name: string | null; avatar_url: string | null }[]
+    | null;
+  listing:
+    | { id: string; kaupet_code: string; title: string }
+    | { id: string; kaupet_code: string; title: string }[]
+    | null;
+};
+
 export type ReviewRow = {
   id: string;
   listing_id: string;
@@ -227,8 +249,7 @@ export const listUserReviews = createServerFn({ method: "POST" })
       });
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (rows ?? []).map((r: any) => {
+    return ((rows ?? []) as unknown as RawReviewRow[]).map((r) => {
       const reviewer = Array.isArray(r.reviewer) ? r.reviewer[0] : r.reviewer;
       const listing = Array.isArray(r.listing) ? r.listing[0] : r.listing;
       return {

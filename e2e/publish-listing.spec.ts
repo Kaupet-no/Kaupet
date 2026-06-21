@@ -19,7 +19,7 @@ test("logger inn og publiserer en annonse", async ({ page }) => {
   await page.goto("/auth");
   await page.getByLabel("E-post").fill(email);
   await page.getByLabel("Passord").fill(password);
-  await page.getByRole("button", { name: "Logg inn" }).click();
+  await page.getByRole("main").getByRole("button", { name: "Logg inn" }).click();
   await expect(page).toHaveURL("/");
 
   await page.goto("/ny-annonse");

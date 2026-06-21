@@ -17,13 +17,13 @@ const { email, password } = JSON.parse(
 
 test("logger inn og publiserer en annonse", async ({ page }) => {
   await page.goto("/auth");
+  // Inputs are controlled (SSR-rendered, then hydrated) — filling before
+  // hydration finishes gets clobbered when React reconciles to its initial
+  // empty state, so wait for the network to settle first.
+  await page.waitForLoadState("networkidle");
   await page.getByLabel("E-post").fill(email);
   await page.getByLabel("Passord").fill(password);
-  page.on("response", async (res) => {
-    if (res.url().includes("/auth/v1/token")) {
-      console.log(`[auth response] ${res.status()} ${await res.text().catch(() => "<no body>")}`);
-    }
-  });
+  await expect(page.getByLabel("E-post")).toHaveValue(email);
   await page.getByRole("main").getByRole("button", { name: "Logg inn" }).click();
   await expect(page).toHaveURL("/", { timeout: 10_000 });
 

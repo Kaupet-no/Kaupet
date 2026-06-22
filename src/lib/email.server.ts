@@ -1,6 +1,6 @@
 import { Resend } from "resend";
 
-const FROM = process.env.RESEND_FROM_EMAIL || "Kaupet.no <varsel@kaupet.no>";
+const FROM = process.env.RESEND_FROM_EMAIL || "Kaupet.no <ikkesvar@varsel.kaupet.no>";
 
 export async function sendNotificationEmail(params: {
   to: string;

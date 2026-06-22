@@ -7,11 +7,11 @@
 
 ![Kaupet.no — søkefeltet på forsiden](docs/images/hero-demo.gif)
 
-Dette repoet består av den faktiske kildekoden bak nettsiden, og du er velkommen til å laste ned, modifisere og distribuere det som del av en egen løsning om du ønsker det.
+Dette repoet består av den produksjonssatte kildekoden, og du er velkommen til å laste ned, modifisere og distribuere det som del av en egen løsning om du ønsker det.
 
 Det eneste kravet er at du respekterer vilkårene i lisensavtalen [GNU Affero General Public License v3.0](LICENSE), som betyr at all kode, også kode du selv modifiserer eller legger til, skal tilgjengeliggjøres åpent med de samme betingelsene.
 
-##### Våre viktigste utviklingsprinsipper:
+#### Våre viktigste utviklingsprinsipper:
 
 - Ingen sporing, ingen lukket plattform.
 - Personvern skal være førende for alle designvalg.

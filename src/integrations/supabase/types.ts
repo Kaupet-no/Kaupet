@@ -619,6 +619,10 @@ export type Database = {
       notification_preferences: {
         Row: {
           created_at: string
+          email_messages: boolean
+          email_price_drops: boolean
+          email_saved_searches: boolean
+          email_sold: boolean
           updated_at: string
           user_id: string
           web_push_messages: boolean
@@ -628,6 +632,10 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          email_messages?: boolean
+          email_price_drops?: boolean
+          email_saved_searches?: boolean
+          email_sold?: boolean
           updated_at?: string
           user_id: string
           web_push_messages?: boolean
@@ -637,6 +645,10 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          email_messages?: boolean
+          email_price_drops?: boolean
+          email_saved_searches?: boolean
+          email_sold?: boolean
           updated_at?: string
           user_id?: string
           web_push_messages?: boolean

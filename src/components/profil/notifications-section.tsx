@@ -51,6 +51,10 @@ export function NotificationsSection() {
       web_push_saved_searches: boolean;
       web_push_price_drops: boolean;
       web_push_sold: boolean;
+      email_messages: boolean;
+      email_saved_searches: boolean;
+      email_price_drops: boolean;
+      email_sold: boolean;
     }) => {
       await updatePrefs({ data: values });
     },
@@ -133,108 +137,71 @@ export function NotificationsSection() {
       <div className="rounded-xl border border-border bg-card p-6">
         <h2 className="text-lg font-medium">Hva vil du varsles om?</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Disse innstillingene gjelder for alle enhetene dine.
+          Disse innstillingene gjelder for alle enhetene dine. Push-varsler krever at du aktiverer
+          dem på enheten over; e-postvarsler sendes til kontoens e-postadresse.
         </p>
 
         {isLoading || !prefs ? (
           <Loader2 className="mt-4 size-5 animate-spin text-muted-foreground" />
         ) : (
           <div className="mt-6 space-y-5">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <Label htmlFor="pref-messages" className="text-sm font-medium">
-                  Nye chat-meldinger
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  Varsel når noen sender deg en melding om en annonse.
-                </p>
+            {(
+              [
+                {
+                  pushKey: "web_push_messages",
+                  emailKey: "email_messages",
+                  title: "Nye chat-meldinger",
+                  description: "Varsel når noen sender deg en melding om en annonse.",
+                },
+                {
+                  pushKey: "web_push_saved_searches",
+                  emailKey: "email_saved_searches",
+                  title: "Treff i lagrede søk",
+                  description: "Varsel når en ny annonse matcher et av søkene dine.",
+                },
+                {
+                  pushKey: "web_push_price_drops",
+                  emailKey: "email_price_drops",
+                  title: "Prisfall på favoritter",
+                  description: "Varsel når en favoritt-annonse blir satt ned med mer enn 5 %.",
+                },
+                {
+                  pushKey: "web_push_sold",
+                  emailKey: "email_sold",
+                  title: "Favoritt blir solgt",
+                  description: "Varsel når en favoritt-annonse blir markert som solgt.",
+                },
+              ] as const
+            ).map((row) => (
+              <div key={row.pushKey} className="flex items-center justify-between gap-4">
+                <div>
+                  <Label htmlFor={`pref-${row.pushKey}`} className="text-sm font-medium">
+                    {row.title}
+                  </Label>
+                  <p className="text-sm text-muted-foreground">{row.description}</p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="flex flex-col items-center gap-1">
+                    <Switch
+                      id={`pref-${row.pushKey}`}
+                      checked={prefs[row.pushKey]}
+                      disabled={mutation.isPending}
+                      onCheckedChange={(v) => mutation.mutate({ ...prefs, [row.pushKey]: v })}
+                    />
+                    <span className="text-xs text-muted-foreground">Push</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <Switch
+                      id={`pref-${row.emailKey}`}
+                      checked={prefs[row.emailKey]}
+                      disabled={mutation.isPending}
+                      onCheckedChange={(v) => mutation.mutate({ ...prefs, [row.emailKey]: v })}
+                    />
+                    <span className="text-xs text-muted-foreground">E-post</span>
+                  </div>
+                </div>
               </div>
-              <Switch
-                id="pref-messages"
-                checked={prefs.web_push_messages}
-                disabled={mutation.isPending}
-                onCheckedChange={(v) =>
-                  mutation.mutate({
-                    web_push_messages: v,
-                    web_push_saved_searches: prefs.web_push_saved_searches,
-                    web_push_price_drops: prefs.web_push_price_drops,
-                    web_push_sold: prefs.web_push_sold,
-                  })
-                }
-              />
-            </div>
-
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <Label htmlFor="pref-searches" className="text-sm font-medium">
-                  Treff i lagrede søk
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  Varsel når en ny annonse matcher et av søkene dine.
-                </p>
-              </div>
-              <Switch
-                id="pref-searches"
-                checked={prefs.web_push_saved_searches}
-                disabled={mutation.isPending}
-                onCheckedChange={(v) =>
-                  mutation.mutate({
-                    web_push_messages: prefs.web_push_messages,
-                    web_push_saved_searches: v,
-                    web_push_price_drops: prefs.web_push_price_drops,
-                    web_push_sold: prefs.web_push_sold,
-                  })
-                }
-              />
-            </div>
-
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <Label htmlFor="pref-price-drops" className="text-sm font-medium">
-                  Prisfall på favoritter
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  Varsel når en favoritt-annonse blir satt ned med mer enn 5 %.
-                </p>
-              </div>
-              <Switch
-                id="pref-price-drops"
-                checked={prefs.web_push_price_drops}
-                disabled={mutation.isPending}
-                onCheckedChange={(v) =>
-                  mutation.mutate({
-                    web_push_messages: prefs.web_push_messages,
-                    web_push_saved_searches: prefs.web_push_saved_searches,
-                    web_push_price_drops: v,
-                    web_push_sold: prefs.web_push_sold,
-                  })
-                }
-              />
-            </div>
-
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <Label htmlFor="pref-sold" className="text-sm font-medium">
-                  Favoritt blir solgt
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  Varsel når en favoritt-annonse blir markert som solgt.
-                </p>
-              </div>
-              <Switch
-                id="pref-sold"
-                checked={prefs.web_push_sold}
-                disabled={mutation.isPending}
-                onCheckedChange={(v) =>
-                  mutation.mutate({
-                    web_push_messages: prefs.web_push_messages,
-                    web_push_saved_searches: prefs.web_push_saved_searches,
-                    web_push_price_drops: prefs.web_push_price_drops,
-                    web_push_sold: v,
-                  })
-                }
-              />
-            </div>
+            ))}
           </div>
         )}
       </div>

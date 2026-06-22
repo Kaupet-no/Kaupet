@@ -50,6 +50,7 @@ export function NotificationsSection() {
       web_push_messages: boolean;
       web_push_saved_searches: boolean;
       web_push_price_drops: boolean;
+      web_push_sold: boolean;
     }) => {
       await updatePrefs({ data: values });
     },
@@ -157,6 +158,7 @@ export function NotificationsSection() {
                     web_push_messages: v,
                     web_push_saved_searches: prefs.web_push_saved_searches,
                     web_push_price_drops: prefs.web_push_price_drops,
+                    web_push_sold: prefs.web_push_sold,
                   })
                 }
               />
@@ -180,6 +182,7 @@ export function NotificationsSection() {
                     web_push_messages: prefs.web_push_messages,
                     web_push_saved_searches: v,
                     web_push_price_drops: prefs.web_push_price_drops,
+                    web_push_sold: prefs.web_push_sold,
                   })
                 }
               />
@@ -203,6 +206,31 @@ export function NotificationsSection() {
                     web_push_messages: prefs.web_push_messages,
                     web_push_saved_searches: prefs.web_push_saved_searches,
                     web_push_price_drops: v,
+                    web_push_sold: prefs.web_push_sold,
+                  })
+                }
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label htmlFor="pref-sold" className="text-sm font-medium">
+                  Favoritt blir solgt
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Varsel når en favoritt-annonse blir markert som solgt.
+                </p>
+              </div>
+              <Switch
+                id="pref-sold"
+                checked={prefs.web_push_sold}
+                disabled={mutation.isPending}
+                onCheckedChange={(v) =>
+                  mutation.mutate({
+                    web_push_messages: prefs.web_push_messages,
+                    web_push_saved_searches: prefs.web_push_saved_searches,
+                    web_push_price_drops: prefs.web_push_price_drops,
+                    web_push_sold: v,
                   })
                 }
               />

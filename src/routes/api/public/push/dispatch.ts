@@ -31,6 +31,10 @@ const PayloadSchema = z.discriminatedUnion("type", [
     type: z.literal("price_drop"),
     price_drop_id: z.string().uuid(),
   }),
+  z.object({
+    type: z.literal("sold"),
+    sold_notification_id: z.string().uuid(),
+  }),
 ]);
 
 function formatKr(n: number) {
@@ -118,7 +122,7 @@ export const Route = createFileRoute("/api/public/push/dispatch")({
           body = listing?.title ?? "Ny annonse matcher søket ditt";
           url = `/annonse/${notif.listing_id}`;
           tag = `ss-${notif.saved_search_id}-${notif.listing_id}`;
-        } else {
+        } else if (payload.type === "price_drop") {
           const { data: drop } = await supabaseAdmin
             .from("favorite_price_drops")
             .select("user_id, listing_id, old_price_nok, new_price_nok, drop_pct")
@@ -138,6 +142,25 @@ export const Route = createFileRoute("/api/public/push/dispatch")({
           body = `Ned ${pct}% · ${formatKr(drop.old_price_nok)} → ${formatKr(drop.new_price_nok)}`;
           url = `/annonse/${drop.listing_id}`;
           tag = `price-drop-${drop.listing_id}`;
+        } else {
+          const { data: sold } = await supabaseAdmin
+            .from("favorite_sold_notifications")
+            .select("user_id, listing_id")
+            .eq("id", payload.sold_notification_id)
+            .maybeSingle();
+          if (!sold) return new Response(null, { status: 204 });
+          userId = sold.user_id;
+
+          const { data: listing } = await supabaseAdmin
+            .from("listings")
+            .select("title")
+            .eq("id", sold.listing_id)
+            .maybeSingle();
+
+          title = "Annonse solgt";
+          body = `${listing?.title ?? "Favoritten din"} er ikke lenger tilgjengelig`;
+          url = `/annonse/${sold.listing_id}`;
+          tag = `sold-${sold.listing_id}`;
         }
 
         if (!userId) return new Response(null, { status: 204 });
@@ -145,12 +168,13 @@ export const Route = createFileRoute("/api/public/push/dispatch")({
         // Check per-type preference
         const { data: prefs } = await supabaseAdmin
           .from("notification_preferences")
-          .select("web_push_messages, web_push_saved_searches, web_push_price_drops")
+          .select("web_push_messages, web_push_saved_searches, web_push_price_drops, web_push_sold")
           .eq("user_id", userId)
           .maybeSingle();
         const messagesEnabled = prefs?.web_push_messages ?? true;
         const savedSearchEnabled = prefs?.web_push_saved_searches ?? true;
         const priceDropEnabled = prefs?.web_push_price_drops ?? true;
+        const soldEnabled = prefs?.web_push_sold ?? true;
         if (payload.type === "message" && !messagesEnabled) {
           return new Response(null, { status: 204 });
         }
@@ -158,6 +182,9 @@ export const Route = createFileRoute("/api/public/push/dispatch")({
           return new Response(null, { status: 204 });
         }
         if (payload.type === "price_drop" && !priceDropEnabled) {
+          return new Response(null, { status: 204 });
+        }
+        if (payload.type === "sold" && !soldEnabled) {
           return new Response(null, { status: 204 });
         }
 

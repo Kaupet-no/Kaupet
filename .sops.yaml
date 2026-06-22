@@ -13,6 +13,7 @@
 keys:
   - &andreas-laptop1 age109lmrhdpc5wz2m6p26eyhq28kf2jxsfd2xv3ykvufc7jk534pfksg89gqf
   - &andreas-laptop2 age1ga96k068k044hnpd4pyjxq7g0eq43svfx09ml65t9z82sjghw9zsmdrhkl
+  - &andreas-laptop3 age13g06p02navcg4hadagp0pd4a0msc2fuwur70mnzetvfj58ajjc9sl6unc8
   # - &CI age1...   # legg til CI-nøkkelen her når GitHub Actions skal dekryptere
 
 creation_rules:
@@ -23,4 +24,5 @@ creation_rules:
       - age:
           - *andreas-laptop1
           - *andreas-laptop2
+          - *andreas-laptop3
           # - *CI

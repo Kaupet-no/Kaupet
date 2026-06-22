@@ -34,6 +34,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatErrorMessage } from "@/lib/errors";
 import { CONDITIONS } from "@/lib/constants";
+import { suggestCategoryForTitle } from "@/lib/category-suggestion.functions";
 
 const listingSchema = z
   .object({
@@ -177,6 +178,42 @@ function NewListingPage() {
     return () => window.clearTimeout(t);
   }, [coords, setValue]);
 
+  // Suggest a category from the title, learned from how other users have
+  // categorized similar listings.
+  const [categoryTouchedManually, setCategoryTouchedManually] = useState(false);
+  const [categorySuggestion, setCategorySuggestion] = useState<{
+    category_id: string;
+    parent_id: string | null;
+    name_nb: string;
+    parent_name_nb: string | null;
+  } | null>(null);
+  const [suggestionDismissed, setSuggestionDismissed] = useState(false);
+
+  useEffect(() => {
+    if (categoryTouchedManually || suggestionDismissed) return;
+    const t = (title ?? "").trim();
+    if (t.length < 5) {
+      setCategorySuggestion(null);
+      return;
+    }
+    const timer = window.setTimeout(async () => {
+      try {
+        const result = await suggestCategoryForTitle({ data: { title: t } });
+        setCategorySuggestion(result.suggestion);
+      } catch {
+        setCategorySuggestion(null);
+      }
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [title, categoryTouchedManually, suggestionDismissed]);
+
+  function applyCategorySuggestion() {
+    if (!categorySuggestion) return;
+    setSelectedParentId(categorySuggestion.parent_id ?? categorySuggestion.category_id);
+    setValue("category_id", categorySuggestion.category_id, { shouldValidate: true });
+    setCategorySuggestion(null);
+  }
+
   const mutation = useMutation({
     mutationFn: async (values: ListingForm) => {
       const parsed = values;
@@ -318,9 +355,40 @@ function NewListingPage() {
         <section className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label>Kategori</Label>
+            {categorySuggestion && !categoryTouchedManually && (
+              <div className="flex items-center gap-2 rounded-md border border-dashed bg-muted/40 px-3 py-2 text-sm">
+                <span>
+                  Forslag:{" "}
+                  {categorySuggestion.parent_name_nb
+                    ? `${categorySuggestion.parent_name_nb} › ${categorySuggestion.name_nb}`
+                    : categorySuggestion.name_nb}{" "}
+                  — bruk denne?
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={applyCategorySuggestion}
+                >
+                  Bruk
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setSuggestionDismissed(true);
+                    setCategorySuggestion(null);
+                  }}
+                >
+                  ✕
+                </Button>
+              </div>
+            )}
             <Select
               value={selectedParentId}
               onValueChange={(v) => {
+                setCategoryTouchedManually(true);
                 setSelectedParentId(v);
                 // If parent has no subcategories, use parent as final category
                 const hasSubs = (categories ?? []).some((c) => c.parent_id === v);
@@ -348,7 +416,10 @@ function NewListingPage() {
             {selectedParentId && subcategories.length > 0 && (
               <Select
                 value={categoryId}
-                onValueChange={(v) => setValue("category_id", v, { shouldValidate: true })}
+                onValueChange={(v) => {
+                  setCategoryTouchedManually(true);
+                  setValue("category_id", v, { shouldValidate: true });
+                }}
               >
                 <SelectTrigger
                   aria-invalid={!!errors.category_id}

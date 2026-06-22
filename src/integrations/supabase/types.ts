@@ -431,11 +431,42 @@ export type Database = {
         }
         Relationships: []
       }
+      listing_category_word_stats: {
+        Row: {
+          category_id: string
+          lexeme: string
+          listing_count: number
+          updated_at: string
+        }
+        Insert: {
+          category_id: string
+          lexeme: string
+          listing_count?: number
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string
+          lexeme?: string
+          listing_count?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_category_word_stats_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       listings: {
         Row: {
           category_id: string | null
           city: string | null
           condition: Database["public"]["Enums"]["listing_condition"]
+          counted_category_id: string | null
+          counted_lexemes: string[] | null
           created_at: string
           description: string
           display_lat: number | null
@@ -460,6 +491,8 @@ export type Database = {
           category_id?: string | null
           city?: string | null
           condition?: Database["public"]["Enums"]["listing_condition"]
+          counted_category_id?: string | null
+          counted_lexemes?: string[] | null
           created_at?: string
           description?: string
           display_lat?: number | null
@@ -484,6 +517,8 @@ export type Database = {
           category_id?: string | null
           city?: string | null
           condition?: Database["public"]["Enums"]["listing_condition"]
+          counted_category_id?: string | null
+          counted_lexemes?: string[] | null
           created_at?: string
           description?: string
           display_lat?: number | null
@@ -1223,6 +1258,17 @@ export type Database = {
         Returns: {
           saved_search_id: string
           unread_count: number
+        }[]
+      }
+      suggest_category_for_title: {
+        Args: { _title: string }
+        Returns: {
+          category_id: string
+          name_nb: string
+          parent_id: string | null
+          parent_name_nb: string | null
+          slug: string
+          votes: number
         }[]
       }
       user_review_summary: {

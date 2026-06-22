@@ -7,6 +7,12 @@ vi.mock("web-push", () => ({
   default: { setVapidDetails, sendNotification },
 }));
 
+const sendNotificationEmail = vi.fn().mockResolvedValue(undefined);
+
+vi.mock("@/lib/email.server", () => ({
+  sendNotificationEmail: (...args: unknown[]) => sendNotificationEmail(...args),
+}));
+
 type Row = Record<string, unknown> | null;
 
 function buildAdmin(opts: {
@@ -20,6 +26,7 @@ function buildAdmin(opts: {
   sold?: Row;
   prefs?: Row;
   subs?: Row[];
+  userEmail?: string | null;
 }) {
   const deletedSubIds: string[] = [];
   const updatedSubIds: string[] = [];
@@ -67,10 +74,24 @@ function buildAdmin(opts: {
     }
   };
 
-  return { from, deletedSubIds, updatedSubIds };
+  return {
+    from,
+    deletedSubIds,
+    updatedSubIds,
+    auth: {
+      admin: {
+        getUserById: async (_id: string) => ({
+          data: { user: opts.userEmail ? { email: opts.userEmail } : null },
+        }),
+      },
+    },
+  };
 }
 
-const supabaseAdminMock: { from: (name: string) => unknown } = {
+const supabaseAdminMock: {
+  from: (name: string) => unknown;
+  auth?: { admin: { getUserById: (id: string) => Promise<unknown> } };
+} = {
   from: () => {
     throw new Error("supabaseAdminMock.from not configured for this test");
   },
@@ -80,8 +101,9 @@ vi.mock("@/integrations/supabase/client.server", () => ({
   supabaseAdmin: supabaseAdminMock,
 }));
 
-function setAdmin(admin: { from: (name: string) => unknown }) {
+function setAdmin(admin: ReturnType<typeof buildAdmin>) {
   supabaseAdminMock.from = admin.from;
+  supabaseAdminMock.auth = admin.auth;
 }
 
 async function postPayload(body: unknown, secret = "test-secret") {
@@ -101,6 +123,7 @@ beforeEach(() => {
   vi.resetModules();
   sendNotification.mockClear().mockResolvedValue(undefined);
   setVapidDetails.mockClear();
+  sendNotificationEmail.mockClear().mockResolvedValue(undefined);
   process.env.PUSH_DISPATCH_SECRET = "test-secret";
   process.env.VAPID_PRIVATE_KEY = "test-private-key";
 });
@@ -309,5 +332,68 @@ describe("push dispatch endpoint", () => {
 
     expect(res.status).toBe(200);
     expect(admin.deletedSubIds).toEqual(["sub-1"]);
+  });
+
+  it("sends an email when the user enabled email notifications for sold listings", async () => {
+    setAdmin(
+      buildAdmin({
+        sold: { user_id: "buyer-1", listing_id: "listing-1" },
+        listing: { title: "iPhone 15 Pro" },
+        prefs: { web_push_sold: false, email_sold: true },
+        userEmail: "buyer@example.com",
+      }),
+    );
+
+    const res = await postPayload({
+      type: "sold",
+      sold_notification_id: "44444444-4444-4444-4444-444444444444",
+    });
+
+    expect(res.status).toBe(200);
+    expect(sendNotification).not.toHaveBeenCalled();
+    expect(sendNotificationEmail).toHaveBeenCalledTimes(1);
+    expect(sendNotificationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "buyer@example.com", url: "/annonse/listing-1" }),
+    );
+  });
+
+  it("sends both push and email when both are enabled", async () => {
+    setAdmin(
+      buildAdmin({
+        sold: { user_id: "buyer-1", listing_id: "listing-1" },
+        listing: { title: "iPhone 15 Pro" },
+        prefs: { web_push_sold: true, email_sold: true },
+        subs: [SUB],
+        userEmail: "buyer@example.com",
+      }),
+    );
+
+    const res = await postPayload({
+      type: "sold",
+      sold_notification_id: "44444444-4444-4444-4444-444444444444",
+    });
+
+    expect(res.status).toBe(200);
+    expect(sendNotification).toHaveBeenCalledTimes(1);
+    expect(sendNotificationEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips email when the user has no email on file", async () => {
+    setAdmin(
+      buildAdmin({
+        sold: { user_id: "buyer-1", listing_id: "listing-1" },
+        listing: { title: "iPhone 15 Pro" },
+        prefs: { web_push_sold: false, email_sold: true },
+        userEmail: null,
+      }),
+    );
+
+    const res = await postPayload({
+      type: "sold",
+      sold_notification_id: "44444444-4444-4444-4444-444444444444",
+    });
+
+    expect(res.status).toBe(200);
+    expect(sendNotificationEmail).not.toHaveBeenCalled();
   });
 });

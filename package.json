@@ -96,6 +96,7 @@
     "react-leaflet": "^5.0.0",
     "react-resizable-panels": "^4.11.2",
     "recharts": "^2.15.4",
+    "resend": "^6.14.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.3.1",

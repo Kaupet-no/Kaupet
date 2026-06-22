@@ -3,9 +3,13 @@
 [![Lisens: AGPL-3.0](https://img.shields.io/badge/lisens-AGPL--3.0-blue.svg)](LICENSE)
 [![CI](https://github.com/Kaupet-no/Kaupet/actions/workflows/ci.yml/badge.svg)](https://github.com/Kaupet-no/Kaupet/actions/workflows/ci.yml)
 
+Kaupet.no en markedsplass for kjøp og salg av brukte ting, bygget på åpen og fri kode.
+
 ![Kaupet.no — søkefeltet på forsiden](docs/images/hero-demo.gif)
 
-Kaupet.no en markedsplass for kjøp og salg av brukte ting, bygget på åpen og fri kode. Dette repoet består av den faktiske kildekoden bak nettsiden, og du er velkommen til å laste ned, modifisere og distribuere det som del av en egen løsning om du ønsker det. Det eneste kravet er at du respekterer vilkårene i lisensavtalen [GNU Affero General Public License v3.0](LICENSE), som betyr at all kode, også kode du selv modifiserer eller legger til, skal tilgjengeliggjøres åpent med samme betingelser.
+Dette repoet består av den faktiske kildekoden bak nettsiden, og du er velkommen til å laste ned, modifisere og distribuere det som del av en egen løsning om du ønsker det.
+
+Det eneste kravet er at du respekterer vilkårene i lisensavtalen [GNU Affero General Public License v3.0](LICENSE), som betyr at all kode, også kode du selv modifiserer eller legger til, skal tilgjengeliggjøres åpent med samme betingelser.
 
 Våre viktigste utviklingsprinsipper:
 

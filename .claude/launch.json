@@ -5,7 +5,7 @@
       "name": "kaupet-dev",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
-      "port": 8082
+      "port": 8080
     }
   ]
 }

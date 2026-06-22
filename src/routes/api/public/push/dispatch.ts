@@ -111,11 +111,12 @@ async function dispatchPush(params: {
 async function dispatchEmail(params: {
   supabaseAdmin: SupabaseAdmin;
   userId: string;
+  type: z.infer<typeof PayloadSchema>["type"];
   title: string;
   body: string;
   url: string;
 }) {
-  const { supabaseAdmin, userId, title, body, url } = params;
+  const { supabaseAdmin, userId, type, title, body, url } = params;
 
   const { data: user } = await supabaseAdmin.auth.admin.getUserById(userId);
   const to = user?.user?.email;
@@ -123,7 +124,7 @@ async function dispatchEmail(params: {
 
   const { sendNotificationEmail } = await import("@/lib/email.server");
   try {
-    await sendNotificationEmail({ to, subject: title, body, url });
+    await sendNotificationEmail({ to, type, subject: title, body, url });
   } catch (err) {
     console.error("Email dispatch error", err);
   }
@@ -285,7 +286,9 @@ export const Route = createFileRoute("/api/public/push/dispatch")({
         }
 
         if (emailEnabled) {
-          tasks.push(dispatchEmail({ supabaseAdmin, userId, title, body, url }));
+          tasks.push(
+            dispatchEmail({ supabaseAdmin, userId, type: payload.type, title, body, url }),
+          );
         }
 
         await Promise.allSettled(tasks);

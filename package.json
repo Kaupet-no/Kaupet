@@ -23,6 +23,7 @@
     "secrets:edit:cloudflare": "sops secrets/cloudflare.env",
     "secrets:edit:migration": "sops secrets/migration.env",
     "secrets:decrypt": "sops --decrypt secrets/dev.env > .env",
+    "env:local": "node scripts/local-env.mjs",
     "secrets:decrypt:staging": "sops --decrypt secrets/staging.env > .env.staging.local",
     "secrets:decrypt:cloudflare": "sops --decrypt secrets/cloudflare.env > .env.cloudflare.local",
     "secrets:decrypt:migration": "sops --decrypt secrets/migration.env > .env.migration.local",

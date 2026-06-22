@@ -29,7 +29,7 @@ bun install
 bun dev
 ```
 
-Appen kjører deretter på `http://localhost:3000`.
+Appen kjører deretter på `http://localhost:8080`.
 
 ### Miljøvariabler
 

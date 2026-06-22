@@ -43,9 +43,9 @@ const exampleEnv = parseDotenv(readFileSync(path.join(root, ".env.example"), "ut
 
 let statusOutput;
 try {
-  statusOutput = run("npx supabase status -o env");
+  statusOutput = run("bunx supabase status -o env");
 } catch {
-  console.error("Fant ikke en kjørende lokal Supabase-stack. Kjør `npx supabase start` først.");
+  console.error("Fant ikke en kjørende lokal Supabase-stack. Kjør `bunx supabase start` først.");
   process.exit(1);
 }
 const local = parseDotenv(statusOutput);

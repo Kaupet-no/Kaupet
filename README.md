@@ -38,14 +38,14 @@ Backenden (database, auth, filer) leveres av Supabase. Du trenger derimot ikke t
 Krever [Docker](https://www.docker.com) og [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started):
 
 ```bash
-npx supabase start   # starter hele Supabase-stacken lokalt (Postgres, Auth, Storage, Studio m.m.)
+bunx supabase start   # starter hele Supabase-stacken lokalt (Postgres, Auth, Storage, Studio m.m.)
 bun run env:local     # genererer .env med lokale Supabase-nøkler + tomme placeholders for resten
 bun dev
 ```
 
 `supabase start` drar opp en komplett, isolert Docker Compose-stack og kjører migrasjonene i [supabase/migrations](supabase/migrations) automatisk. Nøklene som settes i `.env` er Supabase sine offentlig kjente lokale dev-defaults. Funksjonalitet som er avhengig av tredjeparter (Vipps, Resend, push-varsler) vil ikke virke før du eventuelt fyller inn egne nøkler manuelt i `.env`.
 
-Stopp stacken med `npx supabase stop` når du er ferdig. Supabase Studio (lokalt admin-UI) er tilgjengelig på `http://localhost:54323`.
+Stopp stacken med `bunx supabase stop` når du er ferdig. Supabase Studio (lokalt admin-UI) er tilgjengelig på `http://localhost:54323`.
 
 #### Alternativ: kjør mot et eksternt Supabase-prosjekt
 

@@ -66,6 +66,7 @@ export async function subscribe(): Promise<void> {
   const json = subscription.toJSON();
   await savePushSubscription({
     data: {
+      platform: "web",
       endpoint: subscription.endpoint,
       p256dh: json.keys?.p256dh ?? "",
       auth: json.keys?.auth ?? "",

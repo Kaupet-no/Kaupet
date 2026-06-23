@@ -3,47 +3,72 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const SaveSchema = z.object({
-  endpoint: z.string().url().min(1).max(2048),
-  p256dh: z.string().min(1).max(255),
-  auth: z.string().min(1).max(255),
-  user_agent: z.string().max(255).optional().nullable(),
-});
+const SaveSchema = z.discriminatedUnion("platform", [
+  z.object({
+    platform: z.literal("web"),
+    endpoint: z.string().url().min(1).max(2048),
+    p256dh: z.string().min(1).max(255),
+    auth: z.string().min(1).max(255),
+    user_agent: z.string().max(255).optional().nullable(),
+  }),
+  z.object({
+    platform: z.literal("android"),
+    fcm_token: z.string().min(1).max(255),
+    user_agent: z.string().max(255).optional().nullable(),
+  }),
+]);
 
 export const savePushSubscription = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => SaveSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { error } = await supabase.from("push_subscriptions").upsert(
-      {
-        user_id: userId,
-        endpoint: data.endpoint,
-        p256dh: data.p256dh,
-        auth: data.auth,
-        user_agent: data.user_agent ?? null,
-        last_used_at: new Date().toISOString(),
-      },
-      { onConflict: "endpoint" },
-    );
-    if (error) throw new Error(error.message);
+    if (data.platform === "web") {
+      const { error } = await supabase.from("push_subscriptions").upsert(
+        {
+          user_id: userId,
+          platform: "web",
+          endpoint: data.endpoint,
+          p256dh: data.p256dh,
+          auth: data.auth,
+          user_agent: data.user_agent ?? null,
+          last_used_at: new Date().toISOString(),
+        },
+        { onConflict: "endpoint" },
+      );
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await supabase.from("push_subscriptions").upsert(
+        {
+          user_id: userId,
+          platform: "android",
+          fcm_token: data.fcm_token,
+          user_agent: data.user_agent ?? null,
+          last_used_at: new Date().toISOString(),
+        },
+        { onConflict: "fcm_token" },
+      );
+      if (error) throw new Error(error.message);
+    }
     return { ok: true };
   });
 
-const DeleteSchema = z.object({
-  endpoint: z.string().url().min(1).max(2048),
-});
+const DeleteSchema = z.union([
+  z.object({ endpoint: z.string().url().min(1).max(2048) }),
+  z.object({ fcm_token: z.string().min(1).max(255) }),
+]);
 
 export const deletePushSubscription = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => DeleteSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { error } = await supabase
-      .from("push_subscriptions")
-      .delete()
-      .eq("user_id", userId)
-      .eq("endpoint", data.endpoint);
+    let query = supabase.from("push_subscriptions").delete().eq("user_id", userId);
+    query =
+      "endpoint" in data
+        ? query.eq("endpoint", data.endpoint)
+        : query.eq("fcm_token", data.fcm_token);
+    const { error } = await query;
     if (error) throw new Error(error.message);
     return { ok: true };
   });

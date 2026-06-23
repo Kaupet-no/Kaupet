@@ -14,17 +14,36 @@ import {
   subscribe as subscribePush,
   unsubscribeThisDevice,
 } from "@/lib/push";
+import {
+  getCurrentNativeToken,
+  getNativePermissionState,
+  nativePushSupported,
+  subscribeNative,
+  unsubscribeNative,
+} from "@/lib/native-push";
 import { getNotificationPreferences, updateNotificationPreferences } from "@/lib/push.functions";
 import { formatErrorMessage } from "@/lib/errors";
 
 export function NotificationsSection() {
   const queryClient = useQueryClient();
-  const supported = pushSupported();
-  const [permission, setPermission] = useState<NotificationPermission | "unsupported">(() =>
-    getPermissionState(),
+  const isNativeAndroid = nativePushSupported();
+  const supported = isNativeAndroid || pushSupported();
+  const [permission, setPermission] = useState<NotificationPermission | "unsupported">(
+    "unsupported",
   );
   const [endpoint, setEndpoint] = useState<string | null>(null);
   const [busy, setBusy] = useState<null | "subscribe" | "unsubscribe">(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const state = isNativeAndroid ? await getNativePermissionState() : getPermissionState();
+      if (!cancelled) setPermission(state);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isNativeAndroid]);
 
   const getPrefs = useServerFn(getNotificationPreferences);
   const updatePrefs = useServerFn(updateNotificationPreferences);
@@ -37,13 +56,13 @@ export function NotificationsSection() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const ep = await getCurrentEndpoint();
+      const ep = isNativeAndroid ? await getCurrentNativeToken() : await getCurrentEndpoint();
       if (!cancelled) setEndpoint(ep);
     })();
     return () => {
       cancelled = true;
     };
-  }, [permission]);
+  }, [permission, isNativeAndroid]);
 
   const mutation = useMutation({
     mutationFn: async (values: {
@@ -68,10 +87,15 @@ export function NotificationsSection() {
   async function handleSubscribe() {
     setBusy("subscribe");
     try {
-      await subscribePush();
-      setPermission(getPermissionState());
-      const ep = await getCurrentEndpoint();
-      setEndpoint(ep);
+      if (isNativeAndroid) {
+        await subscribeNative();
+        setPermission(await getNativePermissionState());
+        setEndpoint(await getCurrentNativeToken());
+      } else {
+        await subscribePush();
+        setPermission(getPermissionState());
+        setEndpoint(await getCurrentEndpoint());
+      }
       toast.success("Push-varsler er aktivert på denne enheten");
     } catch (e) {
       toast.error(formatErrorMessage(e, "Klarte ikke å aktivere varsler"));
@@ -83,7 +107,11 @@ export function NotificationsSection() {
   async function handleUnsubscribe() {
     setBusy("unsubscribe");
     try {
-      await unsubscribeThisDevice();
+      if (isNativeAndroid) {
+        await unsubscribeNative();
+      } else {
+        await unsubscribeThisDevice();
+      }
       setEndpoint(null);
       toast.success("Denne enheten mottar ikke lenger push-varsler");
     } catch (e) {
@@ -99,10 +127,11 @@ export function NotificationsSection() {
         <div className="flex items-start gap-3">
           <Bell className="mt-0.5 size-5 text-primary" />
           <div className="flex-1">
-            <h2 className="text-lg font-medium">Push-varsler i nettleseren</h2>
+            <h2 className="text-lg font-medium">Push-varsler</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Få varsler om nye meldinger og treff i lagrede søk selv når Kaupet.no ikke er åpen. På
-              iPhone må du først legge til Kaupet.no på hjem-skjermen.
+              {isNativeAndroid
+                ? "Få varsler om nye meldinger og treff i lagrede søk selv når appen ikke er åpen."
+                : "Få varsler om nye meldinger og treff i lagrede søk selv når Kaupet.no ikke er åpen. På iPhone må du først legge til Kaupet.no på hjem-skjermen."}
             </p>
 
             {!supported ? (
@@ -112,8 +141,9 @@ export function NotificationsSection() {
               </p>
             ) : permission === "denied" ? (
               <p className="mt-4 text-sm text-destructive">
-                Du har blokkert varsler for kaupet.no. Endre tillatelsen i nettleserinnstillingene
-                for å aktivere på nytt.
+                {isNativeAndroid
+                  ? "Du har blokkert varsler for Kaupet. Endre tillatelsen i Android-innstillingene for å aktivere på nytt."
+                  : "Du har blokkert varsler for kaupet.no. Endre tillatelsen i nettleserinnstillingene for å aktivere på nytt."}
               </p>
             ) : (
               <div className="mt-4 flex flex-wrap gap-2">

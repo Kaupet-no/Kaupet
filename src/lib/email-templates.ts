@@ -68,8 +68,8 @@ export function renderNotificationEmail(params: {
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;">
             <tr>
               <td style="padding-bottom:24px;" align="center">
-                <span style="font-family:Georgia,'Fraunces',serif; font-size:20px; font-weight:600; color:${COLOR.primary}; letter-spacing:-0.01em;">
-                  Kaupet.no
+                <span style="font-family:Georgia,'Fraunces',serif; font-size:20px; font-weight:600; letter-spacing:-0.01em;">
+                  <span style="color:${COLOR.primary};">Kaupet</span><span style="color:${COLOR.accent};">.</span><span style="color:${COLOR.muted};">no</span>
                 </span>
               </td>
             </tr>

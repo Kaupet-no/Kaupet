@@ -68,8 +68,11 @@ async function dispatchPush(params: {
   const webpush = webpushModule.default ?? webpushModule;
 
   const subject = process.env.VAPID_SUBJECT || "mailto:post@kaupet.no";
+  // Must match VAPID_PUBLIC_KEY in src/lib/push.ts — the client signs
+  // subscriptions against that key, so the server must sign with the
+  // matching private key or push services reject with InvalidSignature.
   const publicKey =
-    "BMRQX3t2gjuYxtGw6f9TNJdz41nQWWd4zyPSBYNAaMNiYsRi73VVBpU6wb0xJ2m1R7MT7De-HQxl-hWbTy5fJbA";
+    "BPFo1ygL7dxhxhtTCPbE6b4qYkP9webql5QNaJuCReVeko8mzNCVyFunhDwIV95v4lKjHttAFgjxTN1zvsVvJnc";
   const privateKey = process.env.VAPID_PRIVATE_KEY;
   if (!privateKey) {
     console.error("Missing VAPID configuration");

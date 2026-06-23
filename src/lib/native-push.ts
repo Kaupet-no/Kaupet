@@ -81,3 +81,28 @@ export async function initNativePushNavigation(navigate: (url: string) => void):
     if (typeof url === "string" && url) navigate(url);
   });
 }
+
+/**
+ * Android leverer ikke push-varsler i statuslinjen når appen er i
+ * forgrunnen — vis en toast i stedet så brukeren ser at noe skjedde.
+ * Call once at app startup on Android.
+ */
+export async function initNativePushForeground(navigate: (url: string) => void): Promise<void> {
+  if (!nativePushSupported()) return;
+  const { PushNotifications } = await import("@capacitor/push-notifications");
+  await PushNotifications.addListener("pushNotificationReceived", (notification) => {
+    void (async () => {
+      const { toast } = await import("sonner");
+      const url = notification.data?.url;
+      const title = notification.title ?? "Nytt varsel";
+      const body = notification.body;
+      toast(title, {
+        description: body,
+        action:
+          typeof url === "string" && url
+            ? { label: "Åpne", onClick: () => navigate(url) }
+            : undefined,
+      });
+    })();
+  });
+}

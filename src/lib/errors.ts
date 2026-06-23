@@ -206,6 +206,10 @@ function isPushDaemonError(err: AnyError): boolean {
   return typeof msg === "string" && /push (service|daemon)/i.test(msg);
 }
 
+function isOrionBrowser(): boolean {
+  return typeof navigator !== "undefined" && /OrionRT|Orion\//i.test(navigator.userAgent);
+}
+
 /**
  * Returnerer en norsk, brukervennlig feilmelding. Bruker `fallback` når
  * feilen ikke kan tolkes, eller når underliggende melding er ulesbar
@@ -219,6 +223,9 @@ export function formatErrorMessage(err: AnyError, fallback: string): string {
   }
 
   if (isPushDaemonError(err)) {
+    if (isOrionBrowser()) {
+      return "Orion har en kjent feil i push-varsler og kobler ikke til varslingstjenesten. Bruk en annen nettleser (f.eks. Safari, Chrome eller Firefox) for å motta push-varsler";
+    }
     return "Nettleseren fikk ikke kontakt med varslingstjenesten. Start nettleseren på nytt, sjekk varslingsinnstillingene i operativsystemet eller nettleseren, og prøv igjen";
   }
 

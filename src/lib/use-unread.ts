@@ -3,12 +3,13 @@ import { useEffect } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/use-auth";
-import { isUnread, useReadVersion } from "@/lib/unread";
+import { isUnread } from "@/lib/unread";
 
 type ConvSummary = {
   id: string;
   last_message_at: string;
   last_sender_id: string | null;
+  my_last_read_at: string | null;
 };
 
 /**
@@ -18,7 +19,6 @@ type ConvSummary = {
 export function useUnreadConversationsCount(): number {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const readVersion = useReadVersion();
 
   const { data, refetch } = useQuery({
     queryKey: ["unread-conversations", user?.id],
@@ -26,7 +26,7 @@ export function useUnreadConversationsCount(): number {
     queryFn: async (): Promise<ConvSummary[]> => {
       const { data: convs, error } = await supabase
         .from("conversations")
-        .select("id, last_message_at")
+        .select("id, last_message_at, buyer_id, seller_id, buyer_last_read_at, seller_last_read_at")
         .or(`buyer_id.eq.${user!.id},seller_id.eq.${user!.id}`);
       if (error) throw error;
       const ids = (convs ?? []).map((c) => c.id);
@@ -46,6 +46,7 @@ export function useUnreadConversationsCount(): number {
         id: c.id,
         last_message_at: c.last_message_at,
         last_sender_id: lastSender.get(c.id) ?? null,
+        my_last_read_at: c.buyer_id === user!.id ? c.buyer_last_read_at : c.seller_last_read_at,
       }));
     },
   });
@@ -81,9 +82,7 @@ export function useUnreadConversationsCount(): number {
     };
   }, [user, qc]);
 
-  // readVersion brukes for å re-evaluere isUnread når noe markeres som lest
-  void readVersion;
-
-  return (data ?? []).filter((c) => isUnread(c.id, c.last_message_at, c.last_sender_id, user?.id))
-    .length;
+  return (data ?? []).filter((c) =>
+    isUnread(c.last_message_at, c.last_sender_id, user?.id, c.my_last_read_at),
+  ).length;
 }

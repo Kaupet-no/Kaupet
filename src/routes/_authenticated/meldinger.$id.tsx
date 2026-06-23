@@ -9,7 +9,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/use-auth";
 import { signListingImageUrls } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
-import { markRead } from "@/lib/unread";
 import { Textarea } from "@/components/ui/textarea";
 import { BlockConversationMenu } from "@/components/block-conversation-menu";
 import { listMyBlocks, listBlocksAgainstMe } from "@/lib/blocks.functions";
@@ -73,7 +72,7 @@ function ConversationPage() {
       const { data, error } = await supabase
         .from("conversations")
         .select(
-          `id, buyer_id, seller_id, listing_id,
+          `id, buyer_id, seller_id, listing_id, buyer_last_read_at, seller_last_read_at,
            listing:listings(id, kaupet_code, title, price_nok, is_free, listing_images(storage_path, sort_order))`,
         )
         .eq("id", id)
@@ -128,6 +127,23 @@ function ConversationPage() {
     }
   }, [conv?.listing?.id, conv?.listing?.listing_images]);
 
+  // Markér samtalen som lest i databasen for innlogget bruker
+  const markReadMutation = useMutation({
+    mutationFn: async (readAt: string) => {
+      if (!conv || !user) return;
+      const update =
+        conv.buyer_id === user.id
+          ? { buyer_last_read_at: readAt }
+          : { seller_last_read_at: readAt };
+      const { error } = await supabase.from("conversations").update(update).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["unread-conversations"] });
+      queryClient.invalidateQueries({ queryKey: ["my-conversations"] });
+    },
+  });
+
   // Realtime
   useEffect(() => {
     const channel = supabase
@@ -148,24 +164,50 @@ function ConversationPage() {
             return [...prev, m];
           });
           // Markér som lest når brukeren er inne i samtalen
-          markRead(id, m.created_at);
+          markReadMutation.mutate(m.created_at);
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "conversations",
+          filter: `id=eq.${id}`,
+        },
+        (payload) => {
+          const updated = payload.new as {
+            buyer_last_read_at: string | null;
+            seller_last_read_at: string | null;
+          };
+          queryClient.setQueryData<typeof conv>(["conversation", id], (prev) =>
+            prev
+              ? {
+                  ...prev,
+                  buyer_last_read_at: updated.buyer_last_read_at,
+                  seller_last_read_at: updated.seller_last_read_at,
+                }
+              : prev,
+          );
         },
       )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [id, queryClient]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, queryClient, conv, user]);
 
   // Auto-scroll + markér som lest når meldinger lastes/oppdateres
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-    if (messages && messages.length > 0) {
-      markRead(id, messages[messages.length - 1].created_at);
+    if (messages && messages.length > 0 && conv && user) {
+      markReadMutation.mutate(messages[messages.length - 1].created_at);
     }
-  }, [messages, id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, id, conv, user]);
 
   const sendMutation = useMutation({
     mutationFn: async (text: string) => {
@@ -421,8 +463,15 @@ function ConversationPage() {
             Send den første meldingen for å starte samtalen.
           </p>
         ) : (
-          renderWithDayDividers(messages ?? [], user?.id ?? "", (messageId) =>
-            deleteMessageMutation.mutate(messageId),
+          renderWithDayDividers(
+            messages ?? [],
+            user?.id ?? "",
+            (messageId) => deleteMessageMutation.mutate(messageId),
+            conv && user
+              ? conv.buyer_id === user.id
+                ? conv.seller_last_read_at
+                : conv.buyer_last_read_at
+              : null,
           )
         )}
       </div>

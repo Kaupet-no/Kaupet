@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/use-auth";
 import { signListingImageUrls } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
-import { isUnread, useReadVersion } from "@/lib/unread";
+import { isUnread } from "@/lib/unread";
 import { usePushStatus } from "@/lib/use-push-status";
 import { formatErrorMessage } from "@/lib/errors";
 
@@ -28,6 +28,8 @@ type ConversationRow = {
   seller_id: string;
   listing_id: string;
   last_message_at: string;
+  buyer_last_read_at: string | null;
+  seller_last_read_at: string | null;
   listing: {
     id: string;
     title: string;
@@ -73,6 +75,8 @@ type RawConv = {
   seller_id: string;
   listing_id: string;
   last_message_at: string;
+  buyer_last_read_at: string | null;
+  seller_last_read_at: string | null;
   listing: RawListingRel | RawListingRel[] | null;
   buyer?: RawProfile | RawProfile[] | null;
   seller?: RawProfile | RawProfile[] | null;
@@ -90,7 +94,7 @@ function InboxPage() {
       const { data, error } = await supabase
         .from("conversations")
         .select(
-          `id, buyer_id, seller_id, listing_id, last_message_at,
+          `id, buyer_id, seller_id, listing_id, last_message_at, buyer_last_read_at, seller_last_read_at,
            listing:listings(id, title, price_nok, is_free, status, listing_images(storage_path, sort_order)),
            buyer:profiles!conversations_buyer_id_fkey(id, display_name, avatar_url, deleted_at),
            seller:profiles!conversations_seller_id_fkey(id, display_name, avatar_url, deleted_at)`,
@@ -102,7 +106,7 @@ function InboxPage() {
         const { data: convs, error: e2 } = await supabase
           .from("conversations")
           .select(
-            `id, buyer_id, seller_id, listing_id, last_message_at,
+            `id, buyer_id, seller_id, listing_id, last_message_at, buyer_last_read_at, seller_last_read_at,
              listing:listings(id, title, price_nok, is_free, status, listing_images(storage_path, sort_order))`,
           )
           .or(`buyer_id.eq.${user!.id},seller_id.eq.${user!.id}`)
@@ -149,17 +153,15 @@ function InboxPage() {
     }
   }, [conversations]);
 
-  const readVersion = useReadVersion();
-
   // Beregn uleste per samtale
   const unreadByConv = useMemo(() => {
-    void readVersion;
     const m = new Map<string, boolean>();
     for (const c of conversations ?? []) {
-      m.set(c.id, isUnread(c.id, c.last_message_at, c.last_message?.sender_id, user?.id));
+      const myLastReadAt = c.buyer_id === user?.id ? c.buyer_last_read_at : c.seller_last_read_at;
+      m.set(c.id, isUnread(c.last_message_at, c.last_message?.sender_id, user?.id, myLastReadAt));
     }
     return m;
-  }, [conversations, readVersion, user?.id]);
+  }, [conversations, user?.id]);
 
   // Grupper etter annonse
   const groups = useMemo(() => {

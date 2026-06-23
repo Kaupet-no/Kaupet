@@ -201,6 +201,11 @@ function isNetworkError(err: AnyError): boolean {
   return false;
 }
 
+function isPushDaemonError(err: AnyError): boolean {
+  const msg = (err as { message?: string })?.message;
+  return typeof msg === "string" && /push (service|daemon)/i.test(msg);
+}
+
 /**
  * Returnerer en norsk, brukervennlig feilmelding. Bruker `fallback` når
  * feilen ikke kan tolkes, eller når underliggende melding er ulesbar
@@ -211,6 +216,10 @@ export function formatErrorMessage(err: AnyError, fallback: string): string {
 
   if (isNetworkError(err)) {
     return "Ingen nettverksforbindelse. Prøv igjen";
+  }
+
+  if (isPushDaemonError(err)) {
+    return "Nettleseren fikk ikke kontakt med varslingstjenesten. Start nettleseren på nytt, sjekk varslingsinnstillingene i operativsystemet eller nettleseren, og prøv igjen";
   }
 
   if (isZodError(err)) {

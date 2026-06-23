@@ -75,7 +75,7 @@
         font-size: 15px;
         line-height: 1.5;
       }
-      button {
+      .retry-button {
         appearance: none;
         border: none;
         background: var(--primary);
@@ -89,13 +89,85 @@
         width: 100%;
         transition: opacity 0.15s ease;
       }
-      button:active {
+      .retry-button:active {
         opacity: 0.85;
       }
       .hint {
         margin-top: 16px;
         font-size: 13px;
         color: var(--muted);
+      }
+      body {
+        padding-bottom: max(24px, calc(6rem + env(safe-area-inset-bottom)));
+      }
+      .bottom-nav {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 50;
+        padding: 0 12px;
+        padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+        pointer-events: none;
+      }
+      .bottom-nav__bar {
+        pointer-events: auto;
+        margin: 0 auto;
+        max-width: 28rem;
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-around;
+        gap: 4px;
+        background: color-mix(in srgb, var(--surface) 95%, transparent);
+        border: 1px solid var(--border);
+        border-radius: 1.5rem;
+        padding: 12px;
+        box-shadow: 0 10px 30px -20px rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(8px);
+      }
+      .bottom-nav__item {
+        appearance: none;
+        border: none;
+        background: none;
+        font: inherit;
+        margin: 0;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        color: var(--muted);
+        cursor: pointer;
+      }
+      .bottom-nav__item:disabled {
+        cursor: default;
+      }
+      .bottom-nav__item--active {
+        color: var(--primary);
+      }
+      .bottom-nav__icon {
+        display: flex;
+        height: 2.75rem;
+        width: 2.75rem;
+        align-items: center;
+        justify-content: center;
+      }
+      .bottom-nav__label {
+        font-size: 11px;
+      }
+      .bottom-nav__fab {
+        margin-top: -1.75rem;
+        height: 4rem;
+        width: 4rem;
+        border-radius: 9999px;
+        background: var(--primary);
+        color: var(--primary-fg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 10px 20px -8px rgba(0, 0, 0, 0.5);
+        border: 4px solid var(--bg);
+        opacity: 0.5;
       }
     </style>
   </head>
@@ -104,10 +176,58 @@
       <img src="assets/logo.svg" alt="Kaupet" class="logo" />
       <h1>Kunne ikke koble til Kaupet</h1>
       <p>Vi når ikke kaupet.no akkurat nå. Sjekk internettforbindelsen din og prøv på nytt.</p>
-      <button type="button" onclick="window.location.replace('https://kaupet.no/')">
+      <button class="retry-button" type="button" onclick="window.location.replace('https://kaupet.no/')">
         Prøv på nytt
       </button>
       <p class="hint">Hvis problemet vedvarer, prøv igjen om noen minutter.</p>
     </main>
+
+    <!-- Static stand-in for the app's bottom navigation (AppBottomNav), shown
+         here too so the app shell feels consistent even when fully offline.
+         Navigation isn't functional without a connection, so every item
+         simply retries the connection like the button above. -->
+    <nav class="bottom-nav" aria-hidden="true">
+      <div class="bottom-nav__bar">
+        <button
+          type="button"
+          class="bottom-nav__item bottom-nav__item--active"
+          onclick="window.location.replace('https://kaupet.no/')"
+          aria-label="Hjem"
+        >
+          <span class="bottom-nav__icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7" /><path d="M5 10v10a1 1 0 0 0 1 1h3v-6h6v6h3a1 1 0 0 0 1-1V10" /></svg>
+          </span>
+          <span class="bottom-nav__label">Hjem</span>
+        </button>
+
+        <button type="button" class="bottom-nav__item" disabled aria-label="Varsler" style="opacity: 0.5">
+          <span class="bottom-nav__icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0" /><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" /></svg>
+          </span>
+          <span class="bottom-nav__label">Varsler</span>
+        </button>
+
+        <div class="bottom-nav__item" style="margin-top: 0">
+          <span class="bottom-nav__fab" aria-hidden="true">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
+          </span>
+          <span class="bottom-nav__label" style="opacity: 0.5">Selg</span>
+        </div>
+
+        <button type="button" class="bottom-nav__item" disabled aria-label="Meldinger" style="opacity: 0.5">
+          <span class="bottom-nav__icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" /></svg>
+          </span>
+          <span class="bottom-nav__label">Meldinger</span>
+        </button>
+
+        <button type="button" class="bottom-nav__item" disabled aria-label="Logg inn" style="opacity: 0.5">
+          <span class="bottom-nav__icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><path d="M10 17l5-5-5-5" /><path d="M15 12H3" /></svg>
+          </span>
+          <span class="bottom-nav__label">Logg inn</span>
+        </button>
+      </div>
+    </nav>
   </body>
 </html>

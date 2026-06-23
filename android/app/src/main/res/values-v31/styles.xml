@@ -3,8 +3,11 @@
 
     <!-- API 31+ reads the splash screen background from the framework-namespaced
          attribute directly, so the compat attribute in values/styles.xml
-         alone isn't enough on these versions. -->
+         alone isn't enough on these versions. This style fully replaces the
+         values/styles.xml version on API 31+, so windowBackground needs to be
+         repeated here too — see the comment there for why it's needed. -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:windowSplashScreenBackground">@color/splashBackground</item>
+        <item name="android:windowBackground">@color/splashBackground</item>
     </style>
 </resources>

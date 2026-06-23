@@ -7,6 +7,12 @@
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
+        <!-- AppCompat's default window background is white. With edge-to-edge
+             enforced on API 35+ (targetSdk 36), the WebView doesn't
+             necessarily paint under the status bar / gesture nav bar, so this
+             window background shows through as white stripes at the top and
+             bottom. Match the app's cream background instead. -->
+        <item name="android:windowBackground">@color/splashBackground</item>
     </style>
 
     <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
@@ -22,5 +28,11 @@
              icon centered on top of it (the OS-mandated pattern on Android
              12+, also used as fallback on older versions via core-splashscreen). -->
         <item name="windowSplashScreenBackground">@color/splashBackground</item>
+        <!-- MainActivity keeps this theme for its whole lifetime (no runtime
+             switch to AppTheme), so windowBackground needs to be set here too
+             — otherwise it falls back to white once the splash icon is gone,
+             showing as white stripes behind the status bar / gesture nav bar
+             in edge-to-edge mode. -->
+        <item name="android:windowBackground">@color/splashBackground</item>
     </style>
 </resources>

@@ -16,6 +16,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthProvider } from "@/lib/auth";
 import { initNativeOfflineWatcher } from "@/lib/native-offline";
+import { initNativePushNavigation } from "@/lib/native-push";
 import { setupNative } from "@/lib/native-setup";
 import { useIsNative } from "@/lib/use-is-native";
 import { AppBottomNav } from "@/components/app-bottom-nav";
@@ -230,8 +231,9 @@ function RootComponent() {
   useEffect(() => {
     const cleanup = initNativeOfflineWatcher();
     void setupNative();
+    void initNativePushNavigation((url) => router.navigate({ href: url }));
     return cleanup;
-  }, []);
+  }, [router]);
 
   const native = useIsNative();
 

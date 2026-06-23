@@ -34,9 +34,30 @@ en innebygd offline-side (`capacitor-shell/offline.html`).
 ## Ikke med i POC
 
 - Publisering i App Store / Google Play
-- Native push-varsler (krever FCM + APNs)
+- Native push-varsler på iOS (krever APNs + Apple Developer-tilgang)
 - Universal Links / App Links
 - Google OAuth-login i appen (bruk e-post + passord)
+
+## Native push-varsler (Android / FCM)
+
+Android-appen bruker `@capacitor/push-notifications` + Firebase Cloud
+Messaging, som et tillegg til det eksisterende web push-systemet (samme
+fire varslingstyper: meldinger, lagrede søk, prisfall, solgt). Token lagres i
+`public.push_subscriptions` (med `platform = 'android'`), og dispatch skjer
+fra `src/lib/fcm.server.ts` via `firebase-admin`.
+
+For at dette skal virke i en build trengs:
+
+1. Et Firebase-prosjekt koblet til app-IDen `no.kaupet.app`.
+2. `google-services.json` fra Firebase Console lagt i `android/app/`
+   (plukkes automatisk opp av `android/app/build.gradle` — ikke commit denne
+   filen, den er miljøspesifikk).
+3. En service account-nøkkel (Project Settings → Service Accounts →
+   Generate new private key) satt som `FCM_SERVICE_ACCOUNT_JSON` i server-
+   miljøet (se `.env.example`).
+
+Uten `google-services.json` bygger appen fortsatt fint, men Google
+Services-pluginet aktiveres ikke og native push vil ikke fungere på enheten.
 
 ---
 

@@ -57,10 +57,34 @@ async function dispatchPush(params: {
 
   const { data: subs } = await supabaseAdmin
     .from("push_subscriptions")
-    .select("id, endpoint, p256dh, auth")
+    .select("id, platform, endpoint, p256dh, auth, fcm_token")
     .eq("user_id", userId);
 
   if (!subs || subs.length === 0) return;
+
+  const webSubs = subs.filter(
+    (s): s is typeof s & { endpoint: string; p256dh: string; auth: string } =>
+      s.platform !== "android" && !!s.endpoint && !!s.p256dh && !!s.auth,
+  );
+  const androidSubs = subs.filter(
+    (s): s is typeof s & { fcm_token: string } => s.platform === "android" && !!s.fcm_token,
+  );
+
+  if (androidSubs.length > 0) {
+    const { sendFcmNotifications } = await import("@/lib/fcm.server");
+    await sendFcmNotifications({
+      tokens: androidSubs.map((s) => ({ id: s.id, fcm_token: s.fcm_token })),
+      title,
+      body,
+      url,
+      tag,
+      onInvalidToken: async (id) => {
+        await supabaseAdmin.from("push_subscriptions").delete().eq("id", id);
+      },
+    });
+  }
+
+  if (webSubs.length === 0) return;
 
   const webpushModule = (await import("web-push")) as unknown as {
     default?: typeof import("web-push");
@@ -83,7 +107,7 @@ async function dispatchPush(params: {
   const notificationPayload = JSON.stringify({ title, body, url, tag });
 
   await Promise.allSettled(
-    subs.map(async (s) => {
+    webSubs.map(async (s) => {
       try {
         await webpush.sendNotification(
           {

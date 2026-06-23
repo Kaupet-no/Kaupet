@@ -1,7 +1,15 @@
 import { useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, ChevronLeft, MapPin, Search as SearchIcon, X } from "lucide-react";
+import {
+  ArrowRight,
+  ChevronLeft,
+  Hash,
+  LayoutGrid,
+  MapPin,
+  Search as SearchIcon,
+  X,
+} from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
@@ -12,6 +20,8 @@ import { AnimatedSearchPlaceholder } from "@/components/animated-search-placehol
 import { useSavedLocation } from "@/lib/use-saved-location";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { SEARCH_SUGGESTIONS } from "@/lib/search-suggestions";
+import { useIsNative } from "@/lib/use-is-native";
+import { AppHeroLogo } from "@/components/app-hero-logo";
 
 type CategoryRow = {
   id: string;
@@ -93,7 +103,9 @@ export function AppLanding() {
     });
   };
 
+  const isNative = useIsNative();
   const [activeCategory, setActiveCategory] = useState<CategoryRow | null>(null);
+  const [categoriesSheetOpen, setCategoriesSheetOpen] = useState(false);
 
   const pickCategory = (cat: CategoryRow) => {
     const subs = childrenByParent.get(cat.id) ?? [];
@@ -116,10 +128,19 @@ export function AppLanding() {
   const hasLocation = location.lat != null && location.lng != null;
   const placeholderPaused = focused || q.length > 0;
 
+  const tileButtonClass =
+    "flex w-32 flex-col items-center gap-2 rounded-2xl border border-border bg-card px-3 py-4 text-center text-sm font-medium transition active:scale-[0.98]";
+  const tileIconClass =
+    "flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary";
+
   return (
     <div className="pb-24">
+      {isNative && <AppHeroLogo />}
+
       {/* Hero — sentrert søkefelt */}
-      <section className="flex min-h-[70vh] flex-col items-center justify-center px-5 pt-8">
+      <section
+        className={`flex flex-col items-center justify-center px-5 ${isNative ? "min-h-[68vh] pt-24" : "min-h-[70vh] pt-8"}`}
+      >
         <h1 className="mb-6 text-center font-display text-2xl tracking-tight">
           Hva leter du etter i dag?
         </h1>
@@ -221,135 +242,261 @@ export function AppLanding() {
             </Sheet>
           </div>
 
-          <div className="mt-3 flex justify-center">
-            <KaupetCodeDialog />
-          </div>
+          {!isNative && (
+            <div className="mt-3 flex justify-center">
+              <KaupetCodeDialog />
+            </div>
+          )}
         </form>
       </section>
 
-      {/* Kategorier */}
-      <section className="overflow-hidden pt-2 sm:px-5">
-        <div className="mb-3 flex items-center justify-between gap-3 px-5 sm:px-0">
-          <h2 className="font-display text-lg tracking-tight">
-            {activeCategory ? activeCategory.name_nb : "Kategorier"}
-          </h2>
-          {activeCategory && (
-            <button
-              type="button"
-              onClick={() => setActiveCategory(null)}
-              className="flex shrink-0 items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium transition hover:border-primary hover:text-primary"
-            >
-              <ChevronLeft className="size-3.5" />
-              Tilbake
-            </button>
-          )}
+      {/* Kaupet-kode + Alle kategorier — kun native */}
+      {isNative && (
+        <div className="mb-2 flex items-center justify-center gap-3 px-5">
+          <KaupetCodeDialog
+            trigger={
+              <button type="button" className={tileButtonClass}>
+                <span className={tileIconClass}>
+                  <Hash className="size-5" />
+                </span>
+                Kaupet-kode
+              </button>
+            }
+          />
+          <Sheet
+            open={categoriesSheetOpen}
+            onOpenChange={(open) => {
+              setCategoriesSheetOpen(open);
+              if (!open) setActiveCategory(null);
+            }}
+          >
+            <SheetTrigger asChild>
+              <button type="button" className={tileButtonClass}>
+                <span className={tileIconClass}>
+                  <LayoutGrid className="size-5" />
+                </span>
+                Alle kategorier
+              </button>
+            </SheetTrigger>
+            <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto rounded-t-2xl">
+              <SheetHeader className="text-left">
+                <SheetTitle className="flex items-center gap-3">
+                  {activeCategory ? activeCategory.name_nb : "Kategorier"}
+                  {activeCategory && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveCategory(null)}
+                      className="flex shrink-0 items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium transition hover:border-primary hover:text-primary"
+                    >
+                      <ChevronLeft className="size-3.5" />
+                      Tilbake
+                    </button>
+                  )}
+                </SheetTitle>
+              </SheetHeader>
+
+              {!activeCategory ? (
+                <div className="mt-4 flex flex-col gap-2">
+                  {rootCategories.map((cat) => {
+                    const Icon = getCategoryIcon(cat.icon);
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => pickCategory(cat)}
+                        className="group flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left transition active:scale-[0.98]"
+                      >
+                        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                          <Icon className="size-5" />
+                        </span>
+                        <span className="truncate font-medium">{cat.name_nb}</span>
+                        <ArrowRight className="ml-auto size-4 shrink-0 text-muted-foreground" />
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                (() => {
+                  const subs = childrenByParent.get(activeCategory.id) ?? [];
+                  const allSlugs = [activeCategory.slug, ...subs.map((s) => s.slug)];
+                  const locationSearch = {
+                    lat: location.lat ?? undefined,
+                    lng: location.lng ?? undefined,
+                    radius: location.lat != null ? location.radius : undefined,
+                    loc: location.label || undefined,
+                  };
+                  return (
+                    <div className="mt-4 flex flex-col gap-2">
+                      <Link
+                        to="/annonser"
+                        search={{
+                          q: "",
+                          category: "",
+                          categories: allSlugs,
+                          catMode: "any",
+                          sort: "new",
+                          ...locationSearch,
+                        }}
+                        onClick={() => setCategoriesSheetOpen(false)}
+                        className="group flex items-center justify-between gap-3 rounded-xl border border-primary bg-primary/5 px-4 py-4 text-left font-medium text-primary transition active:scale-[0.98]"
+                      >
+                        <span className="truncate">Alt i {activeCategory.name_nb}</span>
+                        <ArrowRight className="size-4 shrink-0 transition group-hover:translate-x-0.5" />
+                      </Link>
+                      {subs.map((sub) => (
+                        <Link
+                          key={sub.id}
+                          to="/annonser"
+                          search={{ q: "", category: sub.slug, sort: "new", ...locationSearch }}
+                          onClick={() => setCategoriesSheetOpen(false)}
+                          className="group flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-4 text-left transition active:scale-[0.98]"
+                        >
+                          <span className="truncate font-medium">{sub.name_nb}</span>
+                          <ArrowRight className="size-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
+                        </Link>
+                      ))}
+                      {subs.length === 0 && (
+                        <p className="text-sm text-muted-foreground">
+                          Ingen underkategorier — trykk over for å se alle annonser.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()
+              )}
+            </SheetContent>
+          </Sheet>
         </div>
+      )}
 
-        {!activeCategory ? (
-          <div className="duration-300 animate-out fade-out animate-in fade-in">
-            {/* Mobil: horisontal sveipbar rad */}
-            <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2 sm:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {rootCategories.length === 0 &&
-                Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="h-24 w-20 shrink-0 animate-pulse rounded-2xl bg-muted" />
-                ))}
-              {rootCategories.map((cat) => {
-                const Icon = getCategoryIcon(cat.icon);
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => pickCategory(cat)}
-                    className="group flex w-20 shrink-0 snap-start flex-col items-center gap-2 active:opacity-80"
-                  >
-                    <span className="flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
-                      <Icon className="size-7" />
-                    </span>
-                    <span className="line-clamp-2 text-pretty text-center text-xs font-medium leading-tight">
-                      {cat.name_nb}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Tablet/desktop: grid */}
-            <div className="hidden grid-cols-2 gap-3 sm:grid md:grid-cols-3 lg:grid-cols-4">
-              {rootCategories.length === 0 &&
-                Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="aspect-[5/4] animate-pulse rounded-2xl bg-muted" />
-                ))}
-              {rootCategories.map((cat) => {
-                const Icon = getCategoryIcon(cat.icon);
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => pickCategory(cat)}
-                    className="group flex aspect-[5/4] flex-col items-center justify-center gap-2 rounded-2xl border border-border bg-card p-3 text-center transition active:scale-[0.98] hover:border-primary"
-                  >
-                    <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
-                      <Icon className="size-5" />
-                    </span>
-                    <span className="text-pretty text-sm font-medium leading-tight">
-                      {cat.name_nb}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ) : (
-          (() => {
-            const subs = childrenByParent.get(activeCategory.id) ?? [];
-            const allSlugs = [activeCategory.slug, ...subs.map((s) => s.slug)];
-            const locationSearch = {
-              lat: location.lat ?? undefined,
-              lng: location.lng ?? undefined,
-              radius: location.lat != null ? location.radius : undefined,
-              loc: location.label || undefined,
-            };
-            return (
-              <div
-                key={activeCategory.id}
-                className="flex flex-col gap-2 px-5 duration-300 animate-in fade-in slide-in-from-bottom-8 sm:px-0"
+      {/* Kategorier */}
+      {!isNative && (
+        <section className="overflow-hidden pt-2 sm:px-5">
+          <div className="mb-3 flex items-center justify-between gap-3 px-5 sm:px-0">
+            <h2 className="font-display text-lg tracking-tight">
+              {activeCategory ? activeCategory.name_nb : "Kategorier"}
+            </h2>
+            {activeCategory && (
+              <button
+                type="button"
+                onClick={() => setActiveCategory(null)}
+                className="flex shrink-0 items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium transition hover:border-primary hover:text-primary"
               >
-                <Link
-                  to="/annonser"
-                  search={{
-                    q: "",
-                    category: "",
-                    categories: allSlugs,
-                    catMode: "any",
-                    sort: "new",
-                    ...locationSearch,
-                  }}
-                  className="group flex items-center justify-between gap-3 rounded-xl border border-primary bg-primary/5 px-4 py-4 text-left font-medium text-primary transition active:scale-[0.98]"
-                >
-                  <span className="truncate">Alt i {activeCategory.name_nb}</span>
-                  <ArrowRight className="size-4 shrink-0 transition group-hover:translate-x-0.5" />
-                </Link>
-                {subs.map((sub) => (
-                  <Link
-                    key={sub.id}
-                    to="/annonser"
-                    search={{ q: "", category: sub.slug, sort: "new", ...locationSearch }}
-                    className="group flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-4 text-left transition active:scale-[0.98]"
-                  >
-                    <span className="truncate font-medium">{sub.name_nb}</span>
-                    <ArrowRight className="size-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
-                  </Link>
-                ))}
-                {subs.length === 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    Ingen underkategorier — trykk over for å se alle annonser.
-                  </p>
-                )}
+                <ChevronLeft className="size-3.5" />
+                Tilbake
+              </button>
+            )}
+          </div>
+
+          {!activeCategory ? (
+            <div className="duration-300 animate-out fade-out animate-in fade-in">
+              {/* Mobil: horisontal sveipbar rad */}
+              <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2 sm:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {rootCategories.length === 0 &&
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-24 w-20 shrink-0 animate-pulse rounded-2xl bg-muted"
+                    />
+                  ))}
+                {rootCategories.map((cat) => {
+                  const Icon = getCategoryIcon(cat.icon);
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => pickCategory(cat)}
+                      className="group flex w-20 shrink-0 snap-start flex-col items-center gap-2 active:opacity-80"
+                    >
+                      <span className="flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
+                        <Icon className="size-7" />
+                      </span>
+                      <span className="line-clamp-2 text-pretty text-center text-xs font-medium leading-tight">
+                        {cat.name_nb}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
-            );
-          })()
-        )}
-      </section>
+
+              {/* Tablet/desktop: grid */}
+              <div className="hidden grid-cols-2 gap-3 sm:grid md:grid-cols-3 lg:grid-cols-4">
+                {rootCategories.length === 0 &&
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="aspect-[5/4] animate-pulse rounded-2xl bg-muted" />
+                  ))}
+                {rootCategories.map((cat) => {
+                  const Icon = getCategoryIcon(cat.icon);
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => pickCategory(cat)}
+                      className="group flex aspect-[5/4] flex-col items-center justify-center gap-2 rounded-2xl border border-border bg-card p-3 text-center transition active:scale-[0.98] hover:border-primary"
+                    >
+                      <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
+                        <Icon className="size-5" />
+                      </span>
+                      <span className="text-pretty text-sm font-medium leading-tight">
+                        {cat.name_nb}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            (() => {
+              const subs = childrenByParent.get(activeCategory.id) ?? [];
+              const allSlugs = [activeCategory.slug, ...subs.map((s) => s.slug)];
+              const locationSearch = {
+                lat: location.lat ?? undefined,
+                lng: location.lng ?? undefined,
+                radius: location.lat != null ? location.radius : undefined,
+                loc: location.label || undefined,
+              };
+              return (
+                <div
+                  key={activeCategory.id}
+                  className="flex flex-col gap-2 px-5 duration-300 animate-in fade-in slide-in-from-bottom-8 sm:px-0"
+                >
+                  <Link
+                    to="/annonser"
+                    search={{
+                      q: "",
+                      category: "",
+                      categories: allSlugs,
+                      catMode: "any",
+                      sort: "new",
+                      ...locationSearch,
+                    }}
+                    className="group flex items-center justify-between gap-3 rounded-xl border border-primary bg-primary/5 px-4 py-4 text-left font-medium text-primary transition active:scale-[0.98]"
+                  >
+                    <span className="truncate">Alt i {activeCategory.name_nb}</span>
+                    <ArrowRight className="size-4 shrink-0 transition group-hover:translate-x-0.5" />
+                  </Link>
+                  {subs.map((sub) => (
+                    <Link
+                      key={sub.id}
+                      to="/annonser"
+                      search={{ q: "", category: sub.slug, sort: "new", ...locationSearch }}
+                      className="group flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-4 text-left transition active:scale-[0.98]"
+                    >
+                      <span className="truncate font-medium">{sub.name_nb}</span>
+                      <ArrowRight className="size-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
+                    </Link>
+                  ))}
+                  {subs.length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      Ingen underkategorier — trykk over for å se alle annonser.
+                    </p>
+                  )}
+                </div>
+              );
+            })()
+          )}
+        </section>
+      )}
 
       {/* Populært nå */}
       <section className="mt-8 pl-5">

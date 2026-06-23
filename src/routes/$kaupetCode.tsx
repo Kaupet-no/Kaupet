@@ -22,6 +22,16 @@ const ListingDetailMap = lazy(() =>
   import("@/components/listing-detail-map").then((m) => ({ default: m.ListingDetailMap })),
 );
 
+// crypto.randomUUID() requires a secure context and isn't available in every
+// WebView — fall back to a non-crypto random ID so anonymous view-count
+// tracking still works there.
+function randomVisitorId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `v-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
 export const Route = createFileRoute("/$kaupetCode")({
   validateSearch: z.object({
     promotion: z.string().optional(),
@@ -347,24 +357,37 @@ function ListingDetailPage() {
   useEffect(() => {
     if (!data?.id) return;
     if (user && user.id === data.seller_id) return; // ikke tell egne visninger
-    let visitorKey = user?.id ?? null;
-    if (!visitorKey) {
-      try {
+    // crypto.randomUUID() kun tilgjengelig i secure context — utilgjengelig i
+    // enkelte WebView-oppsett (eldre Android System WebView, evt. usikker
+    // origin). View-telling er ren analytics og skal aldri kunne krasje
+    // annonsesiden, så hele blokken er try/catch-et med en ikke-crypto-basert
+    // fallback for visitor-ID.
+    try {
+      let visitorKey = user?.id ?? null;
+      if (!visitorKey) {
         const k = "kaupet_visitor_id";
-        visitorKey = localStorage.getItem(k);
-        if (!visitorKey) {
-          visitorKey = crypto.randomUUID();
-          localStorage.setItem(k, visitorKey);
+        try {
+          visitorKey = localStorage.getItem(k);
+        } catch {
+          visitorKey = null;
         }
-      } catch {
-        visitorKey = crypto.randomUUID();
+        if (!visitorKey) {
+          visitorKey = randomVisitorId();
+          try {
+            localStorage.setItem(k, visitorKey);
+          } catch {
+            /* ignore — privat nettlesing e.l. */
+          }
+        }
       }
+      supabase
+        .rpc("log_listing_view", { _listing_id: data.id, _visitor_key: visitorKey })
+        .then(({ error }) => {
+          if (error) console.warn("[listing_views] log failed", error);
+        });
+    } catch (e) {
+      console.warn("[listing_views] log failed", e);
     }
-    supabase
-      .rpc("log_listing_view", { _listing_id: data.id, _visitor_key: visitorKey })
-      .then(({ error }) => {
-        if (error) console.warn("[listing_views] log failed", error);
-      });
   }, [data?.id, data?.seller_id, user]);
 
   if (isLoading) {

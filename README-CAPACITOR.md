@@ -71,15 +71,15 @@ Services-pluginet aktiveres ikke og native push vil ikke fungere på enheten.
 3. I prosjektrota:
    ```
    bun install
-   npx cap add android         # kun første gang
-   npx cap sync android
+   bunx cap add android         # kun første gang
+   bunx cap sync android
    ```
 
 ### Bygg og kjør
 
 ```
-npx cap sync android
-npx cap open android
+bunx cap sync android
+bunx cap open android
 ```
 
 Trykk "Run" i Android Studio og velg emulator eller en tilkoblet enhet
@@ -110,15 +110,15 @@ kan installeres med `adb install` eller deles til testere.
 3. Klon prosjektet og kjør:
    ```
    bun install
-   npx cap add ios             # kun første gang
-   npx cap sync ios
+   bunx cap add ios             # kun første gang
+   bunx cap sync ios
    ```
 
 ### Bygg og kjør
 
 ```
-npx cap sync ios
-npx cap open ios
+bunx cap sync ios
+bunx cap open ios
 ```
 
 I Xcode:
@@ -149,7 +149,7 @@ Du trenger kun å bygge og distribuere ny app-versjon når:
 Etter en slik endring:
 
 ```
-npx cap sync
+bunx cap sync
 ```
 
 … og bygg på nytt i Xcode / Android Studio.
@@ -168,7 +168,7 @@ Etter endring av disse, regenerer alle native-størrelser:
 
 ```
 bun run generate:assets
-npx cap sync
+bunx cap sync
 ```
 
 Dette produserer automatisk:
@@ -201,7 +201,7 @@ sdk.dir=C\:\\Users\\<brukernavn>\\AppData\\Local\\Android\\Sdk
 Kjør `cd ios/App && pod install --repo-update`.
 
 **Build feiler etter ny plugin lagt til**
-Kjør `npx cap sync` på nytt så Capacitor regenererer native-prosjektene.
+Kjør `bunx cap sync` på nytt så Capacitor regenererer native-prosjektene.
 
 **WebView viser blank skjerm**
 Sjekk at `https://kaupet.no` er oppe. Hvis offline-siden vises i stedet

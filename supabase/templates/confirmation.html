@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="no">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bekreft e-postadressen din</title>
+  </head>
+  <body style="margin:0; padding:0; background-color:#fbf9f3; font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fbf9f3;">
+      <tr>
+        <td align="center" style="padding:32px 16px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;">
+            <tr>
+              <td style="padding-bottom:24px;" align="center">
+                <span style="font-family:Georgia,'Fraunces',serif; font-size:20px; font-weight:600; color:#2f5d44; letter-spacing:-0.01em;">
+                  Kaupet.no
+                </span>
+              </td>
+            </tr>
+            <tr>
+              <td style="background-color:#ffffff; border:1px solid #e7e1d3; border-radius:16px; padding:32px;">
+                <p style="margin:0 0 8px; font-size:12px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#c1693f;">
+                  Velkommen
+                </p>
+                <h1 style="margin:0 0 16px; font-family:Georgia,'Fraunces',serif; font-size:22px; font-weight:600; color:#202a22; letter-spacing:-0.01em;">
+                  Bekreft e-postadressen din
+                </h1>
+                <p style="margin:0 0 12px; font-size:15px; line-height:1.6; color:#6c7868;">
+                  Takk for at du ble medlem på Kaupet.no.
+                </p>
+                <p style="margin:0 0 28px; font-size:15px; line-height:1.6; color:#202a22;">
+                  Klikk på knappen under for å bekrefte at {{ .Email }} er din e-postadresse, slik at du kan logge inn og ta i bruk kontoen din.
+                </p>
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="border-radius:10px; background-color:#2f5d44;">
+                      <a
+                        href="{{ .ConfirmationURL }}"
+                        style="display:inline-block; padding:12px 22px; font-size:14px; font-weight:600; color:#fbf9f3; text-decoration:none; border-radius:10px;"
+                      >
+                        Bekreft e-postadresse
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:28px 0 0; font-size:12px; line-height:1.6; color:#6c7868;">
+                  Hvis knappen ikke fungerer, kan du lime inn denne lenken i nettleseren din:<br />
+                  <a href="{{ .ConfirmationURL }}" style="color:#6c7868; word-break:break-all;">{{ .ConfirmationURL }}</a>
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding-top:24px;" align="center">
+                <p style="margin:0; font-size:12px; line-height:1.6; color:#6c7868;">
+                  Du får denne e-posten fordi noen registrerte denne adressen på Kaupet.no.
+                  Hvis det ikke var deg, kan du trygt se bort fra den.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

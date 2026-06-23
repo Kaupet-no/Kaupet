@@ -106,27 +106,33 @@ export type Database = {
       conversations: {
         Row: {
           buyer_id: string
+          buyer_last_read_at: string | null
           created_at: string
           id: string
           last_message_at: string
           listing_id: string
           seller_id: string
+          seller_last_read_at: string | null
         }
         Insert: {
           buyer_id: string
+          buyer_last_read_at?: string | null
           created_at?: string
           id?: string
           last_message_at?: string
           listing_id: string
           seller_id: string
+          seller_last_read_at?: string | null
         }
         Update: {
           buyer_id?: string
+          buyer_last_read_at?: string | null
           created_at?: string
           id?: string
           last_message_at?: string
           listing_id?: string
           seller_id?: string
+          seller_last_read_at?: string | null
         }
         Relationships: [
           {

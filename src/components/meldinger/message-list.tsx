@@ -26,9 +26,14 @@ export function renderWithDayDividers(
   messages: Message[],
   myId: string,
   onDelete: (messageId: string) => void,
+  otherLastReadAt?: string | null,
 ) {
   const out: React.ReactElement[] = [];
   let lastDay = "";
+  let lastMineId: string | null = null;
+  for (const m of messages) {
+    if (m.sender_id === myId && !m.deleted_at) lastMineId = m.id;
+  }
   for (const m of messages) {
     const d = new Date(m.created_at);
     const day = d.toLocaleDateString("nb-NO", {
@@ -49,6 +54,9 @@ export function renderWithDayDividers(
     }
     const mine = m.sender_id === myId;
     const deleted = !!m.deleted_at;
+    const isReadByOther =
+      !!otherLastReadAt && new Date(m.created_at).getTime() <= new Date(otherLastReadAt).getTime();
+    const showReadReceipt = mine && !deleted && m.id === lastMineId && isReadByOther;
     out.push(
       <div
         key={m.id}
@@ -102,6 +110,13 @@ export function renderWithDayDividers(
         </div>
       </div>,
     );
+    if (showReadReceipt) {
+      out.push(
+        <p key={`r-${m.id}`} className="mr-1 text-right text-[10px] text-muted-foreground">
+          Lest
+        </p>,
+      );
+    }
   }
   return out;
 }

@@ -101,7 +101,11 @@ async function dispatchPush(params: {
         if (statusCode === 404 || statusCode === 410) {
           await supabaseAdmin.from("push_subscriptions").delete().eq("id", s.id);
         } else {
-          console.error("Web push error", statusCode);
+          const body =
+            typeof err === "object" && err && "body" in err
+              ? (err as { body: unknown }).body
+              : undefined;
+          console.error("Web push error", { subscriptionId: s.id, statusCode, body, err });
         }
       }
     }),

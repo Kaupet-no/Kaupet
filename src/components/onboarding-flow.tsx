@@ -103,7 +103,7 @@ export function OnboardingFlow({ onComplete }: Props) {
               className="mt-12 flex flex-col items-center gap-2 text-sm text-muted-foreground"
             >
               <span>Sveip for å komme i gang</span>
-              <ChevronRight className="size-5 rotate-180 animate-[swipe-hint_1.2s_ease-in-out_infinite]" />
+              <ChevronRight className="size-5 animate-[swipe-hint_1.2s_ease-in-out_infinite]" />
             </button>
           </div>
 

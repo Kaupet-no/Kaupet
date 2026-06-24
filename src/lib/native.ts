@@ -59,7 +59,9 @@ export async function checkLocationPermission(): Promise<"granted" | "denied" | 
   if (!isNative()) return "granted";
   const { Geolocation } = await import("@capacitor/geolocation");
   const status = await Geolocation.checkPermissions();
-  return status.location;
+  const s = status.location;
+  if (s === "granted" || s === "denied") return s;
+  return "prompt";
 }
 
 /** Request location permission from the user. */

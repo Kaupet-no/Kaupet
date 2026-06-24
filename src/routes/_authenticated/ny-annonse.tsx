@@ -20,6 +20,8 @@ import { ImageUploader, type PendingImage } from "@/components/image-uploader";
 import { ListingLocationPicker } from "@/components/listing-location-picker";
 import { PromoteListingDialog } from "@/components/promote-listing-dialog";
 import { PublishedListingDialog } from "@/components/published-listing-dialog";
+import { Turnstile } from "@marsidev/react-turnstile";
+
 import { useIsDemo } from "@/lib/use-is-demo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -179,6 +181,8 @@ function NewListingPage() {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [hasDraftData, setHasDraftData] = useState<Record<string, unknown> | null>(null);
   const { data: isDemo = false } = useIsDemo();
+  const turnstileEnabled = !!import.meta.env.VITE_TURNSTILE_SITE_KEY;
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   const { data: categories } = useQuery({
     queryKey: ["categories", "with-parent"],
@@ -468,6 +472,9 @@ function NewListingPage() {
           city: values.city,
         }));
 
+      if (turnstileEnabled && !turnstileToken)
+        throw new Error("Sikkerhetskontroll ikke fullført. Prøv igjen.");
+
       const listing = await createListing({
         data: {
           title: values.title,
@@ -485,6 +492,7 @@ function NewListingPage() {
           lat: finalCoords?.lat ?? null,
           lng: finalCoords?.lng ?? null,
           can_ship: values.can_ship !== "pickup",
+          turnstileToken,
         },
       });
 
@@ -907,9 +915,13 @@ function NewListingPage() {
               <div className="grid grid-cols-3 gap-2">
                 {(
                   [
-                    { value: "pickup", label: "Hentes", description: "Kjøper henter selv" },
-                    { value: "ship", label: "Sendes", description: "Selger sender" },
-                    { value: "both", label: "Begge deler", description: "Henting eller sending" },
+                    { value: "pickup", label: "Må hentes", description: "Kjøper henter selv" },
+                    { value: "ship", label: "Må sendes", description: "Selger sender" },
+                    {
+                      value: "both",
+                      label: "Begge deler",
+                      description: "Kan både hentes og sendes",
+                    },
                   ] as const
                 ).map((opt) => (
                   <button
@@ -971,7 +983,7 @@ function NewListingPage() {
               {coords && (
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">
-                    Dra markøren for å justere hvor området vises på annonsen.
+                    Dra markøren for å justere hvilket område som skal vises i annonsen.
                   </p>
                   <ListingLocationPicker
                     lat={coords.lat}
@@ -999,7 +1011,18 @@ function NewListingPage() {
                 >
                   Avbryt
                 </Button>
-                <Button type="submit" disabled={mutation.isPending}>
+                {turnstileEnabled && (
+                  <Turnstile
+                    siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+                    onSuccess={(token) => setTurnstileToken(token)}
+                    onExpire={() => setTurnstileToken(null)}
+                    options={{ size: "invisible" }}
+                  />
+                )}
+                <Button
+                  type="submit"
+                  disabled={mutation.isPending || (turnstileEnabled && !turnstileToken)}
+                >
                   {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
                   Publiser annonse
                 </Button>

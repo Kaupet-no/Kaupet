@@ -22,12 +22,36 @@ export const createListing = createServerFn({ method: "POST" })
         lat: z.number().nullable(),
         lng: z.number().nullable(),
         can_ship: z.boolean(),
+        turnstileToken: z.string().optional(),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { userId } = context;
+
+    if (process.env.TURNSTILE_SECRET_KEY) {
+      if (!data.turnstileToken) throw new Error("Turnstile-validering feilet. Prøv igjen.");
+      const cfRes = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+        method: "POST",
+        body: new URLSearchParams({
+          secret: process.env.TURNSTILE_SECRET_KEY,
+          response: data.turnstileToken,
+        }),
+      });
+      const cfJson = (await cfRes.json()) as { success: boolean };
+      if (!cfJson.success) throw new Error("Turnstile-validering feilet. Prøv igjen.");
+    }
+
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const { count } = await supabaseAdmin
+      .from("listings")
+      .select("id", { count: "exact", head: true })
+      .eq("seller_id", userId)
+      .gte("created_at", oneHourAgo);
+    if ((count ?? 0) >= 5) {
+      throw new Error("Du har publisert for mange annonser den siste timen. Prøv igjen senere.");
+    }
 
     const { data: listing, error } = await supabaseAdmin
       .from("listings")

@@ -156,7 +156,7 @@ export function ImageUploader({
           {dragOver ? "Slipp her for å laste opp" : "Slipp bilder her eller velg fra enheten"}
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
-          JPG, PNG eller WebP. Maks {MAX_IMAGES} bilder. Store bilder komprimeres automatisk.
+          JPG, PNG eller WebP. Maks {MAX_IMAGES} bilder.
         </p>
         <input
           ref={inputRef}

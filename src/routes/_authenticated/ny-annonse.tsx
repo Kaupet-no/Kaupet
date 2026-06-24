@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
+import { createListing } from "@/lib/listings.functions";
 import { uploadListingImage } from "@/lib/storage";
 import {
   geocodeNorwayAddress,
@@ -216,7 +217,6 @@ function NewListingPage() {
 
   const mutation = useMutation({
     mutationFn: async (values: ListingForm) => {
-      const parsed = values;
       const { data: userData, error: userErr } = await supabase.auth.getUser();
       if (userErr || !userData.user) throw new Error("Du må være logget inn.");
       const userId = userData.user.id;
@@ -225,34 +225,32 @@ function NewListingPage() {
       const finalCoords =
         coords ??
         (await geocodeNorwayAddress({
-          postal_code: parsed.postal_code,
-          city: parsed.city,
+          postal_code: values.postal_code,
+          city: values.city,
         }));
 
-      const { data: listing, error: insertErr } = await supabase
-        .from("listings")
-        .insert({
-          seller_id: userId,
-          title: parsed.title,
-          description: parsed.description,
-          category_id: parsed.category_id,
-          condition: parsed.condition,
-          is_free: parsed.is_free,
-          price_nok: parsed.is_free
+      // INSERT via server function: lat/lng skrives server-side fordi
+      // authenticated har ikke SELECT på disse kolonnene (privacy-tiltak i
+      // fuzz_listing_location-migrasjonen), og PostgREST avviser INSERT
+      // for kolonner som ikke er i schema-cachen for rollen.
+      const listing = await createListing({
+        data: {
+          title: values.title,
+          description: values.description,
+          category_id: values.category_id,
+          condition: values.condition,
+          is_free: values.is_free,
+          price_nok: values.is_free
             ? null
-            : typeof parsed.price_nok === "number"
-              ? parsed.price_nok
+            : typeof values.price_nok === "number"
+              ? values.price_nok
               : null,
-          postal_code: parsed.postal_code || null,
-          city: parsed.city || null,
+          postal_code: values.postal_code || null,
+          city: values.city || null,
           lat: finalCoords?.lat ?? null,
           lng: finalCoords?.lng ?? null,
-          status: "active",
-          published_at: new Date().toISOString(),
-        })
-        .select("id, kaupet_code")
-        .single();
-      if (insertErr) throw insertErr;
+        },
+      });
 
       // Upload images sequentially to avoid hammering storage
       const uploaded: { storage_path: string; sort_order: number }[] = [];
@@ -278,7 +276,7 @@ function NewListingPage() {
         );
         if (imgErr) throw imgErr;
       }
-      return { id: listing.id as string, kaupet_code: listing.kaupet_code as string };
+      return listing;
     },
     onSuccess: (result) => {
       void import("@/lib/haptics").then((m) => m.hapticNotification("success"));

@@ -3,6 +3,55 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+export const createListing = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        title: z.string().trim().min(5).max(120),
+        description: z.string().trim().min(20).max(4000),
+        category_id: z.string().uuid(),
+        condition: z.enum(["new", "like_new", "good", "acceptable", "for_parts"]),
+        is_free: z.boolean(),
+        price_nok: z.number().int().min(0).max(10_000_000).nullable(),
+        postal_code: z
+          .string()
+          .regex(/^\d{4}$/)
+          .nullable(),
+        city: z.string().max(100).nullable(),
+        lat: z.number().nullable(),
+        lng: z.number().nullable(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { userId } = context;
+
+    const { data: listing, error } = await supabaseAdmin
+      .from("listings")
+      .insert({
+        seller_id: userId,
+        title: data.title,
+        description: data.description,
+        category_id: data.category_id,
+        condition: data.condition,
+        is_free: data.is_free,
+        price_nok: data.is_free ? null : data.price_nok,
+        postal_code: data.postal_code,
+        city: data.city,
+        lat: data.lat,
+        lng: data.lng,
+        status: "active",
+        published_at: new Date().toISOString(),
+      })
+      .select("id, kaupet_code")
+      .single();
+
+    if (error) throw error;
+    return { id: listing.id as string, kaupet_code: listing.kaupet_code as string };
+  });
+
 export const republishListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))

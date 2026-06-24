@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown, RotateCcw, Save, Search as SearchIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -43,9 +43,14 @@ export function AdvancedSearchPanel({
   const [v, setV] = useState<AdvancedSearchValue>(initial);
   const [saveOpen, setSaveOpen] = useState(false);
 
+  const initialRef = useRef(initial);
   useEffect(() => {
-    if (open) setV(initial);
-  }, [open, initial]);
+    initialRef.current = initial;
+  });
+
+  useEffect(() => {
+    if (open) setV(initialRef.current);
+  }, [open]);
 
   const toggleCondition = (val: string) =>
     setV({
@@ -135,7 +140,7 @@ export function AdvancedSearchPanel({
                 checked={v.includeFree}
                 onCheckedChange={(c) => setV({ ...v, includeFree: c === true })}
               />
-              Inkluder gratis annonser
+              Inkluder gratis-annonser
             </label>
           </section>
 

@@ -1,8 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-import { Expand, Map as MapIcon, Save } from "lucide-react";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { Expand, LayoutList, LayoutGrid, Map as MapIcon, Save } from "lucide-react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
@@ -25,10 +25,17 @@ import type { LocationValue } from "@/components/location-filter";
 import type { TermGroup } from "@/lib/term-groups";
 import type { MapListing } from "@/components/listings-map";
 import { FeaturedListingsSection } from "@/components/featured-listings-section";
+import { NativeFilterChips } from "@/components/native-filter-chips";
+import { NativeSearchOverlay } from "@/components/native-search-overlay";
+import { NativeAdvancedSearch } from "@/components/native-advanced-search";
 import { reverseGeocode } from "@/lib/geocode";
 import { saveLastSearchContext } from "@/lib/last-search-context";
 import { summarizeCriteria } from "@/lib/saved-searches";
 import { useAuth } from "@/lib/use-auth";
+import { useIsNative } from "@/lib/use-is-native";
+import { hapticImpact, hapticNotification } from "@/lib/haptics";
+import { useScrollDirection } from "@/lib/use-scroll-direction";
+import { usePullToRefresh } from "@/lib/use-pull-to-refresh";
 
 const ListingsMap = lazy(() =>
   import("@/components/listings-map").then((m) => ({ default: m.ListingsMap })),
@@ -131,6 +138,9 @@ export const Route = createFileRoute("/annonser")({
 });
 
 function BrowsePage() {
+  const isNative = useIsNative();
+  const scrollDir = useScrollDirection();
+  const queryClient = useQueryClient();
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/annonser" });
   const { user } = useAuth();
@@ -143,6 +153,26 @@ function BrowsePage() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [advOpen, setAdvOpen] = useState(false);
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
+  const [loadedPages, setLoadedPages] = useState(1);
+  const PAGE_SIZE = 20;
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
+  const [advancedOverlayOpen, setAdvancedOverlayOpen] = useState(false);
+
+  const { refreshing, pullDistance } = usePullToRefresh({
+    enabled: isNative && mounted,
+    onRefresh: async () => {
+      setLoadedPages(1);
+      await queryClient.invalidateQueries({ queryKey: ["listings"] });
+    },
+  });
+  const [viewMode, setViewMode] = useState<"grid" | "list">(() => {
+    try {
+      return (localStorage.getItem("kaupet_view_mode") as "grid" | "list") ?? "grid";
+    } catch {
+      return "grid";
+    }
+  });
 
   useEffect(() => setMounted(true), []);
   useEffect(() => {
@@ -153,6 +183,20 @@ function BrowsePage() {
     return () => mql.removeEventListener("change", update);
   }, []);
   useEffect(() => setQDraft(search.q), [search.q]);
+  useEffect(
+    () => setLoadedPages(1),
+    [
+      search.q,
+      search.category,
+      search.categories,
+      search.conditions,
+      search.min,
+      search.max,
+      search.sort,
+      search.lat,
+      search.lng,
+    ],
+  );
 
   const location: LocationValue = useMemo(
     () => ({
@@ -267,7 +311,7 @@ function BrowsePage() {
   }, [mounted, search, effectiveCategories, categories]);
 
   const { data: listings, isLoading } = useQuery({
-    queryKey: ["listings", search, radiusIds, effectiveCategories, terms],
+    queryKey: ["listings", search, radiusIds, effectiveCategories, terms, loadedPages],
     enabled:
       (effectiveCategories.length === 0 || !!categories) &&
       (search.lat == null || search.lng == null || radiusIds != null),
@@ -372,7 +416,8 @@ function BrowsePage() {
         qb = qb.order("price_nok", { ascending: false, nullsFirst: false });
       else qb = qb.order("created_at", { ascending: false });
 
-      const { data, error } = await qb.limit(needsClientExclude ? 200 : 60);
+      const limit = PAGE_SIZE * loadedPages;
+      const { data, error } = await qb.limit(needsClientExclude ? limit * 4 : limit);
       if (error) throw error;
 
       let rows = data ?? [];
@@ -383,7 +428,7 @@ function BrowsePage() {
               (g) => g.terms.length > 0 && g.terms.every((t) => rowContainsTerm(l, t)),
             ),
         );
-        rows = rows.slice(0, 60);
+        rows = rows.slice(0, PAGE_SIZE * loadedPages);
       }
 
       return rows.map((l) => {
@@ -414,6 +459,7 @@ function BrowsePage() {
   // user edits them, so re-patching them here from the panel's draft would
   // clobber any bar edits made while the panel was open.
   const handleApply = (v: AdvancedSearchValue) => {
+    void hapticNotification("success");
     const c = valueToCriteria(v);
     updateSearch({
       extraGroups: c.extraGroups,
@@ -467,6 +513,22 @@ function BrowsePage() {
 
   const mapCenter =
     search.lat != null && search.lng != null ? { lat: search.lat, lng: search.lng } : null;
+
+  // Native infinite scroll — load next page when sentinel enters viewport
+  useEffect(() => {
+    if (!isNative || !sentinelRef.current) return;
+    const el = sentinelRef.current;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !isLoading && cards.length >= PAGE_SIZE * loadedPages) {
+          setLoadedPages((p) => p + 1);
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isNative, isLoading, cards.length, loadedPages]);
 
   const renderMap = (withAreaSearch: boolean) =>
     mounted ? (
@@ -547,40 +609,124 @@ function BrowsePage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 md:py-10">
-      <h1 className="font-display text-3xl tracking-tight">Annonser</h1>
+    <div className={`mx-auto max-w-7xl px-4 ${isNative ? "pt-2 pb-8" : "py-8 md:py-10"}`}>
+      {isNative && (pullDistance > 0 || refreshing) && (
+        <div
+          className="flex items-center justify-center overflow-hidden transition-all duration-150"
+          style={{ height: refreshing ? 48 : Math.min(pullDistance, 48) }}
+        >
+          <div
+            className={`size-6 rounded-full border-2 border-primary border-t-transparent ${refreshing ? "animate-spin" : ""}`}
+            style={{ opacity: refreshing ? 1 : pullDistance / 64 }}
+          />
+        </div>
+      )}
+      {!isNative && <h1 className="font-display text-3xl tracking-tight">Annonser</h1>}
 
-      <div className="mt-6 space-y-2">
-        <SearchBar
-          q={qDraft}
-          onQChange={setQDraft}
-          onSubmitQ={() => updateSearch({ q: qDraft })}
-          location={location}
-          onLocationChange={handleLocationChange}
-          selectedSlugs={
-            search.category
-              ? [search.category, ...search.categories.filter((s: string) => s !== search.category)]
-              : search.categories
-          }
-          onSelectedChange={(slugs) =>
-            updateSearch({ category: "", categories: slugs, catMode: "any" })
-          }
-          categories={categories ?? []}
-          hideCategory={advOpen}
-          qMode={search.qMode}
-          onQModeChange={(m) => updateSearch({ qMode: m })}
-          showQMode={advOpen}
-        />
-        <AdvancedSearchPanel
-          open={advOpen}
-          onOpenChange={setAdvOpen}
-          initial={advancedInitial}
-          categories={categories ?? []}
-          onApply={handleApply}
-          sortControl={
-            <SortControl sort={search.sort} onSortChange={(s) => updateSearch({ sort: s })} />
-          }
-        />
+      <div
+        className={
+          isNative
+            ? `sticky top-0 z-40 -mx-4 space-y-2 px-4 pb-2 pt-safe transition-all duration-200 bg-background/95 backdrop-blur ${scrollDir === "down" ? "shadow-sm" : ""}`
+            : "mt-6 space-y-2"
+        }
+      >
+        {/* On native: tap on the search bar opens the full-screen search overlay */}
+        {isNative && (
+          <div className="relative">
+            <SearchBar
+              q={qDraft}
+              onQChange={setQDraft}
+              onSubmitQ={() => {
+                void hapticImpact("medium");
+                updateSearch({ q: qDraft });
+              }}
+              location={location}
+              onLocationChange={handleLocationChange}
+              selectedSlugs={[]}
+              onSelectedChange={() => {}}
+              categories={categories ?? []}
+              hideCategory
+              hideLocation
+              qMode={search.qMode}
+              onQModeChange={(m) => updateSearch({ qMode: m })}
+              showQMode={false}
+            />
+            <button
+              type="button"
+              className="absolute inset-0 z-10"
+              onClick={() => {
+                void hapticImpact("light");
+                setSearchOverlayOpen(true);
+              }}
+              aria-label="Åpne søk"
+            />
+          </div>
+        )}
+        {!isNative && (
+          <SearchBar
+            q={qDraft}
+            onQChange={setQDraft}
+            onSubmitQ={() => {
+              void hapticImpact("medium");
+              updateSearch({ q: qDraft });
+            }}
+            location={location}
+            onLocationChange={handleLocationChange}
+            selectedSlugs={
+              search.category
+                ? [
+                    search.category,
+                    ...search.categories.filter((s: string) => s !== search.category),
+                  ]
+                : search.categories
+            }
+            onSelectedChange={(slugs) =>
+              updateSearch({ category: "", categories: slugs, catMode: "any" })
+            }
+            categories={categories ?? []}
+            hideCategory={advOpen}
+            qMode={search.qMode}
+            onQModeChange={(m) => updateSearch({ qMode: m })}
+            showQMode={advOpen}
+          />
+        )}
+        {isNative ? (
+          <NativeFilterChips
+            sort={search.sort}
+            onSortChange={(s) => updateSearch({ sort: s })}
+            categories={categories ?? []}
+            selectedCategories={effectiveCategories}
+            onCategoriesChange={(slugs) =>
+              updateSearch({ category: "", categories: slugs, catMode: "any" })
+            }
+            min={search.min}
+            max={search.max}
+            includeFree={search.includeFree ?? true}
+            onPriceChange={(mn, mx, free) => updateSearch({ min: mn, max: mx, includeFree: free })}
+            conditions={search.conditions ?? []}
+            onConditionsChange={(c) =>
+              updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
+            }
+            location={location}
+            onLocationChange={handleLocationChange}
+            resultCount={cards.length}
+            onOpenAdvanced={() => setAdvancedOverlayOpen(true)}
+            advancedFilterCount={
+              (search.extraGroups?.length ?? 0) + (search.qMode === "any" ? 1 : 0)
+            }
+          />
+        ) : (
+          <AdvancedSearchPanel
+            open={advOpen}
+            onOpenChange={setAdvOpen}
+            initial={advancedInitial}
+            categories={categories ?? []}
+            onApply={handleApply}
+            sortControl={
+              <SortControl sort={search.sort} onSortChange={(s) => updateSearch({ sort: s })} />
+            }
+          />
+        )}
       </div>
 
       <ActiveFilters
@@ -597,11 +743,38 @@ function BrowsePage() {
       />
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-        <span>
-          {isLoading ? "Søker…" : `${cards.length} annonse${cards.length === 1 ? "" : "r"}`}
-        </span>
         <div className="flex items-center gap-2">
-          {!isDesktop && (
+          <span>
+            {isLoading ? "Søker…" : `${cards.length} annonse${cards.length === 1 ? "" : "r"}`}
+          </span>
+          {isNative && (
+            <button
+              type="button"
+              onClick={() => {
+                void hapticImpact("light");
+                const next = viewMode === "grid" ? "list" : "grid";
+                setViewMode(next);
+                try {
+                  localStorage.setItem("kaupet_view_mode", next);
+                } catch {
+                  /* ignore */
+                }
+              }}
+              className="rounded-lg border border-border bg-card p-1.5 text-muted-foreground hover:text-foreground"
+              aria-label={
+                viewMode === "grid" ? "Bytt til listevisning" : "Bytt til rutenettvisning"
+              }
+            >
+              {viewMode === "grid" ? (
+                <LayoutList className="size-4" />
+              ) : (
+                <LayoutGrid className="size-4" />
+              )}
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {!isDesktop && !isNative && (
             <Sheet open={mobileMapOpen} onOpenChange={setMobileMapOpen}>
               <SheetTrigger asChild>
                 <Button type="button" variant="outline" size="sm" className="gap-1.5">
@@ -678,15 +851,39 @@ function BrowsePage() {
               </Button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <div
+              className={
+                isNative && viewMode === "list"
+                  ? "flex flex-col gap-3"
+                  : "grid grid-cols-2 gap-4 sm:grid-cols-3"
+              }
+            >
               {cards.map((l) => (
                 <ListingCard
                   key={l.id}
                   listing={l}
                   highlighted={hoveredId === l.id || activeId === l.id}
                   onHoverChange={setHoveredId}
+                  compact={isNative && viewMode === "list"}
                 />
               ))}
+            </div>
+          )}
+          {/* Last inn flere (web) / Infinite scroll sentinel (native) */}
+          {!isLoading &&
+            cards.length >= PAGE_SIZE * loadedPages &&
+            (isNative ? (
+              <div ref={sentinelRef} className="h-4" />
+            ) : (
+              <div className="mt-6 flex justify-center">
+                <Button variant="outline" onClick={() => setLoadedPages((p) => p + 1)}>
+                  Last inn flere annonser
+                </Button>
+              </div>
+            ))}
+          {isLoading && loadedPages > 1 && (
+            <div className="mt-6 flex justify-center">
+              <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             </div>
           )}
         </div>
@@ -721,6 +918,59 @@ function BrowsePage() {
           </aside>
         )}
       </div>
+
+      {/* Native kart-FAB + Sheet */}
+      {isNative && (
+        <>
+          <Sheet open={mobileMapOpen} onOpenChange={setMobileMapOpen}>
+            <SheetContent side="bottom" className="h-[88vh] p-4">
+              <SheetHeader>
+                <SheetTitle>Kart</SheetTitle>
+              </SheetHeader>
+              <div className="mt-3 h-[calc(100%-3rem)]">
+                {mobileMapOpen ? renderMap(true) : null}
+              </div>
+            </SheetContent>
+          </Sheet>
+          <button
+            type="button"
+            onClick={() => {
+              void hapticImpact("medium");
+              setMobileMapOpen(true);
+            }}
+            className="fixed bottom-[calc(var(--app-bottom-nav-h)+1rem)] right-4 z-50 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg active:scale-95 transition"
+            aria-label="Vis kart"
+          >
+            <MapIcon className="size-6" />
+            {mapListings.length > 0 && (
+              <span className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white">
+                {mapListings.length > 99 ? "99+" : mapListings.length}
+              </span>
+            )}
+          </button>
+        </>
+      )}
+
+      {/* Native full-screen search overlay */}
+      {isNative && (
+        <NativeSearchOverlay
+          open={searchOverlayOpen}
+          onClose={() => setSearchOverlayOpen(false)}
+          initialQ={qDraft}
+          categories={categories ?? []}
+        />
+      )}
+
+      {/* Native full-screen advanced search */}
+      {isNative && (
+        <NativeAdvancedSearch
+          open={advancedOverlayOpen}
+          onClose={() => setAdvancedOverlayOpen(false)}
+          initial={advancedInitial}
+          categories={categories ?? []}
+          onApply={handleApply}
+        />
+      )}
     </div>
   );
 }

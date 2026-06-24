@@ -5,9 +5,17 @@ export type TermGroup = {
   terms: string[];
 };
 
+function safeUUID(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  // Fallback for older Android WebViews that don't support crypto.randomUUID
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
 export function emptyTermGroup(exclude = false): TermGroup {
   return {
-    id: crypto.randomUUID(),
+    id: safeUUID(),
     mode: "any",
     exclude,
     terms: [],

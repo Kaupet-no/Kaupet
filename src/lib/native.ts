@@ -54,6 +54,22 @@ export async function pickNativePhoto(): Promise<File | null> {
   }
 }
 
+/** Check location permission status without prompting the user. */
+export async function checkLocationPermission(): Promise<"granted" | "denied" | "prompt"> {
+  if (!isNative()) return "granted";
+  const { Geolocation } = await import("@capacitor/geolocation");
+  const status = await Geolocation.checkPermissions();
+  return status.location;
+}
+
+/** Request location permission from the user. */
+export async function requestLocationPermission(): Promise<"granted" | "denied"> {
+  if (!isNative()) return "granted";
+  const { Geolocation } = await import("@capacitor/geolocation");
+  const status = await Geolocation.requestPermissions();
+  return status.location === "granted" ? "granted" : "denied";
+}
+
 /** Native GPS position. Falls back to navigator.geolocation on web. */
 export async function getCurrentPosition(): Promise<GeolocationPosition | null> {
   if (isNative()) {

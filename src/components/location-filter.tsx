@@ -4,7 +4,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
-import { getCurrentPosition } from "@/lib/native";
+import {
+  checkLocationPermission,
+  getCurrentPosition,
+  requestLocationPermission,
+} from "@/lib/native";
 
 export type LocationValue = {
   lat: number | null;
@@ -33,7 +37,14 @@ export function LocationPicker({ value, onChange, onDone, autoFocus = true }: Lo
   const [query, setQuery] = useState(value.label ?? "");
   const [results, setResults] = useState<NominatimResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [locationPermission, setLocationPermission] = useState<"granted" | "denied" | null>(null);
   const debounce = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    checkLocationPermission().then((status) => {
+      if (status === "granted") setLocationPermission("granted");
+    });
+  }, []);
 
   useEffect(() => {
     setQuery(value.label ?? "");
@@ -82,6 +93,12 @@ export function LocationPicker({ value, onChange, onDone, autoFocus = true }: Lo
 
   const useMyLocation = async () => {
     try {
+      const permission = await requestLocationPermission();
+      setLocationPermission(permission);
+      if (permission !== "granted") {
+        toast.error("Tillat posisjon i telefoninnstillingene for å bruke denne funksjonen");
+        return;
+      }
       const pos = await getCurrentPosition();
       if (!pos) {
         toast.error("Posisjon ikke støttet på denne enheten");
@@ -136,8 +153,13 @@ export function LocationPicker({ value, onChange, onDone, autoFocus = true }: Lo
         size="sm"
         className="w-full justify-start"
         onClick={useMyLocation}
+        disabled={locationPermission === "denied"}
+        title={
+          locationPermission === "denied" ? "Tillat posisjon i telefoninnstillingene" : undefined
+        }
       >
-        <Locate className="size-4" /> Bruk min posisjon
+        <Locate className="size-4" />
+        {locationPermission === "denied" ? "Posisjon ikke tillatt" : "Bruk min posisjon"}
       </Button>
       <div className="max-h-[260px] overflow-y-auto">
         {loading && <div className="px-2 py-2 text-sm text-muted-foreground">Søker…</div>}

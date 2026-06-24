@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { signListingImageUrls } from "@/lib/storage";
 import { formatPrice } from "@/lib/format";
 import { FavoriteButton } from "@/components/favorite-button";
+import { useIsNative } from "@/lib/use-is-native";
 
 export type ListingCardData = {
   id: string;
@@ -22,9 +23,11 @@ type Props = {
   listing: ListingCardData;
   highlighted?: boolean;
   onHoverChange?: (id: string | null) => void;
+  compact?: boolean;
 };
 
-export function ListingCard({ listing, highlighted, onHoverChange }: Props) {
+export function ListingCard({ listing, highlighted, onHoverChange, compact = false }: Props) {
+  const isNative = useIsNative();
   const [imgUrl, setImgUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -38,17 +41,50 @@ export function ListingCard({ listing, highlighted, onHoverChange }: Props) {
     };
   }, [listing.cover_path]);
 
+  const linkClass = `group block overflow-hidden rounded-xl border bg-card transition hover:shadow-md ${
+    highlighted
+      ? "border-primary shadow-md ring-2 ring-primary/30"
+      : "border-border hover:border-primary"
+  }`;
+
+  if (compact) {
+    return (
+      <Link
+        to="/$kaupetCode"
+        params={{ kaupetCode: listing.kaupet_code }}
+        className={`${linkClass} flex gap-3 p-2`}
+      >
+        <div className="relative size-20 shrink-0 overflow-hidden rounded-lg bg-muted">
+          {imgUrl ? (
+            <img
+              src={imgUrl}
+              alt={`${listing.title} — ${formatPrice(listing)}`}
+              className="size-full object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <div className="flex size-full items-center justify-center text-xs text-muted-foreground">
+              Ingen bilde
+            </div>
+          )}
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
+          <h3 className="line-clamp-2 text-sm font-medium leading-snug">{listing.title}</h3>
+          <p className="font-display text-base font-semibold">{formatPrice(listing)}</p>
+          {listing.city && <p className="text-xs text-muted-foreground">{listing.city}</p>}
+        </div>
+        <FavoriteButton listingId={listing.id} size="sm" className="shrink-0 self-center" />
+      </Link>
+    );
+  }
+
   return (
     <Link
       to="/$kaupetCode"
       params={{ kaupetCode: listing.kaupet_code }}
       onMouseEnter={onHoverChange ? () => onHoverChange(listing.id) : undefined}
       onMouseLeave={onHoverChange ? () => onHoverChange(null) : undefined}
-      className={`group block overflow-hidden rounded-xl border bg-card transition hover:shadow-md ${
-        highlighted
-          ? "border-primary shadow-md ring-2 ring-primary/30"
-          : "border-border hover:border-primary"
-      }`}
+      className={linkClass}
     >
       <div className="relative aspect-[4/3] bg-muted">
         {imgUrl ? (
@@ -67,10 +103,14 @@ export function ListingCard({ listing, highlighted, onHoverChange }: Props) {
       </div>
       <div className="space-y-1 p-3">
         <h3 className="line-clamp-2 text-sm font-medium leading-snug">{listing.title}</h3>
-        <p className="font-display text-base">{formatPrice(listing)}</p>
+        <p className={`font-display ${isNative ? "text-lg font-semibold" : "text-base"}`}>
+          {formatPrice(listing)}
+        </p>
         {listing.city && (
-          <p className="flex items-center gap-1 text-xs text-muted-foreground">
-            <MapPin className="size-3" /> {listing.city}
+          <p
+            className={`text-xs text-muted-foreground ${isNative ? "" : "flex items-center gap-1"}`}
+          >
+            {!isNative && <MapPin className="size-3" />} {listing.city}
           </p>
         )}
         {typeof listing.total_views === "number" && (

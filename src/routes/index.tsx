@@ -12,6 +12,7 @@ import {
 import { z } from "zod";
 import { useMemo, useRef, useState } from "react";
 import Autoplay from "embla-carousel-autoplay";
+import { OnboardingFlow } from "@/components/onboarding-flow";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/use-auth";
@@ -64,6 +65,21 @@ export const Route = createFileRoute("/")({
 
 function LandingPage() {
   const native = useIsNative();
+  const [onboardingDone, setOnboardingDone] = useState(
+    () => localStorage.getItem("kaupet_onboarding_completed_v1") === "true",
+  );
+
+  if (native && !onboardingDone) {
+    return (
+      <OnboardingFlow
+        onComplete={() => {
+          localStorage.setItem("kaupet_onboarding_completed_v1", "true");
+          setOnboardingDone(true);
+        }}
+      />
+    );
+  }
+
   if (native) return <AppLanding />;
   return <WebLanding />;
 }

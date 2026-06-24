@@ -1,5 +1,7 @@
 import { X } from "lucide-react";
 
+import { hapticImpact } from "@/lib/haptics";
+import { useIsNative } from "@/lib/use-is-native";
 import { TermGroupChips } from "@/components/term-group-editor";
 import { CONDITIONS } from "@/components/advanced-search-value";
 import type { Category } from "@/lib/categories";
@@ -114,13 +116,19 @@ export function ActiveFilters({ search, categories, terms, effectiveCategories, 
 }
 
 function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }) {
+  const isNative = useIsNative();
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs">
+    <span
+      className={`inline-flex items-center gap-1 rounded-full bg-muted px-2.5 text-xs ${isNative ? "h-9 py-0" : "py-1"}`}
+    >
       {label}
       <button
         type="button"
-        onClick={onRemove}
-        className="-m-1.5 rounded-full p-1.5 text-muted-foreground hover:text-foreground"
+        onClick={() => {
+          void hapticImpact("light");
+          onRemove();
+        }}
+        className={`-m-1.5 rounded-full text-muted-foreground hover:text-foreground ${isNative ? "p-2" : "p-1.5"}`}
         aria-label={`Fjern ${label}`}
       >
         <X className="size-3" />

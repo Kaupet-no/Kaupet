@@ -70,6 +70,70 @@ type ListingForm = z.infer<typeof listingSchema>;
 
 const DRAFT_KEY = "kaupet_draft_ny_annonse";
 
+const SIMILAR_STOPWORDS = new Set([
+  "og",
+  "er",
+  "en",
+  "et",
+  "ei",
+  "i",
+  "på",
+  "med",
+  "til",
+  "av",
+  "for",
+  "som",
+  "fra",
+  "har",
+  "den",
+  "det",
+  "de",
+  "vi",
+  "du",
+  "kan",
+  "ikke",
+  "seg",
+  "han",
+  "hun",
+  "men",
+  "om",
+  "så",
+  "ut",
+  "enn",
+  "da",
+  "når",
+  "at",
+  "dem",
+  "sin",
+  "hva",
+  "ved",
+  "var",
+  "ny",
+  "nye",
+  "god",
+  "fin",
+  "fine",
+  "pen",
+  "pent",
+  "pene",
+  "lite",
+  "litt",
+  "stor",
+  "store",
+  "liten",
+  "billig",
+  "rimelig",
+  "rask",
+  "raskt",
+  "gammel",
+  "brukt",
+  "selger",
+  "selges",
+  "kjøper",
+  "kjøpes",
+  "pris",
+]);
+
 export const Route = createFileRoute("/_authenticated/ny-annonse")({
   head: () => ({
     meta: [
@@ -363,14 +427,21 @@ function NewListingPage() {
     enabled: debouncedTitle.length >= 5 && !!categoryId,
     staleTime: 60_000,
     queryFn: async () => {
-      const firstWord = debouncedTitle.trim().split(/\s+/)[0] ?? "";
-      if (firstWord.length < 3) return [];
+      const significantWords = debouncedTitle
+        .toLowerCase()
+        .replace(/[^a-zæøå0-9\s]/g, "")
+        .split(/\s+/)
+        .filter((w) => w.length >= 2 && !SIMILAR_STOPWORDS.has(w));
+      if (significantWords.length === 0) return [];
       const { data } = await supabase
         .from("listings")
         .select("id, title, price_nok, is_free, city")
         .eq("category_id", categoryId)
         .eq("status", "active")
-        .ilike("title", `%${firstWord}%`)
+        .textSearch("search_vector", significantWords.join(" "), {
+          config: "norwegian",
+          type: "plain",
+        })
         .limit(3);
       return data ?? [];
     },
@@ -596,32 +667,6 @@ function NewListingPage() {
                   </span>
                 </div>
               </div>
-              {/* Keyword suggestions from other listings in the same category */}
-              {categoryId &&
-                (keywordsFetching || (keywordSuggestions && keywordSuggestions.length > 0)) && (
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <Tag className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                    <span className="text-xs text-muted-foreground">
-                      Populære søkeord i denne kategorien:
-                    </span>
-                    {keywordsFetching && (
-                      <Loader2
-                        className="size-3.5 animate-spin text-muted-foreground"
-                        aria-hidden
-                      />
-                    )}
-                    {keywordSuggestions?.map(({ word }) => (
-                      <button
-                        key={word}
-                        type="button"
-                        onClick={() => appendTagToDescription(word)}
-                        className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-foreground hover:bg-primary/10 hover:border-primary/40 transition-colors"
-                      >
-                        {word}
-                      </button>
-                    ))}
-                  </div>
-                )}
               <Textarea
                 id="description"
                 rows={8}
@@ -755,6 +800,30 @@ function NewListingPage() {
                 )}
               </div>
             </section>
+
+            {/* Keyword suggestions from other listings in the same category */}
+            {categoryId &&
+              (keywordsFetching || (keywordSuggestions && keywordSuggestions.length > 0)) && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <Tag className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                  <span className="text-xs text-muted-foreground">
+                    Populære søkeord i denne kategorien:
+                  </span>
+                  {keywordsFetching && (
+                    <Loader2 className="size-3.5 animate-spin text-muted-foreground" aria-hidden />
+                  )}
+                  {keywordSuggestions?.map(({ word }) => (
+                    <button
+                      key={word}
+                      type="button"
+                      onClick={() => appendTagToDescription(word)}
+                      className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-foreground hover:bg-primary/10 hover:border-primary/40 transition-colors"
+                    >
+                      {word}
+                    </button>
+                  ))}
+                </div>
+              )}
 
             {/* Similar listings */}
             {similarListings && similarListings.length > 0 && (

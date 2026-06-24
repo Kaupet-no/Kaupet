@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -38,6 +38,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { formatErrorMessage } from "@/lib/errors";
 import { CONDITIONS } from "@/lib/constants";
 import { suggestCategoryForTitle } from "@/lib/category-suggestion.functions";
+import { suggestKeywordsForListing } from "@/lib/keyword-suggestion.functions";
 
 const listingSchema = z
   .object({
@@ -68,57 +69,6 @@ const listingSchema = z
 type ListingForm = z.infer<typeof listingSchema>;
 
 const DRAFT_KEY = "kaupet_draft_ny_annonse";
-const NOR_STOPWORDS = new Set([
-  "og",
-  "er",
-  "en",
-  "et",
-  "i",
-  "på",
-  "med",
-  "til",
-  "av",
-  "for",
-  "som",
-  "fra",
-  "har",
-  "den",
-  "det",
-  "de",
-  "vi",
-  "du",
-  "kan",
-  "ikke",
-  "seg",
-  "han",
-  "hun",
-  "men",
-  "om",
-  "så",
-  "ut",
-  "enn",
-  "da",
-  "når",
-  "at",
-  "dem",
-  "sin",
-  "hva",
-  "ved",
-  "var",
-  "nye",
-  "ny",
-  "god",
-  "lite",
-  "litt",
-  "stor",
-  "selger",
-  "selges",
-  "kjøper",
-  "kjøpes",
-  "pris",
-  "brukt",
-  "gammel",
-]);
 
 export const Route = createFileRoute("/_authenticated/ny-annonse")({
   head: () => ({
@@ -426,15 +376,14 @@ function NewListingPage() {
     },
   });
 
-  // Smart keyword suggestions from title
-  const smartTags = useMemo(() => {
-    const words = (title ?? "")
-      .toLowerCase()
-      .replace(/[^a-zæøå0-9\s]/g, "")
-      .split(/\s+/)
-      .filter((w) => w.length >= 3 && !NOR_STOPWORDS.has(w));
-    return [...new Set(words)].slice(0, 5);
-  }, [title]);
+  // Keyword suggestions from other listings in the same category
+  const { data: keywordSuggestions, isFetching: keywordsFetching } = useQuery({
+    queryKey: ["keyword-suggestions", categoryId, debouncedTitle],
+    enabled: !!categoryId && debouncedTitle.length >= 3,
+    staleTime: 120_000,
+    queryFn: () =>
+      suggestKeywordsForListing({ data: { title: debouncedTitle, category_id: categoryId! } }),
+  });
 
   function appendTagToDescription(tag: string) {
     const current = (description ?? "").trimEnd();
@@ -647,25 +596,32 @@ function NewListingPage() {
                   </span>
                 </div>
               </div>
-              {/* Smart keyword suggestions */}
-              {smartTags.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <Tag className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="text-xs text-muted-foreground">
-                    Tips til søkeord du kan legge til i annonsen:
-                  </span>
-                  {smartTags.map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => appendTagToDescription(tag)}
-                      className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-foreground hover:bg-primary/10 hover:border-primary/40 transition-colors"
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
-              )}
+              {/* Keyword suggestions from other listings in the same category */}
+              {categoryId &&
+                (keywordsFetching || (keywordSuggestions && keywordSuggestions.length > 0)) && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Tag className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                    <span className="text-xs text-muted-foreground">
+                      Populære søkeord i denne kategorien:
+                    </span>
+                    {keywordsFetching && (
+                      <Loader2
+                        className="size-3.5 animate-spin text-muted-foreground"
+                        aria-hidden
+                      />
+                    )}
+                    {keywordSuggestions?.map(({ word }) => (
+                      <button
+                        key={word}
+                        type="button"
+                        onClick={() => appendTagToDescription(word)}
+                        className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-foreground hover:bg-primary/10 hover:border-primary/40 transition-colors"
+                      >
+                        {word}
+                      </button>
+                    ))}
+                  </div>
+                )}
               <Textarea
                 id="description"
                 rows={8}

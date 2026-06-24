@@ -1333,6 +1333,13 @@ export type Database = {
           votes: number
         }[]
       }
+      suggest_keywords_for_listing: {
+        Args: { _title: string; _category_id: string }
+        Returns: {
+          word: string
+          listing_count: number
+        }[]
+      }
       user_review_summary: {
         Args: { _user_id: string }
         Returns: {

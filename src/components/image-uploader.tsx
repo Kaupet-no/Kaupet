@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, ImagePlus, X, GripVertical } from "lucide-react";
+import { Camera, ImagePlus, Lightbulb, X, GripVertical } from "lucide-react";
 import { toast } from "sonner";
 import { MAX_IMAGES, describeImageError, validateImages } from "@/lib/storage";
 import { compressImage } from "@/lib/image-compression";
@@ -13,6 +13,34 @@ export type PendingImage = {
   previewUrl: string;
 };
 
+const GUIDE_KEY = "kaupet_photo_guide_seen";
+
+function PhotoGuide({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/60 p-3 text-sm">
+      <Lightbulb className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
+      <div className="flex-1 space-y-1">
+        <p className="font-medium">Tips for gode bilder</p>
+        <ul className="space-y-0.5 text-muted-foreground">
+          <li>· Sørg for nok lys. Ta gjerne bildet ute eller ved et vindu.</li>
+          <li>
+            · Bidra til å holde fokuset på objektet du skal selge. Ha en ryddig og nøytral bakgrunn.
+          </li>
+          <li>· Sørg for å ta bilde av eventuelle feil eller slitasje.</li>
+        </ul>
+      </div>
+      <button
+        type="button"
+        onClick={onDismiss}
+        className="shrink-0 text-amber-500 hover:text-amber-700"
+        aria-label="Lukk tips"
+      >
+        <X className="size-4" />
+      </button>
+    </div>
+  );
+}
+
 export function ImageUploader({
   images,
   onChange,
@@ -25,6 +53,19 @@ export function ImageUploader({
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
+
+  // Show guide on first-ever visit (not subsequent sessions)
+  useEffect(() => {
+    if (!localStorage.getItem(GUIDE_KEY)) {
+      setShowGuide(true);
+    }
+  }, []);
+
+  function dismissGuide() {
+    localStorage.setItem(GUIDE_KEY, "1");
+    setShowGuide(false);
+  }
 
   // Revoke object URLs on unmount
   useEffect(() => {
@@ -36,7 +77,6 @@ export function ImageUploader({
 
   const addFiles = useCallback(
     async (files: File[]) => {
-      // Sjekk antall først (billig, og uavhengig av komprimering).
       if (files.length + images.length > MAX_IMAGES) {
         toast.error(describeImageError({ kind: "too-many", allowed: MAX_IMAGES }));
         return;
@@ -92,8 +132,12 @@ export function ImageUploader({
     onChange(copy);
   };
 
+  const atLimit = images.length >= MAX_IMAGES;
+
   return (
     <div className="space-y-3">
+      {showGuide && <PhotoGuide onDismiss={dismissGuide} />}
+
       <div
         onDragOver={(e) => {
           e.preventDefault();
@@ -122,33 +166,47 @@ export function ImageUploader({
           onChange={handleFileInput}
           className="hidden"
         />
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="mt-4"
-          onClick={() => inputRef.current?.click()}
-          disabled={images.length >= MAX_IMAGES || processing}
-        >
-          Velg bilder
-        </Button>
-        {isNative() && (
+
+        {/* On native: camera is primary action */}
+        {isNative() ? (
+          <div className="mt-4 flex flex-col gap-2">
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+              className="gap-2"
+              onClick={async () => {
+                try {
+                  const file = await pickNativePhoto();
+                  if (file) addFiles([file]);
+                } catch (e: unknown) {
+                  toast.error(formatErrorMessage(e, "Kunne ikke åpne kameraet"));
+                }
+              }}
+              disabled={atLimit || processing}
+            >
+              <Camera className="size-4" /> Ta bilde / velg fra galleri
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => inputRef.current?.click()}
+              disabled={atLimit || processing}
+            >
+              Velg fra filer
+            </Button>
+          </div>
+        ) : (
           <Button
             type="button"
-            variant="default"
+            variant="outline"
             size="sm"
-            className="mt-2 gap-2"
-            onClick={async () => {
-              try {
-                const file = await pickNativePhoto();
-                if (file) addFiles([file]);
-              } catch (e: unknown) {
-                toast.error(formatErrorMessage(e, "Kunne ikke åpne kameraet"));
-              }
-            }}
-            disabled={images.length >= MAX_IMAGES || processing}
+            className="mt-4"
+            onClick={() => inputRef.current?.click()}
+            disabled={atLimit || processing}
           >
-            <Camera className="size-4" /> Ta bilde / velg fra galleri
+            Velg bilder
           </Button>
         )}
       </div>

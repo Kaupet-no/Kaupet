@@ -509,6 +509,7 @@ export type Database = {
           description: string
           display_lat: number | null
           display_lng: number | null
+          can_ship: boolean
           expires_at: string | null
           id: string
           is_free: boolean
@@ -535,6 +536,7 @@ export type Database = {
           description?: string
           display_lat?: number | null
           display_lng?: number | null
+          can_ship?: boolean
           expires_at?: string | null
           id?: string
           is_free?: boolean
@@ -552,6 +554,7 @@ export type Database = {
           view_count?: number
         }
         Update: {
+          can_ship?: boolean
           category_id?: string | null
           city?: string | null
           condition?: Database["public"]["Enums"]["listing_condition"]

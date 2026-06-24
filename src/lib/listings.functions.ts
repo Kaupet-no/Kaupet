@@ -21,6 +21,7 @@ export const createListing = createServerFn({ method: "POST" })
         city: z.string().max(100).nullable(),
         lat: z.number().nullable(),
         lng: z.number().nullable(),
+        can_ship: z.boolean(),
       })
       .parse(input),
   )
@@ -42,6 +43,7 @@ export const createListing = createServerFn({ method: "POST" })
         city: data.city,
         lat: data.lat,
         lng: data.lng,
+        can_ship: data.can_ship,
         status: "active",
         published_at: new Date().toISOString(),
       })

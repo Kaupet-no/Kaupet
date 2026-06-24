@@ -127,6 +127,25 @@ export function PublishedListingDialog({
           </div>
         </div>
 
+        {/* Next steps guide */}
+        <div className="rounded-lg bg-muted/50 px-4 py-3 text-sm">
+          <p className="mb-2 font-medium">Hva skjer nå?</p>
+          <ul className="space-y-1.5 text-muted-foreground">
+            <li className="flex gap-2">
+              <span aria-hidden>📣</span> Del annonsen med venner og på sosiale medier
+            </li>
+            <li className="flex gap-2">
+              <span aria-hidden>💬</span> Svar raskt på meldinger — kjøpere går videre
+            </li>
+            <li className="flex gap-2">
+              <span aria-hidden>✅</span> Merk som solgt når varen er solgt
+            </li>
+            <li className="flex gap-2">
+              <span aria-hidden>⏱️</span> Annonsen er aktiv i 30 dager — du kan republisere
+            </li>
+          </ul>
+        </div>
+
         {/* Actions */}
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <Button onClick={onView} className="flex-1">

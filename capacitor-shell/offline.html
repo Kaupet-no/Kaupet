@@ -173,7 +173,12 @@
   </head>
   <body>
     <main class="card" role="alert" aria-live="polite">
-      <img src="assets/logo.svg" alt="Kaupet" class="logo" />
+      <svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" aria-label="Kaupet">
+        <rect width="64" height="64" rx="14" fill="#fbf9f3"/>
+        <text x="50%" y="54%" text-anchor="middle" dominant-baseline="central"
+              font-family="Georgia, 'Times New Roman', serif"
+              font-size="48" font-weight="700" fill="#2f5d44">k</text>
+      </svg>
       <h1>Kunne ikke koble til Kaupet</h1>
       <p>Vi når ikke kaupet.no akkurat nå. Sjekk internettforbindelsen din og prøv på nytt.</p>
       <button class="retry-button" type="button" onclick="window.location.replace('https://kaupet.no/')">

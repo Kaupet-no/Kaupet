@@ -8,7 +8,7 @@ import markerShadow from "leaflet/dist/images/marker-shadow.png";
 
 const AREA_RADIUS_M = 500;
 
-const defaultIcon = L.icon({
+export const defaultMarkerIcon = L.icon({
   iconUrl: markerIcon,
   iconRetinaUrl: markerIcon2x,
   shadowUrl: markerShadow,
@@ -17,6 +17,21 @@ const defaultIcon = L.icon({
   popupAnchor: [1, -34],
   shadowSize: [41, 41],
 });
+
+export const CARTO_TILE_LAYER = {
+  attribution:
+    '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+  url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+  subdomains: "abcd",
+} as const;
+
+export const CIRCLE_STYLE = {
+  color: "oklch(0.5 0.02 140)",
+  weight: 2,
+  opacity: 0.9,
+  fillColor: "oklch(0.5 0.02 140)",
+  fillOpacity: 0.15,
+} as const;
 
 function MapClickHandler({ onChange }: { onChange: (next: { lat: number; lng: number }) => void }) {
   useMapEvents({
@@ -34,8 +49,6 @@ function Recenter({ lat, lng }: { lat: number; lng: number }) {
   useEffect(() => {
     const prev = last.current;
     last.current = { lat, lng };
-    // Only recenter when location jumps significantly (e.g. new geocode result),
-    // not on small drag adjustments.
     if (!prev) {
       const bounds = L.latLng(lat, lng).toBounds(AREA_RADIUS_M * 2.4);
       map.fitBounds(bounds, { padding: [16, 16] });
@@ -54,9 +67,11 @@ type Props = {
   lat: number;
   lng: number;
   onChange: (next: { lat: number; lng: number }) => void;
+  /** Disables all interaction (click/drag). Used as a static preview. */
+  readOnly?: boolean;
 };
 
-export function ListingLocationPicker({ lat, lng, onChange }: Props) {
+export function ListingLocationPicker({ lat, lng, onChange, readOnly = false }: Props) {
   const handlers = useMemo(
     () => ({
       dragend(e: L.DragEndEvent) {
@@ -69,32 +84,27 @@ export function ListingLocationPicker({ lat, lng, onChange }: Props) {
   );
 
   return (
-    <div className="isolate h-72 w-full overflow-hidden rounded-2xl border border-border">
+    <div className="isolate h-52 w-full overflow-hidden rounded-2xl border border-border">
       <MapContainer
         center={[lat, lng]}
         zoom={13}
-        scrollWheelZoom
-        zoomControl
+        scrollWheelZoom={!readOnly}
+        zoomControl={!readOnly}
+        dragging={!readOnly}
+        touchZoom={!readOnly}
+        doubleClickZoom={!readOnly}
+        keyboard={false}
         className="h-full w-full"
       >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-          subdomains="abcd"
+        <TileLayer {...CARTO_TILE_LAYER} />
+        <Circle center={[lat, lng]} radius={AREA_RADIUS_M} pathOptions={CIRCLE_STYLE} />
+        <Marker
+          position={[lat, lng]}
+          draggable={!readOnly}
+          icon={defaultMarkerIcon}
+          eventHandlers={readOnly ? {} : handlers}
         />
-        <Circle
-          center={[lat, lng]}
-          radius={AREA_RADIUS_M}
-          pathOptions={{
-            color: "oklch(0.5 0.02 140)",
-            weight: 2,
-            opacity: 0.9,
-            fillColor: "oklch(0.5 0.02 140)",
-            fillOpacity: 0.15,
-          }}
-        />
-        <Marker position={[lat, lng]} draggable icon={defaultIcon} eventHandlers={handlers} />
-        <MapClickHandler onChange={onChange} />
+        {!readOnly && <MapClickHandler onChange={onChange} />}
         <Recenter lat={lat} lng={lng} />
       </MapContainer>
     </div>

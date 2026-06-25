@@ -22,6 +22,8 @@ type Props = {
 
 const QR_SIZE = 320;
 const BRAND_COLOR = "#2f5d44";
+const LOGO_K_COLOR = "#f5f0e8";
+const LOGO_DOT_COLOR = "#c96d2e";
 
 async function generateQrDataUrl(url: string): Promise<string> {
   const mod = (await import("qrcode/lib/browser.js")) as {
@@ -87,15 +89,33 @@ async function generateBrandedQrDataUrl(url: string): Promise<string> {
     const by = (QR_SIZE - badge) / 2;
     const radius = Math.round(badge * 0.22);
 
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = BRAND_COLOR;
     drawRoundedRect(ctx, bx, by, badge, badge, radius);
     ctx.fill();
 
-    ctx.fillStyle = BRAND_COLOR;
-    ctx.font = `600 ${Math.round(badge * 0.78)}px Georgia, "Times New Roman", serif`;
-    ctx.textAlign = "center";
+    // Draw "k." centered in the badge, dot acts as the period
+    const fontSize = Math.round(badge * 0.72);
+    ctx.font = `700 ${fontSize}px Georgia, "Times New Roman", serif`;
+    ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillText("k", QR_SIZE / 2, QR_SIZE / 2 + badge * 0.04);
+
+    // "k." centered as a unit in the badge
+    const dotR = Math.round(badge * 0.07);
+    const gap = dotR * 0.6;
+    const kWidth = ctx.measureText("k").width;
+    const totalWidth = kWidth + gap + dotR * 2;
+    const kx = bx + (badge - totalWidth) / 2;
+    const ky = by + badge * 0.55;
+
+    ctx.fillStyle = LOGO_K_COLOR;
+    ctx.fillText("k", kx, ky);
+
+    const dotCx = kx + kWidth + gap + dotR;
+    const dotCy = ky + fontSize * 0.25;
+    ctx.fillStyle = LOGO_DOT_COLOR;
+    ctx.beginPath();
+    ctx.arc(dotCx, dotCy, dotR, 0, Math.PI * 2);
+    ctx.fill();
 
     return canvas.toDataURL("image/png");
   } catch {

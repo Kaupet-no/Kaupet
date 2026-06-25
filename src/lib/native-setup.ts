@@ -33,25 +33,51 @@ export async function setupNative(): Promise<void> {
     /* plugin unavailable */
   }
 
-  // Keyboard — resize the native WebView (not just <body>) so vh/dvh units
-  // and `position: fixed` sheets actually reflow above the keyboard instead
-  // of staying pinned behind it, and scroll the focused field into view.
+  // Visual viewport tracking — covers both layout and scroll-into-view needs.
+  //
+  // window.visualViewport.height always equals the area above the on-screen
+  // keyboard on iOS (WKWebView) and Android (WebView), making it more
+  // reliable than dvh/innerHeight in Capacitor contexts.
+  //
+  // Two things happen on every resize:
+  //   1. --vvh is updated so CSS layouts (e.g. flex-1 textareas) shrink
+  //      automatically when the keyboard appears.
+  //   2. When the viewport shrinks (keyboard opened), the currently focused
+  //      input or textarea is scrolled into view so the keyboard does not
+  //      cover it.
+  if (window.visualViewport) {
+    let prevHeight = window.visualViewport.height;
+
+    const onViewportResize = () => {
+      const h = window.visualViewport!.height;
+      document.documentElement.style.setProperty("--vvh", `${h}px`);
+
+      if (h < prevHeight) {
+        // Keyboard appeared — scroll focused field into view after the
+        // browser has had one frame to reflow the shrunken layout.
+        requestAnimationFrame(() => {
+          const el = document.activeElement as HTMLElement | null;
+          if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+            el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          }
+        });
+      }
+
+      prevHeight = h;
+    };
+
+    onViewportResize();
+    window.visualViewport.addEventListener("resize", onViewportResize);
+  }
+
+  // Keyboard — resize the native WebView (not just <body>) so position:fixed
+  // elements reflow above the keyboard rather than staying pinned behind it.
   try {
     const { Keyboard, KeyboardResize } = await import("@capacitor/keyboard");
     if (nativePlatform() === "ios") {
       await Keyboard.setResizeMode({ mode: KeyboardResize.Native });
       await Keyboard.setScroll({ isDisabled: false }).catch(() => {});
     }
-    // keyboardDidShow (not keyboardWillShow) so the resize has already
-    // happened before we measure/scroll — otherwise the focused field's
-    // container (e.g. a bottom sheet) may not have settled into its final
-    // size yet and the scroll lands in the wrong place.
-    Keyboard.addListener("keyboardDidShow", () => {
-      const el = document.activeElement as HTMLElement | null;
-      if (el && typeof el.scrollIntoView === "function") {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-    });
   } catch {
     /* plugin unavailable */
   }

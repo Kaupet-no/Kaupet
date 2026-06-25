@@ -331,9 +331,11 @@ function ConversationPage() {
 
   return (
     <div
-      className="mx-auto flex max-w-3xl flex-col px-4 py-4"
+      className="mx-auto flex max-w-3xl flex-col px-4"
       style={{
-        height: native ? "calc(100vh - 4rem - var(--app-bottom-nav-h))" : "calc(100vh - 4rem)",
+        height: native ? "calc(100vh - var(--app-bottom-nav-h))" : "calc(100vh - 4rem)",
+        paddingTop: native ? "calc(env(safe-area-inset-top) + 1rem)" : "1rem",
+        paddingBottom: "1rem",
       }}
     >
       <Link
@@ -477,7 +479,7 @@ function ConversationPage() {
       </div>
 
       <form
-        className="mt-3 flex items-end gap-2"
+        className="mt-3 flex items-stretch gap-2"
         onSubmit={(e) => {
           e.preventDefault();
           if (!sendMutation.isPending && !disabled) sendMutation.mutate(body);
@@ -503,7 +505,7 @@ function ConversationPage() {
         <Button
           type="submit"
           disabled={sendMutation.isPending || !body.trim() || disabled}
-          className="gap-2"
+          className="h-auto gap-2 self-stretch"
         >
           <Send className="size-4" /> Send
         </Button>

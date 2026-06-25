@@ -1,12 +1,14 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Loader2, ImagePlus, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, ImagePlus, X, ChevronLeft, ChevronRight, Send } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
+import { republishListing } from "@/lib/listings.functions";
 import {
   geocodeNorwayAddress,
   lookupPostalCode,
@@ -102,7 +104,7 @@ function EditListingPage() {
         supabase
           .from("listings")
           .select(
-            "id, title, description, category_id, condition, is_free, price_nok, postal_code, city, listing_images(id, storage_path, sort_order)",
+            "id, title, description, category_id, condition, is_free, price_nok, postal_code, city, status, listing_images(id, storage_path, sort_order)",
           )
           .eq("id", id)
           .single(),
@@ -304,6 +306,17 @@ function EditListingPage() {
     });
   };
 
+  const doRepublish = useServerFn(republishListing);
+  const publishDraft = useMutation({
+    mutationFn: () => doRepublish({ data: { id } }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-listings"] });
+      toast.success("Annonsen er publisert!");
+      navigate({ to: "/mine-annonser" });
+    },
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke publisere annonsen")),
+  });
+
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
       const parsed = schema.parse(values);
@@ -397,6 +410,27 @@ function EditListingPage() {
       <p className="mt-1 text-muted-foreground">
         Oppdater detaljer og bilder. Endringene lagres når du trykker «Lagre endringer».
       </p>
+
+      {listing?.status === "draft" && (
+        <div className="mt-4 flex items-center gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+          <span className="flex-1 text-amber-800 dark:text-amber-300">
+            Dette er et utkast — annonsen er ikke publisert og bare du kan se den.
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => publishDraft.mutate()}
+            disabled={publishDraft.isPending}
+          >
+            {publishDraft.isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Send className="size-4" />
+            )}
+            Publiser annonsen
+          </Button>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="mt-8 space-y-8">
         {/* Images */}

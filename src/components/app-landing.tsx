@@ -134,7 +134,7 @@ export function AppLanding() {
     "flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary";
 
   return (
-    <div className="pb-24">
+    <div className={isNative ? "pb-3" : "pb-24"}>
       {isNative && <AppHeroLogo />}
 
       {/* Hero — sentrert søkefelt */}

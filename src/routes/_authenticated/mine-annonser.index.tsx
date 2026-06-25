@@ -14,6 +14,7 @@ import {
   Clock,
   Sparkles,
   Check,
+  Send,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -333,6 +334,11 @@ function ListingRow({
           {row.status === "expired" && (
             <span className="text-xs text-muted-foreground">Publiser på nytt for 30 nye dager</span>
           )}
+          {row.status === "draft" && (
+            <span className="text-xs text-muted-foreground">
+              Ikke publisert — bare du kan se dette
+            </span>
+          )}
           {activePromotion && (
             <span className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-xs text-accent">
               <Sparkles className="size-3" />
@@ -387,6 +393,10 @@ function ListingRow({
         ) : row.status === "expired" ? (
           <Button size="sm" variant="outline" onClick={onRepublish} disabled={busy}>
             <RotateCcw className="size-4" /> Publiser på nytt
+          </Button>
+        ) : row.status === "draft" ? (
+          <Button size="sm" variant="outline" onClick={onRepublish} disabled={busy}>
+            <Send className="size-4" /> Publiser
           </Button>
         ) : (
           <Button size="sm" variant="outline" onClick={onReactivate} disabled={busy}>

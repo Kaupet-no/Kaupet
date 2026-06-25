@@ -9,10 +9,10 @@ const config: CapacitorConfig = {
   // the iOS/Android overscroll bounce when scrolling past the top/bottom.
   backgroundColor: "#fbf9f3",
   server: {
-    url: "https://kaupet.no",
+    url: "http://10.0.2.2:8081",
     errorPath: "offline.html",
-    cleartext: false,
-    androidScheme: "https",
+    cleartext: true,
+    androidScheme: "http",
   },
   ios: {
     // "never" (Capacitor's default): the app already handles safe-area

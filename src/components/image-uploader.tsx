@@ -17,25 +17,16 @@ const GUIDE_KEY = "kaupet_photo_guide_seen";
 
 function PhotoGuide({ onDismiss }: { onDismiss: () => void }) {
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/60 p-3 text-sm">
-      <Lightbulb className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
-      <div className="flex-1 space-y-1">
-        <p className="font-medium">Tips for gode bilder</p>
-        <ul className="space-y-0.5 text-muted-foreground">
-          <li>· Sørg for nok lys. Ta gjerne bildet ute eller ved et vindu.</li>
-          <li>
-            · Bidra til å holde fokuset på objektet du skal selge. Ha en ryddig og nøytral bakgrunn.
-          </li>
-          <li>· Sørg for å ta bilde av eventuelle feil eller slitasje.</li>
-        </ul>
-      </div>
+    <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+      <Lightbulb className="size-3.5 shrink-0 text-accent" aria-hidden />
+      <span className="flex-1">Tips: Godt lys, nøytral bakgrunn og bilde av eventuelle feil.</span>
       <button
         type="button"
         onClick={onDismiss}
-        className="shrink-0 text-amber-500 hover:text-amber-700"
+        className="shrink-0 hover:text-foreground"
         aria-label="Lukk tips"
       >
-        <X className="size-4" />
+        <X className="size-3.5" />
       </button>
     </div>
   );
@@ -145,7 +136,7 @@ export function ImageUploader({
         }}
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
-        className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10 text-center transition ${
+        className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-6 text-center transition ${
           dragOver
             ? "border-primary bg-primary/5"
             : "border-border bg-surface hover:border-primary/40"
@@ -153,10 +144,7 @@ export function ImageUploader({
       >
         <ImagePlus className="mb-2 size-7 text-muted-foreground" />
         <p className="text-sm font-medium">
-          {dragOver ? "Slipp her for å laste opp" : "Slipp bilder her eller velg fra enheten"}
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          JPG, PNG eller WebP. Maks {MAX_IMAGES} bilder.
+          {dragOver ? "Slipp her for å laste opp" : "Legg til bilder"}
         </p>
         <input
           ref={inputRef}
@@ -226,7 +214,7 @@ export function ImageUploader({
       {images.length > 0 && (
         <>
           <p className="text-xs text-muted-foreground">
-            {images.length} av {MAX_IMAGES} bilder. Første bilde er hovedbildet.
+            {images.length} av {MAX_IMAGES} bilder
           </p>
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
             {images.map((img, idx) => (

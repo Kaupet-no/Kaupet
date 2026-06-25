@@ -41,6 +41,9 @@ import {
 import { formatErrorMessage } from "@/lib/errors";
 import { formatPrice } from "@/lib/format";
 import { STATUS_LABEL } from "@/lib/constants";
+import { getMyWtbListings, deleteWtbListing } from "@/lib/wtb-listings.functions";
+import { formatDistanceToNow } from "date-fns";
+import { nb } from "date-fns/locale";
 
 export const Route = createFileRoute("/_authenticated/mine-annonser/")({
   head: () => ({
@@ -75,7 +78,7 @@ function daysLeft(expires_at: string | null): number | null {
 
 function MyListingsPage() {
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<"all" | "active" | "sold" | "draft">("all");
+  const [tab, setTab] = useState<"all" | "active" | "sold" | "draft" | "wtb">("all");
   const [promoteId, setPromoteId] = useState<string | null>(null);
   const { data: isDemo = false } = useIsDemo();
 
@@ -83,6 +86,21 @@ function MyListingsPage() {
   const { data: promos } = useQuery({
     queryKey: ["my-promotions"],
     queryFn: () => fetchPromos(),
+  });
+
+  const fetchMyWtb = useServerFn(getMyWtbListings);
+  const deleteWtbFn = useServerFn(deleteWtbListing);
+  const { data: wtbRows = [], isLoading: wtbLoading } = useQuery({
+    queryKey: ["my-wtb-listings"],
+    queryFn: () => fetchMyWtb(),
+  });
+  const deleteWtbMutation = useMutation({
+    mutationFn: (id: string) => deleteWtbFn({ data: { id } }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-wtb-listings"] });
+      toast.success("Ønskes kjøpt-annonsen er slettet");
+    },
+    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke slette annonsen")),
   });
   const activePromoByListing = new Map<string, { expires_at: string | null; is_gift: boolean }>();
   for (const p of promos ?? []) {
@@ -209,36 +227,112 @@ function MyListingsPage() {
           <TabsTrigger value="active">Aktive</TabsTrigger>
           <TabsTrigger value="sold">Solgt / utløpt</TabsTrigger>
           <TabsTrigger value="draft">Utkast</TabsTrigger>
+          <TabsTrigger value="wtb">
+            Ønskes kjøpt{wtbRows.length > 0 ? ` (${wtbRows.length})` : ""}
+          </TabsTrigger>
         </TabsList>
-        <TabsContent value={tab} className="mt-6">
-          {isLoading ? (
+        {tab !== "wtb" && (
+          <TabsContent value={tab} className="mt-6">
+            {isLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" /> Laster annonser…
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border bg-surface px-6 py-12 text-center">
+                <p className="text-sm text-muted-foreground">Ingen annonser å vise her.</p>
+                <Link to="/ny-annonse" className="mt-4 inline-block">
+                  <Button size="sm" variant="outline">
+                    <Plus className="size-4" /> Opprett din første annonse
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <ul className="space-y-3">
+                {filtered.map((r) => (
+                  <ListingRow
+                    key={r.id}
+                    row={r}
+                    isDemo={isDemo}
+                    activePromotion={activePromoByListing.get(r.id) ?? null}
+                    onPromote={() => setPromoteId(r.id)}
+                    onMarkSold={() => updateStatus.mutate({ id: r.id, status: "sold" })}
+                    onReactivate={() => updateStatus.mutate({ id: r.id, status: "active" })}
+                    onRepublish={() => republish.mutate(r.id)}
+                    onDelete={() => deleteListing.mutate(r.id)}
+                    busy={updateStatus.isPending || deleteListing.isPending || republish.isPending}
+                  />
+                ))}
+              </ul>
+            )}
+          </TabsContent>
+        )}
+
+        <TabsContent value="wtb" className="mt-6">
+          {wtbLoading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" /> Laster annonser…
+              <Loader2 className="size-4 animate-spin" /> Laster…
             </div>
-          ) : filtered.length === 0 ? (
+          ) : wtbRows.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border bg-surface px-6 py-12 text-center">
-              <p className="text-sm text-muted-foreground">Ingen annonser å vise her.</p>
-              <Link to="/ny-annonse" className="mt-4 inline-block">
+              <p className="text-sm text-muted-foreground">
+                Du har ingen ønskes kjøpt-annonser ennå.
+              </p>
+              <Link to="/ny-ok-annonse" className="mt-4 inline-block">
                 <Button size="sm" variant="outline">
-                  <Plus className="size-4" /> Opprett din første annonse
+                  <Plus className="size-4" /> Opprett ønskes kjøpt
                 </Button>
               </Link>
             </div>
           ) : (
             <ul className="space-y-3">
-              {filtered.map((r) => (
-                <ListingRow
-                  key={r.id}
-                  row={r}
-                  isDemo={isDemo}
-                  activePromotion={activePromoByListing.get(r.id) ?? null}
-                  onPromote={() => setPromoteId(r.id)}
-                  onMarkSold={() => updateStatus.mutate({ id: r.id, status: "sold" })}
-                  onReactivate={() => updateStatus.mutate({ id: r.id, status: "active" })}
-                  onRepublish={() => republish.mutate(r.id)}
-                  onDelete={() => deleteListing.mutate(r.id)}
-                  busy={updateStatus.isPending || deleteListing.isPending || republish.isPending}
-                />
+              {wtbRows.map((w) => (
+                <li
+                  key={w.id}
+                  className="flex items-start justify-between gap-4 rounded-xl border bg-card p-4"
+                >
+                  <div className="flex flex-col gap-1">
+                    <p className="font-medium">{w.title}</p>
+                    {w.description && (
+                      <p className="line-clamp-2 text-sm text-muted-foreground">{w.description}</p>
+                    )}
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      {w.categories && <span>{w.categories.name_nb}</span>}
+                      {w.max_price_nok != null && (
+                        <span>· Maks {w.max_price_nok.toLocaleString("nb-NO")} kr</span>
+                      )}
+                      <span>
+                        ·{" "}
+                        {formatDistanceToNow(new Date(w.created_at), {
+                          addSuffix: true,
+                          locale: nb,
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="shrink-0 text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Slett ønskes kjøpt-annonse?</AlertDialogTitle>
+                        <AlertDialogDescription>Dette kan ikke angres.</AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => deleteWtbMutation.mutate(w.id)}>
+                          Slett
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </li>
               ))}
             </ul>
           )}

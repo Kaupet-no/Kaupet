@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { Expand, LayoutList, LayoutGrid, Map as MapIcon, Save } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
@@ -31,6 +32,12 @@ import { NativeAdvancedSearch } from "@/components/native-advanced-search";
 import { reverseGeocode } from "@/lib/geocode";
 import { saveLastSearchContext } from "@/lib/last-search-context";
 import { summarizeCriteria } from "@/lib/saved-searches";
+import {
+  countWtbListings,
+  listWtbListings,
+  type WtbListingWithProfile,
+} from "@/lib/wtb-listings.functions";
+import { WtbListingCard } from "@/components/wtb-listing-card";
 import { useAuth } from "@/lib/use-auth";
 import { useIsNative } from "@/lib/use-is-native";
 import { hapticImpact, hapticNotification } from "@/lib/haptics";
@@ -158,6 +165,7 @@ function BrowsePage() {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
   const [advancedOverlayOpen, setAdvancedOverlayOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"listings" | "wtb">("listings");
 
   const { refreshing, pullDistance } = usePullToRefresh({
     enabled: isNative && mounted,
@@ -448,6 +456,44 @@ function BrowsePage() {
       });
     },
   });
+
+  const countWtbFn = useServerFn(countWtbListings);
+  const listWtbFn = useServerFn(listWtbListings);
+
+  const wtbQueryParams = useMemo(
+    () => ({
+      q: search.q || undefined,
+      categories: effectiveCategories.length
+        ? effectiveCategories
+            .map((slug: string) => categories?.find((c) => c.slug === slug)?.id)
+            .filter((id): id is string => !!id)
+        : undefined,
+    }),
+    [search.q, effectiveCategories, categories],
+  );
+
+  const hasSearchCriteria = !!(search.q || effectiveCategories.length);
+
+  const { data: wtbCount = 0 } = useQuery({
+    queryKey: ["wtb-count", wtbQueryParams],
+    enabled: hasSearchCriteria,
+    staleTime: 60_000,
+    queryFn: () => countWtbFn({ data: wtbQueryParams }),
+  });
+
+  const { data: wtbResult } = useQuery({
+    queryKey: ["wtb-list", wtbQueryParams],
+    enabled: activeTab === "wtb" && hasSearchCriteria,
+    staleTime: 60_000,
+    queryFn: () => listWtbFn({ data: { ...wtbQueryParams, limit: 50, offset: 0 } }),
+  });
+
+  const wtbListings: WtbListingWithProfile[] = wtbResult?.rows ?? [];
+
+  // Reset to listings tab when search criteria change
+  useEffect(() => {
+    setActiveTab("listings");
+  }, [search.q, search.category, search.categories]);
 
   const updateSearch = (patch: Partial<z.infer<typeof searchSchema>>) => {
     navigate({ search: (prev: z.infer<typeof searchSchema>) => ({ ...prev, ...patch }) });
@@ -815,109 +861,153 @@ function BrowsePage() {
         />
       )}
 
-      <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_420px]">
-        <div>
-          {!isLoading && (
-            <FeaturedListingsSection
-              categorySlug={effectiveCategories.length === 1 ? effectiveCategories[0] : undefined}
-              allowedIds={new Set((listings ?? []).map((l) => l.id))}
-              limit={3}
-            />
-          )}
-          {isLoading ? (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="animate-pulse overflow-hidden rounded-xl border border-border bg-card"
-                >
-                  <div className="aspect-[4/3] bg-muted" />
-                  <div className="space-y-2 p-3">
-                    <div className="h-4 w-4/5 rounded bg-muted" />
-                    <div className="h-4 w-1/3 rounded bg-muted" />
-                    <div className="h-3 w-1/2 rounded bg-muted" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : cards.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border bg-surface p-12 text-center">
-              <p className="text-lg font-medium">Ingen annonser funnet</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Prøv et bredere søk eller øk radiusen.
-              </p>
-              <Button variant="outline" className="mt-4" onClick={resetFilters}>
-                Nullstill filtre
-              </Button>
+      {/* ØK-tab — vises kun når søkkriterier gir treff */}
+      {hasSearchCriteria && wtbCount > 0 && (
+        <div className="mt-4 flex gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab("listings")}
+            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+              activeTab === "listings"
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground hover:bg-muted/80"
+            }`}
+          >
+            Til salgs
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("wtb")}
+            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+              activeTab === "wtb"
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground hover:bg-muted/80"
+            }`}
+          >
+            Ønskes kjøpt ({wtbCount})
+          </button>
+        </div>
+      )}
+
+      {activeTab === "wtb" ? (
+        <div className="mt-4">
+          {wtbListings.length === 0 ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             </div>
           ) : (
-            <div
-              className={
-                isNative && viewMode === "list"
-                  ? "flex flex-col gap-3"
-                  : "grid grid-cols-2 gap-4 sm:grid-cols-3"
-              }
-            >
-              {cards.map((l) => (
-                <ListingCard
-                  key={l.id}
-                  listing={l}
-                  highlighted={hoveredId === l.id || activeId === l.id}
-                  onHoverChange={setHoveredId}
-                  compact={isNative && viewMode === "list"}
-                />
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {wtbListings.map((w) => (
+                <WtbListingCard key={w.id} listing={w} />
               ))}
-            </div>
-          )}
-          {/* Last inn flere (web) / Infinite scroll sentinel (native) */}
-          {!isLoading &&
-            cards.length >= PAGE_SIZE * loadedPages &&
-            (isNative ? (
-              <div ref={sentinelRef} className="h-4" />
-            ) : (
-              <div className="mt-6 flex justify-center">
-                <Button variant="outline" onClick={() => setLoadedPages((p) => p + 1)}>
-                  Last inn flere annonser
-                </Button>
-              </div>
-            ))}
-          {isLoading && loadedPages > 1 && (
-            <div className="mt-6 flex justify-center">
-              <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             </div>
           )}
         </div>
-
-        {isDesktop && (
-          <aside>
-            <div className="sticky top-20 h-[calc(100vh-6rem)]">
-              <div className="relative h-full overflow-hidden rounded-2xl border border-border shadow-sm">
-                {renderMap(true)}
-                <Dialog open={bigMapOpen} onOpenChange={setBigMapOpen}>
-                  <DialogTrigger asChild>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      className="absolute right-3 top-3 z-[450] rounded-full shadow-md"
-                    >
-                      <Expand className="size-4" /> Utvid
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-[95vw] p-0 sm:max-w-[95vw]">
-                    <DialogHeader className="px-4 pt-4">
-                      <DialogTitle>Kart</DialogTitle>
-                    </DialogHeader>
-                    <div className="h-[85vh] w-full p-4 pt-2">
-                      {bigMapOpen ? renderMap(true) : null}
+      ) : (
+        <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_420px]">
+          <div>
+            {!isLoading && (
+              <FeaturedListingsSection
+                categorySlug={effectiveCategories.length === 1 ? effectiveCategories[0] : undefined}
+                allowedIds={new Set((listings ?? []).map((l) => l.id))}
+                limit={3}
+              />
+            )}
+            {isLoading ? (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="animate-pulse overflow-hidden rounded-xl border border-border bg-card"
+                  >
+                    <div className="aspect-[4/3] bg-muted" />
+                    <div className="space-y-2 p-3">
+                      <div className="h-4 w-4/5 rounded bg-muted" />
+                      <div className="h-4 w-1/3 rounded bg-muted" />
+                      <div className="h-3 w-1/2 rounded bg-muted" />
                     </div>
-                  </DialogContent>
-                </Dialog>
+                  </div>
+                ))}
               </div>
-            </div>
-          </aside>
-        )}
-      </div>
+            ) : cards.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border bg-surface p-12 text-center">
+                <p className="text-lg font-medium">Ingen annonser funnet</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Prøv et bredere søk eller øk radiusen.
+                </p>
+                <Button variant="outline" className="mt-4" onClick={resetFilters}>
+                  Nullstill filtre
+                </Button>
+              </div>
+            ) : (
+              <div
+                className={
+                  isNative && viewMode === "list"
+                    ? "flex flex-col gap-3"
+                    : "grid grid-cols-2 gap-4 sm:grid-cols-3"
+                }
+              >
+                {cards.map((l) => (
+                  <ListingCard
+                    key={l.id}
+                    listing={l}
+                    highlighted={hoveredId === l.id || activeId === l.id}
+                    onHoverChange={setHoveredId}
+                    compact={isNative && viewMode === "list"}
+                  />
+                ))}
+              </div>
+            )}
+            {/* Last inn flere (web) / Infinite scroll sentinel (native) */}
+            {!isLoading &&
+              cards.length >= PAGE_SIZE * loadedPages &&
+              (isNative ? (
+                <div ref={sentinelRef} className="h-4" />
+              ) : (
+                <div className="mt-6 flex justify-center">
+                  <Button variant="outline" onClick={() => setLoadedPages((p) => p + 1)}>
+                    Last inn flere annonser
+                  </Button>
+                </div>
+              ))}
+            {isLoading && loadedPages > 1 && (
+              <div className="mt-6 flex justify-center">
+                <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              </div>
+            )}
+          </div>
+
+          {isDesktop && (
+            <aside>
+              <div className="sticky top-20 h-[calc(100vh-6rem)]">
+                <div className="relative h-full overflow-hidden rounded-2xl border border-border shadow-sm">
+                  {renderMap(true)}
+                  <Dialog open={bigMapOpen} onOpenChange={setBigMapOpen}>
+                    <DialogTrigger asChild>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        className="absolute right-3 top-3 z-[450] rounded-full shadow-md"
+                      >
+                        <Expand className="size-4" /> Utvid
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-[95vw] p-0 sm:max-w-[95vw]">
+                      <DialogHeader className="px-4 pt-4">
+                        <DialogTitle>Kart</DialogTitle>
+                      </DialogHeader>
+                      <div className="h-[85vh] w-full p-4 pt-2">
+                        {bigMapOpen ? renderMap(true) : null}
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </div>
+            </aside>
+          )}
+        </div>
+      )}
 
       {/* Native kart-FAB + Sheet */}
       {isNative && (

@@ -1,13 +1,15 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Bell, MessageCircle, Plus, LogIn, Home } from "lucide-react";
+import { Bell, MessageCircle, Plus, X, LogIn, Home, PackageOpen, Search } from "lucide-react";
 import { useState } from "react";
 
 import { useAuth } from "@/lib/use-auth";
 import { useUnreadConversationsCount } from "@/lib/use-unread";
 import { useIsAdmin } from "@/lib/use-is-admin";
 import { hapticImpact } from "@/lib/haptics";
+import { isNative } from "@/lib/native";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { NotificationsBell } from "@/components/notifications-bell";
@@ -25,6 +27,11 @@ export function AppBottomNav() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const unread = useUnreadConversationsCount();
   const [userOpen, setUserOpen] = useState(false);
+  const [adPickerOpen, setAdPickerOpen] = useState(false);
+  const native = isNative();
+
+  const isOnNewAdPage =
+    native && (pathname.startsWith("/ny-annonse") || pathname.startsWith("/ny-ok-annonse"));
 
   const isActive = (p: string) => pathname === p || pathname.startsWith(p + "/");
 
@@ -73,16 +80,40 @@ export function AppBottomNav() {
 
         {/* Ny annonse (FAB) — midten */}
         <div className="-mt-7 flex flex-1 flex-col items-center gap-0.5">
-          <Link
-            to={user ? "/ny-annonse" : "/auth"}
-            search={user ? undefined : { mode: "signup" as const }}
-            aria-label="Ny annonse"
-            onClick={() => void hapticImpact("light")}
-            className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background transition active:scale-95"
-          >
-            <Plus className="size-8" />
-          </Link>
-          <span className="text-[11px] text-muted-foreground">Selg</span>
+          {user ? (
+            <button
+              type="button"
+              aria-label={isOnNewAdPage ? "Avbryt" : "Ny annonse"}
+              onClick={() => {
+                void hapticImpact("light");
+                if (isOnNewAdPage) {
+                  void navigate({ to: "/" });
+                } else {
+                  setAdPickerOpen((o) => !o);
+                }
+              }}
+              className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background transition active:scale-95"
+            >
+              {isOnNewAdPage || (native && adPickerOpen) ? (
+                <X key="x" className="size-8 animate-[fab-icon-in_0.18s_ease-out]" />
+              ) : (
+                <Plus key="plus" className="size-8 animate-[fab-icon-in_0.18s_ease-out]" />
+              )}
+            </button>
+          ) : (
+            <Link
+              to="/auth"
+              search={{ mode: "signup" as const }}
+              aria-label="Ny annonse"
+              onClick={() => void hapticImpact("light")}
+              className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background transition active:scale-95"
+            >
+              <Plus className="size-8" />
+            </Link>
+          )}
+          <span className="text-[11px] text-muted-foreground">
+            {isOnNewAdPage ? "Avbryt" : "Ny annonse"}
+          </span>
         </div>
 
         {/* Meldinger */}
@@ -129,7 +160,80 @@ export function AppBottomNav() {
           <span className="text-[11px] text-muted-foreground">{user ? "Meg" : "Logg inn"}</span>
         </div>
       </div>
+
+      {/* Ny annonse-velger: web = Dialog, native = Sheet */}
+      {!native && (
+        <Dialog open={adPickerOpen} onOpenChange={setAdPickerOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Ny annonse</DialogTitle>
+            </DialogHeader>
+            <AdPickerOptions
+              onSell={() => {
+                setAdPickerOpen(false);
+                void navigate({ to: "/ny-annonse", search: { type: "sell" } });
+              }}
+              onBuy={() => {
+                setAdPickerOpen(false);
+                void navigate({ to: "/ny-ok-annonse" });
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+      {native && (
+        <Sheet open={adPickerOpen} onOpenChange={setAdPickerOpen}>
+          <SheetContent side="bottom" className="rounded-t-2xl pb-8">
+            <SheetHeader>
+              <SheetTitle>Ny annonse</SheetTitle>
+            </SheetHeader>
+            <AdPickerOptions
+              onSell={() => {
+                setAdPickerOpen(false);
+                void navigate({ to: "/ny-annonse", search: { type: "sell" } });
+              }}
+              onBuy={() => {
+                setAdPickerOpen(false);
+                void navigate({ to: "/ny-ok-annonse" });
+              }}
+            />
+          </SheetContent>
+        </Sheet>
+      )}
     </nav>
+  );
+}
+
+function AdPickerOptions({ onSell, onBuy }: { onSell: () => void; onBuy: () => void }) {
+  return (
+    <div className="flex flex-col gap-3 pt-2">
+      <button
+        type="button"
+        onClick={onSell}
+        className="flex items-center gap-4 rounded-xl border bg-card p-5 text-left transition hover:border-primary hover:shadow-sm"
+      >
+        <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary/10">
+          <PackageOpen className="size-6 text-primary" />
+        </div>
+        <div>
+          <p className="font-semibold">Jeg selger eller gir bort noe</p>
+          <p className="text-sm text-muted-foreground">Legg ut en annonse med bilder og pris</p>
+        </div>
+      </button>
+      <button
+        type="button"
+        onClick={onBuy}
+        className="flex items-center gap-4 rounded-xl border bg-card p-5 text-left transition hover:border-primary hover:shadow-sm"
+      >
+        <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-secondary">
+          <Search className="size-6 text-secondary-foreground" />
+        </div>
+        <div>
+          <p className="font-semibold">Jeg ønsker å kjøpe noe</p>
+          <p className="text-sm text-muted-foreground">Legg ut en ønskes kjøpt-annonse</p>
+        </div>
+      </button>
+    </div>
   );
 }
 

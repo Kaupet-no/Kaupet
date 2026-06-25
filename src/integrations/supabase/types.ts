@@ -110,7 +110,8 @@ export type Database = {
           created_at: string
           id: string
           last_message_at: string
-          listing_id: string
+          listing_id: string | null
+          wtb_listing_id: string | null
           seller_id: string
           seller_last_read_at: string | null
         }
@@ -120,7 +121,8 @@ export type Database = {
           created_at?: string
           id?: string
           last_message_at?: string
-          listing_id: string
+          listing_id?: string | null
+          wtb_listing_id?: string | null
           seller_id: string
           seller_last_read_at?: string | null
         }
@@ -130,7 +132,8 @@ export type Database = {
           created_at?: string
           id?: string
           last_message_at?: string
-          listing_id?: string
+          listing_id?: string | null
+          wtb_listing_id?: string | null
           seller_id?: string
           seller_last_read_at?: string | null
         }
@@ -140,6 +143,68 @@ export type Database = {
             columns: ["listing_id"]
             isOneToOne: false
             referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_wtb_listing_id_fkey"
+            columns: ["wtb_listing_id"]
+            isOneToOne: false
+            referencedRelation: "wtb_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wtb_listings: {
+        Row: {
+          id: string
+          user_id: string
+          title: string
+          description: string | null
+          category_id: string | null
+          max_price_nok: number | null
+          status: string
+          created_at: string
+          updated_at: string
+          expires_at: string
+          search_vector: unknown
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          title: string
+          description?: string | null
+          category_id?: string | null
+          max_price_nok?: number | null
+          status?: string
+          created_at?: string
+          updated_at?: string
+          expires_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          title?: string
+          description?: string | null
+          category_id?: string | null
+          max_price_nok?: number | null
+          status?: string
+          created_at?: string
+          updated_at?: string
+          expires_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wtb_listings_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wtb_listings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

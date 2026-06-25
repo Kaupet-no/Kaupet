@@ -45,7 +45,7 @@
         justify-content: center;
         padding: 24px;
         padding-top: max(24px, env(safe-area-inset-top));
-        padding-bottom: max(24px, env(safe-area-inset-bottom));
+        padding-bottom: max(24px, calc(6rem + env(safe-area-inset-bottom)));
       }
       .card {
         background: var(--surface);
@@ -57,11 +57,29 @@
         text-align: center;
         box-shadow: 0 10px 30px -20px rgba(0, 0, 0, 0.25);
       }
-      .logo {
-        width: 64px;
-        height: 64px;
-        margin: 0 auto 20px;
-        display: block;
+      .wordmark {
+        display: flex;
+        align-items: baseline;
+        justify-content: center;
+        gap: 0.1em;
+        margin-bottom: 20px;
+        font-family: Georgia, "Times New Roman", ui-serif, serif;
+        font-size: 52px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1;
+      }
+      .wordmark__name { color: var(--primary); }
+      .wordmark__dot  { color: var(--accent); transition: opacity 0.1s; }
+      .wordmark__dot--hidden { opacity: 0; }
+      .wordmark__tld  { color: var(--muted); font-size: 42px; }
+      #ball-canvas {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 100;
       }
       h1 {
         margin: 0 0 8px;
@@ -70,35 +88,10 @@
         letter-spacing: -0.01em;
       }
       p {
-        margin: 0 0 24px;
+        margin: 0;
         color: var(--muted);
         font-size: 15px;
         line-height: 1.5;
-      }
-      .retry-button {
-        appearance: none;
-        border: none;
-        background: var(--primary);
-        color: var(--primary-fg);
-        font: inherit;
-        font-weight: 600;
-        font-size: 15px;
-        padding: 12px 24px;
-        border-radius: 10px;
-        cursor: pointer;
-        width: 100%;
-        transition: opacity 0.15s ease;
-      }
-      .retry-button:active {
-        opacity: 0.85;
-      }
-      .hint {
-        margin-top: 16px;
-        font-size: 13px;
-        color: var(--muted);
-      }
-      body {
-        padding-bottom: max(24px, calc(6rem + env(safe-area-inset-bottom)));
       }
       .bottom-nav {
         position: fixed;
@@ -137,13 +130,8 @@
         align-items: center;
         gap: 2px;
         color: var(--muted);
-        cursor: pointer;
-      }
-      .bottom-nav__item:disabled {
         cursor: default;
-      }
-      .bottom-nav__item--active {
-        color: var(--primary);
+        opacity: 0.5;
       }
       .bottom-nav__icon {
         display: flex;
@@ -173,39 +161,28 @@
   </head>
   <body>
     <main class="card" role="alert" aria-live="polite">
-      <svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" aria-label="Kaupet">
-        <rect width="64" height="64" rx="14" fill="#fbf9f3"/>
-        <text x="50%" y="54%" text-anchor="middle" dominant-baseline="central"
-              font-family="Georgia, 'Times New Roman', serif"
-              font-size="48" font-weight="700" fill="#2f5d44">k</text>
-      </svg>
-      <h1>Kunne ikke koble til Kaupet</h1>
-      <p>Vi når ikke kaupet.no akkurat nå. Sjekk internettforbindelsen din og prøv på nytt.</p>
-      <button class="retry-button" type="button" onclick="window.location.replace('https://kaupet.no/')">
-        Prøv på nytt
-      </button>
-      <p class="hint">Hvis problemet vedvarer, prøv igjen om noen minutter.</p>
+      <div class="wordmark" aria-label="kaupet.no">
+        <span class="wordmark__name">kaupet</span><span class="wordmark__dot">.</span><span class="wordmark__tld">no</span>
+      </div>
+
+      <h1>Oi, da.</h1>
+      <p>Vi har visst litt problemer med å nå baksystemet vårt. Vennligst prøv igjen senere.</p>
     </main>
 
-    <!-- Static stand-in for the app's bottom navigation (AppBottomNav), shown
-         here too so the app shell feels consistent even when fully offline.
-         Navigation isn't functional without a connection, so every item
-         simply retries the connection like the button above. -->
+    <canvas id="ball-canvas" aria-hidden="true"></canvas>
+
+    <!-- Static stand-in for the app's bottom navigation. All items disabled
+         since navigation is not functional without a connection. -->
     <nav class="bottom-nav" aria-hidden="true">
       <div class="bottom-nav__bar">
-        <button
-          type="button"
-          class="bottom-nav__item bottom-nav__item--active"
-          onclick="window.location.replace('https://kaupet.no/')"
-          aria-label="Hjem"
-        >
+        <button type="button" class="bottom-nav__item" disabled aria-label="Hjem">
           <span class="bottom-nav__icon">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7" /><path d="M5 10v10a1 1 0 0 0 1 1h3v-6h6v6h3a1 1 0 0 0 1-1V10" /></svg>
           </span>
           <span class="bottom-nav__label">Hjem</span>
         </button>
 
-        <button type="button" class="bottom-nav__item" disabled aria-label="Varsler" style="opacity: 0.5">
+        <button type="button" class="bottom-nav__item" disabled aria-label="Varsler">
           <span class="bottom-nav__icon">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0" /><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" /></svg>
           </span>
@@ -216,17 +193,17 @@
           <span class="bottom-nav__fab" aria-hidden="true">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
           </span>
-          <span class="bottom-nav__label" style="opacity: 0.5">Selg</span>
+          <span class="bottom-nav__label">Selg</span>
         </div>
 
-        <button type="button" class="bottom-nav__item" disabled aria-label="Meldinger" style="opacity: 0.5">
+        <button type="button" class="bottom-nav__item" disabled aria-label="Meldinger">
           <span class="bottom-nav__icon">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" /></svg>
           </span>
           <span class="bottom-nav__label">Meldinger</span>
         </button>
 
-        <button type="button" class="bottom-nav__item" disabled aria-label="Logg inn" style="opacity: 0.5">
+        <button type="button" class="bottom-nav__item" disabled aria-label="Logg inn">
           <span class="bottom-nav__icon">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><path d="M10 17l5-5-5-5" /><path d="M15 12H3" /></svg>
           </span>
@@ -234,5 +211,142 @@
         </button>
       </div>
     </nav>
+    <script>
+    (function () {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+      const canvas = document.getElementById('ball-canvas');
+      const ctx = canvas.getContext('2d');
+      const dot = document.querySelector('.wordmark__dot');
+
+      const RADIUS = 10;
+      const GRAVITY = 0.45;
+      const RESTITUTION = 0.68;
+      const FRICTION = 0.91;
+      const IMPULSE = 15;
+      const COLOR = '#d97a3c';
+
+      let active = false;
+      let ball = { x: 0, y: 0, vx: 0, vy: 0, scaleY: 1, scaleX: 1 };
+      let rafId = null;
+
+      function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+      window.addEventListener('resize', resize);
+      resize();
+
+      function getDotCenter() {
+        const r = dot.getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      }
+
+      function applyImpulse(tapX, tapY) {
+        const dx = ball.x - tapX;
+        const dy = ball.y - tapY;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        ball.vx += (dx / dist) * IMPULSE;
+        ball.vy += (dy / dist) * IMPULSE;
+      }
+
+      function launch(tapX, tapY) {
+        const center = getDotCenter();
+        ball.x = center.x;
+        ball.y = center.y;
+        ball.vx = (tapX - center.x) * 0.08;
+        ball.vy = -8;
+        dot.classList.add('wordmark__dot--hidden');
+        active = true;
+        rafId = requestAnimationFrame(tick);
+      }
+
+      function tick() {
+        const W = canvas.width;
+        const H = canvas.height;
+
+        ball.vy += GRAVITY;
+
+        ball.x += ball.vx;
+        ball.y += ball.vy;
+
+        // Reset squash/stretch
+        ball.scaleX = 1;
+        ball.scaleY = 1;
+
+        // Floor
+        if (ball.y + RADIUS >= H) {
+          ball.y = H - RADIUS;
+          const speed = Math.abs(ball.vy);
+          if (speed > 1) {
+            ball.vy *= -RESTITUTION;
+            ball.vx *= FRICTION;
+            // Squash on impact
+            const squash = Math.min(0.35, speed * 0.018);
+            ball.scaleY = 1 - squash;
+            ball.scaleX = 1 + squash * 0.6;
+          } else {
+            ball.vy = 0;
+            ball.vx *= FRICTION;
+          }
+        }
+
+        // Ceiling
+        if (ball.y - RADIUS <= 0) {
+          ball.y = RADIUS;
+          ball.vy *= -RESTITUTION;
+        }
+
+        // Sides
+        if (ball.x + RADIUS >= W) {
+          ball.x = W - RADIUS;
+          ball.vx *= -RESTITUTION;
+        }
+        if (ball.x - RADIUS <= 0) {
+          ball.x = RADIUS;
+          ball.vx *= -RESTITUTION;
+        }
+
+        // Draw
+        ctx.clearRect(0, 0, W, H);
+        ctx.save();
+        ctx.translate(ball.x, ball.y);
+        ctx.scale(ball.scaleX, ball.scaleY);
+
+        ctx.shadowColor = 'rgba(0,0,0,0.3)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 3;
+
+        ctx.beginPath();
+        ctx.arc(0, 0, RADIUS, 0, Math.PI * 2);
+        ctx.fillStyle = COLOR;
+        ctx.fill();
+
+        // Highlight
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetY = 0;
+        ctx.beginPath();
+        ctx.arc(-RADIUS * 0.28, -RADIUS * 0.32, RADIUS * 0.28, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.fill();
+
+        ctx.restore();
+
+        rafId = requestAnimationFrame(tick);
+      }
+
+      function onInteract(x, y) {
+        if (!active) {
+          launch(x, y);
+        } else {
+          applyImpulse(x, y);
+        }
+      }
+
+      document.addEventListener('pointerdown', function (e) {
+        onInteract(e.clientX, e.clientY);
+      });
+    })();
+    </script>
   </body>
 </html>

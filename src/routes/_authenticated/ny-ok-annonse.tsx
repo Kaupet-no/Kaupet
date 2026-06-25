@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useBlocker } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useForm } from "react-hook-form";
@@ -18,6 +18,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatErrorMessage } from "@/lib/errors";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const wtbSchema = z.object({
   title: z.string().trim().min(3, "Tittelen må være minst 3 tegn").max(120, "Maks 120 tegn"),
@@ -79,6 +89,13 @@ function NewWtbPage() {
 
   const categoryId = watch("category_id");
   const title = watch("title");
+
+  const shouldBlockNav = step === 1 && title.trim().length > 0;
+  const blocker = useBlocker({
+    shouldBlockFn: () => shouldBlockNav,
+    withResolver: true,
+    enableBeforeUnload: shouldBlockNav,
+  });
 
   const createFn = useServerFn(createWtbListing);
   const { mutate: publish, isPending } = useMutation({
@@ -276,6 +293,33 @@ function NewWtbPage() {
           setCategoryPickerOpen(false);
         }}
       />
+
+      <AlertDialog
+        open={blocker.status === "blocked"}
+        onOpenChange={(open) => {
+          if (!open) blocker.reset?.();
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Avbryte annonsen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Du er i ferd med å forlate siden. Endringene dine vil gå tapt.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => blocker.reset?.()}>
+              Fortsett å redigere
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => blocker.proceed?.()}
+            >
+              Ja, avbryt
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

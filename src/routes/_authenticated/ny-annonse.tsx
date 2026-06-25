@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useBlocker } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useForm } from "react-hook-form";
@@ -153,6 +153,11 @@ const SIMILAR_STOPWORDS = new Set([
 ]);
 
 export const Route = createFileRoute("/_authenticated/ny-annonse")({
+  validateSearch: z
+    .object({
+      type: z.enum(["sell"]).optional(),
+    })
+    .catch({}),
   head: () => ({
     meta: [
       { title: "Ny annonse — Kaupet.no" },
@@ -248,7 +253,7 @@ function NewListingPage() {
   const [draftId, setDraftId] = useState<string | null>(null);
   const draftSaveInProgress = useRef(false);
   const [showNoImageDialog, setShowNoImageDialog] = useState(false);
-  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationMethod, setLocationMethod] = useState<"gps" | "postal" | null>(null);
@@ -257,7 +262,8 @@ function NewListingPage() {
   const { data: isDemo = false } = useIsDemo();
   const turnstileEnabled = !!import.meta.env.VITE_TURNSTILE_SITE_KEY;
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  const [listingType, setListingType] = useState<"sell" | null>(null);
+  const { type: typeParam } = Route.useSearch();
+  const [listingType, setListingType] = useState<"sell" | null>(() => typeParam ?? null);
 
   const { data: categories } = useQuery({
     queryKey: ["categories", "with-parent"],
@@ -306,6 +312,13 @@ function NewListingPage() {
   const title = watch("title");
   const description = watch("description");
   const priceNok = watch("price_nok");
+
+  const shouldBlockNav = publishedId === null && (title.trim().length > 0 || images.length > 0);
+  const blocker = useBlocker({
+    shouldBlockFn: () => shouldBlockNav,
+    withResolver: true,
+    enableBeforeUnload: shouldBlockNav,
+  });
 
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const lastEdited = useRef<"postal_code" | "city" | "map" | null>(null);
@@ -1412,7 +1425,7 @@ function NewListingPage() {
                 <Button
                   type="button"
                   variant="ghost"
-                  onClick={() => setShowCancelDialog(true)}
+                  onClick={() => navigate({ to: "/" })}
                   disabled={mutation.isPending}
                 >
                   Avbryt
@@ -1971,7 +1984,7 @@ function NewListingPage() {
                 <Button
                   type="button"
                   variant="ghost"
-                  onClick={() => setShowCancelDialog(true)}
+                  onClick={() => navigate({ to: "/" })}
                   disabled={mutation.isPending}
                 >
                   Avbryt
@@ -2050,26 +2063,49 @@ function NewListingPage() {
         />
       )}
 
-      <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
-        <AlertDialogContent>
+      <AlertDialog
+        open={blocker.status === "blocked"}
+        onOpenChange={(open) => {
+          if (!open) blocker.reset?.();
+        }}
+      >
+        <AlertDialogContent onClickOutside={() => blocker.reset?.()}>
           <AlertDialogHeader>
             <AlertDialogTitle>Avbryte annonsen?</AlertDialogTitle>
             <AlertDialogDescription>
-              Utkastet ditt er lagret og du kan fortsette senere. Vil du forkaste endringene og gå
-              til forsiden?
+              Vil du lagre annonsen som kladd og fortsette senere, eller forkaste den?
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Fortsett å redigere</AlertDialogCancel>
+          <div className="flex flex-col gap-3 px-6 pb-6 pt-2">
             <AlertDialogAction
+              className="h-14 w-full bg-secondary text-destructive hover:bg-secondary/80"
               onClick={() => {
                 localStorage.removeItem(DRAFT_KEY);
-                navigate({ to: "/" });
+                localStorage.removeItem(DRAFT_ID_KEY);
+                blocker.proceed?.();
               }}
             >
-              Forkast og gå til forsiden
+              Forkast annonse
             </AlertDialogAction>
-          </AlertDialogFooter>
+            <AlertDialogAction
+              className="h-14 w-full bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              disabled={isSavingDraft}
+              onClick={async () => {
+                setIsSavingDraft(true);
+                await saveDraftToSupabase();
+                setIsSavingDraft(false);
+                blocker.proceed?.();
+              }}
+            >
+              {isSavingDraft ? "Lagrer…" : "Lagre som kladd"}
+            </AlertDialogAction>
+            <AlertDialogCancel
+              className="h-14 w-full border-0 bg-secondary text-secondary-foreground hover:bg-secondary/80 !mt-0"
+              onClick={() => blocker.reset?.()}
+            >
+              Fortsett å redigere
+            </AlertDialogCancel>
+          </div>
         </AlertDialogContent>
       </AlertDialog>
 

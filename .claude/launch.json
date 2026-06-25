@@ -2,6 +2,12 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "offline-preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "capacitor-shell", "-p", "4000", "--no-clipboard"],
+      "port": 4000
+    },
+    {
       "name": "kaupet-dev",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],

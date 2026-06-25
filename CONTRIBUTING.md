@@ -55,6 +55,10 @@ Server-side logikk skrives som TanStack `createServerFn`, ikke som Supabase Edge
 
 ## Lisensiering og rettigheter for bidrag
 
-Ved å sende en pull request samtykker du i at bidraget ditt lisensieres under [AGPL-3.0](LICENSE), samme lisens som resten av prosjektet.
+Alle bidragsytere må signere vår **Contributor License Agreement (CLA)** før en pull request kan merges. CLA-en gir Happy Pixel AS rettigheter til å bruke og distribuere bidraget ditt.
+
+Når du åpner en PR for første gang, vil en GitHub-bot be deg om å signere ved å skrive en kommentar i PR-en. Det tar bare noen sekunder.
+
+Les CLA-en her: [CLA.md](CLA.md)
 
 Takk! Sammen bygger vi Norges beste markedsplass for brukte ting! ❤️

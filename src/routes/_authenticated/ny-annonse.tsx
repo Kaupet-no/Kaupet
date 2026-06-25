@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -15,6 +16,8 @@ import {
   Tag,
   LocateFixed,
   Hash,
+  PackageOpen,
+  Search,
 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -51,6 +54,7 @@ import { formatErrorMessage } from "@/lib/errors";
 import { CONDITIONS } from "@/lib/constants";
 import { suggestCategoryForTitle } from "@/lib/category-suggestion.functions";
 import { suggestKeywordsForListing } from "@/lib/keyword-suggestion.functions";
+import { matchWtbListingsForListing } from "@/lib/wtb-listings.functions";
 import { getCurrentPosition, requestLocationPermission, isNative } from "@/lib/native";
 
 const listingSchema = z
@@ -253,6 +257,7 @@ function NewListingPage() {
   const { data: isDemo = false } = useIsDemo();
   const turnstileEnabled = !!import.meta.env.VITE_TURNSTILE_SITE_KEY;
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [listingType, setListingType] = useState<"sell" | null>(null);
 
   const { data: categories } = useQuery({
     queryKey: ["categories", "with-parent"],
@@ -589,6 +594,15 @@ function NewListingPage() {
     },
   });
 
+  // WTB price hint
+  const matchWtbFn = useServerFn(matchWtbListingsForListing);
+  const { data: wtbMatch } = useQuery({
+    queryKey: ["wtb-match", categoryId ?? null, debouncedTitle],
+    enabled: debouncedTitle.length >= 3,
+    staleTime: 120_000,
+    queryFn: () => matchWtbFn({ data: { title: debouncedTitle, category_id: categoryId || null } }),
+  });
+
   // Keyword suggestions from other listings in the same category
   const { data: keywordSuggestions, isFetching: keywordsFetching } = useQuery({
     queryKey: ["keyword-suggestions", categoryId, debouncedTitle],
@@ -805,6 +819,46 @@ function NewListingPage() {
     selectedCategory && selectedParent && selectedParent.id !== selectedCategory.id
       ? `${selectedParent.name_nb} › ${selectedCategory.name_nb}`
       : (selectedCategory?.name_nb ?? null);
+
+  // Show listing type chooser when no draft exists and user hasn't chosen yet
+  if (listingType === null && !hasDraftData) {
+    return (
+      <div className="mx-auto flex min-h-[60vh] max-w-lg flex-col items-center justify-center gap-6 px-4 py-12">
+        <div className="text-center">
+          <h1 className="font-display text-2xl font-bold tracking-tight">Ny annonse</h1>
+          <p className="mt-1 text-muted-foreground">Hva vil du gjøre?</p>
+        </div>
+        <div className="flex w-full flex-col gap-3">
+          <button
+            type="button"
+            onClick={() => setListingType("sell")}
+            className="flex items-center gap-4 rounded-xl border bg-card p-5 text-left transition hover:border-primary hover:shadow-sm"
+          >
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary/10">
+              <PackageOpen className="size-6 text-primary" />
+            </div>
+            <div>
+              <p className="font-semibold">Jeg selger eller gir bort noe</p>
+              <p className="text-sm text-muted-foreground">Legg ut en annonse med bilder og pris</p>
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate({ to: "/ny-ok-annonse" })}
+            className="flex items-center gap-4 rounded-xl border bg-card p-5 text-left transition hover:border-primary hover:shadow-sm"
+          >
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-secondary">
+              <Search className="size-6 text-secondary-foreground" />
+            </div>
+            <div>
+              <p className="font-semibold">Jeg ønsker å kjøpe noe</p>
+              <p className="text-sm text-muted-foreground">Legg ut en ønskes kjøpt-annonse</p>
+            </div>
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-3xl px-4 pt-6 pb-4">
@@ -1078,6 +1132,27 @@ function NewListingPage() {
                 <p id="price-error" className="text-sm text-destructive">
                   {errors.price_nok.message as string}
                 </p>
+              )}
+              {!isFree && wtbMatch && wtbMatch.count > 0 && (
+                <div className="flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm">
+                  <Search className="mt-0.5 size-4 shrink-0 text-primary" />
+                  <div>
+                    <span className="font-medium">
+                      {wtbMatch.count === 1
+                        ? "1 bruker ønsker å kjøpe noe lignende"
+                        : `${wtbMatch.count} brukere ønsker å kjøpe noe lignende`}
+                    </span>
+                    {wtbMatch.maxPrice != null && (
+                      <span className="text-muted-foreground">
+                        {" "}
+                        — høyeste budsjett{" "}
+                        <span className="font-medium text-foreground">
+                          {wtbMatch.maxPrice.toLocaleString("nb-NO")} kr
+                        </span>
+                      </span>
+                    )}
+                  </div>
+                </div>
               )}
             </section>
 

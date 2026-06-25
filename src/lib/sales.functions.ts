@@ -42,6 +42,8 @@ export const confirmBuyer = createServerFn({ method: "POST" })
       throw new Error("Bare selger kan markere en kjøper");
     }
 
+    if (!conv.listing_id)
+      throw new Error("Denne samtalen er ikke knyttet til en annonse til salgs");
     const { error: insErr } = await supabase.from("listing_sales").insert({
       listing_id: conv.listing_id,
       seller_id: conv.seller_id,

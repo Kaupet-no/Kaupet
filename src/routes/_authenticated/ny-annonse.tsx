@@ -660,10 +660,10 @@ function NewListingPage() {
     setValue("city", "");
     markerMoved.current = false;
     lastEdited.current = null;
-    void useMyLocation();
+    void fetchMyLocation();
   }
 
-  async function useMyLocation() {
+  async function fetchMyLocation() {
     setLocationMethod("gps");
     setLocationLoading(true);
     try {
@@ -1170,7 +1170,7 @@ function NewListingPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
-                    onClick={() => void useMyLocation()}
+                    onClick={() => void fetchMyLocation()}
                     className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card p-4 text-center transition-colors hover:border-primary hover:bg-accent active:scale-95"
                   >
                     <LocateFixed className="size-6 text-primary" />
@@ -1677,7 +1677,7 @@ function NewListingPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
-                    onClick={() => void useMyLocation()}
+                    onClick={() => void fetchMyLocation()}
                     className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card p-4 text-center transition-colors hover:border-primary hover:bg-accent active:scale-95"
                   >
                     <LocateFixed className="size-6 text-primary" />

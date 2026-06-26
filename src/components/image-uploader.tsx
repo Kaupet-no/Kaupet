@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Camera, ImagePlus, Lightbulb, X, GripVertical } from "lucide-react";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { MAX_IMAGES, describeImageError, validateImages } from "@/lib/storage";
 import { compressImage } from "@/lib/image-compression";
 import { Button } from "@/components/ui/button";
@@ -69,7 +69,7 @@ export function ImageUploader({
   const addFiles = useCallback(
     async (files: File[]) => {
       if (files.length + images.length > MAX_IMAGES) {
-        toast.error(describeImageError({ kind: "too-many", allowed: MAX_IMAGES }));
+        showErrorToast(describeImageError({ kind: "too-many", allowed: MAX_IMAGES }));
         return;
       }
       setProcessing(true);
@@ -77,7 +77,7 @@ export function ImageUploader({
         const compressed = await Promise.all(files.map((file) => compressImage(file, "listing")));
         const err = validateImages(compressed, images.length);
         if (err) {
-          toast.error(describeImageError(err));
+          showErrorToast(describeImageError(err));
           return;
         }
         const next: PendingImage[] = compressed.map((file) => ({
@@ -168,7 +168,7 @@ export function ImageUploader({
                   const file = await pickNativePhoto();
                   if (file) addFiles([file]);
                 } catch (e: unknown) {
-                  toast.error(formatErrorMessage(e, "Kunne ikke åpne kameraet"));
+                  showErrorToast(formatErrorMessage(e, "Kunne ikke åpne kameraet"));
                 }
               }}
               disabled={atLimit || processing}

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { Loader2, LogOut } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -57,9 +57,9 @@ export function AccountSection() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Sjekk innboksen din for å bekrefte den nye e-posten");
+      showSuccessToast("Sjekk innboksen din for å bekrefte den nye e-posten");
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke endre e-postadressen")),
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke endre e-postadressen")),
   });
 
   const passwordMutation = useMutation({
@@ -70,9 +70,9 @@ export function AccountSection() {
     },
     onSuccess: () => {
       passwordForm.reset();
-      toast.success("Passordet er oppdatert");
+      showSuccessToast("Passordet er oppdatert");
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke endre passordet")),
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke endre passordet")),
   });
 
   const [signingOut, setSigningOut] = useState(false);

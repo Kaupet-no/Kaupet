@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { NativePageHeader } from "@/components/native-page-header";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
@@ -9,10 +10,12 @@ import {
   Plus,
   Pencil,
   SlidersHorizontal,
+  MoreVertical,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
 import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { usePushStatus } from "@/lib/use-push-status";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,6 +40,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { PushEnablePrompt } from "@/components/push-enable-prompt";
 import { AdvancedSearchSheet } from "@/components/advanced-search-sheet";
 import { criteriaToValue, valueToCriteria } from "@/components/advanced-search-value";
@@ -97,7 +106,7 @@ function MineSokPage() {
     await updateSavedSearch(s.id, { notify: !s.notify });
     qc.invalidateQueries({ queryKey: ["saved-searches"] });
     const turningOn = !s.notify;
-    toast.success(s.notify ? "Varsler slått av" : "Varsler slått på");
+    showSuccessToast(s.notify ? "Varsler slått av" : "Varsler slått på");
     if (turningOn && !push.savedSearchesActive) {
       if (!push.supported) {
         toast.message("Push-varsler er ikke tilgjengelig i denne nettleseren");
@@ -116,14 +125,14 @@ function MineSokPage() {
     qc.invalidateQueries({ queryKey: ["saved-searches"] });
     qc.invalidateQueries({ queryKey: ["notifications"] });
     qc.invalidateQueries({ queryKey: ["saved-search-unread-counts"] });
-    toast.success("Søk slettet");
+    showSuccessToast("Søk slettet");
   };
 
   const handleRename = async () => {
     if (!renamingSearch) return;
     const name = renameValue.trim();
     if (!name) {
-      toast.error("Navnet kan ikke være tomt");
+      showErrorToast("Navnet kan ikke være tomt");
       return;
     }
     setRenaming(true);
@@ -131,9 +140,9 @@ function MineSokPage() {
       await updateSavedSearch(renamingSearch.id, { name });
       qc.invalidateQueries({ queryKey: ["saved-searches"] });
       setRenamingSearch(null);
-      toast.success("Navn oppdatert");
+      showSuccessToast("Navn oppdatert");
     } catch (e) {
-      toast.error(formatErrorMessage(e, "Kunne ikke endre navn"));
+      showErrorToast(formatErrorMessage(e, "Kunne ikke endre navn"));
     } finally {
       setRenaming(false);
     }
@@ -161,200 +170,193 @@ function MineSokPage() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-3xl tracking-tight">Mine søk</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Lagrede søk varsler deg automatisk når en ny annonse matcher.
-          </p>
-        </div>
-        <Link to="/annonser" search={{ q: "", category: "", sort: "new" } as never}>
-          <Button variant="outline">
-            <Plus className="size-4" /> Nytt søk
-          </Button>
-        </Link>
-      </div>
-
-      {hasActiveNotify && (
-        <div className="mt-6">
-          <PushEnablePrompt variant="banner" />
-        </div>
-      )}
-
-      <div className="mt-8">
-        {isLoading ? (
-          <div className="space-y-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-24 animate-pulse rounded-lg bg-muted" />
-            ))}
-          </div>
-        ) : searches.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border bg-surface p-12 text-center">
-            <p className="text-lg font-medium">Ingen lagrede søk ennå</p>
+    <>
+      <NativePageHeader title="Mine søk" backLabel="Meg" backTo="/meg" />
+      <div className="mx-auto max-w-4xl px-4 py-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="font-display text-3xl tracking-tight max-sm:hidden">Mine søk</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Bruk "Avansert søk" på annonse-siden og lagre kriteriene dine.
+              Lagrede søk varsler deg automatisk når en ny annonse matcher.
             </p>
-            <Link
-              to="/annonser"
-              search={{ q: "", category: "", sort: "new" } as never}
-              className="mt-4 inline-block"
-            >
-              <Button>
-                <SearchIcon className="size-4" /> Gå til annonser
-              </Button>
-            </Link>
           </div>
-        ) : (
-          <ul className="space-y-3">
-            {searches.map((s) => {
-              const unread = unreadCounts?.get(s.id) ?? 0;
-              return (
-                <li key={s.id} className="rounded-lg border border-border bg-card p-4 shadow-sm">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="font-medium">{s.name}</h3>
-                        {unread > 0 && (
-                          <Link
-                            to="/varsler"
-                            className="inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-accent-foreground hover:opacity-90"
-                          >
-                            {unread} {unread === 1 ? "nytt treff" : "nye treff"}
-                          </Link>
-                        )}
+          <Link to="/annonser" search={{ q: "", category: "", sort: "new" } as never}>
+            <Button variant="outline">
+              <Plus className="size-4" /> Nytt søk
+            </Button>
+          </Link>
+        </div>
+
+        {hasActiveNotify && (
+          <div className="mt-6">
+            <PushEnablePrompt variant="banner" />
+          </div>
+        )}
+
+        <div className="mt-8">
+          {isLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="h-24 animate-pulse rounded-lg bg-muted" />
+              ))}
+            </div>
+          ) : searches.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border bg-surface p-12 text-center">
+              <p className="text-lg font-medium">Ingen lagrede søk ennå</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Bruk "Avansert søk" på annonse-siden og lagre kriteriene dine.
+              </p>
+              <Link
+                to="/annonser"
+                search={{ q: "", category: "", sort: "new" } as never}
+                className="mt-4 inline-block"
+              >
+                <Button>
+                  <SearchIcon className="size-4" /> Gå til annonser
+                </Button>
+              </Link>
+            </div>
+          ) : (
+            <ul className="space-y-3">
+              {searches.map((s) => {
+                const unread = unreadCounts?.get(s.id) ?? 0;
+                return (
+                  <li key={s.id} className="rounded-lg border border-border bg-card p-4 shadow-sm">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="font-medium">{s.name}</h3>
+                          {unread > 0 && (
+                            <Link
+                              to="/varsler"
+                              className="inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-accent-foreground hover:opacity-90"
+                            >
+                              {unread} {unread === 1 ? "nytt treff" : "nye treff"}
+                            </Link>
+                          )}
+                        </div>
+                        <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">
+                          {summarizeCriteria(s.criteria)}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Opprettet{" "}
+                          {formatDistanceToNow(new Date(s.created_at), {
+                            addSuffix: true,
+                            locale: nb,
+                          })}
+                          {s.notify ? " · Varsler på" : " · Varsler av"}
+                        </p>
                       </div>
-                      <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">
-                        {summarizeCriteria(s.criteria)}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Opprettet{" "}
-                        {formatDistanceToNow(new Date(s.created_at), {
-                          addSuffix: true,
-                          locale: nb,
-                        })}
-                        {s.notify ? " · Varsler på" : " · Varsler av"}
-                      </p>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Button size="sm" onClick={() => runSearch(s.criteria)}>
+                          <SearchIcon className="size-4" /> Kjør søk
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => toggleNotify(s)}
+                          aria-label={s.notify ? "Slå av varsler" : "Slå på varsler"}
+                        >
+                          {s.notify ? <BellOff className="size-4" /> : <Bell className="size-4" />}
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="ghost" aria-label="Flere valg">
+                              <MoreVertical className="size-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => setEditingSearch(s)}>
+                              <SlidersHorizontal className="size-4" /> Rediger filtre
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setRenamingSearch(s);
+                                setRenameValue(s.name);
+                              }}
+                            >
+                              <Pencil className="size-4" /> Endre navn
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => setDeleteId(s.id)}
+                            >
+                              <Trash2 className="size-4" /> Slett søk
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Button size="sm" onClick={() => runSearch(s.criteria)}>
-                        <SearchIcon className="size-4" /> Kjør søk
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setEditingSearch(s)}
-                        aria-label="Rediger filtre"
-                      >
-                        <SlidersHorizontal className="size-4" /> Rediger filtre
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setRenamingSearch(s);
-                          setRenameValue(s.name);
-                        }}
-                        aria-label="Endre navn"
-                      >
-                        <Pencil className="size-4" /> Endre navn
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => toggleNotify(s)}
-                        aria-label={s.notify ? "Slå av varsler" : "Slå på varsler"}
-                      >
-                        {s.notify ? (
-                          <>
-                            <BellOff className="size-4" /> Pause
-                          </>
-                        ) : (
-                          <>
-                            <Bell className="size-4" /> Aktiver
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setDeleteId(s.id)}
-                        aria-label="Slett søk"
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        <AlertDialog open={deleteId !== null} onOpenChange={(o) => !o && setDeleteId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Slette lagret søk?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Dette sletter også alle varsler knyttet til søket. Handlingen kan ikke angres.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Avbryt</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete}>Slett</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <Dialog open={renamingSearch !== null} onOpenChange={(o) => !o && setRenamingSearch(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Endre navn på søk</DialogTitle>
+            </DialogHeader>
+            <div>
+              <Label htmlFor="rename-search-input">Navn</Label>
+              <Input
+                id="rename-search-input"
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setRenamingSearch(null)}>
+                Avbryt
+              </Button>
+              <Button onClick={handleRename} disabled={renaming}>
+                {renaming ? "Lagrer…" : "Lagre"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {editingSearch && (
+          <AdvancedSearchSheet
+            open={editingSearch !== null}
+            onOpenChange={(o) => !o && setEditingSearch(null)}
+            initial={criteriaToValue(editingSearch.criteria)}
+            categories={categories ?? []}
+            currentSort={editingSearch.criteria.sort}
+            applyLabel="Lagre endringer"
+            hideSaveAction
+            onApply={async (v) => {
+              try {
+                await updateSavedSearch(editingSearch.id, { criteria: valueToCriteria(v) });
+                qc.invalidateQueries({ queryKey: ["saved-searches"] });
+                showSuccessToast("Søket er oppdatert");
+              } catch (e) {
+                showErrorToast(formatErrorMessage(e, "Kunne ikke oppdatere søket"));
+              } finally {
+                setEditingSearch(null);
+              }
+            }}
+          />
         )}
       </div>
-
-      <AlertDialog open={deleteId !== null} onOpenChange={(o) => !o && setDeleteId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Slette lagret søk?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Dette sletter også alle varsler knyttet til søket. Handlingen kan ikke angres.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Avbryt</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Slett</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <Dialog open={renamingSearch !== null} onOpenChange={(o) => !o && setRenamingSearch(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Endre navn på søk</DialogTitle>
-          </DialogHeader>
-          <div>
-            <Label htmlFor="rename-search-input">Navn</Label>
-            <Input
-              id="rename-search-input"
-              value={renameValue}
-              onChange={(e) => setRenameValue(e.target.value)}
-              className="mt-1"
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setRenamingSearch(null)}>
-              Avbryt
-            </Button>
-            <Button onClick={handleRename} disabled={renaming}>
-              {renaming ? "Lagrer…" : "Lagre"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {editingSearch && (
-        <AdvancedSearchSheet
-          open={editingSearch !== null}
-          onOpenChange={(o) => !o && setEditingSearch(null)}
-          initial={criteriaToValue(editingSearch.criteria)}
-          categories={categories ?? []}
-          currentSort={editingSearch.criteria.sort}
-          applyLabel="Lagre endringer"
-          hideSaveAction
-          onApply={async (v) => {
-            try {
-              await updateSavedSearch(editingSearch.id, { criteria: valueToCriteria(v) });
-              qc.invalidateQueries({ queryKey: ["saved-searches"] });
-              toast.success("Søket er oppdatert");
-            } catch (e) {
-              toast.error(formatErrorMessage(e, "Kunne ikke oppdatere søket"));
-            } finally {
-              setEditingSearch(null);
-            }
-          }}
-        />
-      )}
-    </div>
+    </>
   );
 }

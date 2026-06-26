@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import {
   Check,
   ChevronLeft,
@@ -57,32 +57,26 @@ import { suggestKeywordsForListing } from "@/lib/keyword-suggestion.functions";
 import { matchWtbListingsForListing } from "@/lib/wtb-listings.functions";
 import { getCurrentPosition, requestLocationPermission, isNative } from "@/lib/native";
 
-const listingSchema = z
-  .object({
-    title: z.string().trim().min(5, "Tittelen må være minst 5 tegn").max(120, "Maks 120 tegn"),
-    description: z
-      .string()
-      .trim()
-      .min(20, "Skriv litt mer — minst 20 tegn")
-      .max(4000, "Maks 4000 tegn"),
-    category_id: z.string().uuid("Velg en kategori"),
-    condition: z.enum(["new", "like_new", "good", "acceptable", "for_parts"]),
-    is_free: z.boolean(),
-    can_ship: z.enum(["pickup", "ship", "both"]),
-    price_nok: z.union([z.coerce.number().int().min(0).max(10_000_000), z.literal("")]).optional(),
-    postal_code: z
-      .string()
-      .trim()
-      .regex(/^\d{4}$/u, "Norsk postnummer er 4 sifre")
-      .optional()
-      .or(z.literal("")),
-    city: z.string().trim().max(100).optional().or(z.literal("")),
-  })
-  .refine((d) => d.is_free || (typeof d.price_nok === "number" && d.price_nok >= 0), {
-    message: "Sett en pris eller marker som gratis",
-    path: ["price_nok"],
-  });
-
+const listingSchema = z.object({
+  title: z.string().trim().min(5, "Tittelen må være minst 5 tegn").max(120, "Maks 120 tegn"),
+  description: z
+    .string()
+    .trim()
+    .min(20, "Skriv litt mer — minst 20 tegn")
+    .max(4000, "Maks 4000 tegn"),
+  category_id: z.string().uuid("Velg en kategori"),
+  condition: z.enum(["new", "like_new", "good", "acceptable", "for_parts"]),
+  is_free: z.boolean(),
+  can_ship: z.enum(["pickup", "ship", "both"]),
+  price_nok: z.union([z.coerce.number().int().min(0).max(10_000_000), z.literal("")]).optional(),
+  postal_code: z
+    .string()
+    .trim()
+    .regex(/^\d{4}$/u, "Norsk postnummer er 4 sifre")
+    .optional()
+    .or(z.literal("")),
+  city: z.string().trim().max(100).optional().or(z.literal("")),
+});
 type ListingForm = z.infer<typeof listingSchema>;
 
 const DRAFT_KEY = "kaupet_draft_ny_annonse";
@@ -253,6 +247,7 @@ function NewListingPage() {
   const [draftId, setDraftId] = useState<string | null>(null);
   const draftSaveInProgress = useRef(false);
   const [showNoImageDialog, setShowNoImageDialog] = useState(false);
+  const [showNoPriceDialog, setShowNoPriceDialog] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
@@ -509,7 +504,7 @@ function NewListingPage() {
     if (typeof hasDraftData.category_id === "string")
       setValue("category_id", hasDraftData.category_id);
     setHasDraftData(null);
-    toast.success("Utkast gjenopprettet!");
+    showSuccessToast("Utkast gjenopprettet!");
   }
 
   // Auto-fill city from postal code
@@ -642,12 +637,16 @@ function NewListingPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function goToStep3() {
+  async function goToStep3(skipPriceCheck = false) {
     const fields: (keyof ListingForm)[] = native
       ? ["category_id", "condition", "price_nok"]
       : ["description", "category_id", "condition", "price_nok"];
     const valid = await trigger(fields);
     if (!valid) return;
+    if (!skipPriceCheck && !isFree && (priceNok === "" || priceNok === undefined)) {
+      setShowNoPriceDialog(true);
+      return;
+    }
     setStep(3);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -697,14 +696,14 @@ function NewListingPage() {
       if (isNative()) {
         const permission = await requestLocationPermission();
         if (permission !== "granted") {
-          toast.error("Gi appen tilgang til posisjon i innstillingene.");
+          showErrorToast("Gi appen tilgang til posisjon i innstillingene.");
           setLocationMethod(null);
           return;
         }
       }
       const pos = await getCurrentPosition();
       if (!pos) {
-        toast.error("Kunne ikke hente posisjon.");
+        showErrorToast("Kunne ikke hente posisjon.");
         setLocationMethod(null);
         return;
       }
@@ -718,7 +717,7 @@ function NewListingPage() {
         setValue("postal_code", geo.postal_code, { shouldValidate: false });
       }
     } catch {
-      toast.error("Kunne ikke hente posisjon. Sjekk at du har gitt tilgang.");
+      showErrorToast("Kunne ikke hente posisjon. Sjekk at du har gitt tilgang.");
       setLocationMethod(null);
     } finally {
       setLocationLoading(false);
@@ -797,7 +796,7 @@ function NewListingPage() {
       localStorage.removeItem(DRAFT_KEY);
       localStorage.removeItem(DRAFT_ID_KEY);
       void import("@/lib/haptics").then((m) => m.hapticNotification("success"));
-      toast.success("Annonsen er publisert");
+      showSuccessToast("Annonsen er publisert");
       setPublishedId(result.id);
       setPublishedCode(result.kaupet_code);
       setPublishedOpen(true);
@@ -805,7 +804,7 @@ function NewListingPage() {
     onError: (err: Error) => {
       setUploadProgress(null);
       void import("@/lib/haptics").then((m) => m.hapticNotification("error"));
-      toast.error(formatErrorMessage(err, "Kunne ikke publisere annonsen"));
+      showErrorToast(formatErrorMessage(err, "Kunne ikke publisere annonsen"));
     },
   });
 
@@ -2044,6 +2043,29 @@ function NewListingPage() {
               }}
             >
               Fortsett uten bilde
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* No-price confirmation dialog */}
+      <AlertDialog open={showNoPriceDialog} onOpenChange={setShowNoPriceDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ingen pris satt</AlertDialogTitle>
+            <AlertDialogDescription>
+              Du har ikke satt en pris. Vil du legge til pris, eller publisere uten?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Legg til pris</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowNoPriceDialog(false);
+                void goToStep3(true);
+              }}
+            >
+              Fortsett uten pris
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

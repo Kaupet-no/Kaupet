@@ -103,9 +103,13 @@ export const getMyWtbListings = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase } = context;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     const { data, error } = await supabase
       .from("wtb_listings")
       .select("*, categories(name_nb, slug)")
+      .eq("user_id", user!.id)
       .order("created_at", { ascending: false });
     if (error) throw error;
     return (data ?? []) as (WtbListing & {

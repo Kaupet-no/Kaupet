@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Hash } from "lucide-react";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,7 +29,7 @@ export function KaupetCodeDialog({ trigger }: Props) {
     e.preventDefault();
     const trimmed = code.trim();
     if (!/^[0-9]{8}$/.test(trimmed)) {
-      toast.error("Koden må være 8 sifre");
+      showErrorToast("Koden må være 8 sifre");
       return;
     }
     setOpen(false);

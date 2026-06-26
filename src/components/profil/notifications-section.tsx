@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { Bell, Loader2 } from "lucide-react";
 
 import { Label } from "@/components/ui/label";
@@ -79,9 +79,9 @@ export function NotificationsSection() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notification-preferences"] });
-      toast.success("Innstillingene er lagret");
+      showSuccessToast("Innstillingene er lagret");
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke lagre innstillingene")),
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke lagre innstillingene")),
   });
 
   async function handleSubscribe() {
@@ -96,9 +96,9 @@ export function NotificationsSection() {
         setPermission(getPermissionState());
         setEndpoint(await getCurrentEndpoint());
       }
-      toast.success("Push-varsler er aktivert på denne enheten");
+      showSuccessToast("Push-varsler er aktivert på denne enheten");
     } catch (e) {
-      toast.error(formatErrorMessage(e, "Klarte ikke å aktivere varsler"));
+      showErrorToast(formatErrorMessage(e, "Klarte ikke å aktivere varsler"));
     } finally {
       setBusy(null);
     }
@@ -113,9 +113,9 @@ export function NotificationsSection() {
         await unsubscribeThisDevice();
       }
       setEndpoint(null);
-      toast.success("Denne enheten mottar ikke lenger push-varsler");
+      showSuccessToast("Denne enheten mottar ikke lenger push-varsler");
     } catch (e) {
-      toast.error(formatErrorMessage(e, "Klarte ikke å deaktivere varsler"));
+      showErrorToast(formatErrorMessage(e, "Klarte ikke å deaktivere varsler"));
     } finally {
       setBusy(null);
     }
@@ -174,64 +174,70 @@ export function NotificationsSection() {
         {isLoading || !prefs ? (
           <Loader2 className="mt-4 size-5 animate-spin text-muted-foreground" />
         ) : (
-          <div className="mt-6 space-y-5">
-            {(
-              [
-                {
-                  pushKey: "web_push_messages",
-                  emailKey: "email_messages",
-                  title: "Nye chat-meldinger",
-                  description: "Varsel når noen sender deg en melding om en annonse.",
-                },
-                {
-                  pushKey: "web_push_saved_searches",
-                  emailKey: "email_saved_searches",
-                  title: "Treff i lagrede søk",
-                  description: "Varsel når en ny annonse matcher et av søkene dine.",
-                },
-                {
-                  pushKey: "web_push_price_drops",
-                  emailKey: "email_price_drops",
-                  title: "Prisfall på favoritter",
-                  description: "Varsel når en favoritt-annonse blir satt ned med mer enn 5 %.",
-                },
-                {
-                  pushKey: "web_push_sold",
-                  emailKey: "email_sold",
-                  title: "Favoritt blir solgt",
-                  description: "Varsel når en favoritt-annonse blir markert som solgt.",
-                },
-              ] as const
-            ).map((row) => (
-              <div key={row.pushKey} className="flex items-center justify-between gap-4">
-                <div>
-                  <Label htmlFor={`pref-${row.pushKey}`} className="text-sm font-medium">
-                    {row.title}
-                  </Label>
-                  <p className="text-sm text-muted-foreground">{row.description}</p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="flex flex-col items-center gap-1">
+          <div className="mt-6">
+            <div className="grid grid-cols-[1fr_3rem_3rem] items-center gap-x-2 pb-2 text-xs font-medium text-muted-foreground">
+              <span />
+              <span className="text-center">Push</span>
+              <span className="text-center">E-post</span>
+            </div>
+            <div className="divide-y divide-border">
+              {(
+                [
+                  {
+                    pushKey: "web_push_messages",
+                    emailKey: "email_messages",
+                    title: "Nye chat-meldinger",
+                    description: "Varsel når noen sender deg en melding om en annonse.",
+                  },
+                  {
+                    pushKey: "web_push_saved_searches",
+                    emailKey: "email_saved_searches",
+                    title: "Treff i lagrede søk",
+                    description: "Varsel når en ny annonse matcher et av søkene dine.",
+                  },
+                  {
+                    pushKey: "web_push_price_drops",
+                    emailKey: "email_price_drops",
+                    title: "Prisfall på favoritter",
+                    description: "Varsel når en favoritt-annonse blir satt ned med mer enn 5 %.",
+                  },
+                  {
+                    pushKey: "web_push_sold",
+                    emailKey: "email_sold",
+                    title: "Favoritt blir solgt",
+                    description: "Varsel når en favoritt-annonse blir markert som solgt.",
+                  },
+                ] as const
+              ).map((row) => (
+                <div
+                  key={row.pushKey}
+                  className="grid grid-cols-[1fr_3rem_3rem] items-center gap-x-2 py-4"
+                >
+                  <div>
+                    <Label htmlFor={`pref-${row.pushKey}`} className="text-sm font-medium">
+                      {row.title}
+                    </Label>
+                    <p className="text-sm text-muted-foreground">{row.description}</p>
+                  </div>
+                  <div className="flex justify-center">
                     <Switch
                       id={`pref-${row.pushKey}`}
                       checked={prefs[row.pushKey]}
                       disabled={mutation.isPending}
                       onCheckedChange={(v) => mutation.mutate({ ...prefs, [row.pushKey]: v })}
                     />
-                    <span className="text-xs text-muted-foreground">Push</span>
                   </div>
-                  <div className="flex flex-col items-center gap-1">
+                  <div className="flex justify-center">
                     <Switch
                       id={`pref-${row.emailKey}`}
                       checked={prefs[row.emailKey]}
                       disabled={mutation.isPending}
                       onCheckedChange={(v) => mutation.mutate({ ...prefs, [row.emailKey]: v })}
                     />
-                    <span className="text-xs text-muted-foreground">E-post</span>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
       </div>

@@ -225,11 +225,47 @@
       const FRICTION = 0.91;
       const IMPULSE = 15;
       const COLOR = '#d97a3c';
+      // Accelerometer tilt-to-gravity scale (degrees → px/frame²)
+      const TILT_SCALE = 0.065;
+      // Clamp tilt force so the ball doesn't fly off screen
+      const TILT_MAX = 1.8;
 
       let active = false;
       let ball = { x: 0, y: 0, vx: 0, vy: 0, scaleY: 1, scaleX: 1 };
       let rafId = null;
+      let tiltX = 0; // current horizontal acceleration from gyro
 
+      // ── Haptic feedback ──────────────────────────────────────────────────────
+      // navigator.vibrate works on Android; iOS WebView silently ignores it.
+      function haptic(durationMs) {
+        try { navigator.vibrate && navigator.vibrate(durationMs); } catch (_) {}
+      }
+
+      // ── Accelerometer / device orientation ───────────────────────────────────
+      function startOrientation() {
+        window.addEventListener('deviceorientation', function (e) {
+          // gamma: left/right tilt (-90..90). Null when not available.
+          if (e.gamma !== null) {
+            // Clamp to ±TILT_MAX px/frame²
+            tiltX = Math.max(-TILT_MAX, Math.min(TILT_MAX, e.gamma * TILT_SCALE));
+          }
+        });
+      }
+
+      // iOS 13+ requires an explicit permission request triggered by a user gesture.
+      function requestOrientationPermission() {
+        if (typeof DeviceOrientationEvent !== 'undefined' &&
+            typeof DeviceOrientationEvent.requestPermission === 'function') {
+          DeviceOrientationEvent.requestPermission()
+            .then(function (state) { if (state === 'granted') startOrientation(); })
+            .catch(function () {});
+        } else {
+          // Android and older iOS — no permission needed
+          startOrientation();
+        }
+      }
+
+      // ── Canvas sizing ────────────────────────────────────────────────────────
       function resize() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
@@ -258,6 +294,7 @@
         ball.vy = -8;
         dot.classList.add('wordmark__dot--hidden');
         active = true;
+        requestOrientationPermission();
         rafId = requestAnimationFrame(tick);
       }
 
@@ -265,8 +302,10 @@
         const W = canvas.width;
         const H = canvas.height;
 
-        ball.vy += GRAVITY;
+        // Apply tilt as horizontal gravity
+        ball.vx += tiltX;
 
+        ball.vy += GRAVITY;
         ball.x += ball.vx;
         ball.y += ball.vy;
 
@@ -281,10 +320,10 @@
           if (speed > 1) {
             ball.vy *= -RESTITUTION;
             ball.vx *= FRICTION;
-            // Squash on impact
             const squash = Math.min(0.35, speed * 0.018);
             ball.scaleY = 1 - squash;
             ball.scaleX = 1 + squash * 0.6;
+            if (speed > 2) haptic(Math.round(Math.min(18, speed * 1.2)));
           } else {
             ball.vy = 0;
             ball.vx *= FRICTION;
@@ -294,17 +333,23 @@
         // Ceiling
         if (ball.y - RADIUS <= 0) {
           ball.y = RADIUS;
+          const speed = Math.abs(ball.vy);
           ball.vy *= -RESTITUTION;
+          if (speed > 2) haptic(6);
         }
 
         // Sides
         if (ball.x + RADIUS >= W) {
           ball.x = W - RADIUS;
+          const speed = Math.abs(ball.vx);
           ball.vx *= -RESTITUTION;
+          if (speed > 2) haptic(6);
         }
         if (ball.x - RADIUS <= 0) {
           ball.x = RADIUS;
+          const speed = Math.abs(ball.vx);
           ball.vx *= -RESTITUTION;
+          if (speed > 2) haptic(6);
         }
 
         // Draw

@@ -4,6 +4,7 @@ import { ProfileSection } from "@/components/profil/profile-section";
 import { NotificationsSection } from "@/components/profil/notifications-section";
 import { BlockedSection } from "@/components/profil/blocked-section";
 import { AccountSection } from "@/components/profil/account-section";
+import { NativePageHeader } from "@/components/native-page-header";
 
 export const Route = createFileRoute("/_authenticated/profil")({
   head: () => ({
@@ -26,43 +27,46 @@ function ProfilePage() {
   const navigate = Route.useNavigate();
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10">
-      <h1 className="font-display text-3xl tracking-tight">Min profil</h1>
+    <>
+      <NativePageHeader title="Min profil" backLabel="Meg" backTo="/meg" />
+      <div className="mx-auto max-w-2xl px-4 py-6">
+        <h1 className="font-display text-3xl tracking-tight max-sm:hidden">Min profil</h1>
 
-      <Tabs
-        value={tab}
-        onValueChange={(v) =>
-          navigate({
-            search: {
-              tab:
-                v === "konto" || v === "varslinger" || v === "blokkerte"
-                  ? (v as "konto" | "varslinger" | "blokkerte")
-                  : "profil",
-            },
-            replace: true,
-          })
-        }
-        className="mt-6"
-      >
-        <TabsList>
-          <TabsTrigger value="profil">Profilinfo</TabsTrigger>
-          <TabsTrigger value="varslinger">Varslinger</TabsTrigger>
-          <TabsTrigger value="blokkerte">Blokkerte</TabsTrigger>
-          <TabsTrigger value="konto">Konto</TabsTrigger>
-        </TabsList>
-        <TabsContent value="profil" className="mt-6">
-          <ProfileSection />
-        </TabsContent>
-        <TabsContent value="varslinger" className="mt-6">
-          <NotificationsSection />
-        </TabsContent>
-        <TabsContent value="blokkerte" className="mt-6">
-          <BlockedSection />
-        </TabsContent>
-        <TabsContent value="konto" className="mt-6">
-          <AccountSection />
-        </TabsContent>
-      </Tabs>
-    </div>
+        <Tabs
+          value={tab}
+          onValueChange={(v) =>
+            navigate({
+              search: {
+                tab:
+                  v === "konto" || v === "varslinger" || v === "blokkerte"
+                    ? (v as "konto" | "varslinger" | "blokkerte")
+                    : "profil",
+              },
+              replace: true,
+            })
+          }
+          className="mt-6"
+        >
+          <TabsList>
+            <TabsTrigger value="profil">Profilinfo</TabsTrigger>
+            <TabsTrigger value="varslinger">Varslinger</TabsTrigger>
+            <TabsTrigger value="blokkerte">Blokkerte</TabsTrigger>
+            <TabsTrigger value="konto">Konto</TabsTrigger>
+          </TabsList>
+          <TabsContent value="profil" className="mt-6">
+            <ProfileSection />
+          </TabsContent>
+          <TabsContent value="varslinger" className="mt-6">
+            <NotificationsSection />
+          </TabsContent>
+          <TabsContent value="blokkerte" className="mt-6">
+            <BlockedSection />
+          </TabsContent>
+          <TabsContent value="konto" className="mt-6">
+            <AccountSection />
+          </TabsContent>
+        </Tabs>
+      </div>
+    </>
   );
 }

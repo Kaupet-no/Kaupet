@@ -3,7 +3,7 @@ import { Locate, MapPin, Search as SearchIcon, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { toast } from "sonner";
+import { showErrorToast } from "@/lib/toast";
 import {
   checkLocationPermission,
   getCurrentPosition,
@@ -96,12 +96,12 @@ export function LocationPicker({ value, onChange, onDone, autoFocus = true }: Lo
       const permission = await requestLocationPermission();
       setLocationPermission(permission);
       if (permission !== "granted") {
-        toast.error("Tillat posisjon i telefoninnstillingene for å bruke denne funksjonen");
+        showErrorToast("Tillat posisjon i telefoninnstillingene for å bruke denne funksjonen");
         return;
       }
       const pos = await getCurrentPosition();
       if (!pos) {
-        toast.error("Posisjon ikke støttet på denne enheten");
+        showErrorToast("Posisjon ikke støttet på denne enheten");
         return;
       }
       onChange({
@@ -112,7 +112,7 @@ export function LocationPicker({ value, onChange, onDone, autoFocus = true }: Lo
       });
       onDone?.();
     } catch {
-      toast.error("Kunne ikke hente posisjon");
+      showErrorToast("Kunne ikke hente posisjon");
     }
   };
 

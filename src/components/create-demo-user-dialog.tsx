@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -36,7 +36,7 @@ export function CreateDemoUserDialog({ open, onOpenChange, onCreated }: Props) {
   const mutation = useMutation({
     mutationFn: async () => create({ data: { email, displayName, password } }),
     onSuccess: (res) => {
-      toast.success(`Demo-bruker opprettet: ${res.email}`);
+      showSuccessToast(`Demo-bruker opprettet: ${res.email}`);
       onCreated?.(res.email);
       reset();
       onOpenChange(false);

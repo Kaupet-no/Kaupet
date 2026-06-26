@@ -2,6 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { CheckCheck, TrendingDown, X } from "lucide-react";
+
+import { NativePageHeader } from "@/components/native-page-header";
 import { formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
 
@@ -124,106 +126,109 @@ function VarslerPage() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-3xl tracking-tight">Mine varsler</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Treff i lagrede søk og prisfall på favoritter.
-          </p>
-        </div>
-        {unread > 0 && (
-          <Button variant="outline" size="sm" onClick={handleMarkAllRead}>
-            <CheckCheck className="size-4" /> Marker alle som lest
-          </Button>
-        )}
-      </div>
-
-      <div className="mt-6">
-        {isLoading ? (
-          <div className="space-y-3">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-16 animate-pulse rounded-lg bg-muted" />
-            ))}
-          </div>
-        ) : items.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border bg-surface p-12 text-center">
-            <p className="text-lg font-medium">Ingen varsler ennå</p>
+    <>
+      <NativePageHeader title="Mine varsler" backLabel="Meg" backTo="/meg" />
+      <div className="mx-auto max-w-2xl px-4 py-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="font-display text-3xl tracking-tight max-sm:hidden">Mine varsler</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Lagre et søk for å bli varslet om nye treff.
+              Treff i lagrede søk og prisfall på favoritter.
             </p>
-            <Link to="/mine-sok" className="mt-4 inline-block">
-              <Button>Mine søk</Button>
-            </Link>
           </div>
-        ) : (
-          <ul className="divide-y divide-border rounded-xl border border-border bg-card">
-            {items.map((n) => (
-              <li
-                key={`${n.kind}-${n.id}`}
-                className={`group relative ${!n.read_at ? "bg-primary/5" : ""}`}
-              >
-                <Link
-                  to="/$kaupetCode"
-                  params={{ kaupetCode: n.listing_code ?? "" }}
-                  disabled={!n.listing_code}
-                  onClick={() => handleClick(n)}
-                  className="block px-4 py-3 pr-10 hover:bg-muted aria-disabled:pointer-events-none aria-disabled:opacity-60"
-                >
-                  <div className="flex items-start gap-2">
-                    {!n.read_at && (
-                      <span className="mt-1.5 size-2 shrink-0 rounded-full bg-accent" />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="line-clamp-1 text-sm font-medium">
-                        {n.kind === "price_drop" && (
-                          <TrendingDown className="mr-1 inline size-3.5 text-accent" />
-                        )}
-                        {n.listing_title ??
-                          (n.kind === "price_drop" ? "Favoritten din" : "Ny annonse")}
-                      </p>
-                      <p className="line-clamp-1 text-xs text-muted-foreground">
-                        {n.kind === "search" ? (
-                          <>Treff i "{n.search_name ?? "Lagret søk"}"</>
-                        ) : (
-                          <>
-                            Prisfall −{Number(n.drop_pct).toFixed(0)} % ·{" "}
-                            {formatKr(n.old_price_nok)} → {formatKr(n.new_price_nok)}
-                          </>
-                        )}{" "}
-                        ·{" "}
-                        {formatDistanceToNow(new Date(n.created_at), {
-                          addSuffix: true,
-                          locale: nb,
-                        })}
-                      </p>
-                    </div>
-                  </div>
-                </Link>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    void handleDelete(n);
-                  }}
-                  className="absolute right-3 top-3 rounded p-1 text-muted-foreground opacity-0 transition hover:bg-background hover:text-foreground group-hover:opacity-100"
-                  aria-label="Slett varsel"
-                >
-                  <X className="size-3.5" />
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        {data?.hasMore && (
-          <div className="mt-4 text-center">
-            <Button variant="outline" onClick={() => setPageSize((n) => n + PAGE_SIZE)}>
-              Last flere
+          {unread > 0 && (
+            <Button variant="outline" size="sm" onClick={handleMarkAllRead}>
+              <CheckCheck className="size-4" /> Marker alle som lest
             </Button>
-          </div>
-        )}
+          )}
+        </div>
+
+        <div className="mt-6">
+          {isLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="h-16 animate-pulse rounded-lg bg-muted" />
+              ))}
+            </div>
+          ) : items.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border bg-surface p-12 text-center">
+              <p className="text-lg font-medium">Ingen varsler ennå</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Lagre et søk for å bli varslet om nye treff.
+              </p>
+              <Link to="/mine-sok" className="mt-4 inline-block">
+                <Button>Mine søk</Button>
+              </Link>
+            </div>
+          ) : (
+            <ul className="divide-y divide-border rounded-xl border border-border bg-card">
+              {items.map((n) => (
+                <li
+                  key={`${n.kind}-${n.id}`}
+                  className={`group relative ${!n.read_at ? "bg-primary/5" : ""}`}
+                >
+                  <Link
+                    to="/$kaupetCode"
+                    params={{ kaupetCode: n.listing_code ?? "" }}
+                    disabled={!n.listing_code}
+                    onClick={() => handleClick(n)}
+                    className="block px-4 py-4 pr-12 hover:bg-muted aria-disabled:pointer-events-none aria-disabled:opacity-60"
+                  >
+                    <div className="flex items-start gap-2">
+                      {!n.read_at && (
+                        <span className="mt-1.5 size-2.5 shrink-0 rounded-full bg-accent" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="line-clamp-1 text-sm font-medium">
+                          {n.kind === "price_drop" && (
+                            <TrendingDown className="mr-1 inline size-3.5 text-accent" />
+                          )}
+                          {n.listing_title ??
+                            (n.kind === "price_drop" ? "Favoritten din" : "Ny annonse")}
+                        </p>
+                        <p className="line-clamp-1 text-xs text-muted-foreground">
+                          {n.kind === "search" ? (
+                            <>Treff i "{n.search_name ?? "Lagret søk"}"</>
+                          ) : (
+                            <>
+                              Prisfall −{Number(n.drop_pct).toFixed(0)} % ·{" "}
+                              {formatKr(n.old_price_nok)} → {formatKr(n.new_price_nok)}
+                            </>
+                          )}{" "}
+                          ·{" "}
+                          {formatDistanceToNow(new Date(n.created_at), {
+                            addSuffix: true,
+                            locale: nb,
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      void handleDelete(n);
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-2 text-muted-foreground transition hover:bg-background hover:text-foreground"
+                    aria-label="Slett varsel"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {data?.hasMore && (
+            <div className="mt-4 text-center">
+              <Button variant="outline" onClick={() => setPageSize((n) => n + PAGE_SIZE)}>
+                Last flere
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

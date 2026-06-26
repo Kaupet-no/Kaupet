@@ -24,6 +24,7 @@ import { Route as AuthenticatedProfilRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedNyOkAnnonseRouteImport } from './routes/_authenticated/ny-ok-annonse'
 import { Route as AuthenticatedNyAnnonseRouteImport } from './routes/_authenticated/ny-annonse'
 import { Route as AuthenticatedMineSokRouteImport } from './routes/_authenticated/mine-sok'
+import { Route as AuthenticatedMegRouteImport } from './routes/_authenticated/meg'
 import { Route as AuthenticatedFavoritterRouteImport } from './routes/_authenticated/favoritter'
 import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authenticated/admin/route'
 import { Route as AuthenticatedMineAnnonserIndexRouteImport } from './routes/_authenticated/mine-annonser.index'
@@ -114,6 +115,11 @@ const AuthenticatedNyAnnonseRoute = AuthenticatedNyAnnonseRouteImport.update({
 const AuthenticatedMineSokRoute = AuthenticatedMineSokRouteImport.update({
   id: '/mine-sok',
   path: '/mine-sok',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedMegRoute = AuthenticatedMegRouteImport.update({
+  id: '/meg',
+  path: '/meg',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedFavoritterRoute = AuthenticatedFavoritterRouteImport.update({
@@ -218,6 +224,7 @@ export interface FileRoutesByFullPath {
   '/vilkar': typeof VilkarRoute
   '/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/favoritter': typeof AuthenticatedFavoritterRoute
+  '/meg': typeof AuthenticatedMegRoute
   '/mine-sok': typeof AuthenticatedMineSokRoute
   '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/ny-ok-annonse': typeof AuthenticatedNyOkAnnonseRoute
@@ -249,6 +256,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/vilkar': typeof VilkarRoute
   '/favoritter': typeof AuthenticatedFavoritterRoute
+  '/meg': typeof AuthenticatedMegRoute
   '/mine-sok': typeof AuthenticatedMineSokRoute
   '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/ny-ok-annonse': typeof AuthenticatedNyOkAnnonseRoute
@@ -283,6 +291,7 @@ export interface FileRoutesById {
   '/vilkar': typeof VilkarRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/_authenticated/favoritter': typeof AuthenticatedFavoritterRoute
+  '/_authenticated/meg': typeof AuthenticatedMegRoute
   '/_authenticated/mine-sok': typeof AuthenticatedMineSokRoute
   '/_authenticated/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/_authenticated/ny-ok-annonse': typeof AuthenticatedNyOkAnnonseRoute
@@ -317,6 +326,7 @@ export interface FileRouteTypes {
     | '/vilkar'
     | '/admin'
     | '/favoritter'
+    | '/meg'
     | '/mine-sok'
     | '/ny-annonse'
     | '/ny-ok-annonse'
@@ -348,6 +358,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/vilkar'
     | '/favoritter'
+    | '/meg'
     | '/mine-sok'
     | '/ny-annonse'
     | '/ny-ok-annonse'
@@ -381,6 +392,7 @@ export interface FileRouteTypes {
     | '/vilkar'
     | '/_authenticated/admin'
     | '/_authenticated/favoritter'
+    | '/_authenticated/meg'
     | '/_authenticated/mine-sok'
     | '/_authenticated/ny-annonse'
     | '/_authenticated/ny-ok-annonse'
@@ -526,6 +538,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMineSokRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/meg': {
+      id: '/_authenticated/meg'
+      path: '/meg'
+      fullPath: '/meg'
+      preLoaderRoute: typeof AuthenticatedMegRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/favoritter': {
       id: '/_authenticated/favoritter'
       path: '/favoritter'
@@ -668,6 +687,7 @@ const AuthenticatedAdminRouteRouteWithChildren =
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRouteRoute: typeof AuthenticatedAdminRouteRouteWithChildren
   AuthenticatedFavoritterRoute: typeof AuthenticatedFavoritterRoute
+  AuthenticatedMegRoute: typeof AuthenticatedMegRoute
   AuthenticatedMineSokRoute: typeof AuthenticatedMineSokRoute
   AuthenticatedNyAnnonseRoute: typeof AuthenticatedNyAnnonseRoute
   AuthenticatedNyOkAnnonseRoute: typeof AuthenticatedNyOkAnnonseRoute
@@ -684,6 +704,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRouteRoute: AuthenticatedAdminRouteRouteWithChildren,
   AuthenticatedFavoritterRoute: AuthenticatedFavoritterRoute,
+  AuthenticatedMegRoute: AuthenticatedMegRoute,
   AuthenticatedMineSokRoute: AuthenticatedMineSokRoute,
   AuthenticatedNyAnnonseRoute: AuthenticatedNyAnnonseRoute,
   AuthenticatedNyOkAnnonseRoute: AuthenticatedNyOkAnnonseRoute,

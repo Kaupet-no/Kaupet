@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { Loader2, ShieldOff } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -22,9 +22,9 @@ export function BlockedSection() {
     mutationFn: async (blockId: string) => deleteFn({ data: { blockId } }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["my-blocks"] });
-      toast.success("Blokkering opphevet");
+      showSuccessToast("Blokkering opphevet");
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke oppheve blokkeringen")),
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke oppheve blokkeringen")),
   });
 
   if (isLoading) {

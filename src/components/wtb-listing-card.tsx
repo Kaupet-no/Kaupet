@@ -3,7 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { MessageSquare, Tag, Calendar } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/use-auth";
@@ -51,7 +51,7 @@ export function WtbListingCard({ listing }: Props) {
     onSuccess: (id) => {
       if (id) navigate({ to: "/meldinger/$id", params: { id } });
     },
-    onError: () => toast.error("Kunne ikke starte samtale. Prøv igjen."),
+    onError: () => showErrorToast("Kunne ikke starte samtale. Prøv igjen."),
   });
 
   const isOwn = user?.id === listing.user_id;

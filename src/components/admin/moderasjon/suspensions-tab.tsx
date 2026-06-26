@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -32,10 +32,11 @@ export function SuspensionsTab() {
   const unsuspend = useMutation({
     mutationFn: (userId: string) => unsuspendFn({ data: { userId } }),
     onSuccess: () => {
-      toast.success("Svarteliste opphevet");
+      showSuccessToast("Svarteliste opphevet");
       qc.invalidateQueries({ queryKey: ["admin-suspensions"] });
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke oppheve svartelistingen")),
+    onError: (e: Error) =>
+      showErrorToast(formatErrorMessage(e, "Kunne ikke oppheve svartelistingen")),
   });
   return (
     <Card>

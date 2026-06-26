@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Send, User as UserIcon } from "lucide-react";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/use-auth";
@@ -256,7 +256,7 @@ function ConversationPage() {
         prev?.map((m) => (m.id === messageId ? { ...m, deleted_at: new Date().toISOString() } : m)),
       );
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke slette meldingen")),
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke slette meldingen")),
   });
 
   const priceLabel = conv?.listing?.is_free
@@ -288,22 +288,22 @@ function ConversationPage() {
   const confirmMutation = useMutation({
     mutationFn: () => confirmBuyerFn({ data: { conversationId: id } }),
     onSuccess: () => {
-      toast.success("Kjøper bekreftet");
+      showSuccessToast("Kjøper bekreftet");
       refetchSale();
       queryClient.invalidateQueries({ queryKey: ["conversation", id] });
       queryClient.invalidateQueries({ queryKey: ["my-conversations"] });
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke bekrefte kjøper")),
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke bekrefte kjøper")),
   });
 
   const unconfirmMutation = useMutation({
     mutationFn: () => unconfirmBuyerFn({ data: { listingId: listingId! } }),
     onSuccess: () => {
-      toast.success("Salget er angret");
+      showSuccessToast("Salget er angret");
       refetchSale();
       queryClient.invalidateQueries({ queryKey: ["conversation", id] });
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke angre salget")),
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke angre salget")),
   });
 
   const iBlockedAll = !!(
@@ -428,7 +428,7 @@ function ConversationPage() {
           unconfirming={unconfirmMutation.isPending}
           onSubmitReview={async (rating, comment) => {
             await createReviewFn({ data: { listingId: listingId!, rating, comment } });
-            toast.success("Takk for vurderingen!");
+            showSuccessToast("Takk for vurderingen!");
             refetchMyReview();
           }}
         />

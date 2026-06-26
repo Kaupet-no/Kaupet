@@ -223,8 +223,8 @@ function RootComponent() {
           try {
             const { data } = await supabase.rpc("cancel_account_deletion");
             if (data === true) {
-              const { toast } = await import("sonner");
-              toast.success("Velkommen tilbake! Slettingen av kontoen din er avbrutt.");
+              const { showSuccessToast } = await import("@/lib/toast");
+              showSuccessToast("Velkommen tilbake! Slettingen av kontoen din er avbrutt.");
             }
           } catch {
             // ignore

@@ -10,7 +10,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import {
   closestCenter,
   DndContext,
@@ -200,13 +200,13 @@ function AdminCategories() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Kategori slettet");
+      showSuccessToast("Kategori slettet");
       qc.invalidateQueries({ queryKey: ["admin", "categories"] });
       qc.invalidateQueries({ queryKey: ["admin", "category-counts"] });
       setDeleting(null);
       setReplacementId("__none__");
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke slette kategorien")),
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke slette kategorien")),
   });
 
   const reorderMutation = useMutation({
@@ -220,7 +220,7 @@ function AdminCategories() {
       if (failed?.error) throw failed.error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "categories"] }),
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke lagre rekkefølgen")),
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke lagre rekkefølgen")),
   });
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
@@ -542,11 +542,11 @@ function CategoryFormDialog({
       }
     },
     onSuccess: () => {
-      toast.success(category ? "Kategori oppdatert" : "Kategori opprettet");
+      showSuccessToast(category ? "Kategori oppdatert" : "Kategori opprettet");
       onSaved();
       onClose();
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke lagre kategorien")),
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke lagre kategorien")),
   });
 
   const possibleParents = categories.filter(
@@ -566,7 +566,7 @@ function CategoryFormDialog({
           onSubmit={(e) => {
             e.preventDefault();
             if (!name.trim()) {
-              toast.error("Navn er påkrevd");
+              showErrorToast("Navn er påkrevd");
               return;
             }
             save.mutate();

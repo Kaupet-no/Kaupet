@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2, ShieldOff } from "lucide-react";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -32,10 +32,11 @@ export function BansTab() {
   const unban = useMutation({
     mutationFn: (userId: string) => unbanFn({ data: { userId } }),
     onSuccess: () => {
-      toast.success("Utestenging opphevet");
+      showSuccessToast("Utestenging opphevet");
       qc.invalidateQueries({ queryKey: ["admin-bans"] });
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke oppheve utestengingen")),
+    onError: (e: Error) =>
+      showErrorToast(formatErrorMessage(e, "Kunne ikke oppheve utestengingen")),
   });
   return (
     <Card>

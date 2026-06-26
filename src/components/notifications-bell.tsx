@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, CheckCheck, TrendingDown, X } from "lucide-react";
@@ -7,8 +7,10 @@ import { nb } from "date-fns/locale";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/use-auth";
+import { useIsNative } from "@/lib/use-is-native";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
   listNotifications,
   listPriceDrops,
@@ -138,6 +140,9 @@ export function NotificationsBell() {
     };
   }, [user, qc]);
 
+  const native = useIsNative();
+  const [sheetOpen, setSheetOpen] = useState(false);
+
   if (!user) return null;
 
   const notifications = data ?? [];
@@ -161,118 +166,147 @@ export function NotificationsBell() {
     qc.invalidateQueries({ queryKey: ["notifications"] });
   };
 
+  const bellTrigger = (
+    <Button variant="ghost" size="icon" aria-label="Varsler" className="relative">
+      <Bell className="size-5" />
+      {unread > 0 && (
+        <span
+          className="pointer-events-none absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-accent-foreground"
+          aria-label={`${unread} uleste varsler`}
+        >
+          {unread > 9 ? "9+" : unread}
+        </span>
+      )}
+    </Button>
+  );
+
+  const notifList = (
+    <>
+      <div className="flex items-center justify-between border-b border-border px-3 py-2">
+        <span className="text-sm font-medium">Varsler</span>
+        {unread > 0 && (
+          <button
+            type="button"
+            onClick={handleMarkAllRead}
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <CheckCheck className="size-3.5" /> Marker alle som lest
+          </button>
+        )}
+      </div>
+      <div className="max-h-[400px] overflow-y-auto">
+        {notifications.length === 0 ? (
+          <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+            Ingen varsler ennå.
+            <br />
+            <Link
+              to="/mine-sok"
+              onClick={() => setSheetOpen(false)}
+              className="mt-2 inline-block text-primary hover:underline"
+            >
+              Lag et lagret søk
+            </Link>
+          </div>
+        ) : (
+          <ul className="divide-y divide-border">
+            {notifications.map((n) => (
+              <li
+                key={`${n.kind}-${n.id}`}
+                className={`group relative ${!n.read_at ? "bg-primary/5" : ""}`}
+              >
+                <Link
+                  to="/$kaupetCode"
+                  params={{ kaupetCode: n.listing_code ?? "" }}
+                  disabled={!n.listing_code}
+                  onClick={() => handleClick(n)}
+                  className="block px-3 py-2.5 pr-9 hover:bg-muted aria-disabled:pointer-events-none aria-disabled:opacity-60"
+                >
+                  <div className="flex items-start gap-2">
+                    {!n.read_at && (
+                      <span className="mt-1.5 size-2 shrink-0 rounded-full bg-accent" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="line-clamp-1 text-sm font-medium">
+                        {n.kind === "price_drop" && (
+                          <TrendingDown className="mr-1 inline size-3.5 text-accent" />
+                        )}
+                        {n.listing_title ??
+                          (n.kind === "price_drop" ? "Favoritten din" : "Ny annonse")}
+                      </p>
+                      <p className="line-clamp-1 text-xs text-muted-foreground">
+                        {n.kind === "search" ? (
+                          <>Treff i "{n.search_name ?? "Lagret søk"}"</>
+                        ) : (
+                          <>
+                            Prisfall −{Number(n.drop_pct).toFixed(0)} % ·{" "}
+                            {formatKr(n.old_price_nok)} → {formatKr(n.new_price_nok)}
+                          </>
+                        )}{" "}
+                        ·{" "}
+                        {formatDistanceToNow(new Date(n.created_at), {
+                          addSuffix: true,
+                          locale: nb,
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                </Link>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    void handleDelete(n);
+                  }}
+                  className="absolute right-2 top-2 rounded p-1 text-muted-foreground opacity-0 transition hover:bg-background hover:text-foreground group-hover:opacity-100"
+                  aria-label="Slett varsel"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div className="flex divide-x divide-border border-t border-border">
+        <Link
+          to="/varsler"
+          onClick={() => setSheetOpen(false)}
+          className="flex-1 rounded px-2 py-2 text-center text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          Se alle varsler
+        </Link>
+        <Link
+          to="/mine-sok"
+          onClick={() => setSheetOpen(false)}
+          className="flex-1 rounded px-2 py-2 text-center text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          Administrer lagrede søk
+        </Link>
+      </div>
+    </>
+  );
+
+  if (native) {
+    return (
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetTrigger asChild>{bellTrigger}</SheetTrigger>
+        <SheetContent side="bottom" className="rounded-t-2xl p-0 pb-8">
+          <div className="mx-auto mb-1 mt-3 h-1 w-10 rounded-full bg-muted-foreground/30" />
+          <SheetHeader className="sr-only">
+            <SheetTitle>Varsler</SheetTitle>
+          </SheetHeader>
+          {notifList}
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Varsler" className="relative">
-          <Bell className="size-5" />
-          {unread > 0 && (
-            <span
-              className="pointer-events-none absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-accent-foreground"
-              aria-label={`${unread} uleste varsler`}
-            >
-              {unread > 9 ? "9+" : unread}
-            </span>
-          )}
-        </Button>
-      </PopoverTrigger>
+      <PopoverTrigger asChild>{bellTrigger}</PopoverTrigger>
       <PopoverContent align="end" className="w-[360px] p-0">
-        <div className="flex items-center justify-between border-b border-border px-3 py-2">
-          <span className="text-sm font-medium">Varsler</span>
-          {unread > 0 && (
-            <button
-              type="button"
-              onClick={handleMarkAllRead}
-              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <CheckCheck className="size-3.5" /> Marker alle som lest
-            </button>
-          )}
-        </div>
-        <div className="max-h-[400px] overflow-y-auto">
-          {notifications.length === 0 ? (
-            <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-              Ingen varsler ennå.
-              <br />
-              <Link to="/mine-sok" className="mt-2 inline-block text-primary hover:underline">
-                Lag et lagret søk
-              </Link>
-            </div>
-          ) : (
-            <ul className="divide-y divide-border">
-              {notifications.map((n) => (
-                <li
-                  key={`${n.kind}-${n.id}`}
-                  className={`group relative ${!n.read_at ? "bg-primary/5" : ""}`}
-                >
-                  <Link
-                    to="/$kaupetCode"
-                    params={{ kaupetCode: n.listing_code ?? "" }}
-                    disabled={!n.listing_code}
-                    onClick={() => handleClick(n)}
-                    className="block px-3 py-2.5 pr-9 hover:bg-muted aria-disabled:pointer-events-none aria-disabled:opacity-60"
-                  >
-                    <div className="flex items-start gap-2">
-                      {!n.read_at && (
-                        <span className="mt-1.5 size-2 shrink-0 rounded-full bg-accent" />
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <p className="line-clamp-1 text-sm font-medium">
-                          {n.kind === "price_drop" && (
-                            <TrendingDown className="mr-1 inline size-3.5 text-accent" />
-                          )}
-                          {n.listing_title ??
-                            (n.kind === "price_drop" ? "Favoritten din" : "Ny annonse")}
-                        </p>
-                        <p className="line-clamp-1 text-xs text-muted-foreground">
-                          {n.kind === "search" ? (
-                            <>Treff i "{n.search_name ?? "Lagret søk"}"</>
-                          ) : (
-                            <>
-                              Prisfall −{Number(n.drop_pct).toFixed(0)} % ·{" "}
-                              {formatKr(n.old_price_nok)} → {formatKr(n.new_price_nok)}
-                            </>
-                          )}{" "}
-                          ·{" "}
-                          {formatDistanceToNow(new Date(n.created_at), {
-                            addSuffix: true,
-                            locale: nb,
-                          })}
-                        </p>
-                      </div>
-                    </div>
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      void handleDelete(n);
-                    }}
-                    className="absolute right-2 top-2 rounded p-1 text-muted-foreground opacity-0 transition hover:bg-background hover:text-foreground group-hover:opacity-100"
-                    aria-label="Slett varsel"
-                  >
-                    <X className="size-3.5" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <div className="flex divide-x divide-border border-t border-border">
-          <Link
-            to="/varsler"
-            className="flex-1 rounded px-2 py-2 text-center text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            Se alle varsler
-          </Link>
-          <Link
-            to="/mine-sok"
-            className="flex-1 rounded px-2 py-2 text-center text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            Administrer lagrede søk
-          </Link>
-        </div>
+        {notifList}
       </PopoverContent>
     </Popover>
   );

@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { BellRing, Loader2 } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { usePushStatus } from "@/lib/use-push-status";
 import { Button } from "@/components/ui/button";
@@ -28,9 +28,9 @@ export function PushEnablePrompt({ variant = "inline", showManageLink = true }: 
     setBusy(true);
     try {
       await push.enableOnThisDevice("saved_searches");
-      toast.success("Push-varsler er aktivert på denne enheten");
+      showSuccessToast("Push-varsler er aktivert på denne enheten");
     } catch (e) {
-      toast.error(formatErrorMessage(e, "Klarte ikke å aktivere varsler"));
+      showErrorToast(formatErrorMessage(e, "Klarte ikke å aktivere varsler"));
     } finally {
       setBusy(false);
     }

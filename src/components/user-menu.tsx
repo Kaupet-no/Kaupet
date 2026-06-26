@@ -18,7 +18,7 @@ import { useIsAdmin } from "@/lib/use-is-admin";
 import { useIsDemo } from "@/lib/use-is-demo";
 import { useIsTestEnv } from "@/lib/env";
 import { setTestMode } from "@/lib/test-mode.functions";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -56,10 +56,10 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
     setToggling(true);
     try {
       await callSetTestMode({ data: { enabled: next } });
-      toast.success(next ? "Test-modus aktivert" : "Test-modus deaktivert");
+      showSuccessToast(next ? "Test-modus aktivert" : "Test-modus deaktivert");
       window.location.reload();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Kunne ikke endre test-modus");
+      showErrorToast(e instanceof Error ? e.message : "Kunne ikke endre test-modus");
       setToggling(false);
     }
   }

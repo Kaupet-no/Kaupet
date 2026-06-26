@@ -1,7 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Heart, X } from "lucide-react";
-import { toast } from "sonner";
+
+import { NativePageHeader } from "@/components/native-page-header";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/use-auth";
@@ -81,65 +83,68 @@ function FavoritesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["user-favorites", user?.id] });
-      toast.success("Fjernet fra favoritter");
+      showSuccessToast("Fjernet fra favoritter");
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke fjerne favoritten")),
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke fjerne favoritten")),
   });
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10">
-      <div className="flex items-center gap-3">
-        <Heart className="size-6 text-accent" />
-        <h1 className="font-display text-3xl tracking-tight">Mine favoritter</h1>
-      </div>
-      <p className="mt-1 text-sm text-muted-foreground">Annonser du har lagret for senere.</p>
+    <>
+      <NativePageHeader title="Mine favoritter" backLabel="Meg" backTo="/meg" />
+      <div className="mx-auto max-w-6xl px-4 py-6">
+        <div className="flex items-center gap-3 max-sm:hidden">
+          <Heart className="size-6 text-accent" />
+          <h1 className="font-display text-3xl tracking-tight">Mine favoritter</h1>
+        </div>
+        <p className="mt-1 text-sm text-muted-foreground">Annonser du har lagret for senere.</p>
 
-      <div className="mt-8">
-        {isLoading ? (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-muted" />
-            ))}
-          </div>
-        ) : (favorites ?? []).length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border bg-surface p-12 text-center">
-            <p className="text-lg font-medium">Du har ikke lagret noen favoritter ennå</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Trykk på hjertet på en annonse for å lagre den her.
-            </p>
-            <Link to="/annonser" search={{ q: "", category: "", sort: "new" }}>
-              <Button className="mt-6">Utforsk annonser</Button>
-            </Link>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {(favorites ?? []).map((row) =>
-              row.kind === "available" ? (
-                <ListingCard key={row.listing_id} listing={row.card} />
-              ) : (
-                <div
-                  key={row.listing_id}
-                  className="flex aspect-[4/3] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-muted/30 p-4 text-center"
-                >
-                  <p className="text-sm font-medium">
-                    {row.reason === "deleted"
-                      ? "Annonsen er slettet"
-                      : "Annonsen er ikke lenger tilgjengelig"}
-                  </p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={removeMutation.isPending}
-                    onClick={() => removeMutation.mutate(row.listing_id)}
+        <div className="mt-8">
+          {isLoading ? (
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-muted" />
+              ))}
+            </div>
+          ) : (favorites ?? []).length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border bg-surface p-12 text-center">
+              <p className="text-lg font-medium">Du har ikke lagret noen favoritter ennå</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Trykk på hjertet på en annonse for å lagre den her.
+              </p>
+              <Link to="/annonser" search={{ q: "", category: "", sort: "new" }}>
+                <Button className="mt-6">Utforsk annonser</Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              {(favorites ?? []).map((row) =>
+                row.kind === "available" ? (
+                  <ListingCard key={row.listing_id} listing={row.card} />
+                ) : (
+                  <div
+                    key={row.listing_id}
+                    className="flex aspect-[4/3] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-muted/30 p-4 text-center"
                   >
-                    <X className="size-4" /> Fjern fra favoritter
-                  </Button>
-                </div>
-              ),
-            )}
-          </div>
-        )}
+                    <p className="text-sm font-medium">
+                      {row.reason === "deleted"
+                        ? "Annonsen er slettet"
+                        : "Annonsen er ikke lenger tilgjengelig"}
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={removeMutation.isPending}
+                      onClick={() => removeMutation.mutate(row.listing_id)}
+                    >
+                      <X className="size-4" /> Fjern fra favoritter
+                    </Button>
+                  </div>
+                ),
+              )}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

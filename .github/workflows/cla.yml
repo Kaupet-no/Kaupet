@@ -30,7 +30,6 @@ jobs:
           path-to-document: 'https://github.com/${{ github.repository }}/blob/main/CLA.md'
           branch: 'cla-signatures'
           allowlist: bot*,dependabot[bot],github-actions[bot]
-          sign-comment: 'I have read the CLA Document and I hereby sign the CLA'
           signed-commit-message: 'chore: $contributorName signed the CLA'
           custom-notsigned-prcomment: |
             Takk for bidraget ditt! 🎉

@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
 import { KaupetCodeDialog } from "@/components/kaupet-code-dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/location-filter";
 import { AnimatedSearchPlaceholder } from "@/components/animated-search-placeholder";
 import { useSavedLocation } from "@/lib/use-saved-location";
@@ -172,59 +173,52 @@ export function AppLanding() {
 
           {/* Lokasjon-chip */}
           <div className="mt-4 flex justify-center">
-            <Sheet open={locOpen} onOpenChange={setLocOpen}>
-              <SheetTrigger asChild>
-                <button
-                  type="button"
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm transition ${
-                    hasLocation
-                      ? "border-primary/40 bg-primary/5 text-foreground"
-                      : "border-border bg-card text-muted-foreground"
-                  }`}
-                >
-                  <MapPin className="size-4" />
-                  <span className="truncate max-w-[200px]">
-                    {hasLocation ? `${location.label} · ${location.radius} km` : "Hvor som helst"}
+            <Dialog open={locOpen} onOpenChange={setLocOpen}>
+              <button
+                type="button"
+                onClick={() => setLocOpen(true)}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm transition ${
+                  hasLocation
+                    ? "border-primary/40 bg-primary/5 text-foreground"
+                    : "border-border bg-card text-muted-foreground"
+                }`}
+              >
+                <MapPin className="size-4" />
+                <span className="truncate max-w-[200px]">
+                  {hasLocation ? `${location.label} · ${location.radius} km` : "Hvor som helst"}
+                </span>
+                {hasLocation && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    className="ml-1 rounded-full p-0.5 hover:bg-muted"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setLocation({
+                        lat: null,
+                        lng: null,
+                        radius: location.radius,
+                        label: "",
+                      });
+                    }}
+                    aria-label="Fjern lokasjon"
+                  >
+                    <X className="size-3.5" />
                   </span>
-                  {hasLocation && (
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      className="ml-1 rounded-full p-0.5 hover:bg-muted"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setLocation({
-                          lat: null,
-                          lng: null,
-                          radius: location.radius,
-                          label: "",
-                        });
-                      }}
-                      aria-label="Fjern lokasjon"
-                    >
-                      <X className="size-3.5" />
-                    </span>
-                  )}
-                </button>
-              </SheetTrigger>
-              <SheetContent
-                side="bottom"
-                className="rounded-t-2xl"
+                )}
+              </button>
+              <DialogContent
+                className="w-[calc(100vw-2rem)] max-w-sm rounded-2xl p-6"
                 tabIndex={-1}
                 onOpenAutoFocus={(e) => {
-                  // Radix focuses the first focusable element (the location
-                  // input) on mount by default, which pops the keyboard
-                  // while the sheet is still animating in and pushes it
-                  // off-screen. Keep focus on the sheet itself instead;
-                  // the keyboard only opens once the user taps the input.
                   e.preventDefault();
                   (e.target as HTMLElement)?.focus();
                 }}
               >
-                <SheetHeader className="text-left">
-                  <SheetTitle>Velg sted</SheetTitle>
-                </SheetHeader>
-                <div className="mt-3 space-y-3">
+                <DialogHeader className="text-left">
+                  <DialogTitle>Velg sted</DialogTitle>
+                </DialogHeader>
+                <div className="mt-1 space-y-3">
                   <LocationPicker
                     value={location}
                     onChange={setLocation}
@@ -238,8 +232,8 @@ export function AppLanding() {
                     />
                   )}
                 </div>
-              </SheetContent>
-            </Sheet>
+              </DialogContent>
+            </Dialog>
           </div>
 
           {!isNative && (

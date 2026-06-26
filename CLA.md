@@ -14,9 +14,7 @@ Denne bidragsyteravtalen («Avtalen») dokumenterer rettighetene som bidragsyter
 
 **«Du»** betyr den individuelle opphavspersonen som sender inn et bidrag til Selskapet.
 
-**«Bidrag»** betyr ethvert originalt verk, inkludert endringer eller tillegg til et eksisterende verk, som du bevisst sender inn til Selskapet for inkludering i, eller dokumentasjon av, noen av prosjektene eid eller administrert av Selskapet.
-
-**«Sende inn»** betyr enhver form for elektronisk, muntlig eller skriftlig kommunikasjon sendt til Selskapet eller dets representanter, inkludert men ikke begrenset til kommunikasjon på elektroniske postlister, systemer for versjonskontroll og feilsporingssystemer administrert av, eller på vegne av, Selskapet med formål om å diskutere og forbedre prosjektet.
+**«Bidrag»** betyr ethvert originalt verk, inkludert endringer eller tillegg til et eksisterende verk, som du bevisst sender inn til Selskapet for inkludering i, eller dokumentasjon av, noen av prosjektene eid eller administrert av Selskapet. Med «sende inn» menes enhver form for elektronisk, muntlig eller skriftlig kommunikasjon sendt til Selskapet eller dets representanter, inkludert men ikke begrenset til kommunikasjon på elektroniske postlister, systemer for versjonskontroll og feilsporingssystemer administrert av, eller på vegne av, Selskapet med formål om å diskutere og forbedre prosjektet — men unntatt kommunikasjon som du tydelig har merket eller på annen måte skriftlig angitt som «Ikke et bidrag».
 
 ---
 
@@ -28,17 +26,19 @@ I henhold til vilkårene i denne Avtalen gir du herved til Selskapet og til mott
 
 ## 3. Tildeling av patentlisens
 
-I henhold til vilkårene i denne Avtalen gir du herved til Selskapet og til mottakere av programvare distribuert av Selskapet en varig, verdensomspennende, ikke-eksklusiv, vederlagsfri, royaltyfri, ugjenkallelig patentlisens til å fremstille, få fremstilt, bruke, tilby til salg, selge, importere og på annen måte overføre verket. Denne lisensen gjelder kun de patentrettighetene som kan lisensieres av deg og som nødvendigvis krenkes av ditt/dine Bidrag alene eller i kombinasjon med prosjektet bidraget ble sendt inn til.
+I henhold til vilkårene i denne Avtalen gir du herved til Selskapet og til mottakere av programvare distribuert av Selskapet en varig, verdensomspennende, ikke-eksklusiv, vederlagsfri, royaltyfri, ugjenkallelig (med unntak som angitt i dette avsnittet) patentlisens til å fremstille, få fremstilt, bruke, tilby til salg, selge, importere og på annen måte overføre verket. Denne lisensen gjelder kun de patentrettighetene som kan lisensieres av deg og som nødvendigvis krenkes av ditt Bidrag alene eller i kombinasjon med prosjektet bidraget ble sendt inn til. Dersom en enhet reiser et patentsøksmål mot deg eller andre (inkludert et motkrav eller tilsvar i en rettssak) og hevder at ditt Bidrag eller prosjektet bidraget ble sendt inn til utgjør direkte eller indirekte patentinngrep, opphører alle patentlisenser som er gitt til den enheten i henhold til denne Avtalen fra og med datoen søksmålet ble anlagt.
 
 ---
 
 ## 4. Du erklærer at
 
-1. Du er rettslig berettiget til å gi lisensen ovenfor. Dersom din arbeidsgiver har rettigheter til immaterielle rettigheter du skaper, erklærer du at du har fått tillatelse til å sende inn Bidrag på vegne av denne arbeidsgiveren, eller at arbeidsgiveren har fraskrevet seg slike rettigheter for dine Bidrag til Selskapet.
+1. Du er rettslig berettiget til å gi lisensen ovenfor. Dersom din arbeidsgiver har rettigheter til immaterielle rettigheter du skaper, erklærer du at du har fått tillatelse til å sende inn Bidrag på vegne av denne arbeidsgiveren, at arbeidsgiveren har fraskrevet seg slike rettigheter for dine Bidrag til Selskapet, eller at arbeidsgiveren har inngått en separat bidragsyteravtale med Selskapet.
 
-2. Hvert av dine Bidrag er din originale skapelse. Dersom du ønsker å sende inn verk som ikke er din originale skapelse, kan du sende dette separat til Selskapet med fullstendige opplysninger om kilde og eventuelle lisenser eller andre restriksjoner du er kjent med.
+2. Hvert av dine Bidrag er din originale skapelse (se punkt 4.3 for bestemmelser om bidrag du sender inn på vegne av andre).
 
-3. Ditt Bidrag inkluderer fullstendige opplysninger om eventuelle tredjeparts lisenser eller andre restriksjoner du er kjent med, og som er tilknyttet noen del av ditt Bidrag.
+3. Ditt Bidrag inkluderer fullstendige opplysninger om eventuelle tredjeparts lisenser eller andre restriksjoner (inkludert, men ikke begrenset til, relaterte patenter, varemerker og lisensavtaler) du er kjent med, og som er tilknyttet noen del av ditt Bidrag.
+
+4. Dersom du ønsker å sende inn verk som ikke er din originale skapelse, kan du sende dette separat til Selskapet med fullstendige opplysninger om kilde og eventuelle lisenser eller andre restriksjoner du er kjent med, og tydelig merke det som «Sendt inn på vegne av tredjepart: [navn på kilde]».
 
 ---
 
@@ -82,9 +82,7 @@ This Contributor License Agreement ("Agreement") documents the rights granted by
 
 **"You"** means the individual copyright owner who submits a contribution to the Company.
 
-**"Contribution"** means any original work of authorship, including any modifications or additions to an existing work, that you intentionally submit to the Company for inclusion in, or documentation of, any of the projects owned or managed by the Company.
-
-**"Submit"** means any form of electronic, verbal, or written communication sent to the Company or its representatives, including but not limited to communication on electronic mailing lists, source code control systems, and issue tracking systems managed by, or on behalf of, the Company for the purpose of discussing and improving the project.
+**"Contribution"** means any original work of authorship, including any modifications or additions to an existing work, that you intentionally submit to the Company for inclusion in, or documentation of, any of the projects owned or managed by the Company. For the purposes of this definition, "submit" means any form of electronic, verbal, or written communication sent to the Company or its representatives, including but not limited to communication on electronic mailing lists, source code control systems, and issue tracking systems managed by, or on behalf of, the Company for the purpose of discussing and improving the project, but excluding communication that is conspicuously marked or otherwise designated in writing by the copyright owner as "Not a Contribution."
 
 ---
 
@@ -96,17 +94,19 @@ Subject to the terms and conditions of this Agreement, you hereby grant to the C
 
 ## 3. Grant of Patent License
 
-Subject to the terms and conditions of this Agreement, you hereby grant to the Company and to recipients of software distributed by the Company a perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable patent license to make, have made, use, offer to sell, sell, import, and otherwise transfer the work, where such license applies only to those patent claims licensable by you that are necessarily infringed by your Contribution(s) alone or by combination of your Contribution(s) with the project to which such Contribution(s) were submitted.
+Subject to the terms and conditions of this Agreement, you hereby grant to the Company and to recipients of software distributed by the Company a perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable (except as stated in this section) patent license to make, have made, use, offer to sell, sell, import, and otherwise transfer the work, where such license applies only to those patent claims licensable by you that are necessarily infringed by your Contribution(s) alone or by combination of your Contribution(s) with the project to which such Contribution(s) were submitted. If any entity institutes patent litigation against you or any other entity (including a cross-claim or counterclaim in a lawsuit) alleging that your Contribution, or the project to which you have contributed, constitutes direct or contributory patent infringement, then any patent licenses granted to that entity under this Agreement for that Contribution shall terminate as of the date such litigation is filed.
 
 ---
 
 ## 4. You Represent That
 
-1. You are legally entitled to grant the above license. If your employer(s) have rights to intellectual property that you create, you represent that you have received permission to make Contributions on behalf of that employer, or that your employer has waived such rights for your Contributions to the Company.
+1. You are legally entitled to grant the above license. If your employer(s) have rights to intellectual property that you create, you represent that you have received permission to make Contributions on behalf of that employer, that your employer has waived such rights for your Contributions to the Company, or that your employer has executed a separate contributor license agreement with the Company.
 
-2. Each of your Contributions is your original creation. Should you wish to submit work that is not your original creation, you may submit it separately to the Company, identifying the complete details of its source and any license or other restriction (including, but not limited to, related patents, trademarks, and license agreements) of which you are personally aware.
+2. Each of your Contributions is your original creation (see section 4.4 for submissions on behalf of others).
 
-3. Your Contribution includes complete details of any third-party license or other restriction of which you are aware and which are associated with any part of your Contribution.
+3. Your Contribution includes complete details of any third-party license or other restriction (including, but not limited to, related patents, trademarks, and license agreements) of which you are aware and which are associated with any part of your Contribution.
+
+4. Should you wish to submit work that is not your original creation, you may submit it separately to the Company, identifying the complete details of its source and any license or other restriction of which you are personally aware, and conspicuously marking the work as "Submitted on behalf of a third-party: [named here]".
 
 ---
 

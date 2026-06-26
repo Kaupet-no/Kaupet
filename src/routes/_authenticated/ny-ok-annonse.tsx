@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
-import { ChevronLeft, ChevronRight, Search, Check, Bell } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2, Check, Bell } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { createWtbListing } from "@/lib/wtb-listings.functions";
@@ -16,8 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { formatErrorMessage } from "@/lib/errors";
+import { NativePageHeader } from "@/components/native-page-header";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,6 +53,11 @@ export const Route = createFileRoute("/_authenticated/ny-ok-annonse")({
   component: NewWtbPage,
 });
 
+function FieldValid({ show }: { show: boolean }) {
+  if (!show) return null;
+  return <Check className="size-3.5 text-green-600" aria-hidden />;
+}
+
 function NewWtbPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState<1 | 2>(1);
@@ -61,7 +66,6 @@ function NewWtbPage() {
   const [savingSearch, setSavingSearch] = useState(false);
   const [savedSearch, setSavedSearch] = useState(false);
   const [createdId, setCreatedId] = useState<string | null>(null);
-  const [wantSaveSearch, setWantSaveSearch] = useState(true);
 
   const { data: categories = [] } = useQuery({
     queryKey: ["categories"],
@@ -81,7 +85,7 @@ function NewWtbPage() {
     handleSubmit,
     watch,
     setValue,
-    formState: { errors },
+    formState: { errors, touchedFields },
   } = useForm<WtbForm>({
     resolver: zodResolver(wtbSchema),
     defaultValues: { title: "", description: "", category_id: null, max_price_nok: "" },
@@ -89,6 +93,9 @@ function NewWtbPage() {
 
   const categoryId = watch("category_id");
   const title = watch("title");
+  const titleLength = title.length;
+  const description = watch("description");
+  const descriptionLength = (description ?? "").length;
 
   const shouldBlockNav = step === 1 && title.trim().length > 0;
   const blocker = useBlocker({
@@ -161,22 +168,13 @@ function NewWtbPage() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="wantSave"
-                checked={wantSaveSearch}
-                onCheckedChange={(v) => setWantSaveSearch(!!v)}
-              />
-              <Label htmlFor="wantSave" className="cursor-pointer text-sm">
-                Ja, lagre søk og send varsler
-              </Label>
-            </div>
             <Button
-              className="mt-3 w-full"
+              className="mt-1 w-full gap-2"
               onClick={handleSaveSearch}
-              disabled={!wantSaveSearch || savingSearch}
+              disabled={savingSearch}
             >
-              {savingSearch ? "Lagrer..." : "Lagre søk"}
+              <Bell className="size-4" />
+              {savingSearch ? "Lagrer..." : "Aktiver varsler for dette søket"}
             </Button>
           </div>
         )}
@@ -199,86 +197,106 @@ function NewWtbPage() {
   }
 
   return (
-    <div className="mx-auto max-w-lg px-4 py-8">
-      <div className="mb-6 flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate({ to: "/ny-annonse" })}>
-          <ChevronLeft className="size-5" />
-        </Button>
-        <div>
-          <h1 className="text-lg font-bold">Ønskes kjøpt</h1>
-          <p className="text-sm text-muted-foreground">
-            Fortell hva du leter etter, så finner selgere deg.
-          </p>
-        </div>
-      </div>
+    <div className="mx-auto max-w-3xl px-4 pt-6 pb-4">
+      <NativePageHeader title="Ønskes kjøpt" backTo="/" />
+      <h1 className="font-display text-3xl tracking-tight">Ønskes kjøpt</h1>
 
-      <form onSubmit={handleSubmit((values) => publish(values))} className="flex flex-col gap-5">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="title">
-            Hva leter du etter? <span className="text-destructive">*</span>
-          </Label>
+      <form
+        onSubmit={handleSubmit((values) => publish(values))}
+        className="mt-8 flex flex-col gap-6 pb-24"
+      >
+        <section className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="title">
+              Hva leter du etter? <span className="text-destructive">*</span>
+            </Label>
+            <div className="flex items-center gap-1.5">
+              <FieldValid show={!!touchedFields.title && !errors.title} />
+              <span
+                className={`text-xs ${titleLength > 100 ? "text-destructive" : "text-muted-foreground"}`}
+              >
+                {titleLength}/120
+              </span>
+            </div>
+          </div>
           <Input
             id="title"
             placeholder="f.eks. PlayStation 5, Trek sykkel, iPhone 14..."
             autoFocus
+            aria-invalid={!!errors.title}
+            aria-describedby={errors.title ? "title-error" : undefined}
             {...register("title")}
           />
-          {errors.title && <p className="text-xs text-destructive">{errors.title.message}</p>}
-        </div>
+          {errors.title && (
+            <p id="title-error" className="text-sm text-destructive">
+              {errors.title.message}
+            </p>
+          )}
+        </section>
 
-        <div className="flex flex-col gap-1.5">
-          <Label>Kategori</Label>
+        <section className="space-y-2">
+          <Label>Kategori (valgfritt)</Label>
           <button
             type="button"
+            aria-label="Velg kategori"
+            aria-expanded={categoryPickerOpen}
             onClick={() => setCategoryPickerOpen(true)}
-            className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background hover:bg-accent"
+            className="flex w-full items-center justify-between rounded-md border border-border bg-card px-3 py-2 text-sm transition-colors hover:border-primary/40"
           >
             <span className={categoryName ? "text-foreground" : "text-muted-foreground"}>
-              {categoryName || "Velg kategori (valgfritt)"}
+              {categoryName || "Velg kategori..."}
             </span>
-            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+            <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
           </button>
-        </div>
+        </section>
 
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="max_price">Maks pris du vil betale (kr)</Label>
-          <Input
-            id="max_price"
-            type="number"
-            inputMode="numeric"
-            placeholder="f.eks. 2500"
-            min={0}
-            max={10000000}
-            {...register("max_price_nok")}
-          />
-          {errors.max_price_nok && (
-            <p className="text-xs text-destructive">{errors.max_price_nok.message}</p>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="description">Beskrivelse / krav (valgfritt)</Label>
+        <section className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="description">Beskrivelse / krav (valgfritt)</Label>
+            <span className="text-xs text-muted-foreground">{descriptionLength}/2000</span>
+          </div>
           <Textarea
             id="description"
             placeholder="Beskriv gjerne ønsket stand, farge, versjon, o.l."
             rows={3}
+            aria-invalid={!!errors.description}
+            aria-describedby={errors.description ? "description-error" : undefined}
             {...register("description")}
           />
           {errors.description && (
-            <p className="text-xs text-destructive">{errors.description.message}</p>
+            <p id="description-error" className="text-sm text-destructive">
+              {errors.description.message}
+            </p>
           )}
-        </div>
+        </section>
 
-        <Button type="submit" disabled={isPending} className="gap-2">
-          {isPending ? (
-            "Publiserer..."
-          ) : (
-            <>
-              <Search className="size-4" />
-              Publiser ønskes kjøpt
-            </>
+        <section className="space-y-2">
+          <Label htmlFor="max_price">Maks pris du vil betale (valgfritt)</Label>
+          <Input
+            id="max_price"
+            type="number"
+            inputMode="numeric"
+            placeholder="kr"
+            className="max-w-[200px]"
+            min={0}
+            max={10000000}
+            aria-invalid={!!errors.max_price_nok}
+            aria-describedby={errors.max_price_nok ? "max-price-error" : undefined}
+            {...register("max_price_nok")}
+          />
+          {errors.max_price_nok && (
+            <p id="max-price-error" className="text-sm text-destructive">
+              {errors.max_price_nok.message}
+            </p>
           )}
-        </Button>
+        </section>
+
+        <div className="flex justify-end border-t border-border pt-6">
+          <Button type="submit" disabled={isPending} className="gap-2">
+            {isPending && <Loader2 className="size-4 animate-spin" />}
+            Publiser ønskes kjøpt
+          </Button>
+        </div>
       </form>
 
       <CategoryPicker

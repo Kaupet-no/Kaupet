@@ -16,7 +16,6 @@ import {
   Tag,
   LocateFixed,
   Hash,
-  PackageOpen,
   Search,
 } from "lucide-react";
 
@@ -832,45 +831,12 @@ function NewListingPage() {
       ? `${selectedParent.name_nb} › ${selectedCategory.name_nb}`
       : (selectedCategory?.name_nb ?? null);
 
-  // Show listing type chooser when no draft exists and user hasn't chosen yet
-  if (listingType === null && !hasDraftData) {
-    return (
-      <div className="mx-auto flex min-h-[60vh] max-w-lg flex-col items-center justify-center gap-6 px-4 py-12">
-        <div className="text-center">
-          <h1 className="font-display text-2xl font-bold tracking-tight">Ny annonse</h1>
-          <p className="mt-1 text-muted-foreground">Hva vil du gjøre?</p>
-        </div>
-        <div className="flex w-full flex-col gap-3">
-          <button
-            type="button"
-            onClick={() => setListingType("sell")}
-            className="flex items-center gap-4 rounded-xl border bg-card p-5 text-left transition hover:border-primary hover:shadow-sm"
-          >
-            <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary/10">
-              <PackageOpen className="size-6 text-primary" />
-            </div>
-            <div>
-              <p className="font-semibold">Jeg selger eller gir bort noe</p>
-              <p className="text-sm text-muted-foreground">Legg ut en annonse med bilder og pris</p>
-            </div>
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate({ to: "/ny-ok-annonse" })}
-            className="flex items-center gap-4 rounded-xl border bg-card p-5 text-left transition hover:border-primary hover:shadow-sm"
-          >
-            <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-secondary">
-              <Search className="size-6 text-secondary-foreground" />
-            </div>
-            <div>
-              <p className="font-semibold">Jeg ønsker å kjøpe noe</p>
-              <p className="text-sm text-muted-foreground">Legg ut en ønskes kjøpt-annonse</p>
-            </div>
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Redirect to home if no type selected and no draft — entry should go through the picker dialog
+  useEffect(() => {
+    if (listingType === null && !hasDraftData) {
+      void navigate({ to: "/" });
+    }
+  }, [listingType, hasDraftData, navigate]);
 
   return (
     <div className="mx-auto max-w-3xl px-4 pt-6 pb-4">

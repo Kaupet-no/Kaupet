@@ -31,6 +31,8 @@ import { ChevronLeft } from "lucide-react";
 import { useIsNative } from "@/lib/use-is-native";
 import { AppLanding } from "@/components/app-landing";
 import { KaupetCodeDialog } from "@/components/kaupet-code-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AdPickerOptions } from "@/components/ad-picker-options";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { findCategorySuggestion } from "@/lib/categories";
 import { useTypewriterText } from "@/lib/use-typewriter-text";
@@ -141,8 +143,9 @@ function PopularCarousel({
 }
 
 function WebLanding() {
-  const navigate = useNavigate();
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const [adPickerOpen, setAdPickerOpen] = useState(false);
   const [qDraft, setQDraft] = useState("");
   const autoplay = useRef(Autoplay({ delay: 4500, stopOnInteraction: true }));
 
@@ -412,11 +415,28 @@ function WebLanding() {
 
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             {user ? (
-              <Link to="/ny-annonse">
-                <Button size="lg" variant="outline">
+              <>
+                <Button size="lg" variant="outline" onClick={() => setAdPickerOpen(true)}>
                   Opprett en annonse
                 </Button>
-              </Link>
+                <Dialog open={adPickerOpen} onOpenChange={setAdPickerOpen}>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Ny annonse</DialogTitle>
+                    </DialogHeader>
+                    <AdPickerOptions
+                      onSell={() => {
+                        setAdPickerOpen(false);
+                        void navigate({ to: "/ny-annonse", search: { type: "sell" } });
+                      }}
+                      onBuy={() => {
+                        setAdPickerOpen(false);
+                        void navigate({ to: "/ny-ok-annonse" });
+                      }}
+                    />
+                  </DialogContent>
+                </Dialog>
+              </>
             ) : (
               <Link to="/auth" search={{ mode: "signup" }}>
                 <Button size="lg" variant="outline">

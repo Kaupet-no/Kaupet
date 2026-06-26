@@ -204,7 +204,7 @@ function MineSokPage() {
             <div className="rounded-xl border border-dashed border-border bg-surface p-12 text-center">
               <p className="text-lg font-medium">Ingen lagrede søk ennå</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Bruk "Avansert søk" på annonse-siden og lagre kriteriene dine.
+                Gjør et søk på annonse-siden og lagre kriteriene dine.
               </p>
               <Link
                 to="/annonser"

@@ -23,6 +23,7 @@ import {
 } from "@/lib/native-push";
 import { setupNative } from "@/lib/native-setup";
 import { useIsNative } from "@/lib/use-is-native";
+import { useKeyboardVisible } from "@/lib/use-keyboard-visible";
 import { AppBottomNav } from "@/components/app-bottom-nav";
 import { TestEnvBanner } from "@/components/test-env-banner";
 import { TestEnvGate } from "@/components/test-env-gate";
@@ -258,6 +259,7 @@ function RootComponent() {
 
 function RootBody({ native }: { native: boolean }) {
   const isTest = useIsTestEnv();
+  const keyboardVisible = useKeyboardVisible();
 
   useEffect(() => {
     if (!isTest) return;
@@ -286,7 +288,7 @@ function RootBody({ native }: { native: boolean }) {
       {isTest && <TestEnvBanner />}
       {!native && <SiteHeader />}
       <ModerationBanner />
-      <main className={`flex-1${native ? " pb-bottom-nav" : ""}`}>
+      <main className={`flex-1${native && !keyboardVisible ? " pb-bottom-nav" : ""}`}>
         <Outlet />
       </main>
 
@@ -332,7 +334,7 @@ function RootBody({ native }: { native: boolean }) {
           </div>
         </footer>
       )}
-      {native && <AppBottomNav />}
+      {native && !keyboardVisible && <AppBottomNav />}
     </div>
   );
 

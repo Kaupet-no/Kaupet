@@ -226,9 +226,9 @@
       const IMPULSE = 15;
       const COLOR = '#d97a3c';
       // Accelerometer tilt-to-gravity scale (degrees → px/frame²)
-      const TILT_SCALE = 0.065;
+      const TILT_SCALE = 0.025;
       // Clamp tilt force so the ball doesn't fly off screen
-      const TILT_MAX = 1.8;
+      const TILT_MAX = 0.7;
 
       let active = false;
       let ball = { x: 0, y: 0, vx: 0, vy: 0, scaleY: 1, scaleX: 1 };

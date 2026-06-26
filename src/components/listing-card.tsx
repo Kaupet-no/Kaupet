@@ -116,12 +116,12 @@ export function ListingCard({ listing, highlighted, onHoverChange, compact = fal
         {typeof listing.total_views === "number" && (
           <p
             className="flex items-center gap-1 text-xs text-muted-foreground"
-            title={`${listing.total_views.toLocaleString("nb-NO")} visninger totalt · ${(listing.views_last_week ?? 0).toLocaleString("nb-NO")} siste uke`}
+            title={`${listing.total_views.toLocaleString("nb-NO")} visninger totalt · ${(listing.views_last_week ?? 0).toLocaleString("nb-NO")} siste syv dager`}
           >
             <Eye className="size-3" />
             <span>{listing.total_views.toLocaleString("nb-NO")}</span>
             <span className="text-muted-foreground/70">
-              · {(listing.views_last_week ?? 0).toLocaleString("nb-NO")} siste uke
+              · {(listing.views_last_week ?? 0).toLocaleString("nb-NO")} siste syv dager
             </span>
           </p>
         )}

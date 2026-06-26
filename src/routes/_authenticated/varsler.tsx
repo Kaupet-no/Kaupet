@@ -128,7 +128,7 @@ function VarslerPage() {
   return (
     <>
       <NativePageHeader title="Mine varsler" backLabel="Meg" backTo="/meg" />
-      <div className="mx-auto max-w-2xl px-4 py-6">
+      <div className="mx-auto max-w-4xl px-4 py-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="font-display text-3xl tracking-tight max-sm:hidden">Mine varsler</h1>

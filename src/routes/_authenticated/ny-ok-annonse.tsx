@@ -236,18 +236,32 @@ function NewWtbPage() {
 
         <section className="space-y-2">
           <Label>Kategori (valgfritt)</Label>
-          <button
-            type="button"
-            aria-label="Velg kategori"
-            aria-expanded={categoryPickerOpen}
-            onClick={() => setCategoryPickerOpen(true)}
-            className="flex w-full items-center justify-between rounded-md border border-border bg-card px-3 py-2 text-sm transition-colors hover:border-primary/40"
-          >
-            <span className={categoryName ? "text-foreground" : "text-muted-foreground"}>
-              {categoryName || "Velg kategori..."}
-            </span>
-            <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
-          </button>
+          <CategoryPicker
+            open={categoryPickerOpen}
+            onOpenChange={setCategoryPickerOpen}
+            categories={categories}
+            selectedId={categoryId ?? ""}
+            onSelect={(id, _parentId) => {
+              setValue("category_id", id);
+              const cat = categories.find((c) => c.id === id);
+              setCategoryName(cat?.name_nb ?? "");
+              setCategoryPickerOpen(false);
+            }}
+            trigger={
+              <button
+                type="button"
+                aria-label="Velg kategori"
+                aria-expanded={categoryPickerOpen}
+                onClick={() => setCategoryPickerOpen(true)}
+                className="flex w-full items-center justify-between rounded-md border border-border bg-card px-3 py-2 text-sm transition-colors hover:border-primary/40"
+              >
+                <span className={categoryName ? "text-foreground" : "text-muted-foreground"}>
+                  {categoryName || "Velg kategori..."}
+                </span>
+                <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+              </button>
+            }
+          />
         </section>
 
         <section className="space-y-2">
@@ -298,19 +312,6 @@ function NewWtbPage() {
           </Button>
         </div>
       </form>
-
-      <CategoryPicker
-        open={categoryPickerOpen}
-        onOpenChange={setCategoryPickerOpen}
-        categories={categories}
-        selectedId={categoryId ?? ""}
-        onSelect={(id, _parentId) => {
-          setValue("category_id", id);
-          const cat = categories.find((c) => c.id === id);
-          setCategoryName(cat?.name_nb ?? "");
-          setCategoryPickerOpen(false);
-        }}
-      />
 
       <AlertDialog
         open={blocker.status === "blocked"}

@@ -42,7 +42,7 @@ function PersonvernPage() {
         </section>
 
         <section className="space-y-4">
-          <h2 className="font-display text-2xl">Hva lagres</h2>
+          <h2 className="font-display text-2xl">Informasjonen vi lagrer</h2>
 
           <details className="group rounded-lg border border-border">
             <summary className="flex cursor-pointer items-center justify-between px-4 py-3 font-medium select-none list-none">

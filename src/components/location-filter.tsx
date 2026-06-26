@@ -125,7 +125,7 @@ export function LocationPicker({ value, onChange, onDone, autoFocus = true }: Lo
   const hasLocation = value.lat != null && value.lng != null;
 
   return (
-    <div className="w-[min(300px,calc(100vw-2rem))] space-y-2 p-1">
+    <div className="w-full space-y-2 p-1">
       <div className="relative">
         <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -150,7 +150,7 @@ export function LocationPicker({ value, onChange, onDone, autoFocus = true }: Lo
       <Button
         type="button"
         variant="outline"
-        size="sm"
+        size="lg"
         className="w-full justify-start"
         onClick={useMyLocation}
         disabled={locationPermission === "denied"}
@@ -171,7 +171,7 @@ export function LocationPicker({ value, onChange, onDone, autoFocus = true }: Lo
             key={r.place_id}
             type="button"
             onClick={() => pick(r)}
-            className="flex w-full items-start gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted"
+            className="flex w-full items-start gap-2 rounded px-2 py-3 text-left text-sm hover:bg-muted"
           >
             <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             <span className="line-clamp-2">{r.display_name}</span>
@@ -193,9 +193,7 @@ export function RadiusPicker({
   disabled,
 }: RadiusPickerProps & { disabled?: boolean }) {
   return (
-    <div
-      className={`w-[min(260px,calc(100vw-2rem))] space-y-3 p-2 ${disabled ? "opacity-50" : ""}`}
-    >
+    <div className={`w-full space-y-3 p-2 ${disabled ? "opacity-50" : ""}`}>
       <div className="flex items-baseline justify-between">
         <span className="text-sm font-medium">Radius / omkrets</span>
         <span className="font-display text-sm">{value} km</span>

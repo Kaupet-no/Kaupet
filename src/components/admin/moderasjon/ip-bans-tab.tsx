@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2, Plus, Trash2 } from "lucide-react";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -57,22 +57,22 @@ export function IpBansTab() {
         },
       }),
     onSuccess: () => {
-      toast.success("IP-adressen er sperret");
+      showSuccessToast("IP-adressen er sperret");
       setOpen(false);
       setIp("");
       setReason("");
       setExpiresAt("");
       qc.invalidateQueries({ queryKey: ["admin-ip-bans"] });
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke sperre IP-adressen")),
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke sperre IP-adressen")),
   });
   const unban = useMutation({
     mutationFn: (id: string) => unbanFn({ data: { id } }),
     onSuccess: () => {
-      toast.success("IP-sperre opphevet");
+      showSuccessToast("IP-sperre opphevet");
       qc.invalidateQueries({ queryKey: ["admin-ip-bans"] });
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke oppheve IP-sperren")),
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke oppheve IP-sperren")),
   });
 
   return (

@@ -5,6 +5,7 @@ import { reconcilePromotionPayment } from "@/lib/promotions.functions";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, MapPin } from "lucide-react";
 import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { z } from "zod";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -201,7 +202,7 @@ function ListingDetailPage() {
         const res = await reconcilePromotion({ data: { promotion_id: promoId } });
         if (cancelled) return;
         if (res.status === "active" || res.status === "gifted") {
-          toast.success("Fremhevingen er aktivert");
+          showSuccessToast("Fremhevingen er aktivert");
           queryClient.invalidateQueries({ queryKey: ["listing-active-promotion"] });
           queryClient.invalidateQueries({ queryKey: ["featured-listings"] });
           queryClient.invalidateQueries({ queryKey: ["my-listings"] });
@@ -209,7 +210,7 @@ function ListingDetailPage() {
           return;
         }
         if (res.status === "failed") {
-          toast.error("Betalingen ble ikke fullført. Fremhevingen er ikke aktivert.");
+          showErrorToast("Betalingen ble ikke fullført. Fremhevingen er ikke aktivert.");
           finish();
           return;
         }
@@ -230,7 +231,7 @@ function ListingDetailPage() {
         if (cancelled) return;
         console.error("[promotion reconcile]", e);
         if (attempts >= maxAttempts) {
-          toast.error("Kunne ikke bekrefte betalingen. Prøv igjen senere.");
+          showErrorToast("Kunne ikke bekrefte betalingen. Prøv igjen senere.");
           finish();
           return;
         }

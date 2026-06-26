@@ -37,7 +37,7 @@ import type { Category } from "@/lib/categories";
 import { mergeTermGroups } from "@/lib/term-groups";
 import { useAuth } from "@/lib/use-auth";
 import { createSavedSearch, summarizeCriteria, type SearchCriteria } from "@/lib/saved-searches";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
 
 export { ModeToggle };
@@ -433,16 +433,16 @@ export function SaveSearchDialog({
 
   const handleSave = async () => {
     if (!name.trim()) {
-      toast.error("Gi søket et navn");
+      showErrorToast("Gi søket et navn");
       return;
     }
     setSaving(true);
     try {
       await createSavedSearch(name.trim(), criteria, notify);
-      toast.success("Søk lagret");
+      showSuccessToast("Søk lagret");
       onSaved();
     } catch (e) {
-      toast.error(formatErrorMessage(e, "Kunne ikke lagre søket"));
+      showErrorToast(formatErrorMessage(e, "Kunne ikke lagre søket"));
     } finally {
       setSaving(false);
     }

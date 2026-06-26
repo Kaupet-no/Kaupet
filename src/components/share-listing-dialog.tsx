@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Check, Copy, Download, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -161,14 +161,14 @@ export function ShareListingDialog({ open, onOpenChange, kaupetCode }: Props) {
       if (kind === "code") {
         setCodeCopied(true);
         setTimeout(() => setCodeCopied(false), 1500);
-        toast.success("Kaupet-kode kopiert");
+        showSuccessToast("Kaupet-kode kopiert");
       } else {
         setLinkCopied(true);
         setTimeout(() => setLinkCopied(false), 1500);
-        toast.success("Lenke kopiert");
+        showSuccessToast("Lenke kopiert");
       }
     } catch {
-      toast.error("Kunne ikke kopiere");
+      showErrorToast("Kunne ikke kopiere");
     }
   }
 

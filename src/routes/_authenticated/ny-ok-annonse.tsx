@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { ChevronLeft, ChevronRight, Search, Check, Bell } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -115,7 +115,7 @@ function NewWtbPage() {
       setStep(2);
     },
     onError: (err) =>
-      toast.error(formatErrorMessage(err, "Kunne ikke publisere annonsen. Prøv igjen.")),
+      showErrorToast(formatErrorMessage(err, "Kunne ikke publisere annonsen. Prøv igjen.")),
   });
 
   const handleSaveSearch = async () => {
@@ -129,9 +129,9 @@ function NewWtbPage() {
       const name = summarizeCriteria(criteria) || title.trim();
       await createSavedSearch(name, criteria, true);
       setSavedSearch(true);
-      toast.success("Søk lagret! Du varsles når noen legger ut en matching annonse.");
+      showSuccessToast("Søk lagret! Du varsles når noen legger ut en matching annonse.");
     } catch {
-      toast.error("Kunne ikke lagre søket. Prøv igjen.");
+      showErrorToast("Kunne ikke lagre søket. Prøv igjen.");
     } finally {
       setSavingSearch(false);
     }

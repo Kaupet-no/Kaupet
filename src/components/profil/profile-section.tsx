@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { Calendar, Camera, Loader2 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -89,9 +89,9 @@ export function ProfileSection() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile-edit", userId] });
       queryClient.invalidateQueries({ queryKey: ["profile-menu", userId] });
-      toast.success("Profil oppdatert");
+      showSuccessToast("Profil oppdatert");
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke oppdatere profilen")),
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke oppdatere profilen")),
   });
 
   const avatarMutation = useMutation({
@@ -109,9 +109,10 @@ export function ProfileSection() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile-edit", userId] });
       queryClient.invalidateQueries({ queryKey: ["profile-menu", userId] });
-      toast.success("Profilbilde oppdatert");
+      showSuccessToast("Profilbilde oppdatert");
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke laste opp profilbildet")),
+    onError: (e: Error) =>
+      showErrorToast(formatErrorMessage(e, "Kunne ikke laste opp profilbildet")),
     onSettled: () => setUploadingAvatar(false),
   });
 
@@ -120,7 +121,7 @@ export function ProfileSection() {
     const compressed = await compressImage(file, "avatar");
     const err = validateAvatarImage(compressed);
     if (err) {
-      toast.error(describeImageError(err));
+      showErrorToast(describeImageError(err));
       setUploadingAvatar(false);
       return;
     }

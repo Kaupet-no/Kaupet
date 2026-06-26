@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2, Sparkles, Gift, RefreshCcw, AlertTriangle, Search, Info } from "lucide-react";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import {
   adminListPromotionPricing,
@@ -107,21 +107,21 @@ function AdminPromotionsPage() {
     mutationFn: (vars: { duration_days: number; price_nok: number }) =>
       updatePricing({ data: vars }),
     onSuccess: () => {
-      toast.success("Pris oppdatert");
+      showSuccessToast("Pris oppdatert");
       qc.invalidateQueries({ queryKey: ["admin-promo-pricing"] });
       qc.invalidateQueries({ queryKey: ["promotion-pricing"] });
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke lagre prisen")),
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke lagre prisen")),
   });
 
   const refund = useMutation({
     mutationFn: (id: string) => refundPromo({ data: { promotion_id: id } }),
     onSuccess: () => {
-      toast.success("Refundert");
+      showSuccessToast("Refundert");
       qc.invalidateQueries({ queryKey: ["admin-promotions"] });
       setDetailPromo(null);
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Refusjon feilet")),
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Refusjon feilet")),
   });
 
   const [giftOpen, setGiftOpen] = useState(false);
@@ -146,14 +146,14 @@ function AdminPromotionsPage() {
         },
       }),
     onSuccess: () => {
-      toast.success("Gratis fremheving gitt");
+      showSuccessToast("Gratis fremheving gitt");
       qc.invalidateQueries({ queryKey: ["admin-promotions"] });
       setGiftOpen(false);
       setGiftListing(null);
       setGiftQuery("");
       setGiftReason("");
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke gi fremheving")),
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke gi fremheving")),
   });
 
   const rows = (promosQ.data ?? []) as unknown as PromoRow[];

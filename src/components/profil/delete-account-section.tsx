@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { Loader2, Trash2 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -37,13 +37,13 @@ export function DeleteAccountSection({ currentEmail }: { currentEmail: string })
     });
     if (error) {
       setSubmitting(false);
-      toast.error(formatErrorMessage(error, "Kunne ikke laste opp profilbildet"));
+      showErrorToast(formatErrorMessage(error, "Kunne ikke laste opp profilbildet"));
       return;
     }
     await supabase.auth.signOut();
     setSubmitting(false);
     setOpen(false);
-    toast.success(
+    showSuccessToast(
       "Kontoen din er satt inaktiv. Den slettes permanent om 7 dager hvis du ikke logger inn igjen.",
     );
     navigate({ to: "/" });

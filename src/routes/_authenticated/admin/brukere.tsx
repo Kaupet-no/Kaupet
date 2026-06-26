@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, FlaskConical, Loader2, Plus, Search, Shield, ShieldOff } from "lucide-react";
 import { CreateDemoUserDialog } from "@/components/create-demo-user-dialog";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -69,12 +69,12 @@ function AdminUsers() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Administratorrolle tildelt");
+      showSuccessToast("Administratorrolle tildelt");
       qc.invalidateQueries({ queryKey: ["admin", "users"] });
       setPending(null);
     },
     onError: (e: Error) =>
-      toast.error(formatErrorMessage(e, "Kunne ikke tildele administratorrollen")),
+      showErrorToast(formatErrorMessage(e, "Kunne ikke tildele administratorrollen")),
   });
 
   const revoke = useMutation({
@@ -83,12 +83,12 @@ function AdminUsers() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Administratorrolle fjernet");
+      showSuccessToast("Administratorrolle fjernet");
       qc.invalidateQueries({ queryKey: ["admin", "users"] });
       setPending(null);
     },
     onError: (e: Error) =>
-      toast.error(formatErrorMessage(e, "Kunne ikke fjerne administratorrollen")),
+      showErrorToast(formatErrorMessage(e, "Kunne ikke fjerne administratorrollen")),
   });
 
   const grantDemo = useMutation({
@@ -97,11 +97,11 @@ function AdminUsers() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Demo-tilgang tildelt");
+      showSuccessToast("Demo-tilgang tildelt");
       qc.invalidateQueries({ queryKey: ["admin", "users"] });
       setPending(null);
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke tildele demo-tilgang")),
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke tildele demo-tilgang")),
   });
 
   const revokeDemo = useMutation({
@@ -110,11 +110,11 @@ function AdminUsers() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Demo-tilgang fjernet");
+      showSuccessToast("Demo-tilgang fjernet");
       qc.invalidateQueries({ queryKey: ["admin", "users"] });
       setPending(null);
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke fjerne demo-tilgang")),
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke fjerne demo-tilgang")),
   });
 
   const exportData = useMutation({
@@ -135,8 +135,9 @@ function AdminUsers() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     },
-    onSuccess: () => toast.success("Brukerdata eksportert"),
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke eksportere brukerdata")),
+    onSuccess: () => showSuccessToast("Brukerdata eksportert"),
+    onError: (e: Error) =>
+      showErrorToast(formatErrorMessage(e, "Kunne ikke eksportere brukerdata")),
   });
 
   return (

@@ -3,16 +3,15 @@ import { Bell, MessageCircle, Plus, X, LogIn, Home, PackageOpen, Search } from "
 import { useState } from "react";
 
 import { useAuth } from "@/lib/use-auth";
-import { useUnreadConversationsCount } from "@/lib/use-unread";
-import { useIsAdmin } from "@/lib/use-is-admin";
 import { hapticImpact } from "@/lib/haptics";
 import { isNative } from "@/lib/native";
 import { supabase } from "@/integrations/supabase/client";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { NotificationsBell } from "@/components/notifications-bell";
+import { MessagesButton } from "@/components/messages-button";
 
 function initials(name: string | null | undefined, fallback: string) {
   const source = (name ?? fallback).trim();
@@ -25,8 +24,6 @@ export function AppBottomNav() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const unread = useUnreadConversationsCount();
-  const [userOpen, setUserOpen] = useState(false);
   const [adPickerOpen, setAdPickerOpen] = useState(false);
   const native = isNative();
 
@@ -34,6 +31,10 @@ export function AppBottomNav() {
     native && (pathname.startsWith("/ny-annonse") || pathname.startsWith("/ny-ok-annonse"));
 
   const isActive = (p: string) => pathname === p || pathname.startsWith(p + "/");
+
+  const isOnVarsler = isActive("/varsler");
+  const isOnMeldinger = isActive("/meldinger");
+  const isOnMeg = isActive("/meg");
 
   return (
     <nav
@@ -60,7 +61,9 @@ export function AppBottomNav() {
         </Link>
 
         {/* Varsler */}
-        <div className="flex flex-1 flex-col items-center gap-0.5">
+        <div
+          className={`flex flex-1 flex-col items-center gap-0.5 transition-opacity ${isOnVarsler ? "pointer-events-none opacity-30" : ""}`}
+        >
           {user ? (
             <div className="relative flex h-11 w-11 items-center justify-center">
               <NotificationsBell />
@@ -117,37 +120,32 @@ export function AppBottomNav() {
         </div>
 
         {/* Meldinger */}
-        <Link
-          to="/meldinger"
-          className="flex flex-1 flex-col items-center gap-0.5"
-          aria-label="Meldinger"
+        <div
+          className={`flex flex-1 flex-col items-center gap-0.5 transition-opacity ${isOnMeldinger ? "pointer-events-none opacity-30" : ""}`}
         >
-          <span className="relative flex h-11 w-11 items-center justify-center">
-            <MessageCircle
-              className={`size-6 ${isActive("/meldinger") ? "text-primary" : "text-muted-foreground"}`}
-            />
-            {unread > 0 && (
-              <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-accent-foreground">
-                {unread > 9 ? "9+" : unread}
-              </span>
-            )}
-          </span>
-          <span
-            className={`text-[11px] ${isActive("/meldinger") ? "font-medium text-primary" : "text-muted-foreground"}`}
-          >
-            Meldinger
-          </span>
-        </Link>
+          {user ? (
+            <div className="relative flex h-11 w-11 items-center justify-center">
+              <MessagesButton />
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => navigate({ to: "/auth" })}
+              className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground"
+              aria-label="Meldinger (logg inn)"
+            >
+              <MessageCircle className="size-6" />
+            </button>
+          )}
+          <span className="text-[11px] text-muted-foreground">Meldinger</span>
+        </div>
 
         {/* Bruker */}
-        <div className="flex flex-1 flex-col items-center gap-0.5">
+        <div
+          className={`flex flex-1 flex-col items-center gap-0.5 transition-opacity ${isOnMeg ? "pointer-events-none opacity-30" : ""}`}
+        >
           {user ? (
-            <UserSheet
-              userId={user.id}
-              email={user.email ?? null}
-              open={userOpen}
-              setOpen={setUserOpen}
-            />
+            <UserAvatarButton userId={user.id} email={user.email ?? null} />
           ) : (
             <Link
               to="/auth"
@@ -237,20 +235,8 @@ function AdPickerOptions({ onSell, onBuy }: { onSell: () => void; onBuy: () => v
   );
 }
 
-function UserSheet({
-  userId,
-  email,
-  open,
-  setOpen,
-}: {
-  userId: string;
-  email: string | null;
-  open: boolean;
-  setOpen: (o: boolean) => void;
-}) {
+function UserAvatarButton({ userId, email }: { userId: string; email: string | null }) {
   const navigate = useNavigate();
-  const qc = useQueryClient();
-  const { data: isAdmin } = useIsAdmin();
 
   const { data: profile } = useQuery({
     queryKey: ["profile-menu", userId],
@@ -267,99 +253,19 @@ function UserSheet({
 
   const displayName = profile?.display_name ?? email?.split("@")[0] ?? "Bruker";
 
-  const go = (fn: () => void) => {
-    setOpen(false);
-    fn();
-  };
-
-  return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <button
-          type="button"
-          aria-label="Brukermeny"
-          className="flex h-10 w-10 items-center justify-center"
-        >
-          <Avatar className="size-8">
-            {profile?.avatar_url && <AvatarImage src={profile.avatar_url} alt={displayName} />}
-            <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
-              {initials(profile?.display_name, email ?? "")}
-            </AvatarFallback>
-          </Avatar>
-        </button>
-      </SheetTrigger>
-      <SheetContent side="bottom" className="rounded-t-2xl pb-8">
-        <SheetHeader className="text-left">
-          <SheetTitle className="flex items-center gap-3">
-            <Avatar className="size-10">
-              {profile?.avatar_url && <AvatarImage src={profile.avatar_url} alt={displayName} />}
-              <AvatarFallback className="bg-primary/10 text-sm font-medium text-primary">
-                {initials(profile?.display_name, email ?? "")}
-              </AvatarFallback>
-            </Avatar>
-            <span className="flex flex-col">
-              <span className="text-base">{displayName}</span>
-              {email && (
-                <span className="truncate text-xs font-normal text-muted-foreground">{email}</span>
-              )}
-            </span>
-          </SheetTitle>
-        </SheetHeader>
-        <div className="mt-4 grid gap-1">
-          <SheetItem onClick={() => go(() => navigate({ to: "/mine-annonser" }))}>
-            Mine annonser
-          </SheetItem>
-          <SheetItem onClick={() => go(() => navigate({ to: "/favoritter" }))}>
-            Favoritter
-          </SheetItem>
-          <SheetItem onClick={() => go(() => navigate({ to: "/mine-sok" }))}>Mine søk</SheetItem>
-          <SheetItem onClick={() => go(() => navigate({ to: "/profil" }))}>Min profil</SheetItem>
-          <SheetItem
-            onClick={() => go(() => navigate({ to: "/profil", search: { tab: "konto" } }))}
-          >
-            Kontoinnstillinger
-          </SheetItem>
-          {isAdmin && (
-            <SheetItem onClick={() => go(() => navigate({ to: "/admin" }))}>
-              Administrasjon
-            </SheetItem>
-          )}
-          <div className="my-2 h-px bg-border" />
-          <SheetItem
-            destructive
-            onClick={async () => {
-              setOpen(false);
-              await supabase.auth.signOut();
-              qc.clear();
-              navigate({ to: "/" });
-            }}
-          >
-            Logg ut
-          </SheetItem>
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
-}
-
-function SheetItem({
-  children,
-  onClick,
-  destructive,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  destructive?: boolean;
-}) {
   return (
     <button
       type="button"
-      onClick={onClick}
-      className={`w-full rounded-md px-3 py-3 text-left text-sm hover:bg-muted ${
-        destructive ? "text-destructive" : ""
-      }`}
+      aria-label="Meg"
+      onClick={() => void navigate({ to: "/meg" })}
+      className="flex h-10 w-10 items-center justify-center"
     >
-      {children}
+      <Avatar className="size-8">
+        {profile?.avatar_url && <AvatarImage src={profile.avatar_url} alt={displayName} />}
+        <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
+          {initials(profile?.display_name, email ?? "")}
+        </AvatarFallback>
+      </Avatar>
     </button>
   );
 }

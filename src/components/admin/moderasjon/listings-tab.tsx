@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Ban, Loader2, Search } from "lucide-react";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -58,20 +58,20 @@ export function ListingsTab() {
     mutationFn: (v: { id: string; reason: string }) =>
       disableFn({ data: { id: v.id, reason: v.reason } }),
     onSuccess: () => {
-      toast.success("Annonsen er deaktivert");
+      showSuccessToast("Annonsen er deaktivert");
       setConfirm(null);
       setReason("");
       qc.invalidateQueries({ queryKey: ["admin-listings"] });
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke deaktivere annonsen")),
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke deaktivere annonsen")),
   });
   const enableMut = useMutation({
     mutationFn: (id: string) => enableFn({ data: { id } }),
     onSuccess: () => {
-      toast.success("Annonsen er aktivert");
+      showSuccessToast("Annonsen er aktivert");
       qc.invalidateQueries({ queryKey: ["admin-listings"] });
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke aktivere annonsen")),
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke aktivere annonsen")),
   });
 
   return (

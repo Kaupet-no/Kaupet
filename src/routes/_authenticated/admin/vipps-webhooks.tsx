@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,7 +35,7 @@ function VippsWebhooksPage() {
       const res = await list({ data: { mode: m } });
       setHooks(res.webhooks ?? []);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Kunne ikke hente webhooks");
+      showErrorToast(e instanceof Error ? e.message : "Kunne ikke hente webhooks");
     } finally {
       setBusy(false);
     }
@@ -47,10 +47,10 @@ function VippsWebhooksPage() {
     try {
       const res = await register({ data: { mode, url } });
       setSavedId(res.id);
-      toast.success("Webhook registrert og secret lagret automatisk i databasen.");
+      showSuccessToast("Webhook registrert og secret lagret automatisk i databasen.");
       await refresh(mode);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Registrering feilet");
+      showErrorToast(e instanceof Error ? e.message : "Registrering feilet");
     } finally {
       setBusy(false);
     }
@@ -61,10 +61,10 @@ function VippsWebhooksPage() {
     setBusy(true);
     try {
       await remove({ data: { mode, id } });
-      toast.success("Webhook slettet");
+      showSuccessToast("Webhook slettet");
       await refresh(mode);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Sletting feilet");
+      showErrorToast(e instanceof Error ? e.message : "Sletting feilet");
     } finally {
       setBusy(false);
     }

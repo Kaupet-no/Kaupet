@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Ban, Loader2, ShieldAlert, Shield } from "lucide-react";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -41,23 +41,23 @@ export function AdminUserActions({ userId, displayName }: { userId: string; disp
   const suspendMut = useMutation({
     mutationFn: () => suspendFn({ data: { userId, reason: reason.trim(), days } }),
     onSuccess: () => {
-      toast.success(`${displayName} er svartelistet i ${days} dager`);
+      showSuccessToast(`${displayName} er svartelistet i ${days} dager`);
       setOpen(null);
       setReason("");
       qc.invalidateQueries();
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke svarteliste brukeren")),
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke svarteliste brukeren")),
   });
 
   const banMut = useMutation({
     mutationFn: () => banFn({ data: { userId, reason: reason.trim() } }),
     onSuccess: () => {
-      toast.success(`${displayName} er permanent utestengt`);
+      showSuccessToast(`${displayName} er permanent utestengt`);
       setOpen(null);
       setReason("");
       qc.invalidateQueries();
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke utestenge brukeren")),
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke utestenge brukeren")),
   });
 
   if (!isAdmin) return null;

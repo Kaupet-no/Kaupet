@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { Loader2, ImagePlus, X, ChevronLeft, ChevronRight, Send } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -36,6 +36,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { formatErrorMessage } from "@/lib/errors";
 
 const CONDITIONS = [
@@ -46,27 +56,21 @@ const CONDITIONS = [
   { value: "for_parts", label: "Må repareres" },
 ] as const;
 
-const schema = z
-  .object({
-    title: z.string().trim().min(5).max(120),
-    description: z.string().trim().min(20).max(4000),
-    category_id: z.string().uuid(),
-    condition: z.enum(["new", "like_new", "good", "acceptable", "for_parts"]),
-    is_free: z.boolean(),
-    price_nok: z.union([z.coerce.number().int().min(0).max(10_000_000), z.literal("")]).optional(),
-    postal_code: z
-      .string()
-      .trim()
-      .regex(/^\d{4}$/u, "Norsk postnummer er 4 sifre")
-      .optional()
-      .or(z.literal("")),
-    city: z.string().trim().max(100).optional().or(z.literal("")),
-  })
-  .refine((d) => d.is_free || (typeof d.price_nok === "number" && d.price_nok >= 0), {
-    message: "Sett en pris eller marker som gratis",
-    path: ["price_nok"],
-  });
-
+const schema = z.object({
+  title: z.string().trim().min(5).max(120),
+  description: z.string().trim().min(20).max(4000),
+  category_id: z.string().uuid(),
+  condition: z.enum(["new", "like_new", "good", "acceptable", "for_parts"]),
+  is_free: z.boolean(),
+  price_nok: z.union([z.coerce.number().int().min(0).max(10_000_000), z.literal("")]).optional(),
+  postal_code: z
+    .string()
+    .trim()
+    .regex(/^\d{4}$/u, "Norsk postnummer er 4 sifre")
+    .optional()
+    .or(z.literal("")),
+  city: z.string().trim().max(100).optional().or(z.literal("")),
+});
 type FormValues = z.infer<typeof schema>;
 
 type EditorItem =
@@ -151,11 +155,13 @@ function EditListingPage() {
   });
 
   const isFree = watch("is_free");
+  const priceNok = watch("price_nok");
   const categoryId = watch("category_id");
   const condition = watch("condition");
   const postalCode = watch("postal_code");
   const city = watch("city");
 
+  const [showPublishWarning, setShowPublishWarning] = useState(false);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const lastEdited = useRef<"postal_code" | "city" | "map" | null>(null);
   const markerMoved = useRef(false);
@@ -270,7 +276,7 @@ function EditListingPage() {
   const addFiles = (files: File[]) => {
     const err = validateImages(files, items.length);
     if (err) {
-      toast.error(describeImageError(err));
+      showErrorToast(describeImageError(err));
       return;
     }
     const next: EditorItem[] = files.map((file) => ({
@@ -311,10 +317,10 @@ function EditListingPage() {
     mutationFn: () => doRepublish({ data: { id } }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-listings"] });
-      toast.success("Annonsen er publisert!");
+      showSuccessToast("Annonsen er publisert!");
       navigate({ to: "/mine-annonser" });
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke publisere annonsen")),
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke publisere annonsen")),
   });
 
   const mutation = useMutation({
@@ -390,10 +396,10 @@ function EditListingPage() {
       queryClient.invalidateQueries({ queryKey: ["my-listings"] });
       queryClient.invalidateQueries({ queryKey: ["listing-edit", id] });
       queryClient.invalidateQueries({ queryKey: ["listing", id] });
-      toast.success("Endringer lagret");
+      showSuccessToast("Endringer lagret");
       navigate({ to: "/mine-annonser" });
     },
-    onError: (e: Error) => toast.error(formatErrorMessage(e, "Kunne ikke lagre endringene")),
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke lagre endringene")),
   });
 
   if (isLoading) {
@@ -419,7 +425,15 @@ function EditListingPage() {
           <Button
             type="button"
             size="sm"
-            onClick={() => publishDraft.mutate()}
+            onClick={() => {
+              const missingPrice = !isFree && (priceNok === "" || priceNok === undefined);
+              const missingImages = items.length === 0;
+              if (missingPrice || missingImages) {
+                setShowPublishWarning(true);
+              } else {
+                publishDraft.mutate();
+              }
+            }}
             disabled={publishDraft.isPending}
           >
             {publishDraft.isPending ? (
@@ -431,6 +445,37 @@ function EditListingPage() {
           </Button>
         </div>
       )}
+
+      <AlertDialog open={showPublishWarning} onOpenChange={setShowPublishWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Annonsen mangler informasjon</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>
+                <p className="mb-2">Følgende felter er ikke utfylt:</p>
+                <ul className="list-disc pl-5 space-y-1">
+                  {items.length === 0 && <li>Ingen bilder lagt til</li>}
+                  {!isFree && (priceNok === "" || priceNok === undefined) && (
+                    <li>Ingen pris satt</li>
+                  )}
+                </ul>
+                <p className="mt-3">Vil du publisere likevel, eller gå tilbake og fylle inn?</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Gå tilbake</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowPublishWarning(false);
+                publishDraft.mutate();
+              }}
+            >
+              Publiser likevel
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="mt-8 space-y-8">
         {/* Images */}

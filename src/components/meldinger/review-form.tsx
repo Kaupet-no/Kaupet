@@ -1,7 +1,7 @@
 import * as React from "react";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -42,14 +42,14 @@ export function ReviewForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (rating < 1) {
-      toast.error("Velg minst én stjerne");
+      showErrorToast("Velg minst én stjerne");
       return;
     }
     setSubmitting(true);
     try {
       await onSubmit(rating, comment.trim());
     } catch (err) {
-      toast.error(formatErrorMessage(err, "Kunne ikke sende vurderingen"));
+      showErrorToast(formatErrorMessage(err, "Kunne ikke sende vurderingen"));
     } finally {
       setSubmitting(false);
     }

@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { z } from "zod";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { Loader2 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -64,7 +64,9 @@ function AuthPage() {
     try {
       if (isSignUp) {
         if (!acceptedTerms) {
-          toast.error("Du må godta brukervilkårene og personvernerklæringen for å opprette konto.");
+          showErrorToast(
+            "Du må godta brukervilkårene og personvernerklæringen for å opprette konto.",
+          );
           setLoading(false);
           return;
         }
@@ -81,15 +83,15 @@ function AuthPage() {
           },
         });
         if (error) throw error;
-        toast.success("Konto opprettet! Sjekk e-posten for å bekrefte adressen.");
+        showSuccessToast("Konto opprettet! Sjekk e-posten for å bekrefte adressen.");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        toast.success("Velkommen tilbake!");
+        showSuccessToast("Velkommen tilbake!");
         navigate({ to: "/", replace: true });
       }
     } catch (err: unknown) {
-      toast.error(formatErrorMessage(err, "Noe gikk galt. Prøv igjen."));
+      showErrorToast(formatErrorMessage(err, "Noe gikk galt. Prøv igjen."));
     } finally {
       setLoading(false);
     }

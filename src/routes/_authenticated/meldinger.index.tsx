@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { MessageCircle, ChevronDown, ChevronRight, BellRing, Loader2, X } from "lucide-react";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/use-auth";
@@ -369,9 +369,9 @@ function PushHintForMessages() {
     setBusy(true);
     try {
       await push.enableOnThisDevice("messages");
-      toast.success("Push-varsler er aktivert på denne enheten");
+      showSuccessToast("Push-varsler er aktivert på denne enheten");
     } catch (e) {
-      toast.error(formatErrorMessage(e, "Klarte ikke å aktivere varsler"));
+      showErrorToast(formatErrorMessage(e, "Klarte ikke å aktivere varsler"));
     } finally {
       setBusy(false);
     }

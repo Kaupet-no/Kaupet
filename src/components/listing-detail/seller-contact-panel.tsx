@@ -17,6 +17,7 @@ export function SellerContactPanel({
   contacting,
   shareOpen,
   onShareOpenChange,
+  isNative,
 }: {
   isLoggedIn: boolean;
   seller: Seller;
@@ -28,6 +29,7 @@ export function SellerContactPanel({
   contacting: boolean;
   shareOpen: boolean;
   onShareOpenChange: (open: boolean) => void;
+  isNative?: boolean;
 }) {
   return (
     <div className="rounded-xl border border-border bg-card p-4">
@@ -81,6 +83,7 @@ export function SellerContactPanel({
         onOpenChange={onShareOpenChange}
         kaupetCode={kaupetCode}
         title={title}
+        isNative={isNative}
       />
     </div>
   );

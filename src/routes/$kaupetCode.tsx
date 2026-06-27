@@ -8,7 +8,6 @@ import { toast } from "sonner";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { z } from "zod";
 import { useIsNative } from "@/lib/use-is-native";
-import { shareContent } from "@/lib/native";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/use-auth";
@@ -319,27 +318,9 @@ function ListingDetailPage() {
     },
   });
 
-  const handleShareOpenChange = useCallback(
-    async (open: boolean) => {
-      if (!open) {
-        setShareOpen(false);
-        return;
-      }
-      if (isNative) {
-        try {
-          await shareContent({
-            title: data?.title,
-            url: `https://kaupet.no/${kaupetCode}`,
-          });
-        } catch {
-          // Bruker avbrutt deling
-        }
-      } else {
-        setShareOpen(true);
-      }
-    },
-    [isNative, data?.title, kaupetCode],
-  );
+  const handleShareOpenChange = useCallback((open: boolean) => {
+    setShareOpen(open);
+  }, []);
 
   const contactMutation = useMutation({
     mutationFn: async () => {
@@ -576,6 +557,7 @@ function ListingDetailPage() {
             contacting={contactMutation.isPending}
             shareOpen={shareOpen}
             onShareOpenChange={handleShareOpenChange}
+            isNative={isNative}
           />
         </aside>
       </div>

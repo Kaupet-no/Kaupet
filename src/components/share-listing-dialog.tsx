@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Check, Copy, Download, Loader2 } from "lucide-react";
+import { Check, Copy, Download, Loader2, Share2 } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
+import { shareContent } from "@/lib/native";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +19,7 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   kaupetCode: string;
   title: string;
+  isNative?: boolean;
 };
 
 const QR_SIZE = 320;
@@ -123,7 +125,7 @@ async function generateBrandedQrDataUrl(url: string): Promise<string> {
   }
 }
 
-export function ShareListingDialog({ open, onOpenChange, kaupetCode }: Props) {
+export function ShareListingDialog({ open, onOpenChange, kaupetCode, title, isNative }: Props) {
   const [codeCopied, setCodeCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [qrSrc, setQrSrc] = useState<string | null>(null);
@@ -211,15 +213,17 @@ export function ShareListingDialog({ open, onOpenChange, kaupetCode }: Props) {
                 />
               )}
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={downloadQr}
-              disabled={!qrSrc}
-              className="gap-2"
-            >
-              <Download className="size-4" /> Last ned QR-kode
-            </Button>
+            {!isNative && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={downloadQr}
+                disabled={!qrSrc}
+                className="gap-2"
+              >
+                <Download className="size-4" /> Last ned QR-kode
+              </Button>
+            )}
           </div>
 
           {/* Kaupet-kode */}
@@ -257,6 +261,23 @@ export function ShareListingDialog({ open, onOpenChange, kaupetCode }: Props) {
               </Button>
             </div>
           </div>
+
+          {/* Native share */}
+          {isNative && (
+            <Button
+              type="button"
+              className="w-full gap-2"
+              onClick={async () => {
+                try {
+                  await shareContent({ title, url });
+                } catch {
+                  // Bruker avbrutt deling
+                }
+              }}
+            >
+              <Share2 className="size-4" /> Del med kontakter
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>

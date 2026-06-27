@@ -4,8 +4,9 @@ import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/use-auth";
 import { isUnread } from "@/lib/unread";
+import { isNative } from "@/lib/native";
 
-type ConvSummary = {
+export type ConvSummary = {
   id: string;
   last_message_at: string;
   last_sender_id: string | null;
@@ -76,9 +77,23 @@ export function useUnreadConversationsCount(): number {
     };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibility);
+
+    // På native fungerer ikke focus/visibilitychange pålitelig i Capacitor WebView
+    let removeAppStateListener: (() => void) | undefined;
+    if (isNative()) {
+      void import("@capacitor/app").then(({ App }) => {
+        void App.addListener("appStateChange", ({ isActive }) => {
+          if (isActive) qc.invalidateQueries({ queryKey: ["unread-conversations"] });
+        }).then((handle) => {
+          removeAppStateListener = () => void handle.remove();
+        });
+      });
+    }
+
     return () => {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
+      removeAppStateListener?.();
     };
   }, [user, qc]);
 

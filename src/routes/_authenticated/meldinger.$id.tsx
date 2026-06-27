@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import type { ConvSummary } from "@/lib/use-unread";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
@@ -141,6 +142,14 @@ function ConversationPage() {
       if (error) throw error;
     },
     onSuccess: () => {
+      // Oppdater cachen direkte for å unngå race condition mot INSERT-refetch
+      queryClient.setQueryData<ConvSummary[]>(
+        ["unread-conversations", user?.id],
+        (prev) =>
+          prev?.map((c) =>
+            c.id === id ? { ...c, my_last_read_at: new Date().toISOString() } : c,
+          ) ?? prev,
+      );
       queryClient.invalidateQueries({ queryKey: ["unread-conversations"] });
       queryClient.invalidateQueries({ queryKey: ["my-conversations"] });
     },
@@ -203,7 +212,11 @@ function ConversationPage() {
   // Auto-scroll + markér som lest når meldinger lastes/oppdateres
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      // Utsett scroll til etter DOM-paint (viktig på Capacitor WebView)
+      const el = scrollRef.current;
+      requestAnimationFrame(() => {
+        el.scrollTop = el.scrollHeight;
+      });
     }
     if (messages && messages.length > 0 && conv && user) {
       markReadMutation.mutate(messages[messages.length - 1].created_at);
@@ -420,7 +433,7 @@ function ConversationPage() {
         </div>
       )}
 
-      {conv && (
+      {conv && !(native && keyboardVisible) && (
         <SalePanel
           isSeller={isSeller}
           sale={sale ?? null}

@@ -17,14 +17,18 @@ function FitToCircle({ lat, lng, radius }: { lat: number; lng: number; radius: n
 type Props = {
   lat: number;
   lng: number;
+  interactive?: boolean;
 };
 
-export function ListingDetailMap({ lat, lng }: Props) {
+export function ListingDetailMap({ lat, lng, interactive = true }: Props) {
   return (
     <MapContainer
       center={[lat, lng]}
       zoom={13}
-      scrollWheelZoom
+      scrollWheelZoom={interactive}
+      dragging={interactive}
+      touchZoom={interactive}
+      doubleClickZoom={interactive}
       zoomControl={false}
       className="h-full w-full rounded-2xl"
     >

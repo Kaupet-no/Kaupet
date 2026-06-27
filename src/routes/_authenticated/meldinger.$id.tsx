@@ -16,6 +16,7 @@ import { confirmBuyer, getSaleForListing, unconfirmBuyer } from "@/lib/sales.fun
 import { createReview, getMyReviewForListing } from "@/lib/reviews.functions";
 import { formatErrorMessage } from "@/lib/errors";
 import { useIsNative } from "@/lib/use-is-native";
+import { useKeyboardVisible } from "@/lib/use-keyboard-visible";
 import { ConversationErrorBoundary } from "@/components/meldinger/conversation-error-boundary";
 import { renderWithDayDividers, type Message } from "@/components/meldinger/message-list";
 import { SalePanel } from "@/components/meldinger/sale-panel";
@@ -40,6 +41,7 @@ export const Route = createFileRoute("/_authenticated/meldinger/$id")({
 
 function ConversationPage() {
   const native = useIsNative();
+  const keyboardVisible = useKeyboardVisible();
   const { id } = Route.useParams();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -333,19 +335,25 @@ function ConversationPage() {
     <div
       className="mx-auto flex max-w-3xl flex-col px-4"
       style={{
-        height: native ? "calc(100vh - var(--app-bottom-nav-h))" : "calc(100vh - 4rem)",
+        height: native
+          ? keyboardVisible
+            ? "var(--vvh, 100vh)"
+            : "calc(100vh - var(--app-bottom-nav-h))"
+          : "calc(100vh - 4rem)",
         paddingTop: native ? "calc(env(safe-area-inset-top) + 1rem)" : "1rem",
-        paddingBottom: "1rem",
+        paddingBottom: native && keyboardVisible ? 0 : "1rem",
       }}
     >
-      <Link
-        to="/meldinger"
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="size-4" /> Alle meldinger
-      </Link>
+      {!(native && keyboardVisible) && (
+        <Link
+          to="/meldinger"
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" /> Alle meldinger
+        </Link>
+      )}
 
-      {conv && (
+      {conv && !(native && keyboardVisible) && (
         <div className="mt-3 flex items-center gap-3 rounded-xl border border-border bg-card p-3">
           <div className="size-12 shrink-0 overflow-hidden rounded-lg bg-muted">
             {coverUrl && <img src={coverUrl} alt="" className="size-full object-cover" />}

@@ -283,6 +283,7 @@
       let gameEndTime = 0;
       let ball = { x: 0, y: 0, vx: 0, vy: 0, scaleY: 1, scaleX: 1 };
       let rafId = null;
+      let lastTs = 0;
       let particles = [];
       let charSpans = [];
       let charRects = [];
@@ -367,6 +368,7 @@
         active = false;
         gameStartTime = 0;
         gameEndTime = 0;
+        lastTs = 0;
         particles = [];
         charSpans = [];
         charRects = [];
@@ -444,13 +446,16 @@
         rafId = requestAnimationFrame(tick);
       }
 
-      function tick() {
+      function tick(ts) {
+        const dt = lastTs ? Math.min((ts - lastTs) / (1000 / 60), 3) : 1;
+        lastTs = ts;
+
         const W = canvas.width;
         const H = canvas.height;
 
-        ball.vy += GRAVITY;
-        ball.x += ball.vx;
-        ball.y += ball.vy;
+        ball.vy += GRAVITY * dt;
+        ball.x += ball.vx * dt;
+        ball.y += ball.vy * dt;
 
         // Reset squash/stretch
         ball.scaleX = 1;
@@ -462,13 +467,13 @@
           const speed = Math.abs(ball.vy);
           if (speed > 1) {
             ball.vy *= -RESTITUTION;
-            ball.vx *= FRICTION;
+            ball.vx *= Math.pow(FRICTION, dt);
             const squash = Math.min(0.35, speed * 0.018);
             ball.scaleY = 1 - squash;
             ball.scaleX = 1 + squash * 0.6;
           } else {
             ball.vy = 0;
-            ball.vx *= FRICTION;
+            ball.vx *= Math.pow(FRICTION, dt);
           }
         }
 
@@ -497,11 +502,11 @@
         // Particles
         for (let i = particles.length - 1; i >= 0; i--) {
           const p = particles[i];
-          p.x += p.vx;
-          p.y += p.vy;
-          p.vx *= 0.92;
-          p.vy *= 0.92;
-          p.life -= 0.06;
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          p.vx *= Math.pow(0.92, dt);
+          p.vy *= Math.pow(0.92, dt);
+          p.life -= 0.06 * dt;
           if (p.life <= 0) { particles.splice(i, 1); continue; }
           ctx.save();
           ctx.globalAlpha = p.life;

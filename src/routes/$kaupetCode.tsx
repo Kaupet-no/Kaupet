@@ -2,11 +2,13 @@ import { createFileRoute, Link, notFound, useNavigate, useRouter } from "@tansta
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { reconcilePromotionPayment } from "@/lib/promotions.functions";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { z } from "zod";
+import { useIsNative } from "@/lib/use-is-native";
+import { shareContent } from "@/lib/native";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/use-auth";
@@ -21,6 +23,12 @@ import { SellerContactPanel } from "@/components/listing-detail/seller-contact-p
 
 const ListingDetailMap = lazy(() =>
   import("@/components/listing-detail-map").then((m) => ({ default: m.ListingDetailMap })),
+);
+const ImageLightbox = lazy(() =>
+  import("@/components/listing-detail/image-lightbox").then((m) => ({ default: m.ImageLightbox })),
+);
+const MapOverlay = lazy(() =>
+  import("@/components/listing-detail/map-overlay").then((m) => ({ default: m.MapOverlay })),
 );
 
 // crypto.randomUUID() requires a secure context and isn't available in every
@@ -158,6 +166,7 @@ function ListingDetailPage() {
   const navigate = useNavigate();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const isNative = useIsNative();
   const [activeImage, setActiveImage] = useState(0);
   const [imgUrls, setImgUrls] = useState<Record<string, string>>({});
   const [mounted, setMounted] = useState(false);
@@ -165,6 +174,10 @@ function ListingDetailPage() {
   const [promoteOpen, setPromoteOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [backTarget, setBackTarget] = useState<BackTarget>({ mode: "default" });
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [mapOverlayOpen, setMapOverlayOpen] = useState(false);
+  const closeLightbox = useCallback(() => setLightboxIndex(null), []);
+  const closeMapOverlay = useCallback(() => setMapOverlayOpen(false), []);
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
@@ -306,6 +319,28 @@ function ListingDetailPage() {
     },
   });
 
+  const handleShareOpenChange = useCallback(
+    async (open: boolean) => {
+      if (!open) {
+        setShareOpen(false);
+        return;
+      }
+      if (isNative) {
+        try {
+          await shareContent({
+            title: data?.title,
+            url: `https://kaupet.no/${kaupetCode}`,
+          });
+        } catch {
+          // Bruker avbrutt deling
+        }
+      } else {
+        setShareOpen(true);
+      }
+    },
+    [isNative, data?.title, kaupetCode],
+  );
+
   const contactMutation = useMutation({
     mutationFn: async () => {
       if (!user) {
@@ -415,7 +450,7 @@ function ListingDetailPage() {
         <button
           type="button"
           onClick={() => router.history.back()}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          className="inline-flex items-center gap-1 py-2 pr-2 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-4" /> Tilbake til {backTarget.label}
         </button>
@@ -423,7 +458,7 @@ function ListingDetailPage() {
         <Link
           to="/annonser"
           search={backTarget.search as never}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          className="inline-flex items-center gap-1 py-2 pr-2 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-4" /> Tilbake til {backTarget.label}
         </Link>
@@ -431,7 +466,7 @@ function ListingDetailPage() {
         <Link
           to="/annonser"
           search={{ q: "", category: "", sort: "new" }}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          className="inline-flex items-center gap-1 py-2 pr-2 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-4" /> Tilbake til annonser
         </Link>
@@ -445,6 +480,7 @@ function ListingDetailPage() {
             activeImage={activeImage}
             onSelect={setActiveImage}
             title={data.title}
+            onImageClick={images.length > 0 ? setLightboxIndex : undefined}
           />
           <section className="mt-8">
             <h2 className="font-display text-xl">Beskrivelse</h2>
@@ -539,27 +575,54 @@ function ListingDetailPage() {
             onContact={() => contactMutation.mutate()}
             contacting={contactMutation.isPending}
             shareOpen={shareOpen}
-            onShareOpenChange={setShareOpen}
+            onShareOpenChange={handleShareOpenChange}
           />
         </aside>
       </div>
 
       {data.display_lat != null && data.display_lng != null && (
         <section className="mt-10">
-          <div className="h-80 overflow-hidden rounded-2xl border border-border">
+          <button
+            type="button"
+            onClick={() => setMapOverlayOpen(true)}
+            aria-label="Se kart i fullskjerm"
+            className="block h-80 w-full cursor-pointer overflow-hidden rounded-2xl border border-border"
+          >
             {mounted ? (
               <Suspense fallback={<div className="h-full w-full animate-pulse bg-muted" />}>
-                <ListingDetailMap lat={data.display_lat} lng={data.display_lng} />
+                <ListingDetailMap
+                  lat={data.display_lat}
+                  lng={data.display_lng}
+                  interactive={false}
+                />
               </Suspense>
             ) : (
               <div className="h-full w-full animate-pulse bg-muted" />
             )}
-          </div>
+          </button>
           <p className="mt-2 text-xs text-muted-foreground">
             Lokasjonen er omtrentlig. Gjenstanden befinner seg ikke nødvendigvis innenfor det
             markerte området.
           </p>
         </section>
+      )}
+
+      {lightboxIndex !== null && (
+        <Suspense>
+          <ImageLightbox
+            images={images}
+            imgUrls={imgUrls}
+            initialIndex={lightboxIndex}
+            title={data.title}
+            onClose={closeLightbox}
+          />
+        </Suspense>
+      )}
+
+      {mapOverlayOpen && data.display_lat != null && data.display_lng != null && (
+        <Suspense>
+          <MapOverlay lat={data.display_lat} lng={data.display_lng} onClose={closeMapOverlay} />
+        </Suspense>
       )}
     </div>
   );

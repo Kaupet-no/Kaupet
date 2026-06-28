@@ -9,6 +9,9 @@ import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { z } from "zod";
 import { useIsNative } from "@/lib/use-is-native";
 import { NativePageHeader } from "@/components/native-page-header";
+import { useIsAdmin } from "@/lib/use-is-admin";
+import { useIsModerator } from "@/lib/use-is-moderator";
+import { ListingActionsMenu } from "@/components/listing-detail/listing-actions-menu";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/use-auth";
@@ -167,6 +170,8 @@ function ListingDetailPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const isNative = useIsNative();
+  const { data: isAdmin } = useIsAdmin();
+  const { data: isModerator } = useIsModerator();
   const [activeImage, setActiveImage] = useState(0);
   const [imgUrls, setImgUrls] = useState<Record<string, string>>({});
   const [mounted, setMounted] = useState(false);
@@ -476,19 +481,32 @@ function ListingDetailPage() {
 
         <aside className="space-y-5">
           <div>
-            {category && (
-              <Link
-                to="/annonser"
-                search={{ q: "", category: category.slug, sort: "new" }}
-                className="text-xs uppercase tracking-wide text-muted-foreground hover:text-foreground"
-              >
-                {category.name_nb}
-              </Link>
-            )}
-            <h1 className="mt-1 font-display text-3xl leading-tight tracking-tight">
-              {data.title}
-            </h1>
-            <p className="mt-3 font-display text-3xl text-primary">{priceLabel}</p>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                {category && (
+                  <Link
+                    to="/annonser"
+                    search={{ q: "", category: category.slug, sort: "new" }}
+                    className="text-xs uppercase tracking-wide text-muted-foreground hover:text-foreground"
+                  >
+                    {category.name_nb}
+                  </Link>
+                )}
+                <h1 className="mt-1 font-display text-3xl leading-tight tracking-tight">
+                  {data.title}
+                </h1>
+                <p className="mt-3 font-display text-3xl text-primary">{priceLabel}</p>
+              </div>
+              {user && !isOwner && (
+                <div className="shrink-0 pt-0.5">
+                  <ListingActionsMenu
+                    listingId={data.id}
+                    listingTitle={data.title}
+                    isAdminOrModerator={!!(isAdmin || isModerator)}
+                  />
+                </div>
+              )}
+            </div>
           </div>
 
           {(() => {

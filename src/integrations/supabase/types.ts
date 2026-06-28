@@ -833,27 +833,36 @@ export type Database = {
       }
       reports: {
         Row: {
+          comment: string | null
           created_at: string
           id: string
           listing_id: string
           reason: string
           reporter_id: string
+          resolved_at: string | null
+          resolved_by: string | null
           status: string
         }
         Insert: {
+          comment?: string | null
           created_at?: string
           id?: string
           listing_id: string
           reason: string
           reporter_id: string
+          resolved_at?: string | null
+          resolved_by?: string | null
           status?: string
         }
         Update: {
+          comment?: string | null
           created_at?: string
           id?: string
           listing_id?: string
           reason?: string
           reporter_id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
           status?: string
         }
         Relationships: [
@@ -865,6 +874,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      system_messages: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          read_at: string | null
+          recipient_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          recipient_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          recipient_id?: string
+        }
+        Relationships: []
       }
       saved_search_notifications: {
         Row: {
@@ -1149,8 +1182,16 @@ export type Database = {
         Args: { _reason: string; _user_id: string }
         Returns: undefined
       }
+      admin_delete_listing: {
+        Args: { _id: string; _message: string }
+        Returns: undefined
+      }
       admin_disable_listing: {
         Args: { _id: string; _reason: string }
+        Returns: undefined
+      }
+      admin_disable_listing_with_message: {
+        Args: { _id: string; _reason: string; _message: string }
         Returns: undefined
       }
       admin_enable_listing: { Args: { _id: string }; Returns: undefined }
@@ -1163,11 +1204,37 @@ export type Database = {
           email: string
           is_admin: boolean
           is_demo: boolean
+          is_moderator: boolean
           user_id: string
         }[]
       }
       admin_grant_demo_role: { Args: { _user_id: string }; Returns: undefined }
+      admin_grant_moderator_role: { Args: { _user_id: string }; Returns: undefined }
       admin_grant_role: { Args: { _user_id: string }; Returns: undefined }
+      admin_list_reports: {
+        Args: { _limit?: number }
+        Returns: {
+          id: string
+          created_at: string
+          listing_id: string | null
+          kaupet_code: string | null
+          listing_title: string | null
+          reporter_id: string | null
+          reporter_name: string | null
+          owner_id: string | null
+          owner_name: string | null
+          reason: string | null
+          comment: string | null
+          status: string | null
+          resolved_at: string | null
+        }[]
+      }
+      admin_resolve_report: { Args: { _id: string }; Returns: undefined }
+      admin_revoke_moderator_role: { Args: { _user_id: string }; Returns: undefined }
+      submit_listing_report: {
+        Args: { _listing_id: string; _reason: string; _comment?: string | null }
+        Returns: undefined
+      }
       admin_list_bans: {
         Args: never
         Returns: {
@@ -1414,7 +1481,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "user" | "demo"
+      app_role: "admin" | "user" | "demo" | "moderator"
       block_scope: "all" | "conversation"
       listing_condition:
         | "new"

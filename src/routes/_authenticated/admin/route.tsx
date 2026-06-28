@@ -1,6 +1,7 @@
 import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
 import { BarChart3, Users, FolderTree, ShieldAlert, Sparkles, Webhook } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useIsAdmin } from "@/lib/use-is-admin";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   ssr: false,
@@ -13,7 +14,7 @@ export const Route = createFileRoute("/_authenticated/admin")({
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
-      .eq("role", "admin")
+      .in("role", ["admin", "moderator"])
       .maybeSingle();
     if (!data) throw redirect({ to: "/" });
   },
@@ -21,35 +22,48 @@ export const Route = createFileRoute("/_authenticated/admin")({
 });
 
 function AdminLayout() {
+  const { data: isAdmin } = useIsAdmin();
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
       <div className="mb-8">
         <h1 className="font-display text-3xl tracking-tight">Administrasjon</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Statistikk, brukere og kategorier</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {isAdmin ? "Statistikk, brukere og kategorier" : "Moderasjon og varsler"}
+        </p>
       </div>
       <nav className="mb-8 flex flex-wrap gap-2 border-b border-border">
-        <NavTab to="/admin" icon={<BarChart3 className="size-4" />} label="Oversikt" exact />
-        <NavTab to="/admin/brukere" icon={<Users className="size-4" />} label="Brukere" />
-        <NavTab
-          to="/admin/kategorier"
-          icon={<FolderTree className="size-4" />}
-          label="Kategorier"
-        />
+        {isAdmin && (
+          <>
+            <NavTab to="/admin" icon={<BarChart3 className="size-4" />} label="Oversikt" exact />
+            <NavTab to="/admin/brukere" icon={<Users className="size-4" />} label="Brukere" />
+            <NavTab
+              to="/admin/kategorier"
+              icon={<FolderTree className="size-4" />}
+              label="Kategorier"
+            />
+          </>
+        )}
         <NavTab
           to="/admin/moderasjon"
           icon={<ShieldAlert className="size-4" />}
           label="Moderasjon"
+          exact={!isAdmin}
         />
-        <NavTab
-          to="/admin/promoteringer"
-          icon={<Sparkles className="size-4" />}
-          label="Fremhevinger"
-        />
-        <NavTab
-          to="/admin/vipps-webhooks"
-          icon={<Webhook className="size-4" />}
-          label="Vipps webhooks"
-        />
+        {isAdmin && (
+          <>
+            <NavTab
+              to="/admin/promoteringer"
+              icon={<Sparkles className="size-4" />}
+              label="Fremhevinger"
+            />
+            <NavTab
+              to="/admin/vipps-webhooks"
+              icon={<Webhook className="size-4" />}
+              label="Vipps webhooks"
+            />
+          </>
+        )}
       </nav>
 
       <Outlet />

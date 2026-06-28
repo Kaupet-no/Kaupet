@@ -97,7 +97,22 @@ export function useUnreadConversationsCount(): number {
     };
   }, [user, qc]);
 
-  return (data ?? []).filter((c) =>
+  const conversationUnread = (data ?? []).filter((c) =>
     isUnread(c.last_message_at, c.last_sender_id, user?.id, c.my_last_read_at),
   ).length;
+
+  const { data: systemUnread } = useQuery({
+    queryKey: ["system-messages-unread", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("system_messages")
+        .select("id", { count: "exact", head: true })
+        .is("read_at", null);
+      if (error) return 0;
+      return count ?? 0;
+    },
+  });
+
+  return conversationUnread + (systemUnread ?? 0);
 }

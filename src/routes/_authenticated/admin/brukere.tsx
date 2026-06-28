@@ -42,9 +42,16 @@ type FoundUser = {
   created_at: string;
   is_admin: boolean;
   is_demo: boolean;
+  is_moderator: boolean;
 };
 
-type PendingAction = "grant" | "revoke" | "grant_demo" | "revoke_demo";
+type PendingAction =
+  | "grant"
+  | "revoke"
+  | "grant_demo"
+  | "revoke_demo"
+  | "grant_moderator"
+  | "revoke_moderator";
 
 function AdminUsers() {
   const [input, setInput] = useState("");
@@ -115,6 +122,34 @@ function AdminUsers() {
       setPending(null);
     },
     onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke fjerne demo-tilgang")),
+  });
+
+  const grantModerator = useMutation({
+    mutationFn: async (userId: string) => {
+      const { error } = await supabase.rpc("admin_grant_moderator_role", { _user_id: userId });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      showSuccessToast("Moderatorrolle tildelt");
+      qc.invalidateQueries({ queryKey: ["admin", "users"] });
+      setPending(null);
+    },
+    onError: (e: Error) =>
+      showErrorToast(formatErrorMessage(e, "Kunne ikke tildele moderatorrollen")),
+  });
+
+  const revokeModerator = useMutation({
+    mutationFn: async (userId: string) => {
+      const { error } = await supabase.rpc("admin_revoke_moderator_role", { _user_id: userId });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      showSuccessToast("Moderatorrolle fjernet");
+      qc.invalidateQueries({ queryKey: ["admin", "users"] });
+      setPending(null);
+    },
+    onError: (e: Error) =>
+      showErrorToast(formatErrorMessage(e, "Kunne ikke fjerne moderatorrollen")),
   });
 
   const exportData = useMutation({
@@ -209,6 +244,8 @@ function AdminUsers() {
                         <div className="flex flex-wrap gap-1">
                           {u.is_admin ? (
                             <Badge>Administrator</Badge>
+                          ) : u.is_moderator ? (
+                            <Badge variant="outline">Moderator</Badge>
                           ) : (
                             <Badge variant="secondary">Bruker</Badge>
                           )}
@@ -248,6 +285,23 @@ function AdminUsers() {
                               <FlaskConical className="size-4" /> Gjør til demo
                             </Button>
                           )}
+                          {u.is_moderator && !u.is_admin ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setPending({ user: u, action: "revoke_moderator" })}
+                            >
+                              <ShieldOff className="size-4" /> Fjern moderator
+                            </Button>
+                          ) : !u.is_admin ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setPending({ user: u, action: "grant_moderator" })}
+                            >
+                              <Shield className="size-4" /> Gjør til moderator
+                            </Button>
+                          ) : null}
                           {u.is_admin ? (
                             <Button
                               variant="outline"
@@ -292,7 +346,11 @@ function AdminUsers() {
                   ? "Fjerne administratorrolle?"
                   : pending?.action === "grant_demo"
                     ? "Tildele demo-tilgang?"
-                    : "Fjerne demo-tilgang?"}
+                    : pending?.action === "revoke_demo"
+                      ? "Fjerne demo-tilgang?"
+                      : pending?.action === "grant_moderator"
+                        ? "Tildele moderatorrolle?"
+                        : "Fjerne moderatorrolle?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {pending?.action === "grant"
@@ -301,7 +359,11 @@ function AdminUsers() {
                   ? `${pending?.user.email} vil miste tilgang til administrasjonsgrensesnittet.`
                   : pending?.action === "grant_demo"
                     ? `${pending.user.email} vil få tilgang til å teste nye funksjoner før de lanseres for ordinære brukere.`
-                    : `${pending?.user.email} mister tilgang til demo-funksjoner.`}
+                    : pending?.action === "revoke_demo"
+                      ? `${pending?.user.email} mister tilgang til demo-funksjoner.`
+                      : pending?.action === "grant_moderator"
+                        ? `${pending.user.email} vil få tilgang til å moderere annonser og behandle varsler.`
+                        : `${pending?.user.email} mister moderatortilgang.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -312,18 +374,30 @@ function AdminUsers() {
                 if (pending.action === "grant") grant.mutate(pending.user.user_id);
                 else if (pending.action === "revoke") revoke.mutate(pending.user.user_id);
                 else if (pending.action === "grant_demo") grantDemo.mutate(pending.user.user_id);
-                else revokeDemo.mutate(pending.user.user_id);
+                else if (pending.action === "revoke_demo") revokeDemo.mutate(pending.user.user_id);
+                else if (pending.action === "grant_moderator")
+                  grantModerator.mutate(pending.user.user_id);
+                else revokeModerator.mutate(pending.user.user_id);
               }}
               disabled={
-                grant.isPending || revoke.isPending || grantDemo.isPending || revokeDemo.isPending
+                grant.isPending ||
+                revoke.isPending ||
+                grantDemo.isPending ||
+                revokeDemo.isPending ||
+                grantModerator.isPending ||
+                revokeModerator.isPending
               }
             >
               {grant.isPending ||
               revoke.isPending ||
               grantDemo.isPending ||
-              revokeDemo.isPending ? (
+              revokeDemo.isPending ||
+              grantModerator.isPending ||
+              revokeModerator.isPending ? (
                 <Loader2 className="size-4 animate-spin" />
-              ) : pending?.action === "grant" || pending?.action === "grant_demo" ? (
+              ) : pending?.action === "grant" ||
+                pending?.action === "grant_demo" ||
+                pending?.action === "grant_moderator" ? (
                 "Tildel"
               ) : (
                 "Fjern"

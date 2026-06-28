@@ -186,9 +186,8 @@ export const adminDeleteListing = createServerFn({ method: "POST" })
 export const adminListReports = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await requireAdminOrModeratorRole(context.supabase, context.userId);
     const { data, error } = await context.supabase.rpc("admin_list_reports", { _limit: 200 });
-    if (error) throw error;
+    if (error) throw new Error(error.message);
     return data ?? [];
   });
 

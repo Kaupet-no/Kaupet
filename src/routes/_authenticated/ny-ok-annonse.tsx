@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useIsNative } from "@/lib/use-is-native";
 import { createFileRoute, useNavigate, useBlocker } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -59,6 +60,7 @@ function FieldValid({ show }: { show: boolean }) {
 }
 
 function NewWtbPage() {
+  const native = useIsNative();
   const navigate = useNavigate();
   const [step, setStep] = useState<1 | 2>(1);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
@@ -199,7 +201,7 @@ function NewWtbPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 pt-6 pb-4">
       <NativePageHeader title="Ønskes kjøpt" backTo="/" />
-      <h1 className="font-display text-3xl tracking-tight">Ønskes kjøpt</h1>
+      {!native && <h1 className="font-display text-3xl tracking-tight">Ønskes kjøpt</h1>}
 
       <form
         onSubmit={handleSubmit((values) => publish(values))}

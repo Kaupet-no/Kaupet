@@ -429,31 +429,32 @@ function ListingDetailPage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
       <NativePageHeader title={data.title} />
-      {backTarget.mode === "history" ? (
-        <button
-          type="button"
-          onClick={() => router.history.back()}
-          className="inline-flex items-center gap-1 py-2 pr-2 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" /> Tilbake til {backTarget.label}
-        </button>
-      ) : backTarget.mode === "search" ? (
-        <Link
-          to="/annonser"
-          search={backTarget.search as never}
-          className="inline-flex items-center gap-1 py-2 pr-2 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" /> Tilbake til {backTarget.label}
-        </Link>
-      ) : (
-        <Link
-          to="/annonser"
-          search={{ q: "", category: "", sort: "new" }}
-          className="inline-flex items-center gap-1 py-2 pr-2 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" /> Tilbake til annonser
-        </Link>
-      )}
+      {!isNative &&
+        (backTarget.mode === "history" ? (
+          <button
+            type="button"
+            onClick={() => router.history.back()}
+            className="inline-flex items-center gap-1 py-2 pr-2 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="size-4" /> Tilbake til {backTarget.label}
+          </button>
+        ) : backTarget.mode === "search" ? (
+          <Link
+            to="/annonser"
+            search={backTarget.search as never}
+            className="inline-flex items-center gap-1 py-2 pr-2 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="size-4" /> Tilbake til {backTarget.label}
+          </Link>
+        ) : (
+          <Link
+            to="/annonser"
+            search={{ q: "", category: "", sort: "new" }}
+            className="inline-flex items-center gap-1 py-2 pr-2 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="size-4" /> Tilbake til annonser
+          </Link>
+        ))}
 
       <div className="mt-4 grid gap-8 md:grid-cols-[1.4fr_1fr]">
         <div>

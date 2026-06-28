@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useIsNative } from "@/lib/use-is-native";
 import { useState } from "react";
 import { CheckCheck, TrendingDown, X } from "lucide-react";
 
@@ -48,6 +49,7 @@ function formatKr(n: number) {
 }
 
 function VarslerPage() {
+  const native = useIsNative();
   const { user } = useAuth();
   const qc = useQueryClient();
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
@@ -131,7 +133,9 @@ function VarslerPage() {
       <div className="mx-auto max-w-4xl px-4 py-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="font-display text-3xl tracking-tight max-sm:hidden">Mine varsler</h1>
+            {!native && (
+              <h1 className="font-display text-3xl tracking-tight max-sm:hidden">Mine varsler</h1>
+            )}
             <p className="mt-1 text-sm text-muted-foreground">
               Treff i lagrede søk og prisfall på favoritter.
             </p>

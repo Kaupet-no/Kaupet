@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { NativePageHeader } from "@/components/native-page-header";
+import { useIsNative } from "@/lib/use-is-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -86,6 +87,7 @@ export const Route = createFileRoute("/_authenticated/mine-annonser/$id/rediger"
 });
 
 function EditListingPage() {
+  const native = useIsNative();
   const { id } = Route.useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -414,10 +416,14 @@ function EditListingPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
       <NativePageHeader title="Rediger annonse" backTo="/mine-annonser" />
-      <h1 className="font-display text-3xl tracking-tight">Rediger annonse</h1>
-      <p className="mt-1 text-muted-foreground">
-        Oppdater detaljer og bilder. Endringene lagres når du trykker «Lagre endringer».
-      </p>
+      {!native && (
+        <>
+          <h1 className="font-display text-3xl tracking-tight">Rediger annonse</h1>
+          <p className="mt-1 text-muted-foreground">
+            Oppdater detaljer og bilder. Endringene lagres når du trykker «Lagre endringer».
+          </p>
+        </>
+      )}
 
       {listing?.status === "draft" && (
         <div className="mt-4 flex items-center gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">

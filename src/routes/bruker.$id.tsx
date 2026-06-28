@@ -1,5 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { NativePageHeader } from "@/components/native-page-header";
+import { useIsNative } from "@/lib/use-is-native";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { User as UserIcon } from "lucide-react";
@@ -54,6 +55,7 @@ export const Route = createFileRoute("/bruker/$id")({
 });
 
 function PublicProfilePage() {
+  const native = useIsNative();
   const { id } = Route.useParams();
   const { profile } = Route.useLoaderData();
   const listReviewsFn = useServerFn(listUserReviews);
@@ -124,7 +126,9 @@ function PublicProfilePage() {
         </Avatar>
         <div className="flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="font-display text-3xl tracking-tight">{profile.display_name}</h1>
+            {!native && (
+              <h1 className="font-display text-3xl tracking-tight">{profile.display_name}</h1>
+            )}
           </div>
           <p className="text-xs text-muted-foreground">Medlem siden {memberSince}</p>
           <div className="mt-3 flex items-center gap-2">

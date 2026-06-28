@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useIsNative } from "@/lib/use-is-native";
 import { Heart, X } from "lucide-react";
 
 import { NativePageHeader } from "@/components/native-page-header";
@@ -26,6 +27,7 @@ type FavoriteRow =
   | { kind: "unavailable"; listing_id: string; reason: "deleted" | "archived" };
 
 function FavoritesPage() {
+  const native = useIsNative();
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -92,10 +94,12 @@ function FavoritesPage() {
     <>
       <NativePageHeader title="Mine favoritter" backLabel="Meg" backTo="/meg" />
       <div className="mx-auto max-w-6xl px-4 py-6">
-        <div className="flex items-center gap-3 max-sm:hidden">
-          <Heart className="size-6 text-accent" />
-          <h1 className="font-display text-3xl tracking-tight">Mine favoritter</h1>
-        </div>
+        {!native && (
+          <div className="flex items-center gap-3 max-sm:hidden">
+            <Heart className="size-6 text-accent" />
+            <h1 className="font-display text-3xl tracking-tight">Mine favoritter</h1>
+          </div>
+        )}
         <p className="mt-1 text-sm text-muted-foreground">Annonser du har lagret for senere.</p>
 
         <div className="mt-8">

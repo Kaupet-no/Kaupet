@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { NativePageHeader } from "@/components/native-page-header";
+import { useIsNative } from "@/lib/use-is-native";
 
 export const Route = createFileRoute("/vilkar")({
   head: () => ({
@@ -21,16 +22,19 @@ export const Route = createFileRoute("/vilkar")({
 });
 
 function VilkarPage() {
+  const native = useIsNative();
   return (
     <article className="mx-auto max-w-3xl px-4 py-12">
       <NativePageHeader title="Vilkår" />
-      <header className="mb-10">
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">Brukervilkår</p>
-        <h1 className="mt-2 font-display text-4xl leading-tight tracking-tight">
-          Brukervilkår for Kaupet.no
-        </h1>
-        <p className="mt-3 text-sm text-muted-foreground">Sist oppdatert 20. juni 2026</p>
-      </header>
+      {!native && (
+        <header className="mb-10">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Brukervilkår</p>
+          <h1 className="mt-2 font-display text-4xl leading-tight tracking-tight">
+            Brukervilkår for Kaupet.no
+          </h1>
+          <p className="mt-3 text-sm text-muted-foreground">Sist oppdatert 20. juni 2026</p>
+        </header>
+      )}
 
       <div className="space-y-10 text-sm leading-relaxed text-foreground/90">
         <section>

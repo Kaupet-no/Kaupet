@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { NativePageHeader } from "@/components/native-page-header";
+import { useIsNative } from "@/lib/use-is-native";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { MessageCircle, ChevronDown, ChevronRight, BellRing, Loader2, X } from "lucide-react";
@@ -84,6 +85,7 @@ type RawConv = {
 };
 
 function InboxPage() {
+  const native = useIsNative();
   const { user } = useAuth();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [imgUrls, setImgUrls] = useState<Record<string, string>>({});
@@ -200,10 +202,12 @@ function InboxPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
       <NativePageHeader title="Meldinger" hideBack />
-      <div className="flex items-center gap-3">
-        <MessageCircle className="size-6 text-accent" />
-        <h1 className="font-display text-3xl tracking-tight">Meldinger</h1>
-      </div>
+      {!native && (
+        <div className="flex items-center gap-3">
+          <MessageCircle className="size-6 text-accent" />
+          <h1 className="font-display text-3xl tracking-tight">Meldinger</h1>
+        </div>
+      )}
       <p className="mt-1 text-sm text-muted-foreground">
         Samtalene dine er gruppert etter annonse.
       </p>

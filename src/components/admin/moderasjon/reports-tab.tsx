@@ -4,7 +4,6 @@ import { CheckCircle, ExternalLink, Loader2 } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { Link } from "@tanstack/react-router";
 
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -15,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { adminResolveReport } from "@/lib/admin-moderation.functions";
+import { adminListReports, adminResolveReport } from "@/lib/admin-moderation.functions";
 import { formatErrorMessage } from "@/lib/errors";
 
 type ReportRow = {
@@ -36,15 +35,17 @@ type ReportRow = {
 
 export function ReportsTab() {
   const qc = useQueryClient();
+  const listFn = useServerFn(adminListReports);
   const resolveFn = useServerFn(adminResolveReport);
 
-  const { data: reports, isLoading } = useQuery({
+  const {
+    data: reports,
+    isLoading,
+    isError,
+    error: queryError,
+  } = useQuery({
     queryKey: ["admin-reports"],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("admin_list_reports", { _limit: 200 });
-      if (error) throw error;
-      return (data ?? []) as ReportRow[];
-    },
+    queryFn: () => listFn(),
   });
 
   const resolveMut = useMutation({
@@ -60,6 +61,17 @@ export function ReportsTab() {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-6 text-sm text-destructive">
+        <p className="font-medium">Kunne ikke laste varsler</p>
+        <p className="mt-1 font-mono text-xs opacity-80">
+          {queryError instanceof Error ? queryError.message : String(queryError)}
+        </p>
       </div>
     );
   }

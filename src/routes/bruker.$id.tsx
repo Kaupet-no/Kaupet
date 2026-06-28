@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { NativePageHeader } from "@/components/native-page-header";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { User as UserIcon } from "lucide-react";
@@ -111,6 +112,7 @@ function PublicProfilePage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
+      <NativePageHeader title={profile.display_name} />
       <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-center">
         <Avatar className="size-24">
           {profile.avatar_url && (

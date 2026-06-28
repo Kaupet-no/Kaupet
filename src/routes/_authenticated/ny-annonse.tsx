@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { NativePageHeader } from "@/components/native-page-header";
 import { createFileRoute, useNavigate, useBlocker } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -840,6 +841,7 @@ function NewListingPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 pt-6 pb-4">
+      <NativePageHeader title="Ny annonse" backTo="/" />
       <h1 className="font-display text-3xl tracking-tight">Ny annonse</h1>
 
       {/* Draft restore banner */}

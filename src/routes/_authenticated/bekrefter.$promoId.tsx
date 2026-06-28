@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { NativePageHeader } from "@/components/native-page-header";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2, AlertCircle } from "lucide-react";
@@ -111,16 +112,19 @@ function ConfirmPage() {
   }
 
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center px-4 py-16 text-center"
-    >
-      <Loader2 className="size-12 animate-spin text-primary" aria-hidden="true" />
-      <h1 className="mt-6 font-display text-2xl">Vi bekrefter betalingen din hos Vipps…</h1>
-      <p className="mt-2 text-muted-foreground">
-        Dette tar vanligvis bare et par sekunder. Ikke lukk vinduet.
-      </p>
+    <div className="mx-auto max-w-md">
+      <NativePageHeader title="Betaling" />
+      <div
+        role="status"
+        aria-live="polite"
+        className="flex min-h-[60vh] flex-col items-center justify-center px-4 py-16 text-center"
+      >
+        <Loader2 className="size-12 animate-spin text-primary" aria-hidden="true" />
+        <h1 className="mt-6 font-display text-2xl">Vi bekrefter betalingen din hos Vipps…</h1>
+        <p className="mt-2 text-muted-foreground">
+          Dette tar vanligvis bare et par sekunder. Ikke lukk vinduet.
+        </p>
+      </div>
     </div>
   );
 }

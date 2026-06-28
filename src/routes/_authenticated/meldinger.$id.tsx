@@ -17,6 +17,7 @@ import { confirmBuyer, getSaleForListing, unconfirmBuyer } from "@/lib/sales.fun
 import { createReview, getMyReviewForListing } from "@/lib/reviews.functions";
 import { formatErrorMessage } from "@/lib/errors";
 import { useIsNative } from "@/lib/use-is-native";
+import { NativePageHeader } from "@/components/native-page-header";
 import { useKeyboardVisible } from "@/lib/use-keyboard-visible";
 import { ConversationErrorBoundary } from "@/components/meldinger/conversation-error-boundary";
 import { renderWithDayDividers, type Message } from "@/components/meldinger/message-list";
@@ -346,194 +347,201 @@ function ConversationPage() {
 
   return (
     <div
-      className="mx-auto flex max-w-3xl flex-col px-4"
+      className="mx-auto flex max-w-3xl flex-col"
       style={{
         height: native
           ? keyboardVisible
             ? "var(--vvh, 100vh)"
             : "calc(100vh - var(--app-bottom-nav-h))"
           : "calc(100vh - 4rem)",
-        paddingTop: native ? "calc(env(safe-area-inset-top) + 1rem)" : "1rem",
-        paddingBottom: native && keyboardVisible ? 0 : "1rem",
       }}
     >
-      {!(native && keyboardVisible) && (
-        <Link
-          to="/meldinger"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" /> Alle meldinger
-        </Link>
-      )}
-
-      {conv && !(native && keyboardVisible) && (
-        <div className="mt-3 flex items-center gap-3 rounded-xl border border-border bg-card p-3">
-          <div className="size-12 shrink-0 overflow-hidden rounded-lg bg-muted">
-            {coverUrl && <img src={coverUrl} alt="" className="size-full object-cover" />}
-          </div>
-          <div className="min-w-0 flex-1">
-            {conv.listing ? (
-              <Link
-                to="/$kaupetCode"
-                params={{ kaupetCode: (conv.listing as { kaupet_code: string }).kaupet_code }}
-                className="block truncate font-medium hover:underline"
-              >
-                {conv.listing.title}
-              </Link>
-            ) : (
-              <p className="block truncate font-medium italic text-muted-foreground">
-                Annonsen er ikke lenger tilgjengelig
-              </p>
-            )}
-            <p className="text-xs text-muted-foreground">
-              {priceLabel} · med{" "}
-              {conv.otherDeleted || !otherId ? (
-                <span>{conv.otherDeleted ? "Slettet bruker" : "ukjent bruker"}</span>
-              ) : (
-                <Link
-                  to="/bruker/$id"
-                  params={{ id: otherId }}
-                  className="underline-offset-2 hover:underline"
-                >
-                  {conv.other?.display_name ?? "ukjent bruker"}
-                </Link>
-              )}
-            </p>
-          </div>
-          {otherId && !conv.otherDeleted ? (
-            <Link
-              to="/bruker/$id"
-              params={{ id: otherId }}
-              aria-label={`Se profilen til ${conv.other?.display_name ?? "denne brukeren"}`}
-            >
-              {conv.other?.avatar_url ? (
-                <img
-                  src={conv.other.avatar_url}
-                  alt=""
-                  className="size-9 rounded-full object-cover ring-offset-2 transition hover:ring-2 hover:ring-primary"
-                />
-              ) : (
-                <div className="flex size-9 items-center justify-center rounded-full bg-muted transition hover:ring-2 hover:ring-primary">
-                  <UserIcon className="size-4 text-muted-foreground" />
-                </div>
-              )}
-            </Link>
-          ) : (
-            <div className="flex size-9 items-center justify-center rounded-full bg-muted">
-              <UserIcon className="size-4 text-muted-foreground" />
-            </div>
-          )}
-          {otherId && !conv.otherDeleted && !theyBlockedMe && (
-            <BlockConversationMenu
-              targetUserId={otherId}
-              conversationId={id}
-              targetName={conv.other?.display_name ?? "denne brukeren"}
-            />
-          )}
-        </div>
-      )}
-
-      {conv && !(native && keyboardVisible) && (
-        <SalePanel
-          isSeller={isSeller}
-          sale={sale ?? null}
-          saleIsForThisConversation={saleIsForThisConversation}
-          saleConfirmedForOtherBuyer={saleConfirmedForOtherBuyer}
-          iAmInSale={iAmInSale}
-          otherName={conv.other?.display_name ?? "denne brukeren"}
-          otherDeleted={!!conv.otherDeleted}
-          myReview={myReview ?? null}
-          onConfirm={() => confirmMutation.mutate()}
-          onUnconfirm={() => unconfirmMutation.mutate()}
-          confirming={confirmMutation.isPending}
-          unconfirming={unconfirmMutation.isPending}
-          onSubmitReview={async (rating, comment) => {
-            await createReviewFn({ data: { listingId: listingId!, rating, comment } });
-            showSuccessToast("Takk for vurderingen!");
-            refetchMyReview();
-          }}
-        />
-      )}
-
-      {conv && (conv.otherDeleted || conv.otherPending) && (
-        <div className="mt-3 rounded-xl border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-          {conv.otherDeleted
-            ? "Denne brukeren har slettet kontoen sin. Du kan ikke lenger sende meldinger i denne samtalen."
-            : "Denne brukeren har bedt om å få slettet kontoen sin. Du kan ikke sende nye meldinger."}
-        </div>
-      )}
-
-      {conv && iBlocked && (
-        <div className="mt-3 rounded-xl border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-          {iBlockedAll
-            ? `Du har blokkert ${conv.other?.display_name ?? "denne brukeren"}. Du kan oppheve blokkeringen øverst eller fra profilen din.`
-            : "Du har blokkert denne samtalen. Du kan oppheve blokkeringen øverst eller fra profilen din."}
-        </div>
-      )}
-
-      {conv && theyBlockedMe && !iBlocked && (
-        <div className="mt-3 rounded-xl border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-          Du kan ikke sende meldinger i denne samtalen.
-        </div>
-      )}
-
+      <NativePageHeader title={conv?.listing?.title ?? "Samtale"} backTo="/meldinger" />
       <div
-        ref={scrollRef}
-        className="mt-3 flex-1 space-y-2 overflow-y-auto rounded-xl border border-border bg-surface p-4"
-      >
-        {(messages ?? []).length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">
-            Send den første meldingen for å starte samtalen.
-          </p>
-        ) : (
-          renderWithDayDividers(
-            messages ?? [],
-            user?.id ?? "",
-            (messageId) => deleteMessageMutation.mutate(messageId),
-            conv && user
-              ? conv.buyer_id === user.id
-                ? conv.seller_last_read_at
-                : conv.buyer_last_read_at
-              : null,
-          )
-        )}
-      </div>
-
-      <form
-        className="mt-3 flex items-stretch gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!sendMutation.isPending && !disabled) sendMutation.mutate(body);
+        className="flex flex-1 flex-col overflow-hidden px-4"
+        style={{
+          paddingTop: "1rem",
+          paddingBottom: native && keyboardVisible ? 0 : "1rem",
         }}
       >
-        <Textarea
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              if (!sendMutation.isPending && !disabled) {
-                sendMutation.mutate(body);
-              }
-            }
-          }}
-          placeholder={disabledPlaceholder}
-          rows={2}
-          maxLength={4000}
-          disabled={disabled}
-          className="min-h-[60px] flex-1 resize-none"
-        />
-        <Button
-          type="submit"
-          disabled={sendMutation.isPending || !body.trim() || disabled}
-          className="h-auto gap-2 self-stretch"
+        {!native && (
+          <Link
+            to="/meldinger"
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="size-4" /> Alle meldinger
+          </Link>
+        )}
+
+        {conv && !(native && keyboardVisible) && (
+          <div className="mt-3 flex items-center gap-3 rounded-xl border border-border bg-card p-3">
+            <div className="size-12 shrink-0 overflow-hidden rounded-lg bg-muted">
+              {coverUrl && <img src={coverUrl} alt="" className="size-full object-cover" />}
+            </div>
+            <div className="min-w-0 flex-1">
+              {conv.listing ? (
+                <Link
+                  to="/$kaupetCode"
+                  params={{ kaupetCode: (conv.listing as { kaupet_code: string }).kaupet_code }}
+                  className="block truncate font-medium hover:underline"
+                >
+                  {conv.listing.title}
+                </Link>
+              ) : (
+                <p className="block truncate font-medium italic text-muted-foreground">
+                  Annonsen er ikke lenger tilgjengelig
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                {priceLabel} · med{" "}
+                {conv.otherDeleted || !otherId ? (
+                  <span>{conv.otherDeleted ? "Slettet bruker" : "ukjent bruker"}</span>
+                ) : (
+                  <Link
+                    to="/bruker/$id"
+                    params={{ id: otherId }}
+                    className="underline-offset-2 hover:underline"
+                  >
+                    {conv.other?.display_name ?? "ukjent bruker"}
+                  </Link>
+                )}
+              </p>
+            </div>
+            {otherId && !conv.otherDeleted ? (
+              <Link
+                to="/bruker/$id"
+                params={{ id: otherId }}
+                aria-label={`Se profilen til ${conv.other?.display_name ?? "denne brukeren"}`}
+              >
+                {conv.other?.avatar_url ? (
+                  <img
+                    src={conv.other.avatar_url}
+                    alt=""
+                    className="size-9 rounded-full object-cover ring-offset-2 transition hover:ring-2 hover:ring-primary"
+                  />
+                ) : (
+                  <div className="flex size-9 items-center justify-center rounded-full bg-muted transition hover:ring-2 hover:ring-primary">
+                    <UserIcon className="size-4 text-muted-foreground" />
+                  </div>
+                )}
+              </Link>
+            ) : (
+              <div className="flex size-9 items-center justify-center rounded-full bg-muted">
+                <UserIcon className="size-4 text-muted-foreground" />
+              </div>
+            )}
+            {otherId && !conv.otherDeleted && !theyBlockedMe && (
+              <BlockConversationMenu
+                targetUserId={otherId}
+                conversationId={id}
+                targetName={conv.other?.display_name ?? "denne brukeren"}
+              />
+            )}
+          </div>
+        )}
+
+        {conv && !(native && keyboardVisible) && (
+          <SalePanel
+            isSeller={isSeller}
+            sale={sale ?? null}
+            saleIsForThisConversation={saleIsForThisConversation}
+            saleConfirmedForOtherBuyer={saleConfirmedForOtherBuyer}
+            iAmInSale={iAmInSale}
+            otherName={conv.other?.display_name ?? "denne brukeren"}
+            otherDeleted={!!conv.otherDeleted}
+            myReview={myReview ?? null}
+            onConfirm={() => confirmMutation.mutate()}
+            onUnconfirm={() => unconfirmMutation.mutate()}
+            confirming={confirmMutation.isPending}
+            unconfirming={unconfirmMutation.isPending}
+            onSubmitReview={async (rating, comment) => {
+              await createReviewFn({ data: { listingId: listingId!, rating, comment } });
+              showSuccessToast("Takk for vurderingen!");
+              refetchMyReview();
+            }}
+          />
+        )}
+
+        {conv && (conv.otherDeleted || conv.otherPending) && (
+          <div className="mt-3 rounded-xl border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+            {conv.otherDeleted
+              ? "Denne brukeren har slettet kontoen sin. Du kan ikke lenger sende meldinger i denne samtalen."
+              : "Denne brukeren har bedt om å få slettet kontoen sin. Du kan ikke sende nye meldinger."}
+          </div>
+        )}
+
+        {conv && iBlocked && (
+          <div className="mt-3 rounded-xl border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+            {iBlockedAll
+              ? `Du har blokkert ${conv.other?.display_name ?? "denne brukeren"}. Du kan oppheve blokkeringen øverst eller fra profilen din.`
+              : "Du har blokkert denne samtalen. Du kan oppheve blokkeringen øverst eller fra profilen din."}
+          </div>
+        )}
+
+        {conv && theyBlockedMe && !iBlocked && (
+          <div className="mt-3 rounded-xl border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+            Du kan ikke sende meldinger i denne samtalen.
+          </div>
+        )}
+
+        <div
+          ref={scrollRef}
+          className="mt-3 flex-1 space-y-2 overflow-y-auto rounded-xl border border-border bg-surface p-4"
         >
-          <Send className="size-4" /> Send
-        </Button>
-      </form>
-      {sendMutation.error && (
-        <p className="mt-2 text-xs text-destructive">{(sendMutation.error as Error).message}</p>
-      )}
+          {(messages ?? []).length === 0 ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              Send den første meldingen for å starte samtalen.
+            </p>
+          ) : (
+            renderWithDayDividers(
+              messages ?? [],
+              user?.id ?? "",
+              (messageId) => deleteMessageMutation.mutate(messageId),
+              conv && user
+                ? conv.buyer_id === user.id
+                  ? conv.seller_last_read_at
+                  : conv.buyer_last_read_at
+                : null,
+            )
+          )}
+        </div>
+
+        <form
+          className="mt-3 flex items-stretch gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!sendMutation.isPending && !disabled) sendMutation.mutate(body);
+          }}
+        >
+          <Textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                if (!sendMutation.isPending && !disabled) {
+                  sendMutation.mutate(body);
+                }
+              }
+            }}
+            placeholder={disabledPlaceholder}
+            rows={2}
+            maxLength={4000}
+            disabled={disabled}
+            className="min-h-[60px] flex-1 resize-none"
+          />
+          <Button
+            type="submit"
+            disabled={sendMutation.isPending || !body.trim() || disabled}
+            className="h-auto gap-2 self-stretch"
+          >
+            <Send className="size-4" /> Send
+          </Button>
+        </form>
+        {sendMutation.error && (
+          <p className="mt-2 text-xs text-destructive">{(sendMutation.error as Error).message}</p>
+        )}
+      </div>
     </div>
   );
 }

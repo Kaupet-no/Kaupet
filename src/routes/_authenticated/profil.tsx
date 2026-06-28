@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useIsNative } from "@/lib/use-is-native";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ProfileSection } from "@/components/profil/profile-section";
 import { NotificationsSection } from "@/components/profil/notifications-section";
@@ -23,6 +24,7 @@ export const Route = createFileRoute("/_authenticated/profil")({
 });
 
 function ProfilePage() {
+  const native = useIsNative();
   const { tab = "profil" } = Route.useSearch();
   const navigate = Route.useNavigate();
 
@@ -30,7 +32,9 @@ function ProfilePage() {
     <>
       <NativePageHeader title="Min profil" backLabel="Meg" backTo="/meg" />
       <div className="mx-auto max-w-2xl px-4 py-6">
-        <h1 className="font-display text-3xl tracking-tight max-sm:hidden">Min profil</h1>
+        {!native && (
+          <h1 className="font-display text-3xl tracking-tight max-sm:hidden">Min profil</h1>
+        )}
 
         <Tabs
           value={tab}

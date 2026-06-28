@@ -842,7 +842,7 @@ function NewListingPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 pt-6 pb-4">
       <NativePageHeader title="Ny annonse" backTo="/" />
-      <h1 className="font-display text-3xl tracking-tight">Ny annonse</h1>
+      {!native && <h1 className="font-display text-3xl tracking-tight">Ny annonse</h1>}
 
       {/* Draft restore banner */}
       {hasDraftData && (

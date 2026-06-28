@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { NativePageHeader } from "@/components/native-page-header";
+import { useIsNative } from "@/lib/use-is-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
@@ -66,6 +67,7 @@ export const Route = createFileRoute("/_authenticated/mine-sok")({
 });
 
 function MineSokPage() {
+  const native = useIsNative();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -175,7 +177,9 @@ function MineSokPage() {
       <div className="mx-auto max-w-4xl px-4 py-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="font-display text-3xl tracking-tight max-sm:hidden">Mine søk</h1>
+            {!native && (
+              <h1 className="font-display text-3xl tracking-tight max-sm:hidden">Mine søk</h1>
+            )}
             <p className="mt-1 text-sm text-muted-foreground">
               Lagrede søk varsler deg automatisk når en ny annonse matcher.
             </p>

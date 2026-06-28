@@ -6,16 +6,22 @@ ALTER TABLE public.reports ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMPTZ;
 ALTER TABLE public.reports ADD COLUMN IF NOT EXISTS resolved_by UUID REFERENCES auth.users(id);
 
 -- Allow admins and moderators to view/update reports
+-- Note: uses direct user_roles lookup instead of has_role() to avoid enum cast issue
+-- when 'moderator' enum value was added in the same migration batch.
 DO $$ BEGIN
   CREATE POLICY "Admins and moderators can view reports" ON public.reports
     FOR SELECT TO authenticated
-    USING (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'moderator'));
+    USING (
+      EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role::text IN ('admin', 'moderator'))
+    );
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
   CREATE POLICY "Admins and moderators can update reports" ON public.reports
     FOR UPDATE TO authenticated
-    USING (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'moderator'));
+    USING (
+      EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role::text IN ('admin', 'moderator'))
+    );
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Allow admins and moderators to read moderation log
@@ -23,7 +29,9 @@ DROP POLICY IF EXISTS "Admins read moderation log" ON public.admin_moderation_lo
 DO $$ BEGIN
   CREATE POLICY "Admins and moderators read moderation log" ON public.admin_moderation_log
     FOR SELECT TO authenticated
-    USING (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'moderator'));
+    USING (
+      EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role::text IN ('admin', 'moderator'))
+    );
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- System messages table
@@ -52,7 +60,7 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN
   CREATE POLICY "Admins and moderators can insert system messages" ON public.system_messages
     FOR INSERT TO authenticated WITH CHECK (
-      public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'moderator')
+      EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role::text IN ('admin', 'moderator'))
     );
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 

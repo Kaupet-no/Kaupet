@@ -1,16 +1,6 @@
 -- no transaction
 
--- Fix 1: Change reports.listing_id from ON DELETE CASCADE to ON DELETE SET NULL
--- so that reports are preserved when a listing is deleted.
-ALTER TABLE public.reports ALTER COLUMN listing_id DROP NOT NULL;
-ALTER TABLE public.reports DROP CONSTRAINT IF EXISTS reports_listing_id_fkey;
-ALTER TABLE public.reports
-  ADD CONSTRAINT reports_listing_id_fkey
-  FOREIGN KEY (listing_id) REFERENCES public.listings(id) ON DELETE SET NULL;
-
--- Fix 2: Rewrite admin_list_reports to use direct user_roles lookup instead of
--- has_role(), which takes public.app_role and can fail with the newly added
--- 'moderator' enum value depending on plan cache state.
+-- Fix: kaupet_code is char(8), not text — cast explicitly to match RETURNS TABLE declaration
 CREATE OR REPLACE FUNCTION public.admin_list_reports(_limit int DEFAULT 100)
 RETURNS TABLE(
   id uuid,
@@ -59,20 +49,3 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION public.admin_list_reports FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.admin_list_reports TO authenticated;
-
--- Fix admin_resolve_report similarly
-CREATE OR REPLACE FUNCTION public.admin_resolve_report(_id uuid)
-RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM public.user_roles
-    WHERE user_id = auth.uid() AND role::text IN ('admin', 'moderator')
-  ) THEN
-    RAISE EXCEPTION 'Not authorized';
-  END IF;
-  UPDATE public.reports
-  SET status = 'resolved', resolved_at = now(), resolved_by = auth.uid()
-  WHERE id = _id;
-END $$;
-REVOKE ALL ON FUNCTION public.admin_resolve_report FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.admin_resolve_report TO authenticated;

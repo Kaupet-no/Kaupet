@@ -1,3 +1,5 @@
+-- no transaction
+
 -- Extend reports table
 ALTER TABLE public.reports ADD COLUMN IF NOT EXISTS comment TEXT;
 ALTER TABLE public.reports ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMPTZ;

@@ -4,7 +4,6 @@ import { CheckCircle, ExternalLink, Loader2 } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { Link } from "@tanstack/react-router";
 
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -15,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { adminResolveReport } from "@/lib/admin-moderation.functions";
+import { adminListReports, adminResolveReport } from "@/lib/admin-moderation.functions";
 import { formatErrorMessage } from "@/lib/errors";
 
 type ReportRow = {
@@ -36,6 +35,7 @@ type ReportRow = {
 
 export function ReportsTab() {
   const qc = useQueryClient();
+  const listFn = useServerFn(adminListReports);
   const resolveFn = useServerFn(adminResolveReport);
 
   const {
@@ -45,11 +45,7 @@ export function ReportsTab() {
     error: queryError,
   } = useQuery({
     queryKey: ["admin-reports"],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("admin_list_reports", { _limit: 200 });
-      if (error) throw error;
-      return (data ?? []) as ReportRow[];
-    },
+    queryFn: () => listFn(),
   });
 
   const resolveMut = useMutation({

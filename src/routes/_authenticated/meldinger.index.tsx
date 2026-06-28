@@ -1,9 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { NativePageHeader } from "@/components/native-page-header";
 import { useIsNative } from "@/lib/use-is-native";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { MessageCircle, ChevronDown, ChevronRight, BellRing, Loader2, X } from "lucide-react";
+import {
+  MessageCircle,
+  ChevronDown,
+  ChevronRight,
+  BellRing,
+  Loader2,
+  X,
+  ShieldAlert,
+  ChevronUp,
+} from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -84,11 +93,20 @@ type RawConv = {
   seller?: RawProfile | RawProfile[] | null;
 };
 
+type SystemMessage = {
+  id: string;
+  body: string;
+  created_at: string;
+  read_at: string | null;
+};
+
 function InboxPage() {
   const native = useIsNative();
   const { user } = useAuth();
+  const qc = useQueryClient();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [imgUrls, setImgUrls] = useState<Record<string, string>>({});
+  const [systemOpen, setSystemOpen] = useState(true);
 
   const { data: conversations, isLoading } = useQuery({
     queryKey: ["my-conversations", user?.id],
@@ -139,6 +157,32 @@ function InboxPage() {
       return await attachLastMessage(normalised);
     },
   });
+
+  const { data: systemMessages } = useQuery({
+    queryKey: ["system-messages", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("system_messages")
+        .select("id, body, created_at, read_at")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as SystemMessage[];
+    },
+  });
+
+  const markReadMut = useMutation({
+    mutationFn: async (id: string) => {
+      await supabase
+        .from("system_messages")
+        .update({ read_at: new Date().toISOString() })
+        .eq("id", id)
+        .is("read_at", null);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["system-messages"] }),
+  });
+
+  const unreadSystemCount = systemMessages?.filter((m) => !m.read_at).length ?? 0;
 
   // Last opp signerte bilde-URLer for omslagsbilder
   useEffect(() => {
@@ -211,6 +255,45 @@ function InboxPage() {
       <p className="mt-1 text-sm text-muted-foreground">
         Samtalene dine er gruppert etter annonse.
       </p>
+
+      {systemMessages && systemMessages.length > 0 && (
+        <div className="mt-6 overflow-hidden rounded-xl border border-border bg-card">
+          <button
+            type="button"
+            onClick={() => setSystemOpen((o) => !o)}
+            className="flex w-full items-center gap-3 p-3 text-left hover:bg-muted/40"
+          >
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+              <ShieldAlert className="size-5 text-primary" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-medium">Kaupet-teamet</p>
+              <p className="text-xs text-muted-foreground">
+                {systemMessages.length} {systemMessages.length === 1 ? "melding" : "meldinger"}
+              </p>
+            </div>
+            {unreadSystemCount > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[10px] font-semibold text-accent-foreground">
+                {unreadSystemCount}
+              </span>
+            )}
+            {systemOpen ? (
+              <ChevronUp className="size-4 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="size-4 text-muted-foreground" />
+            )}
+          </button>
+          {systemOpen && (
+            <ul className="divide-y divide-border border-t border-border">
+              {systemMessages.map((msg) => (
+                <li key={msg.id}>
+                  <SystemMessageRow msg={msg} onRead={() => markReadMut.mutate(msg.id)} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       <PushHintForMessages />
 
@@ -349,6 +432,48 @@ function InboxPage() {
         )}
       </div>
     </div>
+  );
+}
+
+function SystemMessageRow({ msg, onRead }: { msg: SystemMessage; onRead: () => void }) {
+  const [open, setOpen] = useState(false);
+
+  const handleOpen = () => {
+    setOpen(true);
+    if (!msg.read_at) onRead();
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={handleOpen}
+        className={`flex w-full items-start gap-3 p-3 text-left hover:bg-muted/40 ${!msg.read_at ? "bg-accent/5" : ""}`}
+      >
+        <div className="min-w-0 flex-1 pl-1">
+          <p className={`truncate text-sm ${!msg.read_at ? "font-semibold" : "font-medium"}`}>
+            {msg.body.slice(0, 80)}
+            {msg.body.length > 80 ? "…" : ""}
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{formatRelative(msg.created_at)}</p>
+        </div>
+        {!msg.read_at && (
+          <span className="mt-1 size-2 shrink-0 rounded-full bg-accent" aria-label="Ulest" />
+        )}
+      </button>
+      {open && (
+        <div className="border-t border-border bg-muted/30 px-4 py-3">
+          <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.body}</p>
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="mt-2 text-xs text-muted-foreground underline underline-offset-2"
+          >
+            Skjul
+          </button>
+        </div>
+      )}
+    </>
   );
 }
 

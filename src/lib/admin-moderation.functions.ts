@@ -3,9 +3,11 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireAdminRole as requireAdmin } from "@/lib/admin-auth.server";
+import { requireAdminOrModeratorRole } from "@/lib/moderator-auth.server";
 
 const reason = z.string().trim().min(1, "Begrunnelse er påkrevd").max(500);
 const uuid = z.string().uuid();
+const message = z.string().trim().min(1, "Melding er påkrevd").max(2000);
 
 export const adminDisableListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -128,6 +130,88 @@ export const adminUnbanIp = createServerFn({ method: "POST" })
     await requireAdmin(context.supabase, context.userId);
     const { error } = await context.supabase.rpc("admin_unban_ip", {
       _id: data.id,
+    });
+    if (error) throw error;
+    return { ok: true };
+  });
+
+export const submitReport = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        listingId: uuid,
+        reason: z.string().trim().min(1, "Grunn er påkrevd").max(500),
+        comment: z.string().trim().max(1000).optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.rpc("submit_listing_report", {
+      _listing_id: data.listingId,
+      _reason: data.reason,
+      _comment: data.comment ?? null,
+    });
+    if (error) throw error;
+    return { ok: true };
+  });
+
+export const adminDisableListingWithMessage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ id: uuid, reason, message }).parse(i))
+  .handler(async ({ data, context }) => {
+    await requireAdminOrModeratorRole(context.supabase, context.userId);
+    const { error } = await context.supabase.rpc("admin_disable_listing_with_message", {
+      _id: data.id,
+      _reason: data.reason,
+      _message: data.message,
+    });
+    if (error) throw error;
+    return { ok: true };
+  });
+
+export const adminDeleteListing = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ id: uuid, message }).parse(i))
+  .handler(async ({ data, context }) => {
+    await requireAdminOrModeratorRole(context.supabase, context.userId);
+    const { error } = await context.supabase.rpc("admin_delete_listing", {
+      _id: data.id,
+      _message: data.message,
+    });
+    if (error) throw error;
+    return { ok: true };
+  });
+
+export const adminResolveReport = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ id: uuid }).parse(i))
+  .handler(async ({ data, context }) => {
+    await requireAdminOrModeratorRole(context.supabase, context.userId);
+    const { error } = await context.supabase.rpc("admin_resolve_report", { _id: data.id });
+    if (error) throw error;
+    return { ok: true };
+  });
+
+export const adminGrantModeratorRole = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ userId: uuid }).parse(i))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    const { error } = await context.supabase.rpc("admin_grant_moderator_role", {
+      _user_id: data.userId,
+    });
+    if (error) throw error;
+    return { ok: true };
+  });
+
+export const adminRevokeModeratorRole = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ userId: uuid }).parse(i))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    const { error } = await context.supabase.rpc("admin_revoke_moderator_role", {
+      _user_id: data.userId,
     });
     if (error) throw error;
     return { ok: true };

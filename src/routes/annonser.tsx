@@ -40,6 +40,7 @@ import {
 import { WtbListingCard } from "@/components/wtb-listing-card";
 import { useAuth } from "@/lib/use-auth";
 import { useIsNative } from "@/lib/use-is-native";
+import { NativePageHeader } from "@/components/native-page-header";
 import { hapticImpact, hapticNotification } from "@/lib/haptics";
 import { useScrollDirection } from "@/lib/use-scroll-direction";
 import { usePullToRefresh } from "@/lib/use-pull-to-refresh";
@@ -667,6 +668,7 @@ function BrowsePage() {
           />
         </div>
       )}
+      <NativePageHeader title="Annonser" hideBack />
       {!isNative && <h1 className="font-display text-3xl tracking-tight">Annonser</h1>}
 
       <div

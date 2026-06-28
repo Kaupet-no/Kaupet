@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { NativePageHeader } from "@/components/native-page-header";
 
 export const Route = createFileRoute("/personvern")({
   head: () => ({
@@ -22,6 +23,7 @@ export const Route = createFileRoute("/personvern")({
 function PersonvernPage() {
   return (
     <article className="mx-auto max-w-3xl px-4 py-12">
+      <NativePageHeader title="Personvern" />
       <header className="mb-10">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">Personvern</p>
         <h1 className="mt-2 font-display text-4xl leading-tight tracking-tight">

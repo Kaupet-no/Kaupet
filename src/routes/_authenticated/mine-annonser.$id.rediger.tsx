@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { NativePageHeader } from "@/components/native-page-header";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -412,6 +413,7 @@ function EditListingPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
+      <NativePageHeader title="Rediger annonse" backTo="/mine-annonser" />
       <h1 className="font-display text-3xl tracking-tight">Rediger annonse</h1>
       <p className="mt-1 text-muted-foreground">
         Oppdater detaljer og bilder. Endringene lagres når du trykker «Lagre endringer».

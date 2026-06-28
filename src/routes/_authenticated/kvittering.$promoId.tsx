@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { NativePageHeader } from "@/components/native-page-header";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { CheckCircle2, Loader2, AlertCircle } from "lucide-react";
@@ -101,6 +102,7 @@ function ReceiptPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:py-16">
+      <NativePageHeader title="Kvittering" backTo="/" />
       <div className="text-center">
         {isFailed ? (
           <AlertCircle className="mx-auto size-14 text-destructive" />

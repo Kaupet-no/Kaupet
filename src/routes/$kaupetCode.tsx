@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { z } from "zod";
 import { useIsNative } from "@/lib/use-is-native";
+import { NativePageHeader } from "@/components/native-page-header";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/use-auth";
@@ -427,6 +428,7 @@ function ListingDetailPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
+      <NativePageHeader title={data.title} />
       {backTarget.mode === "history" ? (
         <button
           type="button"

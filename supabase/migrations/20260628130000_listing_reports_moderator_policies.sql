@@ -208,6 +208,7 @@ REVOKE ALL ON FUNCTION public.admin_revoke_moderator_role FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.admin_revoke_moderator_role TO authenticated;
 
 -- Update admin_find_users_by_email to include is_moderator
+DROP FUNCTION IF EXISTS public.admin_find_users_by_email(text);
 CREATE OR REPLACE FUNCTION public.admin_find_users_by_email(_query text)
 RETURNS TABLE(
   user_id uuid,

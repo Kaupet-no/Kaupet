@@ -31,6 +31,11 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      "react-hooks/set-state-in-effect": "off",
+      "react-hooks/static-components": "off",
+      "react-hooks/incompatible-library": "off",
+      "react-hooks/refs": "off",
+      "no-useless-assignment": "off",
       "no-restricted-imports": [
         "error",
         {

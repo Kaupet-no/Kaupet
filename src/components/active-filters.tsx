@@ -1,3 +1,4 @@
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 
 import { hapticImpact } from "@/lib/haptics";
@@ -44,7 +45,10 @@ export function ActiveFilters({ search, categories, terms, effectiveCategories, 
     !search.includeFree ||
     hasLocation;
 
-  if (!hasAnyFilter) return null;
+  const [collapsed, setCollapsed] = useState(true);
+  const [overflowStart, setOverflowStart] = useState<number | null>(null);
+  const [measuring, setMeasuring] = useState(true);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const removeLine1Term = (term: string) => {
     onUpdate({ q: terms.filter((t) => t !== term).join(" ") });
@@ -78,38 +82,127 @@ export function ActiveFilters({ search, categories, terms, effectiveCategories, 
   else if (search.min != null) priceLabel = `Fra ${search.min} kr`;
   else if (search.max != null) priceLabel = `Til ${search.max} kr`;
 
-  return (
-    <div className="mt-3 flex flex-wrap items-center gap-2">
-      {hasLine1 && (
-        <div className="rounded-md border border-border p-2">
+  const allItems: { key: string; node: ReactNode }[] = [];
+
+  if (hasLine1) {
+    allItems.push({
+      key: "__q__",
+      node: (
+        <div key="__q__" className="rounded-md border border-border p-2">
           <TermGroupChips
             group={{ id: "q", mode: search.qMode, exclude: false, terms }}
             onRemoveTerm={removeLine1Term}
           />
         </div>
-      )}
-      {search.extraGroups.map((g) => (
+      ),
+    });
+  }
+  for (const g of search.extraGroups) {
+    allItems.push({
+      key: g.id,
+      node: (
         <div key={g.id} className="rounded-md border border-border p-2">
           <TermGroupChips group={g} onRemoveTerm={(t) => removeGroupTerm(g.id, t)} />
         </div>
-      ))}
-      {effectiveCategories.map((slug) => {
-        const name = categories.find((c) => c.slug === slug)?.name_nb ?? slug;
-        return <FilterChip key={slug} label={name} onRemove={() => removeCategory(slug)} />;
-      })}
-      {priceLabel && <FilterChip label={priceLabel} onRemove={removePrice} />}
-      {!search.includeFree && (
-        <FilterChip label="Uten gratis annonser" onRemove={removeIncludeFree} />
-      )}
-      {search.conditions.map((value) => {
-        const label = CONDITIONS.find((c) => c.value === value)?.label ?? value;
-        return <FilterChip key={value} label={label} onRemove={() => removeCondition(value)} />;
-      })}
-      {hasLocation && (
+      ),
+    });
+  }
+  for (const slug of effectiveCategories) {
+    const name = categories.find((c) => c.slug === slug)?.name_nb ?? slug;
+    allItems.push({
+      key: `cat_${slug}`,
+      node: <FilterChip key={`cat_${slug}`} label={name} onRemove={() => removeCategory(slug)} />,
+    });
+  }
+  if (priceLabel) {
+    allItems.push({
+      key: "__price__",
+      node: <FilterChip key="__price__" label={priceLabel} onRemove={removePrice} />,
+    });
+  }
+  if (!search.includeFree) {
+    allItems.push({
+      key: "__free__",
+      node: <FilterChip key="__free__" label="Uten gratis annonser" onRemove={removeIncludeFree} />,
+    });
+  }
+  for (const value of search.conditions) {
+    const label = CONDITIONS.find((c) => c.value === value)?.label ?? value;
+    allItems.push({
+      key: `cond_${value}`,
+      node: (
+        <FilterChip key={`cond_${value}`} label={label} onRemove={() => removeCondition(value)} />
+      ),
+    });
+  }
+  if (hasLocation) {
+    allItems.push({
+      key: "__loc__",
+      node: (
         <FilterChip
+          key="__loc__"
           label={`${search.loc || "Valgt sted"}${search.radius ? ` (${search.radius} km)` : ""}`}
           onRemove={removeLocation}
         />
+      ),
+    });
+  }
+
+  const itemCount = allItems.length;
+
+  useEffect(() => {
+    setMeasuring(true);
+    setCollapsed(true);
+  }, [itemCount]);
+
+  useEffect(() => {
+    const parent = containerRef.current?.parentElement;
+    if (!parent) return;
+    const observer = new ResizeObserver(() => {
+      setMeasuring(true);
+      setCollapsed(true);
+    });
+    observer.observe(parent);
+    return () => observer.disconnect();
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!measuring) return;
+    const el = containerRef.current;
+    if (!el) return;
+
+    const children = Array.from(el.children) as HTMLElement[];
+    const tops = children.map((c) => c.offsetTop);
+    const uniqueTops = [...new Set(tops)].sort((a, b) => a - b);
+
+    if (uniqueTops.length <= 2) {
+      setOverflowStart(null);
+    } else {
+      const thirdRowTop = uniqueTops[2];
+      const idx = tops.findIndex((t) => t >= thirdRowTop);
+      setOverflowStart(idx >= 0 ? idx : null);
+    }
+    setMeasuring(false);
+  }, [measuring]);
+
+  if (!hasAnyFilter) return null;
+
+  const showCollapsed = !measuring && collapsed && overflowStart !== null;
+  const visibleItems = showCollapsed ? allItems.slice(0, overflowStart) : allItems;
+  const hiddenCount = showCollapsed ? allItems.length - overflowStart! : 0;
+
+  return (
+    <div ref={containerRef} className="mt-3 flex flex-wrap items-center gap-2">
+      {visibleItems.map((item) => item.node)}
+      {showCollapsed && hiddenCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setCollapsed(false)}
+          className="inline-flex items-center rounded-full bg-muted px-2.5 py-1 text-xs hover:bg-muted/80"
+          aria-label={`Vis ${hiddenCount} flere filtre`}
+        >
+          +{hiddenCount}
+        </button>
       )}
     </div>
   );

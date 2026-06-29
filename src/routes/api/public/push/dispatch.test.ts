@@ -117,7 +117,13 @@ async function postPayload(body: unknown, secret = "test-secret") {
   return Route.options.server.handlers.POST({ request });
 }
 
-const SUB = { id: "sub-1", endpoint: "https://push.example/ep1", p256dh: "p256dh", auth: "auth" };
+const SUB = {
+  id: "sub-1",
+  platform: "web",
+  endpoint: "https://push.example/ep1",
+  p256dh: "p256dh",
+  auth: "auth",
+};
 
 beforeEach(() => {
   vi.resetModules();

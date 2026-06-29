@@ -16,6 +16,11 @@ const SaveSchema = z.discriminatedUnion("platform", [
     fcm_token: z.string().min(1).max(255),
     user_agent: z.string().max(255).optional().nullable(),
   }),
+  z.object({
+    platform: z.literal("ios"),
+    fcm_token: z.string().min(1).max(255),
+    user_agent: z.string().max(255).optional().nullable(),
+  }),
 ]);
 
 export const savePushSubscription = createServerFn({ method: "POST" })
@@ -41,7 +46,7 @@ export const savePushSubscription = createServerFn({ method: "POST" })
       const { error } = await supabase.from("push_subscriptions").upsert(
         {
           user_id: userId,
-          platform: "android",
+          platform: data.platform,
           fcm_token: data.fcm_token,
           user_agent: data.user_agent ?? null,
           last_used_at: new Date().toISOString(),

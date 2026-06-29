@@ -1,13 +1,14 @@
-// Native push helpers for the Android app (Capacitor + FCM). Mirrors the
-// Web Push flow in src/lib/push.ts, but stores an FCM registration token
-// instead of a Web Push subscription. iOS is intentionally not wired up yet
-// (no Apple Developer Program access — see README-CAPACITOR.md).
+// Native push helpers for the Android and iOS apps (Capacitor + FCM).
+// Mirrors the Web Push flow in src/lib/push.ts, but stores an FCM
+// registration token instead of a Web Push subscription.
+// iOS routes through FCM → APNs; the token and dispatch flow are identical
+// to Android — only the stored platform value differs.
 
 import { isNative, nativePlatform } from "@/lib/native";
 import { savePushSubscription, deletePushSubscription } from "./push.functions";
 
 export function nativePushSupported(): boolean {
-  return isNative() && nativePlatform() === "android";
+  return isNative() && (nativePlatform() === "android" || nativePlatform() === "ios");
 }
 
 export async function getNativePermissionState(): Promise<NotificationPermission | "unsupported"> {
@@ -20,6 +21,59 @@ export async function getNativePermissionState(): Promise<NotificationPermission
 }
 
 let registeredToken: string | null = null;
+
+// On Android the Capacitor plugin returns the FCM token directly in the
+// `registration` event (Firebase Android SDK handles the exchange).
+async function getAndroidFCMToken(
+  PushNotifications: Awaited<typeof import("@capacitor/push-notifications")>["PushNotifications"],
+): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const registrationHandle = PushNotifications.addListener("registration", (token) => {
+      void registrationHandle.then((h) => h.remove());
+      void errorHandle.then((h) => h.remove());
+      resolve(token.value);
+    });
+    const errorHandle = PushNotifications.addListener("registrationError", (err) => {
+      void registrationHandle.then((h) => h.remove());
+      void errorHandle.then((h) => h.remove());
+      reject(new Error(err.error || "Kunne ikke registrere enheten for push"));
+    });
+    void PushNotifications.register();
+  });
+}
+
+// On iOS the Capacitor plugin's `registration` event returns a raw APNs token,
+// not an FCM token. AppDelegate.swift forwards the APNs token to Firebase,
+// which exchanges it and injects the real FCM token into the WebView via
+// window.__kaupetFCMToken / the 'kaupet:fcmToken' custom event.
+async function getIOSFCMToken(
+  PushNotifications: Awaited<typeof import("@capacitor/push-notifications")>["PushNotifications"],
+): Promise<string> {
+  // Check if Firebase already delivered a token before this call.
+  const existing = (window as unknown as Record<string, unknown>).__kaupetFCMToken;
+  if (typeof existing === "string" && existing) return existing;
+
+  return new Promise<string>((resolve, reject) => {
+    const timeout = setTimeout(
+      () => reject(new Error("Tidsavbrudd: FCM-token ikke mottatt fra Firebase")),
+      15_000,
+    );
+
+    const onToken = (e: Event) => {
+      clearTimeout(timeout);
+      resolve((e as CustomEvent<string>).detail);
+    };
+    window.addEventListener("kaupet:fcmToken", onToken, { once: true });
+
+    // Register with APNs — AppDelegate forwards the token to Firebase,
+    // which fires the MessagingDelegate and triggers the custom event above.
+    void PushNotifications.register().catch((err: unknown) => {
+      clearTimeout(timeout);
+      window.removeEventListener("kaupet:fcmToken", onToken);
+      reject(err instanceof Error ? err : new Error(String(err)));
+    });
+  });
+}
 
 export async function subscribeNative(): Promise<void> {
   if (!nativePushSupported()) {
@@ -36,23 +90,14 @@ export async function subscribeNative(): Promise<void> {
     throw new Error("Tillatelse til varslinger ble ikke gitt");
   }
 
-  const token = await new Promise<string>((resolve, reject) => {
-    const registrationHandle = PushNotifications.addListener("registration", (token) => {
-      void registrationHandle.then((h) => h.remove());
-      void errorHandle.then((h) => h.remove());
-      resolve(token.value);
-    });
-    const errorHandle = PushNotifications.addListener("registrationError", (err) => {
-      void registrationHandle.then((h) => h.remove());
-      void errorHandle.then((h) => h.remove());
-      reject(new Error(err.error || "Kunne ikke registrere enheten for push"));
-    });
-    void PushNotifications.register();
-  });
+  const token = await (nativePlatform() === "ios"
+    ? getIOSFCMToken(PushNotifications)
+    : getAndroidFCMToken(PushNotifications));
 
   registeredToken = token;
+  const platform = nativePlatform() === "ios" ? "ios" : "android";
   await savePushSubscription({
-    data: { platform: "android", fcm_token: token, user_agent: null },
+    data: { platform, fcm_token: token, user_agent: null },
   });
 }
 

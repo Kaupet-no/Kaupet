@@ -47,6 +47,8 @@ test-results/
 ios/App/Pods/
 ios/App/build/
 ios/App/Podfile.lock
+ios/App/App/GoogleService-Info.plist
+ios/App/GoogleService-Info.plist
 android/.gradle/
 android/app/build/
 android/build/

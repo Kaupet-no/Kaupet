@@ -47,5 +47,9 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Kaupet bruker posisjonen din for å vise annonser i nærheten.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Kaupet bruker posisjonen din for å vise annonser i nærheten.</string>
 </dict>
 </plist>

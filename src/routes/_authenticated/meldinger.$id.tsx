@@ -242,7 +242,7 @@ function ConversationPage() {
       if (error) throw error;
       await supabase
         .from("conversations")
-        .update({ last_message_at: new Date().toISOString() })
+        .update({ last_message_at: data.created_at })
         .eq("id", id);
       return data as Message;
     },

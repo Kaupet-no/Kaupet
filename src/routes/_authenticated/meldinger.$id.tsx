@@ -490,7 +490,9 @@ function ConversationPage() {
         >
           {(messages ?? []).length === 0 ? (
             <p className="py-10 text-center text-sm text-muted-foreground">
-              Send den første meldingen for å starte samtalen.
+              {conv?.other?.display_name
+                ? `Send den første meldingen til ${conv.other.display_name}${conv.listing?.title ? ` om «${conv.listing.title}»` : ""}.`
+                : "Send den første meldingen for å starte samtalen."}
             </p>
           ) : (
             renderWithDayDividers(

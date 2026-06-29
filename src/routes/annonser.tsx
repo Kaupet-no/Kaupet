@@ -935,11 +935,27 @@ function BrowsePage() {
               <div className="rounded-xl border border-dashed border-border bg-surface p-12 text-center">
                 <p className="text-lg font-medium">Ingen annonser funnet</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Prøv et bredere søk eller øk radiusen.
+                  {search.q && effectiveCategories.length > 0
+                    ? `Ingen treff for «${search.q}» i valgt kategori. Prøv å søke i alle kategorier eller bruk andre søkeord.`
+                    : search.q
+                      ? `Ingen treff for «${search.q}». Prøv andre søkeord eller fjern filtre.`
+                      : effectiveCategories.length > 0
+                        ? "Ingen annonser i valgt kategori. Prøv å velge en bredere kategori."
+                        : "Prøv et bredere søk eller øk radiusen."}
                 </p>
-                <Button variant="outline" className="mt-4" onClick={resetFilters}>
-                  Nullstill filtre
-                </Button>
+                <div className="mt-4 flex flex-wrap justify-center gap-2">
+                  {effectiveCategories.length > 0 && (
+                    <Button
+                      variant="outline"
+                      onClick={() => updateSearch({ category: "", categories: [] })}
+                    >
+                      Fjern kategorifilter
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={resetFilters}>
+                    Nullstill alle filtre
+                  </Button>
+                </div>
               </div>
             ) : (
               <div

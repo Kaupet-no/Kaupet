@@ -300,7 +300,7 @@ function InboxPage() {
       <div className="mt-8 space-y-3">
         {isLoading ? (
           <div className="space-y-3">
-            {Array.from({ length: 4 }).map((_, i) => (
+            {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="h-20 animate-pulse rounded-xl bg-muted" />
             ))}
           </div>

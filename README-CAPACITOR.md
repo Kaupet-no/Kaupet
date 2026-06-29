@@ -34,17 +34,19 @@ en innebygd offline-side (`capacitor-shell/offline.html`).
 ## Ikke med i POC
 
 - Publisering i App Store / Google Play
-- Native push-varsler på iOS (krever APNs + Apple Developer-tilgang)
 - Universal Links / App Links
 - Google OAuth-login i appen (bruk e-post + passord)
 
-## Native push-varsler (Android / FCM)
+## Native push-varsler (Android og iOS / FCM)
 
-Android-appen bruker `@capacitor/push-notifications` + Firebase Cloud
+Begge native apper bruker `@capacitor/push-notifications` + Firebase Cloud
 Messaging, som et tillegg til det eksisterende web push-systemet (samme
-fire varslingstyper: meldinger, lagrede søk, prisfall, solgt). Token lagres i
-`public.push_subscriptions` (med `platform = 'android'`), og dispatch skjer
-fra `src/lib/fcm.server.ts` via `firebase-admin`.
+fire varslingstyper: meldinger, lagrede søk, prisfall, solgt). iOS ruter
+via FCM → APNs; koden er identisk for begge plattformer. Token lagres i
+`public.push_subscriptions` (med `platform = 'android'` eller `'ios'`), og
+dispatch skjer fra `src/lib/fcm.server.ts`.
+
+### Android
 
 For at dette skal virke i en build trengs:
 
@@ -58,6 +60,24 @@ For at dette skal virke i en build trengs:
 
 Uten `google-services.json` bygger appen fortsatt fint, men Google
 Services-pluginet aktiveres ikke og native push vil ikke fungere på enheten.
+
+### iOS
+
+1. I Firebase Console: legg til en iOS-app med bundle ID `no.kaupet.app`
+   (Project settings → Add app → Apple).
+2. Last ned `GoogleService-Info.plist` og legg den i `ios/App/App/` (ikke
+   commit — den er miljøspesifikk).
+3. Last opp APNs Auth Key til Firebase: Project settings → Cloud Messaging
+   → Apple app configuration → APNs Authentication Key.
+   - Nøkkelen opprettes i Apple Developer Console under
+     Certificates, Identifiers & Profiles → Keys (type: Apple Push
+     Notifications service (APNs)).
+4. I Xcode: åpne `ios/App/App.xcodeproj`, velg `App`-target →
+   Signing & Capabilities → `+ Capability` → legg til
+   **Push Notifications**.
+5. Kjør `bunx cap sync ios` så Capacitor plukker opp `GoogleService-Info.plist`.
+
+Etter dette fungerer push-varsler på iOS på nøyaktig samme måte som Android.
 
 ---
 

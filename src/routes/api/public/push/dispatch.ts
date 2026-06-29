@@ -64,16 +64,17 @@ async function dispatchPush(params: {
 
   const webSubs = subs.filter(
     (s): s is typeof s & { endpoint: string; p256dh: string; auth: string } =>
-      s.platform !== "android" && !!s.endpoint && !!s.p256dh && !!s.auth,
+      s.platform === "web" && !!s.endpoint && !!s.p256dh && !!s.auth,
   );
-  const androidSubs = subs.filter(
-    (s): s is typeof s & { fcm_token: string } => s.platform === "android" && !!s.fcm_token,
+  const fcmSubs = subs.filter(
+    (s): s is typeof s & { fcm_token: string } =>
+      (s.platform === "android" || s.platform === "ios") && !!s.fcm_token,
   );
 
-  if (androidSubs.length > 0) {
+  if (fcmSubs.length > 0) {
     const { sendFcmNotifications } = await import("@/lib/fcm.server");
     await sendFcmNotifications({
-      tokens: androidSubs.map((s) => ({ id: s.id, fcm_token: s.fcm_token })),
+      tokens: fcmSubs.map((s) => ({ id: s.id, fcm_token: s.fcm_token })),
       title,
       body,
       url,

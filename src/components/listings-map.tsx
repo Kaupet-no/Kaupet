@@ -292,6 +292,7 @@ function PopupCard({ listing }: { listing: MapListing }) {
       <Link
         to="/$kaupetCode"
         params={{ kaupetCode: listing.kaupet_code }}
+        state={{ fromSearch: true } as never}
         className="mt-2 inline-block text-xs font-medium text-primary hover:underline"
       >
         Se annonse →

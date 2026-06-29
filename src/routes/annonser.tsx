@@ -972,6 +972,7 @@ function BrowsePage() {
                     highlighted={hoveredId === l.id || activeId === l.id}
                     onHoverChange={setHoveredId}
                     compact={isNative && viewMode === "list"}
+                    linkState={{ fromSearch: true }}
                   />
                 ))}
               </div>

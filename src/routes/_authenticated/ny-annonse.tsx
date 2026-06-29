@@ -243,6 +243,7 @@ function NewListingPage() {
     null,
   );
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [draftSaveError, setDraftSaveError] = useState(false);
   const [hasDraftData, setHasDraftData] = useState<Record<string, unknown> | null>(null);
   const [draftId, setDraftId] = useState<string | null>(null);
   const draftSaveInProgress = useRef(false);
@@ -423,13 +424,15 @@ function NewListingPage() {
         },
       });
       setDraftId(result.id);
+      setLastSaved(new Date());
+      setDraftSaveError(false);
       try {
         localStorage.setItem(DRAFT_ID_KEY, result.id);
       } catch {
         // ignore
       }
     } catch {
-      // Silent — draft save is best-effort
+      setDraftSaveError(true);
     } finally {
       draftSaveInProgress.current = false;
     }
@@ -869,7 +872,11 @@ function NewListingPage() {
       <div className="sticky top-0 z-10 -mx-4 bg-background/95 px-4 py-3 backdrop-blur border-b border-border mt-4">
         <div className="flex items-center justify-between">
           <StepIndicator step={step} native={native} />
-          {savedTimeLabel && <p className="text-xs text-muted-foreground">{savedTimeLabel}</p>}
+          {draftSaveError ? (
+            <p className="text-xs text-destructive">Utkast ble ikke lagret</p>
+          ) : (
+            savedTimeLabel && <p className="text-xs text-muted-foreground">{savedTimeLabel}</p>
+          )}
         </div>
       </div>
 
@@ -1375,12 +1382,17 @@ function NewListingPage() {
               )}
             </section>
 
-            {uploadProgress && (
+            {mutation.isPending && (
               <div className="space-y-1.5">
                 <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
-                  Laster opp bilde {uploadProgress.done} av {uploadProgress.total}…
+                  {uploadProgress
+                    ? `Laster opp bilde ${uploadProgress.done} av ${uploadProgress.total}…`
+                    : "Forbereder opplasting…"}
                 </p>
-                <Progress value={(uploadProgress.done / uploadProgress.total) * 100} />
+                <Progress
+                  value={uploadProgress ? (uploadProgress.done / uploadProgress.total) * 100 : null}
+                  className={uploadProgress ? "" : "animate-pulse"}
+                />
               </div>
             )}
 
@@ -1934,12 +1946,17 @@ function NewListingPage() {
               </div>
             </section>
 
-            {uploadProgress && (
+            {mutation.isPending && (
               <div className="space-y-1.5">
                 <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
-                  Laster opp bilde {uploadProgress.done} av {uploadProgress.total}…
+                  {uploadProgress
+                    ? `Laster opp bilde ${uploadProgress.done} av ${uploadProgress.total}…`
+                    : "Forbereder opplasting…"}
                 </p>
-                <Progress value={(uploadProgress.done / uploadProgress.total) * 100} />
+                <Progress
+                  value={uploadProgress ? (uploadProgress.done / uploadProgress.total) * 100 : null}
+                  className={uploadProgress ? "" : "animate-pulse"}
+                />
               </div>
             )}
 

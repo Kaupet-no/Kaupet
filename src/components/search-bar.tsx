@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronLeft,
@@ -67,6 +67,7 @@ export function SearchBar({
   const [catOpen, setCatOpen] = useState(false);
   const [drillParentId, setDrillParentId] = useState<string | null>(null);
   const [qFocused, setQFocused] = useState(false);
+  const suggestionRef = useRef<HTMLButtonElement>(null);
 
   const tree = useMemo(() => buildTree(categories), [categories]);
   const hasLocation = location.lat != null && location.lng != null;
@@ -89,7 +90,7 @@ export function SearchBar({
       }}
     >
       <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1 shadow-sm transition-shadow focus-within:shadow-md hover:shadow-md">
-        <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="relative flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto [scrollbar-width:none] after:pointer-events-none after:absolute after:right-0 after:top-0 after:h-full after:w-8 after:bg-gradient-to-l after:from-card after:to-transparent [&::-webkit-scrollbar]:hidden">
           {/* Hva */}
           <div className="relative flex min-w-[120px] flex-1 items-center gap-2 rounded-full px-4 py-1.5">
             <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
@@ -98,13 +99,31 @@ export function SearchBar({
               onChange={(e) => onQChange(e.target.value)}
               onFocus={() => setQFocused(true)}
               onBlur={() => setQFocused(false)}
+              onKeyDown={(e) => {
+                if ((e.key === "ArrowDown" || e.key === "Tab") && qSuggestion && !e.shiftKey) {
+                  if (suggestionRef.current) {
+                    e.preventDefault();
+                    suggestionRef.current.focus();
+                  }
+                }
+              }}
               placeholder="Hva leter du etter?"
-              className="h-8 border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
+              className="h-8 border-0 bg-transparent p-0 shadow-none focus-visible:ring-0 focus-visible:outline-none"
+              aria-autocomplete="list"
+              aria-expanded={!!(qFocused && qSuggestion)}
+              aria-haspopup="listbox"
             />
             {qFocused && qSuggestion && (
-              <div className="absolute left-0 top-[calc(100%+0.5rem)] z-50 w-[min(320px,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-card p-1 shadow-md">
+              <div
+                role="listbox"
+                aria-label="Kategorisøk"
+                className="absolute left-0 top-[calc(100%+0.5rem)] z-50 w-[min(320px,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-card p-1 shadow-md"
+              >
                 <button
+                  ref={suggestionRef}
                   type="button"
+                  role="option"
+                  aria-selected="false"
                   // Mouse-down fires before the input's blur, so the click
                   // registers instead of being lost when focus leaves the field.
                   onMouseDown={(e) => {
@@ -112,7 +131,16 @@ export function SearchBar({
                     onSelectedChange([qSuggestion.slug]);
                     onQChange("");
                   }}
-                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onSelectedChange([qSuggestion.slug]);
+                      onQChange("");
+                    } else if (e.key === "Escape") {
+                      setQFocused(false);
+                    }
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
                 >
                   <FolderOpen className="size-4 shrink-0 text-muted-foreground" />
                   <span>

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Trash2 } from "lucide-react";
+import { CheckCheck, Trash2 } from "lucide-react";
 
 import {
   AlertDialog,
@@ -98,7 +98,7 @@ export function renderWithDayDividers(
         >
           <p className="whitespace-pre-wrap break-words">{deleted ? "Melding slettet" : m.body}</p>
           <p
-            className={`mt-1 text-[10px] ${
+            className={`mt-1 text-xs ${
               mine && !deleted ? "text-primary-foreground/70" : "text-muted-foreground"
             }`}
           >
@@ -112,8 +112,12 @@ export function renderWithDayDividers(
     );
     if (showReadReceipt) {
       out.push(
-        <p key={`r-${m.id}`} className="mr-1 text-right text-[10px] text-muted-foreground">
-          Lest
+        <p
+          key={`r-${m.id}`}
+          className="mr-1 flex items-center justify-end gap-0.5 text-xs text-primary"
+        >
+          <CheckCheck className="size-3.5" aria-hidden />
+          <span>Lest</span>
         </p>,
       );
     }

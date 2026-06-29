@@ -101,7 +101,7 @@ export function AppBottomNav() {
               {isOnNewAdPage || (native && adPickerOpen) ? (
                 <X key="x" className="size-8 animate-[fab-icon-in_0.18s_ease-out]" />
               ) : (
-                <Plus key="plus" className="size-8 animate-[fab-icon-in_0.18s_ease-out]" />
+                <Plus key="plus" className="size-8 animate-[fab-icon-in-reverse_0.18s_ease-out]" />
               )}
             </button>
           ) : (

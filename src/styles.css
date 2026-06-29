@@ -183,6 +183,17 @@
   }
 }
 
+@keyframes fab-icon-in-reverse {
+  from {
+    transform: rotate(45deg) scale(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: rotate(0deg) scale(1);
+    opacity: 1;
+  }
+}
+
 @keyframes swipe-hint {
   0%,
   100% {

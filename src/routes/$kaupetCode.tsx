@@ -1,4 +1,11 @@
-import { createFileRoute, Link, notFound, useNavigate, useRouter } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Link,
+  notFound,
+  useNavigate,
+  useRouter,
+  useRouterState,
+} from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { reconcilePromotionPayment } from "@/lib/promotions.functions";
@@ -179,6 +186,9 @@ function ListingDetailPage() {
   const [promoteOpen, setPromoteOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [backTarget, setBackTarget] = useState<BackTarget>({ mode: "default" });
+  const fromSearch = useRouterState({
+    select: (s) => (s.location.state as { fromSearch?: boolean } | null)?.fromSearch === true,
+  });
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [mapOverlayOpen, setMapOverlayOpen] = useState(false);
   const closeLightbox = useCallback(() => setLightboxIndex(null), []);
@@ -187,14 +197,14 @@ function ListingDetailPage() {
 
   useEffect(() => {
     const last = readLastSearchContext();
-    if (router.history.canGoBack() && last) {
+    if (router.history.canGoBack() && last && fromSearch) {
       setBackTarget({ mode: "history", label: last.label });
     } else if (last) {
       setBackTarget({ mode: "search", label: last.label, search: last.search });
     } else {
       setBackTarget({ mode: "default" });
     }
-  }, [router]);
+  }, [router, fromSearch]);
 
   const reconcilePromotion = useServerFn(reconcilePromotionPayment);
   useEffect(() => {

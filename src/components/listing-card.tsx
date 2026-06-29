@@ -24,9 +24,16 @@ type Props = {
   highlighted?: boolean;
   onHoverChange?: (id: string | null) => void;
   compact?: boolean;
+  linkState?: Record<string, unknown>;
 };
 
-export function ListingCard({ listing, highlighted, onHoverChange, compact = false }: Props) {
+export function ListingCard({
+  listing,
+  highlighted,
+  onHoverChange,
+  compact = false,
+  linkState,
+}: Props) {
   const isNative = useIsNative();
   const [imgUrl, setImgUrl] = useState<string | null>(null);
 
@@ -52,6 +59,7 @@ export function ListingCard({ listing, highlighted, onHoverChange, compact = fal
       <Link
         to="/$kaupetCode"
         params={{ kaupetCode: listing.kaupet_code }}
+        state={linkState}
         className={`${linkClass} flex gap-3 p-2`}
       >
         <div className="relative size-20 shrink-0 overflow-hidden rounded-lg bg-muted">
@@ -82,6 +90,7 @@ export function ListingCard({ listing, highlighted, onHoverChange, compact = fal
     <Link
       to="/$kaupetCode"
       params={{ kaupetCode: listing.kaupet_code }}
+      state={linkState}
       onMouseEnter={onHoverChange ? () => onHoverChange(listing.id) : undefined}
       onMouseLeave={onHoverChange ? () => onHoverChange(null) : undefined}
       className={linkClass}

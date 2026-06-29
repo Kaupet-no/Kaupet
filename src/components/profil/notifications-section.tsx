@@ -2,11 +2,12 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
-import { Bell, Loader2 } from "lucide-react";
+import { Bell, Loader2, Monitor, Smartphone, Trash2 } from "lucide-react";
 
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   getCurrentEndpoint,
   getPermissionState,
@@ -21,8 +22,54 @@ import {
   subscribeNative,
   unsubscribeNative,
 } from "@/lib/native-push";
-import { getNotificationPreferences, updateNotificationPreferences } from "@/lib/push.functions";
+import {
+  deletePushSubscriptionById,
+  getNotificationPreferences,
+  getUserPushSubscriptions,
+  updateNotificationPreferences,
+} from "@/lib/push.functions";
 import { formatErrorMessage } from "@/lib/errors";
+
+function parseUserAgent(ua: string | null, platform: string): string {
+  if (!ua) return platform === "android" ? "Android-appen" : "Ukjent nettleser";
+  if (platform === "android") return "Android-appen";
+  const browser = /Edg\//.test(ua)
+    ? "Edge"
+    : /OPR\//.test(ua)
+      ? "Opera"
+      : /Chrome\//.test(ua)
+        ? "Chrome"
+        : /Firefox\//.test(ua)
+          ? "Firefox"
+          : /Safari\//.test(ua)
+            ? "Safari"
+            : "Nettleser";
+  const os = /Windows/.test(ua)
+    ? "Windows"
+    : /Macintosh/.test(ua)
+      ? "Mac"
+      : /Linux/.test(ua)
+        ? "Linux"
+        : /Android/.test(ua)
+          ? "Android"
+          : /iPhone|iPad/.test(ua)
+            ? "iOS"
+            : null;
+  return os ? `${browser} på ${os}` : browser;
+}
+
+function formatRelativeTime(iso: string | null): string {
+  if (!iso) return "Aldri";
+  const diff = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 2) return "Akkurat nå";
+  if (minutes < 60) return `${minutes} min siden`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} t siden`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} d siden`;
+  return new Date(iso).toLocaleDateString("nb-NO", { day: "numeric", month: "short" });
+}
 
 export function NotificationsSection() {
   const queryClient = useQueryClient();
@@ -47,10 +94,28 @@ export function NotificationsSection() {
 
   const getPrefs = useServerFn(getNotificationPreferences);
   const updatePrefs = useServerFn(updateNotificationPreferences);
+  const getDevices = useServerFn(getUserPushSubscriptions);
+  const deleteDevice = useServerFn(deletePushSubscriptionById);
 
   const { data: prefs, isLoading } = useQuery({
     queryKey: ["notification-preferences"],
     queryFn: () => getPrefs({}),
+  });
+
+  const { data: devices, isLoading: devicesLoading } = useQuery({
+    queryKey: ["push-subscriptions"],
+    queryFn: () => getDevices({}),
+  });
+
+  const removeDeviceMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await deleteDevice({ data: { id } });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["push-subscriptions"] });
+      showSuccessToast("Enheten er fjernet");
+    },
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke fjerne enheten")),
   });
 
   useEffect(() => {
@@ -161,6 +226,70 @@ export function NotificationsSection() {
               </div>
             )}
           </div>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-border bg-card p-6">
+        <h2 className="text-lg font-medium">Enheter med push-varsler</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Alle enheter der du har aktivert push-varsler. Fjern enheter du ikke lenger bruker.
+        </p>
+        <div className="mt-4">
+          {devicesLoading ? (
+            <Loader2 className="size-5 animate-spin text-muted-foreground" />
+          ) : !devices || devices.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Ingen enheter med push-varsler.</p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {devices.map((device) => {
+                const isThisDevice =
+                  device.platform === "android"
+                    ? endpoint !== null && device.fcm_token === endpoint
+                    : endpoint !== null && device.endpoint === endpoint;
+                return (
+                  <li key={device.id} className="flex items-center gap-3 py-3">
+                    {device.platform === "android" ? (
+                      <Smartphone className="size-5 shrink-0 text-muted-foreground" />
+                    ) : (
+                      <Monitor className="size-5 shrink-0 text-muted-foreground" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="truncate text-sm font-medium">
+                          {parseUserAgent(device.user_agent, device.platform)}
+                        </span>
+                        {isThisDevice && (
+                          <Badge variant="secondary" className="shrink-0 text-xs">
+                            Denne enheten
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Sist aktiv: {formatRelativeTime(device.last_used_at)}
+                      </p>
+                    </div>
+                    {!isThisDevice && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 text-muted-foreground hover:text-destructive"
+                        disabled={removeDeviceMutation.isPending}
+                        onClick={() => removeDeviceMutation.mutate(device.id)}
+                        aria-label="Fjern enhet"
+                      >
+                        {removeDeviceMutation.variables === device.id &&
+                        removeDeviceMutation.isPending ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="size-4" />
+                        )}
+                      </Button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       </div>
 

@@ -2,20 +2,12 @@ import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Search } from "lucide-react";
+import { z } from "zod";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
+import { CategoryFilterFields } from "@/components/category-filter-fields";
 import { getCategoryIcon } from "@/lib/category-icons";
 import type { Category } from "@/lib/categories";
 import {
@@ -25,14 +17,25 @@ import {
   type AttributeFilterValue,
 } from "@/lib/category-filters";
 
+// `f` lets callers (e.g. the landing page's category picker) deep-link
+// preselected filter values into this page; it's read once on mount below,
+// not kept in sync with the URL as filters change.
+const searchSchema = z.object({
+  f: z.record(z.string(), z.any()).optional(),
+});
+
 export const Route = createFileRoute("/kategori/$slug")({
+  validateSearch: searchSchema,
   head: () => ({ meta: [{ title: "Kategori — Kaupet.no" }] }),
   component: CategoryPage,
 });
 
 function CategoryPage() {
   const { slug } = Route.useParams();
-  const [filterValues, setFilterValues] = useState<Record<string, AttributeFilterValue>>({});
+  const { f: initialFilters } = Route.useSearch();
+  const [filterValues, setFilterValues] = useState<Record<string, AttributeFilterValue>>(
+    () => (initialFilters as Record<string, AttributeFilterValue>) ?? {},
+  );
 
   const { data: categories } = useQuery({
     queryKey: ["categories", "with-color"],
@@ -159,107 +162,18 @@ function CategoryPage() {
         {filters.length > 0 && (
           <aside className="mb-6 space-y-5 md:mb-0">
             <p className="text-sm font-medium">Filtrer</p>
-            {filters.map((f) => {
-              const current = filterValues[f.key];
-              const set = (v: AttributeFilterValue | undefined) =>
+            <CategoryFilterFields
+              filters={filters}
+              values={filterValues}
+              onChange={(key, v) =>
                 setFilterValues((prev) => {
                   const next = { ...prev };
-                  if (v === undefined) delete next[f.key];
-                  else next[f.key] = v;
+                  if (v === undefined) delete next[key];
+                  else next[key] = v;
                   return next;
-                });
-
-              if (f.type === "boolean") {
-                return (
-                  <label key={f.id} className="flex items-center gap-2 text-sm">
-                    <Checkbox
-                      checked={current?.kind === "boolean" ? current.value : false}
-                      onCheckedChange={(c) =>
-                        set(c === true ? { kind: "boolean", value: true } : undefined)
-                      }
-                    />
-                    {f.label_nb}
-                  </label>
-                );
+                })
               }
-              if (f.type === "select" || f.type === "multiselect") {
-                // Both rendered as single-select dropdowns here for simplicity.
-                return (
-                  <div key={f.id} className="space-y-2">
-                    <Label>{f.label_nb}</Label>
-                    <Select
-                      value={current?.kind === "select" ? current.value : "__all__"}
-                      onValueChange={(v) =>
-                        set(v === "__all__" ? undefined : { kind: "select", value: v })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__all__">Alle</SelectItem>
-                        {(f.options ?? []).map((o) => (
-                          <SelectItem key={o.value} value={o.value}>
-                            {o.label_nb}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                );
-              }
-              // number / range / text → min/max for numeric, single field for text
-              if (f.type === "text") {
-                return (
-                  <div key={f.id} className="space-y-2">
-                    <Label>{f.label_nb}</Label>
-                    <Input
-                      value={current?.kind === "text" ? current.value : ""}
-                      onChange={(e) =>
-                        set(e.target.value ? { kind: "text", value: e.target.value } : undefined)
-                      }
-                    />
-                  </div>
-                );
-              }
-              const range =
-                current?.kind === "range" ? current : { min: undefined, max: undefined };
-              const updateRange = (patch: { min?: number; max?: number }) => {
-                const merged = { min: range.min, max: range.max, ...patch };
-                if (merged.min === undefined && merged.max === undefined) return set(undefined);
-                set({ kind: "range", min: merged.min, max: merged.max });
-              };
-              return (
-                <div key={f.id} className="space-y-2">
-                  <Label>
-                    {f.label_nb}
-                    {f.unit ? ` (${f.unit})` : ""}
-                  </Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      placeholder="Fra"
-                      value={range.min ?? ""}
-                      onChange={(e) =>
-                        updateRange({
-                          min: e.target.value === "" ? undefined : Number(e.target.value),
-                        })
-                      }
-                    />
-                    <Input
-                      type="number"
-                      placeholder="Til"
-                      value={range.max ?? ""}
-                      onChange={(e) =>
-                        updateRange({
-                          max: e.target.value === "" ? undefined : Number(e.target.value),
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-              );
-            })}
+            />
             {Object.keys(filterValues).length > 0 && (
               <Button variant="outline" size="sm" onClick={() => setFilterValues({})}>
                 Nullstill filtre

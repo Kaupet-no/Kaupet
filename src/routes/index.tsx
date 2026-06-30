@@ -37,6 +37,13 @@ import { getCategoryIcon } from "@/lib/category-icons";
 import { findCategorySuggestion } from "@/lib/categories";
 import { useTypewriterText } from "@/lib/use-typewriter-text";
 import { SEARCH_SUGGESTIONS } from "@/lib/search-suggestions";
+import { categoryHeadingFontStack } from "@/lib/category-fonts";
+import { CategoryFilterFields } from "@/components/category-filter-fields";
+import {
+  effectiveFiltersForCategory,
+  normalizeFilter,
+  type AttributeFilterValue,
+} from "@/lib/category-filters";
 
 type CategoryRow = {
   id: string;
@@ -45,6 +52,7 @@ type CategoryRow = {
   parent_id: string | null;
   icon: string | null;
   color: string | null;
+  heading_font: string | null;
 };
 
 const searchSchema = z.object({
@@ -155,11 +163,23 @@ function WebLanding() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
-        .select("id, slug, name_nb, parent_id, icon, color")
+        .select("id, slug, name_nb, parent_id, icon, color, heading_font")
         .order("sort_order")
         .order("name_nb");
       if (error) throw error;
       return (data ?? []) as CategoryRow[];
+    },
+  });
+
+  const { data: allFilters } = useQuery({
+    queryKey: ["category-filters", "all"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("category_filters")
+        .select("id, category_id, key, label_nb, type, unit, options, sort_order")
+        .order("sort_order");
+      if (error) throw error;
+      return (data ?? []).map(normalizeFilter);
     },
   });
 
@@ -180,10 +200,23 @@ function WebLanding() {
     }
     return map;
   }, [categories]);
+  const categoriesById = useMemo(() => {
+    const map = new Map<string, CategoryRow>();
+    for (const c of categories ?? []) map.set(c.id, c);
+    return map;
+  }, [categories]);
 
   const [activeCategory, setActiveCategory] = useState<CategoryRow | null>(null);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const [filterValues, setFilterValues] = useState<Record<string, AttributeFilterValue>>({});
   const subcatRef = useRef<HTMLDivElement>(null);
+
+  // Filters configured for the active main category, shown below its
+  // subcategories so the user can narrow the search before browsing.
+  const activeFilters = useMemo(
+    () => effectiveFiltersForCategory(activeCategory?.id ?? null, allFilters ?? [], categoriesById),
+    [activeCategory, allFilters, categoriesById],
+  );
 
   const [qFocused, setQFocused] = useState(false);
   const typewriterPlaceholder = useTypewriterText(SEARCH_SUGGESTIONS, {
@@ -212,6 +245,7 @@ function WebLanding() {
       return;
     }
     setActiveCategory(cat);
+    setFilterValues({});
     // Scroll so the newly revealed subcategories are visible after the slide-down.
     requestAnimationFrame(() => {
       setTimeout(
@@ -265,13 +299,29 @@ function WebLanding() {
           }}
         />
         <div className="relative z-10 mx-auto max-w-2xl px-4 py-16 text-center md:py-24">
-          <h1 className="font-display text-5xl leading-[1.05] tracking-tight md:text-6xl">
-            Gi tingene dine <span className="italic text-accent">et nytt liv</span>.
-          </h1>
-          <p className="mx-auto mt-4 max-w-lg text-lg text-muted-foreground">
-            Kaupet.no er en norsk markedsplass for brukte ting mellom privatpersoner. Ingen
-            mellomledd, ingen reklame.
-          </p>
+          {/* Hero text and the category heading are mutually exclusive, each
+              sliding in from the direction matching the background tint and
+              the subcategory grid below, so picking a category visibly moves
+              the page into a more focused area. */}
+          {activeCategory ? (
+            <h1
+              key={activeCategory.id}
+              className="text-5xl leading-[1.05] tracking-tight duration-700 animate-in fade-in slide-in-from-right-4 md:text-6xl"
+              style={{ fontFamily: categoryHeadingFontStack(activeCategory.heading_font) }}
+            >
+              {activeCategory.name_nb}
+            </h1>
+          ) : (
+            <div key="hero" className="duration-700 animate-in fade-in slide-in-from-left-4">
+              <h1 className="font-display text-5xl leading-[1.05] tracking-tight md:text-6xl">
+                Gi tingene dine <span className="italic text-accent">et nytt liv</span>.
+              </h1>
+              <p className="mx-auto mt-4 max-w-lg text-lg text-muted-foreground">
+                Kaupet.no er en norsk markedsplass for brukte ting mellom privatpersoner. Ingen
+                mellomledd, ingen reklame.
+              </p>
+            </div>
+          )}
 
           <form onSubmit={submitSearch} className="mx-auto mt-8 flex max-w-lg gap-2">
             <div className="relative flex-1">
@@ -317,7 +367,10 @@ function WebLanding() {
             open={categoriesOpen}
             onOpenChange={(o) => {
               setCategoriesOpen(o);
-              if (!o) setActiveCategory(null);
+              if (!o) {
+                setActiveCategory(null);
+                setFilterValues({});
+              }
             }}
           >
             <div className="flex justify-center">
@@ -334,22 +387,14 @@ function WebLanding() {
             </div>
 
             <CollapsibleContent>
-              <div
-                ref={subcatRef}
-                className="mx-auto mt-3 max-w-xl rounded-2xl border border-border bg-card p-4 text-left shadow-sm"
-                style={
-                  activeCategory?.color
-                    ? {
-                        borderColor: activeCategory.color,
-                        boxShadow: `0 0 0 1px ${activeCategory.color}`,
-                      }
-                    : undefined
-                }
-              >
+              <div ref={subcatRef} className="mx-auto mt-3 max-w-xl text-left">
                 {activeCategory && (
                   <button
                     type="button"
-                    onClick={() => setActiveCategory(null)}
+                    onClick={() => {
+                      setActiveCategory(null);
+                      setFilterValues({});
+                    }}
                     className="mb-3 flex items-center gap-1 rounded px-1.5 py-1 text-left text-xs text-muted-foreground hover:bg-muted"
                   >
                     <ChevronLeft className="size-3.5" />
@@ -436,6 +481,34 @@ function WebLanding() {
                     </>
                   )}
                 </div>
+
+                {activeCategory && activeFilters.length > 0 && (
+                  <div className="mt-4 space-y-4 border-t border-border pt-4">
+                    <CategoryFilterFields
+                      filters={activeFilters}
+                      values={filterValues}
+                      onChange={(key, v) =>
+                        setFilterValues((prev) => {
+                          const next = { ...prev };
+                          if (v === undefined) delete next[key];
+                          else next[key] = v;
+                          return next;
+                        })
+                      }
+                    />
+                    <Button
+                      onClick={() =>
+                        navigate({
+                          to: "/kategori/$slug",
+                          params: { slug: activeCategory.slug },
+                          search: { f: filterValues },
+                        })
+                      }
+                    >
+                      Vis treff
+                    </Button>
+                  </div>
+                )}
               </div>
             </CollapsibleContent>
           </Collapsible>

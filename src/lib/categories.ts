@@ -5,6 +5,7 @@ export type Category = {
   parent_id: string | null;
   icon?: string | null;
   color?: string | null;
+  heading_font?: string | null;
 };
 
 /** Main categories are colored root categories presented as Kaupet sub-sites. */

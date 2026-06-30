@@ -77,6 +77,7 @@ import {
   type FilterOption,
   type FilterType,
 } from "@/lib/category-filters";
+import { CATEGORY_HEADING_FONTS, DEFAULT_CATEGORY_HEADING_FONT } from "@/lib/category-fonts";
 
 export const Route = createFileRoute("/_authenticated/admin/kategorier")({
   head: () => ({ meta: [{ title: "Kategoriadministrasjon — Kaupet.no" }] }),
@@ -91,6 +92,7 @@ type Category = {
   sort_order: number;
   icon: string | null;
   color: string | null;
+  heading_font: string | null;
 };
 
 // Suggested unique colors for main categories (OKLch, matching the design system).
@@ -132,7 +134,7 @@ function AdminCategories() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
-        .select("id, name_nb, slug, parent_id, sort_order, icon, color")
+        .select("id, name_nb, slug, parent_id, sort_order, icon, color, heading_font")
         .order("sort_order")
         .order("name_nb");
       if (error) throw error;
@@ -579,6 +581,9 @@ function CategoryFormDialog({
   const [icon, setIcon] = useState<string | null>(category?.icon ?? null);
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
   const [color, setColor] = useState<string>(category?.color ?? "");
+  const [headingFont, setHeadingFont] = useState<string>(
+    category?.heading_font ?? DEFAULT_CATEGORY_HEADING_FONT,
+  );
 
   const save = useMutation({
     mutationFn: async () => {
@@ -588,8 +593,9 @@ function CategoryFormDialog({
         sort_order: sortOrder,
         parent_id: parent === "__none__" ? null : parent,
         icon,
-        // Color only applies to main (top-level) categories.
+        // Color and heading font only apply to main (top-level) categories.
         color: parent === "__none__" ? color.trim() || null : null,
+        heading_font: parent === "__none__" ? headingFont : null,
       };
       if (category) {
         const { error } = await supabase.from("categories").update(payload).eq("id", category.id);
@@ -734,6 +740,26 @@ function CategoryFormDialog({
               <p className="text-xs text-muted-foreground">
                 Brukes som bakgrunn på landingssiden og som aksent på kategorisiden. La stå tom for
                 å skjule kategorien som hovedkategori.
+              </p>
+            </div>
+          )}
+          {parent === "__none__" && (
+            <div className="space-y-2">
+              <Label htmlFor="heading-font">Overskriftsfont (hovedkategori)</Label>
+              <Select value={headingFont} onValueChange={setHeadingFont}>
+                <SelectTrigger id="heading-font">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(CATEGORY_HEADING_FONTS).map(([token, { label, stack }]) => (
+                    <SelectItem key={token} value={token}>
+                      <span style={{ fontFamily: stack }}>{label}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Brukes på kategori-overskriften som vises på landingssiden når kategorien er valgt.
               </p>
             </div>
           )}

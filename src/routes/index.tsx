@@ -1,14 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import {
-  ArrowRight,
-  ChevronDown,
-  FolderOpen,
-  Heart,
-  MapPin,
-  Search,
-  ShieldCheck,
-} from "lucide-react";
+import { ArrowRight, FolderOpen, Heart, MapPin, Search, ShieldCheck } from "lucide-react";
 import { z } from "zod";
 import { useMemo, useRef, useState } from "react";
 import Autoplay from "embla-carousel-autoplay";
@@ -18,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import {
   Carousel,
   CarouselContent,
@@ -219,8 +211,17 @@ function WebLanding() {
   );
 
   const [qFocused, setQFocused] = useState(false);
-  const typewriterPlaceholder = useTypewriterText(SEARCH_SUGGESTIONS, {
+  // When a main category is active, hint at what's searchable within it by
+  // typing its subcategory names instead of the generic suggestion list.
+  const typewriterWords = useMemo(() => {
+    if (!activeCategory) return SEARCH_SUGGESTIONS;
+    const subs = childrenByParent.get(activeCategory.id) ?? [];
+    const words = subs.map((s) => s.name_nb.toLocaleLowerCase("nb-NO"));
+    return words.length > 0 ? words : [activeCategory.name_nb.toLocaleLowerCase("nb-NO")];
+  }, [activeCategory, childrenByParent]);
+  const typewriterPlaceholder = useTypewriterText(typewriterWords, {
     paused: qFocused || qDraft.length > 0,
+    resetKey: activeCategory?.id ?? "all",
   });
 
   // Suggest a matching category while the user types in the hero search, so
@@ -236,6 +237,14 @@ function WebLanding() {
   };
 
   const handlePickCategory = (cat: CategoryRow) => {
+    // Clicking the already-active category again closes it and returns the
+    // landing page to its default state, instead of just re-selecting it.
+    if (activeCategory?.id === cat.id) {
+      setActiveCategory(null);
+      setFilterValues({});
+      setCategoriesOpen(false);
+      return;
+    }
     const subs = childrenByParent.get(cat.id) ?? [];
     if (subs.length === 0) {
       navigate({
@@ -246,6 +255,7 @@ function WebLanding() {
     }
     setActiveCategory(cat);
     setFilterValues({});
+    setCategoriesOpen(true);
     // Scroll so the newly revealed subcategories are visible after the slide-down.
     requestAnimationFrame(() => {
       setTimeout(
@@ -253,6 +263,35 @@ function WebLanding() {
         80,
       );
     });
+  };
+
+  // Shared look for every main-category icon — same neutral color regardless
+  // of the category, so the row reads as one consistent set rather than a
+  // rainbow of per-category accents.
+  const renderCategoryIcon = (cat: CategoryRow) => {
+    const Icon = getCategoryIcon(cat.icon);
+    const active = activeCategory?.id === cat.id;
+    return (
+      <button
+        key={cat.id}
+        type="button"
+        onClick={() => handlePickCategory(cat)}
+        className="group flex w-14 flex-col items-center gap-1.5 text-center"
+      >
+        <span
+          className={`flex size-10 items-center justify-center rounded-full transition ${
+            active
+              ? "bg-primary text-primary-foreground"
+              : "bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground"
+          }`}
+        >
+          <Icon className="size-4" />
+        </span>
+        <span className="line-clamp-2 text-pretty text-[11px] font-medium leading-tight text-foreground">
+          {cat.name_nb}
+        </span>
+      </button>
+    );
   };
 
   const { data: popular } = useQuery({
@@ -277,9 +316,13 @@ function WebLanding() {
 
   const submitSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    // When a main category is active, scope the search to just that category
+    // — /annonser already expands a parent category to include all of its
+    // children server-side, so listing it alone (not every subcategory
+    // slug too) is both sufficient and what the filter UI should display.
     navigate({
       to: "/annonser",
-      search: { q: qDraft.trim(), category: "", sort: "new" },
+      search: { q: qDraft.trim(), category: activeCategory?.slug ?? "", sort: "new" },
     });
   };
 
@@ -316,10 +359,6 @@ function WebLanding() {
               <h1 className="font-display text-5xl leading-[1.05] tracking-tight md:text-6xl">
                 Gi tingene dine <span className="italic text-accent">et nytt liv</span>.
               </h1>
-              <p className="mx-auto mt-4 max-w-lg text-lg text-muted-foreground">
-                Kaupet.no er en norsk markedsplass for brukte ting mellom privatpersoner. Ingen
-                mellomledd, ingen reklame.
-              </p>
             </div>
           )}
 
@@ -360,9 +399,26 @@ function WebLanding() {
             </Button>
           </form>
 
-          {/* "Utforsk kategorier" — slider rett under knappen, ikke en egen
-              seksjon lenger ned, så sammenhengen mellom trykk og resultat er
-              tydelig. */}
+          {/* Hovedkategorier — alltid synlige i én horisontal, sveipbar rad
+              rett under søkefeltet, så man kan bla uten å klikke seg inn
+              først. Underkategorier/filtre ligger bak hvert valg. */}
+          <div
+            className="mx-auto mt-6 flex max-w-lg gap-4 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            style={{ scrollSnapType: "x proximity" }}
+          >
+            {rootCategories.length === 0 &&
+              Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="flex w-14 shrink-0 flex-col items-center gap-1.5">
+                  <div className="size-10 animate-pulse rounded-full bg-muted" />
+                </div>
+              ))}
+            {rootCategories.map((cat) => (
+              <div key={cat.id} className="shrink-0" style={{ scrollSnapAlign: "start" }}>
+                {renderCategoryIcon(cat)}
+              </div>
+            ))}
+          </div>
+
           <Collapsible
             open={categoriesOpen}
             onOpenChange={(o) => {
@@ -373,41 +429,29 @@ function WebLanding() {
               }
             }}
           >
-            <div className="flex justify-center">
-              <CollapsibleTrigger asChild>
-                <button
-                  type="button"
-                  className="group mt-3 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                  <FolderOpen className="size-3.5 transition-transform duration-200 group-hover:-translate-y-0.5" />
-                  …eller velg en kategori
-                  <ChevronDown className="size-3.5 transition-transform duration-200 group-hover:translate-y-0.5 group-data-[state=open]:rotate-180" />
-                </button>
-              </CollapsibleTrigger>
-            </div>
-
             <CollapsibleContent>
-              <div ref={subcatRef} className="mx-auto mt-3 max-w-xl text-left">
-                {activeCategory && (
+              {activeCategory && (
+                // Underkategorier + filtre — frikoblet, ikke i boks, så det er
+                // tydelig at man har beveget seg ut av hovedkategori-valget.
+                <div ref={subcatRef} className="mx-auto mt-3 max-w-xl text-left">
                   <button
                     type="button"
                     onClick={() => {
                       setActiveCategory(null);
                       setFilterValues({});
+                      setCategoriesOpen(false);
                     }}
                     className="mb-3 flex items-center gap-1 rounded px-1.5 py-1 text-left text-xs text-muted-foreground hover:bg-muted"
                   >
                     <ChevronLeft className="size-3.5" />
-                    Tilbake til hovedkategorier
+                    Lukk
                   </button>
-                )}
 
-                <div
-                  key={activeCategory?.id ?? "root"}
-                  className={`grid grid-cols-3 gap-1 duration-200 animate-in fade-in sm:grid-cols-4 md:grid-cols-6 ${activeCategory ? "slide-in-from-right-4" : "slide-in-from-left-4"}`}
-                >
-                  {activeCategory ? (
-                    (() => {
+                  <div
+                    key={activeCategory.id}
+                    className="grid grid-cols-3 gap-1 duration-200 animate-in fade-in slide-in-from-right-4 sm:grid-cols-4 md:grid-cols-6"
+                  >
+                    {(() => {
                       const subs = childrenByParent.get(activeCategory.id) ?? [];
                       const AllIcon = getCategoryIcon(activeCategory.icon);
 
@@ -450,66 +494,38 @@ function WebLanding() {
                           )}
                         </>
                       );
-                    })()
-                  ) : (
-                    <>
-                      {rootCategories.length === 0 &&
-                        Array.from({ length: 6 }).map((_, i) => (
-                          <div
-                            key={i}
-                            className="aspect-square animate-pulse rounded-xl bg-muted"
-                          />
-                        ))}
-                      {rootCategories.map((cat) => {
-                        const Icon = getCategoryIcon(cat.icon);
-                        return (
-                          <button
-                            key={cat.id}
-                            type="button"
-                            onClick={() => handlePickCategory(cat)}
-                            className="group flex flex-col items-center gap-1.5 rounded-xl p-2 text-center transition hover:bg-muted"
-                          >
-                            <span className="flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
-                              <Icon className="size-5" />
-                            </span>
-                            <span className="line-clamp-2 text-pretty text-xs font-medium leading-tight">
-                              {cat.name_nb}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </>
+                    })()}
+                  </div>
+
+                  {activeFilters.length > 0 && (
+                    <div className="mt-4 space-y-4 border-t border-border pt-4">
+                      <CategoryFilterFields
+                        filters={activeFilters}
+                        values={filterValues}
+                        onChange={(key, v) =>
+                          setFilterValues((prev) => {
+                            const next = { ...prev };
+                            if (v === undefined) delete next[key];
+                            else next[key] = v;
+                            return next;
+                          })
+                        }
+                      />
+                      <Button
+                        onClick={() =>
+                          navigate({
+                            to: "/kategori/$slug",
+                            params: { slug: activeCategory.slug },
+                            search: { f: filterValues },
+                          })
+                        }
+                      >
+                        Vis treff
+                      </Button>
+                    </div>
                   )}
                 </div>
-
-                {activeCategory && activeFilters.length > 0 && (
-                  <div className="mt-4 space-y-4 border-t border-border pt-4">
-                    <CategoryFilterFields
-                      filters={activeFilters}
-                      values={filterValues}
-                      onChange={(key, v) =>
-                        setFilterValues((prev) => {
-                          const next = { ...prev };
-                          if (v === undefined) delete next[key];
-                          else next[key] = v;
-                          return next;
-                        })
-                      }
-                    />
-                    <Button
-                      onClick={() =>
-                        navigate({
-                          to: "/kategori/$slug",
-                          params: { slug: activeCategory.slug },
-                          search: { f: filterValues },
-                        })
-                      }
-                    >
-                      Vis treff
-                    </Button>
-                  </div>
-                )}
-              </div>
+              )}
             </CollapsibleContent>
           </Collapsible>
 
@@ -536,15 +552,27 @@ function WebLanding() {
                     />
                   </DialogContent>
                 </Dialog>
+                <KaupetCodeDialog />
               </>
             ) : (
-              <Link to="/auth" search={{ mode: "signup" }}>
-                <Button size="lg" variant="outline">
-                  Kom i gang gratis
-                </Button>
-              </Link>
+              <>
+                <KaupetCodeDialog />
+                <div className="relative flex flex-col items-center">
+                  <Link to="/auth" search={{ mode: "signup" }}>
+                    <Button size="lg" variant="outline">
+                      Kom i gang gratis
+                    </Button>
+                  </Link>
+                  {/* Flytende, leken merkelapp — på mobil (stablede knapper) ligger
+                      den i normal flyt for å ikke dekke knappen under; fra sm og opp
+                      er det rom til å la den flyte fritt over innholdet. */}
+                  <div className="pointer-events-none relative mt-3 w-44 rotate-[-3deg] rounded-2xl bg-primary px-3 py-2.5 text-center text-xs font-medium leading-snug text-primary-foreground shadow-lg sm:absolute sm:left-1/2 sm:top-full sm:z-20 sm:mt-3 sm:w-44 sm:-translate-x-1/2">
+                    <span className="absolute -top-1.5 left-9 size-3 rotate-45 rounded-[2px] bg-primary" />
+                    Det er alltid gratis å legge ut annonser på Kaupet, uansett hva du selger.
+                  </div>
+                </div>
+              </>
             )}
-            <KaupetCodeDialog />
           </div>
         </div>
       </section>

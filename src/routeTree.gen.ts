@@ -17,6 +17,7 @@ import { Route as AnnonserRouteImport } from './routes/annonser'
 import { Route as KaupetCodeRouteImport } from './routes/$kaupetCode'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as KategoriSlugRouteImport } from './routes/kategori.$slug'
 import { Route as BrukerIdRouteImport } from './routes/bruker.$id'
 import { Route as AnnonseListingIdRouteImport } from './routes/annonse.$listingId'
 import { Route as AuthenticatedVarslerRouteImport } from './routes/_authenticated/varsler'
@@ -79,6 +80,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KategoriSlugRoute = KategoriSlugRouteImport.update({
+  id: '/kategori/$slug',
+  path: '/kategori/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BrukerIdRoute = BrukerIdRouteImport.update({
@@ -232,6 +238,7 @@ export interface FileRoutesByFullPath {
   '/varsler': typeof AuthenticatedVarslerRoute
   '/annonse/$listingId': typeof AnnonseListingIdRoute
   '/bruker/$id': typeof BrukerIdRoute
+  '/kategori/$slug': typeof KategoriSlugRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
@@ -264,6 +271,7 @@ export interface FileRoutesByTo {
   '/varsler': typeof AuthenticatedVarslerRoute
   '/annonse/$listingId': typeof AnnonseListingIdRoute
   '/bruker/$id': typeof BrukerIdRoute
+  '/kategori/$slug': typeof KategoriSlugRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
@@ -299,6 +307,7 @@ export interface FileRoutesById {
   '/_authenticated/varsler': typeof AuthenticatedVarslerRoute
   '/annonse/$listingId': typeof AnnonseListingIdRoute
   '/bruker/$id': typeof BrukerIdRoute
+  '/kategori/$slug': typeof KategoriSlugRoute
   '/_authenticated/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/_authenticated/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/_authenticated/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
@@ -334,6 +343,7 @@ export interface FileRouteTypes {
     | '/varsler'
     | '/annonse/$listingId'
     | '/bruker/$id'
+    | '/kategori/$slug'
     | '/admin/brukere'
     | '/admin/kategorier'
     | '/admin/moderasjon'
@@ -366,6 +376,7 @@ export interface FileRouteTypes {
     | '/varsler'
     | '/annonse/$listingId'
     | '/bruker/$id'
+    | '/kategori/$slug'
     | '/admin/brukere'
     | '/admin/kategorier'
     | '/admin/moderasjon'
@@ -400,6 +411,7 @@ export interface FileRouteTypes {
     | '/_authenticated/varsler'
     | '/annonse/$listingId'
     | '/bruker/$id'
+    | '/kategori/$slug'
     | '/_authenticated/admin/brukere'
     | '/_authenticated/admin/kategorier'
     | '/_authenticated/admin/moderasjon'
@@ -427,6 +439,7 @@ export interface RootRouteChildren {
   VilkarRoute: typeof VilkarRoute
   AnnonseListingIdRoute: typeof AnnonseListingIdRoute
   BrukerIdRoute: typeof BrukerIdRoute
+  KategoriSlugRoute: typeof KategoriSlugRoute
   ApiPublicPushDispatchRoute: typeof ApiPublicPushDispatchRoute
   ApiPublicVippsWebhookRoute: typeof ApiPublicVippsWebhookRoute
 }
@@ -487,6 +500,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/kategori/$slug': {
+      id: '/kategori/$slug'
+      path: '/kategori/$slug'
+      fullPath: '/kategori/$slug'
+      preLoaderRoute: typeof KategoriSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/bruker/$id': {
@@ -733,6 +753,7 @@ const rootRouteChildren: RootRouteChildren = {
   VilkarRoute: VilkarRoute,
   AnnonseListingIdRoute: AnnonseListingIdRoute,
   BrukerIdRoute: BrukerIdRoute,
+  KategoriSlugRoute: KategoriSlugRoute,
   ApiPublicPushDispatchRoute: ApiPublicPushDispatchRoute,
   ApiPublicVippsWebhookRoute: ApiPublicVippsWebhookRoute,
 }

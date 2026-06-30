@@ -1,4 +1,16 @@
-export type Category = { id: string; slug: string; name_nb: string; parent_id: string | null };
+export type Category = {
+  id: string;
+  slug: string;
+  name_nb: string;
+  parent_id: string | null;
+  icon?: string | null;
+  color?: string | null;
+};
+
+/** Main categories are colored root categories presented as Kaupet sub-sites. */
+export function mainCategories(categories: Category[]): Category[] {
+  return categories.filter((c) => c.parent_id == null && !!c.color);
+}
 export type SortValue = "new" | "price_asc" | "price_desc";
 
 export const SORT_OPTIONS: Array<{ value: SortValue; label: string }> = [

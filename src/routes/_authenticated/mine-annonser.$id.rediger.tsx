@@ -49,6 +49,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { formatErrorMessage } from "@/lib/errors";
+import { AttributeFields, type AttributeMap } from "@/components/attribute-fields";
 
 const CONDITIONS = [
   { value: "new", label: "Helt ny" },
@@ -111,7 +112,7 @@ function EditListingPage() {
         supabase
           .from("listings")
           .select(
-            "id, title, description, category_id, condition, is_free, price_nok, postal_code, city, status, listing_images(id, storage_path, sort_order)",
+            "id, title, description, category_id, condition, is_free, price_nok, postal_code, city, status, attributes, listing_images(id, storage_path, sort_order)",
           )
           .eq("id", id)
           .single(),
@@ -227,11 +228,15 @@ function EditListingPage() {
   const [selectedParentId, setSelectedParentId] = useState<string>("");
   const subcategories = (categories ?? []).filter((c) => c.parent_id === selectedParentId);
   const categoryHydratedFor = useRef<string | null>(null);
+  const [attributes, setAttributes] = useState<AttributeMap>({});
 
-  // Initialize parent selector from existing category when listing loads (once)
+  // Initialize parent selector and attributes from existing category when listing loads (once)
   useEffect(() => {
     if (!listing || !categories) return;
     if (categoryHydratedFor.current === listing.id) return;
+    if (listing.attributes && typeof listing.attributes === "object") {
+      setAttributes(listing.attributes as AttributeMap);
+    }
     const current = categories.find((c) => c.id === listing.category_id);
     if (!current) return;
     if (current.parent_id) {
@@ -353,6 +358,7 @@ function EditListingPage() {
           city: parsed.city || null,
           lat: finalCoords?.lat ?? null,
           lng: finalCoords?.lng ?? null,
+          attributes,
         })
         .eq("id", id);
       if (updErr) throw updErr;
@@ -657,6 +663,12 @@ function EditListingPage() {
                 {errors.category_id && <p className="text-sm text-destructive">Velg en kategori</p>}
               </>
             )}
+            <AttributeFields
+              categoryId={categoryId || null}
+              categories={categories ?? []}
+              value={attributes}
+              onChange={setAttributes}
+            />
           </div>
           <div className="space-y-2">
             <Label>Tilstand</Label>

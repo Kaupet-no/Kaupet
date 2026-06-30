@@ -8,7 +8,9 @@ import {
   Loader2,
   Pencil,
   Plus,
+  SlidersHorizontal,
   Trash2,
+  X,
 } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import {
@@ -68,6 +70,13 @@ import {
 } from "@/components/ui/command";
 import { formatErrorMessage } from "@/lib/errors";
 import { CATEGORY_ICON_OPTIONS, getCategoryIcon } from "@/lib/category-icons";
+import {
+  FILTER_TYPE_LABELS,
+  normalizeFilter,
+  type CategoryFilter,
+  type FilterOption,
+  type FilterType,
+} from "@/lib/category-filters";
 
 export const Route = createFileRoute("/_authenticated/admin/kategorier")({
   head: () => ({ meta: [{ title: "Kategoriadministrasjon — Kaupet.no" }] }),
@@ -81,7 +90,22 @@ type Category = {
   parent_id: string | null;
   sort_order: number;
   icon: string | null;
+  color: string | null;
 };
+
+// Suggested unique colors for main categories (OKLch, matching the design system).
+const MAIN_CATEGORY_COLOR_PRESETS = [
+  "oklch(0.62 0.13 250)",
+  "oklch(0.66 0.12 50)",
+  "oklch(0.60 0.12 150)",
+  "oklch(0.65 0.13 350)",
+  "oklch(0.68 0.14 70)",
+  "oklch(0.62 0.10 90)",
+  "oklch(0.55 0.06 260)",
+  "oklch(0.58 0.13 310)",
+  "oklch(0.70 0.10 200)",
+  "oklch(0.55 0.12 240)",
+];
 
 function slugify(s: string) {
   return s
@@ -100,6 +124,7 @@ function AdminCategories() {
   const [creating, setCreating] = useState<{ parentId: string | null } | null>(null);
   const [deleting, setDeleting] = useState<Category | null>(null);
   const [replacementId, setReplacementId] = useState<string>("__none__");
+  const [managingFilters, setManagingFilters] = useState<Category | null>(null);
   const [search, setSearch] = useState("");
 
   const { data: categories, isLoading } = useQuery({
@@ -107,7 +132,7 @@ function AdminCategories() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
-        .select("id, name_nb, slug, parent_id, sort_order, icon")
+        .select("id, name_nb, slug, parent_id, sort_order, icon, color")
         .order("sort_order")
         .order("name_nb");
       if (error) throw error;
@@ -286,6 +311,7 @@ function AdminCategories() {
                 onEdit={setEditing}
                 onDelete={setDeleting}
                 onAddChild={(parent) => setCreating({ parentId: parent.id })}
+                onManageFilters={setManagingFilters}
               />
             </DndContext>
           )}
@@ -302,6 +328,13 @@ function AdminCategories() {
             setCreating(null);
           }}
           onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "categories"] })}
+        />
+      )}
+
+      {managingFilters && (
+        <CategoryFiltersDialog
+          category={managingFilters}
+          onClose={() => setManagingFilters(null)}
         />
       )}
 
@@ -386,6 +419,7 @@ function CategoryList({
   onEdit,
   onDelete,
   onAddChild,
+  onManageFilters,
 }: {
   categories: Category[];
   childrenMap: Map<string | null, Category[]>;
@@ -394,6 +428,7 @@ function CategoryList({
   onEdit: (c: Category) => void;
   onDelete: (c: Category) => void;
   onAddChild: (c: Category) => void;
+  onManageFilters: (c: Category) => void;
 }) {
   return (
     <SortableContext items={categories.map((c) => c.id)} strategy={verticalListSortingStrategy}>
@@ -408,6 +443,7 @@ function CategoryList({
             onEdit={onEdit}
             onDelete={onDelete}
             onAddChild={onAddChild}
+            onManageFilters={onManageFilters}
           />
         ))}
       </ul>
@@ -423,6 +459,7 @@ function SortableCategoryRow({
   onEdit,
   onDelete,
   onAddChild,
+  onManageFilters,
 }: {
   category: Category;
   childrenMap: Map<string | null, Category[]>;
@@ -431,6 +468,7 @@ function SortableCategoryRow({
   onEdit: (c: Category) => void;
   onDelete: (c: Category) => void;
   onAddChild: (c: Category) => void;
+  onManageFilters: (c: Category) => void;
 }) {
   const kids = childrenMap.get(category.id) ?? [];
   const Icon = getCategoryIcon(category.icon);
@@ -469,11 +507,27 @@ function SortableCategoryRow({
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          {depth === 0 && category.color && (
+            <span
+              className="size-4 shrink-0 rounded-full border"
+              style={{ background: category.color }}
+              aria-hidden
+            />
+          )}
           {depth === 0 && (
             <Button variant="ghost" size="sm" onClick={() => onAddChild(category)}>
               <Plus className="size-4" /> Underkategori
             </Button>
           )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => onManageFilters(category)}
+            aria-label="Filtre"
+            title="Administrer filtre"
+          >
+            <SlidersHorizontal className="size-4" />
+          </Button>
           <Button variant="ghost" size="icon" onClick={() => onEdit(category)} aria-label="Rediger">
             <Pencil className="size-4" />
           </Button>
@@ -497,6 +551,7 @@ function SortableCategoryRow({
           onEdit={onEdit}
           onDelete={onDelete}
           onAddChild={onAddChild}
+          onManageFilters={onManageFilters}
         />
       )}
     </li>
@@ -523,6 +578,7 @@ function CategoryFormDialog({
   const [slugTouched, setSlugTouched] = useState(!!category);
   const [icon, setIcon] = useState<string | null>(category?.icon ?? null);
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
+  const [color, setColor] = useState<string>(category?.color ?? "");
 
   const save = useMutation({
     mutationFn: async () => {
@@ -532,6 +588,8 @@ function CategoryFormDialog({
         sort_order: sortOrder,
         parent_id: parent === "__none__" ? null : parent,
         icon,
+        // Color only applies to main (top-level) categories.
+        color: parent === "__none__" ? color.trim() || null : null,
       };
       if (category) {
         const { error } = await supabase.from("categories").update(payload).eq("id", category.id);
@@ -645,6 +703,40 @@ function CategoryFormDialog({
               </PopoverContent>
             </Popover>
           </div>
+          {parent === "__none__" && (
+            <div className="space-y-2">
+              <Label htmlFor="color">Farge (hovedkategori)</Label>
+              <div className="flex items-center gap-2">
+                <span
+                  className="size-9 shrink-0 rounded-md border"
+                  style={{ background: color || "transparent" }}
+                  aria-hidden
+                />
+                <Input
+                  id="color"
+                  value={color}
+                  onChange={(e) => setColor(e.target.value)}
+                  placeholder="oklch(0.62 0.13 250)"
+                />
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {MAIN_CATEGORY_COLOR_PRESETS.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setColor(preset)}
+                    className="size-6 rounded-full border ring-offset-background transition hover:ring-2 hover:ring-ring"
+                    style={{ background: preset }}
+                    aria-label={`Velg farge ${preset}`}
+                  />
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Brukes som bakgrunn på landingssiden og som aksent på kategorisiden. La stå tom for
+                å skjule kategorien som hovedkategori.
+              </p>
+            </div>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="sort">Sorteringsrekkefølge</Label>
@@ -683,6 +775,322 @@ function CategoryFormDialog({
             </Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function filterKeyify(s: string) {
+  return slugify(s).replace(/-/g, "_");
+}
+
+const FILTER_TYPES: FilterType[] = ["select", "multiselect", "number", "range", "boolean", "text"];
+
+type EditableFilter = {
+  id?: string;
+  key: string;
+  label_nb: string;
+  type: FilterType;
+  unit: string;
+  options: FilterOption[];
+};
+
+function CategoryFiltersDialog({ category, onClose }: { category: Category; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [draft, setDraft] = useState<EditableFilter | null>(null);
+  const [keyTouched, setKeyTouched] = useState(false);
+
+  const { data: filters, isLoading } = useQuery({
+    queryKey: ["admin", "category-filters", category.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("category_filters")
+        .select("id, category_id, key, label_nb, type, unit, options, sort_order")
+        .eq("category_id", category.id)
+        .order("sort_order");
+      if (error) throw error;
+      return (data ?? []).map(normalizeFilter);
+    },
+  });
+
+  const invalidate = () =>
+    qc.invalidateQueries({ queryKey: ["admin", "category-filters", category.id] });
+
+  const save = useMutation({
+    mutationFn: async (f: EditableFilter) => {
+      const usesOptions = f.type === "select" || f.type === "multiselect";
+      const payload = {
+        category_id: category.id,
+        key: f.key.trim() || filterKeyify(f.label_nb),
+        label_nb: f.label_nb.trim(),
+        type: f.type,
+        unit: f.unit.trim() || null,
+        options: usesOptions ? f.options.filter((o) => o.value.trim()) : null,
+        sort_order: (filters?.length ?? 0) * 10 + 10,
+      };
+      if (f.id) {
+        const { error } = await supabase.from("category_filters").update(payload).eq("id", f.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("category_filters").insert(payload);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      showSuccessToast("Filter lagret");
+      setDraft(null);
+      invalidate();
+    },
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke lagre filteret")),
+  });
+
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("category_filters").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      showSuccessToast("Filter slettet");
+      invalidate();
+    },
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke slette filteret")),
+  });
+
+  function startNew() {
+    setKeyTouched(false);
+    setDraft({
+      key: "",
+      label_nb: "",
+      type: "select",
+      unit: "",
+      options: [{ value: "", label_nb: "" }],
+    });
+  }
+
+  function startEdit(f: CategoryFilter) {
+    setKeyTouched(true);
+    setDraft({
+      id: f.id,
+      key: f.key,
+      label_nb: f.label_nb,
+      type: f.type,
+      unit: f.unit ?? "",
+      options: f.options && f.options.length > 0 ? f.options : [{ value: "", label_nb: "" }],
+    });
+  }
+
+  const usesOptions = draft?.type === "select" || draft?.type === "multiselect";
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Filtre for «{category.name_nb}»</DialogTitle>
+          <DialogDescription>
+            Filtre vises i annonseskjema og søk for denne kategorien og dens underkategorier.
+          </DialogDescription>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="flex justify-center py-6">
+            <Loader2 className="size-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <ul className="space-y-1">
+            {(filters ?? []).length === 0 && (
+              <li className="py-2 text-sm text-muted-foreground">Ingen filtre ennå.</li>
+            )}
+            {(filters ?? []).map((f) => (
+              <li
+                key={f.id}
+                className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 hover:bg-accent/40"
+              >
+                <div className="min-w-0">
+                  <span className="font-medium">{f.label_nb}</span>{" "}
+                  <span className="text-xs text-muted-foreground">
+                    {FILTER_TYPE_LABELS[f.type]}
+                    {f.unit ? ` · ${f.unit}` : ""} · {f.key}
+                  </span>
+                </div>
+                <div className="flex shrink-0 gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => startEdit(f)}
+                    aria-label="Rediger"
+                  >
+                    <Pencil className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => remove.mutate(f.id)}
+                    aria-label="Slett"
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {draft ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!draft.label_nb.trim()) {
+                showErrorToast("Navn er påkrevd");
+                return;
+              }
+              save.mutate(draft);
+            }}
+            className="space-y-4 rounded-md border p-3"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="f-label">Navn</Label>
+              <Input
+                id="f-label"
+                value={draft.label_nb}
+                onChange={(e) =>
+                  setDraft((d) =>
+                    d
+                      ? {
+                          ...d,
+                          label_nb: e.target.value,
+                          key: keyTouched ? d.key : filterKeyify(e.target.value),
+                        }
+                      : d,
+                  )
+                }
+                placeholder="f.eks. Skjermstørrelse"
+                required
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="f-key">Nøkkel</Label>
+                <Input
+                  id="f-key"
+                  value={draft.key}
+                  onChange={(e) => {
+                    setKeyTouched(true);
+                    setDraft((d) => (d ? { ...d, key: e.target.value } : d));
+                  }}
+                  placeholder="tv_size_inch"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select
+                  value={draft.type}
+                  onValueChange={(v) => setDraft((d) => (d ? { ...d, type: v as FilterType } : d))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FILTER_TYPES.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {FILTER_TYPE_LABELS[t]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="f-unit">Enhet (valgfritt)</Label>
+              <Input
+                id="f-unit"
+                value={draft.unit}
+                onChange={(e) => setDraft((d) => (d ? { ...d, unit: e.target.value } : d))}
+                placeholder="f.eks. tommer, km"
+              />
+            </div>
+            {usesOptions && (
+              <div className="space-y-2">
+                <Label>Valg</Label>
+                {draft.options.map((opt, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <Input
+                      value={opt.label_nb}
+                      onChange={(e) =>
+                        setDraft((d) => {
+                          if (!d) return d;
+                          const options = [...d.options];
+                          options[i] = {
+                            label_nb: e.target.value,
+                            value: options[i].value.trim() || filterKeyify(e.target.value),
+                          };
+                          return { ...d, options };
+                        })
+                      }
+                      placeholder="Visningsnavn (f.eks. OLED)"
+                    />
+                    <Input
+                      value={opt.value}
+                      onChange={(e) =>
+                        setDraft((d) => {
+                          if (!d) return d;
+                          const options = [...d.options];
+                          options[i] = { ...options[i], value: e.target.value };
+                          return { ...d, options };
+                        })
+                      }
+                      placeholder="verdi (oled)"
+                      className="max-w-[8rem]"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() =>
+                        setDraft((d) =>
+                          d ? { ...d, options: d.options.filter((_, j) => j !== i) } : d,
+                        )
+                      }
+                      aria-label="Fjern valg"
+                    >
+                      <X className="size-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setDraft((d) =>
+                      d ? { ...d, options: [...d.options, { value: "", label_nb: "" }] } : d,
+                    )
+                  }
+                >
+                  <Plus className="size-4" /> Legg til valg
+                </Button>
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setDraft(null)}>
+                Avbryt
+              </Button>
+              <Button type="submit" disabled={save.isPending}>
+                {save.isPending ? <Loader2 className="size-4 animate-spin" /> : "Lagre filter"}
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <Button type="button" variant="outline" onClick={startNew}>
+            <Plus className="size-4" /> Nytt filter
+          </Button>
+        )}
+
+        <DialogFooter>
+          <Button type="button" onClick={onClose}>
+            Lukk
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

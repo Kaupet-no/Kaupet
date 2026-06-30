@@ -30,6 +30,7 @@ import { FullscreenLocationPicker } from "@/components/fullscreen-location-picke
 import { PromoteListingDialog } from "@/components/promote-listing-dialog";
 import { PublishedListingDialog } from "@/components/published-listing-dialog";
 import { CategoryPicker } from "@/components/category-picker";
+import { AttributeFields, type AttributeMap } from "@/components/attribute-fields";
 import { Turnstile } from "@marsidev/react-turnstile";
 
 import { useIsDemo } from "@/lib/use-is-demo";
@@ -251,6 +252,7 @@ function NewListingPage() {
   const [showNoPriceDialog, setShowNoPriceDialog] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
+  const [attributes, setAttributes] = useState<AttributeMap>({});
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationMethod, setLocationMethod] = useState<"gps" | "postal" | null>(null);
   const [fullscreenMapOpen, setFullscreenMapOpen] = useState(false);
@@ -761,6 +763,7 @@ function NewListingPage() {
           lat: finalCoords?.lat ?? null,
           lng: finalCoords?.lng ?? null,
           can_ship: values.can_ship !== "pickup",
+          attributes,
           turnstileToken,
         },
       });
@@ -1016,6 +1019,13 @@ function NewListingPage() {
                   {errors.category_id.message}
                 </p>
               )}
+
+              <AttributeFields
+                categoryId={categoryId || null}
+                categories={categories ?? []}
+                value={attributes}
+                onChange={setAttributes}
+              />
             </section>
 
             <section className="space-y-2">
@@ -1537,6 +1547,13 @@ function NewListingPage() {
                   {errors.category_id.message}
                 </p>
               )}
+
+              <AttributeFields
+                categoryId={categoryId || null}
+                categories={categories ?? []}
+                value={attributes}
+                onChange={setAttributes}
+              />
             </section>
 
             {/* Condition as horizontal chip row */}

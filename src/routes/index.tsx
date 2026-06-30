@@ -44,6 +44,7 @@ type CategoryRow = {
   name_nb: string;
   parent_id: string | null;
   icon: string | null;
+  color: string | null;
 };
 
 const searchSchema = z.object({
@@ -154,7 +155,7 @@ function WebLanding() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
-        .select("id, slug, name_nb, parent_id, icon")
+        .select("id, slug, name_nb, parent_id, icon, color")
         .order("sort_order")
         .order("name_nb");
       if (error) throw error;
@@ -162,8 +163,11 @@ function WebLanding() {
     },
   });
 
+  // Only colored root categories are presented as main categories on the landing
+  // page; the catch-all "Annet" (no color) stays reachable via search but is not
+  // shown here.
   const rootCategories = useMemo(
-    () => (categories ?? []).filter((c) => c.parent_id === null),
+    () => (categories ?? []).filter((c) => c.parent_id === null && !!c.color),
     [categories],
   );
   const childrenByParent = useMemo(() => {
@@ -179,6 +183,7 @@ function WebLanding() {
 
   const [activeCategory, setActiveCategory] = useState<CategoryRow | null>(null);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const subcatRef = useRef<HTMLDivElement>(null);
 
   const [qFocused, setQFocused] = useState(false);
   const typewriterPlaceholder = useTypewriterText(SEARCH_SUGGESTIONS, {
@@ -207,6 +212,13 @@ function WebLanding() {
       return;
     }
     setActiveCategory(cat);
+    // Scroll so the newly revealed subcategories are visible after the slide-down.
+    requestAnimationFrame(() => {
+      setTimeout(
+        () => subcatRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }),
+        80,
+      );
+    });
   };
 
   const { data: popular } = useQuery({
@@ -241,7 +253,18 @@ function WebLanding() {
     <div>
       {/* Hero — søkefeltet får all oppmerksomheten, som en søkemotor */}
       <section className="relative overflow-hidden bg-surface">
-        <div className="mx-auto max-w-2xl px-4 py-16 text-center md:py-24">
+        {/* Per-category background tint that animates in from the left when a
+            main category is selected. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 origin-left transition-[transform,background-color,opacity] duration-700 ease-out"
+          style={{
+            background: activeCategory?.color ?? "transparent",
+            opacity: activeCategory ? 0.16 : 0,
+            transform: activeCategory ? "translateX(0)" : "translateX(-100%)",
+          }}
+        />
+        <div className="relative z-10 mx-auto max-w-2xl px-4 py-16 text-center md:py-24">
           <h1 className="font-display text-5xl leading-[1.05] tracking-tight md:text-6xl">
             Gi tingene dine <span className="italic text-accent">et nytt liv</span>.
           </h1>
@@ -304,14 +327,25 @@ function WebLanding() {
                   className="group mt-3 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                   <FolderOpen className="size-3.5 transition-transform duration-200 group-hover:-translate-y-0.5" />
-                  Utforsk kategorier
+                  …eller velg en kategori
                   <ChevronDown className="size-3.5 transition-transform duration-200 group-hover:translate-y-0.5 group-data-[state=open]:rotate-180" />
                 </button>
               </CollapsibleTrigger>
             </div>
 
             <CollapsibleContent>
-              <div className="mx-auto mt-3 max-w-xl rounded-2xl border border-border bg-card p-4 text-left shadow-sm">
+              <div
+                ref={subcatRef}
+                className="mx-auto mt-3 max-w-xl rounded-2xl border border-border bg-card p-4 text-left shadow-sm"
+                style={
+                  activeCategory?.color
+                    ? {
+                        borderColor: activeCategory.color,
+                        boxShadow: `0 0 0 1px ${activeCategory.color}`,
+                      }
+                    : undefined
+                }
+              >
                 {activeCategory && (
                   <button
                     type="button"
@@ -330,20 +364,13 @@ function WebLanding() {
                   {activeCategory ? (
                     (() => {
                       const subs = childrenByParent.get(activeCategory.id) ?? [];
-                      const allSlugs = [activeCategory.slug, ...subs.map((s) => s.slug)];
                       const AllIcon = getCategoryIcon(activeCategory.icon);
 
                       return (
                         <>
                           <Link
-                            to="/annonser"
-                            search={{
-                              q: "",
-                              category: "",
-                              categories: allSlugs,
-                              catMode: "any",
-                              sort: "new",
-                            }}
+                            to="/kategori/$slug"
+                            params={{ slug: activeCategory.slug }}
                             className="group flex flex-col items-center gap-1.5 rounded-xl p-2 text-center transition hover:bg-muted"
                           >
                             <span className="flex size-11 items-center justify-center rounded-full bg-primary text-primary-foreground">

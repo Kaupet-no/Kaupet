@@ -30,12 +30,6 @@ import { findCategorySuggestion } from "@/lib/categories";
 import { useTypewriterText } from "@/lib/use-typewriter-text";
 import { SEARCH_SUGGESTIONS } from "@/lib/search-suggestions";
 import { categoryHeadingFontStack } from "@/lib/category-fonts";
-import { CategoryFilterFields } from "@/components/category-filter-fields";
-import {
-  effectiveFiltersForCategory,
-  normalizeFilter,
-  type AttributeFilterValue,
-} from "@/lib/category-filters";
 
 type CategoryRow = {
   id: string;
@@ -163,18 +157,6 @@ function WebLanding() {
     },
   });
 
-  const { data: allFilters } = useQuery({
-    queryKey: ["category-filters", "all"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("category_filters")
-        .select("id, category_id, key, label_nb, type, unit, options, sort_order")
-        .order("sort_order");
-      if (error) throw error;
-      return (data ?? []).map(normalizeFilter);
-    },
-  });
-
   // Only colored root categories are presented as main categories on the landing
   // page; the catch-all "Annet" (no color) stays reachable via search but is not
   // shown here.
@@ -192,23 +174,10 @@ function WebLanding() {
     }
     return map;
   }, [categories]);
-  const categoriesById = useMemo(() => {
-    const map = new Map<string, CategoryRow>();
-    for (const c of categories ?? []) map.set(c.id, c);
-    return map;
-  }, [categories]);
 
   const [activeCategory, setActiveCategory] = useState<CategoryRow | null>(null);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
-  const [filterValues, setFilterValues] = useState<Record<string, AttributeFilterValue>>({});
   const subcatRef = useRef<HTMLDivElement>(null);
-
-  // Filters configured for the active main category, shown below its
-  // subcategories so the user can narrow the search before browsing.
-  const activeFilters = useMemo(
-    () => effectiveFiltersForCategory(activeCategory?.id ?? null, allFilters ?? [], categoriesById),
-    [activeCategory, allFilters, categoriesById],
-  );
 
   const [qFocused, setQFocused] = useState(false);
   // When a main category is active, hint at what's searchable within it by
@@ -241,20 +210,15 @@ function WebLanding() {
     // landing page to its default state, instead of just re-selecting it.
     if (activeCategory?.id === cat.id) {
       setActiveCategory(null);
-      setFilterValues({});
       setCategoriesOpen(false);
       return;
     }
     const subs = childrenByParent.get(cat.id) ?? [];
     if (subs.length === 0) {
-      navigate({
-        to: "/annonser",
-        search: { q: "", category: cat.slug, sort: "new" },
-      });
+      navigate({ to: "/kategori/$slug", params: { slug: cat.slug } });
       return;
     }
     setActiveCategory(cat);
-    setFilterValues({});
     setCategoriesOpen(true);
     // Scroll so the newly revealed subcategories are visible after the slide-down.
     requestAnimationFrame(() => {
@@ -276,7 +240,8 @@ function WebLanding() {
         key={cat.id}
         type="button"
         onClick={() => handlePickCategory(cat)}
-        className="group flex w-14 flex-col items-center gap-1.5 text-center"
+        aria-expanded={active}
+        className="group flex w-16 flex-col items-center gap-1.5 text-center"
       >
         <span
           className={`flex size-10 items-center justify-center rounded-full transition ${
@@ -287,7 +252,7 @@ function WebLanding() {
         >
           <Icon className="size-4" />
         </span>
-        <span className="line-clamp-2 text-pretty text-[11px] font-medium leading-tight text-foreground">
+        <span className="line-clamp-2 text-pretty text-xs font-medium leading-tight text-foreground">
           {cat.name_nb}
         </span>
       </button>
@@ -399,34 +364,42 @@ function WebLanding() {
             </Button>
           </form>
 
-          {/* Hovedkategorier — alltid synlige i én horisontal, sveipbar rad
-              rett under søkefeltet, så man kan bla uten å klikke seg inn
-              først. Underkategorier/filtre ligger bak hvert valg. */}
-          <div
-            className="mx-auto mt-6 flex max-w-lg gap-4 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            style={{ scrollSnapType: "x proximity" }}
-          >
-            {rootCategories.length === 0 &&
-              Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="flex w-14 shrink-0 flex-col items-center gap-1.5">
-                  <div className="size-10 animate-pulse rounded-full bg-muted" />
+          {/* Hovedkategorier — på mobil én horisontal, sveipbar rad med
+              kant-fade som viser at det finnes flere; fra sm og opp brytes
+              raden slik at alle kategoriene alltid er synlige uten scroll.
+              Underkategorier ligger bak hvert valg. */}
+          <div className="relative mx-auto mt-6 max-w-lg sm:max-w-2xl">
+            <div
+              className="flex gap-4 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:justify-center sm:overflow-visible"
+              style={{ scrollSnapType: "x proximity" }}
+            >
+              {rootCategories.length === 0 &&
+                Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="flex w-16 shrink-0 flex-col items-center gap-1.5">
+                    <div className="size-10 animate-pulse rounded-full bg-muted" />
+                  </div>
+                ))}
+              {rootCategories.map((cat) => (
+                <div key={cat.id} className="shrink-0" style={{ scrollSnapAlign: "start" }}>
+                  {renderCategoryIcon(cat)}
                 </div>
               ))}
-            {rootCategories.map((cat) => (
-              <div key={cat.id} className="shrink-0" style={{ scrollSnapAlign: "start" }}>
-                {renderCategoryIcon(cat)}
-              </div>
-            ))}
+            </div>
+            {/* Kant-fade — kun mobil, hinter om at raden kan sveipes videre.
+                Skjules mens en kategori er valgt, siden fargen ellers ville
+                kollidert med kategoritinten bak. */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-surface to-transparent transition-opacity sm:hidden"
+              style={{ opacity: activeCategory ? 0 : 1 }}
+            />
           </div>
 
           <Collapsible
             open={categoriesOpen}
             onOpenChange={(o) => {
               setCategoriesOpen(o);
-              if (!o) {
-                setActiveCategory(null);
-                setFilterValues({});
-              }
+              if (!o) setActiveCategory(null);
             }}
           >
             <CollapsibleContent>
@@ -438,7 +411,6 @@ function WebLanding() {
                     type="button"
                     onClick={() => {
                       setActiveCategory(null);
-                      setFilterValues({});
                       setCategoriesOpen(false);
                     }}
                     className="mb-3 flex items-center gap-1 rounded px-1.5 py-1 text-left text-xs text-muted-foreground hover:bg-muted"
@@ -496,34 +468,6 @@ function WebLanding() {
                       );
                     })()}
                   </div>
-
-                  {activeFilters.length > 0 && (
-                    <div className="mt-4 space-y-4 border-t border-border pt-4">
-                      <CategoryFilterFields
-                        filters={activeFilters}
-                        values={filterValues}
-                        onChange={(key, v) =>
-                          setFilterValues((prev) => {
-                            const next = { ...prev };
-                            if (v === undefined) delete next[key];
-                            else next[key] = v;
-                            return next;
-                          })
-                        }
-                      />
-                      <Button
-                        onClick={() =>
-                          navigate({
-                            to: "/kategori/$slug",
-                            params: { slug: activeCategory.slug },
-                            search: { f: filterValues },
-                          })
-                        }
-                      >
-                        Vis treff
-                      </Button>
-                    </div>
-                  )}
                 </div>
               )}
             </CollapsibleContent>

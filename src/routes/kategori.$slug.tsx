@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
 import { CategoryFilterFields } from "@/components/category-filter-fields";
 import { getCategoryIcon } from "@/lib/category-icons";
-import type { Category } from "@/lib/categories";
+import { breadcrumbPath, buildTree, descendants, type Category } from "@/lib/categories";
 import {
   applyAttributeFilters,
   effectiveFiltersForCategory,
@@ -62,24 +62,29 @@ function CategoryPage() {
     },
   });
 
-  const main = useMemo(
-    () => (categories ?? []).find((c) => c.slug === slug && c.parent_id == null),
-    [categories, slug],
-  );
+  // A slug can point at any depth (a main category, a subcategory, or a leaf
+  // like "Bukse") — the page always shows that category plus every listing
+  // in its descendants, with filters inherited up the chain.
+  const main = useMemo(() => (categories ?? []).find((c) => c.slug === slug), [categories, slug]);
   const categoriesById = useMemo(() => {
     const m = new Map<string, Category>();
     for (const c of categories ?? []) m.set(c.id, c);
     return m;
   }, [categories]);
+  const tree = useMemo(() => buildTree(categories ?? []), [categories]);
+
+  // The header's color/icon come from the nearest ancestor that has one set
+  // (only main categories carry a color today), so a leaf like "Bukse" still
+  // gets the "Klær og mote" tint instead of falling back to a bare default.
+  const path = useMemo(() => (main ? breadcrumbPath(main, tree) : []), [main, tree]);
+  const accentSource = [...path].reverse().find((c) => !!c.color) ?? main;
 
   const categoryIds = useMemo(() => {
     if (!main) return [];
-    const ids = [main.id];
-    for (const c of categories ?? []) if (c.parent_id === main.id) ids.push(c.id);
-    return ids;
-  }, [main, categories]);
+    return [main.id, ...descendants(main, tree).map((c) => c.id)];
+  }, [main, tree]);
 
-  // Filters configured on the main category itself apply to the whole sub-site.
+  // Filters configured on this category (or inherited from an ancestor) apply here.
   const filters = useMemo(
     () => effectiveFiltersForCategory(main?.id ?? null, allFilters ?? [], categoriesById),
     [main, allFilters, categoriesById],
@@ -127,8 +132,8 @@ function CategoryPage() {
     );
   }
 
-  const Icon = getCategoryIcon(main?.icon ?? null);
-  const accent = main?.color ?? undefined;
+  const Icon = getCategoryIcon(main?.icon ?? accentSource?.icon ?? null);
+  const accent = accentSource?.color ?? undefined;
 
   return (
     <div>
@@ -145,7 +150,11 @@ function CategoryPage() {
             >
               <Icon className="size-6" />
             </span>
-            <h1 className="font-display text-4xl tracking-tight">{main?.name_nb ?? "Kategori"}</h1>
+            <h1 className="font-display text-4xl tracking-tight">
+              {path.length > 1
+                ? path.map((p) => p.name_nb).join(" › ")
+                : (main?.name_nb ?? "Kategori")}
+            </h1>
           </div>
           <Link
             to="/annonser"

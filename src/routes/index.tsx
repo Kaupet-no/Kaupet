@@ -27,6 +27,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AdPickerOptions } from "@/components/ad-picker-options";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { findCategorySuggestion } from "@/lib/categories";
+import { Badge } from "@/components/ui/badge";
 import { useTypewriterText } from "@/lib/use-typewriter-text";
 import { SEARCH_SUGGESTIONS } from "@/lib/search-suggestions";
 import { categoryHeadingFontStack } from "@/lib/category-fonts";
@@ -198,30 +199,37 @@ function WebLanding() {
     return map;
   }, [categories]);
 
-  const [activeCategory, setActiveCategory] = useState<CategoryRow | null>(null);
+  // Path of categories drilled into so far, root-first (e.g. [Klær og mote,
+  // Herreklær, Bukse]). Only the root carries a presentation color/font, so
+  // the hero heading always tracks path[0], while the subcategory grid and
+  // filters below track the deepest selected level.
+  const [selectedPath, setSelectedPath] = useState<CategoryRow[]>([]);
+  const activeCategory = selectedPath[0] ?? null;
+  const currentParent = selectedPath[selectedPath.length - 1] ?? null;
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [filterValues, setFilterValues] = useState<Record<string, AttributeFilterValue>>({});
   const subcatRef = useRef<HTMLDivElement>(null);
 
-  // Filters configured for the active main category, shown below its
-  // subcategories so the user can narrow the search before browsing.
+  // Filters configured for the deepest selected category (inherited up the
+  // chain), shown below its subcategories so the user can narrow the search
+  // before browsing — e.g. clothing size on "Bukse", screen size on "TV".
   const activeFilters = useMemo(
-    () => effectiveFiltersForCategory(activeCategory?.id ?? null, allFilters ?? [], categoriesById),
-    [activeCategory, allFilters, categoriesById],
+    () => effectiveFiltersForCategory(currentParent?.id ?? null, allFilters ?? [], categoriesById),
+    [currentParent, allFilters, categoriesById],
   );
 
   const [qFocused, setQFocused] = useState(false);
-  // When a main category is active, hint at what's searchable within it by
-  // typing its subcategory names instead of the generic suggestion list.
+  // When a category is active, hint at what's searchable within it by typing
+  // its (deepest-level) subcategory names instead of the generic suggestions.
   const typewriterWords = useMemo(() => {
-    if (!activeCategory) return SEARCH_SUGGESTIONS;
-    const subs = childrenByParent.get(activeCategory.id) ?? [];
+    if (!currentParent) return SEARCH_SUGGESTIONS;
+    const subs = childrenByParent.get(currentParent.id) ?? [];
     const words = subs.map((s) => s.name_nb.toLocaleLowerCase("nb-NO"));
-    return words.length > 0 ? words : [activeCategory.name_nb.toLocaleLowerCase("nb-NO")];
-  }, [activeCategory, childrenByParent]);
+    return words.length > 0 ? words : [currentParent.name_nb.toLocaleLowerCase("nb-NO")];
+  }, [currentParent, childrenByParent]);
   const typewriterPlaceholder = useTypewriterText(typewriterWords, {
     paused: qFocused || qDraft.length > 0,
-    resetKey: activeCategory?.id ?? "all",
+    resetKey: currentParent?.id ?? "all",
   });
 
   // Suggest a matching category while the user types in the hero search, so
@@ -237,10 +245,10 @@ function WebLanding() {
   };
 
   const handlePickCategory = (cat: CategoryRow) => {
-    // Clicking the already-active category again closes it and returns the
-    // landing page to its default state, instead of just re-selecting it.
+    // Clicking the already-active root category again closes it and returns
+    // the landing page to its default state, instead of just re-selecting it.
     if (activeCategory?.id === cat.id) {
-      setActiveCategory(null);
+      setSelectedPath([]);
       setFilterValues({});
       setCategoriesOpen(false);
       return;
@@ -253,7 +261,7 @@ function WebLanding() {
       });
       return;
     }
-    setActiveCategory(cat);
+    setSelectedPath([cat]);
     setFilterValues({});
     setCategoriesOpen(true);
     // Scroll so the newly revealed subcategories are visible after the slide-down.
@@ -263,6 +271,35 @@ function WebLanding() {
         80,
       );
     });
+  };
+
+  // Drill one level deeper from the subcategory grid — whether or not `sub`
+  // turns out to have children of its own, so a leaf like "Bukse" or "TV"
+  // still reveals its own filters instead of navigating away immediately.
+  const drillIntoSub = (sub: CategoryRow) => {
+    setSelectedPath((prev) => [...prev, sub]);
+    setFilterValues({});
+    requestAnimationFrame(() => {
+      setTimeout(
+        () => subcatRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }),
+        80,
+      );
+    });
+  };
+
+  const goBack = () => {
+    if (selectedPath.length > 1) {
+      setSelectedPath((prev) => prev.slice(0, -1));
+    } else {
+      setSelectedPath([]);
+      setCategoriesOpen(false);
+    }
+    setFilterValues({});
+  };
+
+  const jumpToDepth = (index: number) => {
+    setSelectedPath((prev) => prev.slice(0, index + 1));
+    setFilterValues({});
   };
 
   // Shared look for every main-category icon — same neutral color regardless
@@ -424,58 +461,71 @@ function WebLanding() {
             onOpenChange={(o) => {
               setCategoriesOpen(o);
               if (!o) {
-                setActiveCategory(null);
+                setSelectedPath([]);
                 setFilterValues({});
               }
             }}
           >
             <CollapsibleContent>
-              {activeCategory && (
+              {currentParent && (
                 // Underkategorier + filtre — frikoblet, ikke i boks, så det er
                 // tydelig at man har beveget seg ut av hovedkategori-valget.
                 <div ref={subcatRef} className="mx-auto mt-3 max-w-xl text-left">
                   <button
                     type="button"
-                    onClick={() => {
-                      setActiveCategory(null);
-                      setFilterValues({});
-                      setCategoriesOpen(false);
-                    }}
-                    className="mb-3 flex items-center gap-1 rounded px-1.5 py-1 text-left text-xs text-muted-foreground hover:bg-muted"
+                    onClick={goBack}
+                    className="mb-2 flex items-center gap-1 rounded px-1.5 py-1 text-left text-xs text-muted-foreground hover:bg-muted"
                   >
                     <ChevronLeft className="size-3.5" />
-                    Lukk
+                    {selectedPath.length > 1
+                      ? `Tilbake til ${selectedPath[selectedPath.length - 2].name_nb}`
+                      : "Lukk"}
                   </button>
 
+                  {selectedPath.length > 1 && (
+                    <div className="mb-3 flex flex-wrap items-center gap-1.5">
+                      {selectedPath.map((c, i) => (
+                        <Badge
+                          key={c.id}
+                          variant={i === selectedPath.length - 1 ? "default" : "secondary"}
+                          className="cursor-pointer"
+                          onClick={() => jumpToDepth(i)}
+                        >
+                          {c.name_nb}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+
                   <div
-                    key={activeCategory.id}
+                    key={currentParent.id}
                     className="grid grid-cols-3 gap-1 duration-200 animate-in fade-in slide-in-from-right-4 sm:grid-cols-4 md:grid-cols-6"
                   >
                     {(() => {
-                      const subs = childrenByParent.get(activeCategory.id) ?? [];
-                      const AllIcon = getCategoryIcon(activeCategory.icon);
+                      const subs = childrenByParent.get(currentParent.id) ?? [];
+                      const AllIcon = getCategoryIcon(currentParent.icon);
 
                       return (
                         <>
                           <Link
                             to="/kategori/$slug"
-                            params={{ slug: activeCategory.slug }}
+                            params={{ slug: currentParent.slug }}
                             className="group flex flex-col items-center gap-1.5 rounded-xl p-2 text-center transition hover:bg-muted"
                           >
                             <span className="flex size-11 items-center justify-center rounded-full bg-primary text-primary-foreground">
                               <AllIcon className="size-5" />
                             </span>
                             <span className="line-clamp-2 text-pretty text-xs font-medium leading-tight">
-                              Alt i {activeCategory.name_nb}
+                              Alt i {currentParent.name_nb}
                             </span>
                           </Link>
                           {subs.map((sub) => {
                             const Icon = getCategoryIcon(sub.icon);
                             return (
-                              <Link
+                              <button
                                 key={sub.id}
-                                to="/annonser"
-                                search={{ q: "", category: sub.slug, sort: "new" }}
+                                type="button"
+                                onClick={() => drillIntoSub(sub)}
                                 className="group flex flex-col items-center gap-1.5 rounded-xl p-2 text-center transition hover:bg-muted"
                               >
                                 <span className="flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
@@ -484,7 +534,7 @@ function WebLanding() {
                                 <span className="line-clamp-2 text-pretty text-xs font-medium leading-tight">
                                   {sub.name_nb}
                                 </span>
-                              </Link>
+                              </button>
                             );
                           })}
                           {subs.length === 0 && (
@@ -515,7 +565,7 @@ function WebLanding() {
                         onClick={() =>
                           navigate({
                             to: "/kategori/$slug",
-                            params: { slug: activeCategory.slug },
+                            params: { slug: currentParent.slug },
                             search: { f: filterValues },
                           })
                         }

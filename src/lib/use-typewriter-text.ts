@@ -8,6 +8,8 @@ type Options = {
   hold?: number;
   /** pause animation (e.g. when the field is focused or has a value) */
   paused?: boolean;
+  /** changing this value restarts the animation cleanly on a fresh word (e.g. when `words` is swapped out for a different set) */
+  resetKey?: string | number;
 };
 
 /**
@@ -24,11 +26,21 @@ type Options = {
  * by the browser itself, which is reliable everywhere.
  */
 export function useTypewriterText(words: string[], options: Options = {}): string {
-  const { typeSpeed = 90, deleteSpeed = 40, hold = 1400, paused = false } = options;
+  const { typeSpeed = 90, deleteSpeed = 40, hold = 1400, paused = false, resetKey } = options;
 
   const [wordIndex, setWordIndex] = useState(() => Math.floor(Math.random() * words.length));
   const [text, setText] = useState("");
   const [phase, setPhase] = useState<"typing" | "holding" | "deleting">("typing");
+
+  // Restart cleanly on a fresh word whenever resetKey changes, instead of
+  // continuing mid-type/delete into a word list that may no longer contain
+  // the word currently on screen.
+  useEffect(() => {
+    setText("");
+    setPhase("typing");
+    setWordIndex(Math.floor(Math.random() * words.length));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetKey]);
 
   useEffect(() => {
     if (paused) return;

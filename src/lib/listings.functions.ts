@@ -3,6 +3,12 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+// Free-form per-category attribute values keyed by category_filters.key.
+const attributesSchema = z.record(
+  z.string(),
+  z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]),
+);
+
 export const saveDraftListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
@@ -24,6 +30,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
         lat: z.number().nullable().optional(),
         lng: z.number().nullable().optional(),
         can_ship: z.boolean().optional(),
+        attributes: attributesSchema.optional(),
       })
       .parse(input),
   )
@@ -43,6 +50,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
       ...(data.lat !== undefined && { lat: data.lat }),
       ...(data.lng !== undefined && { lng: data.lng }),
       ...(data.can_ship !== undefined && { can_ship: data.can_ship }),
+      ...(data.attributes !== undefined && { attributes: data.attributes }),
     };
 
     if (data.id) {
@@ -97,6 +105,7 @@ export const createListing = createServerFn({ method: "POST" })
         lat: z.number().nullable(),
         lng: z.number().nullable(),
         can_ship: z.boolean(),
+        attributes: attributesSchema.optional(),
         turnstileToken: z.string().optional(),
       })
       .parse(input),
@@ -130,6 +139,7 @@ export const createListing = createServerFn({ method: "POST" })
       lat: data.lat,
       lng: data.lng,
       can_ship: data.can_ship,
+      ...(data.attributes !== undefined && { attributes: data.attributes }),
       status: "active" as const,
       published_at: new Date().toISOString(),
     };

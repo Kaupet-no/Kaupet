@@ -67,7 +67,9 @@ export type Database = {
       }
       categories: {
         Row: {
+          color: string | null
           created_at: string
+          heading_font: string | null
           icon: string | null
           id: string
           name_nb: string
@@ -76,7 +78,9 @@ export type Database = {
           sort_order: number
         }
         Insert: {
+          color?: string | null
           created_at?: string
+          heading_font?: string | null
           icon?: string | null
           id?: string
           name_nb: string
@@ -85,7 +89,9 @@ export type Database = {
           sort_order?: number
         }
         Update: {
+          color?: string | null
           created_at?: string
+          heading_font?: string | null
           icon?: string | null
           id?: string
           name_nb?: string
@@ -97,6 +103,50 @@ export type Database = {
           {
             foreignKeyName: "categories_parent_id_fkey"
             columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      category_filters: {
+        Row: {
+          category_id: string
+          created_at: string
+          id: string
+          key: string
+          label_nb: string
+          options: Json | null
+          sort_order: number
+          type: string
+          unit: string | null
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          id?: string
+          key: string
+          label_nb: string
+          options?: Json | null
+          sort_order?: number
+          type: string
+          unit?: string | null
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          id?: string
+          key?: string
+          label_nb?: string
+          options?: Json | null
+          sort_order?: number
+          type?: string
+          unit?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "category_filters_category_id_fkey"
+            columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
             referencedColumns: ["id"]
@@ -167,6 +217,7 @@ export type Database = {
           updated_at: string
           expires_at: string
           search_vector: unknown
+          attributes: Json
         }
         Insert: {
           id?: string
@@ -179,6 +230,7 @@ export type Database = {
           created_at?: string
           updated_at?: string
           expires_at?: string
+          attributes?: Json
         }
         Update: {
           id?: string
@@ -191,6 +243,7 @@ export type Database = {
           created_at?: string
           updated_at?: string
           expires_at?: string
+          attributes?: Json
         }
         Relationships: [
           {
@@ -565,6 +618,7 @@ export type Database = {
       }
       listings: {
         Row: {
+          attributes: Json
           category_id: string | null
           city: string | null
           condition: Database["public"]["Enums"]["listing_condition"]
@@ -592,6 +646,7 @@ export type Database = {
           view_count: number
         }
         Insert: {
+          attributes?: Json
           category_id?: string | null
           city?: string | null
           condition?: Database["public"]["Enums"]["listing_condition"]
@@ -619,6 +674,7 @@ export type Database = {
           view_count?: number
         }
         Update: {
+          attributes?: Json
           can_ship?: boolean
           category_id?: string | null
           city?: string | null

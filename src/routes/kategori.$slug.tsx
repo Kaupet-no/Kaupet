@@ -1,0 +1,216 @@
+import { useMemo, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { Search } from "lucide-react";
+import { z } from "zod";
+
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { ListingCard, type ListingCardData } from "@/components/listing-card";
+import { CategoryFilterFields } from "@/components/category-filter-fields";
+import { getCategoryIcon } from "@/lib/category-icons";
+import { breadcrumbPath, buildTree, descendants, type Category } from "@/lib/categories";
+import {
+  applyAttributeFilters,
+  effectiveFiltersForCategory,
+  normalizeFilter,
+  type AttributeFilterValue,
+} from "@/lib/category-filters";
+
+// `f` lets callers (e.g. the landing page's category picker) deep-link
+// preselected filter values into this page; it's read once on mount below,
+// not kept in sync with the URL as filters change.
+const searchSchema = z.object({
+  f: z.record(z.string(), z.any()).optional(),
+});
+
+export const Route = createFileRoute("/kategori/$slug")({
+  validateSearch: searchSchema,
+  head: () => ({ meta: [{ title: "Kategori — Kaupet.no" }] }),
+  component: CategoryPage,
+});
+
+function CategoryPage() {
+  const { slug } = Route.useParams();
+  const { f: initialFilters } = Route.useSearch();
+  const [filterValues, setFilterValues] = useState<Record<string, AttributeFilterValue>>(
+    () => (initialFilters as Record<string, AttributeFilterValue>) ?? {},
+  );
+
+  const { data: categories } = useQuery({
+    queryKey: ["categories", "with-color"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("categories")
+        .select("id, slug, name_nb, parent_id, icon, color")
+        .order("sort_order")
+        .order("name_nb");
+      if (error) throw error;
+      return (data ?? []) as Category[];
+    },
+  });
+
+  const { data: allFilters } = useQuery({
+    queryKey: ["category-filters", "all"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("category_filters")
+        .select("id, category_id, key, label_nb, type, unit, options, sort_order")
+        .order("sort_order");
+      if (error) throw error;
+      return (data ?? []).map(normalizeFilter);
+    },
+  });
+
+  // A slug can point at any depth (a main category, a subcategory, or a leaf
+  // like "Bukse") — the page always shows that category plus every listing
+  // in its descendants, with filters inherited up the chain.
+  const main = useMemo(() => (categories ?? []).find((c) => c.slug === slug), [categories, slug]);
+  const categoriesById = useMemo(() => {
+    const m = new Map<string, Category>();
+    for (const c of categories ?? []) m.set(c.id, c);
+    return m;
+  }, [categories]);
+  const tree = useMemo(() => buildTree(categories ?? []), [categories]);
+
+  // The header's color/icon come from the nearest ancestor that has one set
+  // (only main categories carry a color today), so a leaf like "Bukse" still
+  // gets the "Klær og mote" tint instead of falling back to a bare default.
+  const path = useMemo(() => (main ? breadcrumbPath(main, tree) : []), [main, tree]);
+  const accentSource = [...path].reverse().find((c) => !!c.color) ?? main;
+
+  const categoryIds = useMemo(() => {
+    if (!main) return [];
+    return [main.id, ...descendants(main, tree).map((c) => c.id)];
+  }, [main, tree]);
+
+  // Filters configured on this category (or inherited from an ancestor) apply here.
+  const filters = useMemo(
+    () => effectiveFiltersForCategory(main?.id ?? null, allFilters ?? [], categoriesById),
+    [main, allFilters, categoriesById],
+  );
+
+  const { data: listings, isLoading } = useQuery({
+    queryKey: ["category-listings", main?.id, filterValues],
+    enabled: !!main,
+    queryFn: async () => {
+      let qb = supabase
+        .from("listings")
+        .select(
+          "id, kaupet_code, title, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order)",
+        )
+        .eq("status", "active")
+        .in("category_id", categoryIds);
+      qb = applyAttributeFilters(qb, filterValues);
+      const { data, error } = await qb.order("created_at", { ascending: false }).limit(48);
+      if (error) throw error;
+      return (data ?? []).map<ListingCardData>((l) => {
+        const imgs = (l.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
+        return {
+          id: l.id,
+          kaupet_code: l.kaupet_code,
+          title: l.title,
+          price_nok: l.price_nok,
+          is_free: l.is_free,
+          city: l.city,
+          created_at: l.created_at,
+          cover_path: imgs[0]?.storage_path ?? null,
+        };
+      });
+    },
+  });
+
+  if (categories && !main) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-20 text-center">
+        <h1 className="font-display text-3xl">Fant ikke kategorien</h1>
+        <p className="mt-3 text-muted-foreground">Kategorien «{slug}» finnes ikke.</p>
+        <Link to="/annonser" search={{ q: "", category: "", sort: "new" }}>
+          <Button className="mt-6">Til alle annonser</Button>
+        </Link>
+      </div>
+    );
+  }
+
+  const Icon = getCategoryIcon(main?.icon ?? accentSource?.icon ?? null);
+  const accent = accentSource?.color ?? undefined;
+
+  return (
+    <div>
+      <section
+        className="relative overflow-hidden"
+        style={accent ? { background: accent } : undefined}
+      >
+        <div className="absolute inset-0 bg-background/80" aria-hidden />
+        <div className="relative z-10 mx-auto max-w-6xl px-4 py-12">
+          <div className="flex items-center gap-3">
+            <span
+              className="flex size-12 items-center justify-center rounded-full text-white"
+              style={{ background: accent ?? "var(--primary)" }}
+            >
+              <Icon className="size-6" />
+            </span>
+            <h1 className="font-display text-4xl tracking-tight">
+              {path.length > 1
+                ? path.map((p) => p.name_nb).join(" › ")
+                : (main?.name_nb ?? "Kategori")}
+            </h1>
+          </div>
+          <Link
+            to="/annonser"
+            search={{ q: "", category: main?.slug ?? "", sort: "new" }}
+            className="mt-3 inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+          >
+            <Search className="size-4" /> Søk i alle kategorier
+          </Link>
+        </div>
+      </section>
+
+      <div className="mx-auto max-w-6xl gap-8 px-4 py-8 md:grid md:grid-cols-[16rem_1fr]">
+        {/* Category-specific filters */}
+        {filters.length > 0 && (
+          <aside className="mb-6 space-y-5 md:mb-0">
+            <p className="text-sm font-medium">Filtrer</p>
+            <CategoryFilterFields
+              filters={filters}
+              values={filterValues}
+              onChange={(key, v) =>
+                setFilterValues((prev) => {
+                  const next = { ...prev };
+                  if (v === undefined) delete next[key];
+                  else next[key] = v;
+                  return next;
+                })
+              }
+            />
+            {Object.keys(filterValues).length > 0 && (
+              <Button variant="outline" size="sm" onClick={() => setFilterValues({})}>
+                Nullstill filtre
+              </Button>
+            )}
+          </aside>
+        )}
+
+        <div>
+          {isLoading ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-muted" />
+              ))}
+            </div>
+          ) : (listings ?? []).length === 0 ? (
+            <p className="py-16 text-center text-muted-foreground">
+              Ingen annonser i denne kategorien ennå.
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {(listings ?? []).map((l) => (
+                <ListingCard key={l.id} listing={l} />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

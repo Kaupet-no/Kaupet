@@ -9,11 +9,27 @@
 -- the relevant main category (so they are not silently orphaned by the
 -- listings.category_id ON DELETE SET NULL behavior), then the old category
 -- rows (and their cascaded category_filters) are deleted, then the new tree
--- is inserted.
+-- is inserted. wtb_listings.category_id has no ON DELETE rule (defaults to
+-- RESTRICT), so it must be reassigned too or the delete below fails with a
+-- foreign key violation.
 
 -- 1. Reassign listings from any non-main category to their main category
 --    before we delete the old subtree.
 UPDATE public.listings l
+SET category_id = m.id
+FROM public.categories c
+JOIN public.categories m ON m.slug IN (
+  'elektronikk', 'interior', 'hus-og-hage', 'klar-og-mote', 'sport',
+  'dyr-og-utstyr', 'bil-og-mc', 'kunst', 'barn-og-baby', 'bat'
+) AND m.parent_id IS NULL
+WHERE l.category_id = c.id
+  AND c.parent_id IS NOT NULL
+  AND (
+    c.parent_id = m.id
+    OR c.parent_id IN (SELECT id FROM public.categories WHERE parent_id = m.id)
+  );
+
+UPDATE public.wtb_listings l
 SET category_id = m.id
 FROM public.categories c
 JOIN public.categories m ON m.slug IN (

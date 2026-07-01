@@ -255,10 +255,7 @@ function WebLanding() {
     }
     const subs = childrenByParent.get(cat.id) ?? [];
     if (subs.length === 0) {
-      navigate({
-        to: "/annonser",
-        search: { q: "", category: cat.slug, sort: "new" },
-      });
+      navigate({ to: "/kategori/$slug", params: { slug: cat.slug } });
       return;
     }
     setSelectedPath([cat]);
@@ -313,7 +310,8 @@ function WebLanding() {
         key={cat.id}
         type="button"
         onClick={() => handlePickCategory(cat)}
-        className="group flex w-14 flex-col items-center gap-1.5 text-center"
+        aria-expanded={active}
+        className="group flex w-16 flex-col items-center gap-1.5 text-center"
       >
         <span
           className={`flex size-10 items-center justify-center rounded-full transition ${
@@ -324,7 +322,7 @@ function WebLanding() {
         >
           <Icon className="size-4" />
         </span>
-        <span className="line-clamp-2 text-pretty text-[11px] font-medium leading-tight text-foreground">
+        <span className="line-clamp-2 text-pretty text-xs font-medium leading-tight text-foreground">
           {cat.name_nb}
         </span>
       </button>
@@ -436,24 +434,35 @@ function WebLanding() {
             </Button>
           </form>
 
-          {/* Hovedkategorier — alltid synlige i én horisontal, sveipbar rad
-              rett under søkefeltet, så man kan bla uten å klikke seg inn
-              først. Underkategorier/filtre ligger bak hvert valg. */}
-          <div
-            className="mx-auto mt-6 flex max-w-lg gap-4 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            style={{ scrollSnapType: "x proximity" }}
-          >
-            {rootCategories.length === 0 &&
-              Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="flex w-14 shrink-0 flex-col items-center gap-1.5">
-                  <div className="size-10 animate-pulse rounded-full bg-muted" />
+          {/* Hovedkategorier — på mobil én horisontal, sveipbar rad med
+              kant-fade som viser at det finnes flere; fra sm og opp brytes
+              raden slik at alle kategoriene alltid er synlige uten scroll.
+              Underkategorier ligger bak hvert valg. */}
+          <div className="relative mx-auto mt-6 max-w-lg sm:max-w-2xl">
+            <div
+              className="flex gap-4 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:justify-center sm:overflow-visible"
+              style={{ scrollSnapType: "x proximity" }}
+            >
+              {rootCategories.length === 0 &&
+                Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="flex w-16 shrink-0 flex-col items-center gap-1.5">
+                    <div className="size-10 animate-pulse rounded-full bg-muted" />
+                  </div>
+                ))}
+              {rootCategories.map((cat) => (
+                <div key={cat.id} className="shrink-0" style={{ scrollSnapAlign: "start" }}>
+                  {renderCategoryIcon(cat)}
                 </div>
               ))}
-            {rootCategories.map((cat) => (
-              <div key={cat.id} className="shrink-0" style={{ scrollSnapAlign: "start" }}>
-                {renderCategoryIcon(cat)}
-              </div>
-            ))}
+            </div>
+            {/* Kant-fade — kun mobil, hinter om at raden kan sveipes videre.
+                Skjules mens en kategori er valgt, siden fargen ellers ville
+                kollidert med kategoritinten bak. */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-surface to-transparent transition-opacity sm:hidden"
+              style={{ opacity: activeCategory ? 0 : 1 }}
+            />
           </div>
 
           <Collapsible

@@ -7,6 +7,7 @@ import { IpBansTab } from "@/components/admin/moderasjon/ip-bans-tab";
 import { LogTab } from "@/components/admin/moderasjon/log-tab";
 import { ErrorLogTab } from "@/components/admin/moderasjon/error-log-tab";
 import { ReportsTab } from "@/components/admin/moderasjon/reports-tab";
+import { VehicleBrandsTab } from "@/components/admin/moderasjon/vehicle-brands-tab";
 import { useIsAdmin } from "@/lib/use-is-admin";
 
 export const Route = createFileRoute("/_authenticated/admin/moderasjon")({
@@ -21,6 +22,7 @@ function ModerationPage() {
     <Tabs defaultValue="reports" className="space-y-6">
       <TabsList className="flex flex-wrap">
         <TabsTrigger value="reports">Varsler</TabsTrigger>
+        <TabsTrigger value="vehicle-brands">Kjøretøymerker</TabsTrigger>
         {isAdmin && (
           <>
             <TabsTrigger value="listings">Annonser</TabsTrigger>
@@ -34,6 +36,9 @@ function ModerationPage() {
       </TabsList>
       <TabsContent value="reports">
         <ReportsTab />
+      </TabsContent>
+      <TabsContent value="vehicle-brands">
+        <VehicleBrandsTab />
       </TabsContent>
       {isAdmin && (
         <>

@@ -35,6 +35,7 @@ import {
   useAllCategoryFilters,
   type AttributeMap,
 } from "@/components/attribute-fields";
+import { VehicleLookupPanel } from "@/components/vehicle-lookup-panel";
 import {
   categoryBreadcrumb,
   getMissingRequiredFilters,
@@ -1050,6 +1051,13 @@ function NewListingPage() {
                 </p>
               )}
 
+              <VehicleLookupPanel
+                categoryId={categoryId || null}
+                categories={categories ?? []}
+                value={attributes}
+                onChange={setAttributes}
+              />
+
               <AttributeFields
                 categoryId={categoryId || null}
                 categories={categories ?? []}
@@ -1579,6 +1587,13 @@ function NewListingPage() {
                   {errors.category_id.message}
                 </p>
               )}
+
+              <VehicleLookupPanel
+                categoryId={categoryId || null}
+                categories={categories ?? []}
+                value={attributes}
+                onChange={setAttributes}
+              />
 
               <AttributeFields
                 categoryId={categoryId || null}

@@ -9,9 +9,25 @@ export const attributesSchema = z.record(
   z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]),
 );
 
-export type FilterType = "select" | "multiselect" | "number" | "range" | "boolean" | "text";
+export type FilterType =
+  | "select"
+  | "multiselect"
+  | "number"
+  | "range"
+  | "boolean"
+  | "text"
+  | "brand_select"
+  | "model_select";
 
 export type FilterOption = { value: string; label_nb: string };
+
+/** For brand_select filters, `unit` stores which vehicle_brands.category_group to read from. */
+export type VehicleBrandGroup =
+  | "bil"
+  | "motorsykkel"
+  | "moped_atv"
+  | "bobil_campingvogn"
+  | "henger";
 
 export type CategoryFilter = {
   id: string;
@@ -31,6 +47,8 @@ export const FILTER_TYPE_LABELS: Record<FilterType, string> = {
   range: "Tallområde (fra–til)",
   boolean: "Ja/nei",
   text: "Fritekst",
+  brand_select: "Bilmerke (koblet)",
+  model_select: "Bilmodell (koblet)",
 };
 
 /** Coerces a raw DB row (options is JSONB) into a typed CategoryFilter. */

@@ -96,9 +96,13 @@ function LandingPage() {
 // <img> included) instead of just re-rendering it, causing visible flicker.
 function PopularCarousel({
   popular,
+  isError,
+  onRetry,
   autoplay,
 }: {
   popular: ListingCardData[] | undefined;
+  isError: boolean;
+  onRetry: () => void;
   autoplay: React.RefObject<ReturnType<typeof Autoplay>>;
 }) {
   return (
@@ -114,7 +118,16 @@ function PopularCarousel({
         </Link>
       </div>
 
-      {popular && popular.length > 0 ? (
+      {isError ? (
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-muted/40 py-10 text-center">
+          <p className="text-sm text-muted-foreground">
+            Klarte ikke å hente populære annonser akkurat nå.
+          </p>
+          <Button variant="outline" size="sm" onClick={onRetry}>
+            Prøv igjen
+          </Button>
+        </div>
+      ) : popular && popular.length > 0 ? (
         <Carousel
           opts={{ align: "start", loop: true }}
           plugins={[autoplay.current]}
@@ -151,7 +164,11 @@ function WebLanding() {
   const [qDraft, setQDraft] = useState("");
   const autoplay = useRef(Autoplay({ delay: 4500, stopOnInteraction: true }));
 
-  const { data: categories } = useQuery({
+  const {
+    data: categories,
+    isError: categoriesIsError,
+    refetch: refetchCategories,
+  } = useQuery({
     queryKey: ["categories"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -207,6 +224,10 @@ function WebLanding() {
   const activeCategory = selectedPath[0] ?? null;
   const currentParent = selectedPath[selectedPath.length - 1] ?? null;
   const [categoriesOpen, setCategoriesOpen] = useState(false);
+  // Tracks which way the subcategory list/filter panel should slide in, so
+  // drilling deeper feels like moving forward (from the right) and going
+  // back feels like retreating (from the left) — matching the hero swap.
+  const [navDirection, setNavDirection] = useState<"forward" | "back">("forward");
   const [filterValues, setFilterValues] = useState<Record<string, AttributeFilterValue>>({});
   const subcatRef = useRef<HTMLDivElement>(null);
 
@@ -261,6 +282,7 @@ function WebLanding() {
     setSelectedPath([cat]);
     setFilterValues({});
     setCategoriesOpen(true);
+    setNavDirection("forward");
     // Scroll so the newly revealed subcategories are visible after the slide-down.
     requestAnimationFrame(() => {
       setTimeout(
@@ -276,6 +298,7 @@ function WebLanding() {
   const drillIntoSub = (sub: CategoryRow) => {
     setSelectedPath((prev) => [...prev, sub]);
     setFilterValues({});
+    setNavDirection("forward");
     requestAnimationFrame(() => {
       setTimeout(
         () => subcatRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }),
@@ -292,11 +315,13 @@ function WebLanding() {
       setCategoriesOpen(false);
     }
     setFilterValues({});
+    setNavDirection("back");
   };
 
   const jumpToDepth = (index: number) => {
     setSelectedPath((prev) => prev.slice(0, index + 1));
     setFilterValues({});
+    setNavDirection("back");
   };
 
   // Shared look for every main-category icon — same neutral color regardless
@@ -329,7 +354,11 @@ function WebLanding() {
     );
   };
 
-  const { data: popular } = useQuery({
+  const {
+    data: popular,
+    isError: popularIsError,
+    refetch: refetchPopular,
+  } = useQuery({
     queryKey: ["popular-listings-last-week"],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("popular_listings_last_week", { _limit: 8 });
@@ -387,7 +416,7 @@ function WebLanding() {
               className="text-5xl leading-[1.05] tracking-tight duration-700 animate-in fade-in slide-in-from-right-4 md:text-6xl"
               style={{ fontFamily: categoryHeadingFontStack(activeCategory.heading_font) }}
             >
-              {activeCategory.name_nb}
+              /{activeCategory.name_nb}
             </h1>
           ) : (
             <div key="hero" className="duration-700 animate-in fade-in slide-in-from-left-4">
@@ -405,7 +434,7 @@ function WebLanding() {
                 onChange={(e) => setQDraft(e.target.value)}
                 onFocus={() => setQFocused(true)}
                 onBlur={() => setQFocused(false)}
-                placeholder={typewriterPlaceholder}
+                placeholder={typewriterPlaceholder ? `f.eks. ${typewriterPlaceholder}` : ""}
                 className="h-12 border-border bg-card pl-9 text-base shadow-md"
                 aria-label="Søk i annonser"
               />
@@ -443,7 +472,16 @@ function WebLanding() {
               className="flex gap-4 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:justify-center sm:overflow-visible"
               style={{ scrollSnapType: "x proximity" }}
             >
-              {rootCategories.length === 0 &&
+              {categoriesIsError && (
+                <div className="flex w-full flex-col items-center gap-2 py-2 text-center">
+                  <p className="text-xs text-muted-foreground">Klarte ikke å hente kategorier.</p>
+                  <Button variant="outline" size="sm" onClick={() => void refetchCategories()}>
+                    Prøv igjen
+                  </Button>
+                </div>
+              )}
+              {!categoriesIsError &&
+                rootCategories.length === 0 &&
                 Array.from({ length: 8 }).map((_, i) => (
                   <div key={i} className="flex w-16 shrink-0 flex-col items-center gap-1.5">
                     <div className="size-10 animate-pulse rounded-full bg-muted" />
@@ -454,6 +492,23 @@ function WebLanding() {
                   {renderCategoryIcon(cat)}
                 </div>
               ))}
+              {/* Alltid synlig inngang til det fulle kategoritreet — dekker
+                  også kategorier uten farge (f.eks. "Annet") som ikke vises
+                  i raden over. */}
+              <div className="shrink-0" style={{ scrollSnapAlign: "start" }}>
+                <Link
+                  to="/annonser"
+                  search={{ q: "", category: "", sort: "new" }}
+                  className="group flex w-16 flex-col items-center gap-1.5 text-center"
+                >
+                  <span className="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground transition group-hover:bg-primary group-hover:text-primary-foreground">
+                    <FolderOpen className="size-4" />
+                  </span>
+                  <span className="line-clamp-2 text-pretty text-xs font-medium leading-tight text-foreground">
+                    Se alle
+                  </span>
+                </Link>
+              </div>
             </div>
             {/* Kant-fade — kun mobil, hinter om at raden kan sveipes videre.
                 Skjules mens en kategori er valgt, siden fargen ellers ville
@@ -477,169 +532,182 @@ function WebLanding() {
           >
             <CollapsibleContent>
               {currentParent && (
-                // Underkategorier + filtre — frikoblet, ikke i boks, så det er
-                // tydelig at man har beveget seg ut av hovedkategori-valget.
-                <div ref={subcatRef} className="mx-auto mt-3 max-w-xl text-left">
-                  <button
-                    type="button"
-                    onClick={goBack}
-                    className="mb-2 flex items-center gap-1 rounded px-1.5 py-1 text-left text-xs text-muted-foreground hover:bg-muted"
-                  >
-                    <ChevronLeft className="size-3.5" />
-                    {selectedPath.length > 1
-                      ? `Tilbake til ${selectedPath[selectedPath.length - 2].name_nb}`
-                      : "Lukk"}
-                  </button>
+                // Underkategorier + filtre — bryter ut av hero-kolonnens
+                // max-w-2xl slik at panelet blir like bredt som seksjonene
+                // lenger ned på siden (max-w-6xl), og gir filtrene god plass
+                // ved siden av listen i stedet for å bli klemt sammen.
+                <div
+                  className="relative left-1/2 -ml-[50vw] mt-3 w-screen text-left"
+                  ref={subcatRef}
+                >
+                  <div className="mx-auto max-w-6xl px-4">
+                    <button
+                      type="button"
+                      onClick={goBack}
+                      className="mb-2 flex items-center gap-1 rounded px-1.5 py-1 text-left text-xs text-muted-foreground hover:bg-muted"
+                    >
+                      <ChevronLeft className="size-3.5" />
+                      {selectedPath.length > 1
+                        ? `Tilbake til ${selectedPath[selectedPath.length - 2].name_nb}`
+                        : "Lukk"}
+                    </button>
 
-                  {selectedPath.length > 1 && (
-                    <div className="mb-3 flex flex-wrap items-center gap-1.5">
-                      {selectedPath.map((c, i) => (
-                        <Badge
-                          key={c.id}
-                          variant={i === selectedPath.length - 1 ? "default" : "secondary"}
-                          className="cursor-pointer"
-                          onClick={() => jumpToDepth(i)}
-                        >
-                          {c.name_nb}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-
-                  <div
-                    key={currentParent.id}
-                    className="grid grid-cols-3 gap-1 duration-200 animate-in fade-in slide-in-from-right-4 sm:grid-cols-4 md:grid-cols-6"
-                  >
-                    {(() => {
-                      const subs = childrenByParent.get(currentParent.id) ?? [];
-                      const AllIcon = getCategoryIcon(currentParent.icon);
-
-                      return (
-                        <>
-                          <Link
-                            to="/kategori/$slug"
-                            params={{ slug: currentParent.slug }}
-                            className="group flex flex-col items-center gap-1.5 rounded-xl p-2 text-center transition hover:bg-muted"
+                    {selectedPath.length > 1 && (
+                      <div className="mb-3 flex flex-wrap items-center gap-1.5">
+                        {selectedPath.map((c, i) => (
+                          <Badge
+                            key={c.id}
+                            variant={i === selectedPath.length - 1 ? "default" : "secondary"}
+                            className="cursor-pointer"
+                            onClick={() => jumpToDepth(i)}
                           >
-                            <span className="flex size-11 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                              <AllIcon className="size-5" />
-                            </span>
-                            <span className="line-clamp-2 text-pretty text-xs font-medium leading-tight">
-                              Alt i {currentParent.name_nb}
-                            </span>
-                          </Link>
-                          {subs.map((sub) => {
-                            const Icon = getCategoryIcon(sub.icon);
-                            return (
-                              <button
-                                key={sub.id}
-                                type="button"
-                                onClick={() => drillIntoSub(sub)}
-                                className="group flex flex-col items-center gap-1.5 rounded-xl p-2 text-center transition hover:bg-muted"
-                              >
-                                <span className="flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
-                                  <Icon className="size-5" />
-                                </span>
-                                <span className="line-clamp-2 text-pretty text-xs font-medium leading-tight">
-                                  {sub.name_nb}
-                                </span>
-                              </button>
-                            );
-                          })}
-                          {subs.length === 0 && (
-                            <p className="col-span-full text-sm text-muted-foreground">
-                              Ingen underkategorier — trykk over for å se alle annonser.
-                            </p>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </div>
+                            {c.name_nb}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
 
-                  {activeFilters.length > 0 && (
-                    <div className="mt-4 space-y-4 border-t border-border pt-4">
-                      <CategoryFilterFields
-                        filters={activeFilters}
-                        values={filterValues}
-                        onChange={(key, v) =>
-                          setFilterValues((prev) => {
-                            const next = { ...prev };
-                            if (v === undefined) delete next[key];
-                            else next[key] = v;
-                            return next;
-                          })
-                        }
-                      />
-                      <Button
-                        onClick={() =>
-                          navigate({
-                            to: "/kategori/$slug",
-                            params: { slug: currentParent.slug },
-                            search: { f: filterValues },
-                          })
-                        }
-                      >
-                        Vis treff
-                      </Button>
+                    <div
+                      key={currentParent.id}
+                      className={`duration-700 animate-in fade-in ${
+                        navDirection === "forward"
+                          ? "slide-in-from-right-4"
+                          : "slide-in-from-left-4"
+                      }`}
+                    >
+                      {/* Underkategorier som kompakte tekst-tagger i en rad —
+                          bevisst uten ikon-sirkel/farge, så nivået leser som
+                          en nedtrapping fra hovedkategori-raden i stedet for
+                          en gjentakelse av samme visuelle mønster. */}
+                      <div className="flex flex-wrap gap-2">
+                        {(() => {
+                          const subs = childrenByParent.get(currentParent.id) ?? [];
+
+                          return (
+                            <>
+                              <Link
+                                to="/$kaupetCode"
+                                params={{ kaupetCode: currentParent.slug }}
+                                className="rounded-lg border border-primary bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition"
+                              >
+                                Alt i {currentParent.name_nb}
+                              </Link>
+                              {subs.map((sub) => (
+                                <button
+                                  key={sub.id}
+                                  type="button"
+                                  onClick={() => drillIntoSub(sub)}
+                                  className="rounded-lg border border-border bg-card px-3 py-1.5 text-sm text-foreground transition hover:border-primary hover:text-primary"
+                                >
+                                  {sub.name_nb}
+                                </button>
+                              ))}
+                              {subs.length === 0 && (
+                                <p className="py-1.5 text-sm text-muted-foreground">
+                                  Ingen underkategorier — trykk over for å se alle annonser.
+                                </p>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
+
+                      {/* Filtre for valgt underkategori — under tag-raden,
+                          full bredde, så det ikke blir tomrom ved siden av
+                          en kompakt tag-rad når det ikke finnes filtre. */}
+                      {activeFilters.length > 0 && (
+                        <div className="mt-4 space-y-4 border-t border-border pt-4">
+                          <CategoryFilterFields
+                            filters={activeFilters}
+                            values={filterValues}
+                            onChange={(key, v) =>
+                              setFilterValues((prev) => {
+                                const next = { ...prev };
+                                if (v === undefined) delete next[key];
+                                else next[key] = v;
+                                return next;
+                              })
+                            }
+                          />
+                          <Button
+                            onClick={() =>
+                              navigate({
+                                to: "/$kaupetCode",
+                                params: { kaupetCode: currentParent.slug },
+                                search: { f: filterValues },
+                              })
+                            }
+                          >
+                            Vis treff
+                          </Button>
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
             </CollapsibleContent>
           </Collapsible>
 
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
-            {user ? (
-              <>
-                <Button size="lg" variant="outline" onClick={() => setAdPickerOpen(true)}>
-                  Opprett en annonse
-                </Button>
-                <Dialog open={adPickerOpen} onOpenChange={setAdPickerOpen}>
-                  <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Ny annonse</DialogTitle>
-                    </DialogHeader>
-                    <AdPickerOptions
-                      onSell={() => {
-                        setAdPickerOpen(false);
-                        void navigate({ to: "/ny-annonse", search: { type: "sell" } });
-                      }}
-                      onBuy={() => {
-                        setAdPickerOpen(false);
-                        void navigate({ to: "/ny-ok-annonse" });
-                      }}
-                    />
-                  </DialogContent>
-                </Dialog>
-                <KaupetCodeDialog />
-              </>
-            ) : (
-              <>
-                <KaupetCodeDialog />
-                <div className="relative flex flex-col items-center">
-                  <Link to="/auth" search={{ mode: "signup" }}>
-                    <Button size="lg" variant="outline">
-                      Kom i gang gratis
-                    </Button>
-                  </Link>
-                  {/* Flytende, leken merkelapp — på mobil (stablede knapper) ligger
+          {!activeCategory && (
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              {user ? (
+                <>
+                  <Button size="lg" variant="outline" onClick={() => setAdPickerOpen(true)}>
+                    Opprett en annonse
+                  </Button>
+                  <Dialog open={adPickerOpen} onOpenChange={setAdPickerOpen}>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Ny annonse</DialogTitle>
+                      </DialogHeader>
+                      <AdPickerOptions
+                        onSell={() => {
+                          setAdPickerOpen(false);
+                          void navigate({ to: "/ny-annonse", search: { type: "sell" } });
+                        }}
+                        onBuy={() => {
+                          setAdPickerOpen(false);
+                          void navigate({ to: "/ny-ok-annonse" });
+                        }}
+                      />
+                    </DialogContent>
+                  </Dialog>
+                  <KaupetCodeDialog />
+                </>
+              ) : (
+                <>
+                  <KaupetCodeDialog />
+                  <div className="relative flex flex-col items-center">
+                    <Link to="/auth" search={{ mode: "signup" }}>
+                      <Button size="lg" variant="outline">
+                        Kom i gang gratis
+                      </Button>
+                    </Link>
+                    {/* Flytende, leken merkelapp — på mobil (stablede knapper) ligger
                       den i normal flyt for å ikke dekke knappen under; fra sm og opp
                       er det rom til å la den flyte fritt over innholdet. */}
-                  <div className="pointer-events-none relative mt-3 w-44 rotate-[-3deg] rounded-2xl bg-primary px-3 py-2.5 text-center text-xs font-medium leading-snug text-primary-foreground shadow-lg sm:absolute sm:left-1/2 sm:top-full sm:z-20 sm:mt-3 sm:w-44 sm:-translate-x-1/2">
-                    <span className="absolute -top-1.5 left-9 size-3 rotate-45 rounded-[2px] bg-primary" />
-                    Det er alltid gratis å legge ut annonser på Kaupet, uansett hva du selger.
+                    <div className="pointer-events-none relative mt-3 w-44 rotate-[-3deg] rounded-2xl bg-primary px-3 py-2.5 text-center text-xs font-medium leading-snug text-primary-foreground shadow-lg sm:absolute sm:left-1/2 sm:top-full sm:z-20 sm:mt-3 sm:w-44 sm:-translate-x-1/2">
+                      <span className="absolute -top-1.5 left-9 size-3 rotate-45 rounded-[2px] bg-primary" />
+                      Det er alltid gratis å annonsere på Kaupet, uansett hva du selger.
+                    </div>
                   </div>
-                </div>
-              </>
-            )}
-          </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </section>
 
       {/* Populært akkurat nå — egen seksjon, lenger ned slik at søkefeltet
           eier hero-seksjonen alene */}
       <section className="mx-auto max-w-6xl px-4 pb-16">
-        <PopularCarousel popular={popular} autoplay={autoplay} />
+        <PopularCarousel
+          popular={popular}
+          isError={popularIsError}
+          onRetry={() => void refetchPopular()}
+          autoplay={autoplay}
+        />
       </section>
 
       {/* How it works */}
@@ -685,7 +753,11 @@ function WebLanding() {
                 Et alternativ vi bygger sammen.
               </h2>
               <p className="mt-3 max-w-xl opacity-90">
-                Kaupet.no bygges åpent på GitHub. Frivillige utviklere og designere er hjertelig
+                Kaupet.no bygges på åpen kildekode, med rett til personvern som et grunnprinsipp. Vi
+                benytter derfor ingen sporende informasjonskapsler eller tredjeparts analyseverktøy.
+              </p>
+              <p>
+                Ønsker du å bidra? Sjekk ut repoet på GitHub. Alle bidragsytere er hjertelig
                 velkomne.
               </p>
             </div>

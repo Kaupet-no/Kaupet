@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { createWtbListing } from "@/lib/wtb-listings.functions";
 import { createSavedSearch, summarizeCriteria } from "@/lib/saved-searches";
 import { CategoryPicker } from "@/components/category-picker";
+import { AttributeFields, type AttributeMap } from "@/components/attribute-fields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -68,6 +69,7 @@ function NewWtbPage() {
   const [savingSearch, setSavingSearch] = useState(false);
   const [savedSearch, setSavedSearch] = useState(false);
   const [createdId, setCreatedId] = useState<string | null>(null);
+  const [attributes, setAttributes] = useState<AttributeMap>({});
 
   const { data: categories = [] } = useQuery({
     queryKey: ["categories"],
@@ -115,6 +117,7 @@ function NewWtbPage() {
           description: values.description || undefined,
           category_id: values.category_id ?? null,
           max_price_nok: typeof values.max_price_nok === "number" ? values.max_price_nok : null,
+          attributes,
         },
       });
       return result.id;
@@ -263,6 +266,12 @@ function NewWtbPage() {
                 <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
               </button>
             }
+          />
+          <AttributeFields
+            categoryId={categoryId ?? null}
+            categories={categories}
+            value={attributes}
+            onChange={setAttributes}
           />
         </section>
 

@@ -10,7 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { reconcilePromotionPayment } from "@/lib/promotions.functions";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, MapPin } from "lucide-react";
+import { ArrowLeft, MapPin, Search } from "lucide-react";
 import { toast } from "sonner";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { z } from "zod";
@@ -23,6 +23,16 @@ import { ListingActionsMenu } from "@/components/listing-detail/listing-actions-
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/use-auth";
 import { readLastSearchContext, type LastSearchContext } from "@/lib/last-search-context";
+import { CategoryFilterFields } from "@/components/category-filter-fields";
+import { getCategoryIcon } from "@/lib/category-icons";
+import { buildTree, descendants, type Category } from "@/lib/categories";
+import { normalizeSlugForMatch } from "@/lib/slug";
+import {
+  applyAttributeFilters,
+  effectiveFiltersForCategory,
+  normalizeFilter,
+  type AttributeFilterValue,
+} from "@/lib/category-filters";
 
 import { signListingImageUrls } from "@/lib/storage";
 import { CONDITION_LABEL } from "@/lib/constants";
@@ -30,6 +40,7 @@ import { Button } from "@/components/ui/button";
 import { ImageGallery } from "@/components/listing-detail/image-gallery";
 import { OwnerStatsPanel } from "@/components/listing-detail/owner-stats-panel";
 import { SellerContactPanel } from "@/components/listing-detail/seller-contact-panel";
+import { ListingCard, type ListingCardData } from "@/components/listing-card";
 
 const ListingDetailMap = lazy(() =>
   import("@/components/listing-detail-map").then((m) => ({ default: m.ListingDetailMap })),
@@ -55,22 +66,46 @@ export const Route = createFileRoute("/$kaupetCode")({
   validateSearch: z.object({
     promotion: z.string().optional(),
     promo_id: z.string().optional(),
+    // Only used by the category-landing branch, to deep-link preselected
+    // filter values (e.g. from the homepage's category picker).
+    f: z.record(z.string(), z.any()).optional(),
   }),
   loader: async ({ params }) => {
-    if (!/^[0-9]{8}$/.test(params.kaupetCode)) throw notFound();
-    const { data, error } = await supabase
-      .from("listings")
-      .select(
-        "id, kaupet_code, title, description, price_nok, is_free, condition, city, updated_at, published_at, status",
-      )
-      .eq("kaupet_code", params.kaupetCode)
-      .maybeSingle();
-    if (error) throw error;
-    if (!data) throw notFound();
-    return { listing: data };
+    // A single dynamic root segment serves two purposes: an 8-digit code is
+    // always a listing (kaupet-koder are numeric by construction), anything
+    // else is looked up as a main category's landing page slug. Two separate
+    // routes at "/$..." would be ambiguous, so both live in this one loader.
+    if (/^[0-9]{8}$/.test(params.kaupetCode)) {
+      const { data, error } = await supabase
+        .from("listings")
+        .select(
+          "id, kaupet_code, title, description, price_nok, is_free, condition, city, updated_at, published_at, status",
+        )
+        .eq("kaupet_code", params.kaupetCode)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) throw notFound();
+      return { kind: "listing" as const, listing: data };
+    }
+
+    const { data: mains, error: catError } = await supabase
+      .from("categories")
+      .select("id, slug, name_nb, parent_id, icon, color")
+      .is("parent_id", null);
+    if (catError) throw catError;
+    const exact = (mains ?? []).find((c) => c.slug === params.kaupetCode);
+    const normalizedSlug = normalizeSlugForMatch(params.kaupetCode);
+    const category =
+      exact ?? (mains ?? []).find((c) => normalizeSlugForMatch(c.slug) === normalizedSlug);
+    if (!category) throw notFound();
+    return { kind: "category" as const, category: category as Category };
   },
   head: ({ params, loaderData }) => {
-    const l = loaderData?.listing;
+    if (loaderData?.kind === "category") {
+      const c = loaderData.category;
+      return { meta: [{ title: `/${c.name_nb} — Kaupet.no` }] };
+    }
+    const l = loaderData?.kind === "listing" ? loaderData.listing : undefined;
     if (!l) {
       return {
         meta: [{ title: "Annonse — Kaupet.no" }, { name: "robots", content: "noindex" }],
@@ -130,12 +165,14 @@ export const Route = createFileRoute("/$kaupetCode")({
       ],
     };
   },
-  component: ListingDetailPage,
+  component: RootSlugPage,
   errorComponent: ListingErrorBoundary,
   notFoundComponent: () => (
     <div className="mx-auto max-w-2xl px-4 py-20 text-center">
-      <h1 className="font-display text-2xl">Annonsen finnes ikke</h1>
-      <p className="mt-2 text-sm text-muted-foreground">Den kan ha blitt fjernet eller solgt.</p>
+      <h1 className="font-display text-2xl">Fant ikke siden</h1>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Annonsen kan ha blitt fjernet eller solgt, eller kategorien finnes ikke.
+      </p>
       <Link to="/annonser" search={{ q: "", category: "", sort: "new" }}>
         <Button className="mt-6" variant="outline">
           Se flere annonser
@@ -144,6 +181,160 @@ export const Route = createFileRoute("/$kaupetCode")({
     </div>
   ),
 });
+
+function RootSlugPage() {
+  const loaderData = Route.useLoaderData();
+  if (loaderData.kind === "category") return <CategoryLandingPage main={loaderData.category} />;
+  return <ListingDetailPage />;
+}
+
+function CategoryLandingPage({ main }: { main: Category }) {
+  const { f: initialFilters } = Route.useSearch() as { f?: Record<string, AttributeFilterValue> };
+  const [filterValues, setFilterValues] = useState<Record<string, AttributeFilterValue>>(
+    () => initialFilters ?? {},
+  );
+
+  const { data: categories } = useQuery({
+    queryKey: ["categories", "with-color"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("categories")
+        .select("id, slug, name_nb, parent_id, icon, color")
+        .order("sort_order")
+        .order("name_nb");
+      if (error) throw error;
+      return (data ?? []) as Category[];
+    },
+  });
+
+  const { data: allFilters } = useQuery({
+    queryKey: ["category-filters", "all"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("category_filters")
+        .select("id, category_id, key, label_nb, type, unit, options, sort_order")
+        .order("sort_order");
+      if (error) throw error;
+      return (data ?? []).map(normalizeFilter);
+    },
+  });
+
+  const tree = useMemo(() => buildTree(categories ?? []), [categories]);
+  const categoryIds = useMemo(
+    () => [main.id, ...descendants(main, tree).map((c) => c.id)],
+    [main, tree],
+  );
+  const filters = useMemo(
+    () => effectiveFiltersForCategory(main.id, allFilters ?? [], tree.byId),
+    [main, allFilters, tree],
+  );
+
+  const { data: listings, isLoading } = useQuery({
+    queryKey: ["category-listings", main.id, filterValues],
+    queryFn: async () => {
+      let qb = supabase
+        .from("listings")
+        .select(
+          "id, kaupet_code, title, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order)",
+        )
+        .eq("status", "active")
+        .in("category_id", categoryIds);
+      qb = applyAttributeFilters(qb, filterValues);
+      const { data, error } = await qb.order("created_at", { ascending: false }).limit(48);
+      if (error) throw error;
+      return (data ?? []).map<ListingCardData>((l) => {
+        const imgs = (l.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
+        return {
+          id: l.id,
+          kaupet_code: l.kaupet_code,
+          title: l.title,
+          price_nok: l.price_nok,
+          is_free: l.is_free,
+          city: l.city,
+          created_at: l.created_at,
+          cover_path: imgs[0]?.storage_path ?? null,
+        };
+      });
+    },
+  });
+
+  const Icon = getCategoryIcon(main.icon ?? null);
+  const accent = main.color ?? undefined;
+
+  return (
+    <div>
+      <section
+        className="relative overflow-hidden"
+        style={accent ? { background: accent } : undefined}
+      >
+        <div className="absolute inset-0 bg-background/80" aria-hidden />
+        <div className="relative z-10 mx-auto max-w-6xl px-4 py-12">
+          <div className="flex items-center gap-3">
+            <span
+              className="flex size-12 items-center justify-center rounded-full text-white"
+              style={{ background: accent ?? "var(--primary)" }}
+            >
+              <Icon className="size-6" />
+            </span>
+            <h1 className="font-display text-4xl tracking-tight">/{main.name_nb}</h1>
+          </div>
+          <Link
+            to="/annonser"
+            search={{ q: "", category: main.slug, sort: "new" }}
+            className="mt-3 inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+          >
+            <Search className="size-4" /> Søk i alle kategorier
+          </Link>
+        </div>
+      </section>
+
+      <div className="mx-auto max-w-6xl gap-8 px-4 py-8 md:grid md:grid-cols-[16rem_1fr]">
+        {filters.length > 0 && (
+          <aside className="mb-6 space-y-5 md:mb-0">
+            <p className="text-sm font-medium">Filtrer</p>
+            <CategoryFilterFields
+              filters={filters}
+              values={filterValues}
+              onChange={(key, v) =>
+                setFilterValues((prev) => {
+                  const next = { ...prev };
+                  if (v === undefined) delete next[key];
+                  else next[key] = v;
+                  return next;
+                })
+              }
+            />
+            {Object.keys(filterValues).length > 0 && (
+              <Button variant="outline" size="sm" onClick={() => setFilterValues({})}>
+                Nullstill filtre
+              </Button>
+            )}
+          </aside>
+        )}
+
+        <div>
+          {isLoading ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-muted" />
+              ))}
+            </div>
+          ) : (listings ?? []).length === 0 ? (
+            <p className="py-16 text-center text-muted-foreground">
+              Ingen annonser i denne kategorien ennå.
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {(listings ?? []).map((l) => (
+                <ListingCard key={l.id} listing={l} />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function ListingErrorBoundary({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();

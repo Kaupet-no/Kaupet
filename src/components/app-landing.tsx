@@ -161,7 +161,8 @@ export function AppLanding() {
               className="h-14 w-full rounded-full border border-border bg-card pl-12 pr-4 text-base shadow-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
             />
             {!placeholderPaused && (
-              <div className="pointer-events-none absolute inset-y-0 left-12 right-4 flex items-center">
+              <div className="pointer-events-none absolute inset-y-0 left-12 right-4 flex items-center gap-1">
+                <span className="select-none text-base text-muted-foreground">f.eks.</span>
                 <AnimatedSearchPlaceholder
                   words={SEARCH_SUGGESTIONS}
                   paused={placeholderPaused}
@@ -275,7 +276,7 @@ export function AppLanding() {
             <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto rounded-t-2xl">
               <SheetHeader className="text-left">
                 <SheetTitle className="flex items-center gap-3">
-                  {activeCategory ? activeCategory.name_nb : "Kategorier"}
+                  {activeCategory ? `/${activeCategory.name_nb}` : "Kategorier"}
                   {activeCategory && (
                     <button
                       type="button"
@@ -368,7 +369,7 @@ export function AppLanding() {
         <section className="overflow-hidden pt-2 sm:px-5">
           <div className="mb-3 flex items-center justify-between gap-3 px-5 sm:px-0">
             <h2 className="font-display text-lg tracking-tight">
-              {activeCategory ? activeCategory.name_nb : "Kategorier"}
+              {activeCategory ? `/${activeCategory.name_nb}` : "Kategorier"}
             </h2>
             {activeCategory && (
               <button

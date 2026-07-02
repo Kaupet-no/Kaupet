@@ -17,7 +17,6 @@ import { Route as AnnonserRouteImport } from './routes/annonser'
 import { Route as KaupetCodeRouteImport } from './routes/$kaupetCode'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as KategoriSlugRouteImport } from './routes/kategori.$slug'
 import { Route as BrukerIdRouteImport } from './routes/bruker.$id'
 import { Route as AnnonseListingIdRouteImport } from './routes/annonse.$listingId'
 import { Route as AuthenticatedVarslerRouteImport } from './routes/_authenticated/varsler'
@@ -42,6 +41,7 @@ import { Route as AuthenticatedAdminBrukereRouteImport } from './routes/_authent
 import { Route as ApiPublicVippsWebhookRouteImport } from './routes/api/public/vipps/webhook'
 import { Route as ApiPublicPushDispatchRouteImport } from './routes/api/public/push/dispatch'
 import { Route as AuthenticatedMineAnnonserIdRedigerRouteImport } from './routes/_authenticated/mine-annonser.$id.rediger'
+import { Route as AuthenticatedMineAnnonserOkIdRedigerRouteImport } from './routes/_authenticated/mine-annonser.ok.$id.rediger'
 
 const VilkarRoute = VilkarRouteImport.update({
   id: '/vilkar',
@@ -80,11 +80,6 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const KategoriSlugRoute = KategoriSlugRouteImport.update({
-  id: '/kategori/$slug',
-  path: '/kategori/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BrukerIdRoute = BrukerIdRouteImport.update({
@@ -219,6 +214,12 @@ const AuthenticatedMineAnnonserIdRedigerRoute =
     path: '/mine-annonser/$id/rediger',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedMineAnnonserOkIdRedigerRoute =
+  AuthenticatedMineAnnonserOkIdRedigerRouteImport.update({
+    id: '/mine-annonser/ok/$id/rediger',
+    path: '/mine-annonser/ok/$id/rediger',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -238,7 +239,6 @@ export interface FileRoutesByFullPath {
   '/varsler': typeof AuthenticatedVarslerRoute
   '/annonse/$listingId': typeof AnnonseListingIdRoute
   '/bruker/$id': typeof BrukerIdRoute
-  '/kategori/$slug': typeof KategoriSlugRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
@@ -253,6 +253,7 @@ export interface FileRoutesByFullPath {
   '/mine-annonser/$id/rediger': typeof AuthenticatedMineAnnonserIdRedigerRoute
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
   '/api/public/vipps/webhook': typeof ApiPublicVippsWebhookRoute
+  '/mine-annonser/ok/$id/rediger': typeof AuthenticatedMineAnnonserOkIdRedigerRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -271,7 +272,6 @@ export interface FileRoutesByTo {
   '/varsler': typeof AuthenticatedVarslerRoute
   '/annonse/$listingId': typeof AnnonseListingIdRoute
   '/bruker/$id': typeof BrukerIdRoute
-  '/kategori/$slug': typeof KategoriSlugRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
@@ -286,6 +286,7 @@ export interface FileRoutesByTo {
   '/mine-annonser/$id/rediger': typeof AuthenticatedMineAnnonserIdRedigerRoute
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
   '/api/public/vipps/webhook': typeof ApiPublicVippsWebhookRoute
+  '/mine-annonser/ok/$id/rediger': typeof AuthenticatedMineAnnonserOkIdRedigerRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -307,7 +308,6 @@ export interface FileRoutesById {
   '/_authenticated/varsler': typeof AuthenticatedVarslerRoute
   '/annonse/$listingId': typeof AnnonseListingIdRoute
   '/bruker/$id': typeof BrukerIdRoute
-  '/kategori/$slug': typeof KategoriSlugRoute
   '/_authenticated/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/_authenticated/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/_authenticated/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
@@ -322,6 +322,7 @@ export interface FileRoutesById {
   '/_authenticated/mine-annonser/$id/rediger': typeof AuthenticatedMineAnnonserIdRedigerRoute
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
   '/api/public/vipps/webhook': typeof ApiPublicVippsWebhookRoute
+  '/_authenticated/mine-annonser/ok/$id/rediger': typeof AuthenticatedMineAnnonserOkIdRedigerRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -343,7 +344,6 @@ export interface FileRouteTypes {
     | '/varsler'
     | '/annonse/$listingId'
     | '/bruker/$id'
-    | '/kategori/$slug'
     | '/admin/brukere'
     | '/admin/kategorier'
     | '/admin/moderasjon'
@@ -358,6 +358,7 @@ export interface FileRouteTypes {
     | '/mine-annonser/$id/rediger'
     | '/api/public/push/dispatch'
     | '/api/public/vipps/webhook'
+    | '/mine-annonser/ok/$id/rediger'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -376,7 +377,6 @@ export interface FileRouteTypes {
     | '/varsler'
     | '/annonse/$listingId'
     | '/bruker/$id'
-    | '/kategori/$slug'
     | '/admin/brukere'
     | '/admin/kategorier'
     | '/admin/moderasjon'
@@ -391,6 +391,7 @@ export interface FileRouteTypes {
     | '/mine-annonser/$id/rediger'
     | '/api/public/push/dispatch'
     | '/api/public/vipps/webhook'
+    | '/mine-annonser/ok/$id/rediger'
   id:
     | '__root__'
     | '/'
@@ -411,7 +412,6 @@ export interface FileRouteTypes {
     | '/_authenticated/varsler'
     | '/annonse/$listingId'
     | '/bruker/$id'
-    | '/kategori/$slug'
     | '/_authenticated/admin/brukere'
     | '/_authenticated/admin/kategorier'
     | '/_authenticated/admin/moderasjon'
@@ -426,6 +426,7 @@ export interface FileRouteTypes {
     | '/_authenticated/mine-annonser/$id/rediger'
     | '/api/public/push/dispatch'
     | '/api/public/vipps/webhook'
+    | '/_authenticated/mine-annonser/ok/$id/rediger'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -439,7 +440,6 @@ export interface RootRouteChildren {
   VilkarRoute: typeof VilkarRoute
   AnnonseListingIdRoute: typeof AnnonseListingIdRoute
   BrukerIdRoute: typeof BrukerIdRoute
-  KategoriSlugRoute: typeof KategoriSlugRoute
   ApiPublicPushDispatchRoute: typeof ApiPublicPushDispatchRoute
   ApiPublicVippsWebhookRoute: typeof ApiPublicVippsWebhookRoute
 }
@@ -500,13 +500,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/kategori/$slug': {
-      id: '/kategori/$slug'
-      path: '/kategori/$slug'
-      fullPath: '/kategori/$slug'
-      preLoaderRoute: typeof KategoriSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/bruker/$id': {
@@ -677,6 +670,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMineAnnonserIdRedigerRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/mine-annonser/ok/$id/rediger': {
+      id: '/_authenticated/mine-annonser/ok/$id/rediger'
+      path: '/mine-annonser/ok/$id/rediger'
+      fullPath: '/mine-annonser/ok/$id/rediger'
+      preLoaderRoute: typeof AuthenticatedMineAnnonserOkIdRedigerRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -719,6 +719,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedMeldingerIndexRoute: typeof AuthenticatedMeldingerIndexRoute
   AuthenticatedMineAnnonserIndexRoute: typeof AuthenticatedMineAnnonserIndexRoute
   AuthenticatedMineAnnonserIdRedigerRoute: typeof AuthenticatedMineAnnonserIdRedigerRoute
+  AuthenticatedMineAnnonserOkIdRedigerRoute: typeof AuthenticatedMineAnnonserOkIdRedigerRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -737,6 +738,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedMineAnnonserIndexRoute: AuthenticatedMineAnnonserIndexRoute,
   AuthenticatedMineAnnonserIdRedigerRoute:
     AuthenticatedMineAnnonserIdRedigerRoute,
+  AuthenticatedMineAnnonserOkIdRedigerRoute:
+    AuthenticatedMineAnnonserOkIdRedigerRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -753,7 +756,6 @@ const rootRouteChildren: RootRouteChildren = {
   VilkarRoute: VilkarRoute,
   AnnonseListingIdRoute: AnnonseListingIdRoute,
   BrukerIdRoute: BrukerIdRoute,
-  KategoriSlugRoute: KategoriSlugRoute,
   ApiPublicPushDispatchRoute: ApiPublicPushDispatchRoute,
   ApiPublicVippsWebhookRoute: ApiPublicVippsWebhookRoute,
 }

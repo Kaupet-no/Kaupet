@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { attributesSchema } from "@/lib/category-filters";
 
 export type WtbListing = {
   id: string;
@@ -26,6 +27,8 @@ const wtbInputSchema = z.object({
   description: z.string().trim().max(2000, "Maks 2000 tegn").optional(),
   category_id: z.string().uuid().nullable().optional(),
   max_price_nok: z.number().int().min(0).max(10_000_000).nullable().optional(),
+  // Filters are always optional for WTB listings — never enforced server-side.
+  attributes: attributesSchema.optional(),
 });
 
 export const createWtbListing = createServerFn({ method: "POST" })
@@ -55,6 +58,7 @@ export const createWtbListing = createServerFn({ method: "POST" })
         description: data.description ?? null,
         category_id: data.category_id ?? null,
         max_price_nok: data.max_price_nok ?? null,
+        attributes: data.attributes ?? {},
       })
       .select("id")
       .single();
@@ -62,23 +66,40 @@ export const createWtbListing = createServerFn({ method: "POST" })
     return { id: row.id as string };
   });
 
+const wtbUpdateSchema = z.object({
+  id: z.string().uuid(),
+  title: z
+    .string()
+    .trim()
+    .min(3, "Tittelen må være minst 3 tegn")
+    .max(120, "Maks 120 tegn")
+    .optional(),
+  description: z.string().trim().max(2000, "Maks 2000 tegn").optional(),
+  category_id: z.string().uuid().nullable().optional(),
+  max_price_nok: z.number().int().min(0).max(10_000_000).nullable().optional(),
+  attributes: attributesSchema.optional(),
+  status: z.enum(["active", "fulfilled", "archived"]).optional(),
+});
+
 export const updateWtbListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z.object({ id: z.string().uuid() }).merge(wtbInputSchema).parse(input),
-  )
+  .inputValidator((input: unknown) => wtbUpdateSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { userId } = context;
 
+    const fields = {
+      ...(data.title !== undefined && { title: data.title }),
+      ...(data.description !== undefined && { description: data.description }),
+      ...(data.category_id !== undefined && { category_id: data.category_id }),
+      ...(data.max_price_nok !== undefined && { max_price_nok: data.max_price_nok }),
+      ...(data.attributes !== undefined && { attributes: data.attributes }),
+      ...(data.status !== undefined && { status: data.status }),
+    };
+
     const { error } = await supabaseAdmin
       .from("wtb_listings")
-      .update({
-        title: data.title,
-        description: data.description ?? null,
-        category_id: data.category_id ?? null,
-        max_price_nok: data.max_price_nok ?? null,
-      })
+      .update(fields)
       .eq("id", data.id)
       .eq("user_id", userId);
     if (error) throw error;

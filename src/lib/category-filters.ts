@@ -1,5 +1,13 @@
+import { z } from "zod";
+
 /** Minimal category shape needed for filter inheritance (avoids requiring slug/name). */
 export type CategoryNode = { id: string; parent_id: string | null };
+
+/** Free-form per-category attribute values keyed by category_filters.key. */
+export const attributesSchema = z.record(
+  z.string(),
+  z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]),
+);
 
 export type FilterType = "select" | "multiselect" | "number" | "range" | "boolean" | "text";
 
@@ -75,6 +83,47 @@ export function effectiveFiltersForCategory(
     );
   for (const f of ordered) byKey.set(f.key, f);
   return Array.from(byKey.values()).sort((a, b) => a.sort_order - b.sort_order);
+}
+
+/**
+ * Returns the effective filters (excluding "range", which is search-only, and
+ * "boolean", which a plain checkbox can't distinguish "unanswered" from
+ * "false" for) that don't yet have a value in `attributes`. Used to require
+ * filter values to be filled in before a listing can be published/saved.
+ */
+export function getMissingRequiredFilters(
+  categoryId: string | null,
+  allFilters: CategoryFilter[],
+  categoriesById: Map<string, CategoryNode>,
+  attributes: Record<string, AttributeValue>,
+): CategoryFilter[] {
+  const filters = effectiveFiltersForCategory(categoryId, allFilters, categoriesById).filter(
+    (f) => f.type !== "range" && f.type !== "boolean",
+  );
+  return filters.filter((f) => {
+    const v = attributes[f.key];
+    if (v === undefined || v === null) return true;
+    if (typeof v === "string") return v.trim() === "";
+    if (Array.isArray(v)) return v.length === 0;
+    return false;
+  });
+}
+
+/**
+ * Builds a " › "-separated breadcrumb label for a category by walking up its
+ * parent chain, e.g. "Elektronikk › TV og lyd › TV". Works for any depth.
+ */
+export function categoryBreadcrumb<
+  T extends { id: string; parent_id: string | null; name_nb: string },
+>(categoryId: string | null, categoriesById: Map<string, T>): string {
+  if (!categoryId) return "";
+  const path: string[] = [];
+  let cur = categoriesById.get(categoryId);
+  while (cur) {
+    path.unshift(cur.name_nb);
+    cur = cur.parent_id ? categoriesById.get(cur.parent_id) : undefined;
+  }
+  return path.join(" › ");
 }
 
 function depthOf(categoryId: string, categoriesById: Map<string, CategoryNode>): number {

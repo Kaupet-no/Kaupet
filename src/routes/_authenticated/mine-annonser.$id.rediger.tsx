@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
-import { Loader2, ImagePlus, X, ChevronLeft, ChevronRight, Send } from "lucide-react";
+import { Loader2, ImagePlus, X, ChevronLeft, ChevronRight, ChevronDown, Send } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { republishListing } from "@/lib/listings.functions";
@@ -49,7 +49,17 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { formatErrorMessage } from "@/lib/errors";
-import { AttributeFields, type AttributeMap } from "@/components/attribute-fields";
+import {
+  AttributeFields,
+  useAllCategoryFilters,
+  type AttributeMap,
+} from "@/components/attribute-fields";
+import {
+  categoryBreadcrumb,
+  getMissingRequiredFilters,
+  type CategoryNode,
+} from "@/lib/category-filters";
+import { CategoryPicker } from "@/components/category-picker";
 
 const CONDITIONS = [
   { value: "new", label: "Helt ny" },
@@ -224,25 +234,30 @@ function EditListingPage() {
     return () => window.clearTimeout(t);
   }, [coords, setValue]);
 
-  const parentCategories = (categories ?? []).filter((c) => !c.parent_id);
-  const [selectedParentId, setSelectedParentId] = useState<string>("");
-  const subcategories = (categories ?? []).filter((c) => c.parent_id === selectedParentId);
+  const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const categoryHydratedFor = useRef<string | null>(null);
   const [attributes, setAttributes] = useState<AttributeMap>({});
+  const [attributesTouched, setAttributesTouched] = useState(false);
 
-  // Initialize parent selector and attributes from existing category when listing loads (once)
+  const { data: allFilters } = useAllCategoryFilters();
+  const categoriesById = useMemo(() => {
+    const m = new Map<string, CategoryNode & { name_nb: string }>();
+    for (const c of categories ?? []) m.set(c.id, c);
+    return m;
+  }, [categories]);
+  const missingFilters = useMemo(
+    () =>
+      getMissingRequiredFilters(categoryId || null, allFilters ?? [], categoriesById, attributes),
+    [categoryId, allFilters, categoriesById, attributes],
+  );
+  const categoryLabel = categoryId ? categoryBreadcrumb(categoryId, categoriesById) || null : null;
+
+  // Initialize attributes from existing listing when it loads (once)
   useEffect(() => {
     if (!listing || !categories) return;
     if (categoryHydratedFor.current === listing.id) return;
     if (listing.attributes && typeof listing.attributes === "object") {
       setAttributes(listing.attributes as AttributeMap);
-    }
-    const current = categories.find((c) => c.id === listing.category_id);
-    if (!current) return;
-    if (current.parent_id) {
-      setSelectedParentId(current.parent_id);
-    } else {
-      setSelectedParentId(current.id);
     }
     categoryHydratedFor.current = listing.id;
   }, [listing, categories]);
@@ -491,7 +506,17 @@ function EditListingPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="mt-8 space-y-8">
+      <form
+        onSubmit={handleSubmit((v) => {
+          if (missingFilters.length > 0) {
+            setAttributesTouched(true);
+            showErrorToast("Fyll inn alle obligatoriske egenskaper før du lagrer.");
+            return;
+          }
+          mutation.mutate(v);
+        })}
+        className="mt-8 space-y-8"
+      >
         {/* Images */}
         <section className="space-y-3">
           <Label>Bilder</Label>
@@ -615,51 +640,27 @@ function EditListingPage() {
               </div>
             ) : (
               <>
-                <Select
-                  value={selectedParentId || undefined}
-                  onValueChange={(v) => {
-                    if (v === selectedParentId) return;
-                    setSelectedParentId(v);
-                    const hasSubs = categories.some((c) => c.parent_id === v);
-                    if (!hasSubs) {
-                      setValue("category_id", v, { shouldValidate: true });
-                    } else {
-                      setValue("category_id", "", { shouldValidate: false });
-                    }
-                  }}
+                <button
+                  type="button"
+                  onClick={() => setCategoryPickerOpen(true)}
+                  className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors ${
+                    errors.category_id
+                      ? "border-destructive"
+                      : categoryLabel
+                        ? "border-border bg-card"
+                        : "border-border bg-card text-muted-foreground"
+                  } hover:border-primary/40`}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Velg hovedkategori" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {parentCategories.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name_nb}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {selectedParentId && subcategories.length > 0 && (
-                  <Select
-                    value={
-                      categoryId && subcategories.some((c) => c.id === categoryId)
-                        ? categoryId
-                        : undefined
-                    }
-                    onValueChange={(v) => setValue("category_id", v, { shouldValidate: true })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Velg underkategori" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {subcategories.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name_nb}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
+                  <span>{categoryLabel ?? "Velg kategori..."}</span>
+                  <ChevronDown className="size-4 text-muted-foreground" />
+                </button>
+                <CategoryPicker
+                  open={categoryPickerOpen}
+                  onOpenChange={setCategoryPickerOpen}
+                  categories={categories}
+                  selectedId={categoryId || ""}
+                  onSelect={(id) => setValue("category_id", id, { shouldValidate: true })}
+                />
                 {errors.category_id && <p className="text-sm text-destructive">Velg en kategori</p>}
               </>
             )}
@@ -668,6 +669,8 @@ function EditListingPage() {
               categories={categories ?? []}
               value={attributes}
               onChange={setAttributes}
+              required
+              showErrors={attributesTouched}
             />
           </div>
           <div className="space-y-2">

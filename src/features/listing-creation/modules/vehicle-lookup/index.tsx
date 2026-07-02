@@ -24,6 +24,9 @@ import {
 import { lookupVehicleByRegNumber } from "@/lib/vehicle-lookup.functions";
 import { createVehicleBrand, createVehicleModel } from "@/lib/vehicle-brands.functions";
 
+import type { CategoryModule, CategoryModuleProps } from "../types";
+import { MODULE_VALIDATORS } from "../validators";
+
 /**
  * Registreringsstatus + Statens vegvesen-kjøretøyoppslag. Vises kun for
  * kategorier som har koblede merke/modell-felt (brand_select), dvs.
@@ -35,12 +38,7 @@ export function VehicleLookupPanel({
   categories,
   value,
   onChange,
-}: {
-  categoryId: string | null;
-  categories: CategoryNode[];
-  value: AttributeMap;
-  onChange: (next: AttributeMap) => void;
-}) {
+}: CategoryModuleProps) {
   const { data: allFilters } = useAllCategoryFilters();
 
   const categoriesById = useMemo(() => {
@@ -256,3 +254,10 @@ export function VehicleLookupPanel({
     </div>
   );
 }
+
+export const vehicleLookupModule: CategoryModule = {
+  key: "vehicle-lookup",
+  Component: VehicleLookupPanel,
+  order: 0,
+  validateExtra: MODULE_VALIDATORS["vehicle-lookup"],
+};

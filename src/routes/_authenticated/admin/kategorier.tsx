@@ -11,6 +11,7 @@ import {
   Plus,
   SlidersHorizontal,
   Trash2,
+  Workflow,
   X,
 } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
@@ -88,6 +89,9 @@ import {
   type FilterType,
 } from "@/lib/category-filters";
 import { CATEGORY_HEADING_FONTS, DEFAULT_CATEGORY_HEADING_FONT } from "@/lib/category-fonts";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DEFAULT_FIELD_GROUPS, DEFAULT_MODULES } from "@/features/listing-creation/category-flows";
+import { MODULE_LABELS_NB, MODULE_REGISTRY } from "@/features/listing-creation/modules/registry";
 
 export const Route = createFileRoute("/_authenticated/admin/kategorier")({
   head: () => ({ meta: [{ title: "Kategoriadministrasjon — Kaupet.no" }] }),
@@ -140,6 +144,7 @@ function AdminCategories() {
   const [deleting, setDeleting] = useState<Category | null>(null);
   const [replacementId, setReplacementId] = useState<string>("__none__");
   const [managingFilters, setManagingFilters] = useState<Category | null>(null);
+  const [managingFlow, setManagingFlow] = useState<Category | null>(null);
   const [search, setSearch] = useState("");
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [dragOffsetX, setDragOffsetX] = useState(0);
@@ -383,6 +388,7 @@ function AdminCategories() {
                       onDelete={setDeleting}
                       onAddChild={(parent) => setCreating({ parentId: parent.id })}
                       onManageFilters={setManagingFilters}
+                      onManageFlow={setManagingFlow}
                     />
                   ))}
                 </ul>
@@ -410,6 +416,10 @@ function AdminCategories() {
           category={managingFilters}
           onClose={() => setManagingFilters(null)}
         />
+      )}
+
+      {managingFlow && (
+        <CategoryFlowDialog category={managingFlow} onClose={() => setManagingFlow(null)} />
       )}
 
       <AlertDialog
@@ -496,6 +506,7 @@ function SortableCategoryRow({
   onDelete,
   onAddChild,
   onManageFilters,
+  onManageFlow,
 }: {
   category: Category;
   depth: number;
@@ -507,6 +518,7 @@ function SortableCategoryRow({
   onDelete: (c: Category) => void;
   onAddChild: (c: Category) => void;
   onManageFilters: (c: Category) => void;
+  onManageFlow: (c: Category) => void;
 }) {
   const Icon = getCategoryIcon(category.icon);
   const listingCount = countsById.get(category.id) ?? 0;
@@ -579,6 +591,15 @@ function SortableCategoryRow({
             title="Administrer filtre"
           >
             <SlidersHorizontal className="size-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => onManageFlow(category)}
+            aria-label="Annonseflyt"
+            title="Administrer annonseflyt"
+          >
+            <Workflow className="size-4" />
           </Button>
           <Button variant="ghost" size="icon" onClick={() => onEdit(category)} aria-label="Rediger">
             <Pencil className="size-4" />
@@ -1185,6 +1206,144 @@ function CategoryFiltersDialog({ category, onClose }: { category: Category; onCl
           <Button type="button" onClick={onClose}>
             Lukk
           </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const MODULE_KEYS = Object.keys(MODULE_REGISTRY);
+
+function CategoryFlowDialog({ category, onClose }: { category: Category; onClose: () => void }) {
+  const qc = useQueryClient();
+
+  const { data: flowRow, isLoading } = useQuery({
+    queryKey: ["admin", "category-flow", category.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("category_flows")
+        .select("id, category_id, field_groups, modules, sort_order")
+        .eq("category_id", category.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const [modules, setModules] = useState<string[] | null>(null);
+  const activeModules = modules ?? flowRow?.modules ?? DEFAULT_MODULES;
+  const hasCustomFlow = !!flowRow;
+
+  const invalidate = () =>
+    qc.invalidateQueries({ queryKey: ["admin", "category-flow", category.id] });
+
+  const save = useMutation({
+    mutationFn: async (nextModules: string[]) => {
+      const { error } = await supabase
+        .from("category_flows")
+        .upsert(
+          { category_id: category.id, field_groups: DEFAULT_FIELD_GROUPS, modules: nextModules },
+          { onConflict: "category_id" },
+        );
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      showSuccessToast("Annonseflyt lagret");
+      invalidate();
+    },
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke lagre annonseflyten")),
+  });
+
+  const resetToDefault = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("category_flows")
+        .delete()
+        .eq("category_id", category.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      showSuccessToast("Tilbakestilt til standardflyt");
+      setModules(null);
+      invalidate();
+    },
+    onError: (e: Error) =>
+      showErrorToast(formatErrorMessage(e, "Kunne ikke tilbakestille annonseflyten")),
+  });
+
+  function toggle(key: string) {
+    const current = modules ?? flowRow?.modules ?? DEFAULT_MODULES;
+    const next = current.includes(key) ? current.filter((k) => k !== key) : [...current, key];
+    setModules(next);
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Annonseflyt for «{category.name_nb}»</DialogTitle>
+          <DialogDescription>
+            Velg hvilke moduler som vises i annonseskjemaets detaljsteg for denne kategorien og dens
+            underkategorier. Uten egen flyt her arves nærmeste overordnede kategoris flyt, eller
+            standardflyten («Kategoriegenskaper» alene) hvis ingen har en.
+          </DialogDescription>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="flex justify-center py-6">
+            <Loader2 className="size-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {!hasCustomFlow && (
+              <p className="rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">
+                Denne kategorien har ingen egen flyt ennå — bruker standardflyten (eller nærmeste
+                overordnede kategoris flyt, hvis satt).
+              </p>
+            )}
+            <ul className="space-y-2">
+              {MODULE_KEYS.map((key) => (
+                <li key={key}>
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={activeModules.includes(key)}
+                      onCheckedChange={() => toggle(key)}
+                    />
+                    {MODULE_LABELS_NB[key] ?? key}
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <DialogFooter className="gap-2 sm:justify-between">
+          {hasCustomFlow && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => resetToDefault.mutate()}
+              disabled={resetToDefault.isPending}
+            >
+              {resetToDefault.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                "Tilbakestill til standard"
+              )}
+            </Button>
+          )}
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Lukk
+            </Button>
+            <Button
+              type="button"
+              disabled={save.isPending || isLoading}
+              onClick={() => save.mutate(activeModules)}
+            >
+              {save.isPending ? <Loader2 className="size-4 animate-spin" /> : "Lagre"}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

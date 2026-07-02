@@ -13,7 +13,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { createWtbListing } from "@/lib/wtb-listings.functions";
 import { createSavedSearch, summarizeCriteria } from "@/lib/saved-searches";
 import { CategoryPicker } from "@/components/category-picker";
-import { AttributeFields, type AttributeMap } from "@/components/attribute-fields";
+import { type AttributeMap } from "@/components/attribute-fields";
+import { modulesForKeys } from "@/features/listing-creation/modules/registry";
+
+// "Ønskes kjøpt" has no vehicle-lookup module: a buyer describes what they
+// want, not a specific already-registered vehicle, so only the generic
+// category-attributes module applies here.
+const WTB_MODULES = modulesForKeys(["generic-attributes"]);
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -267,12 +273,15 @@ function NewWtbPage() {
               </button>
             }
           />
-          <AttributeFields
-            categoryId={categoryId ?? null}
-            categories={categories}
-            value={attributes}
-            onChange={setAttributes}
-          />
+          {WTB_MODULES.map(({ key, Component }) => (
+            <Component
+              key={key}
+              categoryId={categoryId ?? null}
+              categories={categories}
+              value={attributes}
+              onChange={setAttributes}
+            />
+          ))}
         </section>
 
         <section className="space-y-2">

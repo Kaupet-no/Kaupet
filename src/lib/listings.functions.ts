@@ -8,6 +8,11 @@ import {
   normalizeFilter,
   type CategoryNode,
 } from "@/lib/category-filters";
+import {
+  effectiveFlowForCategory,
+  type CategoryFlowRow,
+} from "@/features/listing-creation/category-flows";
+import { validateModules } from "@/features/listing-creation/modules/validators";
 
 export const saveDraftListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -127,11 +132,14 @@ export const createListing = createServerFn({ method: "POST" })
       if (!cfJson.success) throw new Error("Turnstile-validering feilet. Prøv igjen.");
     }
 
-    const [{ data: filterRows }, { data: categoryRows }] = await Promise.all([
+    const [{ data: filterRows }, { data: categoryRows }, flowsResult] = await Promise.all([
       supabaseAdmin
         .from("category_filters")
         .select("id, category_id, key, label_nb, type, unit, options, sort_order"),
       supabaseAdmin.from("categories").select("id, parent_id"),
+      supabaseAdmin
+        .from("category_flows")
+        .select("id, category_id, field_groups, modules, sort_order"),
     ]);
     const categoriesById = new Map<string, CategoryNode>(
       (categoryRows ?? []).map((c) => [c.id as string, c as CategoryNode]),
@@ -145,6 +153,12 @@ export const createListing = createServerFn({ method: "POST" })
     if (missing.length > 0) {
       throw new Error(`Fyll inn: ${missing.map((f) => f.label_nb).join(", ")}`);
     }
+
+    // category_flows may not exist yet in every environment (pre-migration); degrade to the default flow.
+    const flowRows = (flowsResult.data ?? []) as CategoryFlowRow[];
+    const { modules } = effectiveFlowForCategory(data.category_id, flowRows, categoriesById);
+    const moduleError = validateModules(modules, data.attributes ?? {});
+    if (moduleError) throw new Error(moduleError);
 
     const listingFields = {
       title: data.title,

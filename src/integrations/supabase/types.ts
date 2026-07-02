@@ -156,6 +156,44 @@ export type Database = {
           },
         ]
       }
+      category_flows: {
+        Row: {
+          category_id: string
+          created_at: string
+          field_groups: string[]
+          id: string
+          modules: string[]
+          sort_order: number
+          steps: string[]
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          field_groups?: string[]
+          id?: string
+          modules?: string[]
+          sort_order?: number
+          steps?: string[]
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          field_groups?: string[]
+          id?: string
+          modules?: string[]
+          sort_order?: number
+          steps?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "category_flows_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: true
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vehicle_brands: {
         Row: {
           id: string

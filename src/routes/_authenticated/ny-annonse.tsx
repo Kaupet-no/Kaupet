@@ -7,50 +7,32 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
-import {
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  ChevronDown,
-  Loader2,
-  MapPin,
-  Tag,
-  LocateFixed,
-  Hash,
-  Search,
-} from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { createListing, saveDraftListing } from "@/lib/listings.functions";
 import { uploadListingImage } from "@/lib/storage";
 import { geocodeNorwayAddress, lookupPostalCode, reverseGeocodeAddress } from "@/lib/geocode";
-import { ImageUploader, type PendingImage } from "@/components/image-uploader";
-import { ListingLocationPicker } from "@/components/listing-location-picker";
+import { type PendingImage } from "@/components/image-uploader";
 import { FullscreenLocationPicker } from "@/components/fullscreen-location-picker";
 import { PromoteListingDialog } from "@/components/promote-listing-dialog";
 import { PublishedListingDialog } from "@/components/published-listing-dialog";
 import { CategoryPicker } from "@/components/category-picker";
-import {
-  AttributeFields,
-  useAllCategoryFilters,
-  type AttributeMap,
-} from "@/components/attribute-fields";
-import { VehicleLookupPanel } from "@/components/vehicle-lookup-panel";
+import { useAllCategoryFilters, type AttributeMap } from "@/components/attribute-fields";
+import { modulesForKeys } from "@/features/listing-creation/modules/registry";
+import { effectiveFlowForCategory } from "@/features/listing-creation/category-flows";
+import { useAllCategoryFlows } from "@/features/listing-creation/use-all-category-flows";
+import { useListingSteps } from "@/features/listing-creation/use-listing-steps";
 import {
   categoryBreadcrumb,
   getMissingRequiredFilters,
   type CategoryNode,
 } from "@/lib/category-filters";
-import { Turnstile } from "@marsidev/react-turnstile";
 
 import { useIsDemo } from "@/lib/use-is-demo";
 import { useAuth } from "@/lib/use-auth";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Progress } from "@/components/ui/progress";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -67,6 +49,23 @@ import { suggestCategoryForTitle } from "@/lib/category-suggestion.functions";
 import { suggestKeywordsForListing } from "@/lib/keyword-suggestion.functions";
 import { matchWtbListingsForListing } from "@/lib/wtb-listings.functions";
 import { getCurrentPosition, requestLocationPermission, isNative } from "@/lib/native";
+
+import { TitlePhotos } from "@/features/listing-creation/field-groups/title-photos";
+import { CategoryAttributes } from "@/features/listing-creation/field-groups/category-attributes";
+import { Condition } from "@/features/listing-creation/field-groups/condition";
+import { Price } from "@/features/listing-creation/field-groups/price";
+import {
+  DescriptionField,
+  KeywordChips,
+} from "@/features/listing-creation/field-groups/description-keywords";
+import { DeliveryLocation } from "@/features/listing-creation/field-groups/delivery-location";
+import {
+  ReviewPreview,
+  UploadProgress,
+  PublishActions,
+} from "@/features/listing-creation/field-groups/review-publish";
+import { SimilarListings } from "@/features/listing-creation/field-groups/similar-listings";
+import type { WizardSharedProps } from "@/features/listing-creation/field-groups/types";
 
 const listingSchema = z.object({
   title: z.string().trim().min(5, "Tittelen må være minst 5 tegn").max(120, "Maks 120 tegn"),
@@ -172,7 +171,7 @@ export const Route = createFileRoute("/_authenticated/ny-annonse")({
   component: NewListingPage,
 });
 
-function StepIndicator({ step, native }: { step: 1 | 2 | 3 | 4 | 5; native: boolean }) {
+function StepIndicator({ step, native }: { step: number; native: boolean }) {
   if (native) {
     const labels = ["Tittel", "Detaljer", "Beskrivelse", "Sted", "Publiser"];
     return (
@@ -236,15 +235,10 @@ function StepIndicator({ step, native }: { step: 1 | 2 | 3 | 4 | 5; native: bool
   );
 }
 
-function FieldValid({ show }: { show: boolean }) {
-  if (!show) return null;
-  return <Check className="size-4 shrink-0 text-green-500" aria-hidden />;
-}
-
 function NewListingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
+  const { step, setStep } = useListingSteps(5);
   const [images, setImages] = useState<PendingImage[]>([]);
   const [publishedId, setPublishedId] = useState<string | null>(null);
   const [publishedCode, setPublishedCode] = useState<string | null>(null);
@@ -290,6 +284,7 @@ function NewListingPage() {
   const [selectedParentId, setSelectedParentId] = useState<string>("");
 
   const { data: allFilters } = useAllCategoryFilters();
+  const { data: allFlows } = useAllCategoryFlows();
   const categoriesById = useMemo(() => {
     const m = new Map<string, CategoryNode & { name_nb: string }>();
     for (const c of categories ?? []) m.set(c.id, c);
@@ -333,6 +328,14 @@ function NewListingPage() {
     () =>
       getMissingRequiredFilters(categoryId || null, allFilters ?? [], categoriesById, attributes),
     [categoryId, allFilters, categoriesById, attributes],
+  );
+
+  const activeModules = useMemo(
+    () =>
+      modulesForKeys(
+        effectiveFlowForCategory(categoryId || null, allFlows ?? [], categoriesById).modules,
+      ),
+    [categoryId, allFlows, categoriesById],
   );
 
   const shouldBlockNav = publishedId === null && (title.trim().length > 0 || images.length > 0);
@@ -678,6 +681,13 @@ function NewListingPage() {
       );
       return;
     }
+    for (const mod of activeModules) {
+      const error = mod.validateExtra?.(attributes);
+      if (error) {
+        showErrorToast(error);
+        return;
+      }
+    }
     if (!skipPriceCheck && !isFree && (priceNok === "" || priceNok === undefined)) {
       setShowNoPriceDialog(true);
       return;
@@ -868,6 +878,69 @@ function NewListingPage() {
     }
   }, [listingType, hasDraftData, navigate]);
 
+  const sharedProps: WizardSharedProps = {
+    native,
+
+    register,
+    watch,
+    setValue,
+    trigger,
+    errors,
+    touchedFields,
+
+    title,
+    description,
+    categoryId,
+    condition,
+    isFree,
+    canShip,
+    priceNok,
+    postalCode,
+    city,
+
+    categories: categories ?? [],
+    categoryLabel,
+    setCategoryPickerOpen,
+    categorySuggestion,
+    categoryTouchedManually,
+    applyCategorySuggestion,
+    setSuggestionDismissed,
+    setCategorySuggestion,
+
+    attributes,
+    onAttributesChange: setAttributes,
+    attributesTouched,
+    activeModules,
+
+    conditionDescription,
+
+    wtbMatch,
+
+    keywordsFetching,
+    keywordSuggestions,
+    appendTagToDescription,
+
+    similarListings,
+
+    images,
+    setImages,
+    uploadProgress,
+
+    locationMethod,
+    setLocationMethod,
+    locationLoading,
+    coords,
+    setCoords,
+    switchToPostal,
+    switchToGps,
+    fetchMyLocation,
+    setFullscreenMapOpen,
+    markerMoved,
+    lastEdited,
+
+    previewPrice,
+  };
+
   return (
     <div className="mx-auto max-w-3xl px-4 pt-6 pb-4">
       <NativePageHeader title="Ny annonse" backTo="/" />
@@ -923,37 +996,7 @@ function NewListingPage() {
         {/* ── Web Step 1: Bilder & tittel ─────────────────────────────── */}
         {!native && step === 1 && (
           <div className="space-y-6">
-            <section className="space-y-2">
-              <Label>
-                Bilder{" "}
-                <span className="font-normal text-muted-foreground">(anbefalt — maks 8)</span>
-              </Label>
-              <ImageUploader images={images} onChange={setImages} uploadProgress={uploadProgress} />
-            </section>
-
-            <section className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="title">Tittel</Label>
-                <div className="flex items-center gap-1.5">
-                  <FieldValid show={!!touchedFields.title && !errors.title} />
-                  <span className="text-xs text-muted-foreground">
-                    {(title ?? "").length} / 120
-                  </span>
-                </div>
-              </div>
-              <Input
-                id="title"
-                placeholder="F.eks. Trek Marlin 5 sykkel 2022 — sort, lite brukt"
-                aria-invalid={!!errors.title}
-                aria-describedby={errors.title ? "title-error" : undefined}
-                {...register("title")}
-              />
-              {errors.title && (
-                <p id="title-error" className="text-sm text-destructive">
-                  {errors.title.message}
-                </p>
-              )}
-            </section>
+            <TitlePhotos {...sharedProps} />
 
             <div className="flex justify-end border-t border-border pt-6">
               <Button type="button" onClick={() => void goToStep2()}>
@@ -966,232 +1009,17 @@ function NewListingPage() {
         {/* ── Web Step 2: Detaljer ────────────────────────────────────── */}
         {!native && step === 2 && (
           <div className="space-y-6">
-            <section className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="description">Beskrivelse</Label>
-                <div className="flex items-center gap-1.5">
-                  <FieldValid show={!!touchedFields.description && !errors.description} />
-                  <span className="text-xs text-muted-foreground">
-                    {(description ?? "").length} / 4000
-                  </span>
-                </div>
-              </div>
-              <Textarea
-                id="description"
-                rows={5}
-                placeholder="Beskriv tilstand, alder, hvorfor du selger, og om henting/sending."
-                aria-invalid={!!errors.description}
-                aria-describedby={errors.description ? "description-error" : undefined}
-                {...register("description")}
-              />
-              {errors.description && (
-                <p id="description-error" className="text-sm text-destructive">
-                  {errors.description.message}
-                </p>
-              )}
-            </section>
+            <DescriptionField {...sharedProps} />
 
-            <section className="space-y-2">
-              <div className="flex items-center gap-1.5">
-                <Label>Kategori</Label>
-                <FieldValid show={!!touchedFields.category_id && !errors.category_id} />
-              </div>
+            <CategoryAttributes {...sharedProps} />
 
-              {categorySuggestion && !categoryTouchedManually && (
-                <div className="flex items-center gap-2 rounded-md border border-dashed bg-muted/40 px-3 py-2 text-sm">
-                  <span>
-                    Forslag:{" "}
-                    {categorySuggestion.parent_name_nb
-                      ? `${categorySuggestion.parent_name_nb} › ${categorySuggestion.name_nb}`
-                      : categorySuggestion.name_nb}{" "}
-                    — bruk denne?
-                  </span>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    onClick={applyCategorySuggestion}
-                  >
-                    Bruk
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setSuggestionDismissed(true);
-                      setCategorySuggestion(null);
-                    }}
-                  >
-                    ✕
-                  </Button>
-                </div>
-              )}
+            <Condition {...sharedProps} />
 
-              <button
-                type="button"
-                onClick={() => setCategoryPickerOpen(true)}
-                aria-invalid={!!errors.category_id}
-                aria-describedby={errors.category_id ? "category-error" : undefined}
-                className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors ${
-                  errors.category_id
-                    ? "border-destructive"
-                    : categoryLabel
-                      ? "border-border bg-card"
-                      : "border-border bg-card text-muted-foreground"
-                } hover:border-primary/40`}
-              >
-                <span>{categoryLabel ?? "Velg kategori..."}</span>
-                <ChevronDown className="size-4 text-muted-foreground" />
-              </button>
+            <KeywordChips {...sharedProps} />
 
-              {errors.category_id && (
-                <p id="category-error" className="text-sm text-destructive">
-                  {errors.category_id.message}
-                </p>
-              )}
+            <SimilarListings {...sharedProps} />
 
-              <VehicleLookupPanel
-                categoryId={categoryId || null}
-                categories={categories ?? []}
-                value={attributes}
-                onChange={setAttributes}
-              />
-
-              <AttributeFields
-                categoryId={categoryId || null}
-                categories={categories ?? []}
-                value={attributes}
-                onChange={setAttributes}
-                required
-                showErrors={attributesTouched}
-              />
-            </section>
-
-            <section className="space-y-2">
-              <Label>Tilstand</Label>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {CONDITIONS.map((c) => (
-                  <button
-                    key={c.value}
-                    type="button"
-                    onClick={() =>
-                      setValue("condition", c.value as ListingForm["condition"], {
-                        shouldValidate: true,
-                      })
-                    }
-                    className={`flex flex-col items-start rounded-xl border px-3 py-2.5 text-left transition-colors ${
-                      condition === c.value
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border bg-card hover:border-primary/40 hover:bg-primary/5"
-                    }`}
-                  >
-                    <span className="text-sm font-medium">{c.label}</span>
-                    <span className="mt-0.5 text-xs text-muted-foreground line-clamp-2">
-                      {c.description}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            {categoryId &&
-              (keywordsFetching || (keywordSuggestions && keywordSuggestions.length > 0)) && (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <Tag className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                  {keywordsFetching && (
-                    <Loader2 className="size-3.5 animate-spin text-muted-foreground" aria-hidden />
-                  )}
-                  {keywordSuggestions?.map(({ word }) => (
-                    <button
-                      key={word}
-                      type="button"
-                      onClick={() => appendTagToDescription(word)}
-                      className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-foreground hover:bg-primary/10 hover:border-primary/40 transition-colors"
-                    >
-                      {word}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-            {similarListings && similarListings.length > 0 && (
-              <section className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Lignende annonser</p>
-                <ul className="divide-y divide-border rounded-lg border border-border">
-                  {similarListings.map((l) => (
-                    <li key={l.id} className="flex items-center justify-between px-3 py-2 text-sm">
-                      <span className="line-clamp-1 flex-1 text-foreground">{l.title}</span>
-                      <span className="ml-3 shrink-0 text-muted-foreground">
-                        {l.is_free
-                          ? "Gratis"
-                          : typeof l.price_nok === "number"
-                            ? `${l.price_nok.toLocaleString("nb-NO")} kr`
-                            : "—"}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
-            <section className="space-y-3">
-              <div className="flex items-center gap-1.5">
-                <Label>Pris</Label>
-                <FieldValid
-                  show={
-                    (!!touchedFields.price_nok || isFree) &&
-                    !errors.price_nok &&
-                    (isFree || typeof priceNok === "number")
-                  }
-                />
-              </div>
-              <div className="flex items-center gap-3">
-                <Input
-                  type="number"
-                  min={0}
-                  placeholder="kr"
-                  disabled={isFree}
-                  className="max-w-[200px]"
-                  aria-invalid={!!errors.price_nok}
-                  aria-describedby={errors.price_nok ? "price-error" : undefined}
-                  {...register("price_nok")}
-                />
-                <label className="flex items-center gap-2 text-sm">
-                  <Checkbox
-                    checked={isFree}
-                    onCheckedChange={(v) => setValue("is_free", Boolean(v))}
-                  />
-                  Gis bort gratis
-                </label>
-              </div>
-              {errors.price_nok && (
-                <p id="price-error" className="text-sm text-destructive">
-                  {errors.price_nok.message as string}
-                </p>
-              )}
-              {!isFree && wtbMatch && wtbMatch.count > 0 && (
-                <div className="flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm">
-                  <Search className="mt-0.5 size-4 shrink-0 text-primary" />
-                  <div>
-                    <span className="font-medium">
-                      {wtbMatch.count === 1
-                        ? "1 bruker ønsker å kjøpe noe lignende"
-                        : `${wtbMatch.count} brukere ønsker å kjøpe noe lignende`}
-                    </span>
-                    {wtbMatch.maxPrice != null && (
-                      <span className="text-muted-foreground">
-                        {" "}
-                        — høyeste budsjett{" "}
-                        <span className="font-medium text-foreground">
-                          {wtbMatch.maxPrice.toLocaleString("nb-NO")} kr
-                        </span>
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-            </section>
+            <Price {...sharedProps} />
 
             <div className="flex items-center justify-between border-t border-border pt-6">
               <Button type="button" variant="ghost" onClick={() => setStep(1)}>
@@ -1207,274 +1035,26 @@ function NewListingPage() {
         {/* ── Web Step 3: Sted & publiser ──────────────────────────────── */}
         {!native && step === 3 && (
           <div className="space-y-6">
-            <section className="space-y-2">
-              <Label>Forhåndsvisning</Label>
-              <p className="text-xs text-muted-foreground">
-                Dette er slik annonsen din vil se ut i søkelisten
-              </p>
-              <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm sm:max-w-[220px]">
-                <div className="aspect-square bg-muted">
-                  {images[0] ? (
-                    <img
-                      src={images[0].previewUrl}
-                      alt=""
-                      className="size-full object-cover"
-                      aria-hidden
-                    />
-                  ) : (
-                    <div className="flex size-full flex-col items-center justify-center gap-1 text-muted-foreground">
-                      <span className="text-2xl">📷</span>
-                      <span className="text-xs">Ingen bilde</span>
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-0.5 p-3">
-                  <p className="line-clamp-2 text-sm font-medium leading-snug">{title || "—"}</p>
-                  {previewPrice && (
-                    <p className="font-display text-base font-semibold">{previewPrice}</p>
-                  )}
-                  {(city || postalCode) && (
-                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <MapPin className="size-3" /> {city || postalCode}
-                    </p>
-                  )}
-                  {categoryLabel && (
-                    <p className="text-xs text-muted-foreground truncate">{categoryLabel}</p>
-                  )}
-                </div>
-              </div>
-            </section>
+            <ReviewPreview {...sharedProps} />
 
-            <section className="space-y-3">
-              <Label>Levering</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {(
-                  [
-                    { value: "pickup", label: "Må hentes", description: "Kjøper henter selv" },
-                    { value: "ship", label: "Må sendes", description: "Selger sender" },
-                    {
-                      value: "both",
-                      label: "Begge deler",
-                      description: "Kan både hentes og sendes",
-                    },
-                  ] as const
-                ).map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setValue("can_ship", opt.value, { shouldValidate: true })}
-                    className={`flex flex-col items-center gap-1 rounded-lg border px-3 py-3 text-center text-sm transition-colors ${
-                      canShip === opt.value
-                        ? "border-primary bg-primary/10 font-medium text-primary"
-                        : "border-border bg-card text-foreground hover:border-primary/40 hover:bg-primary/5"
-                    }`}
-                  >
-                    <span className="font-medium">{opt.label}</span>
-                    <span className="text-xs text-muted-foreground">{opt.description}</span>
-                  </button>
-                ))}
-              </div>
-            </section>
+            <DeliveryLocation {...sharedProps} />
 
-            <section className="space-y-4">
-              <Label>Sted</Label>
-              {locationMethod === null && (
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => void fetchMyLocation()}
-                    className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card p-4 text-center transition-colors hover:border-primary hover:bg-accent active:scale-95"
-                  >
-                    <LocateFixed className="size-6 text-primary" />
-                    <span className="text-sm font-medium">Bruk min posisjon</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLocationMethod("postal")}
-                    className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card p-4 text-center transition-colors hover:border-primary hover:bg-accent active:scale-95"
-                  >
-                    <Hash className="size-6 text-primary" />
-                    <span className="text-sm font-medium">Skriv inn postnummer</span>
-                  </button>
-                </div>
-              )}
-              {locationMethod === "gps" && (
-                <div className="space-y-3">
-                  {locationLoading ? (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="size-4 animate-spin" />
-                      Henter posisjon…
-                    </div>
-                  ) : coords ? (
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-muted-foreground">
-                        <MapPin className="mr-1 inline size-3.5" />
-                        {[postalCode, city].filter(Boolean).join(" ") || "Posisjon funnet"}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={switchToPostal}
-                        className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                      >
-                        Benytt postnummer isteden
-                      </button>
-                    </div>
-                  ) : null}
-                  {coords && (
-                    <div className="space-y-2">
-                      {native ? (
-                        <div
-                          className="relative cursor-pointer"
-                          onClick={() => setFullscreenMapOpen(true)}
-                        >
-                          <ListingLocationPicker
-                            lat={coords.lat}
-                            lng={coords.lng}
-                            onChange={() => {}}
-                            readOnly
-                          />
-                          <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center">
-                            <span className="rounded-full bg-background/90 px-3 py-1.5 text-xs text-muted-foreground shadow">
-                              Trykk for å justere lokasjonen på annonsen
-                            </span>
-                          </div>
-                        </div>
-                      ) : (
-                        <ListingLocationPicker
-                          lat={coords.lat}
-                          lng={coords.lng}
-                          onChange={(next) => {
-                            markerMoved.current = true;
-                            lastEdited.current = "map";
-                            setCoords(next);
-                          }}
-                        />
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        Denne lokasjonen vises på annonsen din. Bare omtrentlig posisjon er synlig
-                        for andre.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-              {locationMethod === "postal" && (
-                <div className="space-y-3">
-                  <div className="flex items-end gap-3">
-                    <div className="w-36 space-y-2">
-                      <Label htmlFor="postal_code">Postnummer</Label>
-                      <Input
-                        id="postal_code"
-                        inputMode="numeric"
-                        maxLength={4}
-                        placeholder="0150"
-                        aria-invalid={!!errors.postal_code}
-                        aria-describedby={errors.postal_code ? "postal-code-error" : undefined}
-                        {...register("postal_code", {
-                          onChange: () => {
-                            lastEdited.current = "postal_code";
-                            markerMoved.current = false;
-                          },
-                        })}
-                      />
-                      {errors.postal_code && (
-                        <p id="postal-code-error" className="text-sm text-destructive">
-                          {errors.postal_code.message}
-                        </p>
-                      )}
-                    </div>
-                    {city && <p className="pb-2 text-sm text-muted-foreground">{city}</p>}
-                    <button
-                      type="button"
-                      onClick={switchToGps}
-                      className="mb-2 ml-auto text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                    >
-                      Bruk min posisjon isteden
-                    </button>
-                  </div>
-                  {coords && (
-                    <div className="space-y-2">
-                      {native ? (
-                        <div
-                          className="relative cursor-pointer"
-                          onClick={() => setFullscreenMapOpen(true)}
-                        >
-                          <ListingLocationPicker
-                            lat={coords.lat}
-                            lng={coords.lng}
-                            onChange={() => {}}
-                            readOnly
-                          />
-                          <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center">
-                            <span className="rounded-full bg-background/90 px-3 py-1.5 text-xs text-muted-foreground shadow">
-                              Trykk for å justere lokasjonen på annonsen
-                            </span>
-                          </div>
-                        </div>
-                      ) : (
-                        <ListingLocationPicker
-                          lat={coords.lat}
-                          lng={coords.lng}
-                          onChange={(next) => {
-                            markerMoved.current = true;
-                            lastEdited.current = "map";
-                            setCoords(next);
-                          }}
-                        />
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        Denne lokasjonen vises på annonsen din. Bare omtrentlig posisjon er synlig
-                        for andre.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </section>
-
-            {mutation.isPending && (
-              <div className="space-y-1.5">
-                <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
-                  {uploadProgress
-                    ? `Laster opp bilde ${uploadProgress.done} av ${uploadProgress.total}…`
-                    : "Forbereder opplasting…"}
-                </p>
-                <Progress
-                  value={uploadProgress ? (uploadProgress.done / uploadProgress.total) * 100 : null}
-                  className={uploadProgress ? "" : "animate-pulse"}
-                />
-              </div>
-            )}
+            <UploadProgress
+              mutationIsPending={mutation.isPending}
+              uploadProgress={uploadProgress}
+            />
 
             <div className="flex items-center justify-between border-t border-border pt-6">
               <Button type="button" variant="ghost" onClick={() => setStep(2)}>
                 <ChevronLeft className="size-4" /> Tilbake
               </Button>
-              <div className="flex items-center gap-3">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => navigate({ to: "/" })}
-                  disabled={mutation.isPending}
-                >
-                  Avbryt
-                </Button>
-                {turnstileEnabled && (
-                  <Turnstile
-                    siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-                    onSuccess={(token) => setTurnstileToken(token)}
-                    onExpire={() => setTurnstileToken(null)}
-                    options={{ size: "invisible" }}
-                  />
-                )}
-                <Button
-                  type="submit"
-                  disabled={mutation.isPending || (turnstileEnabled && !turnstileToken)}
-                >
-                  {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
-                  Publiser annonse
-                </Button>
-              </div>
+              <PublishActions
+                turnstileEnabled={turnstileEnabled}
+                turnstileToken={turnstileToken}
+                setTurnstileToken={setTurnstileToken}
+                mutationIsPending={mutation.isPending}
+                onCancel={() => navigate({ to: "/" })}
+              />
             </div>
           </div>
         )}
@@ -1484,37 +1064,7 @@ function NewListingPage() {
         {/* ── Native Step 1: Tittel & bilder ─────────────────────────────────── */}
         {native && step === 1 && (
           <div className="space-y-6">
-            <section className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="title">Tittel</Label>
-                <div className="flex items-center gap-1.5">
-                  <FieldValid show={!!touchedFields.title && !errors.title} />
-                  <span className="text-xs text-muted-foreground">
-                    {(title ?? "").length} / 120
-                  </span>
-                </div>
-              </div>
-              <Input
-                id="title"
-                placeholder="F.eks. Trek Marlin 5 sykkel 2022 — sort, lite brukt"
-                aria-invalid={!!errors.title}
-                aria-describedby={errors.title ? "title-error" : undefined}
-                {...register("title")}
-              />
-              {errors.title && (
-                <p id="title-error" className="text-sm text-destructive">
-                  {errors.title.message}
-                </p>
-              )}
-            </section>
-
-            <section className="space-y-2">
-              <Label>
-                Bilder{" "}
-                <span className="font-normal text-muted-foreground">(anbefalt — maks 8)</span>
-              </Label>
-              <ImageUploader images={images} onChange={setImages} uploadProgress={uploadProgress} />
-            </section>
+            <TitlePhotos {...sharedProps} />
 
             <div className="fixed inset-x-0 bottom-[var(--app-bottom-nav-h)] z-40 flex justify-end bg-background/95 px-4 pt-3 pb-3 backdrop-blur border-t border-border">
               <Button type="button" onClick={() => void goToStep2()}>
@@ -1527,170 +1077,13 @@ function NewListingPage() {
         {/* ── Native Step 2: Detaljer ────────────────────────────────────────── */}
         {native && step === 2 && (
           <div className="space-y-6">
-            {/* Category */}
-            <section className="space-y-2">
-              <div className="flex items-center gap-1.5">
-                <Label>Kategori</Label>
-                <FieldValid show={!!touchedFields.category_id && !errors.category_id} />
-              </div>
+            <CategoryAttributes {...sharedProps} />
 
-              {categorySuggestion && !categoryTouchedManually && (
-                <div className="flex items-center gap-2 rounded-md border border-dashed bg-muted/40 px-3 py-2 text-sm">
-                  <span>
-                    Forslag:{" "}
-                    {categorySuggestion.parent_name_nb
-                      ? `${categorySuggestion.parent_name_nb} › ${categorySuggestion.name_nb}`
-                      : categorySuggestion.name_nb}{" "}
-                    — bruk denne?
-                  </span>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    onClick={applyCategorySuggestion}
-                  >
-                    Bruk
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setSuggestionDismissed(true);
-                      setCategorySuggestion(null);
-                    }}
-                  >
-                    ✕
-                  </Button>
-                </div>
-              )}
+            <Condition {...sharedProps} />
 
-              <button
-                type="button"
-                onClick={() => setCategoryPickerOpen(true)}
-                aria-invalid={!!errors.category_id}
-                aria-describedby={errors.category_id ? "category-error" : undefined}
-                className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors ${
-                  errors.category_id
-                    ? "border-destructive"
-                    : categoryLabel
-                      ? "border-border bg-card"
-                      : "border-border bg-card text-muted-foreground"
-                } hover:border-primary/40`}
-              >
-                <span>{categoryLabel ?? "Velg kategori..."}</span>
-                <ChevronDown className="size-4 text-muted-foreground" />
-              </button>
+            <Price {...sharedProps} />
 
-              {errors.category_id && (
-                <p id="category-error" className="text-sm text-destructive">
-                  {errors.category_id.message}
-                </p>
-              )}
-
-              <VehicleLookupPanel
-                categoryId={categoryId || null}
-                categories={categories ?? []}
-                value={attributes}
-                onChange={setAttributes}
-              />
-
-              <AttributeFields
-                categoryId={categoryId || null}
-                categories={categories ?? []}
-                value={attributes}
-                onChange={setAttributes}
-                required
-                showErrors={attributesTouched}
-              />
-            </section>
-
-            {/* Condition as horizontal chip row */}
-            <section className="space-y-2">
-              <Label>Tilstand</Label>
-              <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
-                {CONDITIONS.map((c) => (
-                  <button
-                    key={c.value}
-                    type="button"
-                    onClick={() =>
-                      setValue("condition", c.value as ListingForm["condition"], {
-                        shouldValidate: true,
-                      })
-                    }
-                    className={`shrink-0 rounded-full border px-3 py-1.5 text-sm whitespace-nowrap transition-colors ${
-                      condition === c.value
-                        ? "border-primary bg-primary/10 text-primary font-medium"
-                        : "border-border bg-card text-muted-foreground hover:border-primary/40"
-                    }`}
-                  >
-                    {c.label}
-                  </button>
-                ))}
-              </div>
-              {conditionDescription && (
-                <p className="text-xs text-muted-foreground">{conditionDescription}</p>
-              )}
-            </section>
-
-            {/* Price */}
-            <section className="space-y-3">
-              <div className="flex items-center gap-1.5">
-                <Label>Pris</Label>
-                <FieldValid
-                  show={
-                    (!!touchedFields.price_nok || isFree) &&
-                    !errors.price_nok &&
-                    (isFree || typeof priceNok === "number")
-                  }
-                />
-              </div>
-              <div className="flex items-center gap-3">
-                <Input
-                  type="number"
-                  min={0}
-                  placeholder="kr"
-                  disabled={isFree}
-                  className="max-w-[200px]"
-                  aria-invalid={!!errors.price_nok}
-                  aria-describedby={errors.price_nok ? "price-error" : undefined}
-                  {...register("price_nok")}
-                />
-                <label className="flex items-center gap-2 text-sm">
-                  <Checkbox
-                    checked={isFree}
-                    onCheckedChange={(v) => setValue("is_free", Boolean(v))}
-                  />
-                  Gis bort gratis
-                </label>
-              </div>
-              {errors.price_nok && (
-                <p id="price-error" className="text-sm text-destructive">
-                  {errors.price_nok.message as string}
-                </p>
-              )}
-            </section>
-
-            {/* Similar listings */}
-            {similarListings && similarListings.length > 0 && (
-              <section className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Lignende annonser</p>
-                <ul className="divide-y divide-border rounded-lg border border-border">
-                  {similarListings.map((l) => (
-                    <li key={l.id} className="flex items-center justify-between px-3 py-2 text-sm">
-                      <span className="line-clamp-1 flex-1 text-foreground">{l.title}</span>
-                      <span className="ml-3 shrink-0 text-muted-foreground">
-                        {l.is_free
-                          ? "Gratis"
-                          : typeof l.price_nok === "number"
-                            ? `${l.price_nok.toLocaleString("nb-NO")} kr`
-                            : "—"}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
+            <SimilarListings {...sharedProps} />
 
             <div className="fixed inset-x-0 bottom-[var(--app-bottom-nav-h)] z-40 flex items-center justify-between bg-background/95 px-4 pt-3 pb-3 backdrop-blur border-t border-border">
               <Button type="button" variant="ghost" onClick={() => setStep(1)}>
@@ -1711,51 +1104,9 @@ function NewListingPage() {
               height: "calc(var(--vvh, 100dvh) - var(--app-bottom-nav-h) - 13.75rem)",
             }}
           >
-            <section className="flex flex-1 flex-col gap-2 min-h-0">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="description">Beskrivelse</Label>
-                <div className="flex items-center gap-1.5">
-                  <FieldValid show={!!touchedFields.description && !errors.description} />
-                  <span className="text-xs text-muted-foreground">
-                    {(description ?? "").length} / 4000
-                  </span>
-                </div>
-              </div>
-              <Textarea
-                id="description"
-                className="flex-1 resize-none min-h-0"
-                placeholder="Beskriv tilstand, alder, hvorfor du selger, og om henting/sending."
-                aria-invalid={!!errors.description}
-                aria-describedby={errors.description ? "description-error" : undefined}
-                {...register("description")}
-              />
-              {errors.description && (
-                <p id="description-error" className="text-sm text-destructive">
-                  {errors.description.message}
-                </p>
-              )}
-            </section>
+            <DescriptionField {...sharedProps} />
 
-            {/* Keyword suggestions */}
-            {categoryId &&
-              (keywordsFetching || (keywordSuggestions && keywordSuggestions.length > 0)) && (
-                <div className="flex flex-wrap items-center gap-1.5 mt-3">
-                  <Tag className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                  {keywordsFetching && (
-                    <Loader2 className="size-3.5 animate-spin text-muted-foreground" aria-hidden />
-                  )}
-                  {keywordSuggestions?.map(({ word }) => (
-                    <button
-                      key={word}
-                      type="button"
-                      onClick={() => appendTagToDescription(word)}
-                      className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-foreground hover:bg-primary/10 hover:border-primary/40 transition-colors"
-                    >
-                      {word}
-                    </button>
-                  ))}
-                </div>
-              )}
+            <KeywordChips {...sharedProps} />
 
             <div className="fixed inset-x-0 bottom-[var(--app-bottom-nav-h)] z-40 flex items-center justify-between bg-background/95 px-4 pt-3 pb-3 backdrop-blur border-t border-border">
               <Button type="button" variant="ghost" onClick={() => setStep(2)}>
@@ -1771,194 +1122,7 @@ function NewListingPage() {
         {/* ── Native Step 4: Sted & levering ──────────────────────────────────── */}
         {native && step === 4 && (
           <div className="space-y-6">
-            {/* Delivery options */}
-            <section className="space-y-3">
-              <Label>Levering</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {(
-                  [
-                    { value: "pickup", label: "Må hentes", description: "Kjøper henter selv" },
-                    { value: "ship", label: "Må sendes", description: "Selger sender" },
-                    {
-                      value: "both",
-                      label: "Begge deler",
-                      description: "Kan både hentes og sendes",
-                    },
-                  ] as const
-                ).map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setValue("can_ship", opt.value, { shouldValidate: true })}
-                    className={`flex flex-col items-center gap-1 rounded-lg border px-3 py-3 text-center text-sm transition-colors ${
-                      canShip === opt.value
-                        ? "border-primary bg-primary/10 font-medium text-primary"
-                        : "border-border bg-card text-foreground hover:border-primary/40 hover:bg-primary/5"
-                    }`}
-                  >
-                    <span className="font-medium">{opt.label}</span>
-                    <span className="text-xs text-muted-foreground">{opt.description}</span>
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            {/* Location */}
-            <section className="space-y-4">
-              <Label>Sted</Label>
-              {locationMethod === null && (
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => void fetchMyLocation()}
-                    className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card p-4 text-center transition-colors hover:border-primary hover:bg-accent active:scale-95"
-                  >
-                    <LocateFixed className="size-6 text-primary" />
-                    <span className="text-sm font-medium">Bruk min posisjon</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLocationMethod("postal")}
-                    className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card p-4 text-center transition-colors hover:border-primary hover:bg-accent active:scale-95"
-                  >
-                    <Hash className="size-6 text-primary" />
-                    <span className="text-sm font-medium">Skriv inn postnummer</span>
-                  </button>
-                </div>
-              )}
-              {locationMethod === "gps" && (
-                <div className="space-y-3">
-                  {locationLoading ? (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="size-4 animate-spin" />
-                      Henter posisjon…
-                    </div>
-                  ) : coords ? (
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-muted-foreground">
-                        <MapPin className="mr-1 inline size-3.5" />
-                        {[postalCode, city].filter(Boolean).join(" ") || "Posisjon funnet"}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={switchToPostal}
-                        className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                      >
-                        Benytt postnummer isteden
-                      </button>
-                    </div>
-                  ) : null}
-                  {coords && (
-                    <div className="space-y-2">
-                      {native ? (
-                        <div
-                          className="relative cursor-pointer"
-                          onClick={() => setFullscreenMapOpen(true)}
-                        >
-                          <ListingLocationPicker
-                            lat={coords.lat}
-                            lng={coords.lng}
-                            onChange={() => {}}
-                            readOnly
-                          />
-                          <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center">
-                            <span className="rounded-full bg-background/90 px-3 py-1.5 text-xs text-muted-foreground shadow">
-                              Trykk for å justere lokasjonen på annonsen
-                            </span>
-                          </div>
-                        </div>
-                      ) : (
-                        <ListingLocationPicker
-                          lat={coords.lat}
-                          lng={coords.lng}
-                          onChange={(next) => {
-                            markerMoved.current = true;
-                            lastEdited.current = "map";
-                            setCoords(next);
-                          }}
-                        />
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        Denne lokasjonen vises på annonsen din. Bare omtrentlig posisjon er synlig
-                        for andre.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-              {locationMethod === "postal" && (
-                <div className="space-y-3">
-                  <div className="flex items-end gap-3">
-                    <div className="w-36 space-y-2">
-                      <Label htmlFor="postal_code">Postnummer</Label>
-                      <Input
-                        id="postal_code"
-                        inputMode="numeric"
-                        maxLength={4}
-                        placeholder="0150"
-                        aria-invalid={!!errors.postal_code}
-                        aria-describedby={errors.postal_code ? "postal-code-error" : undefined}
-                        {...register("postal_code", {
-                          onChange: () => {
-                            lastEdited.current = "postal_code";
-                            markerMoved.current = false;
-                          },
-                        })}
-                      />
-                      {errors.postal_code && (
-                        <p id="postal-code-error" className="text-sm text-destructive">
-                          {errors.postal_code.message}
-                        </p>
-                      )}
-                    </div>
-                    {city && <p className="pb-2 text-sm text-muted-foreground">{city}</p>}
-                    <button
-                      type="button"
-                      onClick={switchToGps}
-                      className="mb-2 ml-auto text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                    >
-                      Bruk min posisjon isteden
-                    </button>
-                  </div>
-                  {coords && (
-                    <div className="space-y-2">
-                      {native ? (
-                        <div
-                          className="relative cursor-pointer"
-                          onClick={() => setFullscreenMapOpen(true)}
-                        >
-                          <ListingLocationPicker
-                            lat={coords.lat}
-                            lng={coords.lng}
-                            onChange={() => {}}
-                            readOnly
-                          />
-                          <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center">
-                            <span className="rounded-full bg-background/90 px-3 py-1.5 text-xs text-muted-foreground shadow">
-                              Trykk for å justere lokasjonen på annonsen
-                            </span>
-                          </div>
-                        </div>
-                      ) : (
-                        <ListingLocationPicker
-                          lat={coords.lat}
-                          lng={coords.lng}
-                          onChange={(next) => {
-                            markerMoved.current = true;
-                            lastEdited.current = "map";
-                            setCoords(next);
-                          }}
-                        />
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        Denne lokasjonen vises på annonsen din. Bare omtrentlig posisjon er synlig
-                        for andre.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </section>
+            <DeliveryLocation {...sharedProps} />
 
             <div className="fixed inset-x-0 bottom-[var(--app-bottom-nav-h)] z-40 flex items-center justify-between bg-background/95 px-4 pt-3 pb-3 backdrop-blur border-t border-border">
               <Button type="button" variant="ghost" onClick={() => setStep(3)}>
@@ -1974,87 +1138,24 @@ function NewListingPage() {
         {/* ── Native Step 5: Forhåndsvisning & publiser ──────────────────────── */}
         {native && step === 5 && (
           <div className="space-y-6">
-            <section className="space-y-2">
-              <Label>Forhåndsvisning</Label>
-              <p className="text-xs text-muted-foreground">
-                Dette er slik annonsen din vil se ut i søkelisten
-              </p>
-              <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm sm:max-w-[220px]">
-                <div className="aspect-square bg-muted">
-                  {images[0] ? (
-                    <img
-                      src={images[0].previewUrl}
-                      alt=""
-                      className="size-full object-cover"
-                      aria-hidden
-                    />
-                  ) : (
-                    <div className="flex size-full flex-col items-center justify-center gap-1 text-muted-foreground">
-                      <span className="text-2xl">📷</span>
-                      <span className="text-xs">Ingen bilde</span>
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-0.5 p-3">
-                  <p className="line-clamp-2 text-sm font-medium leading-snug">{title || "—"}</p>
-                  {previewPrice && (
-                    <p className="font-display text-base font-semibold">{previewPrice}</p>
-                  )}
-                  {(city || postalCode) && (
-                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <MapPin className="size-3" /> {city || postalCode}
-                    </p>
-                  )}
-                  {categoryLabel && (
-                    <p className="text-xs text-muted-foreground truncate">{categoryLabel}</p>
-                  )}
-                </div>
-              </div>
-            </section>
+            <ReviewPreview {...sharedProps} />
 
-            {mutation.isPending && (
-              <div className="space-y-1.5">
-                <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
-                  {uploadProgress
-                    ? `Laster opp bilde ${uploadProgress.done} av ${uploadProgress.total}…`
-                    : "Forbereder opplasting…"}
-                </p>
-                <Progress
-                  value={uploadProgress ? (uploadProgress.done / uploadProgress.total) * 100 : null}
-                  className={uploadProgress ? "" : "animate-pulse"}
-                />
-              </div>
-            )}
+            <UploadProgress
+              mutationIsPending={mutation.isPending}
+              uploadProgress={uploadProgress}
+            />
 
             <div className="fixed inset-x-0 bottom-[var(--app-bottom-nav-h)] z-40 flex items-center justify-between bg-background/95 px-4 pt-3 pb-3 backdrop-blur border-t border-border">
               <Button type="button" variant="ghost" onClick={() => setStep(4)}>
                 <ChevronLeft className="size-4" /> Tilbake
               </Button>
-              <div className="flex items-center gap-3">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => navigate({ to: "/" })}
-                  disabled={mutation.isPending}
-                >
-                  Avbryt
-                </Button>
-                {turnstileEnabled && (
-                  <Turnstile
-                    siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-                    onSuccess={(token) => setTurnstileToken(token)}
-                    onExpire={() => setTurnstileToken(null)}
-                    options={{ size: "invisible" }}
-                  />
-                )}
-                <Button
-                  type="submit"
-                  disabled={mutation.isPending || (turnstileEnabled && !turnstileToken)}
-                >
-                  {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
-                  Publiser annonse
-                </Button>
-              </div>
+              <PublishActions
+                turnstileEnabled={turnstileEnabled}
+                turnstileToken={turnstileToken}
+                setTurnstileToken={setTurnstileToken}
+                mutationIsPending={mutation.isPending}
+                onCancel={() => navigate({ to: "/" })}
+              />
             </div>
           </div>
         )}

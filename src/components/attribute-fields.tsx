@@ -21,7 +21,10 @@ import {
   type CategoryNode,
   type VehicleBrandGroup,
 } from "@/lib/category-filters";
-import { VehicleBrandField, VehicleModelField } from "@/components/vehicle-brand-model-fields";
+import {
+  VehicleBrandField,
+  VehicleModelField,
+} from "@/features/listing-creation/modules/vehicle-lookup/vehicle-brand-model-fields";
 
 export type AttributeMap = Record<string, AttributeValue>;
 

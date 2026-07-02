@@ -7,6 +7,7 @@ import {
   Search,
   Settings,
   Shield,
+  ShieldCheck,
   User,
 } from "lucide-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
@@ -16,6 +17,7 @@ import { useIsAdmin } from "@/lib/use-is-admin";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { NativePageHeader } from "@/components/native-page-header";
+import { Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authenticated/meg")({
   head: () => ({ meta: [{ title: "Meg — Kaupet.no" }] }),
@@ -128,6 +130,27 @@ function MegPage() {
               last
               onClick={() => void navigate({ to: "/profil", search: { tab: "konto" } })}
             />
+          </div>
+        </div>
+
+        {/* Om Kaupet.no — samme personvern-/åpen kildekode-budskap som vises
+            i footer på web, som native-brukere ellers aldri ser. */}
+        <div className="mt-6">
+          <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Om Kaupet.no
+          </p>
+          <div className="overflow-hidden rounded-2xl border border-border bg-card p-4">
+            <div className="flex items-start gap-3">
+              <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" />
+              <p className="text-sm text-muted-foreground">
+                Kaupet.no er gratis og bygges åpent på GitHub, uten sporingscookies eller
+                tredjeparts analyseverktøy. Les vår{" "}
+                <Link to="/personvern" className="underline hover:text-foreground">
+                  personvernerklæring
+                </Link>
+                .
+              </p>
+            </div>
           </div>
         </div>
 

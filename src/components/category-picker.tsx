@@ -33,6 +33,12 @@ function useIsDesktop() {
   return isDesktop;
 }
 
+/**
+ * Lets the user drill down through an arbitrary number of category levels
+ * (main category -> subcategory -> leaf, ...), selecting only once they
+ * reach a category with no children of its own. Filters live on leaf
+ * categories, so this must be able to reach any depth, not just 2 levels.
+ */
 export function CategoryPicker({
   open,
   onOpenChange,
@@ -42,47 +48,42 @@ export function CategoryPicker({
   trigger,
 }: Props) {
   const isDesktop = useIsDesktop();
-  const [parentId, setParentId] = useState<string | null>(null);
-  const [hoveredParentId, setHoveredParentId] = useState<string | null>(null);
+  const [path, setPath] = useState<Category[]>([]);
   const [search, setSearch] = useState("");
 
-  const parents = categories.filter((c) => !c.parent_id);
-  const children = categories.filter((c) => c.parent_id === parentId);
+  const currentParentId = path.at(-1)?.id ?? null;
+  const currentLevel = categories.filter((c) => c.parent_id === currentParentId);
 
-  const filteredParents = search.trim()
-    ? parents.filter((c) => c.name_nb.toLowerCase().includes(search.toLowerCase()))
-    : parents;
+  const filteredCurrentLevel = search.trim()
+    ? currentLevel.filter((c) => c.name_nb.toLowerCase().includes(search.toLowerCase()))
+    : currentLevel;
 
-  const filteredChildren = search.trim()
-    ? children.filter((c) => c.name_nb.toLowerCase().includes(search.toLowerCase()))
-    : children;
+  const searchResults = search.trim()
+    ? categories.filter((c) => c.name_nb.toLowerCase().includes(search.toLowerCase()))
+    : null;
 
-  function handleParentClick(id: string) {
-    const hasSubs = categories.some((c) => c.parent_id === id);
-    if (hasSubs) {
-      setParentId(id);
+  function hasChildren(id: string) {
+    return categories.some((c) => c.parent_id === id);
+  }
+
+  function handleItemClick(item: Category) {
+    if (hasChildren(item.id)) {
+      setPath((p) => [...p, item]);
       setSearch("");
     } else {
-      onSelect(id, id);
+      onSelect(item.id, currentParentId ?? item.id);
       onOpenChange(false);
       resetState();
     }
   }
 
-  function handleChildClick(child: Category) {
-    onSelect(child.id, child.parent_id!);
-    onOpenChange(false);
-    resetState();
-  }
-
   function handleBack() {
-    setParentId(null);
+    setPath((p) => p.slice(0, -1));
     setSearch("");
   }
 
   function resetState() {
-    setParentId(null);
-    setHoveredParentId(null);
+    setPath([]);
     setSearch("");
   }
 
@@ -91,36 +92,32 @@ export function CategoryPicker({
     onOpenChange(v);
   }
 
-  const activeParent = parentId ? parents.find((p) => p.id === parentId) : null;
+  function categoryParentLabel(cat: Category): string | null {
+    const parent = cat.parent_id ? categories.find((p) => p.id === cat.parent_id) : null;
+    if (!parent) return null;
+    const grandparent = parent.parent_id ? categories.find((p) => p.id === parent.parent_id) : null;
+    return grandparent ? `${grandparent.name_nb} / ${parent.name_nb}` : parent.name_nb;
+  }
 
-  // Desktop: two-column layout
-  if (isDesktop) {
-    const desktopHoverId = hoveredParentId ?? parentId;
-    const desktopChildren = desktopHoverId
-      ? categories.filter((c) => c.parent_id === desktopHoverId)
-      : [];
+  const breadcrumb = path.map((p) => p.name_nb).join(" › ");
 
-    const searchResults = search.trim()
-      ? categories.filter((c) => c.name_nb.toLowerCase().includes(search.toLowerCase()))
-      : null;
+  const drillDownContent = (
+    <>
+      {/* Search */}
+      <div className="relative p-3 border-b shrink-0">
+        <Search className="absolute left-6 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
+        <Input
+          placeholder="Søk i kategorier..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-9"
+          autoFocus={isDesktop}
+        />
+      </div>
 
-    const desktopContent = (
-      <>
-        {/* Search */}
-        <div className="relative p-3 border-b shrink-0">
-          <Search className="absolute left-6 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
-          <Input
-            placeholder="Søk i kategorier..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-            autoFocus
-          />
-        </div>
-
+      <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
         {searchResults ? (
-          /* Flat search results */
-          <div className="overflow-y-auto p-2 space-y-0.5">
+          <>
             {searchResults.length === 0 && (
               <p className="py-4 text-center text-sm text-muted-foreground">
                 Ingen kategorier funnet
@@ -128,100 +125,88 @@ export function CategoryPicker({
             )}
             {searchResults.map((cat) => {
               const isSelected = selectedId === cat.id;
-              const parent = cat.parent_id ? parents.find((p) => p.id === cat.parent_id) : null;
+              const parentLabel = categoryParentLabel(cat);
               return (
                 <button
                   key={cat.id}
                   type="button"
-                  onClick={() =>
-                    cat.parent_id ? handleChildClick(cat) : handleParentClick(cat.id)
-                  }
+                  onClick={() => handleItemClick(cat)}
                   className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
                     isSelected ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted"
                   }`}
                 >
                   <span>
-                    {parent && <span className="text-muted-foreground">{parent.name_nb} / </span>}
+                    {parentLabel && <span className="text-muted-foreground">{parentLabel} / </span>}
                     {cat.name_nb}
                   </span>
-                  {isSelected && <Check className="size-4 shrink-0" />}
+                  {isSelected ? (
+                    <Check className="size-4 shrink-0" />
+                  ) : hasChildren(cat.id) ? (
+                    <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
+                  ) : null}
                 </button>
               );
             })}
-          </div>
+          </>
         ) : (
-          /* Two-column layout */
-          <div className="flex flex-1 min-h-0">
-            {/* Left: parent categories */}
-            <div className="w-48 border-r overflow-y-auto p-2 space-y-0.5 shrink-0">
-              {filteredParents.map((cat) => {
-                const hasSubs = categories.some((c) => c.parent_id === cat.id);
-                const isActive = desktopHoverId === cat.id;
-                const isSelected = selectedId === cat.id;
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => handleParentClick(cat.id)}
-                    onMouseEnter={() => hasSubs && setHoveredParentId(cat.id)}
-                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                      isActive
-                        ? "bg-muted font-medium"
-                        : isSelected
-                          ? "bg-primary/10 text-primary font-medium"
-                          : "hover:bg-muted"
-                    }`}
-                  >
-                    <span>{cat.name_nb}</span>
-                    {hasSubs ? (
-                      <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
-                    ) : isSelected ? (
-                      <Check className="size-3.5 shrink-0" />
-                    ) : null}
-                  </button>
-                );
-              })}
-            </div>
+          <>
+            {filteredCurrentLevel.map((cat) => {
+              const isSelected = selectedId === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => handleItemClick(cat)}
+                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                    isSelected ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted"
+                  }`}
+                >
+                  <span>{cat.name_nb}</span>
+                  {hasChildren(cat.id) ? (
+                    <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
+                  ) : isSelected ? (
+                    <Check className="size-3.5 shrink-0" />
+                  ) : null}
+                </button>
+              );
+            })}
+            {filteredCurrentLevel.length === 0 && (
+              <p className="py-4 text-center text-sm text-muted-foreground">
+                Ingen underkategorier
+              </p>
+            )}
+          </>
+        )}
+      </div>
+    </>
+  );
 
-            {/* Right: subcategories */}
-            <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
-              {desktopChildren.length === 0 && desktopHoverId && (
-                <p className="py-4 text-center text-sm text-muted-foreground">
-                  Ingen underkategorier
-                </p>
-              )}
-              {desktopChildren.length === 0 && !desktopHoverId && (
-                <p className="py-4 text-center text-sm text-muted-foreground">
-                  Hold musepekeren over en kategori
-                </p>
-              )}
-              {desktopChildren.map((cat) => {
-                const isSelected = selectedId === cat.id;
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => handleChildClick(cat)}
-                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                      isSelected ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted"
-                    }`}
-                  >
-                    <span>{cat.name_nb}</span>
-                    {isSelected && <Check className="size-4 shrink-0" />}
-                  </button>
-                );
-              })}
-            </div>
+  // Desktop: single-column drill-down dialog/popover
+  if (isDesktop) {
+    const desktopContent = (
+      <div className="flex flex-col h-full">
+        {path.length > 0 && (
+          <div className="flex items-center gap-2 border-b px-3 py-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleBack}
+              className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-muted"
+              aria-label="Tilbake til kategorier"
+            >
+              <ChevronLeft className="size-4" />
+            </button>
+            <span className="text-sm font-medium">{breadcrumb}</span>
           </div>
         )}
-      </>
+        {drillDownContent}
+      </div>
     );
 
     if (trigger) {
       return (
         <Popover open={open} onOpenChange={handleOpenChange}>
           <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-          <PopoverContent className="p-0 w-[480px] max-h-[500px] flex flex-col" align="start">
+          <PopoverContent className="p-0 w-[380px] max-h-[500px] flex flex-col" align="start">
             {desktopContent}
           </PopoverContent>
         </Popover>
@@ -230,7 +215,7 @@ export function CategoryPicker({
 
     return (
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="p-0 max-w-[480px] h-[500px] flex flex-col gap-0">
+        <DialogContent className="p-0 max-w-[380px] h-[500px] flex flex-col gap-0">
           <DialogHeader className="sr-only">
             <DialogTitle>Velg kategori</DialogTitle>
           </DialogHeader>
@@ -247,7 +232,7 @@ export function CategoryPicker({
       <SheetContent side="bottom" className="h-[80vh] rounded-t-2xl flex flex-col p-0">
         <SheetHeader className="px-4 pt-4 pb-2 shrink-0">
           <div className="flex items-center gap-2">
-            {parentId && (
+            {path.length > 0 && (
               <button
                 type="button"
                 onClick={handleBack}
@@ -257,77 +242,10 @@ export function CategoryPicker({
                 <ChevronLeft className="size-5" />
               </button>
             )}
-            <SheetTitle className="text-left">
-              {activeParent ? activeParent.name_nb : "Velg kategori"}
-            </SheetTitle>
-          </div>
-          <div className="relative mt-2">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
-            <Input
-              placeholder="Søk i kategorier..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
+            <SheetTitle className="text-left">{breadcrumb || "Velg kategori"}</SheetTitle>
           </div>
         </SheetHeader>
-
-        <div className="flex-1 overflow-y-auto px-4 pb-6">
-          {!parentId || search.trim() ? (
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              {filteredParents.map((cat) => {
-                const isSelected = selectedId === cat.id;
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => handleParentClick(cat.id)}
-                    className={`flex items-center justify-between rounded-xl border px-4 py-3 text-left text-sm font-medium transition-colors ${
-                      isSelected
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border bg-card hover:border-primary/40 hover:bg-primary/5"
-                    }`}
-                  >
-                    <span>{cat.name_nb}</span>
-                    {isSelected && <Check className="size-4 shrink-0" />}
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="space-y-1 pt-1">
-              {filteredChildren.map((cat) => {
-                const isSelected = selectedId === cat.id;
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => handleChildClick(cat)}
-                    className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-sm font-medium transition-colors ${
-                      isSelected
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border bg-card hover:border-primary/40 hover:bg-primary/5"
-                    }`}
-                  >
-                    <span>{cat.name_nb}</span>
-                    {isSelected && <Check className="size-4 shrink-0" />}
-                  </button>
-                );
-              })}
-              {filteredChildren.length === 0 && (
-                <p className="py-4 text-center text-sm text-muted-foreground">
-                  Ingen underkategorier
-                </p>
-              )}
-            </div>
-          )}
-
-          {filteredParents.length === 0 && search.trim() && (
-            <p className="py-4 text-center text-sm text-muted-foreground">
-              Ingen kategorier funnet
-            </p>
-          )}
-        </div>
+        <div className="flex flex-1 flex-col min-h-0">{drillDownContent}</div>
       </SheetContent>
     </Sheet>
   );

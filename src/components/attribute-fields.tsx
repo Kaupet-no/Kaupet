@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import {
   effectiveFiltersForCategory,
+  getMissingRequiredFilters,
   normalizeFilter,
   type AttributeValue,
   type CategoryFilter,
@@ -48,11 +49,17 @@ export function AttributeFields({
   categories,
   value,
   onChange,
+  required = false,
+  showErrors = false,
 }: {
   categoryId: string | null;
   categories: CategoryNode[];
   value: AttributeMap;
   onChange: (next: AttributeMap) => void;
+  /** When true, filters are treated as required (shows a "*" marker). */
+  required?: boolean;
+  /** When true (and `required`), shows "required" errors for empty filters. */
+  showErrors?: boolean;
 }) {
   const { data: allFilters } = useAllCategoryFilters();
 
@@ -66,6 +73,12 @@ export function AttributeFields({
     () => effectiveFiltersForCategory(categoryId, allFilters ?? [], categoriesById),
     [categoryId, allFilters, categoriesById],
   );
+
+  const missingKeys = useMemo(() => {
+    if (!required || !showErrors) return new Set<string>();
+    const missing = getMissingRequiredFilters(categoryId, allFilters ?? [], categoriesById, value);
+    return new Set(missing.map((f) => f.key));
+  }, [required, showErrors, categoryId, allFilters, categoriesById, value]);
 
   if (!categoryId || filters.length === 0) return null;
 
@@ -85,6 +98,8 @@ export function AttributeFields({
           filter={f}
           value={value[f.key]}
           onChange={(v) => set(f.key, v)}
+          required={required}
+          error={missingKeys.has(f.key) ? `Fyll inn ${f.label_nb.toLowerCase()}` : undefined}
         />
       ))}
     </div>
@@ -95,10 +110,14 @@ function AttributeField({
   filter,
   value,
   onChange,
+  required,
+  error,
 }: {
   filter: CategoryFilter;
   value: AttributeValue | undefined;
   onChange: (v: AttributeValue | undefined) => void;
+  required?: boolean;
+  error?: string;
 }) {
   const label = filter.unit ? `${filter.label_nb} (${filter.unit})` : filter.label_nb;
 
@@ -118,12 +137,14 @@ function AttributeField({
     const options = filter.options ?? [];
     return (
       <div className="space-y-2">
-        <Label>{label}</Label>
+        <Label>
+          {label} {required && <span className="text-destructive">*</span>}
+        </Label>
         <Select
           value={typeof value === "string" ? value : ""}
           onValueChange={(v) => onChange(v || undefined)}
         >
-          <SelectTrigger>
+          <SelectTrigger aria-invalid={!!error}>
             <SelectValue placeholder="Velg…" />
           </SelectTrigger>
           <SelectContent>
@@ -134,6 +155,7 @@ function AttributeField({
             ))}
           </SelectContent>
         </Select>
+        {error && <p className="text-sm text-destructive">{error}</p>}
       </div>
     );
   }
@@ -147,7 +169,9 @@ function AttributeField({
     };
     return (
       <div className="space-y-2">
-        <Label>{label}</Label>
+        <Label>
+          {label} {required && <span className="text-destructive">*</span>}
+        </Label>
         <div className="flex flex-wrap gap-3">
           {options.map((o) => (
             <label key={o.value} className="flex items-center gap-2 text-sm">
@@ -159,6 +183,7 @@ function AttributeField({
             </label>
           ))}
         </div>
+        {error && <p className="text-sm text-destructive">{error}</p>}
       </div>
     );
   }
@@ -167,9 +192,12 @@ function AttributeField({
   const isNumber = filter.type === "number" || filter.type === "range";
   return (
     <div className="space-y-2">
-      <Label>{label}</Label>
+      <Label>
+        {label} <span className="text-destructive">*</span>
+      </Label>
       <Input
         type={isNumber ? "number" : "text"}
+        aria-invalid={!!error}
         value={value === undefined ? "" : String(value)}
         onChange={(e) => {
           const raw = e.target.value;
@@ -177,6 +205,7 @@ function AttributeField({
           onChange(isNumber ? Number(raw) : raw);
         }}
       />
+      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }

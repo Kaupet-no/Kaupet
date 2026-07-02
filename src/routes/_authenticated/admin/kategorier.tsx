@@ -662,6 +662,9 @@ function CategoryFormDialog({
               maxLength={80}
               placeholder="auto-generert fra navn"
             />
+            {parent === "__none__" && slug.trim() && (
+              <p className="text-xs text-muted-foreground">Landingsside: kaupet.no/{slug.trim()}</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label>Ikon</Label>

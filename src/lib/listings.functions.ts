@@ -2,12 +2,12 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-
-// Free-form per-category attribute values keyed by category_filters.key.
-const attributesSchema = z.record(
-  z.string(),
-  z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]),
-);
+import {
+  attributesSchema,
+  getMissingRequiredFilters,
+  normalizeFilter,
+  type CategoryNode,
+} from "@/lib/category-filters";
 
 export const saveDraftListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -125,6 +125,25 @@ export const createListing = createServerFn({ method: "POST" })
       });
       const cfJson = (await cfRes.json()) as { success: boolean };
       if (!cfJson.success) throw new Error("Turnstile-validering feilet. Prøv igjen.");
+    }
+
+    const [{ data: filterRows }, { data: categoryRows }] = await Promise.all([
+      supabaseAdmin
+        .from("category_filters")
+        .select("id, category_id, key, label_nb, type, unit, options, sort_order"),
+      supabaseAdmin.from("categories").select("id, parent_id"),
+    ]);
+    const categoriesById = new Map<string, CategoryNode>(
+      (categoryRows ?? []).map((c) => [c.id as string, c as CategoryNode]),
+    );
+    const missing = getMissingRequiredFilters(
+      data.category_id,
+      (filterRows ?? []).map(normalizeFilter),
+      categoriesById,
+      data.attributes ?? {},
+    );
+    if (missing.length > 0) {
+      throw new Error(`Fyll inn: ${missing.map((f) => f.label_nb).join(", ")}`);
     }
 
     const listingFields = {

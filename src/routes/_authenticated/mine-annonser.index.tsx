@@ -406,7 +406,10 @@ function MyListingsPage() {
                     className="flex items-start justify-between gap-4 rounded-xl border bg-card p-4"
                   >
                     <div className="flex flex-col gap-1">
-                      <p className="font-medium">{w.title}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{w.title}</p>
+                        {w.status === "fulfilled" && <Badge variant="secondary">Oppfylt</Badge>}
+                      </div>
                       {w.description && (
                         <p className="line-clamp-2 text-sm text-muted-foreground">
                           {w.description}
@@ -426,29 +429,36 @@ function MyListingsPage() {
                         </span>
                       </div>
                     </div>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="shrink-0 text-muted-foreground hover:text-destructive"
-                        >
-                          <Trash2 className="size-4" />
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Link to="/mine-annonser/ok/$id/rediger" params={{ id: w.id }}>
+                        <Button size="icon" variant="ghost" className="text-muted-foreground">
+                          <Pencil className="size-4" />
                         </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Slett ønskes kjøpt-annonse?</AlertDialogTitle>
-                          <AlertDialogDescription>Dette kan ikke angres.</AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Avbryt</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => deleteWtbMutation.mutate(w.id)}>
-                            Slett
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                      </Link>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Slett ønskes kjøpt-annonse?</AlertDialogTitle>
+                            <AlertDialogDescription>Dette kan ikke angres.</AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => deleteWtbMutation.mutate(w.id)}>
+                              Slett
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </li>
                 ))}
               </ul>

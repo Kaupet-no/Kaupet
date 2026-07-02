@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { NativePageHeader } from "@/components/native-page-header";
 import { createFileRoute, useNavigate, useBlocker } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -30,7 +30,16 @@ import { FullscreenLocationPicker } from "@/components/fullscreen-location-picke
 import { PromoteListingDialog } from "@/components/promote-listing-dialog";
 import { PublishedListingDialog } from "@/components/published-listing-dialog";
 import { CategoryPicker } from "@/components/category-picker";
-import { AttributeFields, type AttributeMap } from "@/components/attribute-fields";
+import {
+  AttributeFields,
+  useAllCategoryFilters,
+  type AttributeMap,
+} from "@/components/attribute-fields";
+import {
+  categoryBreadcrumb,
+  getMissingRequiredFilters,
+  type CategoryNode,
+} from "@/lib/category-filters";
 import { Turnstile } from "@marsidev/react-turnstile";
 
 import { useIsDemo } from "@/lib/use-is-demo";
@@ -253,6 +262,7 @@ function NewListingPage() {
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const [attributes, setAttributes] = useState<AttributeMap>({});
+  const [attributesTouched, setAttributesTouched] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationMethod, setLocationMethod] = useState<"gps" | "postal" | null>(null);
   const [fullscreenMapOpen, setFullscreenMapOpen] = useState(false);
@@ -277,6 +287,13 @@ function NewListingPage() {
 
   const parentCategories = (categories ?? []).filter((c) => !c.parent_id);
   const [selectedParentId, setSelectedParentId] = useState<string>("");
+
+  const { data: allFilters } = useAllCategoryFilters();
+  const categoriesById = useMemo(() => {
+    const m = new Map<string, CategoryNode & { name_nb: string }>();
+    for (const c of categories ?? []) m.set(c.id, c);
+    return m;
+  }, [categories]);
 
   const {
     register,
@@ -310,6 +327,12 @@ function NewListingPage() {
   const title = watch("title");
   const description = watch("description");
   const priceNok = watch("price_nok");
+
+  const missingFilters = useMemo(
+    () =>
+      getMissingRequiredFilters(categoryId || null, allFilters ?? [], categoriesById, attributes),
+    [categoryId, allFilters, categoriesById, attributes],
+  );
 
   const shouldBlockNav = publishedId === null && (title.trim().length > 0 || images.length > 0);
   const blocker = useBlocker({
@@ -389,7 +412,6 @@ function NewListingPage() {
       }
     }, 2000);
     return () => window.clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     title,
     description,
@@ -648,6 +670,13 @@ function NewListingPage() {
       : ["description", "category_id", "condition", "price_nok"];
     const valid = await trigger(fields);
     if (!valid) return;
+    if (missingFilters.length > 0) {
+      setAttributesTouched(true);
+      showErrorToast(
+        `Fyll inn ${missingFilters.map((f) => f.label_nb).join(", ")} før du går videre.`,
+      );
+      return;
+    }
     if (!skipPriceCheck && !isFree && (priceNok === "" || priceNok === undefined)) {
       setShowNoPriceDialog(true);
       return;
@@ -829,14 +858,7 @@ function NewListingPage() {
     : null;
 
   // Derived label for the category picker button
-  const selectedCategory = (categories ?? []).find((c) => c.id === categoryId);
-  const selectedParent = selectedParentId
-    ? (categories ?? []).find((c) => c.id === selectedParentId)
-    : null;
-  const categoryLabel =
-    selectedCategory && selectedParent && selectedParent.id !== selectedCategory.id
-      ? `${selectedParent.name_nb} › ${selectedCategory.name_nb}`
-      : (selectedCategory?.name_nb ?? null);
+  const categoryLabel = categoryId ? categoryBreadcrumb(categoryId, categoriesById) || null : null;
 
   // Redirect to home if no type selected and no draft — entry should go through the picker dialog
   useEffect(() => {
@@ -884,7 +906,15 @@ function NewListingPage() {
       </div>
 
       <form
-        onSubmit={handleSubmit((v) => mutation.mutate(v))}
+        onSubmit={handleSubmit((v) => {
+          if (missingFilters.length > 0) {
+            setAttributesTouched(true);
+            setStep(2);
+            showErrorToast("Fyll inn alle obligatoriske egenskaper før du publiserer.");
+            return;
+          }
+          mutation.mutate(v);
+        })}
         className={`mt-8 ${native ? (step >= 3 ? "overflow-hidden" : "pb-[calc(var(--app-bottom-nav-h)+1.5rem)]") : "pb-24"}`}
       >
         {/* ══ WEB: original 3-step flow ══════════════════════════════════ */}
@@ -1025,6 +1055,8 @@ function NewListingPage() {
                 categories={categories ?? []}
                 value={attributes}
                 onChange={setAttributes}
+                required
+                showErrors={attributesTouched}
               />
             </section>
 
@@ -1553,6 +1585,8 @@ function NewListingPage() {
                 categories={categories ?? []}
                 value={attributes}
                 onChange={setAttributes}
+                required
+                showErrors={attributesTouched}
               />
             </section>
 

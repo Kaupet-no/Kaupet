@@ -276,7 +276,7 @@ function WebLanding() {
     }
     const subs = childrenByParent.get(cat.id) ?? [];
     if (subs.length === 0) {
-      navigate({ to: "/kategori/$slug", params: { slug: cat.slug } });
+      goToCategory(cat);
       return;
     }
     setSelectedPath([cat]);

@@ -156,6 +156,89 @@ export type Database = {
           },
         ]
       }
+      vehicle_brands: {
+        Row: {
+          id: string
+          name: string
+          category_group: string
+          status: string
+          submitted_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          category_group: string
+          status?: string
+          submitted_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          category_group?: string
+          status?: string
+          submitted_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      vehicle_models: {
+        Row: {
+          id: string
+          brand_id: string
+          name: string
+          status: string
+          submitted_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          brand_id: string
+          name: string
+          status?: string
+          submitted_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          brand_id?: string
+          name?: string
+          status?: string
+          submitted_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_models_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_brands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicle_lookup_log: {
+        Row: {
+          id: string
+          user_id: string
+          registration_number: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          registration_number: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          registration_number?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       conversations: {
         Row: {
           buyer_id: string
@@ -1290,6 +1373,23 @@ export type Database = {
       }
       admin_resolve_report: { Args: { _id: string }; Returns: undefined }
       admin_revoke_moderator_role: { Args: { _user_id: string }; Returns: undefined }
+      admin_list_pending_vehicle_entries: {
+        Args: never
+        Returns: {
+          kind: string
+          id: string
+          name: string
+          category_group: string
+          brand_name: string | null
+          submitted_by: string | null
+          submitted_by_name: string | null
+          created_at: string
+        }[]
+      }
+      admin_approve_vehicle_brand: { Args: { _id: string }; Returns: undefined }
+      admin_reject_vehicle_brand: { Args: { _id: string }; Returns: undefined }
+      admin_approve_vehicle_model: { Args: { _id: string }; Returns: undefined }
+      admin_reject_vehicle_model: { Args: { _id: string }; Returns: undefined }
       submit_listing_report: {
         Args: { _listing_id: string; _reason: string; _comment?: string | null }
         Returns: undefined

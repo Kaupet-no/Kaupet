@@ -19,7 +19,9 @@ import {
   type AttributeValue,
   type CategoryFilter,
   type CategoryNode,
+  type VehicleBrandGroup,
 } from "@/lib/category-filters";
+import { VehicleBrandField, VehicleModelField } from "@/components/vehicle-brand-model-fields";
 
 export type AttributeMap = Record<string, AttributeValue>;
 
@@ -92,16 +94,48 @@ export function AttributeFields({
   return (
     <div className="space-y-4 rounded-xl border border-border p-4">
       <p className="text-sm font-medium">Egenskaper</p>
-      {filters.map((f) => (
-        <AttributeField
-          key={f.id}
-          filter={f}
-          value={value[f.key]}
-          onChange={(v) => set(f.key, v)}
-          required={required}
-          error={missingKeys.has(f.key) ? `Fyll inn ${f.label_nb.toLowerCase()}` : undefined}
-        />
-      ))}
+      {filters.map((f) => {
+        if (f.type === "brand_select") {
+          return (
+            <VehicleBrandField
+              key={f.id}
+              categoryGroup={(f.unit ?? "bil") as VehicleBrandGroup}
+              value={typeof value[f.key] === "string" ? (value[f.key] as string) : undefined}
+              onChange={(v) => set(f.key, v)}
+              required={required}
+              error={missingKeys.has(f.key) ? `Fyll inn ${f.label_nb.toLowerCase()}` : undefined}
+            />
+          );
+        }
+        if (f.type === "model_select") {
+          const brandFilter = filters.find((bf) => bf.type === "brand_select");
+          const brandName =
+            brandFilter && typeof value[brandFilter.key] === "string"
+              ? (value[brandFilter.key] as string)
+              : undefined;
+          return (
+            <VehicleModelField
+              key={f.id}
+              categoryGroup={(brandFilter?.unit ?? "bil") as VehicleBrandGroup}
+              brandName={brandName}
+              value={typeof value[f.key] === "string" ? (value[f.key] as string) : undefined}
+              onChange={(v) => set(f.key, v)}
+              required={required}
+              error={missingKeys.has(f.key) ? `Fyll inn ${f.label_nb.toLowerCase()}` : undefined}
+            />
+          );
+        }
+        return (
+          <AttributeField
+            key={f.id}
+            filter={f}
+            value={value[f.key]}
+            onChange={(v) => set(f.key, v)}
+            required={required}
+            error={missingKeys.has(f.key) ? `Fyll inn ${f.label_nb.toLowerCase()}` : undefined}
+          />
+        );
+      })}
     </div>
   );
 }

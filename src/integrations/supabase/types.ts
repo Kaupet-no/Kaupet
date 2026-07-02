@@ -74,6 +74,7 @@ export type Database = {
           id: string
           name_nb: string
           parent_id: string | null
+          search_examples: string[]
           slug: string
           sort_order: number
         }
@@ -85,6 +86,7 @@ export type Database = {
           id?: string
           name_nb: string
           parent_id?: string | null
+          search_examples?: string[]
           slug: string
           sort_order?: number
         }
@@ -96,6 +98,7 @@ export type Database = {
           id?: string
           name_nb?: string
           parent_id?: string | null
+          search_examples?: string[]
           slug?: string
           sort_order?: number
         }

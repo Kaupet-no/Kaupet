@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  ChevronDown,
   ChevronRight,
   ChevronsUpDown,
   GripVertical,
@@ -20,6 +21,7 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragMoveEvent,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -28,11 +30,19 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import {
+  collectDescendantIds,
+  depthOf,
+  flattenTree,
+  getProjection,
+  MAX_CATEGORY_DEPTH,
+} from "@/lib/category-admin-tree";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
@@ -93,6 +103,7 @@ type Category = {
   icon: string | null;
   color: string | null;
   heading_font: string | null;
+  search_examples: string[] | null;
 };
 
 // Suggested unique colors for main categories (OKLch, matching the design system).
@@ -108,6 +119,8 @@ const MAIN_CATEGORY_COLOR_PRESETS = [
   "oklch(0.70 0.10 200)",
   "oklch(0.55 0.12 240)",
 ];
+
+const INDENT_WIDTH = 24;
 
 function slugify(s: string) {
   return s
@@ -128,13 +141,26 @@ function AdminCategories() {
   const [replacementId, setReplacementId] = useState<string>("__none__");
   const [managingFilters, setManagingFilters] = useState<Category | null>(null);
   const [search, setSearch] = useState("");
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
+  const [dragOffsetX, setDragOffsetX] = useState(0);
+
+  const toggleCollapsed = (id: string) => {
+    setCollapsedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const { data: categories, isLoading } = useQuery({
     queryKey: ["admin", "categories"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
-        .select("id, name_nb, slug, parent_id, sort_order, icon, color, heading_font")
+        .select(
+          "id, name_nb, slug, parent_id, sort_order, icon, color, heading_font, search_examples",
+        )
         .order("sort_order")
         .order("name_nb");
       if (error) throw error;
@@ -168,9 +194,11 @@ function AdminCategories() {
     return byParent;
   }, [categories]);
 
-  const filteredTree = useMemo(() => {
+  // When searching, ignore collapse state and only show matched categories
+  // plus their ancestors/descendants (same behavior as before flattening).
+  const searchVisibleIds = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return tree;
+    if (!term) return null;
     const all = categories ?? [];
     const byId = new Map(all.map((c) => [c.id, c]));
     const matchedIds = all.filter(
@@ -191,15 +219,24 @@ function AdminCategories() {
       }
     };
     for (const match of matchedIds) addDescendants(match.id);
-    const filtered = new Map<string | null, Category[]>();
-    for (const [parentId, kids] of tree.entries()) {
-      filtered.set(
-        parentId,
-        kids.filter((k) => visible.has(k.id)),
-      );
-    }
-    return filtered;
+    return visible;
   }, [tree, categories, search]);
+
+  const hasChildrenSet = useMemo(() => {
+    const s = new Set<string>();
+    for (const c of categories ?? []) if (c.parent_id) s.add(c.parent_id);
+    return s;
+  }, [categories]);
+
+  const flatItems = useMemo(
+    () => flattenTree(categories ?? [], searchVisibleIds ? new Set<string>() : collapsedIds),
+    [categories, collapsedIds, searchVisibleIds],
+  );
+
+  const visibleFlatItems = useMemo(
+    () => (searchVisibleIds ? flatItems.filter((i) => searchVisibleIds.has(i.id)) : flatItems),
+    [flatItems, searchVisibleIds],
+  );
 
   const usageQuery = useQuery({
     queryKey: ["admin", "category-usage", deleting?.id],
@@ -237,10 +274,13 @@ function AdminCategories() {
   });
 
   const reorderMutation = useMutation({
-    mutationFn: async (updates: { id: string; sort_order: number }[]) => {
+    mutationFn: async (updates: { id: string; sort_order: number; parent_id: string | null }[]) => {
       const results = await Promise.all(
         updates.map((u) =>
-          supabase.from("categories").update({ sort_order: u.sort_order }).eq("id", u.id),
+          supabase
+            .from("categories")
+            .update({ sort_order: u.sort_order, parent_id: u.parent_id })
+            .eq("id", u.id),
         ),
       );
       const failed = results.find((r) => r.error);
@@ -252,24 +292,43 @@ function AdminCategories() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const all = categories ?? [];
-    const activeCat = all.find((c) => c.id === active.id);
-    const overCat = all.find((c) => c.id === over.id);
-    if (!activeCat || !overCat || activeCat.parent_id !== overCat.parent_id) return;
-    const siblings = tree.get(activeCat.parent_id) ?? [];
-    const oldIndex = siblings.findIndex((c) => c.id === active.id);
-    const newIndex = siblings.findIndex((c) => c.id === over.id);
-    if (oldIndex === -1 || newIndex === -1) return;
-    const reordered = arrayMove(siblings, oldIndex, newIndex);
-    reorderMutation.mutate(
-      reordered.map((c: Category, i: number) => ({ id: c.id, sort_order: (i + 1) * 10 })),
-    );
+  function handleDragMove(event: DragMoveEvent) {
+    setDragOffsetX(event.delta.x);
   }
 
-  const roots = filteredTree.get(null) ?? [];
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    setDragOffsetX(0);
+    if (!over) return;
+    const all = categories ?? [];
+    const oldIndex = visibleFlatItems.findIndex((i) => i.id === active.id);
+    const newIndex = visibleFlatItems.findIndex((i) => i.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reorderedFlat = arrayMove(visibleFlatItems, oldIndex, newIndex);
+    const projected = getProjection(
+      reorderedFlat,
+      String(active.id),
+      dragOffsetX,
+      INDENT_WIDTH,
+      all,
+    );
+    if (!projected) return;
+    const { parentId: newParentId } = projected;
+
+    const updates: { id: string; sort_order: number; parent_id: string | null }[] = [];
+    const groupCounters = new Map<string | null, number>();
+    for (const item of reorderedFlat) {
+      const effectiveParentId = item.id === active.id ? newParentId : item.parent_id;
+      const n = (groupCounters.get(effectiveParentId) ?? 0) + 1;
+      groupCounters.set(effectiveParentId, n);
+      const newSortOrder = n * 10;
+      if (item.id === active.id || item.sort_order !== newSortOrder) {
+        updates.push({ id: item.id, sort_order: newSortOrder, parent_id: effectiveParentId });
+      }
+    }
+    if (updates.length === 0) return;
+    reorderMutation.mutate(updates);
+  }
 
   return (
     <div className="space-y-6">
@@ -295,7 +354,7 @@ function AdminCategories() {
             <div className="flex justify-center py-8">
               <Loader2 className="size-5 animate-spin text-muted-foreground" />
             </div>
-          ) : roots.length === 0 ? (
+          ) : visibleFlatItems.length === 0 ? (
             <p className="py-8 text-center text-muted-foreground">
               {search.trim() ? "Ingen kategorier matcher søket" : "Ingen kategorier ennå"}
             </p>
@@ -303,18 +362,31 @@ function AdminCategories() {
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
+              onDragMove={handleDragMove}
               onDragEnd={handleDragEnd}
             >
-              <CategoryList
-                categories={roots}
-                childrenMap={filteredTree}
-                countsById={countsById}
-                depth={0}
-                onEdit={setEditing}
-                onDelete={setDeleting}
-                onAddChild={(parent) => setCreating({ parentId: parent.id })}
-                onManageFilters={setManagingFilters}
-              />
+              <SortableContext
+                items={visibleFlatItems.map((i) => i.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <ul className="space-y-1">
+                  {visibleFlatItems.map((c) => (
+                    <SortableCategoryRow
+                      key={c.id}
+                      category={c}
+                      depth={c.depth}
+                      hasChildren={hasChildrenSet.has(c.id)}
+                      collapsed={collapsedIds.has(c.id)}
+                      onToggleCollapse={toggleCollapsed}
+                      countsById={countsById}
+                      onEdit={setEditing}
+                      onDelete={setDeleting}
+                      onAddChild={(parent) => setCreating({ parentId: parent.id })}
+                      onManageFilters={setManagingFilters}
+                    />
+                  ))}
+                </ul>
+              </SortableContext>
             </DndContext>
           )}
         </CardContent>
@@ -413,66 +485,29 @@ function AdminCategories() {
   );
 }
 
-function CategoryList({
-  categories,
-  childrenMap,
-  countsById,
-  depth,
-  onEdit,
-  onDelete,
-  onAddChild,
-  onManageFilters,
-}: {
-  categories: Category[];
-  childrenMap: Map<string | null, Category[]>;
-  countsById: Map<string, number>;
-  depth: number;
-  onEdit: (c: Category) => void;
-  onDelete: (c: Category) => void;
-  onAddChild: (c: Category) => void;
-  onManageFilters: (c: Category) => void;
-}) {
-  return (
-    <SortableContext items={categories.map((c) => c.id)} strategy={verticalListSortingStrategy}>
-      <ul className="space-y-1">
-        {categories.map((c) => (
-          <SortableCategoryRow
-            key={c.id}
-            category={c}
-            childrenMap={childrenMap}
-            countsById={countsById}
-            depth={depth}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            onAddChild={onAddChild}
-            onManageFilters={onManageFilters}
-          />
-        ))}
-      </ul>
-    </SortableContext>
-  );
-}
-
 function SortableCategoryRow({
   category,
-  childrenMap,
-  countsById,
   depth,
+  hasChildren,
+  collapsed,
+  onToggleCollapse,
+  countsById,
   onEdit,
   onDelete,
   onAddChild,
   onManageFilters,
 }: {
   category: Category;
-  childrenMap: Map<string | null, Category[]>;
-  countsById: Map<string, number>;
   depth: number;
+  hasChildren: boolean;
+  collapsed: boolean;
+  onToggleCollapse: (id: string) => void;
+  countsById: Map<string, number>;
   onEdit: (c: Category) => void;
   onDelete: (c: Category) => void;
   onAddChild: (c: Category) => void;
   onManageFilters: (c: Category) => void;
 }) {
-  const kids = childrenMap.get(category.id) ?? [];
   const Icon = getCategoryIcon(category.icon);
   const listingCount = countsById.get(category.id) ?? 0;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -488,7 +523,7 @@ function SortableCategoryRow({
     <li ref={setNodeRef} style={style}>
       <div
         className="flex items-center justify-between gap-2 rounded-md px-2 py-2 hover:bg-accent/40"
-        style={{ paddingLeft: `${depth * 20 + 8}px` }}
+        style={{ paddingLeft: `${depth * INDENT_WIDTH + 8}px` }}
       >
         <div className="flex min-w-0 items-center gap-2">
           <button
@@ -496,11 +531,26 @@ function SortableCategoryRow({
             {...attributes}
             {...listeners}
             className="cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
-            aria-label="Dra for å endre rekkefølge"
+            aria-label="Dra for å endre rekkefølge og nivå"
           >
             <GripVertical className="size-4" />
           </button>
-          {depth > 0 && <ChevronRight className="size-3 text-muted-foreground" />}
+          {hasChildren ? (
+            <button
+              type="button"
+              onClick={() => onToggleCollapse(category.id)}
+              className="text-muted-foreground"
+              aria-label={collapsed ? "Vis underkategorier" : "Skjul underkategorier"}
+            >
+              {collapsed ? (
+                <ChevronRight className="size-3.5" />
+              ) : (
+                <ChevronDown className="size-3.5" />
+              )}
+            </button>
+          ) : (
+            <span className="inline-block size-3.5" aria-hidden />
+          )}
           <Icon className="size-4 shrink-0 text-muted-foreground" />
           <span className="truncate font-medium">{category.name_nb}</span>
           <span className="truncate text-xs text-muted-foreground">/{category.slug}</span>
@@ -516,7 +566,7 @@ function SortableCategoryRow({
               aria-hidden
             />
           )}
-          {depth === 0 && (
+          {depth < MAX_CATEGORY_DEPTH - 1 && (
             <Button variant="ghost" size="sm" onClick={() => onAddChild(category)}>
               <Plus className="size-4" /> Underkategori
             </Button>
@@ -544,18 +594,6 @@ function SortableCategoryRow({
           </Button>
         </div>
       </div>
-      {kids.length > 0 && (
-        <CategoryList
-          categories={kids}
-          childrenMap={childrenMap}
-          countsById={countsById}
-          depth={depth + 1}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          onAddChild={onAddChild}
-          onManageFilters={onManageFilters}
-        />
-      )}
     </li>
   );
 }
@@ -584,9 +622,15 @@ function CategoryFormDialog({
   const [headingFont, setHeadingFont] = useState<string>(
     category?.heading_font ?? DEFAULT_CATEGORY_HEADING_FONT,
   );
+  const [searchExamples, setSearchExamples] = useState<string>(
+    (category?.search_examples ?? []).join("\n"),
+  );
 
   const save = useMutation({
     mutationFn: async () => {
+      if (parent !== "__none__" && depthOf(parent, categories) >= MAX_CATEGORY_DEPTH - 1) {
+        throw new Error(`Maks kategoridybde er ${MAX_CATEGORY_DEPTH} nivåer`);
+      }
       const payload = {
         name_nb: name.trim(),
         slug: slug.trim() || slugify(name),
@@ -596,6 +640,10 @@ function CategoryFormDialog({
         // Color and heading font only apply to main (top-level) categories.
         color: parent === "__none__" ? color.trim() || null : null,
         heading_font: parent === "__none__" ? headingFont : null,
+        search_examples: searchExamples
+          .split("\n")
+          .map((w) => w.trim())
+          .filter(Boolean),
       };
       if (category) {
         const { error } = await supabase.from("categories").update(payload).eq("id", category.id);
@@ -613,9 +661,11 @@ function CategoryFormDialog({
     onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke lagre kategorien")),
   });
 
-  const possibleParents = categories.filter(
-    (c) => !category || (c.id !== category.id && c.parent_id !== category.id),
-  );
+  const excludedIds = category ? collectDescendantIds(categories, category.id) : new Set<string>();
+  if (category) excludedIds.add(category.id);
+  const possibleParents = categories
+    .filter((c) => !excludedIds.has(c.id))
+    .filter((c) => depthOf(c.id, categories) < MAX_CATEGORY_DEPTH - 1);
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -766,6 +816,20 @@ function CategoryFormDialog({
               </p>
             </div>
           )}
+          <div className="space-y-2">
+            <Label htmlFor="search-examples">Eksempelsøkeord</Label>
+            <Textarea
+              id="search-examples"
+              value={searchExamples}
+              onChange={(e) => setSearchExamples(e.target.value)}
+              placeholder={"iPhone 15\nPlayStation 5\nairpods"}
+              rows={4}
+            />
+            <p className="text-xs text-muted-foreground">
+              Ett ord/uttrykk per linje. Rulleres i søkefeltets typewriter-animasjon på
+              landingssiden når kategorien er valgt. Tom liste faller tilbake til underkategorinavn.
+            </p>
+          </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="sort">Sorteringsrekkefølge</Label>
@@ -785,9 +849,11 @@ function CategoryFormDialog({
                 <SelectContent>
                   <SelectItem value="__none__">Ingen (toppnivå)</SelectItem>
                   {possibleParents
-                    .filter((c) => c.parent_id === null)
+                    .slice()
+                    .sort((a, b) => depthOf(a.id, categories) - depthOf(b.id, categories))
                     .map((c) => (
                       <SelectItem key={c.id} value={c.id}>
+                        {" ".repeat(depthOf(c.id, categories))}
                         {c.name_nb}
                       </SelectItem>
                     ))}

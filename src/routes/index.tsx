@@ -46,6 +46,7 @@ type CategoryRow = {
   icon: string | null;
   color: string | null;
   heading_font: string | null;
+  search_examples: string[] | null;
 };
 
 const searchSchema = z.object({
@@ -173,7 +174,7 @@ function WebLanding() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
-        .select("id, slug, name_nb, parent_id, icon, color, heading_font")
+        .select("id, slug, name_nb, parent_id, icon, color, heading_font, search_examples")
         .order("sort_order")
         .order("name_nb");
       if (error) throw error;
@@ -244,6 +245,9 @@ function WebLanding() {
   // its (deepest-level) subcategory names instead of the generic suggestions.
   const typewriterWords = useMemo(() => {
     if (!currentParent) return SEARCH_SUGGESTIONS;
+    if (currentParent.search_examples?.length) {
+      return currentParent.search_examples.map((w) => w.toLocaleLowerCase("nb-NO"));
+    }
     const subs = childrenByParent.get(currentParent.id) ?? [];
     const words = subs.map((s) => s.name_nb.toLocaleLowerCase("nb-NO"));
     return words.length > 0 ? words : [currentParent.name_nb.toLocaleLowerCase("nb-NO")];

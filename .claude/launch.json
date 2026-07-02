@@ -26,6 +26,13 @@
       "runtimeArgs": ["vite", "dev", "--port", "5180"],
       "port": 5180,
       "autoPort": false
+    },
+    {
+      "name": "kaupet-dev-verify2",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "dev", "--port", "5181"],
+      "port": 5181,
+      "autoPort": false
     }
   ]
 }

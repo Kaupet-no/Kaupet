@@ -30,6 +30,7 @@ type CategoryRow = {
   name_nb: string;
   parent_id: string | null;
   icon: string | null;
+  search_examples: string[] | null;
 };
 
 export function AppLanding() {
@@ -45,7 +46,7 @@ export function AppLanding() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
-        .select("id, slug, name_nb, parent_id, icon")
+        .select("id, slug, name_nb, parent_id, icon, search_examples")
         .order("sort_order")
         .order("name_nb");
       if (error) throw error;
@@ -108,6 +109,19 @@ export function AppLanding() {
   const [activeCategory, setActiveCategory] = useState<CategoryRow | null>(null);
   const [categoriesSheetOpen, setCategoriesSheetOpen] = useState(false);
 
+  // Hint at what's searchable within the selected category by rotating its
+  // curated example words instead of the generic suggestions, mirroring the
+  // web landing page's typewriter behavior (src/routes/index.tsx).
+  const typewriterWords = useMemo(() => {
+    if (!activeCategory) return SEARCH_SUGGESTIONS;
+    if (activeCategory.search_examples?.length) {
+      return activeCategory.search_examples.map((w) => w.toLocaleLowerCase("nb-NO"));
+    }
+    const subs = childrenByParent.get(activeCategory.id) ?? [];
+    const words = subs.map((s) => s.name_nb.toLocaleLowerCase("nb-NO"));
+    return words.length > 0 ? words : [activeCategory.name_nb.toLocaleLowerCase("nb-NO")];
+  }, [activeCategory, childrenByParent]);
+
   const pickCategory = (cat: CategoryRow) => {
     const subs = childrenByParent.get(cat.id) ?? [];
     if (subs.length === 0) {
@@ -164,7 +178,8 @@ export function AppLanding() {
               <div className="pointer-events-none absolute inset-y-0 left-12 right-4 flex items-center gap-1">
                 <span className="select-none text-base text-muted-foreground">f.eks.</span>
                 <AnimatedSearchPlaceholder
-                  words={SEARCH_SUGGESTIONS}
+                  key={activeCategory?.id ?? "all"}
+                  words={typewriterWords}
                   paused={placeholderPaused}
                   className="text-base"
                 />

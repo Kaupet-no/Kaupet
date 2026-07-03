@@ -745,14 +745,14 @@ export type Database = {
           attributes: Json
           category_id: string | null
           city: string | null
-          condition: Database["public"]["Enums"]["listing_condition"]
+          condition: Database["public"]["Enums"]["listing_condition"] | null
           counted_category_id: string | null
           counted_lexemes: string[] | null
           created_at: string
           description: string
           display_lat: number | null
           display_lng: number | null
-          can_ship: boolean
+          can_ship: boolean | null
           expires_at: string | null
           id: string
           is_free: boolean
@@ -773,14 +773,14 @@ export type Database = {
           attributes?: Json
           category_id?: string | null
           city?: string | null
-          condition?: Database["public"]["Enums"]["listing_condition"]
+          condition?: Database["public"]["Enums"]["listing_condition"] | null
           counted_category_id?: string | null
           counted_lexemes?: string[] | null
           created_at?: string
           description?: string
           display_lat?: number | null
           display_lng?: number | null
-          can_ship?: boolean
+          can_ship?: boolean | null
           expires_at?: string | null
           id?: string
           is_free?: boolean
@@ -799,10 +799,10 @@ export type Database = {
         }
         Update: {
           attributes?: Json
-          can_ship?: boolean
+          can_ship?: boolean | null
           category_id?: string | null
           city?: string | null
-          condition?: Database["public"]["Enums"]["listing_condition"]
+          condition?: Database["public"]["Enums"]["listing_condition"] | null
           counted_category_id?: string | null
           counted_lexemes?: string[] | null
           created_at?: string

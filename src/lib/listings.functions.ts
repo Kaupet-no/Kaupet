@@ -13,6 +13,7 @@ import {
   type CategoryFlowRow,
 } from "@/features/listing-creation/category-flows";
 import { validateModules } from "@/features/listing-creation/modules/validators";
+import { validateRequiredFieldGroups } from "@/features/listing-creation/field-groups/validators";
 
 export const saveDraftListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -23,7 +24,10 @@ export const saveDraftListing = createServerFn({ method: "POST" })
         title: z.string().trim().min(1).max(120),
         description: z.string().trim().max(4000).optional(),
         category_id: z.string().uuid().nullable().optional(),
-        condition: z.enum(["new", "like_new", "good", "acceptable", "for_parts"]).optional(),
+        condition: z
+          .enum(["new", "like_new", "good", "acceptable", "for_parts"])
+          .nullable()
+          .optional(),
         is_free: z.boolean().optional(),
         price_nok: z.number().int().min(0).max(10_000_000).nullable().optional(),
         postal_code: z
@@ -34,7 +38,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
         city: z.string().max(100).nullable().optional(),
         lat: z.number().nullable().optional(),
         lng: z.number().nullable().optional(),
-        can_ship: z.boolean().optional(),
+        can_ship: z.boolean().nullable().optional(),
         attributes: attributesSchema.optional(),
       })
       .parse(input),
@@ -99,7 +103,7 @@ export const createListing = createServerFn({ method: "POST" })
         title: z.string().trim().min(5).max(120),
         description: z.string().trim().min(20).max(4000),
         category_id: z.string().uuid(),
-        condition: z.enum(["new", "like_new", "good", "acceptable", "for_parts"]),
+        condition: z.enum(["new", "like_new", "good", "acceptable", "for_parts"]).nullable(),
         is_free: z.boolean(),
         price_nok: z.number().int().min(0).max(10_000_000).nullable(),
         postal_code: z
@@ -109,7 +113,7 @@ export const createListing = createServerFn({ method: "POST" })
         city: z.string().max(100).nullable(),
         lat: z.number().nullable(),
         lng: z.number().nullable(),
-        can_ship: z.boolean(),
+        can_ship: z.boolean().nullable(),
         attributes: attributesSchema.optional(),
         turnstileToken: z.string().nullable().optional(),
       })
@@ -156,9 +160,18 @@ export const createListing = createServerFn({ method: "POST" })
 
     // category_flows may not exist yet in every environment (pre-migration); degrade to the default flow.
     const flowRows = (flowsResult.data ?? []) as CategoryFlowRow[];
-    const { modules } = effectiveFlowForCategory(data.category_id, flowRows, categoriesById);
+    const { fieldGroups, modules } = effectiveFlowForCategory(
+      data.category_id,
+      flowRows,
+      categoriesById,
+    );
     const moduleError = validateModules(modules, data.attributes ?? {});
     if (moduleError) throw new Error(moduleError);
+    const fieldGroupError = validateRequiredFieldGroups(fieldGroups, {
+      condition: data.condition,
+      can_ship: data.can_ship,
+    });
+    if (fieldGroupError) throw new Error(fieldGroupError);
 
     const listingFields = {
       title: data.title,

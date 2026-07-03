@@ -16,9 +16,9 @@ export type ListingFormShape = {
   title: string;
   description: string;
   category_id: string;
-  condition: "new" | "like_new" | "good" | "acceptable" | "for_parts";
+  condition?: "new" | "like_new" | "good" | "acceptable" | "for_parts" | null;
   is_free: boolean;
-  can_ship: "pickup" | "ship" | "both";
+  can_ship?: "pickup" | "ship" | "both" | null;
   price_nok?: number | "" | undefined;
   postal_code?: string | undefined;
   city?: string | undefined;

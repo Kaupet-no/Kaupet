@@ -65,9 +65,9 @@ const listingSchema = z.object({
     .min(20, "Skriv litt mer — minst 20 tegn")
     .max(4000, "Maks 4000 tegn"),
   category_id: z.string().uuid("Velg en kategori"),
-  condition: z.enum(["new", "like_new", "good", "acceptable", "for_parts"]),
+  condition: z.enum(["new", "like_new", "good", "acceptable", "for_parts"]).nullable().optional(),
   is_free: z.boolean(),
-  can_ship: z.enum(["pickup", "ship", "both"]),
+  can_ship: z.enum(["pickup", "ship", "both"]).nullable().optional(),
   price_nok: z.union([z.coerce.number().int().min(0).max(10_000_000), z.literal("")]).optional(),
   postal_code: z
     .string()
@@ -763,7 +763,7 @@ function NewListingPage() {
           title: values.title,
           description: values.description,
           category_id: values.category_id,
-          condition: values.condition,
+          condition: fieldGroupKeys.includes("condition") ? (values.condition ?? null) : null,
           is_free: values.is_free,
           price_nok: values.is_free
             ? null
@@ -774,7 +774,9 @@ function NewListingPage() {
           city: values.city || null,
           lat: finalCoords?.lat ?? null,
           lng: finalCoords?.lng ?? null,
-          can_ship: values.can_ship !== "pickup",
+          can_ship: fieldGroupKeys.includes("delivery-location")
+            ? values.can_ship !== "pickup"
+            : null,
           attributes,
           turnstileToken,
         },

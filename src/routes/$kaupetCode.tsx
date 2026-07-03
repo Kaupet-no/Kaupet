@@ -734,12 +734,14 @@ function ListingDetailPage() {
 
             return (
               <dl className="grid grid-cols-2 gap-3 rounded-xl border border-border bg-card p-4 text-sm sm:grid-cols-3">
-                <div>
-                  <dt className="text-muted-foreground">Tilstand</dt>
-                  <dd className="font-medium">
-                    {CONDITION_LABEL[data.condition] ?? data.condition}
-                  </dd>
-                </div>
+                {data.condition && (
+                  <div>
+                    <dt className="text-muted-foreground">Tilstand</dt>
+                    <dd className="font-medium">
+                      {CONDITION_LABEL[data.condition] ?? data.condition}
+                    </dd>
+                  </div>
+                )}
                 <div>
                   <dt className="text-muted-foreground">Lokasjon</dt>
                   <dd className="flex items-center gap-1 font-medium">

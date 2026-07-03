@@ -94,3 +94,19 @@ export function KeywordChips({
     </div>
   );
 }
+
+/**
+ * Registry-facing wrapper: DescriptionField + KeywordChips rendered
+ * adjacently. Per the fase-2 field-group wiring decision, the generic
+ * per-page rendering renders a field group's pieces together; this changes
+ * where KeywordChips sits on web (previously further down, after Condition)
+ * but keeps native's existing adjacent layout unchanged.
+ */
+export function DescriptionKeywordsGroup(props: WizardSharedProps) {
+  return (
+    <>
+      <DescriptionField {...props} />
+      <KeywordChips {...props} />
+    </>
+  );
+}

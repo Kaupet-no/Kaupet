@@ -20,9 +20,13 @@ import { PublishedListingDialog } from "@/components/published-listing-dialog";
 import { CategoryPicker } from "@/components/category-picker";
 import { useAllCategoryFilters, type AttributeMap } from "@/components/attribute-fields";
 import { modulesForKeys } from "@/features/listing-creation/modules/registry";
-import { effectiveFlowForCategory } from "@/features/listing-creation/category-flows";
+import {
+  effectiveFlowForCategory,
+  resolveWizardPages,
+} from "@/features/listing-creation/category-flows";
 import { useAllCategoryFlows } from "@/features/listing-creation/use-all-category-flows";
-import { useListingSteps } from "@/features/listing-creation/use-listing-steps";
+import { useListingSteps, type WizardPage } from "@/features/listing-creation/use-listing-steps";
+import { fieldGroupsForKeys, pageLabel } from "@/features/listing-creation/field-groups/registry";
 import {
   categoryBreadcrumb,
   getMissingRequiredFilters,
@@ -50,21 +54,7 @@ import { suggestKeywordsForListing } from "@/lib/keyword-suggestion.functions";
 import { matchWtbListingsForListing } from "@/lib/wtb-listings.functions";
 import { getCurrentPosition, requestLocationPermission, isNative } from "@/lib/native";
 
-import { TitlePhotos } from "@/features/listing-creation/field-groups/title-photos";
-import { CategoryAttributes } from "@/features/listing-creation/field-groups/category-attributes";
-import { Condition } from "@/features/listing-creation/field-groups/condition";
-import { Price } from "@/features/listing-creation/field-groups/price";
-import {
-  DescriptionField,
-  KeywordChips,
-} from "@/features/listing-creation/field-groups/description-keywords";
-import { DeliveryLocation } from "@/features/listing-creation/field-groups/delivery-location";
-import {
-  ReviewPreview,
-  UploadProgress,
-  PublishActions,
-} from "@/features/listing-creation/field-groups/review-publish";
-import { SimilarListings } from "@/features/listing-creation/field-groups/similar-listings";
+import { PublishActions } from "@/features/listing-creation/field-groups/review-publish";
 import type { WizardSharedProps } from "@/features/listing-creation/field-groups/types";
 
 const listingSchema = z.object({
@@ -171,66 +161,54 @@ export const Route = createFileRoute("/_authenticated/ny-annonse")({
   component: NewListingPage,
 });
 
-function StepIndicator({ step, native }: { step: number; native: boolean }) {
-  if (native) {
-    const labels = ["Tittel", "Detaljer", "Beskrivelse", "Sted", "Publiser"];
-    return (
-      <nav aria-label="Fremdrift i skjema" className="flex items-center gap-1.5">
-        {([1, 2, 3, 4, 5] as const).map((s) => (
-          <div key={s} className="flex items-center gap-1.5">
+function StepIndicator({
+  step,
+  pages,
+  native,
+}: {
+  step: number;
+  pages: WizardPage[];
+  native: boolean;
+}) {
+  const labels = pages.map((p) => pageLabel(p.groups, native));
+  const total = labels.length;
+  const gapClass = native ? "gap-1.5" : "gap-2";
+  const circleClass = native ? "size-6" : "size-7";
+  const checkClass = native ? "size-3" : "size-3.5";
+  const labelBreakpoint = native ? "lg:inline" : "sm:inline";
+  const lineWidth = native ? "w-4" : "w-6";
+
+  return (
+    <nav aria-label="Fremdrift i skjema" className={`flex items-center ${gapClass}`}>
+      {labels.map((label, i) => {
+        const s = i + 1;
+        return (
+          <div key={label + s} className={`flex items-center ${gapClass}`}>
             <div
-              className={`flex size-6 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
+              className={`flex ${circleClass} items-center justify-center rounded-full text-xs font-semibold transition-colors ${
                 s < step
                   ? "bg-primary text-primary-foreground"
                   : s === step
                     ? "bg-primary text-primary-foreground ring-2 ring-primary/30"
                     : "bg-muted text-muted-foreground"
               }`}
-              aria-label={`Steg ${s}: ${labels[s - 1]}${s < step ? " (fullført)" : s === step ? " (pågår)" : ""}`}
+              aria-label={`Steg ${s}: ${label}${s < step ? " (fullført)" : s === step ? " (pågår)" : ""}`}
             >
-              {s < step ? <Check className="size-3" /> : s}
+              {s < step ? <Check className={checkClass} /> : s}
             </div>
             <span
-              className={`hidden text-xs lg:inline ${s === step ? "font-medium text-foreground" : "text-muted-foreground"}`}
+              className={`hidden text-xs ${labelBreakpoint} ${s === step ? "font-medium text-foreground" : "text-muted-foreground"}`}
             >
-              {labels[s - 1]}
+              {label}
             </span>
-            {s < 5 && (
-              <div className={`h-px w-4 shrink-0 ${s < step ? "bg-primary" : "bg-border"}`} />
+            {s < total && (
+              <div
+                className={`h-px ${lineWidth} shrink-0 ${s < step ? "bg-primary" : "bg-border"}`}
+              />
             )}
           </div>
-        ))}
-      </nav>
-    );
-  }
-
-  const labels = ["Bilder & tittel", "Detaljer", "Lokasjon"];
-  return (
-    <nav aria-label="Fremdrift i skjema" className="flex items-center gap-2">
-      {([1, 2, 3] as const).map((s) => (
-        <div key={s} className="flex items-center gap-2">
-          <div
-            className={`flex size-7 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
-              s < step
-                ? "bg-primary text-primary-foreground"
-                : s === step
-                  ? "bg-primary text-primary-foreground ring-2 ring-primary/30"
-                  : "bg-muted text-muted-foreground"
-            }`}
-            aria-label={`Steg ${s}: ${labels[s - 1]}${s < step ? " (fullført)" : s === step ? " (pågår)" : ""}`}
-          >
-            {s < step ? <Check className="size-3.5" /> : s}
-          </div>
-          <span
-            className={`hidden text-xs sm:inline ${s === step ? "font-medium text-foreground" : "text-muted-foreground"}`}
-          >
-            {labels[s - 1]}
-          </span>
-          {s < 3 && (
-            <div className={`h-px w-6 shrink-0 ${s < step ? "bg-primary" : "bg-border"}`} />
-          )}
-        </div>
-      ))}
+        );
+      })}
     </nav>
   );
 }
@@ -238,7 +216,6 @@ function StepIndicator({ step, native }: { step: number; native: boolean }) {
 function NewListingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { step, setStep } = useListingSteps(5);
   const [images, setImages] = useState<PendingImage[]>([]);
   const [publishedId, setPublishedId] = useState<string | null>(null);
   const [publishedCode, setPublishedCode] = useState<string | null>(null);
@@ -336,6 +313,24 @@ function NewListingPage() {
         effectiveFlowForCategory(categoryId || null, allFlows ?? [], categoriesById).modules,
       ),
     [categoryId, allFlows, categoriesById],
+  );
+
+  const fieldGroupKeys = useMemo(
+    () => effectiveFlowForCategory(categoryId || null, allFlows ?? [], categoriesById).fieldGroups,
+    [categoryId, allFlows, categoriesById],
+  );
+
+  const pages: WizardPage[] = useMemo(
+    () =>
+      resolveWizardPages(fieldGroupKeys, { native }).map((keys) => ({
+        groups: fieldGroupsForKeys(keys),
+      })),
+    [fieldGroupKeys, native],
+  );
+
+  const { step, setStep, currentPage, goNext, isFirst, isLast } = useListingSteps(pages);
+  const categoryAttributesPageIndex = pages.findIndex((p) =>
+    p.groups.some((g) => g.key === "category-attributes"),
   );
 
   const shouldBlockNav = publishedId === null && (title.trim().length > 0 || images.length > 0);
@@ -657,54 +652,31 @@ function NewListingPage() {
     setValue("description", next, { shouldTouch: false });
   }
 
-  async function goToStep2() {
-    const valid = await trigger(["title"]);
+  async function goToNextPage(options?: { skipImageCheck?: boolean; skipPriceCheck?: boolean }) {
+    const groups = currentPage?.groups ?? [];
+    const fields = groups.flatMap((g) => g.fieldsToValidate ?? []);
+    const valid = fields.length > 0 ? await trigger(fields) : true;
     if (!valid) return;
-    if (images.length === 0) {
-      setShowNoImageDialog(true);
-      return;
-    }
-    setStep(2);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  async function goToStep3(skipPriceCheck = false) {
-    const fields: (keyof ListingForm)[] = native
-      ? ["category_id", "condition", "price_nok"]
-      : ["description", "category_id", "condition", "price_nok"];
-    const valid = await trigger(fields);
-    if (!valid) return;
-    if (missingFilters.length > 0) {
-      setAttributesTouched(true);
-      showErrorToast(
-        `Fyll inn ${missingFilters.map((f) => f.label_nb).join(", ")} før du går videre.`,
-      );
-      return;
-    }
-    for (const mod of activeModules) {
-      const error = mod.validateExtra?.(attributes);
-      if (error) {
-        showErrorToast(error);
+    const validateCtx = { images, attributes, activeModules, missingFilters, isFree, priceNok };
+    for (const group of groups) {
+      const result = group.validateExtra?.(validateCtx);
+      if (result === "SHOW_NO_IMAGE_DIALOG") {
+        if (options?.skipImageCheck) continue;
+        setShowNoImageDialog(true);
+        return;
+      }
+      if (result === "SHOW_NO_PRICE_DIALOG") {
+        if (options?.skipPriceCheck) continue;
+        setShowNoPriceDialog(true);
+        return;
+      }
+      if (typeof result === "string") {
+        if (group.key === "category-attributes") setAttributesTouched(true);
+        showErrorToast(result);
         return;
       }
     }
-    if (!skipPriceCheck && !isFree && (priceNok === "" || priceNok === undefined)) {
-      setShowNoPriceDialog(true);
-      return;
-    }
-    setStep(3);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  async function goToStep4() {
-    const valid = await trigger(["description"]);
-    if (!valid) return;
-    setStep(4);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  function goToStep5() {
-    setStep(5);
+    goNext();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -939,6 +911,11 @@ function NewListingPage() {
     lastEdited,
 
     previewPrice,
+    mutationIsPending: mutation.isPending,
+    turnstileEnabled,
+    turnstileToken,
+    setTurnstileToken,
+    onCancel: () => navigate({ to: "/" }),
   };
 
   return (
@@ -970,7 +947,7 @@ function NewListingPage() {
       {/* Sticky step indicator */}
       <div className="sticky top-0 z-10 -mx-4 bg-background/95 px-4 py-3 backdrop-blur border-b border-border mt-4">
         <div className="flex items-center justify-between">
-          <StepIndicator step={step} native={native} />
+          <StepIndicator step={step} pages={pages} native={native} />
           {draftSaveError ? (
             <p className="text-xs text-destructive">Utkast ble ikke lagret</p>
           ) : (
@@ -983,182 +960,61 @@ function NewListingPage() {
         onSubmit={handleSubmit((v) => {
           if (missingFilters.length > 0) {
             setAttributesTouched(true);
-            setStep(2);
+            if (categoryAttributesPageIndex >= 0) setStep(categoryAttributesPageIndex + 1);
             showErrorToast("Fyll inn alle obligatoriske egenskaper før du publiserer.");
             return;
           }
           mutation.mutate(v);
         })}
-        className={`mt-8 ${native ? (step >= 3 ? "overflow-hidden" : "pb-[calc(var(--app-bottom-nav-h)+1.5rem)]") : "pb-24"}`}
+        className={`mt-8 ${native ? (isLast ? "overflow-hidden" : "pb-[calc(var(--app-bottom-nav-h)+1.5rem)]") : "pb-24"}`}
       >
-        {/* ══ WEB: original 3-step flow ══════════════════════════════════ */}
+        {(() => {
+          const groups = currentPage?.groups ?? [];
+          const isNativeDescriptionSoloPage =
+            native && groups.length === 1 && groups[0].key === "description-keywords";
+          const nextGroups = pages[step]?.groups ?? [];
+          return (
+            <div
+              className={isNativeDescriptionSoloPage ? "flex flex-col" : "space-y-6"}
+              style={
+                isNativeDescriptionSoloPage
+                  ? { height: "calc(var(--vvh, 100dvh) - var(--app-bottom-nav-h) - 13.75rem)" }
+                  : undefined
+              }
+            >
+              {groups.map((g) => (
+                <g.Component key={g.key} {...sharedProps} />
+              ))}
 
-        {/* ── Web Step 1: Bilder & tittel ─────────────────────────────── */}
-        {!native && step === 1 && (
-          <div className="space-y-6">
-            <TitlePhotos {...sharedProps} />
-
-            <div className="flex justify-end border-t border-border pt-6">
-              <Button type="button" onClick={() => void goToStep2()}>
-                Neste: Detaljer <ChevronRight className="size-4" />
-              </Button>
+              <div
+                className={`${
+                  native
+                    ? "fixed inset-x-0 bottom-[var(--app-bottom-nav-h)] z-40 bg-background/95 px-4 pt-3 pb-3 backdrop-blur border-t border-border"
+                    : "border-t border-border pt-6"
+                } flex items-center ${isFirst ? "justify-end" : "justify-between"}`}
+              >
+                {!isFirst && (
+                  <Button type="button" variant="ghost" onClick={() => setStep(step - 1)}>
+                    <ChevronLeft className="size-4" /> Tilbake
+                  </Button>
+                )}
+                {!isLast ? (
+                  <Button type="button" onClick={() => void goToNextPage()}>
+                    Neste: {pageLabel(nextGroups, native)} <ChevronRight className="size-4" />
+                  </Button>
+                ) : (
+                  <PublishActions
+                    turnstileEnabled={turnstileEnabled}
+                    turnstileToken={turnstileToken}
+                    setTurnstileToken={setTurnstileToken}
+                    mutationIsPending={mutation.isPending}
+                    onCancel={() => navigate({ to: "/" })}
+                  />
+                )}
+              </div>
             </div>
-          </div>
-        )}
-
-        {/* ── Web Step 2: Detaljer ────────────────────────────────────── */}
-        {!native && step === 2 && (
-          <div className="space-y-6">
-            <DescriptionField {...sharedProps} />
-
-            <CategoryAttributes {...sharedProps} />
-
-            <Condition {...sharedProps} />
-
-            <KeywordChips {...sharedProps} />
-
-            <SimilarListings {...sharedProps} />
-
-            <Price {...sharedProps} />
-
-            <div className="flex items-center justify-between border-t border-border pt-6">
-              <Button type="button" variant="ghost" onClick={() => setStep(1)}>
-                <ChevronLeft className="size-4" /> Tilbake
-              </Button>
-              <Button type="button" onClick={() => void goToStep3()}>
-                Neste: Lokasjon <ChevronRight className="size-4" />
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Web Step 3: Sted & publiser ──────────────────────────────── */}
-        {!native && step === 3 && (
-          <div className="space-y-6">
-            <ReviewPreview {...sharedProps} />
-
-            <DeliveryLocation {...sharedProps} />
-
-            <UploadProgress
-              mutationIsPending={mutation.isPending}
-              uploadProgress={uploadProgress}
-            />
-
-            <div className="flex items-center justify-between border-t border-border pt-6">
-              <Button type="button" variant="ghost" onClick={() => setStep(2)}>
-                <ChevronLeft className="size-4" /> Tilbake
-              </Button>
-              <PublishActions
-                turnstileEnabled={turnstileEnabled}
-                turnstileToken={turnstileToken}
-                setTurnstileToken={setTurnstileToken}
-                mutationIsPending={mutation.isPending}
-                onCancel={() => navigate({ to: "/" })}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* ══ NATIVE: new 5-step flow ════════════════════════════════════ */}
-
-        {/* ── Native Step 1: Tittel & bilder ─────────────────────────────────── */}
-        {native && step === 1 && (
-          <div className="space-y-6">
-            <TitlePhotos {...sharedProps} />
-
-            <div className="fixed inset-x-0 bottom-[var(--app-bottom-nav-h)] z-40 flex justify-end bg-background/95 px-4 pt-3 pb-3 backdrop-blur border-t border-border">
-              <Button type="button" onClick={() => void goToStep2()}>
-                Neste: Detaljer <ChevronRight className="size-4" />
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Native Step 2: Detaljer ────────────────────────────────────────── */}
-        {native && step === 2 && (
-          <div className="space-y-6">
-            <CategoryAttributes {...sharedProps} />
-
-            <Condition {...sharedProps} />
-
-            <Price {...sharedProps} />
-
-            <SimilarListings {...sharedProps} />
-
-            <div className="fixed inset-x-0 bottom-[var(--app-bottom-nav-h)] z-40 flex items-center justify-between bg-background/95 px-4 pt-3 pb-3 backdrop-blur border-t border-border">
-              <Button type="button" variant="ghost" onClick={() => setStep(1)}>
-                <ChevronLeft className="size-4" /> Tilbake
-              </Button>
-              <Button type="button" onClick={() => void goToStep3()}>
-                Neste: Beskrivelse <ChevronRight className="size-4" />
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Native Step 3: Beskrivelse ──────────────────────────────────────── */}
-        {native && step === 3 && (
-          <div
-            className="flex flex-col"
-            style={{
-              height: "calc(var(--vvh, 100dvh) - var(--app-bottom-nav-h) - 13.75rem)",
-            }}
-          >
-            <DescriptionField {...sharedProps} />
-
-            <KeywordChips {...sharedProps} />
-
-            <div className="fixed inset-x-0 bottom-[var(--app-bottom-nav-h)] z-40 flex items-center justify-between bg-background/95 px-4 pt-3 pb-3 backdrop-blur border-t border-border">
-              <Button type="button" variant="ghost" onClick={() => setStep(2)}>
-                <ChevronLeft className="size-4" /> Tilbake
-              </Button>
-              <Button type="button" onClick={() => void goToStep4()}>
-                Neste: Sted & levering <ChevronRight className="size-4" />
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Native Step 4: Sted & levering ──────────────────────────────────── */}
-        {native && step === 4 && (
-          <div className="space-y-6">
-            <DeliveryLocation {...sharedProps} />
-
-            <div className="fixed inset-x-0 bottom-[var(--app-bottom-nav-h)] z-40 flex items-center justify-between bg-background/95 px-4 pt-3 pb-3 backdrop-blur border-t border-border">
-              <Button type="button" variant="ghost" onClick={() => setStep(3)}>
-                <ChevronLeft className="size-4" /> Tilbake
-              </Button>
-              <Button type="button" onClick={goToStep5}>
-                Neste: Forhåndsvisning <ChevronRight className="size-4" />
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Native Step 5: Forhåndsvisning & publiser ──────────────────────── */}
-        {native && step === 5 && (
-          <div className="space-y-6">
-            <ReviewPreview {...sharedProps} />
-
-            <UploadProgress
-              mutationIsPending={mutation.isPending}
-              uploadProgress={uploadProgress}
-            />
-
-            <div className="fixed inset-x-0 bottom-[var(--app-bottom-nav-h)] z-40 flex items-center justify-between bg-background/95 px-4 pt-3 pb-3 backdrop-blur border-t border-border">
-              <Button type="button" variant="ghost" onClick={() => setStep(4)}>
-                <ChevronLeft className="size-4" /> Tilbake
-              </Button>
-              <PublishActions
-                turnstileEnabled={turnstileEnabled}
-                turnstileToken={turnstileToken}
-                setTurnstileToken={setTurnstileToken}
-                mutationIsPending={mutation.isPending}
-                onCancel={() => navigate({ to: "/" })}
-              />
-            </div>
-          </div>
-        )}
+          );
+        })()}
       </form>
 
       {/* Category picker bottom sheet */}
@@ -1190,8 +1046,7 @@ function NewListingPage() {
             <AlertDialogAction
               onClick={() => {
                 setShowNoImageDialog(false);
-                setStep(2);
-                window.scrollTo({ top: 0, behavior: "smooth" });
+                void goToNextPage({ skipImageCheck: true });
               }}
             >
               Fortsett uten bilde
@@ -1214,7 +1069,7 @@ function NewListingPage() {
             <AlertDialogAction
               onClick={() => {
                 setShowNoPriceDialog(false);
-                void goToStep3(true);
+                void goToNextPage({ skipPriceCheck: true });
               }}
             >
               Fortsett uten pris

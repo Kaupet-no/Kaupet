@@ -6,6 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 import type { WizardSharedProps } from "../types";
 import { FieldValid } from "../field-valid";
+import { SimilarListings } from "../similar-listings";
 
 /**
  * Pris (price) + "gis bort gratis" + WTB-treff-hint. The WTB hint used to be
@@ -77,5 +78,20 @@ export function Price({
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * Registry-facing wrapper: Price + "Lignende annonser". Attaches
+ * SimilarListings directly below Price (mirroring where it already sits on
+ * native today) so it has a single home in the field-group registry instead
+ * of being interleaved ad hoc per platform in ny-annonse.tsx.
+ */
+export function PriceGroup(props: WizardSharedProps) {
+  return (
+    <>
+      <Price {...props} />
+      <SimilarListings similarListings={props.similarListings} />
+    </>
   );
 }

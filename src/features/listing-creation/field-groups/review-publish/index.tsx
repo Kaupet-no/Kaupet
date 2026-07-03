@@ -86,6 +86,31 @@ type PublishActionsProps = {
   onCancel: () => void;
 };
 
+/**
+ * Registry-facing wrapper: ReviewPreview + UploadProgress. `PublishActions`
+ * is deliberately excluded — it renders inline in the wizard's footer bar
+ * next to "Tilbake" (not stacked above it), same as today, so ny-annonse.tsx
+ * renders it explicitly on the last page instead of via this wrapper.
+ */
+export function ReviewPublishGroup(props: WizardSharedProps) {
+  return (
+    <>
+      <ReviewPreview
+        images={props.images}
+        title={props.title}
+        previewPrice={props.previewPrice}
+        city={props.city}
+        postalCode={props.postalCode}
+        categoryLabel={props.categoryLabel}
+      />
+      <UploadProgress
+        mutationIsPending={props.mutationIsPending}
+        uploadProgress={props.uploadProgress}
+      />
+    </>
+  );
+}
+
 /** Turnstile + "Avbryt" + "Publiser annonse" submit button — shared verbatim. */
 export function PublishActions({
   turnstileEnabled,

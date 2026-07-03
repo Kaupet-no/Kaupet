@@ -115,4 +115,9 @@ export type WizardSharedProps = {
 
   // review/publish
   previewPrice: string | null;
+  mutationIsPending: boolean;
+  turnstileEnabled: boolean;
+  turnstileToken: string | null;
+  setTurnstileToken: (token: string | null) => void;
+  onCancel: () => void;
 };

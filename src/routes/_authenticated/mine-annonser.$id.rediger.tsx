@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
-import { Loader2, ImagePlus, X, ChevronLeft, ChevronRight, ChevronDown, Send } from "lucide-react";
+import { Loader2, ImagePlus, X, ChevronLeft, ChevronRight, Send } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { republishListing } from "@/lib/listings.functions";
@@ -17,7 +17,7 @@ import {
   lookupCity,
   reverseGeocodeAddress,
 } from "@/lib/geocode";
-import { ListingLocationPicker } from "@/components/listing-location-picker";
+import { FullscreenLocationPicker } from "@/components/fullscreen-location-picker";
 import {
   LISTING_BUCKET,
   MAX_IMAGES,
@@ -28,16 +28,7 @@ import {
 } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,32 +40,95 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { formatErrorMessage } from "@/lib/errors";
-import {
-  AttributeFields,
-  useAllCategoryFilters,
-  type AttributeMap,
-} from "@/components/attribute-fields";
+import { useAllCategoryFilters, type AttributeMap } from "@/components/attribute-fields";
 import {
   categoryBreadcrumb,
   getMissingRequiredFilters,
   type CategoryNode,
 } from "@/lib/category-filters";
 import { CategoryPicker } from "@/components/category-picker";
+import { modulesForKeys } from "@/features/listing-creation/modules/registry";
+import { effectiveFlowForCategory } from "@/features/listing-creation/category-flows";
+import { useAllCategoryFlows } from "@/features/listing-creation/use-all-category-flows";
+import { fieldGroupsForKeys } from "@/features/listing-creation/field-groups/registry";
+import { validateRequiredFieldGroups } from "@/features/listing-creation/field-groups/validators";
+import type { WizardSharedProps } from "@/features/listing-creation/field-groups/types";
+import { CONDITIONS } from "@/lib/constants";
+import { suggestKeywordsForListing } from "@/lib/keyword-suggestion.functions";
+import { matchWtbListingsForListing } from "@/lib/wtb-listings.functions";
+import { getCurrentPosition, requestLocationPermission, isNative } from "@/lib/native";
 
-const CONDITIONS = [
-  { value: "new", label: "Helt ny" },
-  { value: "like_new", label: "Som ny" },
-  { value: "good", label: "Pent brukt" },
-  { value: "acceptable", label: "Brukt med slitasje" },
-  { value: "for_parts", label: "Må repareres" },
-] as const;
+const SIMILAR_STOPWORDS = new Set([
+  "og",
+  "er",
+  "en",
+  "et",
+  "ei",
+  "i",
+  "på",
+  "med",
+  "til",
+  "av",
+  "for",
+  "som",
+  "fra",
+  "har",
+  "den",
+  "det",
+  "de",
+  "vi",
+  "du",
+  "kan",
+  "ikke",
+  "seg",
+  "han",
+  "hun",
+  "men",
+  "om",
+  "så",
+  "ut",
+  "enn",
+  "da",
+  "når",
+  "at",
+  "dem",
+  "sin",
+  "hva",
+  "ved",
+  "var",
+  "ny",
+  "nye",
+  "god",
+  "fin",
+  "fine",
+  "pen",
+  "pent",
+  "pene",
+  "lite",
+  "litt",
+  "stor",
+  "store",
+  "liten",
+  "billig",
+  "rimelig",
+  "rask",
+  "raskt",
+  "gammel",
+  "brukt",
+  "selger",
+  "selges",
+  "kjøper",
+  "kjøpes",
+  "pris",
+]);
 
 const schema = z.object({
   title: z.string().trim().min(5).max(120),
   description: z.string().trim().min(20).max(4000),
   category_id: z.string().uuid(),
-  condition: z.enum(["new", "like_new", "good", "acceptable", "for_parts"]),
+  condition: z.enum(["new", "like_new", "good", "acceptable", "for_parts"]).nullable().optional(),
   is_free: z.boolean(),
+  can_ship: z.enum(["pickup", "ship", "both"]).nullable().optional(),
   price_nok: z.union([z.coerce.number().int().min(0).max(10_000_000), z.literal("")]).optional(),
   postal_code: z
     .string()
@@ -122,7 +176,7 @@ function EditListingPage() {
         supabase
           .from("listings")
           .select(
-            "id, title, description, category_id, condition, is_free, price_nok, postal_code, city, status, attributes, listing_images(id, storage_path, sort_order)",
+            "id, title, description, category_id, condition, is_free, price_nok, can_ship, postal_code, city, status, attributes, listing_images(id, storage_path, sort_order)",
           )
           .eq("id", id)
           .single(),
@@ -140,8 +194,9 @@ function EditListingPage() {
       title: listing.title,
       description: listing.description ?? "",
       category_id: listing.category_id ?? "",
-      condition: (listing.condition as FormValues["condition"]) ?? "good",
+      condition: (listing.condition as FormValues["condition"]) ?? null,
       is_free: listing.is_free,
+      can_ship: listing.can_ship === true ? "ship" : listing.can_ship === false ? "pickup" : null,
       price_nok: listing.price_nok ?? "",
       postal_code: listing.postal_code ?? "",
       city: listing.city ?? "",
@@ -153,15 +208,17 @@ function EditListingPage() {
     handleSubmit,
     setValue,
     watch,
-    formState: { errors },
+    trigger,
+    formState: { errors, touchedFields },
   } = useForm<FormValues>({
     values: formValues,
     defaultValues: {
       title: "",
       description: "",
       category_id: "",
-      condition: "good",
+      condition: null,
       is_free: false,
+      can_ship: null,
       price_nok: "",
       postal_code: "",
       city: "",
@@ -172,14 +229,21 @@ function EditListingPage() {
   const priceNok = watch("price_nok");
   const categoryId = watch("category_id");
   const condition = watch("condition");
+  const canShip = watch("can_ship");
   const postalCode = watch("postal_code");
   const city = watch("city");
+  const title = watch("title");
+  const description = watch("description");
 
   const [showPublishWarning, setShowPublishWarning] = useState(false);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const lastEdited = useRef<"postal_code" | "city" | "map" | null>(null);
   const markerMoved = useRef(false);
   const coordsHydratedFor = useRef<string | null>(null);
+  const [locationMethod, setLocationMethod] = useState<"gps" | "postal" | null>(null);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [fullscreenMapOpen, setFullscreenMapOpen] = useState(false);
+  const locationMethodHydratedFor = useRef<string | null>(null);
 
   // Initialize coords from existing listing
   useEffect(() => {
@@ -188,6 +252,15 @@ function EditListingPage() {
     if (typeof listing.lat === "number" && typeof listing.lng === "number") {
       setCoords({ lat: listing.lat, lng: listing.lng });
     }
+  }, [listing]);
+
+  // Default the location method to "postal" for existing listings that already
+  // have a postal code/city, so editing doesn't hide the already-filled-in
+  // location fields behind the create-wizard's pick-a-method screen.
+  useEffect(() => {
+    if (!listing || locationMethodHydratedFor.current === listing.id) return;
+    locationMethodHydratedFor.current = listing.id;
+    if (listing.postal_code || listing.city) setLocationMethod("postal");
   }, [listing]);
 
   // Auto-fill city from postal code
@@ -261,6 +334,144 @@ function EditListingPage() {
     }
     categoryHydratedFor.current = listing.id;
   }, [listing, categories]);
+
+  const { data: allFlows } = useAllCategoryFlows();
+  const fieldGroupKeys = useMemo(
+    () => effectiveFlowForCategory(categoryId || null, allFlows ?? [], categoriesById).fieldGroups,
+    [categoryId, allFlows, categoriesById],
+  );
+  const activeModules = useMemo(
+    () =>
+      modulesForKeys(
+        effectiveFlowForCategory(categoryId || null, allFlows ?? [], categoriesById).modules,
+      ),
+    [categoryId, allFlows, categoriesById],
+  );
+  const fieldGroups = useMemo(
+    () =>
+      fieldGroupsForKeys(fieldGroupKeys).filter(
+        (g) => g.key !== "title-photos" && g.key !== "review-publish",
+      ),
+    [fieldGroupKeys],
+  );
+  const conditionDescription = CONDITIONS.find((c) => c.value === condition)?.description;
+
+  // Category suggestions don't make sense when editing an already-published
+  // listing (suggesting a different category off a title tweak mid-edit
+  // would be surprising) — deliberately stubbed out so CategoryAttributes'
+  // suggestion banner never shows here.
+  const categorySuggestion = null;
+  const categoryTouchedManually = true;
+  function applyCategorySuggestion() {}
+  function setSuggestionDismissed() {}
+  function setCategorySuggestion() {}
+
+  // Debounced title for WTB/keyword/similar-listings queries
+  const [debouncedTitle, setDebouncedTitle] = useState("");
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedTitle(title ?? ""), 800);
+    return () => window.clearTimeout(t);
+  }, [title]);
+
+  const { data: similarListings } = useQuery({
+    queryKey: ["similar-listings", categoryId, debouncedTitle],
+    enabled: debouncedTitle.length >= 5 && !!categoryId,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const significantWords = debouncedTitle
+        .toLowerCase()
+        .replace(/[^a-zæøå0-9\s]/g, "")
+        .split(/\s+/)
+        .filter((w) => w.length >= 2 && !SIMILAR_STOPWORDS.has(w));
+      if (significantWords.length === 0) return [];
+      const { data } = await supabase
+        .from("listings")
+        .select("id, title, price_nok, is_free, city")
+        .eq("category_id", categoryId)
+        .eq("status", "active")
+        .neq("id", id)
+        .textSearch("search_vector", significantWords.join(" "), {
+          config: "norwegian",
+          type: "plain",
+        })
+        .limit(3);
+      return data ?? [];
+    },
+  });
+
+  const matchWtbFn = useServerFn(matchWtbListingsForListing);
+  const { data: wtbMatch } = useQuery({
+    queryKey: ["wtb-match", categoryId ?? null, debouncedTitle],
+    enabled: debouncedTitle.length >= 3,
+    staleTime: 120_000,
+    queryFn: () => matchWtbFn({ data: { title: debouncedTitle, category_id: categoryId || null } }),
+  });
+
+  const { data: keywordSuggestions, isFetching: keywordsFetching } = useQuery({
+    queryKey: ["keyword-suggestions", categoryId, debouncedTitle],
+    enabled: !!categoryId && debouncedTitle.length >= 3,
+    staleTime: 120_000,
+    queryFn: () =>
+      suggestKeywordsForListing({ data: { title: debouncedTitle, category_id: categoryId! } }),
+  });
+
+  function appendTagToDescription(tag: string) {
+    const current = (description ?? "").trimEnd();
+    const next = current ? `${current} ${tag}` : tag;
+    setValue("description", next, { shouldTouch: false });
+  }
+
+  function switchToPostal() {
+    setCoords(null);
+    setValue("postal_code", "");
+    setValue("city", "");
+    markerMoved.current = false;
+    lastEdited.current = null;
+    setLocationMethod("postal");
+  }
+
+  function switchToGps() {
+    setValue("postal_code", "");
+    setValue("city", "");
+    markerMoved.current = false;
+    lastEdited.current = null;
+    void fetchMyLocation();
+  }
+
+  async function fetchMyLocation() {
+    setLocationMethod("gps");
+    setLocationLoading(true);
+    try {
+      if (isNative()) {
+        const permission = await requestLocationPermission();
+        if (permission !== "granted") {
+          showErrorToast("Gi appen tilgang til posisjon i innstillingene.");
+          setLocationMethod(null);
+          return;
+        }
+      }
+      const pos = await getCurrentPosition();
+      if (!pos) {
+        showErrorToast("Kunne ikke hente posisjon.");
+        setLocationMethod(null);
+        return;
+      }
+      const { lat, lng } = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      setCoords({ lat, lng });
+      markerMoved.current = false;
+      lastEdited.current = null;
+      const geo = await reverseGeocodeAddress({ lat, lng });
+      if (geo.city) setValue("city", geo.city, { shouldValidate: false });
+      if (geo.postal_code && /^\d{4}$/.test(geo.postal_code)) {
+        setValue("postal_code", geo.postal_code, { shouldValidate: false });
+      }
+    } catch {
+      showErrorToast("Kunne ikke hente posisjon. Sjekk at du har gitt tilgang.");
+      setLocationMethod(null);
+    } finally {
+      setLocationLoading(false);
+    }
+  }
 
   // Image editor state
   const [items, setItems] = useState<EditorItem[]>([]);
@@ -362,8 +573,11 @@ function EditListingPage() {
           title: parsed.title,
           description: parsed.description,
           category_id: parsed.category_id,
-          condition: parsed.condition,
+          condition: fieldGroupKeys.includes("condition") ? (parsed.condition ?? null) : null,
           is_free: parsed.is_free,
+          can_ship: fieldGroupKeys.includes("delivery-location")
+            ? parsed.can_ship !== "pickup"
+            : null,
           price_nok: parsed.is_free
             ? null
             : typeof parsed.price_nok === "number"
@@ -513,6 +727,25 @@ function EditListingPage() {
             showErrorToast("Fyll inn alle obligatoriske egenskaper før du lagrer.");
             return;
           }
+          for (const mod of activeModules) {
+            const err = mod.validateExtra?.(attributes);
+            if (err) {
+              showErrorToast(err);
+              return;
+            }
+          }
+          const fieldGroupError = validateRequiredFieldGroups(fieldGroupKeys, {
+            condition: v.condition ?? null,
+            can_ship: fieldGroupKeys.includes("delivery-location")
+              ? v.can_ship != null
+                ? v.can_ship !== "pickup"
+                : null
+              : null,
+          });
+          if (fieldGroupError) {
+            showErrorToast(fieldGroupError);
+            return;
+          }
           mutation.mutate(v);
         })}
         className="mt-8 space-y-8"
@@ -623,148 +856,103 @@ function EditListingPage() {
           {errors.title && <p className="text-sm text-destructive">{errors.title.message}</p>}
         </section>
 
-        <section className="space-y-2">
-          <Label htmlFor="description">Beskrivelse</Label>
-          <Textarea id="description" rows={8} {...register("description")} />
-          {errors.description && (
-            <p className="text-sm text-destructive">{errors.description.message}</p>
-          )}
-        </section>
+        {(() => {
+          const sharedProps: WizardSharedProps = {
+            native,
 
-        <section className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Kategori</Label>
-            {!categories ? (
-              <div className="flex h-10 items-center rounded-md border border-input bg-background px-3 text-sm text-muted-foreground">
-                <Loader2 className="mr-2 size-4 animate-spin" /> Laster kategorier…
-              </div>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setCategoryPickerOpen(true)}
-                  className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors ${
-                    errors.category_id
-                      ? "border-destructive"
-                      : categoryLabel
-                        ? "border-border bg-card"
-                        : "border-border bg-card text-muted-foreground"
-                  } hover:border-primary/40`}
-                >
-                  <span>{categoryLabel ?? "Velg kategori..."}</span>
-                  <ChevronDown className="size-4 text-muted-foreground" />
-                </button>
-                <CategoryPicker
-                  open={categoryPickerOpen}
-                  onOpenChange={setCategoryPickerOpen}
-                  categories={categories}
-                  selectedId={categoryId || ""}
-                  onSelect={(id) => setValue("category_id", id, { shouldValidate: true })}
-                />
-                {errors.category_id && <p className="text-sm text-destructive">Velg en kategori</p>}
-              </>
-            )}
-            <AttributeFields
-              categoryId={categoryId || null}
-              categories={categories ?? []}
-              value={attributes}
-              onChange={setAttributes}
-              required
-              showErrors={attributesTouched}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Tilstand</Label>
-            <Select
-              value={condition || undefined}
-              onValueChange={(v) =>
-                setValue("condition", v as FormValues["condition"], { shouldValidate: true })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {CONDITIONS.map((c) => (
-                  <SelectItem key={c.value} value={c.value}>
-                    {c.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </section>
+            register,
+            watch,
+            setValue,
+            trigger,
+            errors,
+            touchedFields,
 
-        <section className="space-y-3">
-          <Label>Pris</Label>
-          <div className="flex items-center gap-3">
-            <Input
-              type="number"
-              min={0}
-              placeholder="kr"
-              disabled={isFree}
-              className="max-w-[200px]"
-              {...register("price_nok")}
-            />
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox checked={isFree} onCheckedChange={(v) => setValue("is_free", Boolean(v))} />
-              Gis bort gratis
-            </label>
-          </div>
-          {errors.price_nok && (
-            <p className="text-sm text-destructive">{errors.price_nok.message as string}</p>
-          )}
-        </section>
+            title,
+            description,
+            categoryId,
+            condition,
+            isFree,
+            canShip,
+            priceNok,
+            postalCode,
+            city,
 
-        <section className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-[160px_1fr]">
-            <div className="space-y-2">
-              <Label htmlFor="postal_code">Postnummer</Label>
-              <Input
-                id="postal_code"
-                inputMode="numeric"
-                maxLength={4}
-                {...register("postal_code", {
-                  onChange: () => {
-                    lastEdited.current = "postal_code";
-                    markerMoved.current = false;
-                  },
-                })}
-              />
-              {errors.postal_code && (
-                <p className="text-sm text-destructive">{errors.postal_code.message}</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="city">Sted</Label>
-              <Input
-                id="city"
-                {...register("city", {
-                  onChange: () => {
-                    lastEdited.current = "city";
-                    markerMoved.current = false;
-                  },
-                })}
-              />
-            </div>
-          </div>
-          {coords && (
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">
-                Dra markøren for å justere hvor området vises på annonsen.
-              </p>
-              <ListingLocationPicker
-                lat={coords.lat}
-                lng={coords.lng}
-                onChange={(next) => {
-                  markerMoved.current = true;
-                  lastEdited.current = "map";
-                  setCoords(next);
-                }}
-              />
-            </div>
-          )}
-        </section>
+            categories: categories ?? [],
+            categoryLabel,
+            setCategoryPickerOpen,
+            categorySuggestion,
+            categoryTouchedManually,
+            applyCategorySuggestion,
+            setSuggestionDismissed,
+            setCategorySuggestion,
+
+            attributes,
+            onAttributesChange: setAttributes,
+            attributesTouched,
+            activeModules,
+
+            conditionDescription,
+
+            wtbMatch,
+
+            keywordsFetching,
+            keywordSuggestions,
+            appendTagToDescription,
+
+            similarListings,
+
+            images: [],
+            setImages: () => {},
+            uploadProgress: null,
+
+            locationMethod,
+            setLocationMethod,
+            locationLoading,
+            coords,
+            setCoords,
+            switchToPostal,
+            switchToGps,
+            fetchMyLocation,
+            setFullscreenMapOpen,
+            markerMoved,
+            lastEdited,
+
+            previewPrice: null,
+            mutationIsPending: mutation.isPending,
+            turnstileEnabled: false,
+            turnstileToken: null,
+            setTurnstileToken: () => {},
+            onCancel: () => navigate({ to: "/mine-annonser" }),
+          };
+          return (
+            <>
+              {fieldGroups.map((g) => (
+                <g.Component key={g.key} {...sharedProps} />
+              ))}
+            </>
+          );
+        })()}
+
+        <CategoryPicker
+          open={categoryPickerOpen}
+          onOpenChange={setCategoryPickerOpen}
+          categories={categories ?? []}
+          selectedId={categoryId || ""}
+          onSelect={(id) => setValue("category_id", id, { shouldValidate: true })}
+        />
+
+        {fullscreenMapOpen && coords && (
+          <FullscreenLocationPicker
+            lat={coords.lat}
+            lng={coords.lng}
+            onConfirm={(next) => {
+              markerMoved.current = true;
+              lastEdited.current = "map";
+              setCoords(next);
+            }}
+            onClose={() => setFullscreenMapOpen(false)}
+          />
+        )}
 
         <div className="flex items-center justify-end gap-3 border-t border-border pt-6">
           <Button

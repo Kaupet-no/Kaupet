@@ -6,6 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 import type { WizardSharedProps } from "../types";
 import { FieldValid } from "../field-valid";
+import { RequiredMark } from "../required-mark";
 import { SimilarListings } from "../similar-listings";
 
 /**
@@ -26,7 +27,10 @@ export function Price({
   return (
     <section className="space-y-3">
       <div className="flex items-center gap-1.5">
-        <Label>Pris</Label>
+        <Label>
+          Pris
+          <RequiredMark />
+        </Label>
         <FieldValid
           show={
             (!!touchedFields.price_nok || isFree) &&
@@ -56,7 +60,7 @@ export function Price({
           {errors.price_nok.message as string}
         </p>
       )}
-      {!isFree && wtbMatch && wtbMatch.count > 0 && (
+      {wtbMatch && wtbMatch.count > 0 && (
         <div className="flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm">
           <Search className="mt-0.5 size-4 shrink-0 text-primary" />
           <div>

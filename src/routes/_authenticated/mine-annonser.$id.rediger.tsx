@@ -3,7 +3,7 @@ import { NativePageHeader } from "@/components/native-page-header";
 import { useIsNative } from "@/lib/use-is-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
@@ -44,14 +44,19 @@ import { useAllCategoryFilters, type AttributeMap } from "@/components/attribute
 import {
   categoryBreadcrumb,
   getMissingRequiredFilters,
+  vehicleCategoryGroupFor,
   type CategoryNode,
 } from "@/lib/category-filters";
 import { CategoryPicker } from "@/components/category-picker";
 import { modulesForKeys } from "@/features/listing-creation/modules/registry";
 import { effectiveFlowForCategory } from "@/features/listing-creation/category-flows";
 import { useAllCategoryFlows } from "@/features/listing-creation/use-all-category-flows";
-import { fieldGroupsForKeys } from "@/features/listing-creation/field-groups/registry";
+import {
+  fieldGroupsForKeys,
+  FIELD_GROUP_LABELS_NB,
+} from "@/features/listing-creation/field-groups/registry";
 import { validateRequiredFieldGroups } from "@/features/listing-creation/field-groups/validators";
+import { VehicleTitleFields } from "@/features/listing-creation/field-groups/title-photos";
 import type { WizardSharedProps } from "@/features/listing-creation/field-groups/types";
 import { CONDITIONS } from "@/lib/constants";
 import { suggestKeywordsForListing } from "@/lib/keyword-suggestion.functions";
@@ -124,6 +129,7 @@ const SIMILAR_STOPWORDS = new Set([
 
 const schema = z.object({
   title: z.string().trim().min(5).max(120),
+  subtitle: z.string().trim().max(80).optional().or(z.literal("")),
   description: z.string().trim().min(20).max(4000),
   category_id: z.string().uuid(),
   condition: z.enum(["new", "like_new", "good", "acceptable", "for_parts"]).nullable().optional(),
@@ -143,6 +149,34 @@ type FormValues = z.infer<typeof schema>;
 type EditorItem =
   | { kind: "existing"; key: string; storage_path: string; url?: string }
   | { kind: "new"; key: string; file: File; previewUrl: string };
+
+/**
+ * Groups the edit form into numbered sections mirroring the create-wizard's
+ * step order/labels, so editing an existing listing feels structurally
+ * consistent with creating one even though it's a single scrolling page
+ * rather than a paginated wizard.
+ */
+function EditSection({
+  step,
+  title,
+  children,
+}: {
+  step: number;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className={step === 1 ? "space-y-6" : "space-y-6 border-t border-border pt-8"}>
+      <div className="flex items-center gap-2">
+        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
+          {step}
+        </span>
+        <h2 className="text-sm font-medium text-muted-foreground">{title}</h2>
+      </div>
+      {children}
+    </section>
+  );
+}
 
 export const Route = createFileRoute("/_authenticated/mine-annonser/$id/rediger")({
   head: () => ({
@@ -176,7 +210,7 @@ function EditListingPage() {
         supabase
           .from("listings")
           .select(
-            "id, title, description, category_id, condition, is_free, price_nok, can_ship, postal_code, city, status, attributes, listing_images(id, storage_path, sort_order)",
+            "id, title, subtitle, description, category_id, condition, is_free, price_nok, can_ship, postal_code, city, status, attributes, listing_images(id, storage_path, sort_order)",
           )
           .eq("id", id)
           .single(),
@@ -192,6 +226,7 @@ function EditListingPage() {
     if (!listing) return undefined;
     return {
       title: listing.title,
+      subtitle: listing.subtitle ?? "",
       description: listing.description ?? "",
       category_id: listing.category_id ?? "",
       condition: (listing.condition as FormValues["condition"]) ?? null,
@@ -214,6 +249,7 @@ function EditListingPage() {
     values: formValues,
     defaultValues: {
       title: "",
+      subtitle: "",
       description: "",
       category_id: "",
       condition: null,
@@ -233,6 +269,7 @@ function EditListingPage() {
   const postalCode = watch("postal_code");
   const city = watch("city");
   const title = watch("title");
+  const subtitle = watch("subtitle");
   const description = watch("description");
 
   const [showPublishWarning, setShowPublishWarning] = useState(false);
@@ -324,6 +361,10 @@ function EditListingPage() {
     [categoryId, allFilters, categoriesById, attributes],
   );
   const categoryLabel = categoryId ? categoryBreadcrumb(categoryId, categoriesById) || null : null;
+  const vehicleGroup = useMemo(
+    () => vehicleCategoryGroupFor(categoryId || null, allFilters ?? [], categoriesById),
+    [categoryId, allFilters, categoriesById],
+  );
 
   // Initialize attributes from existing listing when it loads (once)
   useEffect(() => {
@@ -350,7 +391,8 @@ function EditListingPage() {
   const fieldGroups = useMemo(
     () =>
       fieldGroupsForKeys(fieldGroupKeys).filter(
-        (g) => g.key !== "title-photos" && g.key !== "review-publish",
+        (g) =>
+          g.key !== "category-select" && g.key !== "title-photos" && g.key !== "review-publish",
       ),
     [fieldGroupKeys],
   );
@@ -571,6 +613,7 @@ function EditListingPage() {
         .from("listings")
         .update({
           title: parsed.title,
+          subtitle: parsed.subtitle || null,
           description: parsed.description,
           category_id: parsed.category_id,
           condition: fieldGroupKeys.includes("condition") ? (parsed.condition ?? null) : null,
@@ -750,111 +793,126 @@ function EditListingPage() {
         })}
         className="mt-8 space-y-8"
       >
-        {/* Images */}
-        <section className="space-y-3">
-          <Label>Bilder</Label>
-          <p className="text-xs text-muted-foreground">
-            {items.length} av {MAX_IMAGES} bilder. Første bilde er hovedbildet. Bruk pilene for å
-            endre rekkefølge.
-          </p>
+        <EditSection step={1} title={FIELD_GROUP_LABELS_NB["title-photos"]}>
+          <section className="space-y-3">
+            <Label>Bilder</Label>
+            <p className="text-xs text-muted-foreground">
+              {items.length} av {MAX_IMAGES} bilder. Første bilde er hovedbildet. Bruk pilene for å
+              endre rekkefølge.
+            </p>
 
-          {items.length > 0 && (
-            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-              {items.map((it, idx) => {
-                const src = it.kind === "existing" ? it.url : it.previewUrl;
-                return (
-                  <li
-                    key={it.key}
-                    className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted"
-                  >
-                    {src ? (
-                      <img
-                        src={src}
-                        alt={idx === 0 ? "Hovedbilde av annonsen" : `Bilde ${idx + 1} av annonsen`}
-                        className="size-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex size-full items-center justify-center">
-                        <Loader2 className="size-4 animate-spin text-muted-foreground" />
-                      </div>
-                    )}
-                    {idx === 0 && (
-                      <span className="absolute left-2 top-2 rounded bg-primary/90 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary-foreground">
-                        Hoved
-                      </span>
-                    )}
-                    {it.kind === "new" && (
-                      <span className="absolute right-2 top-2 rounded bg-accent/90 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent-foreground">
-                        Ny
-                      </span>
-                    )}
-                    <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent p-1 opacity-0 transition group-hover:opacity-100">
-                      <div className="flex">
+            {items.length > 0 && (
+              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                {items.map((it, idx) => {
+                  const src = it.kind === "existing" ? it.url : it.previewUrl;
+                  return (
+                    <li
+                      key={it.key}
+                      className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted"
+                    >
+                      {src ? (
+                        <img
+                          src={src}
+                          alt={
+                            idx === 0 ? "Hovedbilde av annonsen" : `Bilde ${idx + 1} av annonsen`
+                          }
+                          className="size-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex size-full items-center justify-center">
+                          <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                        </div>
+                      )}
+                      {idx === 0 && (
+                        <span className="absolute left-2 top-2 rounded bg-primary/90 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary-foreground">
+                          Hoved
+                        </span>
+                      )}
+                      {it.kind === "new" && (
+                        <span className="absolute right-2 top-2 rounded bg-accent/90 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent-foreground">
+                          Ny
+                        </span>
+                      )}
+                      <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent p-1 opacity-0 transition group-hover:opacity-100">
+                        <div className="flex">
+                          <button
+                            type="button"
+                            onClick={() => move(it.key, -1)}
+                            className="rounded p-1 text-white hover:bg-white/20 disabled:opacity-40"
+                            disabled={idx === 0}
+                            aria-label="Flytt venstre"
+                          >
+                            <ChevronLeft className="size-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => move(it.key, 1)}
+                            className="rounded p-1 text-white hover:bg-white/20 disabled:opacity-40"
+                            disabled={idx === items.length - 1}
+                            aria-label="Flytt høyre"
+                          >
+                            <ChevronRight className="size-3.5" />
+                          </button>
+                        </div>
                         <button
                           type="button"
-                          onClick={() => move(it.key, -1)}
-                          className="rounded p-1 text-white hover:bg-white/20 disabled:opacity-40"
-                          disabled={idx === 0}
-                          aria-label="Flytt venstre"
+                          onClick={() => removeItem(it.key)}
+                          className="rounded p-1 text-white hover:bg-destructive"
+                          aria-label="Fjern bilde"
                         >
-                          <ChevronLeft className="size-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => move(it.key, 1)}
-                          className="rounded p-1 text-white hover:bg-white/20 disabled:opacity-40"
-                          disabled={idx === items.length - 1}
-                          aria-label="Flytt høyre"
-                        >
-                          <ChevronRight className="size-3.5" />
+                          <X className="size-3.5" />
                         </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => removeItem(it.key)}
-                        className="rounded p-1 text-white hover:bg-destructive"
-                        aria-label="Fjern bilde"
-                      >
-                        <X className="size-3.5" />
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
 
-          <div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                const fl = e.target.files;
-                if (fl) addFiles(Array.from(fl));
-                e.target.value = "";
-              }}
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  const fl = e.target.files;
+                  if (fl) addFiles(Array.from(fl));
+                  e.target.value = "";
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={items.length >= MAX_IMAGES}
+              >
+                <ImagePlus className="size-4" />
+                Last opp bilder
+              </Button>
+            </div>
+          </section>
+
+          {vehicleGroup ? (
+            <VehicleTitleFields
+              register={register}
+              setValue={setValue}
+              errors={errors}
+              touchedFields={touchedFields}
+              title={title}
+              subtitle={subtitle}
+              attributes={attributes}
             />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={items.length >= MAX_IMAGES}
-            >
-              <ImagePlus className="size-4" />
-              Last opp bilder
-            </Button>
-          </div>
-        </section>
-
-        <section className="space-y-2">
-          <Label htmlFor="title">Tittel</Label>
-          <Input id="title" {...register("title")} />
-          {errors.title && <p className="text-sm text-destructive">{errors.title.message}</p>}
-        </section>
+          ) : (
+            <section className="space-y-2">
+              <Label htmlFor="title">Tittel</Label>
+              <Input id="title" {...register("title")} />
+              {errors.title && <p className="text-sm text-destructive">{errors.title.message}</p>}
+            </section>
+          )}
+        </EditSection>
 
         {(() => {
           const sharedProps: WizardSharedProps = {
@@ -868,6 +926,7 @@ function EditListingPage() {
             touchedFields,
 
             title,
+            subtitle,
             description,
             categoryId,
             condition,
@@ -880,6 +939,7 @@ function EditListingPage() {
             categories: categories ?? [],
             categoryLabel,
             setCategoryPickerOpen,
+            onCategorySelect: (id) => setValue("category_id", id, { shouldValidate: true }),
             categorySuggestion,
             categoryTouchedManually,
             applyCategorySuggestion,
@@ -926,8 +986,14 @@ function EditListingPage() {
           };
           return (
             <>
-              {fieldGroups.map((g) => (
-                <g.Component key={g.key} {...sharedProps} />
+              {fieldGroups.map((g, idx) => (
+                <EditSection
+                  key={g.key}
+                  step={idx + 2}
+                  title={FIELD_GROUP_LABELS_NB[g.key] ?? g.key}
+                >
+                  <g.Component {...sharedProps} />
+                </EditSection>
               ))}
             </>
           );

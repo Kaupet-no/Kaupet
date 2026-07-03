@@ -128,6 +128,24 @@ export function getMissingRequiredFilters(
 }
 
 /**
+ * Returns the vehicle_brands.category_group a category should look up
+ * brands/models from, or null if the category has no `brand_select` filter
+ * (i.e. isn't a vehicle category). Shared by the vehicle-lookup module and
+ * the title-photos field group so both agree on what counts as "a vehicle
+ * category" — driven by admin-configured category_filters, not a hardcoded
+ * category name/slug.
+ */
+export function vehicleCategoryGroupFor(
+  categoryId: string | null,
+  allFilters: CategoryFilter[],
+  categoriesById: Map<string, CategoryNode>,
+): VehicleBrandGroup | null {
+  const filters = effectiveFiltersForCategory(categoryId, allFilters, categoriesById);
+  const brandFilter = filters.find((f) => f.type === "brand_select");
+  return (brandFilter?.unit as VehicleBrandGroup | undefined) ?? null;
+}
+
+/**
  * Builds a " › "-separated breadcrumb label for a category by walking up its
  * parent chain, e.g. "Elektronikk › TV og lyd › TV". Works for any depth.
  */

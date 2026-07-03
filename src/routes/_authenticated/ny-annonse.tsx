@@ -59,6 +59,7 @@ import type { WizardSharedProps } from "@/features/listing-creation/field-groups
 
 const listingSchema = z.object({
   title: z.string().trim().min(5, "Tittelen må være minst 5 tegn").max(120, "Maks 120 tegn"),
+  subtitle: z.string().trim().max(80, "Maks 80 tegn").optional().or(z.literal("")),
   description: z
     .string()
     .trim()
@@ -197,7 +198,11 @@ function StepIndicator({
               {s < step ? <Check className={checkClass} /> : s}
             </div>
             <span
-              className={`hidden text-xs ${labelBreakpoint} ${s === step ? "font-medium text-foreground" : "text-muted-foreground"}`}
+              className={`text-xs ${
+                s === step
+                  ? "inline font-medium text-foreground"
+                  : `hidden ${labelBreakpoint} text-muted-foreground`
+              }`}
             >
               {label}
             </span>
@@ -250,7 +255,7 @@ function NewListingPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
-        .select("id, name_nb, parent_id")
+        .select("id, name_nb, parent_id, icon")
         .order("sort_order");
       if (error) throw error;
       return data;
@@ -280,6 +285,7 @@ function NewListingPage() {
     mode: "onTouched",
     defaultValues: {
       title: "",
+      subtitle: "",
       description: "",
       category_id: "",
       condition: "good",
@@ -298,6 +304,7 @@ function NewListingPage() {
   const postalCode = watch("postal_code");
   const city = watch("city");
   const title = watch("title");
+  const subtitle = watch("subtitle");
   const description = watch("description");
   const priceNok = watch("price_nok");
 
@@ -329,6 +336,30 @@ function NewListingPage() {
   );
 
   const { step, setStep, currentPage, goNext, isFirst, isLast } = useListingSteps(pages);
+
+  /** Browser back should step the wizard backward instead of leaving the
+   * route entirely: push a history entry each time the step advances, and
+   * on popstate (back button or the in-page "Tilbake" button, which now
+   * delegates to `history.back()`) restore the step encoded in that entry
+   * — falling back to step 1 for the entry from before the first push.
+   * Mirrors the pushState/popstate pattern used by image-lightbox.tsx and
+   * map-overlay.tsx for overlay dismissal. */
+  const prevStepRef = useRef(step);
+  useEffect(() => {
+    if (step > prevStepRef.current) {
+      window.history.pushState({ wizardStep: step }, "");
+    }
+    prevStepRef.current = step;
+  }, [step]);
+
+  useEffect(() => {
+    function onPopState(e: PopStateEvent) {
+      const wizardStep = (e.state as { wizardStep?: number } | null)?.wizardStep;
+      setStep(wizardStep ?? 1);
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [setStep]);
   const categoryAttributesPageIndex = pages.findIndex((p) =>
     p.groups.some((g) => g.key === "category-attributes"),
   );
@@ -393,6 +424,7 @@ function NewListingPage() {
           DRAFT_KEY,
           JSON.stringify({
             title,
+            subtitle,
             description,
             selectedParentId,
             category_id: categoryId,
@@ -413,6 +445,7 @@ function NewListingPage() {
     return () => window.clearTimeout(t);
   }, [
     title,
+    subtitle,
     description,
     selectedParentId,
     categoryId,
@@ -434,6 +467,7 @@ function NewListingPage() {
         data: {
           ...(draftId ? { id: draftId } : {}),
           title: currentTitle,
+          subtitle: (subtitle ?? "").trim() || null,
           description: (description ?? "").trim() || undefined,
           category_id: categoryId || null,
           condition: condition || undefined,
@@ -507,6 +541,7 @@ function NewListingPage() {
   function restoreDraft() {
     if (!hasDraftData) return;
     if (typeof hasDraftData.title === "string") setValue("title", hasDraftData.title);
+    if (typeof hasDraftData.subtitle === "string") setValue("subtitle", hasDraftData.subtitle);
     if (typeof hasDraftData.description === "string")
       setValue("description", hasDraftData.description);
     if (typeof hasDraftData.condition === "string")
@@ -761,6 +796,7 @@ function NewListingPage() {
         data: {
           ...(draftId ? { draftId } : {}),
           title: values.title,
+          subtitle: values.subtitle || null,
           description: values.description,
           category_id: values.category_id,
           condition: fieldGroupKeys.includes("condition") ? (values.condition ?? null) : null,
@@ -863,6 +899,7 @@ function NewListingPage() {
     touchedFields,
 
     title,
+    subtitle,
     description,
     categoryId,
     condition,
@@ -875,6 +912,15 @@ function NewListingPage() {
     categories: categories ?? [],
     categoryLabel,
     setCategoryPickerOpen,
+    onCategorySelect: (id, parentId) => {
+      setCategoryTouchedManually(true);
+      setSelectedParentId(parentId);
+      setValue("category_id", id, { shouldValidate: true });
+      setCategorySuggestion(null);
+      if (currentPage?.groups?.some((g) => g.key === "category-select")) {
+        goToNextPage();
+      }
+    },
     categorySuggestion,
     categoryTouchedManually,
     applyCategorySuggestion,
@@ -996,7 +1042,7 @@ function NewListingPage() {
                 } flex items-center ${isFirst ? "justify-end" : "justify-between"}`}
               >
                 {!isFirst && (
-                  <Button type="button" variant="ghost" onClick={() => setStep(step - 1)}>
+                  <Button type="button" variant="ghost" onClick={() => window.history.back()}>
                     <ChevronLeft className="size-4" /> Tilbake
                   </Button>
                 )}

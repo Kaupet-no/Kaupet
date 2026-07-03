@@ -1,10 +1,11 @@
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 
 import type { WizardSharedProps } from "../types";
 import { FieldValid } from "../field-valid";
+import { RequiredMark } from "../required-mark";
 
 /** Category picker + suggestion banner + activeModules (vehicle-lookup/generic-attributes). */
 export function CategoryAttributes({
@@ -27,21 +28,23 @@ export function CategoryAttributes({
   return (
     <section className="space-y-2">
       <div className="flex items-center gap-1.5">
-        <Label>Kategori</Label>
+        <Label>
+          Kategori
+          <RequiredMark />
+        </Label>
         <FieldValid show={!!touchedFields.category_id && !errors.category_id} />
       </div>
 
       {categorySuggestion && !categoryTouchedManually && (
-        <div className="flex items-center gap-2 rounded-md border border-dashed bg-muted/40 px-3 py-2 text-sm">
+        <div className="flex items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
+          <Sparkles className="size-4 shrink-0 text-primary" aria-hidden />
           <span>
-            Forslag:{" "}
             {categorySuggestion.parent_name_nb
               ? `${categorySuggestion.parent_name_nb} › ${categorySuggestion.name_nb}`
-              : categorySuggestion.name_nb}{" "}
-            — bruk denne?
+              : categorySuggestion.name_nb}
           </span>
-          <Button type="button" size="sm" variant="secondary" onClick={applyCategorySuggestion}>
-            Bruk
+          <Button type="button" size="sm" onClick={applyCategorySuggestion} className="ml-auto">
+            Bruk forslag
           </Button>
           <Button
             type="button"
@@ -55,6 +58,10 @@ export function CategoryAttributes({
             ✕
           </Button>
         </div>
+      )}
+
+      {categorySuggestion && !categoryTouchedManually && (
+        <p className="text-xs text-muted-foreground">Eller velg en annen kategori selv:</p>
       )}
 
       <button

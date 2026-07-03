@@ -765,6 +765,7 @@ export type Database = {
           search_vector: unknown
           seller_id: string
           status: Database["public"]["Enums"]["listing_status"]
+          subtitle: string | null
           title: string
           updated_at: string
           view_count: number
@@ -793,6 +794,7 @@ export type Database = {
           search_vector?: unknown
           seller_id: string
           status?: Database["public"]["Enums"]["listing_status"]
+          subtitle?: string | null
           title: string
           updated_at?: string
           view_count?: number
@@ -821,6 +823,7 @@ export type Database = {
           search_vector?: unknown
           seller_id?: string
           status?: Database["public"]["Enums"]["listing_status"]
+          subtitle?: string | null
           title?: string
           updated_at?: string
           view_count?: number

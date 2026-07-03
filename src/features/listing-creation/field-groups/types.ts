@@ -14,6 +14,7 @@ import type { PendingImage } from "@/components/image-uploader";
 /** Minimal shape of ny-annonse.tsx's ListingForm — kept local to avoid a circular import. */
 export type ListingFormShape = {
   title: string;
+  subtitle?: string | undefined;
   description: string;
   category_id: string;
   condition?: "new" | "like_new" | "good" | "acceptable" | "for_parts" | null;
@@ -43,6 +44,7 @@ export type WizardSharedProps = {
 
   // watched form values
   title: string;
+  subtitle: string | undefined;
   description: string;
   categoryId: string;
   condition: ListingFormShape["condition"];
@@ -53,9 +55,10 @@ export type WizardSharedProps = {
   city: string | undefined;
 
   // category
-  categories: CategoryNode[];
+  categories: (CategoryNode & { name_nb: string })[];
   categoryLabel: string | null;
   setCategoryPickerOpen: (open: boolean) => void;
+  onCategorySelect: (categoryId: string, parentId: string) => void;
   categorySuggestion: {
     category_id: string;
     parent_id: string | null;

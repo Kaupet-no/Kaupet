@@ -22,6 +22,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
       .object({
         id: z.string().uuid().optional(),
         title: z.string().trim().min(1).max(120),
+        subtitle: z.string().trim().max(80).nullable().optional(),
         description: z.string().trim().max(4000).optional(),
         category_id: z.string().uuid().nullable().optional(),
         condition: z
@@ -49,6 +50,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
 
     const fields = {
       title: data.title,
+      ...(data.subtitle !== undefined && { subtitle: data.subtitle }),
       ...(data.description !== undefined && { description: data.description }),
       ...(data.category_id !== undefined && { category_id: data.category_id }),
       ...(data.condition !== undefined && { condition: data.condition }),
@@ -101,6 +103,7 @@ export const createListing = createServerFn({ method: "POST" })
       .object({
         draftId: z.string().uuid().optional(),
         title: z.string().trim().min(5).max(120),
+        subtitle: z.string().trim().max(80).nullable().optional(),
         description: z.string().trim().min(20).max(4000),
         category_id: z.string().uuid(),
         condition: z.enum(["new", "like_new", "good", "acceptable", "for_parts"]).nullable(),
@@ -175,6 +178,7 @@ export const createListing = createServerFn({ method: "POST" })
 
     const listingFields = {
       title: data.title,
+      subtitle: data.subtitle || null,
       description: data.description,
       category_id: data.category_id,
       condition: data.condition,

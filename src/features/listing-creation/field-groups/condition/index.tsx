@@ -2,6 +2,7 @@ import { Label } from "@/components/ui/label";
 import { CONDITIONS } from "@/lib/constants";
 
 import type { WizardSharedProps, ListingFormShape } from "../types";
+import { RequiredMark } from "../required-mark";
 
 /**
  * Tilstand (condition). Web renders a grid of description-cards; native
@@ -17,7 +18,10 @@ export function Condition({
   if (native) {
     return (
       <section className="space-y-2">
-        <Label>Tilstand</Label>
+        <Label>
+          Tilstand
+          <RequiredMark />
+        </Label>
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
           {CONDITIONS.map((c) => (
             <button

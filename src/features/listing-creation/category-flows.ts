@@ -40,29 +40,41 @@ const DEFAULT_FLOW: CategoryFlow = { fieldGroups: DEFAULT_FIELD_GROUPS, modules:
  * category_filters (which merges parent + child by key), a child flow row
  * overrides its parent's field_groups/modules wholesale — a category either
  * opts into a fully custom flow or inherits one completely.
+ *
+ * `category-select` is always prepended and is never part of the stored
+ * `field_groups` — it's a structural, always-first step (pick a category
+ * before anything else), not admin-configurable content.
  */
 export function effectiveFlowForCategory(
   categoryId: string | null,
   allFlows: CategoryFlowRow[],
   categoriesById: Map<string, CategoryNode>,
 ): CategoryFlow {
-  if (!categoryId) return DEFAULT_FLOW;
+  if (!categoryId) return prependCategorySelect(DEFAULT_FLOW);
   const flowsByCategoryId = new Map(allFlows.map((f) => [f.category_id, f]));
   let cur: CategoryNode | undefined = categoriesById.get(categoryId);
   while (cur) {
     const row = flowsByCategoryId.get(cur.id);
-    if (row) return { fieldGroups: row.field_groups, modules: row.modules };
+    if (row) return prependCategorySelect({ fieldGroups: row.field_groups, modules: row.modules });
     cur = cur.parent_id ? categoriesById.get(cur.parent_id) : undefined;
   }
-  return DEFAULT_FLOW;
+  return prependCategorySelect(DEFAULT_FLOW);
+}
+
+function prependCategorySelect(flow: CategoryFlow): CategoryFlow {
+  return { ...flow, fieldGroups: ["category-select", ...flow.fieldGroups] };
 }
 
 /**
  * Chunks an ordered list of active field-group keys into wizard "pages" for a
  * given platform: web pages hold more groups per page, native pages hold
- * fewer. `title-photos` is always solo first; `review-publish` is always
- * solo last on native, and absorbs `delivery-location` as one page on web —
+ * fewer. `category-select` is always solo first (category must be chosen
+ * before anything else, including title); `review-publish` is always solo
+ * last on native, and absorbs `delivery-location` as one page on web —
  * reproducing today's exact 3-web/5-native split for the default flow.
+ * `title-photos` is no longer forced first — its position is just whatever
+ * order it has in `fieldGroupKeys`, so a category flow can put
+ * `category-attributes` (and any vehicle lookup it triggers) before it.
  *
  * Chunking is purely positional: it has no notion of "these groups prefer to
  * stay adjacent," so a category that reorders `delivery-location` between
@@ -78,14 +90,14 @@ export function resolveWizardPages(
   const chunkSize = options.native ? 3 : 4;
 
   const withoutEnds = fieldGroupKeys.filter(
-    (k) => k !== "title-photos" && k !== "review-publish" && k !== "delivery-location",
+    (k) => k !== "category-select" && k !== "review-publish" && k !== "delivery-location",
   );
-  const hasTitlePhotos = fieldGroupKeys.includes("title-photos");
+  const hasCategorySelect = fieldGroupKeys.includes("category-select");
   const hasReviewPublish = fieldGroupKeys.includes("review-publish");
   const hasDeliveryLocation = fieldGroupKeys.includes("delivery-location");
 
   const pages: string[][] = [];
-  if (hasTitlePhotos) pages.push(["title-photos"]);
+  if (hasCategorySelect) pages.push(["category-select"]);
 
   for (let i = 0; i < withoutEnds.length; i += chunkSize) {
     pages.push(withoutEnds.slice(i, i + chunkSize));

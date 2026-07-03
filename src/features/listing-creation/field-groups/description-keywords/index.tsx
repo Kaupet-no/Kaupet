@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 import type { WizardSharedProps } from "../types";
 import { FieldValid } from "../field-valid";
+import { RequiredMark } from "../required-mark";
 
 /**
  * Description textarea. Rendered with a fixed-height flex-fill wrapper on
@@ -28,7 +29,10 @@ export function DescriptionField({
   const field = (
     <>
       <div className="flex items-center justify-between">
-        <Label htmlFor="description">Beskrivelse</Label>
+        <Label htmlFor="description">
+          Beskrivelse
+          <RequiredMark />
+        </Label>
         <div className="flex items-center gap-1.5">
           <FieldValid show={!!touchedFields.description && !errors.description} />
           <span className="text-xs text-muted-foreground">{(description ?? "").length} / 4000</span>

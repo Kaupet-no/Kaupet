@@ -16,11 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useAllCategoryFilters, type AttributeMap } from "@/components/attribute-fields";
-import {
-  effectiveFiltersForCategory,
-  type CategoryNode,
-  type VehicleBrandGroup,
-} from "@/lib/category-filters";
+import { vehicleCategoryGroupFor, type CategoryNode } from "@/lib/category-filters";
 import { lookupVehicleByRegNumber } from "@/lib/vehicle-lookup.functions";
 import { createVehicleBrand, createVehicleModel } from "@/lib/vehicle-brands.functions";
 
@@ -47,12 +43,10 @@ export function VehicleLookupPanel({
     return m;
   }, [categories]);
 
-  const filters = useMemo(
-    () => effectiveFiltersForCategory(categoryId, allFilters ?? [], categoriesById),
+  const categoryGroup = useMemo(
+    () => vehicleCategoryGroupFor(categoryId, allFilters ?? [], categoriesById),
     [categoryId, allFilters, categoriesById],
   );
-  const brandFilter = filters.find((f) => f.type === "brand_select");
-  const categoryGroup = (brandFilter?.unit ?? null) as VehicleBrandGroup | null;
 
   const [regNr, setRegNr] = useState("");
   const [loading, setLoading] = useState(false);
@@ -193,9 +187,29 @@ export function VehicleLookupPanel({
             {lookupError && <p className="text-sm text-destructive">{lookupError}</p>}
           </div>
 
-          {summary && (
+          {loading && (
+            <div className="animate-pulse space-y-2 rounded-md bg-muted/40 p-3">
+              <div className="h-3 w-40 rounded bg-muted-foreground/20" />
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                <div className="h-3 w-full rounded bg-muted-foreground/20" />
+                <div className="h-3 w-full rounded bg-muted-foreground/20" />
+                <div className="h-3 w-full rounded bg-muted-foreground/20" />
+                <div className="h-3 w-full rounded bg-muted-foreground/20" />
+              </div>
+            </div>
+          )}
+
+          {!loading && summary && (
             <div className="rounded-md bg-muted/40 p-3 text-sm">
               <p className="font-medium">Data fra Statens vegvesen</p>
+              {(summary.year || summary.brand || summary.model) && (
+                <p className="mt-1 text-muted-foreground">
+                  Tittel blir:{" "}
+                  <span className="font-medium text-foreground">
+                    {[summary.year, summary.brand, summary.model].filter(Boolean).join(" ")}
+                  </span>
+                </p>
+              )}
               <dl className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1">
                 {summary.brand && (
                   <>

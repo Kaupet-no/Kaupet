@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { ListingLocationPicker } from "@/components/listing-location-picker";
 
 import type { WizardSharedProps } from "../types";
+import { RequiredMark } from "../required-mark";
 
 /** Delivery-method buttons + location section (GPS/postal/map). Identical on web and native. */
 export function DeliveryLocation({
@@ -30,7 +31,10 @@ export function DeliveryLocation({
   return (
     <>
       <section className="space-y-3">
-        <Label>Levering</Label>
+        <Label>
+          Levering
+          <RequiredMark />
+        </Label>
         <div className="grid grid-cols-3 gap-2">
           {(
             [
@@ -61,7 +65,10 @@ export function DeliveryLocation({
       </section>
 
       <section className="space-y-4">
-        <Label>Sted</Label>
+        <Label>
+          Sted
+          <RequiredMark />
+        </Label>
         {locationMethod === null && (
           <div className="grid grid-cols-2 gap-3">
             <button

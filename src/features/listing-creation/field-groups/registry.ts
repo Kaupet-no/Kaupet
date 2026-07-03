@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 
 import { TitlePhotos } from "./title-photos";
+import { CategorySelect } from "./category-select";
 import { CategoryAttributes } from "./category-attributes";
 import { Condition } from "./condition";
 import { PriceGroup } from "./price";
@@ -30,6 +31,11 @@ export type FieldGroup = {
 };
 
 export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
+  "category-select": {
+    key: "category-select",
+    Component: CategorySelect,
+    fieldsToValidate: ["category_id"],
+  },
   "title-photos": {
     key: "title-photos",
     Component: TitlePhotos,
@@ -94,6 +100,7 @@ export function fieldGroupsForKeys(keys: string[]): FieldGroup[] {
  * the default flow.
  */
 const FIELD_GROUP_LABEL_NATIVE_NB: Record<string, string> = {
+  "category-select": "Kategori",
   "title-photos": "Tittel",
   "category-attributes": "Detaljer",
   condition: "Detaljer",
@@ -104,6 +111,7 @@ const FIELD_GROUP_LABEL_NATIVE_NB: Record<string, string> = {
 };
 
 const FIELD_GROUP_LABEL_WEB_NB: Record<string, string> = {
+  "category-select": "Kategori",
   "title-photos": "Bilder & tittel",
   "category-attributes": "Detaljer",
   condition: "Detaljer",
@@ -121,6 +129,7 @@ export function pageLabel(groups: FieldGroup[], native: boolean): string {
 
 /** Norwegian admin-display labels — distinct from the step-indicator labels above (different audience/purpose). */
 export const FIELD_GROUP_LABELS_NB: Record<string, string> = {
+  "category-select": "Kategori",
   "title-photos": "Bilder & tittel",
   "category-attributes": "Kategoriegenskaper",
   condition: "Tilstand",
@@ -140,13 +149,14 @@ export const LOCKED_FIELD_GROUP_KEYS: string[] = [
 
 /**
  * Groups whose position in the array is structurally fixed by
- * resolveWizardPages regardless of array order (title-photos is always solo
- * first, review-publish/delivery-location are always last) — no drag handle
- * for these in the admin UI, since dragging them would be visibly
- * inconsequential.
+ * resolveWizardPages regardless of array order (review-publish/
+ * delivery-location are always last) — no drag handle for these in the admin
+ * UI, since dragging them would be visibly inconsequential. `category-select`
+ * is also structurally fixed (always first) but isn't part of a category's
+ * stored field_groups at all (see category-flows.ts), so it never appears in
+ * this admin-facing list. `title-photos` used to be fixed-first too, but is
+ * now freely reorderable so a category (e.g. Bil og MC) can put
+ * `category-attributes` before it — needed so vehicle lookup fills
+ * brand/model/year before the title step reads them.
  */
-export const POSITION_FIXED_FIELD_GROUP_KEYS: string[] = [
-  "title-photos",
-  "review-publish",
-  "delivery-location",
-];
+export const POSITION_FIXED_FIELD_GROUP_KEYS: string[] = ["review-publish", "delivery-location"];

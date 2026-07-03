@@ -471,7 +471,7 @@ function ListingDetailPage() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, description, price_nok, is_free, condition, city, postal_code, display_lat, display_lng, created_at, updated_at, published_at, status, seller_id, category_id, listing_images(storage_path, sort_order), categories(name_nb, slug)",
+          "id, kaupet_code, title, subtitle, description, price_nok, is_free, condition, city, postal_code, display_lat, display_lng, created_at, updated_at, published_at, status, seller_id, category_id, listing_images(storage_path, sort_order), categories(name_nb, slug)",
         )
         .eq("kaupet_code", kaupetCode)
         .maybeSingle();
@@ -696,6 +696,9 @@ function ListingDetailPage() {
                 <h1 className="mt-1 font-display text-3xl leading-tight tracking-tight">
                   {data.title}
                 </h1>
+                {data.subtitle && (
+                  <p className="mt-1 text-sm text-muted-foreground">{data.subtitle}</p>
+                )}
                 <p className="mt-3 font-display text-3xl text-primary">{priceLabel}</p>
               </div>
               {user && !isOwner && (

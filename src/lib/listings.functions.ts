@@ -111,7 +111,7 @@ export const createListing = createServerFn({ method: "POST" })
         lng: z.number().nullable(),
         can_ship: z.boolean(),
         attributes: attributesSchema.optional(),
-        turnstileToken: z.string().optional(),
+        turnstileToken: z.string().nullable().optional(),
       })
       .parse(input),
   )

@@ -237,8 +237,8 @@ function EditListingPage() {
 
   const [showPublishWarning, setShowPublishWarning] = useState(false);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const lastEdited = useRef<"postal_code" | "city" | "map" | null>(null);
-  const markerMoved = useRef(false);
+  const lastEditedRef = useRef<"postal_code" | "city" | "map" | null>(null);
+  const markerMovedRef = useRef(false);
   const coordsHydratedFor = useRef<string | null>(null);
   const [locationMethod, setLocationMethod] = useState<"gps" | "postal" | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
@@ -265,21 +265,21 @@ function EditListingPage() {
 
   // Auto-fill city from postal code
   useEffect(() => {
-    if (lastEdited.current !== "postal_code") return;
+    if (lastEditedRef.current !== "postal_code") return;
     const p = (postalCode ?? "").trim();
     if (!/^\d{4}$/.test(p)) return;
     const t = window.setTimeout(async () => {
       const r = await lookupPostalCode(p);
       if (!r) return;
       if (r.city) setValue("city", r.city, { shouldValidate: false });
-      if (!markerMoved.current) setCoords({ lat: r.lat, lng: r.lng });
+      if (!markerMovedRef.current) setCoords({ lat: r.lat, lng: r.lng });
     }, 500);
     return () => window.clearTimeout(t);
   }, [postalCode, setValue]);
 
   // Auto-fill postal from city
   useEffect(() => {
-    if (lastEdited.current !== "city") return;
+    if (lastEditedRef.current !== "city") return;
     const c = (city ?? "").trim();
     if (c.length < 2) return;
     const t = window.setTimeout(async () => {
@@ -288,7 +288,7 @@ function EditListingPage() {
       if (r.postal_code && !(postalCode ?? "").trim()) {
         setValue("postal_code", r.postal_code, { shouldValidate: false });
       }
-      if (!markerMoved.current) setCoords({ lat: r.lat, lng: r.lng });
+      if (!markerMovedRef.current) setCoords({ lat: r.lat, lng: r.lng });
     }, 500);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -296,7 +296,7 @@ function EditListingPage() {
 
   // Reverse-geocode map position back to city/postal
   useEffect(() => {
-    if (lastEdited.current !== "map" || !coords) return;
+    if (lastEditedRef.current !== "map" || !coords) return;
     const t = window.setTimeout(async () => {
       const r = await reverseGeocodeAddress(coords);
       if (r.city) setValue("city", r.city, { shouldValidate: false });
@@ -425,16 +425,16 @@ function EditListingPage() {
     setCoords(null);
     setValue("postal_code", "");
     setValue("city", "");
-    markerMoved.current = false;
-    lastEdited.current = null;
+    markerMovedRef.current = false;
+    lastEditedRef.current = null;
     setLocationMethod("postal");
   }
 
   function switchToGps() {
     setValue("postal_code", "");
     setValue("city", "");
-    markerMoved.current = false;
-    lastEdited.current = null;
+    markerMovedRef.current = false;
+    lastEditedRef.current = null;
     void fetchMyLocation();
   }
 
@@ -458,8 +458,8 @@ function EditListingPage() {
       }
       const { lat, lng } = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       setCoords({ lat, lng });
-      markerMoved.current = false;
-      lastEdited.current = null;
+      markerMovedRef.current = false;
+      lastEditedRef.current = null;
       const geo = await reverseGeocodeAddress({ lat, lng });
       if (geo.city) setValue("city", geo.city, { shouldValidate: false });
       if (geo.postal_code && /^\d{4}$/.test(geo.postal_code)) {
@@ -914,8 +914,8 @@ function EditListingPage() {
             switchToGps,
             fetchMyLocation,
             setFullscreenMapOpen,
-            markerMoved,
-            lastEdited,
+            markerMovedRef,
+            lastEditedRef,
 
             previewPrice: null,
             mutationIsPending: mutation.isPending,
@@ -946,8 +946,8 @@ function EditListingPage() {
             lat={coords.lat}
             lng={coords.lng}
             onConfirm={(next) => {
-              markerMoved.current = true;
-              lastEdited.current = "map";
+              markerMovedRef.current = true;
+              lastEditedRef.current = "map";
               setCoords(next);
             }}
             onClose={() => setFullscreenMapOpen(false)}

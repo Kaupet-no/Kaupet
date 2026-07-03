@@ -22,8 +22,8 @@ export function DeliveryLocation({
   switchToPostal,
   switchToGps,
   setFullscreenMapOpen,
-  markerMoved,
-  lastEdited,
+  markerMovedRef,
+  lastEditedRef,
   errors,
   register,
 }: WizardSharedProps) {
@@ -128,8 +128,8 @@ export function DeliveryLocation({
                     lat={coords.lat}
                     lng={coords.lng}
                     onChange={(next) => {
-                      markerMoved.current = true;
-                      lastEdited.current = "map";
+                      markerMovedRef.current = true;
+                      lastEditedRef.current = "map";
                       setCoords(next);
                     }}
                   />
@@ -156,8 +156,8 @@ export function DeliveryLocation({
                   aria-describedby={errors.postal_code ? "postal-code-error" : undefined}
                   {...register("postal_code", {
                     onChange: () => {
-                      lastEdited.current = "postal_code";
-                      markerMoved.current = false;
+                      lastEditedRef.current = "postal_code";
+                      markerMovedRef.current = false;
                     },
                   })}
                 />
@@ -200,8 +200,8 @@ export function DeliveryLocation({
                     lat={coords.lat}
                     lng={coords.lng}
                     onChange={(next) => {
-                      markerMoved.current = true;
-                      lastEdited.current = "map";
+                      markerMovedRef.current = true;
+                      lastEditedRef.current = "map";
                       setCoords(next);
                     }}
                   />

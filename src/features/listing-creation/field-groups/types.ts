@@ -110,8 +110,8 @@ export type WizardSharedProps = {
   switchToGps: () => void;
   fetchMyLocation: () => void | Promise<void>;
   setFullscreenMapOpen: (open: boolean) => void;
-  markerMoved: { current: boolean };
-  lastEdited: { current: "postal_code" | "city" | "map" | null };
+  markerMovedRef: { current: boolean };
+  lastEditedRef: { current: "postal_code" | "city" | "map" | null };
 
   // review/publish
   previewPrice: string | null;

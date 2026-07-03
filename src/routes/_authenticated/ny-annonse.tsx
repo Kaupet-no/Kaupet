@@ -341,8 +341,8 @@ function NewListingPage() {
   });
 
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const lastEdited = useRef<"postal_code" | "city" | "map" | null>(null);
-  const markerMoved = useRef(false);
+  const lastEditedRef = useRef<"postal_code" | "city" | "map" | null>(null);
+  const markerMovedRef = useRef(false);
 
   // Load draft from localStorage on mount
   useEffect(() => {
@@ -535,21 +535,21 @@ function NewListingPage() {
 
   // Auto-fill city from postal code
   useEffect(() => {
-    if (lastEdited.current !== "postal_code") return;
+    if (lastEditedRef.current !== "postal_code") return;
     const p = (postalCode ?? "").trim();
     if (!/^\d{4}$/.test(p)) return;
     const t = window.setTimeout(async () => {
       const r = await lookupPostalCode(p);
       if (!r) return;
       if (r.city) setValue("city", r.city, { shouldValidate: false });
-      if (!markerMoved.current) setCoords({ lat: r.lat, lng: r.lng });
+      if (!markerMovedRef.current) setCoords({ lat: r.lat, lng: r.lng });
     }, 500);
     return () => window.clearTimeout(t);
   }, [postalCode, setValue]);
 
   // Reverse-geocode map position
   useEffect(() => {
-    if (lastEdited.current !== "map" || !coords) return;
+    if (lastEditedRef.current !== "map" || !coords) return;
     const t = window.setTimeout(async () => {
       const r = await reverseGeocodeAddress(coords);
       if (r.city) setValue("city", r.city, { shouldValidate: false });
@@ -685,24 +685,24 @@ function NewListingPage() {
     setCoords(null);
     setValue("postal_code", "");
     setValue("city", "");
-    markerMoved.current = false;
-    lastEdited.current = null;
+    markerMovedRef.current = false;
+    lastEditedRef.current = null;
   }
 
   function switchToPostal() {
     setCoords(null);
     setValue("postal_code", "");
     setValue("city", "");
-    markerMoved.current = false;
-    lastEdited.current = null;
+    markerMovedRef.current = false;
+    lastEditedRef.current = null;
     setLocationMethod("postal");
   }
 
   function switchToGps() {
     setValue("postal_code", "");
     setValue("city", "");
-    markerMoved.current = false;
-    lastEdited.current = null;
+    markerMovedRef.current = false;
+    lastEditedRef.current = null;
     void fetchMyLocation();
   }
 
@@ -726,8 +726,8 @@ function NewListingPage() {
       }
       const { lat, lng } = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       setCoords({ lat, lng });
-      markerMoved.current = false;
-      lastEdited.current = null;
+      markerMovedRef.current = false;
+      lastEditedRef.current = null;
       const geo = await reverseGeocodeAddress({ lat, lng });
       if (geo.city) setValue("city", geo.city, { shouldValidate: false });
       if (geo.postal_code && /^\d{4}$/.test(geo.postal_code)) {
@@ -909,8 +909,8 @@ function NewListingPage() {
     switchToGps,
     fetchMyLocation,
     setFullscreenMapOpen,
-    markerMoved,
-    lastEdited,
+    markerMovedRef,
+    lastEditedRef,
 
     previewPrice,
     mutationIsPending: mutation.isPending,
@@ -1086,8 +1086,8 @@ function NewListingPage() {
           lat={coords.lat}
           lng={coords.lng}
           onConfirm={(next) => {
-            markerMoved.current = true;
-            lastEdited.current = "map";
+            markerMovedRef.current = true;
+            lastEditedRef.current = "map";
             setCoords(next);
           }}
           onClose={() => setFullscreenMapOpen(false)}

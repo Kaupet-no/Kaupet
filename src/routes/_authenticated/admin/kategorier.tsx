@@ -90,8 +90,16 @@ import {
 } from "@/lib/category-filters";
 import { CATEGORY_HEADING_FONTS, DEFAULT_CATEGORY_HEADING_FONT } from "@/lib/category-fonts";
 import { Checkbox } from "@/components/ui/checkbox";
-import { DEFAULT_FIELD_GROUPS, DEFAULT_MODULES } from "@/features/listing-creation/category-flows";
+import {
+  DEFAULT_FIELD_GROUPS,
+  DEFAULT_MODULES,
+  resolveWizardPages,
+} from "@/features/listing-creation/category-flows";
 import { MODULE_LABELS_NB, MODULE_REGISTRY } from "@/features/listing-creation/modules/registry";
+import {
+  FIELD_GROUP_LABELS_NB,
+  LOCKED_FIELD_GROUP_KEYS,
+} from "@/features/listing-creation/field-groups/registry";
 
 export const Route = createFileRoute("/_authenticated/admin/kategorier")({
   head: () => ({ meta: [{ title: "Kategoriadministrasjon — Kaupet.no" }] }),
@@ -1214,6 +1222,69 @@ function CategoryFiltersDialog({ category, onClose }: { category: Category; onCl
 
 const MODULE_KEYS = Object.keys(MODULE_REGISTRY);
 
+/**
+ * The only field groups whose relative order actually affects the wizard's
+ * pagination (resolveWizardPages always pins title-photos first and
+ * review-publish/delivery-location last, regardless of their array
+ * position) — so this is the only set the admin UI lets an admin drag.
+ */
+const MIDDLE_FIELD_GROUP_KEYS = [
+  "category-attributes",
+  "condition",
+  "price",
+  "description-keywords",
+];
+
+function SortableFieldGroupRow({
+  id,
+  checked,
+  disabled,
+  onToggle,
+}: {
+  id: string;
+  checked: boolean;
+  disabled: boolean;
+  onToggle: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+  return (
+    <li ref={setNodeRef} style={style} className="flex items-center gap-2 rounded-md px-1 py-1">
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        className="cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
+        aria-label="Dra for å endre rekkefølge"
+      >
+        <GripVertical className="size-4" />
+      </button>
+      <label className="flex items-center gap-2 text-sm">
+        <Checkbox checked={checked} disabled={disabled} onCheckedChange={onToggle} />
+        {FIELD_GROUP_LABELS_NB[id] ?? id}
+      </label>
+    </li>
+  );
+}
+
+function FieldGroupPagesPreview({ label, pages }: { label: string; pages: string[][] }) {
+  return (
+    <p>
+      <span className="font-medium text-foreground">{label}</span> — {pages.length}{" "}
+      {pages.length === 1 ? "side" : "sider"}:{" "}
+      {pages
+        .map((p, i) => `${i + 1}) ${p.map((k) => FIELD_GROUP_LABELS_NB[k] ?? k).join(", ")}`)
+        .join("  ")}
+    </p>
+  );
+}
+
 function CategoryFlowDialog({ category, onClose }: { category: Category; onClose: () => void }) {
   const qc = useQueryClient();
 
@@ -1234,15 +1305,41 @@ function CategoryFlowDialog({ category, onClose }: { category: Category; onClose
   const activeModules = modules ?? flowRow?.modules ?? DEFAULT_MODULES;
   const hasCustomFlow = !!flowRow;
 
+  const [fieldGroups, setFieldGroups] = useState<string[] | null>(null);
+  const storedFieldGroups = fieldGroups ?? flowRow?.field_groups ?? DEFAULT_FIELD_GROUPS;
+  const middleOrder = [
+    ...storedFieldGroups.filter((k) => MIDDLE_FIELD_GROUP_KEYS.includes(k)),
+    ...MIDDLE_FIELD_GROUP_KEYS.filter((k) => !storedFieldGroups.includes(k)),
+  ];
+  const deliveryActive = storedFieldGroups.includes("delivery-location");
+  const activeFieldGroups = [
+    "title-photos",
+    ...middleOrder.filter(
+      (k) => LOCKED_FIELD_GROUP_KEYS.includes(k) || storedFieldGroups.includes(k),
+    ),
+    ...(deliveryActive ? ["delivery-location"] : []),
+    "review-publish",
+  ];
+
+  const fieldGroupSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+  );
+
   const invalidate = () =>
     qc.invalidateQueries({ queryKey: ["admin", "category-flow", category.id] });
 
   const save = useMutation({
-    mutationFn: async (nextModules: string[]) => {
+    mutationFn: async ({
+      nextModules,
+      nextFieldGroups,
+    }: {
+      nextModules: string[];
+      nextFieldGroups: string[];
+    }) => {
       const { error } = await supabase
         .from("category_flows")
         .upsert(
-          { category_id: category.id, field_groups: DEFAULT_FIELD_GROUPS, modules: nextModules },
+          { category_id: category.id, field_groups: nextFieldGroups, modules: nextModules },
           { onConflict: "category_id" },
         );
       if (error) throw error;
@@ -1265,6 +1362,7 @@ function CategoryFlowDialog({ category, onClose }: { category: Category; onClose
     onSuccess: () => {
       showSuccessToast("Tilbakestilt til standardflyt");
       setModules(null);
+      setFieldGroups(null);
       invalidate();
     },
     onError: (e: Error) =>
@@ -1277,15 +1375,40 @@ function CategoryFlowDialog({ category, onClose }: { category: Category; onClose
     setModules(next);
   }
 
+  function toggleFieldGroup(key: string) {
+    if (LOCKED_FIELD_GROUP_KEYS.includes(key)) return;
+    const next = storedFieldGroups.includes(key)
+      ? storedFieldGroups.filter((k) => k !== key)
+      : [...storedFieldGroups, key];
+    setFieldGroups(next);
+  }
+
+  function handleFieldGroupDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = middleOrder.indexOf(String(active.id));
+    const newIndex = middleOrder.indexOf(String(over.id));
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(middleOrder, oldIndex, newIndex);
+    setFieldGroups([
+      "title-photos",
+      ...reordered.filter(
+        (k) => LOCKED_FIELD_GROUP_KEYS.includes(k) || storedFieldGroups.includes(k),
+      ),
+      ...(deliveryActive ? ["delivery-location"] : []),
+      "review-publish",
+    ]);
+  }
+
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Annonseflyt for «{category.name_nb}»</DialogTitle>
           <DialogDescription>
-            Velg hvilke moduler som vises i annonseskjemaets detaljsteg for denne kategorien og dens
-            underkategorier. Uten egen flyt her arves nærmeste overordnede kategoris flyt, eller
-            standardflyten («Kategoriegenskaper» alene) hvis ingen har en.
+            Velg og sorter hvilke feltgrupper og moduler som vises i annonseskjemaet for denne
+            kategorien og dens underkategorier. Uten egen flyt her arves nærmeste overordnede
+            kategoris flyt, eller standardflyten hvis ingen har en.
           </DialogDescription>
         </DialogHeader>
 
@@ -1294,26 +1417,93 @@ function CategoryFlowDialog({ category, onClose }: { category: Category; onClose
             <Loader2 className="size-5 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {!hasCustomFlow && (
               <p className="rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">
                 Denne kategorien har ingen egen flyt ennå — bruker standardflyten (eller nærmeste
                 overordnede kategoris flyt, hvis satt).
               </p>
             )}
-            <ul className="space-y-2">
-              {MODULE_KEYS.map((key) => (
-                <li key={key}>
+
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">Feltgrupper</p>
+              <ul>
+                <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm text-muted-foreground">
+                  <span className="inline-block size-4 shrink-0" aria-hidden />
+                  <Checkbox checked disabled />
+                  {FIELD_GROUP_LABELS_NB["title-photos"]}
+                  <span className="text-xs">(alltid først)</span>
+                </li>
+              </ul>
+              <DndContext
+                sensors={fieldGroupSensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleFieldGroupDragEnd}
+              >
+                <SortableContext items={middleOrder} strategy={verticalListSortingStrategy}>
+                  <ul>
+                    {middleOrder.map((key) => (
+                      <SortableFieldGroupRow
+                        key={key}
+                        id={key}
+                        checked={
+                          LOCKED_FIELD_GROUP_KEYS.includes(key) || storedFieldGroups.includes(key)
+                        }
+                        disabled={LOCKED_FIELD_GROUP_KEYS.includes(key)}
+                        onToggle={() => toggleFieldGroup(key)}
+                      />
+                    ))}
+                  </ul>
+                </SortableContext>
+              </DndContext>
+              <ul>
+                <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm">
+                  <span className="inline-block size-4 shrink-0" aria-hidden />
                   <label className="flex items-center gap-2 text-sm">
                     <Checkbox
-                      checked={activeModules.includes(key)}
-                      onCheckedChange={() => toggle(key)}
+                      checked={deliveryActive}
+                      onCheckedChange={() => toggleFieldGroup("delivery-location")}
                     />
-                    {MODULE_LABELS_NB[key] ?? key}
+                    {FIELD_GROUP_LABELS_NB["delivery-location"]}
                   </label>
                 </li>
-              ))}
-            </ul>
+                <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm text-muted-foreground">
+                  <span className="inline-block size-4 shrink-0" aria-hidden />
+                  <Checkbox checked disabled />
+                  {FIELD_GROUP_LABELS_NB["review-publish"]}
+                  <span className="text-xs">(alltid sist)</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="space-y-1 rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">
+              <p className="font-medium text-foreground">Forhåndsvisning av annonseskjemaet</p>
+              <FieldGroupPagesPreview
+                label="Web"
+                pages={resolveWizardPages(activeFieldGroups, { native: false })}
+              />
+              <FieldGroupPagesPreview
+                label="Native"
+                pages={resolveWizardPages(activeFieldGroups, { native: true })}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">Moduler</p>
+              <ul className="space-y-2">
+                {MODULE_KEYS.map((key) => (
+                  <li key={key}>
+                    <label className="flex items-center gap-2 text-sm">
+                      <Checkbox
+                        checked={activeModules.includes(key)}
+                        onCheckedChange={() => toggle(key)}
+                      />
+                      {MODULE_LABELS_NB[key] ?? key}
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         )}
 
@@ -1339,7 +1529,9 @@ function CategoryFlowDialog({ category, onClose }: { category: Category; onClose
             <Button
               type="button"
               disabled={save.isPending || isLoading}
-              onClick={() => save.mutate(activeModules)}
+              onClick={() =>
+                save.mutate({ nextModules: activeModules, nextFieldGroups: activeFieldGroups })
+              }
             >
               {save.isPending ? <Loader2 className="size-4 animate-spin" /> : "Lagre"}
             </Button>

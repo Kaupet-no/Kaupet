@@ -118,3 +118,35 @@ export function pageLabel(groups: FieldGroup[], native: boolean): string {
   const map = native ? FIELD_GROUP_LABEL_NATIVE_NB : FIELD_GROUP_LABEL_WEB_NB;
   return (groups[0] && map[groups[0].key]) || "Steg";
 }
+
+/** Norwegian admin-display labels — distinct from the step-indicator labels above (different audience/purpose). */
+export const FIELD_GROUP_LABELS_NB: Record<string, string> = {
+  "title-photos": "Bilder & tittel",
+  "category-attributes": "Kategoriegenskaper",
+  condition: "Tilstand",
+  price: "Pris",
+  "description-keywords": "Beskrivelse & nøkkelord",
+  "delivery-location": "Levering & sted",
+  "review-publish": "Forhåndsvisning & publiser",
+};
+
+/** Field groups every flow must include — admin UI won't let these be unchecked; enforced in DB too. */
+export const LOCKED_FIELD_GROUP_KEYS: string[] = [
+  "title-photos",
+  "category-attributes",
+  "description-keywords",
+  "review-publish",
+];
+
+/**
+ * Groups whose position in the array is structurally fixed by
+ * resolveWizardPages regardless of array order (title-photos is always solo
+ * first, review-publish/delivery-location are always last) — no drag handle
+ * for these in the admin UI, since dragging them would be visibly
+ * inconsequential.
+ */
+export const POSITION_FIXED_FIELD_GROUP_KEYS: string[] = [
+  "title-photos",
+  "review-publish",
+  "delivery-location",
+];

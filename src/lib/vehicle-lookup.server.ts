@@ -56,6 +56,16 @@ export type VehicleLookupResult = {
 
 const SVV_BASE_URL = "https://akfell-datautlevering.atlas.vegvesen.no/enkeltoppslag/kjoretoydata";
 
+/** SVV returns "-" (or blank) for fields that don't apply to a given vehicle
+ * (e.g. no specific model registered for the brand) — treat that as "no
+ * value" rather than a real string, so callers never try to match/propose it
+ * as an actual brand or model name. */
+function nullifyPlaceholder(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  return trimmed === "" || trimmed === "-" ? null : trimmed;
+}
+
 /** Best-effort mapping of common Norwegian fuel-type strings to our select options. */
 function mapFuelType(value: string | null | undefined): string | null {
   if (!value) return null;
@@ -162,8 +172,8 @@ export async function lookupVehicle(registrationNumber: string): Promise<Vehicle
   }
 
   const teknisk = vehicle.godkjenning?.tekniskGodkjenning?.tekniskeData;
-  const brand = teknisk?.generelt?.merke?.[0]?.merke ?? null;
-  const model = teknisk?.generelt?.handelsbetegnelse?.[0] ?? null;
+  const brand = nullifyPlaceholder(teknisk?.generelt?.merke?.[0]?.merke);
+  const model = nullifyPlaceholder(teknisk?.generelt?.handelsbetegnelse?.[0]);
   const firstRegDate = vehicle.forstegangsregistrering?.registrertForstegangNorgeDato ?? null;
   const firstRegYear = firstRegDate?.slice(0, 4);
   const motor = teknisk?.motorOgDrivverk?.motor?.[0];
@@ -177,7 +187,7 @@ export async function lookupVehicle(registrationNumber: string): Promise<Vehicle
     year: firstRegYear ? Number(firstRegYear) : null,
     fuel_type: fuelType,
     transmission: mapTransmission(teknisk?.motorOgDrivverk?.girkassetype?.kodeNavn),
-    color: teknisk?.karosseriOgLasteplan?.rFarge?.[0]?.kodeNavn ?? null,
+    color: nullifyPlaceholder(teknisk?.karosseriOgLasteplan?.rFarge?.[0]?.kodeNavn),
     weight_kg: teknisk?.vekter?.egenvekt ?? null,
     vin: vehicle.kjoretoyId?.understellsnummer ?? null,
     next_eu_control: vehicle.periodiskKjoretoyKontroll?.kontrollfrist ?? null,
@@ -195,7 +205,7 @@ export async function lookupVehicle(registrationNumber: string): Promise<Vehicle
     first_registration_date: firstRegDate,
     cylinders: fuelType !== "el" ? (motor?.antallSylindre ?? null) : null,
     engine_displacement_cc: fuelType !== "el" ? (motor?.slagvolum ?? null) : null,
-    engine_code: fuelType !== "el" ? (motor?.motorKode ?? null) : null,
+    engine_code: fuelType !== "el" ? nullifyPlaceholder(motor?.motorKode) : null,
     sleeping_places: teknisk?.karosseriOgLasteplan?.antallSoveplasser ?? null,
   };
 }

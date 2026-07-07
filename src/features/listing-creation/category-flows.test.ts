@@ -30,14 +30,14 @@ function row(partial: Partial<CategoryFlowRow> & { category_id: string }): Categ
 describe("effectiveFlowForCategory", () => {
   it("returns the default flow for a null category", () => {
     expect(effectiveFlowForCategory(null, [], byId)).toEqual({
-      fieldGroups: DEFAULT_FIELD_GROUPS,
+      fieldGroups: ["category-select", ...DEFAULT_FIELD_GROUPS],
       modules: DEFAULT_MODULES,
     });
   });
 
   it("returns the default flow when no category in the chain has a row", () => {
     expect(effectiveFlowForCategory("cars", [], byId)).toEqual({
-      fieldGroups: DEFAULT_FIELD_GROUPS,
+      fieldGroups: ["category-select", ...DEFAULT_FIELD_GROUPS],
       modules: DEFAULT_MODULES,
     });
   });
@@ -81,6 +81,7 @@ describe("effectiveFlowForCategory", () => {
       }),
     ];
     expect(effectiveFlowForCategory("cars", flows, byId).fieldGroups).toEqual([
+      "category-select",
       "title-photos",
       "category-attributes",
       "review-publish",
@@ -89,19 +90,22 @@ describe("effectiveFlowForCategory", () => {
 });
 
 describe("resolveWizardPages", () => {
-  it("reproduces today's exact 3-page web split for the default flow", () => {
-    expect(resolveWizardPages(DEFAULT_FIELD_GROUPS, { native: false })).toEqual([
-      ["title-photos"],
-      ["category-attributes", "condition", "price", "description-keywords"],
+  const flowWithCategorySelect = ["category-select", ...DEFAULT_FIELD_GROUPS];
+
+  it("reproduces today's web split for the default flow (chunks of 4, ends pinned)", () => {
+    expect(resolveWizardPages(flowWithCategorySelect, { native: false })).toEqual([
+      ["category-select"],
+      ["title-photos", "category-attributes", "condition", "price"],
+      ["description-keywords"],
       ["delivery-location", "review-publish"],
     ]);
   });
 
-  it("reproduces today's exact 5-page native split for the default flow", () => {
-    expect(resolveWizardPages(DEFAULT_FIELD_GROUPS, { native: true })).toEqual([
-      ["title-photos"],
-      ["category-attributes", "condition", "price"],
-      ["description-keywords"],
+  it("reproduces today's native split for the default flow (chunks of 3, ends pinned)", () => {
+    expect(resolveWizardPages(flowWithCategorySelect, { native: true })).toEqual([
+      ["category-select"],
+      ["title-photos", "category-attributes", "condition"],
+      ["price", "description-keywords"],
       ["delivery-location"],
       ["review-publish"],
     ]);
@@ -110,13 +114,11 @@ describe("resolveWizardPages", () => {
   it("produces fewer, smaller pages for a category with fewer groups", () => {
     const groups = ["title-photos", "category-attributes", "review-publish"];
     expect(resolveWizardPages(groups, { native: false })).toEqual([
-      ["title-photos"],
-      ["category-attributes"],
+      ["title-photos", "category-attributes"],
       ["review-publish"],
     ]);
     expect(resolveWizardPages(groups, { native: true })).toEqual([
-      ["title-photos"],
-      ["category-attributes"],
+      ["title-photos", "category-attributes"],
       ["review-publish"],
     ]);
   });

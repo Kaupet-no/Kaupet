@@ -71,7 +71,7 @@ function PublicProfilePage() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order)",
+          "id, kaupet_code, title, subtitle, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order)",
         )
         .eq("seller_id", id)
         .eq("status", "active")
@@ -83,6 +83,7 @@ function PublicProfilePage() {
         id: string;
         kaupet_code: string;
         title: string;
+        subtitle: string | null;
         price_nok: number | null;
         is_free: boolean;
         city: string | null;
@@ -97,6 +98,7 @@ function PublicProfilePage() {
           id: l.id,
           kaupet_code: l.kaupet_code,
           title: l.title,
+          subtitle: l.subtitle,
           price_nok: l.price_nok,
           is_free: l.is_free,
           city: l.city,

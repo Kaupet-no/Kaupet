@@ -78,6 +78,7 @@ export function AppLanding() {
         id: l.listing_id,
         kaupet_code: l.kaupet_code,
         title: l.title,
+        subtitle: l.subtitle,
         price_nok: l.price_nok,
         is_free: l.is_free,
         city: l.city,

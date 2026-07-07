@@ -235,7 +235,7 @@ function CategoryLandingPage({ main }: { main: Category }) {
       let qb = supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order)",
+          "id, kaupet_code, title, subtitle, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order)",
         )
         .eq("status", "active")
         .in("category_id", categoryIds);
@@ -248,6 +248,7 @@ function CategoryLandingPage({ main }: { main: Category }) {
           id: l.id,
           kaupet_code: l.kaupet_code,
           title: l.title,
+          subtitle: l.subtitle,
           price_nok: l.price_nok,
           is_free: l.is_free,
           city: l.city,

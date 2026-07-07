@@ -341,7 +341,7 @@ function BrowsePage() {
       let qb = supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, description, price_nok, is_free, city, display_lat, display_lng, created_at, listing_images(storage_path, sort_order)",
+          "id, kaupet_code, title, subtitle, description, price_nok, is_free, city, display_lat, display_lng, created_at, listing_images(storage_path, sort_order)",
         )
         .eq("status", "active");
 
@@ -446,6 +446,7 @@ function BrowsePage() {
           id: l.id,
           kaupet_code: l.kaupet_code,
           title: l.title,
+          subtitle: l.subtitle,
           price_nok: l.price_nok,
           is_free: l.is_free,
           city: l.city,
@@ -538,6 +539,7 @@ function BrowsePage() {
     id: l.id,
     kaupet_code: l.kaupet_code,
     title: l.title,
+    subtitle: l.subtitle,
     price_nok: l.price_nok,
     is_free: l.is_free,
     city: l.city,

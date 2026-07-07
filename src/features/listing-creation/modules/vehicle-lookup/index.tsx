@@ -57,6 +57,20 @@ export function VehicleLookupPanel({
     year: number | null;
     fuel_type: string | null;
     weight_kg: number | null;
+    power_hk: number | null;
+    drive_type: string | null;
+    tow_hitch: boolean | null;
+    max_tow_weight_kg: number | null;
+    seats: number | null;
+    imported_used: boolean | null;
+    first_registration_date: string | null;
+    color: string | null;
+    transmission: string | null;
+    next_eu_control: string | null;
+    cylinders: number | null;
+    engine_displacement_cc: number | null;
+    engine_code: string | null;
+    sleeping_places: number | null;
   } | null>(null);
   const [confirmValue, setConfirmValue] = useState<{
     kind: "brand" | "model";
@@ -97,6 +111,23 @@ export function VehicleLookupPanel({
       };
       if (lookup.year) next.year = lookup.year;
       if (lookup.fuel_type) next.fuel_type = lookup.fuel_type;
+      if (lookup.weight_kg != null) next.weight_kg = lookup.weight_kg;
+      if (lookup.transmission) next.transmission = lookup.transmission;
+      if (lookup.color) next.color = lookup.color;
+      if (lookup.next_eu_control) next.next_eu_control = lookup.next_eu_control;
+      if (lookup.power_hk != null) next.power_hk = lookup.power_hk;
+      if (lookup.drive_type) next.drive_type = lookup.drive_type;
+      if (lookup.tow_hitch != null) next.tow_hitch = lookup.tow_hitch;
+      if (lookup.max_tow_weight_kg != null) next.max_tow_weight_kg = lookup.max_tow_weight_kg;
+      if (lookup.seats != null) next.seats = lookup.seats;
+      if (lookup.imported_used != null) next.imported_used = lookup.imported_used;
+      if (lookup.first_registration_date)
+        next.first_registration_date = lookup.first_registration_date;
+      if (lookup.cylinders != null) next.cylinders = lookup.cylinders;
+      if (lookup.engine_displacement_cc != null)
+        next.engine_displacement_cc = lookup.engine_displacement_cc;
+      if (lookup.engine_code) next.engine_code = lookup.engine_code;
+      if (lookup.sleeping_places != null) next.sleeping_places = lookup.sleeping_places;
 
       if (brandMatch) next.brand = brandMatch.name;
       if (modelMatch) next.model = modelMatch.name;
@@ -107,6 +138,20 @@ export function VehicleLookupPanel({
         year: lookup.year,
         fuel_type: lookup.fuel_type,
         weight_kg: lookup.weight_kg,
+        power_hk: lookup.power_hk,
+        drive_type: lookup.drive_type,
+        tow_hitch: lookup.tow_hitch,
+        max_tow_weight_kg: lookup.max_tow_weight_kg,
+        seats: lookup.seats,
+        imported_used: lookup.imported_used,
+        first_registration_date: lookup.first_registration_date,
+        color: lookup.color,
+        transmission: lookup.transmission,
+        next_eu_control: lookup.next_eu_control,
+        cylinders: lookup.cylinders,
+        engine_displacement_cc: lookup.engine_displacement_cc,
+        engine_code: lookup.engine_code,
+        sleeping_places: lookup.sleeping_places,
       });
 
       if (lookup.brand && !brandMatch) {
@@ -200,6 +245,15 @@ export function VehicleLookupPanel({
           )}
 
           {!loading && summary && (
+            <div className="rounded-md border border-amber-400/50 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+              Opplysningene under er hentet fra Statens vegvesen. Du kan endre feltene under dersom
+              noe er feil, men husk at du etter forbrukerkjøpsloven er ansvarlig for at
+              opplysningene om kjøretøyet du oppgir i annonsen er korrekte — rett kun det som
+              faktisk er feil.
+            </div>
+          )}
+
+          {!loading && summary && (
             <div className="rounded-md bg-muted/40 p-3 text-sm">
               <p className="font-medium">Data fra Statens vegvesen</p>
               {(summary.year || summary.brand || summary.model) && (
@@ -239,6 +293,94 @@ export function VehicleLookupPanel({
                   <>
                     <dt className="text-muted-foreground">Egenvekt</dt>
                     <dd>{summary.weight_kg} kg</dd>
+                  </>
+                )}
+                {summary.power_hk && (
+                  <>
+                    <dt className="text-muted-foreground">Effekt</dt>
+                    <dd>{summary.power_hk} hk</dd>
+                  </>
+                )}
+                {summary.drive_type && (
+                  <>
+                    <dt className="text-muted-foreground">Hjuldrift</dt>
+                    <dd>
+                      {summary.drive_type === "4x4"
+                        ? "Firehjulsdrift"
+                        : summary.drive_type === "bakhjul"
+                          ? "Bakhjulsdrift"
+                          : "Forhjulsdrift"}
+                    </dd>
+                  </>
+                )}
+                {summary.transmission && (
+                  <>
+                    <dt className="text-muted-foreground">Girkasse</dt>
+                    <dd>{summary.transmission === "automat" ? "Automat" : "Manuell"}</dd>
+                  </>
+                )}
+                {summary.tow_hitch != null && (
+                  <>
+                    <dt className="text-muted-foreground">Hengerfeste</dt>
+                    <dd>
+                      {summary.tow_hitch
+                        ? `Ja${summary.max_tow_weight_kg ? ` (${summary.max_tow_weight_kg} kg)` : ""}`
+                        : "Nei"}
+                    </dd>
+                  </>
+                )}
+                {summary.seats && (
+                  <>
+                    <dt className="text-muted-foreground">Antall seter</dt>
+                    <dd>{summary.seats}</dd>
+                  </>
+                )}
+                {categoryGroup === "bobil_campingvogn" && summary.sleeping_places && (
+                  <>
+                    <dt className="text-muted-foreground">Antall soveplasser</dt>
+                    <dd>{summary.sleeping_places}</dd>
+                  </>
+                )}
+                {summary.imported_used != null && (
+                  <>
+                    <dt className="text-muted-foreground">Bruktimportert</dt>
+                    <dd>{summary.imported_used ? "Ja" : "Nei"}</dd>
+                  </>
+                )}
+                {summary.first_registration_date && (
+                  <>
+                    <dt className="text-muted-foreground">Førstegangsregistrering</dt>
+                    <dd>{summary.first_registration_date}</dd>
+                  </>
+                )}
+                {summary.color && (
+                  <>
+                    <dt className="text-muted-foreground">Farge</dt>
+                    <dd>{summary.color}</dd>
+                  </>
+                )}
+                {summary.next_eu_control && (
+                  <>
+                    <dt className="text-muted-foreground">Neste EU-kontroll</dt>
+                    <dd>{summary.next_eu_control}</dd>
+                  </>
+                )}
+                {summary.fuel_type !== "el" && summary.cylinders && (
+                  <>
+                    <dt className="text-muted-foreground">Antall sylindre</dt>
+                    <dd>{summary.cylinders}</dd>
+                  </>
+                )}
+                {summary.fuel_type !== "el" && summary.engine_displacement_cc && (
+                  <>
+                    <dt className="text-muted-foreground">Slagvolum</dt>
+                    <dd>{summary.engine_displacement_cc} cc</dd>
+                  </>
+                )}
+                {summary.fuel_type !== "el" && summary.engine_code && (
+                  <>
+                    <dt className="text-muted-foreground">Motorkode</dt>
+                    <dd>{summary.engine_code}</dd>
                   </>
                 )}
               </dl>

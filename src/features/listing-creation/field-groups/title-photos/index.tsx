@@ -11,6 +11,12 @@ import type { WizardSharedProps } from "../types";
 import { FieldValid } from "../field-valid";
 import { RequiredMark } from "../required-mark";
 
+/** "bmw" / "BMW" / "iX3" -> "Bmw" / "Bmw" / "Ix3" — first letter upper, rest lower. */
+function capitalizeWord(value: unknown): string | null {
+  if (typeof value !== "string" || !value) return null;
+  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+}
+
 /**
  * Tittel + undertittel for kjøretøy-kategorier (de med en `brand_select`-
  * filter, se `vehicleCategoryGroupFor`): tittelen bygges automatisk av
@@ -35,7 +41,11 @@ export function VehicleTitleFields({
 >) {
   const [manualOverride, setManualOverride] = useState(false);
 
-  const computedTitle = [attributes.year, attributes.brand, attributes.model]
+  const computedTitle = [
+    attributes.year,
+    capitalizeWord(attributes.brand),
+    capitalizeWord(attributes.model),
+  ]
     .filter((v) => v !== undefined && v !== null && v !== "")
     .join(" ");
 

@@ -11,6 +11,7 @@ type Category = {
   name_nb: string;
   parent_id: string | null;
   icon?: string | null;
+  color?: string | null;
 };
 
 /** How long the checkmark confirmation is shown on the picked item before
@@ -131,12 +132,11 @@ export function CategoryPicker({
 
   const breadcrumb = path.map((p) => p.name_nb).join(" › ");
 
-  /** Top-level, no active search: the visually rich entry point into the
-   * category tree, shown as a grid of icon cards. Every other level (drilled
-   * into a subcategory, or a live search) falls back to the compact list —
-   * subcategories rarely have their own icon set, and a grid doesn't suit
-   * search results that span multiple parents. */
-  const showGrid = path.length === 0 && !searchResults;
+  /** Every drill-down level (main → sub → leaf) is shown as a visual grid of
+   * icon/color cards, so the picker stays "pretty visual" all the way down —
+   * only a live search (which spans multiple parents) falls back to the
+   * compact list, since a grid doesn't suit mixed-breadcrumb results. */
+  const showGrid = !searchResults;
 
   function rowItem(cat: Category, opts: { parentLabel?: string | null } = {}) {
     const isSelected = selectedId === cat.id;
@@ -213,13 +213,21 @@ export function CategoryPicker({
                 >
                   <span
                     className={`flex size-11 items-center justify-center rounded-full transition-transform ${
-                      isPending ? "bg-primary/20 scale-110" : "bg-primary/10"
-                    }`}
+                      isPending ? "scale-110" : ""
+                    } ${cat.color ? "" : isPending ? "bg-primary/20" : "bg-primary/10"}`}
+                    style={{
+                      backgroundColor: cat.color
+                        ? isPending
+                          ? cat.color
+                          : `color-mix(in oklch, ${cat.color} 16%, transparent)`
+                        : undefined,
+                      color: cat.color && isPending ? "white" : cat.color || undefined,
+                    }}
                   >
                     {isPending ? (
-                      <Check className="size-5 text-primary" />
+                      <Check className={`size-5 ${cat.color ? "" : "text-primary"}`} />
                     ) : (
-                      <Icon className="size-5 text-primary" />
+                      <Icon className={`size-5 ${cat.color ? "" : "text-primary"}`} />
                     )}
                   </span>
                   <span className="text-sm font-medium leading-tight">{cat.name_nb}</span>

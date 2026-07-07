@@ -55,7 +55,7 @@ export type WizardSharedProps = {
   city: string | undefined;
 
   // category
-  categories: (CategoryNode & { name_nb: string })[];
+  categories: (CategoryNode & { name_nb: string; icon?: string | null; color?: string | null })[];
   categoryLabel: string | null;
   setCategoryPickerOpen: (open: boolean) => void;
   onCategorySelect: (categoryId: string, parentId: string) => void;

@@ -255,7 +255,7 @@ function NewListingPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
-        .select("id, name_nb, parent_id, icon")
+        .select("id, name_nb, parent_id, icon, color")
         .order("sort_order");
       if (error) throw error;
       return data;

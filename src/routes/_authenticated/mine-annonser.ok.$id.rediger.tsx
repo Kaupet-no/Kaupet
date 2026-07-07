@@ -12,8 +12,16 @@ import { ChevronDown, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { updateWtbListing } from "@/lib/wtb-listings.functions";
 import { CategoryPicker } from "@/components/category-picker";
-import { AttributeFields, type AttributeMap } from "@/components/attribute-fields";
-import { categoryBreadcrumb, type CategoryNode } from "@/lib/category-filters";
+import {
+  AttributeFields,
+  useAllCategoryFilters,
+  type AttributeMap,
+} from "@/components/attribute-fields";
+import {
+  categoryBreadcrumb,
+  vehicleCategoryGroupFor,
+  type CategoryNode,
+} from "@/lib/category-filters";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,6 +31,7 @@ import { formatErrorMessage } from "@/lib/errors";
 
 const wtbSchema = z.object({
   title: z.string().trim().min(3, "Tittelen må være minst 3 tegn").max(120, "Maks 120 tegn"),
+  subtitle: z.string().trim().max(80, "Maks 80 tegn").optional().or(z.literal("")),
   description: z.string().trim().max(2000, "Maks 2000 tegn").optional().or(z.literal("")),
   category_id: z.string().uuid().nullable().optional(),
   max_price_nok: z
@@ -62,7 +71,7 @@ function EditWtbPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("wtb_listings")
-        .select("id, title, description, category_id, max_price_nok, attributes, status")
+        .select("id, title, subtitle, description, category_id, max_price_nok, attributes, status")
         .eq("id", id)
         .single();
       if (error) throw error;
@@ -74,6 +83,7 @@ function EditWtbPage() {
     if (!listing) return undefined;
     return {
       title: listing.title,
+      subtitle: listing.subtitle ?? "",
       description: listing.description ?? "",
       category_id: listing.category_id ?? null,
       max_price_nok: listing.max_price_nok ?? "",
@@ -91,6 +101,7 @@ function EditWtbPage() {
     values: formValues,
     defaultValues: {
       title: "",
+      subtitle: "",
       description: "",
       category_id: null,
       max_price_nok: "",
@@ -98,6 +109,7 @@ function EditWtbPage() {
   });
 
   const categoryId = watch("category_id");
+  const subtitle = watch("subtitle");
 
   const categoriesById = useMemo(() => {
     const m = new Map<string, CategoryNode & { name_nb: string }>();
@@ -105,6 +117,11 @@ function EditWtbPage() {
     return m;
   }, [categories]);
   const categoryLabel = categoryId ? categoryBreadcrumb(categoryId, categoriesById) || null : null;
+  const { data: allFilters } = useAllCategoryFilters();
+  const vehicleGroup = useMemo(
+    () => vehicleCategoryGroupFor(categoryId ?? null, allFilters ?? [], categoriesById),
+    [categoryId, allFilters, categoriesById],
+  );
 
   const attributesHydratedFor = useMemo(() => listing?.id, [listing?.id]);
   useEffect(() => {
@@ -122,6 +139,7 @@ function EditWtbPage() {
         data: {
           id,
           title: values.title,
+          subtitle: values.subtitle?.trim() || null,
           description: values.description || undefined,
           category_id: values.category_id ?? null,
           max_price_nok: typeof values.max_price_nok === "number" ? values.max_price_nok : null,
@@ -181,9 +199,24 @@ function EditWtbPage() {
 
       <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="mt-8 flex flex-col gap-6">
         <section className="space-y-2">
-          <Label htmlFor="title">Hva leter du etter?</Label>
+          <Label htmlFor="title">{vehicleGroup ? "Tittel" : "Hva leter du etter?"}</Label>
           <Input id="title" {...register("title")} />
           {errors.title && <p className="text-sm text-destructive">{errors.title.message}</p>}
+        </section>
+
+        <section className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="subtitle">
+              Undertittel <span className="font-normal text-muted-foreground">(valgfritt)</span>
+            </Label>
+            <span className="text-xs text-muted-foreground">{(subtitle ?? "").length}/80</span>
+          </div>
+          <Input
+            id="subtitle"
+            placeholder="F.eks. utstyrsvariant, spesifikk modell, eller annet selgere bør vite"
+            {...register("subtitle")}
+          />
+          {errors.subtitle && <p className="text-sm text-destructive">{errors.subtitle.message}</p>}
         </section>
 
         <section className="space-y-2">

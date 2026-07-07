@@ -9,13 +9,14 @@ import type { WizardSharedProps } from "../types";
 
 type ReviewPreviewProps = Pick<
   WizardSharedProps,
-  "images" | "title" | "previewPrice" | "city" | "postalCode" | "categoryLabel"
+  "images" | "title" | "subtitle" | "previewPrice" | "city" | "postalCode" | "categoryLabel"
 >;
 
 /** Preview card showing how the listing will look in the search list. */
 export function ReviewPreview({
   images,
   title,
+  subtitle,
   previewPrice,
   city,
   postalCode,
@@ -40,6 +41,7 @@ export function ReviewPreview({
         </div>
         <div className="space-y-0.5 p-3">
           <p className="line-clamp-2 text-sm font-medium leading-snug">{title || "—"}</p>
+          {subtitle && <p className="line-clamp-1 text-xs text-muted-foreground">{subtitle}</p>}
           {previewPrice && <p className="font-display text-base font-semibold">{previewPrice}</p>}
           {(city || postalCode) && (
             <p className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -98,6 +100,7 @@ export function ReviewPublishGroup(props: WizardSharedProps) {
       <ReviewPreview
         images={props.images}
         title={props.title}
+        subtitle={props.subtitle}
         previewPrice={props.previewPrice}
         city={props.city}
         postalCode={props.postalCode}

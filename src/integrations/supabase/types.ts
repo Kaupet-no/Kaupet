@@ -333,6 +333,7 @@ export type Database = {
           id: string
           user_id: string
           title: string
+          subtitle: string | null
           description: string | null
           category_id: string | null
           max_price_nok: number | null
@@ -347,6 +348,7 @@ export type Database = {
           id?: string
           user_id: string
           title: string
+          subtitle?: string | null
           description?: string | null
           category_id?: string | null
           max_price_nok?: number | null
@@ -360,6 +362,7 @@ export type Database = {
           id?: string
           user_id?: string
           title?: string
+          subtitle?: string | null
           description?: string | null
           category_id?: string | null
           max_price_nok?: number | null
@@ -1641,6 +1644,7 @@ export type Database = {
           listing_id: string
           price_nok: number
           title: string
+          subtitle: string | null
           total_views: number
           views_last_week: number
         }[]

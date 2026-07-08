@@ -3,8 +3,12 @@ ALTER TABLE public.wtb_listings
   ADD COLUMN subtitle text;
 
 -- 1b. popular_listings_last_week (brukt av landingssiden) må også returnere
--- subtitle, slik at listing-card kan vise den der.
-CREATE OR REPLACE FUNCTION public.popular_listings_last_week(_limit int DEFAULT 8)
+-- subtitle, slik at listing-card kan vise den der. CREATE OR REPLACE kan ikke
+-- endre OUT-parametrene (returtypen) til en eksisterende funksjon, så den må
+-- droppes eksplisitt først.
+DROP FUNCTION IF EXISTS public.popular_listings_last_week(int);
+
+CREATE FUNCTION public.popular_listings_last_week(_limit int DEFAULT 8)
 RETURNS TABLE(
   listing_id uuid,
   kaupet_code char(8),
@@ -48,6 +52,9 @@ AS $$
   ORDER BY views_last_week DESC NULLS LAST, l.created_at DESC
   LIMIT GREATEST(1, LEAST(COALESCE(_limit, 8), 50));
 $$;
+
+-- DROP FUNCTION fjerner tidligere grants, så de må settes på nytt.
+GRANT EXECUTE ON FUNCTION public.popular_listings_last_week(int) TO anon, authenticated;
 
 -- 2. Konsolider motorsykkel sin 'engine_cc' til felles nøkkel
 --    'engine_displacement_cc' (samme nøkkel brukes nå på tvers av alle

@@ -127,4 +127,36 @@ describe("resolveWizardPages", () => {
     expect(resolveWizardPages([], { native: false })).toEqual([]);
     expect(resolveWizardPages([], { native: true })).toEqual([]);
   });
+
+  it("solo-pages vehicle-registration and vehicle-confirm wherever they land in the array", () => {
+    const groups = [
+      "category-select",
+      "vehicle-registration",
+      "vehicle-confirm",
+      "category-attributes",
+      "title-photos",
+      "condition",
+      "price",
+      "description-keywords",
+      "delivery-location",
+      "review-publish",
+    ];
+    expect(resolveWizardPages(groups, { native: false })).toEqual([
+      ["category-select"],
+      ["vehicle-registration"],
+      ["vehicle-confirm"],
+      ["category-attributes", "title-photos", "condition", "price"],
+      ["description-keywords"],
+      ["delivery-location", "review-publish"],
+    ]);
+    expect(resolveWizardPages(groups, { native: true })).toEqual([
+      ["category-select"],
+      ["vehicle-registration"],
+      ["vehicle-confirm"],
+      ["category-attributes", "title-photos", "condition"],
+      ["price", "description-keywords"],
+      ["delivery-location"],
+      ["review-publish"],
+    ]);
+  });
 });

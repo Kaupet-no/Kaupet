@@ -2,7 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type { VehicleBrandGroup } from "@/lib/category-filters";
 
 const MAX_LOOKUPS_PER_HOUR = 20;
 
@@ -12,13 +11,20 @@ export const lookupVehicleByRegNumber = createServerFn({ method: "POST" })
     z
       .object({
         registrationNumber: z.string().trim().min(2).max(10),
-        categoryGroup: z.enum(["bil", "motorsykkel", "moped_atv", "bobil_campingvogn", "henger"]),
+        // Optional: at the "Bil og MC"-first lookup, the leaf category (and
+        // therefore the brand group) isn't known yet — brand/model matching
+        // is deferred to matchVehicleBrandModel once the user confirms the
+        // auto-detected vehicle type.
+        categoryGroup: z
+          .enum(["bil", "motorsykkel", "moped_atv", "bobil_campingvogn", "henger"])
+          .optional(),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { lookupVehicle } = await import("@/lib/vehicle-lookup.server");
+    const { matchVehicleBrandAndModel } = await import("@/lib/vehicle-brand-match.functions");
     const { userId } = context;
 
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
@@ -36,33 +42,18 @@ export const lookupVehicleByRegNumber = createServerFn({ method: "POST" })
       .from("vehicle_lookup_log")
       .insert({ user_id: userId, registration_number: result.registrationNumber });
 
-    const categoryGroup: VehicleBrandGroup = data.categoryGroup;
     let brandMatch: { id: string; name: string } | null = null;
     let modelMatch: { id: string; name: string } | null = null;
 
-    if (result.brand) {
-      // Only match already-approved brands/models — a pending, unapproved
-      // proposal from another user shouldn't be silently auto-selected here.
-      const { data: brandRow } = await supabaseAdmin
-        .from("vehicle_brands")
-        .select("id, name")
-        .eq("category_group", categoryGroup)
-        .eq("status", "approved")
-        .ilike("name", result.brand)
-        .maybeSingle();
-      if (brandRow) {
-        brandMatch = brandRow;
-        if (result.model) {
-          const { data: modelRow } = await supabaseAdmin
-            .from("vehicle_models")
-            .select("id, name")
-            .eq("brand_id", brandRow.id)
-            .eq("status", "approved")
-            .ilike("name", result.model)
-            .maybeSingle();
-          if (modelRow) modelMatch = modelRow;
-        }
-      }
+    if (data.categoryGroup) {
+      const matched = await matchVehicleBrandAndModel(
+        supabaseAdmin,
+        result.brand,
+        result.model,
+        data.categoryGroup,
+      );
+      brandMatch = matched.brandMatch;
+      modelMatch = matched.modelMatch;
     }
 
     return { lookup: result, brandMatch, modelMatch };

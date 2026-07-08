@@ -6,12 +6,7 @@ import type { AttributeMap } from "@/components/attribute-fields";
  * (step gating in ny-annonse.tsx) and server-side (createListing in
  * listings.functions.ts) without pulling component code into the server bundle.
  */
-export const MODULE_VALIDATORS: Record<string, (attributes: AttributeMap) => string | null> = {
-  "vehicle-lookup": (attrs) =>
-    attrs.is_registered && !attrs.registration_number
-      ? "Fyll inn registreringsnummer eller fjern haken for registrert kjøretøy"
-      : null,
-};
+export const MODULE_VALIDATORS: Record<string, (attributes: AttributeMap) => string | null> = {};
 
 /** Runs every active module's validator against `attributes`; returns the first error, if any. */
 export function validateModules(moduleKeys: string[], attributes: AttributeMap): string | null {

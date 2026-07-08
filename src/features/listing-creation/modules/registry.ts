@@ -1,17 +1,18 @@
-import { vehicleLookupModule } from "./vehicle-lookup";
 import { genericAttributesModule } from "./generic-attributes";
 import type { CategoryModule } from "./types";
 
 export type { CategoryModule, CategoryModuleProps } from "./types";
 
+/** Vehicle lookup (Statens Vegvesen) used to be a category-attributes
+ * module; it's now the dedicated vehicle-registration/vehicle-confirm field
+ * groups in the vehicle-first flow (see category-flows.ts), so it no longer
+ * needs a MODULE_REGISTRY entry. */
 export const MODULE_REGISTRY: Record<string, CategoryModule> = {
-  "vehicle-lookup": vehicleLookupModule,
   "generic-attributes": genericAttributesModule,
 };
 
 /** Norwegian display labels for admin UI (category flow configuration). */
 export const MODULE_LABELS_NB: Record<string, string> = {
-  "vehicle-lookup": "Kjøretøyoppslag (Statens vegvesen)",
   "generic-attributes": "Kategoriegenskaper",
 };
 

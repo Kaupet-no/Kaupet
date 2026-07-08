@@ -10,6 +10,8 @@ import type { AttributeMap } from "@/components/attribute-fields";
 import type { CategoryNode } from "@/lib/category-filters";
 import type { CategoryModule } from "@/features/listing-creation/modules/registry";
 import type { PendingImage } from "@/components/image-uploader";
+import type { VehicleLookupResult } from "@/lib/vehicle-lookup.server";
+import type { VehicleClassification } from "@/lib/vehicle-classification";
 
 /** Minimal shape of ny-annonse.tsx's ListingForm — kept local to avoid a circular import. */
 export type ListingFormShape = {
@@ -55,7 +57,12 @@ export type WizardSharedProps = {
   city: string | undefined;
 
   // category
-  categories: (CategoryNode & { name_nb: string; icon?: string | null; color?: string | null })[];
+  categories: (CategoryNode & {
+    name_nb: string;
+    slug?: string;
+    icon?: string | null;
+    color?: string | null;
+  })[];
   categoryLabel: string | null;
   setCategoryPickerOpen: (open: boolean) => void;
   onCategorySelect: (categoryId: string, parentId: string) => void;
@@ -75,6 +82,18 @@ export type WizardSharedProps = {
   onAttributesChange: (next: AttributeMap) => void;
   attributesTouched: boolean;
   activeModules: CategoryModule[];
+
+  // vehicle-first flow (vehicle-registration / vehicle-confirm field groups)
+  bilOgMcCategoryId: string | null;
+  vehicleRegistered: boolean;
+  setVehicleRegistered: (v: boolean) => void;
+  vehicleLookupLoading: boolean;
+  vehicleLookupError: string | null;
+  vehicleLookupResult: VehicleLookupResult | null;
+  vehicleClassification: VehicleClassification | null;
+  runVehicleLookup: (registrationNumber: string) => void | Promise<void>;
+  confirmVehicleData: (leafCategoryId: string) => void | Promise<void>;
+  rejectVehicleLookup: () => void;
 
   // condition
   conditionDescription: string | undefined;

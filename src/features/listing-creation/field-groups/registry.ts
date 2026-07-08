@@ -3,6 +3,8 @@ import type { ComponentType } from "react";
 import { TitlePhotos } from "./title-photos";
 import { CategorySelect } from "./category-select";
 import { CategoryAttributes } from "./category-attributes";
+import { VehicleRegistration } from "./vehicle-registration";
+import { VehicleConfirm } from "./vehicle-confirm";
 import { Condition } from "./condition";
 import { PriceGroup } from "./price";
 import { DescriptionKeywordsGroup } from "./description-keywords";
@@ -19,6 +21,9 @@ export type ValidateCtx = {
   missingFilters: { label_nb: string }[];
   isFree: boolean;
   priceNok: WizardSharedProps["priceNok"];
+  categoryId: string;
+  bilOgMcCategoryId: string | null;
+  vehicleLookupResult: WizardSharedProps["vehicleLookupResult"];
 };
 
 export type FieldGroup = {
@@ -41,6 +46,26 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
     Component: TitlePhotos,
     fieldsToValidate: ["title"],
     validateExtra: (ctx) => (ctx.images.length === 0 ? "SHOW_NO_IMAGE_DIALOG" : null),
+  },
+  "vehicle-registration": {
+    key: "vehicle-registration",
+    Component: VehicleRegistration,
+    fieldsToValidate: ["category_id"],
+    validateExtra: (ctx) => {
+      // Either a lookup succeeded (proceed to vehicle-confirm) or the user
+      // manually picked a real leaf category (opted out of registered path).
+      if (ctx.vehicleLookupResult) return null;
+      if (ctx.categoryId && ctx.categoryId !== ctx.bilOgMcCategoryId) return null;
+      return "Slå opp registreringsnummer, eller velg kjøretøytype manuelt.";
+    },
+  },
+  "vehicle-confirm": {
+    key: "vehicle-confirm",
+    Component: VehicleConfirm,
+    validateExtra: (ctx) => {
+      if (ctx.categoryId && ctx.categoryId !== ctx.bilOgMcCategoryId) return null;
+      return "Bekreft opplysningene fra Statens vegvesen før du går videre.";
+    },
   },
   "category-attributes": {
     key: "category-attributes",
@@ -101,6 +126,8 @@ export function fieldGroupsForKeys(keys: string[]): FieldGroup[] {
  */
 const FIELD_GROUP_LABEL_NATIVE_NB: Record<string, string> = {
   "category-select": "Kategori",
+  "vehicle-registration": "Registreringsnr.",
+  "vehicle-confirm": "Bekreft kjøretøy",
   "title-photos": "Tittel",
   "category-attributes": "Detaljer",
   condition: "Detaljer",
@@ -112,6 +139,8 @@ const FIELD_GROUP_LABEL_NATIVE_NB: Record<string, string> = {
 
 const FIELD_GROUP_LABEL_WEB_NB: Record<string, string> = {
   "category-select": "Kategori",
+  "vehicle-registration": "Registreringsnummer",
+  "vehicle-confirm": "Bekreft kjøretøy",
   "title-photos": "Bilder & tittel",
   "category-attributes": "Detaljer",
   condition: "Detaljer",
@@ -130,6 +159,8 @@ export function pageLabel(groups: FieldGroup[], native: boolean): string {
 /** Norwegian admin-display labels — distinct from the step-indicator labels above (different audience/purpose). */
 export const FIELD_GROUP_LABELS_NB: Record<string, string> = {
   "category-select": "Kategori",
+  "vehicle-registration": "Kjøretøyregistrering",
+  "vehicle-confirm": "Bekreft kjøretøy (Statens vegvesen)",
   "title-photos": "Bilder & tittel",
   "category-attributes": "Kategoriegenskaper",
   condition: "Tilstand",
@@ -158,5 +189,12 @@ export const LOCKED_FIELD_GROUP_KEYS: string[] = [
  * now freely reorderable so a category (e.g. Bil og MC) can put
  * `category-attributes` before it — needed so vehicle lookup fills
  * brand/model/year before the title step reads them.
+ *
+ * `vehicle-confirm` behaves similarly to `category-select`: it's injected at
+ * runtime (in ny-annonse.tsx) only once a Statens Vegvesen lookup has
+ * succeeded, and is never part of a category's stored `field_groups` — so it
+ * never appears in the admin-facing list either. `vehicle-registration` IS a
+ * normal, admin-configurable field group (seeded on the Bil og MC category's
+ * flow row) since an admin may legitimately want to reorder it.
  */
 export const POSITION_FIXED_FIELD_GROUP_KEYS: string[] = ["review-publish", "delivery-location"];

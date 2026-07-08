@@ -24,7 +24,7 @@ import {
 import {
   VehicleBrandField,
   VehicleModelField,
-} from "@/features/listing-creation/modules/vehicle-lookup/vehicle-brand-model-fields";
+} from "@/features/listing-creation/modules/generic-attributes/vehicle-brand-model-fields";
 
 export type AttributeMap = Record<string, AttributeValue>;
 

@@ -390,9 +390,16 @@ function EditListingPage() {
   );
   const fieldGroups = useMemo(
     () =>
+      // vehicle-registration/vehicle-confirm never re-trigger on edit: the
+      // listing already has a leaf category_id, so there's nothing to look
+      // up or confirm — editing goes straight to the normal field groups.
       fieldGroupsForKeys(fieldGroupKeys).filter(
         (g) =>
-          g.key !== "category-select" && g.key !== "title-photos" && g.key !== "review-publish",
+          g.key !== "category-select" &&
+          g.key !== "title-photos" &&
+          g.key !== "review-publish" &&
+          g.key !== "vehicle-registration" &&
+          g.key !== "vehicle-confirm",
       ),
     [fieldGroupKeys],
   );
@@ -950,6 +957,19 @@ function EditListingPage() {
             onAttributesChange: setAttributes,
             attributesTouched,
             activeModules,
+
+            // Vehicle-first lookup/confirm never re-trigger on edit (see
+            // `fieldGroups` filter above) — these are unused no-ops here.
+            bilOgMcCategoryId: null,
+            vehicleRegistered: true,
+            setVehicleRegistered: () => {},
+            vehicleLookupLoading: false,
+            vehicleLookupError: null,
+            vehicleLookupResult: null,
+            vehicleClassification: null,
+            runVehicleLookup: () => {},
+            confirmVehicleData: () => {},
+            rejectVehicleLookup: () => {},
 
             conditionDescription,
 

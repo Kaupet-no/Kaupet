@@ -83,6 +83,18 @@ function prependCategorySelect(flow: CategoryFlow): CategoryFlow {
  * accepted limitation (not solved by a second hidden rule), mitigated by a
  * live pagination preview in the admin UI.
  */
+/** Field-group keys that always get their own solo page, wherever they land
+ * in the ordered array — `category-select` is always first (see
+ * prependCategorySelect); `vehicle-registration`/`vehicle-confirm` can land
+ * anywhere in the array (admin-configurable position for the former,
+ * runtime-injected right after it for the latter), but must never be bundled
+ * with unrelated groups like `condition`/`price`. */
+const SOLO_FIELD_GROUP_KEYS = new Set([
+  "category-select",
+  "vehicle-registration",
+  "vehicle-confirm",
+]);
+
 export function resolveWizardPages(
   fieldGroupKeys: string[],
   options: { native: boolean },
@@ -90,18 +102,30 @@ export function resolveWizardPages(
   const chunkSize = options.native ? 3 : 4;
 
   const withoutEnds = fieldGroupKeys.filter(
-    (k) => k !== "category-select" && k !== "review-publish" && k !== "delivery-location",
+    (k) => k !== "review-publish" && k !== "delivery-location",
   );
-  const hasCategorySelect = fieldGroupKeys.includes("category-select");
   const hasReviewPublish = fieldGroupKeys.includes("review-publish");
   const hasDeliveryLocation = fieldGroupKeys.includes("delivery-location");
 
   const pages: string[][] = [];
-  if (hasCategorySelect) pages.push(["category-select"]);
+  let buffer: string[] = [];
+  const flush = () => {
+    if (buffer.length > 0) {
+      pages.push(buffer);
+      buffer = [];
+    }
+  };
 
-  for (let i = 0; i < withoutEnds.length; i += chunkSize) {
-    pages.push(withoutEnds.slice(i, i + chunkSize));
+  for (const key of withoutEnds) {
+    if (SOLO_FIELD_GROUP_KEYS.has(key)) {
+      flush();
+      pages.push([key]);
+    } else {
+      buffer.push(key);
+      if (buffer.length >= chunkSize) flush();
+    }
   }
+  flush();
 
   if (options.native) {
     if (hasDeliveryLocation) pages.push(["delivery-location"]);

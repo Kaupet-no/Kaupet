@@ -31,6 +31,12 @@ type Props = {
    * where category choice is the page content rather than a triggered
    * overlay. `open`/`onOpenChange`/`trigger` are ignored in this mode. */
   inline?: boolean;
+  /** Category ids that should be selectable as a terminal choice even though
+   * they have children — e.g. "Bil og MC" itself, so the vehicle-first flow
+   * can treat picking the top-level vehicle category as done, deferring the
+   * actual leaf (personbil/varebil/...) to the Statens Vegvesen lookup
+   * instead of forcing manual drill-down. */
+  selectableGroups?: string[];
 };
 
 function useIsDesktop() {
@@ -60,6 +66,7 @@ export function CategoryPicker({
   onSelect,
   trigger,
   inline,
+  selectableGroups,
 }: Props) {
   const isDesktop = useIsDesktop();
   const [path, setPath] = useState<Category[]>([]);
@@ -90,7 +97,7 @@ export function CategoryPicker({
 
   function handleItemClick(item: Category) {
     if (pendingSelection) return;
-    if (hasChildren(item.id)) {
+    if (hasChildren(item.id) && !selectableGroups?.includes(item.id)) {
       setPath((p) => [...p, item]);
       setSearch("");
     } else {

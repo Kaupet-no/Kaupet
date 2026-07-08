@@ -24,6 +24,7 @@ export function CategorySelect({
   applyCategorySuggestion,
   setSuggestionDismissed,
   setCategorySuggestion,
+  bilOgMcCategoryId,
 }: WizardSharedProps) {
   return (
     <section className="space-y-3">
@@ -67,6 +68,7 @@ export function CategorySelect({
         categories={categories ?? []}
         selectedId={categoryId}
         onSelect={onCategorySelect}
+        selectableGroups={bilOgMcCategoryId ? [bilOgMcCategoryId] : undefined}
       />
 
       {errors.category_id && (

@@ -30,8 +30,14 @@ import { fieldGroupsForKeys, pageLabel } from "@/features/listing-creation/field
 import {
   categoryBreadcrumb,
   getMissingRequiredFilters,
+  vehicleCategoryGroupFor,
   type CategoryNode,
 } from "@/lib/category-filters";
+import { lookupVehicleByRegNumber } from "@/lib/vehicle-lookup.functions";
+import { matchVehicleBrandModel } from "@/lib/vehicle-brand-match.functions";
+import { classifyVehicleCategory } from "@/lib/vehicle-classification";
+import type { VehicleLookupResult } from "@/lib/vehicle-lookup.server";
+import type { VehicleClassification } from "@/lib/vehicle-classification";
 
 import { useIsDemo } from "@/lib/use-is-demo";
 import { useAuth } from "@/lib/use-auth";
@@ -255,12 +261,28 @@ function NewListingPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
-        .select("id, name_nb, parent_id, icon, color")
+        .select("id, name_nb, slug, parent_id, icon, color")
         .order("sort_order");
       if (error) throw error;
       return data;
     },
   });
+
+  const bilOgMcCategoryId = useMemo(
+    () => (categories ?? []).find((c) => c.slug === "bil-og-mc" && !c.parent_id)?.id ?? null,
+    [categories],
+  );
+
+  // Vehicle-first flow state (vehicle-registration / vehicle-confirm field groups)
+  const [vehicleRegistered, setVehicleRegistered] = useState(true);
+  const [vehicleLookupLoading, setVehicleLookupLoading] = useState(false);
+  const [vehicleLookupError, setVehicleLookupError] = useState<string | null>(null);
+  const [vehicleLookupResult, setVehicleLookupResult] = useState<VehicleLookupResult | null>(null);
+  const [vehicleClassification, setVehicleClassification] = useState<VehicleClassification | null>(
+    null,
+  );
+  const lookupVehicleFn = useServerFn(lookupVehicleByRegNumber);
+  const matchBrandModelFn = useServerFn(matchVehicleBrandModel);
 
   const parentCategories = (categories ?? []).filter((c) => !c.parent_id);
   const [selectedParentId, setSelectedParentId] = useState<string>("");
@@ -322,10 +344,24 @@ function NewListingPage() {
     [categoryId, allFlows, categoriesById],
   );
 
-  const fieldGroupKeys = useMemo(
+  const baseFieldGroupKeys = useMemo(
     () => effectiveFlowForCategory(categoryId || null, allFlows ?? [], categoriesById).fieldGroups,
     [categoryId, allFlows, categoriesById],
   );
+
+  // Inject vehicle-confirm right after vehicle-registration once a lookup has
+  // succeeded — it's never part of a category's stored field_groups (see
+  // category-flows.ts), so it only ever appears in the live wizard state.
+  const fieldGroupKeys = useMemo(() => {
+    if (!vehicleLookupResult) return baseFieldGroupKeys;
+    const idx = baseFieldGroupKeys.indexOf("vehicle-registration");
+    if (idx === -1) return baseFieldGroupKeys;
+    return [
+      ...baseFieldGroupKeys.slice(0, idx + 1),
+      "vehicle-confirm",
+      ...baseFieldGroupKeys.slice(idx + 1),
+    ];
+  }, [baseFieldGroupKeys, vehicleLookupResult]);
 
   const pages: WizardPage[] = useMemo(
     () =>
@@ -687,12 +723,100 @@ function NewListingPage() {
     setValue("description", next, { shouldTouch: false });
   }
 
+  async function runVehicleLookup(registrationNumber: string) {
+    setVehicleLookupLoading(true);
+    setVehicleLookupError(null);
+    try {
+      const { lookup } = await lookupVehicleFn({ data: { registrationNumber } });
+      setVehicleLookupResult(lookup);
+      setVehicleClassification(
+        classifyVehicleCategory(
+          lookup.classification_code,
+          lookup.body_type_hint,
+          lookup.sleeping_places,
+        ),
+      );
+    } catch (e) {
+      setVehicleLookupError(e instanceof Error ? e.message : "Kjøretøyoppslag feilet.");
+    } finally {
+      setVehicleLookupLoading(false);
+    }
+  }
+
+  async function confirmVehicleData(leafCategoryId: string) {
+    const lookup = vehicleLookupResult;
+    if (!lookup) return;
+
+    const next: AttributeMap = {
+      ...attributes,
+      is_registered: true,
+      registration_number: lookup.registrationNumber,
+      vehicle_lookup: JSON.stringify(lookup),
+    };
+    if (lookup.year) next.year = lookup.year;
+    if (lookup.fuel_type) next.fuel_type = lookup.fuel_type;
+    if (lookup.weight_kg != null) next.weight_kg = lookup.weight_kg;
+    if (lookup.transmission) next.transmission = lookup.transmission;
+    if (lookup.color) next.color = lookup.color;
+    if (lookup.next_eu_control) next.next_eu_control = lookup.next_eu_control;
+    if (lookup.power_hk != null) next.power_hk = lookup.power_hk;
+    if (lookup.drive_type) next.drive_type = lookup.drive_type;
+    if (lookup.tow_hitch != null) next.tow_hitch = lookup.tow_hitch;
+    if (lookup.max_tow_weight_kg != null) next.max_tow_weight_kg = lookup.max_tow_weight_kg;
+    if (lookup.seats != null) next.seats = lookup.seats;
+    if (lookup.imported_used != null) next.imported_used = lookup.imported_used;
+    if (lookup.first_registration_date)
+      next.first_registration_date = lookup.first_registration_date;
+    if (lookup.cylinders != null) next.cylinders = lookup.cylinders;
+    if (lookup.engine_displacement_cc != null)
+      next.engine_displacement_cc = lookup.engine_displacement_cc;
+    if (lookup.engine_code) next.engine_code = lookup.engine_code;
+    if (lookup.sleeping_places != null) next.sleeping_places = lookup.sleeping_places;
+
+    const categoryGroup = vehicleCategoryGroupFor(leafCategoryId, allFilters ?? [], categoriesById);
+    if (categoryGroup) {
+      try {
+        const { brandMatch, modelMatch } = await matchBrandModelFn({
+          data: { brand: lookup.brand, model: lookup.model, categoryGroup },
+        });
+        if (brandMatch) next.brand = brandMatch.name;
+        if (modelMatch) next.model = modelMatch.name;
+      } catch {
+        // Non-fatal — brand/model just stay unset for manual selection below.
+      }
+    }
+
+    setAttributes(next);
+    setCategoryTouchedManually(true);
+    setSelectedParentId(categoriesById.get(leafCategoryId)?.parent_id ?? leafCategoryId);
+    setValue("category_id", leafCategoryId, { shouldValidate: true });
+    goToNextPage();
+  }
+
+  function rejectVehicleLookup() {
+    setVehicleLookupResult(null);
+    setVehicleClassification(null);
+    setVehicleLookupError(null);
+    setVehicleRegistered(false);
+    setStep(Math.max(1, step - 1));
+  }
+
   async function goToNextPage(options?: { skipImageCheck?: boolean; skipPriceCheck?: boolean }) {
     const groups = currentPage?.groups ?? [];
     const fields = groups.flatMap((g) => g.fieldsToValidate ?? []);
     const valid = fields.length > 0 ? await trigger(fields) : true;
     if (!valid) return;
-    const validateCtx = { images, attributes, activeModules, missingFilters, isFree, priceNok };
+    const validateCtx = {
+      images,
+      attributes,
+      activeModules,
+      missingFilters,
+      isFree,
+      priceNok,
+      categoryId,
+      bilOgMcCategoryId,
+      vehicleLookupResult,
+    };
     for (const group of groups) {
       const result = group.validateExtra?.(validateCtx);
       if (result === "SHOW_NO_IMAGE_DIALOG") {
@@ -931,6 +1055,17 @@ function NewListingPage() {
     onAttributesChange: setAttributes,
     attributesTouched,
     activeModules,
+
+    bilOgMcCategoryId,
+    vehicleRegistered,
+    setVehicleRegistered,
+    vehicleLookupLoading,
+    vehicleLookupError,
+    vehicleLookupResult,
+    vehicleClassification,
+    runVehicleLookup,
+    confirmVehicleData,
+    rejectVehicleLookup,
 
     conditionDescription,
 

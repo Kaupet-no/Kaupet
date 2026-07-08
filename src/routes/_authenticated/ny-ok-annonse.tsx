@@ -144,16 +144,10 @@ function NewWtbPage() {
   const description = watch("description");
   const descriptionLength = (description ?? "").length;
 
-  // WTB never shows vehicle-lookup: regnr-oppslag gjelder ett konkret
-  // registrert kjøretøy, ikke søkekriterier for en ønsket kjøretøytype. Filtrer
-  // den derfor alltid bort, uansett hva effectiveFlowForCategory ellers
-  // returnerer for kjøretøykategorier.
   const activeModules = useMemo(
     () =>
       modulesForKeys(
-        effectiveFlowForCategory(categoryId ?? null, allFlows ?? [], categoriesById).modules.filter(
-          (m) => m !== "vehicle-lookup",
-        ),
+        effectiveFlowForCategory(categoryId ?? null, allFlows ?? [], categoriesById).modules,
       ),
     [categoryId, allFlows, categoriesById],
   );

@@ -20,6 +20,16 @@
  * parsing under er derfor defensiv (optional chaining → null ved avvik) og
  * bør dobbeltsjekkes mot et faktisk respons-payload før det stoles blindt
  * på i produksjon.
+ *
+ * NB 3: `classification_code` (EU-kjøretøyklasse, f.eks. "M1"/"N1"/"L3e"/
+ * "O1", brukt til å utlede annonsekategori automatisk) og `body_type_hint`
+ * (fritekst karosseri/formål-streng, brukt kun til å skille bobil/
+ * campingvogn fra en ordinær M1-personbil) er lagt til august 2026 basert på
+ * offentlig SVV-dokumentasjon om `kjoretoyklassifisering`-strukturen, men
+ * stiene under er IKKE verifisert mot et reelt respons-payload. Forbrukeren
+ * ser og kan overstyre utledet kjøretøytype i bekreftelsessteget, så en feil
+ * her blokkerer aldri annonsering — men bør valideres mot ekte oppslag før
+ * dette stoles blindt på i produksjon.
  */
 
 function assertVehicleLookupConfigured() {
@@ -52,6 +62,8 @@ export type VehicleLookupResult = {
   engine_displacement_cc: number | null;
   engine_code: string | null;
   sleeping_places: number | null;
+  classification_code: string | null;
+  body_type_hint: string | null;
 };
 
 const SVV_BASE_URL = "https://akfell-datautlevering.atlas.vegvesen.no/enkeltoppslag/kjoretoydata";
@@ -127,6 +139,10 @@ export async function lookupVehicle(registrationNumber: string): Promise<Vehicle
     kjoretoydataListe?: Array<{
       godkjenning?: {
         tekniskGodkjenning?: {
+          kjoretoyklassifisering?: {
+            tekniskKode?: { kodeNavn?: string };
+            beskrivelse?: string;
+          };
           tekniskeData?: {
             generelt?: {
               merke?: Array<{ merke?: string }>;
@@ -135,6 +151,7 @@ export async function lookupVehicle(registrationNumber: string): Promise<Vehicle
             karosseriOgLasteplan?: {
               rFarge?: Array<{ kodeNavn?: string }>;
               antallSoveplasser?: number;
+              karosseritype?: { kodeNavn?: string };
             };
             vekter?: {
               egenvekt?: number;
@@ -179,6 +196,7 @@ export async function lookupVehicle(registrationNumber: string): Promise<Vehicle
   const motor = teknisk?.motorOgDrivverk?.motor?.[0];
   const fuelType = mapFuelType(motor?.drivstoff?.[0]?.drivstoffKode?.kodeNavn);
   const tilhengerkopling = teknisk?.tilhengerkopling?.kopling?.[0];
+  const klassifisering = vehicle.godkjenning?.tekniskGodkjenning?.kjoretoyklassifisering;
 
   return {
     registrationNumber: regNr,
@@ -207,5 +225,9 @@ export async function lookupVehicle(registrationNumber: string): Promise<Vehicle
     engine_displacement_cc: fuelType !== "el" ? (motor?.slagvolum ?? null) : null,
     engine_code: fuelType !== "el" ? nullifyPlaceholder(motor?.motorKode) : null,
     sleeping_places: teknisk?.karosseriOgLasteplan?.antallSoveplasser ?? null,
+    classification_code: nullifyPlaceholder(klassifisering?.tekniskKode?.kodeNavn),
+    body_type_hint: nullifyPlaceholder(
+      teknisk?.karosseriOgLasteplan?.karosseritype?.kodeNavn ?? klassifisering?.beskrivelse,
+    ),
   };
 }

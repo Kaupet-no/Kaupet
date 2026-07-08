@@ -15,7 +15,7 @@ import { ModerationBanner } from "@/components/moderation-banner";
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthProvider } from "@/lib/auth";
-import { initNativeOfflineWatcher } from "@/lib/native-offline";
+import { initOfflineWatcher } from "@/lib/native-offline";
 import {
   autoRestoreNativePush,
   initNativePushForeground,
@@ -237,7 +237,7 @@ function RootComponent() {
   }, [router, queryClient]);
 
   useEffect(() => {
-    const cleanup = initNativeOfflineWatcher();
+    const cleanup = initOfflineWatcher();
     void setupNative();
     void autoRestoreNativePush();
     void initNativePushNavigation((url) => router.navigate({ href: url }));

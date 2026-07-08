@@ -161,7 +161,7 @@ function PublicProfilePage() {
             </div>
           ) : reviews.length === 0 ? (
             <p className="rounded-xl border border-dashed border-border bg-surface p-8 text-center text-sm text-muted-foreground">
-              Ingen vurderinger å vise enda.
+              Ingen vurderinger ennå.
             </p>
           ) : (
             reviews.map((r) => (

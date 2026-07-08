@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createFileRoute, useNavigate, useBlocker } from "@tanstack/react-router";
 import { NativePageHeader } from "@/components/native-page-header";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -27,6 +27,16 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { formatErrorMessage } from "@/lib/errors";
 
 const wtbSchema = z.object({
@@ -95,7 +105,7 @@ function EditWtbPage() {
     handleSubmit,
     setValue,
     watch,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<WtbForm>({
     resolver: zodResolver(wtbSchema),
     values: formValues,
@@ -133,6 +143,16 @@ function EditWtbPage() {
 
   const updateFn = useServerFn(updateWtbListing);
 
+  // Unsaved-changes guard: form dirty or attributes changed after hydration.
+  const attributesDirtyRef = useRef(false);
+  const skipGuardRef = useRef(false);
+  const hasUnsavedChanges = (isDirty || attributesDirtyRef.current) && !skipGuardRef.current;
+  const blocker = useBlocker({
+    shouldBlockFn: () => hasUnsavedChanges,
+    withResolver: true,
+    enableBeforeUnload: hasUnsavedChanges,
+  });
+
   const mutation = useMutation({
     mutationFn: (values: WtbForm) =>
       updateFn({
@@ -150,6 +170,7 @@ function EditWtbPage() {
       queryClient.invalidateQueries({ queryKey: ["my-wtb-listings"] });
       queryClient.invalidateQueries({ queryKey: ["wtb-listing-edit", id] });
       showSuccessToast("Endringer lagret");
+      skipGuardRef.current = true;
       navigate({ to: "/mine-annonser" });
     },
     onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke lagre endringene")),
@@ -250,7 +271,10 @@ function EditWtbPage() {
             categoryId={categoryId ?? null}
             categories={categories ?? []}
             value={attributes}
-            onChange={setAttributes}
+            onChange={(next) => {
+              attributesDirtyRef.current = true;
+              setAttributes(next);
+            }}
           />
         </section>
 
@@ -288,6 +312,33 @@ function EditWtbPage() {
           </Button>
         </div>
       </form>
+
+      <AlertDialog
+        open={blocker.status === "blocked"}
+        onOpenChange={(open) => {
+          if (!open) blocker.reset?.();
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Du har ulagrede endringer</AlertDialogTitle>
+            <AlertDialogDescription>
+              Hvis du forlater siden nå, mister du endringene du har gjort.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => blocker.proceed?.()}
+            >
+              Forkast endringer
+            </AlertDialogAction>
+            <AlertDialogCancel onClick={() => blocker.reset?.()}>
+              Fortsett å redigere
+            </AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/location-filter";
-import { ModeToggle } from "@/components/mode-toggle";
+import { ModeToggle } from "@/components/search-term-mode-toggle";
 import {
   buildTree,
   categoryLabel,

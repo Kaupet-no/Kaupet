@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useBlocker } from "@tanstack/react-router";
 import { NativePageHeader } from "@/components/native-page-header";
 import { useIsNative } from "@/lib/use-is-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -244,7 +244,7 @@ function EditListingPage() {
     setValue,
     watch,
     trigger,
-    formState: { errors, touchedFields },
+    formState: { errors, touchedFields, isDirty },
   } = useForm<FormValues>({
     values: formValues,
     defaultValues: {
@@ -527,6 +527,7 @@ function EditListingPage() {
   const [removedPaths, setRemovedPaths] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const hydratedFor = useRef<string | null>(null);
+  const originalImageKeysRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!listing || hydratedFor.current === listing.id) return;
@@ -538,6 +539,7 @@ function EditListingPage() {
     }));
     setItems(initial);
     hydratedFor.current = listing.id;
+    originalImageKeysRef.current = initial.map((i) => i.key).join("|");
     if (sorted.length > 0) {
       signListingImageUrls(sorted.map((i) => i.storage_path)).then((map) => {
         setItems((curr) =>
@@ -595,12 +597,25 @@ function EditListingPage() {
     });
   };
 
+  // Unsaved-changes guard: form dirty, image list changed, or attributes touched.
+  const imagesDirty =
+    originalImageKeysRef.current !== null &&
+    items.map((i) => i.key).join("|") !== originalImageKeysRef.current;
+  const skipGuardRef = useRef(false);
+  const hasUnsavedChanges = (isDirty || imagesDirty || attributesTouched) && !skipGuardRef.current;
+  const blocker = useBlocker({
+    shouldBlockFn: () => hasUnsavedChanges,
+    withResolver: true,
+    enableBeforeUnload: hasUnsavedChanges,
+  });
+
   const doRepublish = useServerFn(republishListing);
   const publishDraft = useMutation({
     mutationFn: () => doRepublish({ data: { id } }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-listings"] });
       showSuccessToast("Annonsen er publisert!");
+      skipGuardRef.current = true;
       navigate({ to: "/mine-annonser" });
     },
     onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke publisere annonsen")),
@@ -685,6 +700,7 @@ function EditListingPage() {
       queryClient.invalidateQueries({ queryKey: ["listing-edit", id] });
       queryClient.invalidateQueries({ queryKey: ["listing", id] });
       showSuccessToast("Endringer lagret");
+      skipGuardRef.current = true;
       navigate({ to: "/mine-annonser" });
     },
     onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke lagre endringene")),
@@ -1057,6 +1073,33 @@ function EditListingPage() {
           </Button>
         </div>
       </form>
+
+      <AlertDialog
+        open={blocker.status === "blocked"}
+        onOpenChange={(open) => {
+          if (!open) blocker.reset?.();
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Du har ulagrede endringer</AlertDialogTitle>
+            <AlertDialogDescription>
+              Hvis du forlater siden nå, mister du endringene du har gjort.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => blocker.proceed?.()}
+            >
+              Forkast endringer
+            </AlertDialogAction>
+            <AlertDialogCancel onClick={() => blocker.reset?.()}>
+              Fortsett å redigere
+            </AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

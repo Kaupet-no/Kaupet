@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { Expand, LayoutList, LayoutGrid, Map as MapIcon, Save } from "lucide-react";
@@ -81,6 +81,26 @@ const termGroupSchema = z.object({
   terms: z.array(z.string()),
 });
 
+type SearchListing = {
+  id: string;
+  kaupet_code: string;
+  title: string;
+  subtitle: string | null;
+  price_nok: number | null;
+  is_free: boolean;
+  city: string | null;
+  lat: number | null;
+  lng: number | null;
+  created_at: string;
+  cover_path: string | null;
+};
+
+type ListingsPage = {
+  rows: SearchListing[];
+  totalCount: number | null;
+  nextOffset: number | null;
+};
+
 const searchSchema = z.object({
   q: z.string().optional().default(""),
   qMode: z.enum(["all", "any"]).optional().default("all"),
@@ -161,7 +181,6 @@ function BrowsePage() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [advOpen, setAdvOpen] = useState(false);
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
-  const [loadedPages, setLoadedPages] = useState(1);
   const PAGE_SIZE = 20;
   const sentinelRef = useRef<HTMLDivElement>(null);
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
@@ -171,8 +190,7 @@ function BrowsePage() {
   const { refreshing, pullDistance } = usePullToRefresh({
     enabled: isNative && mounted,
     onRefresh: async () => {
-      setLoadedPages(1);
-      await queryClient.invalidateQueries({ queryKey: ["listings"] });
+      await queryClient.resetQueries({ queryKey: ["listings"] });
     },
   });
   const [viewMode, setViewMode] = useState<"grid" | "list">(() => {
@@ -192,20 +210,6 @@ function BrowsePage() {
     return () => mql.removeEventListener("change", update);
   }, []);
   useEffect(() => setQDraft(search.q), [search.q]);
-  useEffect(
-    () => setLoadedPages(1),
-    [
-      search.q,
-      search.category,
-      search.categories,
-      search.conditions,
-      search.min,
-      search.max,
-      search.sort,
-      search.lat,
-      search.lng,
-    ],
-  );
 
   const location: LocationValue = useMemo(
     () => ({
@@ -319,12 +323,20 @@ function BrowsePage() {
     saveLastSearchContext({ search, label });
   }, [mounted, search, effectiveCategories, categories]);
 
-  const { data: listings, isLoading } = useQuery({
-    queryKey: ["listings", search, radiusIds, effectiveCategories, terms, loadedPages],
+  const {
+    data: listingsData,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ["listings", search, radiusIds, effectiveCategories, terms],
     enabled:
       (effectiveCategories.length === 0 || !!categories) &&
       (search.lat == null || search.lng == null || radiusIds != null),
-    queryFn: async () => {
+    initialPageParam: 0,
+    getNextPageParam: (lastPage: ListingsPage) => lastPage.nextOffset ?? undefined,
+    queryFn: async ({ pageParam }): Promise<ListingsPage> => {
       const extraGroups = search.extraGroups ?? [];
       const includeGroups = [
         { mode: search.qMode ?? "all", terms },
@@ -337,17 +349,21 @@ function BrowsePage() {
       // applied client-side below — fetch a larger buffer to compensate for
       // rows trimmed after that pass.
       const needsClientExclude = excludeAllGroups.length > 0;
+      const emptyPage: ListingsPage = { rows: [], totalCount: 0, nextOffset: null };
 
       let qb = supabase
         .from("listings")
         .select(
           "id, kaupet_code, title, subtitle, description, price_nok, is_free, city, display_lat, display_lng, created_at, listing_images(storage_path, sort_order)",
+          // Total antall treff hentes bare på første side; klient-ekskludering
+          // filtrerer etterpå, så der finnes ikke noe presist servertall.
+          { count: pageParam === 0 && !needsClientExclude ? "exact" : undefined },
         )
         .eq("status", "active");
 
       if (search.lat != null && search.lng != null) {
         const ids = radiusIds ?? [];
-        if (ids.length === 0) return [];
+        if (ids.length === 0) return emptyPage;
         qb = qb.in("id", ids);
       }
 
@@ -392,7 +408,7 @@ function BrowsePage() {
             }
           }
         }
-        if (ids.size === 0) return [];
+        if (ids.size === 0) return emptyPage;
         qb = qb.in("category_id", Array.from(ids));
       }
 
@@ -425,22 +441,16 @@ function BrowsePage() {
         qb = qb.order("price_nok", { ascending: false, nullsFirst: false });
       else qb = qb.order("created_at", { ascending: false });
 
-      const limit = PAGE_SIZE * loadedPages;
-      const { data, error } = await qb.limit(needsClientExclude ? limit * 4 : limit);
+      // pageParam er rå database-offset. Uten klient-ekskludering er én side
+      // nøyaktig PAGE_SIZE rader; med klient-ekskludering hentes en større
+      // buffer, filtreres, og neste offset settes til raden etter siste
+      // beholdte, så tidligere sider aldri re-hentes.
+      const fetchSize = needsClientExclude ? PAGE_SIZE * 4 : PAGE_SIZE;
+      const { data, error, count } = await qb.range(pageParam, pageParam + fetchSize - 1);
       if (error) throw error;
 
-      let rows = data ?? [];
-      if (needsClientExclude) {
-        rows = rows.filter(
-          (l) =>
-            !excludeAllGroups.some(
-              (g) => g.terms.length > 0 && g.terms.every((t) => rowContainsTerm(l, t)),
-            ),
-        );
-        rows = rows.slice(0, PAGE_SIZE * loadedPages);
-      }
-
-      return rows.map((l) => {
+      const raw = data ?? [];
+      const mapRow = (l: (typeof raw)[number]) => {
         const imgs = (l.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
         return {
           id: l.id,
@@ -455,9 +465,41 @@ function BrowsePage() {
           created_at: l.created_at,
           cover_path: imgs[0]?.storage_path ?? null,
         };
-      });
+      };
+
+      if (!needsClientExclude) {
+        return {
+          rows: raw.map(mapRow),
+          totalCount: count ?? null,
+          nextOffset: raw.length === fetchSize ? pageParam + fetchSize : null,
+        };
+      }
+
+      const isExcluded = (l: (typeof raw)[number]) =>
+        excludeAllGroups.some(
+          (g) => g.terms.length > 0 && g.terms.every((t) => rowContainsTerm(l, t)),
+        );
+      const kept: typeof raw = [];
+      let consumed = raw.length;
+      for (let i = 0; i < raw.length; i++) {
+        if (isExcluded(raw[i])) continue;
+        kept.push(raw[i]);
+        if (kept.length === PAGE_SIZE) {
+          consumed = i + 1;
+          break;
+        }
+      }
+      const bufferExhausted = raw.length < fetchSize && kept.length < PAGE_SIZE;
+      return {
+        rows: kept.map(mapRow),
+        totalCount: null,
+        nextOffset: bufferExhausted ? null : pageParam + consumed,
+      };
     },
   });
+
+  const listings = useMemo(() => listingsData?.pages.flatMap((p) => p.rows), [listingsData]);
+  const totalCount = listingsData?.pages[0]?.totalCount ?? null;
 
   const countWtbFn = useServerFn(countWtbListings);
   const listWtbFn = useServerFn(listWtbListings);
@@ -483,7 +525,7 @@ function BrowsePage() {
     queryFn: () => countWtbFn({ data: wtbQueryParams }),
   });
 
-  const { data: wtbResult } = useQuery({
+  const { data: wtbResult, isLoading: wtbLoading } = useQuery({
     queryKey: ["wtb-list", wtbQueryParams],
     enabled: activeTab === "wtb" && hasSearchCriteria,
     staleTime: 60_000,
@@ -569,15 +611,15 @@ function BrowsePage() {
     const el = sentinelRef.current;
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting && !isLoading && cards.length >= PAGE_SIZE * loadedPages) {
-          setLoadedPages((p) => p + 1);
+        if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          void fetchNextPage();
         }
       },
       { rootMargin: "200px" },
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [isNative, isLoading, cards.length, loadedPages]);
+  }, [isNative, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const renderMap = (withAreaSearch: boolean) =>
     mounted ? (
@@ -759,7 +801,7 @@ function BrowsePage() {
             }
             location={location}
             onLocationChange={handleLocationChange}
-            resultCount={cards.length}
+            resultCount={totalCount ?? cards.length}
             onOpenAdvanced={() => setAdvancedOverlayOpen(true)}
             advancedFilterCount={
               (search.extraGroups?.length ?? 0) + (search.qMode === "any" ? 1 : 0)
@@ -795,7 +837,9 @@ function BrowsePage() {
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
         <div className="flex items-center gap-2">
           <span>
-            {isLoading ? "Søker…" : `${cards.length} annonse${cards.length === 1 ? "" : "r"}`}
+            {isLoading
+              ? "Søker…"
+              : `${(totalCount ?? cards.length).toLocaleString("nb-NO")} annonse${(totalCount ?? cards.length) === 1 ? "" : "r"}`}
           </span>
           {isNative && (
             <button
@@ -867,9 +911,11 @@ function BrowsePage() {
 
       {/* ØK-tab — vises kun når søkkriterier gir treff */}
       {hasSearchCriteria && wtbCount > 0 && (
-        <div className="mt-4 flex gap-2">
+        <div className="mt-4 flex gap-2" role="tablist" aria-label="Annonsetype">
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "listings"}
             onClick={() => setActiveTab("listings")}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
               activeTab === "listings"
@@ -881,6 +927,8 @@ function BrowsePage() {
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "wtb"}
             onClick={() => setActiveTab("wtb")}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
               activeTab === "wtb"
@@ -895,9 +943,16 @@ function BrowsePage() {
 
       {activeTab === "wtb" ? (
         <div className="mt-4">
-          {wtbListings.length === 0 ? (
+          {wtbLoading ? (
             <div className="flex items-center justify-center py-16">
               <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            </div>
+          ) : wtbListings.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border bg-surface p-12 text-center">
+              <p className="text-lg font-medium">Ingen ønskes kjøpt-annonser funnet</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Ingen etterspør dette akkurat nå. Prøv et bredere søk.
+              </p>
             </div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -981,17 +1036,19 @@ function BrowsePage() {
             )}
             {/* Last inn flere (web) / Infinite scroll sentinel (native) */}
             {!isLoading &&
-              cards.length >= PAGE_SIZE * loadedPages &&
+              hasNextPage &&
               (isNative ? (
                 <div ref={sentinelRef} className="h-4" />
               ) : (
-                <div className="mt-6 flex justify-center">
-                  <Button variant="outline" onClick={() => setLoadedPages((p) => p + 1)}>
-                    Last inn flere annonser
-                  </Button>
-                </div>
+                !isFetchingNextPage && (
+                  <div className="mt-6 flex justify-center">
+                    <Button variant="outline" onClick={() => void fetchNextPage()}>
+                      Last inn flere annonser
+                    </Button>
+                  </div>
+                )
               ))}
-            {isLoading && loadedPages > 1 && (
+            {isFetchingNextPage && (
               <div className="mt-6 flex justify-center">
                 <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
               </div>

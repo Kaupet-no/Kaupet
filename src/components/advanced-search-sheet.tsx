@@ -31,7 +31,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { LocationPicker, RadiusPicker } from "@/components/location-filter";
-import { ModeToggle } from "@/components/mode-toggle";
+import { ModeToggle } from "@/components/search-term-mode-toggle";
 import { TermGroupEditor } from "@/components/term-group-editor";
 import type { Category } from "@/lib/categories";
 import { mergeTermGroups } from "@/lib/term-groups";

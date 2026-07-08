@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, ImagePlus, Lightbulb, X, GripVertical } from "lucide-react";
+import { Camera, ChevronLeft, ChevronRight, ImagePlus, Lightbulb, X } from "lucide-react";
+import {
+  DndContext,
+  PointerSensor,
+  TouchSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import { SortableContext, arrayMove, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { MAX_IMAGES, describeImageError, validateImages } from "@/lib/storage";
 import { compressImage } from "@/lib/image-compression";
@@ -14,6 +25,81 @@ export type PendingImage = {
 };
 
 const GUIDE_KEY = "kaupet_photo_guide_seen";
+
+function SortableImageItem({
+  img,
+  idx,
+  count,
+  onMove,
+  onRemove,
+}: {
+  img: PendingImage;
+  idx: number;
+  count: number;
+  onMove: (id: string, dir: -1 | 1) => void;
+  onRemove: (id: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: img.id,
+  });
+  return (
+    <li
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={`group relative aspect-square touch-manipulation overflow-hidden rounded-lg border border-border bg-muted ${
+        isDragging ? "z-10 cursor-grabbing opacity-80 shadow-lg" : "cursor-grab"
+      }`}
+      {...attributes}
+      {...listeners}
+    >
+      <img
+        src={img.previewUrl}
+        alt={
+          idx === 0
+            ? `Hovedbilde av annonsen (${img.file.name})`
+            : `Bilde ${idx + 1} av annonsen (${img.file.name})`
+        }
+        className="size-full object-cover"
+        draggable={false}
+      />
+      {idx === 0 && (
+        <span className="absolute left-2 top-2 rounded bg-primary/90 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary-foreground">
+          Hoved
+        </span>
+      )}
+      <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent p-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100">
+        <div className="flex">
+          <button
+            type="button"
+            onClick={() => onMove(img.id, -1)}
+            className="rounded p-1 text-white hover:bg-white/20 disabled:opacity-40"
+            disabled={idx === 0}
+            aria-label="Flytt bakover"
+          >
+            <ChevronLeft className="size-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onMove(img.id, 1)}
+            className="rounded p-1 text-white hover:bg-white/20 disabled:opacity-40"
+            disabled={idx === count - 1}
+            aria-label="Flytt fremover"
+          >
+            <ChevronRight className="size-3.5" />
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={() => onRemove(img.id)}
+          className="rounded p-1 text-white hover:bg-destructive"
+          aria-label="Fjern bilde"
+        >
+          <X className="size-3.5" />
+        </button>
+      </div>
+    </li>
+  );
+}
 
 function PhotoGuide({ onDismiss }: { onDismiss: () => void }) {
   return (
@@ -125,6 +211,22 @@ export function ImageUploader({
 
   const atLimit = images.length >= MAX_IMAGES;
 
+  // Aktiveringsterskler gjør at vanlige klikk/tapp på knappene i flisene
+  // ikke starter en dra-operasjon.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const from = images.findIndex((i) => i.id === active.id);
+    const to = images.findIndex((i) => i.id === over.id);
+    if (from < 0 || to < 0) return;
+    onChange(arrayMove(images, from, to));
+  };
+
   return (
     <div className="space-y-3">
       {showGuide && <PhotoGuide onDismiss={dismissGuide} />}
@@ -216,59 +318,29 @@ export function ImageUploader({
           <p className="text-xs text-muted-foreground">
             {images.length} av {MAX_IMAGES} bilder
           </p>
-          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-            {images.map((img, idx) => (
-              <li
-                key={img.id}
-                className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted"
-              >
-                <img
-                  src={img.previewUrl}
-                  alt={
-                    idx === 0
-                      ? `Hovedbilde av annonsen (${img.file.name})`
-                      : `Bilde ${idx + 1} av annonsen (${img.file.name})`
-                  }
-                  className="size-full object-cover"
-                />
-                {idx === 0 && (
-                  <span className="absolute left-2 top-2 rounded bg-primary/90 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary-foreground">
-                    Hoved
-                  </span>
-                )}
-                <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent p-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100">
-                  <div className="flex">
-                    <button
-                      type="button"
-                      onClick={() => move(img.id, -1)}
-                      className="rounded p-1 text-white hover:bg-white/20 disabled:opacity-40"
-                      disabled={idx === 0}
-                      aria-label="Flytt venstre"
-                    >
-                      <GripVertical className="size-3.5 rotate-90" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => move(img.id, 1)}
-                      className="rounded p-1 text-white hover:bg-white/20 disabled:opacity-40"
-                      disabled={idx === images.length - 1}
-                      aria-label="Flytt høyre"
-                    >
-                      <GripVertical className="size-3.5 -rotate-90" />
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => remove(img.id)}
-                    className="rounded p-1 text-white hover:bg-destructive"
-                    aria-label="Fjern bilde"
-                  >
-                    <X className="size-3.5" />
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext items={images.map((i) => i.id)} strategy={rectSortingStrategy}>
+              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                {images.map((img, idx) => (
+                  <SortableImageItem
+                    key={img.id}
+                    img={img}
+                    idx={idx}
+                    count={images.length}
+                    onMove={move}
+                    onRemove={remove}
+                  />
+                ))}
+              </ul>
+            </SortableContext>
+          </DndContext>
+          <p className="text-xs text-muted-foreground">
+            Dra bildene for å endre rekkefølgen. Det første bildet blir hovedbildet.
+          </p>
         </>
       )}
     </div>

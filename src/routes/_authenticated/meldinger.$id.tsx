@@ -131,10 +131,15 @@ function ConversationPage() {
     }
   }, [conv?.listing?.id, conv?.listing?.listing_images]);
 
-  // Markér samtalen som lest i databasen for innlogget bruker
+  // Markér samtalen som lest i databasen for innlogget bruker.
+  // lastMarkedRef hindrer at samme (eller eldre) tidsstempel skrives på nytt
+  // for hver realtime-INSERT eller cache-oppdatering.
+  const lastMarkedRef = useRef<string | null>(null);
   const markReadMutation = useMutation({
     mutationFn: async (readAt: string) => {
       if (!conv || !user) return;
+      if (lastMarkedRef.current && readAt <= lastMarkedRef.current) return;
+      lastMarkedRef.current = readAt;
       const update =
         conv.buyer_id === user.id
           ? { buyer_last_read_at: readAt }
@@ -246,15 +251,42 @@ function ConversationPage() {
         .eq("id", id);
       return data as Message;
     },
-    onSuccess: (m) => {
+    // Optimistisk: vis meldingen og tøm feltet umiddelbart; rull tilbake ved feil.
+    onMutate: (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed || trimmed.length > 4000) return {};
+      const optimistic: Message = {
+        id: `optimistic-${crypto.randomUUID()}`,
+        conversation_id: id,
+        sender_id: user!.id,
+        body: trimmed,
+        created_at: new Date().toISOString(),
+        deleted_at: null,
+        pending: true,
+      };
+      queryClient.setQueryData<Message[]>(["messages", id], (prev) =>
+        prev ? [...prev, optimistic] : [optimistic],
+      );
+      setBody("");
+      return { optimisticId: optimistic.id, previousBody: text };
+    },
+    onSuccess: (m, _text, context) => {
       queryClient.setQueryData<Message[]>(["messages", id], (prev) => {
-        if (!prev) return [m];
-        if (prev.some((x) => x.id === m.id)) return prev;
-        return [...prev, m];
+        const withoutOptimistic = (prev ?? []).filter((x) => x.id !== context?.optimisticId);
+        if (withoutOptimistic.some((x) => x.id === m.id)) return withoutOptimistic;
+        return [...withoutOptimistic, m];
       });
       queryClient.invalidateQueries({ queryKey: ["my-conversations"] });
       void import("@/lib/haptics").then((m) => m.hapticSelection());
-      setBody("");
+    },
+    onError: (e: Error, _text, context) => {
+      if (context?.optimisticId) {
+        queryClient.setQueryData<Message[]>(["messages", id], (prev) =>
+          prev?.filter((x) => x.id !== context.optimisticId),
+        );
+        setBody((curr) => (curr.trim() ? curr : (context.previousBody ?? "")));
+      }
+      showErrorToast(formatErrorMessage(e, "Meldingen ble ikke sendt. Prøv igjen."));
     },
   });
 
@@ -540,9 +572,6 @@ function ConversationPage() {
             <Send className="size-4" /> Send
           </Button>
         </form>
-        {sendMutation.error && (
-          <p className="mt-2 text-xs text-destructive">{(sendMutation.error as Error).message}</p>
-        )}
       </div>
     </div>
   );

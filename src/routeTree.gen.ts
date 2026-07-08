@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VilkarRouteImport } from './routes/vilkar'
+import { Route as TilbakestillPassordRouteImport } from './routes/tilbakestill-passord'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as PersonvernRouteImport } from './routes/personvern'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -46,6 +47,11 @@ import { Route as AuthenticatedMineAnnonserOkIdRedigerRouteImport } from './rout
 const VilkarRoute = VilkarRouteImport.update({
   id: '/vilkar',
   path: '/vilkar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TilbakestillPassordRoute = TilbakestillPassordRouteImport.update({
+  id: '/tilbakestill-passord',
+  path: '/tilbakestill-passord',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -228,6 +234,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/personvern': typeof PersonvernRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/tilbakestill-passord': typeof TilbakestillPassordRoute
   '/vilkar': typeof VilkarRoute
   '/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/favoritter': typeof AuthenticatedFavoritterRoute
@@ -262,6 +269,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/personvern': typeof PersonvernRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/tilbakestill-passord': typeof TilbakestillPassordRoute
   '/vilkar': typeof VilkarRoute
   '/favoritter': typeof AuthenticatedFavoritterRoute
   '/meg': typeof AuthenticatedMegRoute
@@ -297,6 +305,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/personvern': typeof PersonvernRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/tilbakestill-passord': typeof TilbakestillPassordRoute
   '/vilkar': typeof VilkarRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/_authenticated/favoritter': typeof AuthenticatedFavoritterRoute
@@ -333,6 +342,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/personvern'
     | '/sitemap.xml'
+    | '/tilbakestill-passord'
     | '/vilkar'
     | '/admin'
     | '/favoritter'
@@ -367,6 +377,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/personvern'
     | '/sitemap.xml'
+    | '/tilbakestill-passord'
     | '/vilkar'
     | '/favoritter'
     | '/meg'
@@ -401,6 +412,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/personvern'
     | '/sitemap.xml'
+    | '/tilbakestill-passord'
     | '/vilkar'
     | '/_authenticated/admin'
     | '/_authenticated/favoritter'
@@ -437,6 +449,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   PersonvernRoute: typeof PersonvernRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  TilbakestillPassordRoute: typeof TilbakestillPassordRoute
   VilkarRoute: typeof VilkarRoute
   AnnonseListingIdRoute: typeof AnnonseListingIdRoute
   BrukerIdRoute: typeof BrukerIdRoute
@@ -451,6 +464,13 @@ declare module '@tanstack/react-router' {
       path: '/vilkar'
       fullPath: '/vilkar'
       preLoaderRoute: typeof VilkarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tilbakestill-passord': {
+      id: '/tilbakestill-passord'
+      path: '/tilbakestill-passord'
+      fullPath: '/tilbakestill-passord'
+      preLoaderRoute: typeof TilbakestillPassordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sitemap.xml': {
@@ -753,6 +773,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   PersonvernRoute: PersonvernRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  TilbakestillPassordRoute: TilbakestillPassordRoute,
   VilkarRoute: VilkarRoute,
   AnnonseListingIdRoute: AnnonseListingIdRoute,
   BrukerIdRoute: BrukerIdRoute,

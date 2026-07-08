@@ -40,7 +40,11 @@ import { Button } from "@/components/ui/button";
 import { ImageGallery } from "@/components/listing-detail/image-gallery";
 import { OwnerStatsPanel } from "@/components/listing-detail/owner-stats-panel";
 import { SellerContactPanel } from "@/components/listing-detail/seller-contact-panel";
+import { VehicleSpecBar } from "@/components/listing-detail/vehicle/vehicle-spec-bar";
+import { VehicleTechTable } from "@/components/listing-detail/vehicle/vehicle-tech-table";
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
+import { VEHICLE_LEAF_SLUGS, type VehicleLeafSlug } from "@/lib/vehicle-classification";
+import type { VehicleLookupResult } from "@/lib/vehicle-lookup.server";
 
 const ListingDetailMap = lazy(() =>
   import("@/components/listing-detail-map").then((m) => ({ default: m.ListingDetailMap })),
@@ -472,7 +476,7 @@ function ListingDetailPage() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, subtitle, description, price_nok, is_free, condition, city, postal_code, display_lat, display_lng, created_at, updated_at, published_at, status, seller_id, category_id, listing_images(storage_path, sort_order), categories(name_nb, slug)",
+          "id, kaupet_code, title, subtitle, description, price_nok, is_free, condition, city, postal_code, display_lat, display_lng, created_at, updated_at, published_at, status, seller_id, category_id, attributes, listing_images(storage_path, sort_order), categories(name_nb, slug)",
         )
         .eq("kaupet_code", kaupetCode)
         .maybeSingle();
@@ -633,6 +637,18 @@ function ListingDetailPage() {
   const seller = data.seller;
   const category = Array.isArray(data.categories) ? data.categories[0] : data.categories;
 
+  const attributes = (data.attributes ?? {}) as Record<string, unknown>;
+  const isVehicleCategory =
+    !!category?.slug && VEHICLE_LEAF_SLUGS.includes(category.slug as VehicleLeafSlug);
+  const vehicleLookup = isVehicleCategory
+    ? ((attributes.vehicle_lookup as VehicleLookupResult | undefined) ?? null)
+    : null;
+  const mileageKmRaw = attributes.mileage_km;
+  const mileageKm =
+    isVehicleCategory && typeof mileageKmRaw === "number" && Number.isFinite(mileageKmRaw)
+      ? mileageKmRaw
+      : null;
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
       <NativePageHeader title={data.title} />
@@ -673,6 +689,9 @@ function ListingDetailPage() {
             title={data.title}
             onImageClick={images.length > 0 ? setLightboxIndex : undefined}
           />
+          {isVehicleCategory && (
+            <VehicleTechTable vehicleLookup={vehicleLookup} mileageKm={mileageKm} />
+          )}
           <section className="mt-8">
             <h2 className="font-display text-xl">Beskrivelse</h2>
             <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
@@ -713,6 +732,10 @@ function ListingDetailPage() {
               )}
             </div>
           </div>
+
+          {isVehicleCategory && (
+            <VehicleSpecBar vehicleLookup={vehicleLookup} mileageKm={mileageKm} />
+          )}
 
           {(() => {
             const fmt = (s: string) =>

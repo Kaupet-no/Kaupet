@@ -106,6 +106,12 @@ export function ReviewPublishGroup(props: WizardSharedProps) {
         postalCode={props.postalCode}
         categoryLabel={props.categoryLabel}
       />
+      {props.attributes.vehicle_lookup && (
+        <p className="text-xs text-muted-foreground">
+          Kjøretøyopplysningene i denne annonsen er hentet fra Statens vegvesen. Du er ansvarlig for
+          at de stemmer — gå tilbake for å rette dersom noe er feil.
+        </p>
+      )}
       <UploadProgress
         mutationIsPending={props.mutationIsPending}
         uploadProgress={props.uploadProgress}

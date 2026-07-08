@@ -967,7 +967,9 @@ function EditListingPage() {
             vehicleLookupError: null,
             vehicleLookupResult: null,
             vehicleClassification: null,
+            vehiclePreviousClassificationMismatch: null,
             runVehicleLookup: () => {},
+            matchVehicleBrandForLeaf: async () => null,
             confirmVehicleData: () => {},
             rejectVehicleLookup: () => {},
 

@@ -49,6 +49,10 @@ export function VehicleRegistration({
 
       {vehicleRegistered ? (
         <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Vi henter kjøretøyopplysninger automatisk fra Statens vegvesen. Du får sjekke og rette
+            opplysningene før annonsen opprettes.
+          </p>
           <div className="flex gap-2">
             <Input
               value={regNr}
@@ -66,7 +70,18 @@ export function VehicleRegistration({
               {vehicleLookupLoading ? "Slår opp…" : "Slå opp"}
             </Button>
           </div>
-          {vehicleLookupError && <p className="text-sm text-destructive">{vehicleLookupError}</p>}
+          {vehicleLookupError && (
+            <div className="space-y-1.5">
+              <p className="text-sm text-destructive">{vehicleLookupError}</p>
+              <button
+                type="button"
+                onClick={() => setVehicleRegistered(false)}
+                className="text-sm text-muted-foreground underline-offset-2 hover:underline"
+              >
+                Fyll inn kjøretøyopplysninger manuelt i stedet
+              </button>
+            </div>
+          )}
           {vehicleLookupResult && (
             <p className="text-sm text-muted-foreground">
               Fant kjøretøyet. Gå videre for å bekrefte opplysningene.

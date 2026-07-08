@@ -262,18 +262,21 @@ export type Database = {
           user_id: string
           registration_number: string
           created_at: string
+          classification_result: Json | null
         }
         Insert: {
           id?: string
           user_id: string
           registration_number: string
           created_at?: string
+          classification_result?: Json | null
         }
         Update: {
           id?: string
           user_id?: string
           registration_number?: string
           created_at?: string
+          classification_result?: Json | null
         }
         Relationships: []
       }

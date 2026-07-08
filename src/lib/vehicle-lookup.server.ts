@@ -108,6 +108,55 @@ function mapDriveType(value: string | null | undefined): string | null {
   return null;
 }
 
+/** Next midnight in Europe/Oslo, as a Date — used to tell the user exactly
+ * when the SVV daily quota resets, instead of a vague "prøv igjen senere". */
+function nextNorwayMidnight(): Date {
+  const now = new Date();
+  const osloDateParts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Oslo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+  // osloDateParts is "YYYY-MM-DD" for "now" in Oslo time; midnight tonight in
+  // Oslo is that date + 1 day at 00:00, expressed back as a UTC instant via a
+  // round-trip through the Oslo offset at that moment.
+  const [y, m, d] = osloDateParts.split("-").map(Number);
+  const midnightUtcGuess = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0));
+  // Correct for Oslo's UTC offset (CET/CEST) at that instant.
+  const offsetMinutes = getOsloOffsetMinutes(midnightUtcGuess);
+  return new Date(midnightUtcGuess.getTime() - offsetMinutes * 60_000);
+}
+
+function getOsloOffsetMinutes(at: Date): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Oslo",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(at);
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
+  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
+  const localMinutes = hour * 60 + minute;
+  const utcMinutes = at.getUTCHours() * 60 + at.getUTCMinutes();
+  let diff = localMinutes - utcMinutes;
+  if (diff > 720) diff -= 1440;
+  if (diff < -720) diff += 1440;
+  return diff;
+}
+
+/** Formats a Date as "kl. HH:MM" in Europe/Oslo — shared by the SVV
+ * quota-exhausted message here and the per-user hourly rate limit message in
+ * vehicle-lookup.functions.ts. */
+export function formatRetryClockNorway(at: Date): string {
+  const time = new Intl.DateTimeFormat("nb-NO", {
+    timeZone: "Europe/Oslo",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(at);
+  return `kl. ${time}`;
+}
+
 export async function lookupVehicle(registrationNumber: string): Promise<VehicleLookupResult> {
   assertVehicleLookupConfigured();
   const regNr = registrationNumber.trim().toUpperCase();
@@ -125,7 +174,9 @@ export async function lookupVehicle(registrationNumber: string): Promise<Vehicle
   // 422 = "Antall kjoretoy i respons overstiger kvote" (kvote brukt opp), med
   // Retry-After-header ("Prøv igjen etter midnatt (norsk tid)").
   if (res.status === 422) {
-    throw new Error("Kvoten for kjøretøyoppslag er brukt opp for i dag. Prøv igjen etter midnatt.");
+    throw new Error(
+      `Kvoten for kjøretøyoppslag hos Statens vegvesen er brukt opp for i dag. Prøv igjen ${formatRetryClockNorway(nextNorwayMidnight())}, eller fyll inn kjøretøyopplysningene manuelt i mellomtiden.`,
+    );
   }
   if (!res.ok) {
     const text = await res.text();

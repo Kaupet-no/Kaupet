@@ -281,6 +281,8 @@ function NewListingPage() {
   const [vehicleClassification, setVehicleClassification] = useState<VehicleClassification | null>(
     null,
   );
+  const [vehiclePreviousClassificationMismatch, setVehiclePreviousClassificationMismatch] =
+    useState<{ slug: string | null; lookedUpAt: string } | null>(null);
   const lookupVehicleFn = useServerFn(lookupVehicleByRegNumber);
   const matchBrandModelFn = useServerFn(matchVehicleBrandModel);
 
@@ -727,7 +729,9 @@ function NewListingPage() {
     setVehicleLookupLoading(true);
     setVehicleLookupError(null);
     try {
-      const { lookup } = await lookupVehicleFn({ data: { registrationNumber } });
+      const { lookup, previousClassificationMismatch } = await lookupVehicleFn({
+        data: { registrationNumber },
+      });
       setVehicleLookupResult(lookup);
       setVehicleClassification(
         classifyVehicleCategory(
@@ -736,6 +740,7 @@ function NewListingPage() {
           lookup.sleeping_places,
         ),
       );
+      setVehiclePreviousClassificationMismatch(previousClassificationMismatch);
     } catch (e) {
       setVehicleLookupError(e instanceof Error ? e.message : "Kjøretøyoppslag feilet.");
     } finally {
@@ -743,7 +748,25 @@ function NewListingPage() {
     }
   }
 
-  async function confirmVehicleData(leafCategoryId: string) {
+  /** Runs the deferred brand/model match for a chosen leaf category, so
+   * vehicle-confirm can show/resolve an unmatched brand or model to the user
+   * *before* they commit — rather than confirmVehicleData silently leaving
+   * brand/model unset. */
+  async function matchVehicleBrandForLeaf(leafCategoryId: string) {
+    const lookup = vehicleLookupResult;
+    if (!lookup) return null;
+    const categoryGroup = vehicleCategoryGroupFor(leafCategoryId, allFilters ?? [], categoriesById);
+    if (!categoryGroup) return null;
+    const { brandMatch, modelMatch } = await matchBrandModelFn({
+      data: { brand: lookup.brand, model: lookup.model, categoryGroup },
+    });
+    return { categoryGroup, brandMatch, modelMatch };
+  }
+
+  function confirmVehicleData(
+    leafCategoryId: string,
+    resolved?: { brandName?: string; modelName?: string },
+  ) {
     const lookup = vehicleLookupResult;
     if (!lookup) return;
 
@@ -772,19 +795,8 @@ function NewListingPage() {
       next.engine_displacement_cc = lookup.engine_displacement_cc;
     if (lookup.engine_code) next.engine_code = lookup.engine_code;
     if (lookup.sleeping_places != null) next.sleeping_places = lookup.sleeping_places;
-
-    const categoryGroup = vehicleCategoryGroupFor(leafCategoryId, allFilters ?? [], categoriesById);
-    if (categoryGroup) {
-      try {
-        const { brandMatch, modelMatch } = await matchBrandModelFn({
-          data: { brand: lookup.brand, model: lookup.model, categoryGroup },
-        });
-        if (brandMatch) next.brand = brandMatch.name;
-        if (modelMatch) next.model = modelMatch.name;
-      } catch {
-        // Non-fatal — brand/model just stay unset for manual selection below.
-      }
-    }
+    if (resolved?.brandName) next.brand = resolved.brandName;
+    if (resolved?.modelName) next.model = resolved.modelName;
 
     setAttributes(next);
     setCategoryTouchedManually(true);
@@ -797,6 +809,7 @@ function NewListingPage() {
     setVehicleLookupResult(null);
     setVehicleClassification(null);
     setVehicleLookupError(null);
+    setVehiclePreviousClassificationMismatch(null);
     setVehicleRegistered(false);
     setStep(Math.max(1, step - 1));
   }
@@ -1063,7 +1076,9 @@ function NewListingPage() {
     vehicleLookupError,
     vehicleLookupResult,
     vehicleClassification,
+    vehiclePreviousClassificationMismatch,
     runVehicleLookup,
+    matchVehicleBrandForLeaf,
     confirmVehicleData,
     rejectVehicleLookup,
 

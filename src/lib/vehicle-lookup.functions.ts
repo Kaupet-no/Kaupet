@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { classifyVehicleCategory } from "@/lib/vehicle-classification";
 
 const MAX_LOOKUPS_PER_HOUR = 20;
 
@@ -23,24 +24,59 @@ export const lookupVehicleByRegNumber = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { lookupVehicle } = await import("@/lib/vehicle-lookup.server");
+    const { lookupVehicle, formatRetryClockNorway } = await import("@/lib/vehicle-lookup.server");
     const { matchVehicleBrandAndModel } = await import("@/lib/vehicle-brand-match.functions");
     const { userId } = context;
 
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { count } = await supabaseAdmin
+    const { data: recentLookups, count } = await supabaseAdmin
       .from("vehicle_lookup_log")
-      .select("id", { count: "exact", head: true })
+      .select("created_at", { count: "exact" })
       .eq("user_id", userId)
-      .gte("created_at", oneHourAgo);
+      .gte("created_at", oneHourAgo)
+      .order("created_at", { ascending: true });
     if ((count ?? 0) >= MAX_LOOKUPS_PER_HOUR) {
-      throw new Error("For mange kjøretøyoppslag den siste timen. Prøv igjen senere.");
+      const oldest = recentLookups?.[0]?.created_at;
+      const retryAt = oldest
+        ? new Date(new Date(oldest).getTime() + 60 * 60 * 1000)
+        : new Date(Date.now() + 60 * 60 * 1000);
+      throw new Error(
+        `For mange kjøretøyoppslag den siste timen. Prøv igjen ${formatRetryClockNorway(retryAt)}, eller fyll inn kjøretøyopplysningene manuelt i mellomtiden.`,
+      );
     }
 
     const result = await lookupVehicle(data.registrationNumber);
-    await supabaseAdmin
-      .from("vehicle_lookup_log")
-      .insert({ user_id: userId, registration_number: result.registrationNumber });
+    const classification = classifyVehicleCategory(
+      result.classification_code,
+      result.body_type_hint,
+      result.sleeping_places,
+    );
+
+    // Personlige kjennemerker kan overføres mellom kjøretøy av ulik klasse —
+    // varsle (mykt, ikke blokkerende) hvis samme bruker har slått opp samme
+    // skilt før med en annen utledet kjøretøytype.
+    let previousClassificationMismatch: { slug: string | null; lookedUpAt: string } | null = null;
+    if (classification.slug) {
+      const { data: previous } = await supabaseAdmin
+        .from("vehicle_lookup_log")
+        .select("classification_result, created_at")
+        .eq("user_id", userId)
+        .eq("registration_number", result.registrationNumber)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const previousSlug = (previous?.classification_result as { slug?: string | null } | null)
+        ?.slug;
+      if (previousSlug && previousSlug !== classification.slug) {
+        previousClassificationMismatch = { slug: previousSlug, lookedUpAt: previous!.created_at };
+      }
+    }
+
+    await supabaseAdmin.from("vehicle_lookup_log").insert({
+      user_id: userId,
+      registration_number: result.registrationNumber,
+      classification_result: classification,
+    });
 
     let brandMatch: { id: string; name: string } | null = null;
     let modelMatch: { id: string; name: string } | null = null;
@@ -56,5 +92,5 @@ export const lookupVehicleByRegNumber = createServerFn({ method: "POST" })
       modelMatch = matched.modelMatch;
     }
 
-    return { lookup: result, brandMatch, modelMatch };
+    return { lookup: result, brandMatch, modelMatch, previousClassificationMismatch };
   });

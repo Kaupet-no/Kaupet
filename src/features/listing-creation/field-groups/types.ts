@@ -91,8 +91,26 @@ export type WizardSharedProps = {
   vehicleLookupError: string | null;
   vehicleLookupResult: VehicleLookupResult | null;
   vehicleClassification: VehicleClassification | null;
+  /** Set when the same user previously looked up the same registration
+   * number and got a different classification — surfaced as a soft warning
+   * in vehicle-confirm (personalized plates can be transferred between
+   * vehicles of a different class). */
+  vehiclePreviousClassificationMismatch: { slug: string | null; lookedUpAt: string } | null;
   runVehicleLookup: (registrationNumber: string) => void | Promise<void>;
-  confirmVehicleData: (leafCategoryId: string) => void | Promise<void>;
+  /** Matches the lookup's raw brand/model against approved vehicle_brands/
+   * vehicle_models for the brand group implied by `leafCategoryId`. Returns
+   * null if the leaf has no brand group (shouldn't happen for the 7 vehicle
+   * leaves, but defensive). Lets vehicle-confirm show/resolve an unmatched
+   * brand or model *before* the user commits, instead of silently. */
+  matchVehicleBrandForLeaf: (leafCategoryId: string) => Promise<{
+    categoryGroup: "bil" | "motorsykkel" | "moped_atv" | "bobil_campingvogn" | "henger";
+    brandMatch: { id: string; name: string } | null;
+    modelMatch: { id: string; name: string } | null;
+  } | null>;
+  confirmVehicleData: (
+    leafCategoryId: string,
+    resolved?: { brandName?: string; modelName?: string },
+  ) => void | Promise<void>;
   rejectVehicleLookup: () => void;
 
   // condition

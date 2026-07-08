@@ -1312,7 +1312,14 @@ function CategoryFlowDialog({ category, onClose }: { category: Category; onClose
     ...MIDDLE_FIELD_GROUP_KEYS.filter((k) => !storedFieldGroups.includes(k)),
   ];
   const deliveryActive = storedFieldGroups.includes("delivery-location");
+  // vehicle-registration (Statens vegvesen-oppslag for Bil og MC) isn't part
+  // of MIDDLE_FIELD_GROUP_KEYS — this simple editor doesn't support letting
+  // admins reorder/toggle it yet — but it must survive a save if the
+  // category already has it (seeded via migration), or the vehicle-first
+  // flow silently breaks the next time someone touches this dialog.
+  const hasVehicleRegistration = storedFieldGroups.includes("vehicle-registration");
   const activeFieldGroups = [
+    ...(hasVehicleRegistration ? ["vehicle-registration"] : []),
     "title-photos",
     ...middleOrder.filter(
       (k) => LOCKED_FIELD_GROUP_KEYS.includes(k) || storedFieldGroups.includes(k),
@@ -1427,7 +1434,22 @@ function CategoryFlowDialog({ category, onClose }: { category: Category; onClose
 
             <div className="space-y-1">
               <p className="text-xs font-medium text-muted-foreground">Feltgrupper</p>
+              {hasVehicleRegistration && (
+                <p className="rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">
+                  Denne kategorien har kjøretøyregistrering (Statens vegvesen-oppslag) satt opp via
+                  migrasjon. Bekreftelsessteget som vises etter et vellykket oppslag legges alltid
+                  til automatisk og kan ikke konfigureres her.
+                </p>
+              )}
               <ul>
+                {hasVehicleRegistration && (
+                  <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm text-muted-foreground">
+                    <span className="inline-block size-4 shrink-0" aria-hidden />
+                    <Checkbox checked disabled />
+                    {FIELD_GROUP_LABELS_NB["vehicle-registration"]}
+                    <span className="text-xs">(alltid først, kan ikke fjernes her)</span>
+                  </li>
+                )}
                 <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm text-muted-foreground">
                   <span className="inline-block size-4 shrink-0" aria-hidden />
                   <Checkbox checked disabled />

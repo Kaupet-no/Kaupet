@@ -917,6 +917,7 @@ type EditableFilter = {
   type: FilterType;
   unit: string;
   options: FilterOption[];
+  is_primary: boolean;
 };
 
 function CategoryFiltersDialog({ category, onClose }: { category: Category; onClose: () => void }) {
@@ -929,7 +930,7 @@ function CategoryFiltersDialog({ category, onClose }: { category: Category; onCl
     queryFn: async () => {
       const { data, error } = await supabase
         .from("category_filters")
-        .select("id, category_id, key, label_nb, type, unit, options, sort_order")
+        .select("id, category_id, key, label_nb, type, unit, options, sort_order, is_primary")
         .eq("category_id", category.id)
         .order("sort_order");
       if (error) throw error;
@@ -951,6 +952,7 @@ function CategoryFiltersDialog({ category, onClose }: { category: Category; onCl
         unit: f.unit.trim() || null,
         options: usesOptions ? f.options.filter((o) => o.value.trim()) : null,
         sort_order: (filters?.length ?? 0) * 10 + 10,
+        is_primary: f.is_primary,
       };
       if (f.id) {
         const { error } = await supabase.from("category_filters").update(payload).eq("id", f.id);
@@ -966,6 +968,15 @@ function CategoryFiltersDialog({ category, onClose }: { category: Category; onCl
       invalidate();
     },
     onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke lagre filteret")),
+  });
+
+  const toggleIsPrimary = useMutation({
+    mutationFn: async ({ id, is_primary }: { id: string; is_primary: boolean }) => {
+      const { error } = await supabase.from("category_filters").update({ is_primary }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke oppdatere filteret")),
   });
 
   const remove = useMutation({
@@ -988,6 +999,7 @@ function CategoryFiltersDialog({ category, onClose }: { category: Category; onCl
       type: "select",
       unit: "",
       options: [{ value: "", label_nb: "" }],
+      is_primary: true,
     });
   }
 
@@ -1000,6 +1012,7 @@ function CategoryFiltersDialog({ category, onClose }: { category: Category; onCl
       type: f.type,
       unit: f.unit ?? "",
       options: f.options && f.options.length > 0 ? f.options : [{ value: "", label_nb: "" }],
+      is_primary: f.is_primary,
     });
   }
 
@@ -1036,7 +1049,16 @@ function CategoryFiltersDialog({ category, onClose }: { category: Category; onCl
                     {f.unit ? ` · ${f.unit}` : ""} · {f.key}
                   </span>
                 </div>
-                <div className="flex shrink-0 gap-1">
+                <div className="flex shrink-0 items-center gap-2">
+                  <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Checkbox
+                      checked={f.is_primary}
+                      onCheckedChange={(c) =>
+                        toggleIsPrimary.mutate({ id: f.id, is_primary: c === true })
+                      }
+                    />
+                    Vis alltid
+                  </label>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -1133,6 +1155,13 @@ function CategoryFiltersDialog({ category, onClose }: { category: Category; onCl
                 placeholder="f.eks. tommer, km"
               />
             </div>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={draft.is_primary}
+                onCheckedChange={(c) => setDraft((d) => (d ? { ...d, is_primary: c === true } : d))}
+              />
+              Vis alltid (av = under «Flere valg»)
+            </label>
             {usesOptions && (
               <div className="space-y-2">
                 <Label>Valg</Label>

@@ -38,6 +38,7 @@ export type CategoryFilter = {
   unit: string | null;
   options: FilterOption[] | null;
   sort_order: number;
+  is_primary: boolean;
 };
 
 export const FILTER_TYPE_LABELS: Record<FilterType, string> = {
@@ -61,6 +62,7 @@ export function normalizeFilter(row: {
   unit: string | null;
   options: unknown;
   sort_order: number;
+  is_primary: boolean;
 }): CategoryFilter {
   return {
     id: row.id,
@@ -71,6 +73,21 @@ export function normalizeFilter(row: {
     unit: row.unit,
     options: Array.isArray(row.options) ? (row.options as FilterOption[]) : null,
     sort_order: row.sort_order,
+    is_primary: row.is_primary,
+  };
+}
+
+/**
+ * Splits an already-resolved filter list into those always shown on the
+ * landing/category filter panel vs. those tucked behind "Se flere valg".
+ */
+export function splitPrimaryFilters(filters: CategoryFilter[]): {
+  primary: CategoryFilter[];
+  secondary: CategoryFilter[];
+} {
+  return {
+    primary: filters.filter((f) => f.is_primary),
+    secondary: filters.filter((f) => !f.is_primary),
   };
 }
 

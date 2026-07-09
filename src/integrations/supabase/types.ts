@@ -117,6 +117,7 @@ export type Database = {
           category_id: string
           created_at: string
           id: string
+          is_primary: boolean
           key: string
           label_nb: string
           options: Json | null
@@ -128,6 +129,7 @@ export type Database = {
           category_id: string
           created_at?: string
           id?: string
+          is_primary?: boolean
           key: string
           label_nb: string
           options?: Json | null
@@ -139,6 +141,7 @@ export type Database = {
           category_id?: string
           created_at?: string
           id?: string
+          is_primary?: boolean
           key?: string
           label_nb?: string
           options?: Json | null

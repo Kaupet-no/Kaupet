@@ -1,8 +1,16 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, FolderOpen, Heart, MapPin, Search, ShieldCheck } from "lucide-react";
+import {
+  ArrowRight,
+  ChevronDown,
+  FolderOpen,
+  Heart,
+  MapPin,
+  Search,
+  ShieldCheck,
+} from "lucide-react";
 import { z } from "zod";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Autoplay from "embla-carousel-autoplay";
 import { OnboardingFlow } from "@/components/onboarding-flow";
 
@@ -10,7 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Carousel,
   CarouselContent,
@@ -35,6 +43,7 @@ import { CategoryFilterFields } from "@/components/category-filter-fields";
 import {
   effectiveFiltersForCategory,
   normalizeFilter,
+  splitPrimaryFilters,
   type AttributeFilterValue,
 } from "@/lib/category-filters";
 
@@ -187,7 +196,7 @@ function WebLanding() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("category_filters")
-        .select("id, category_id, key, label_nb, type, unit, options, sort_order")
+        .select("id, category_id, key, label_nb, type, unit, options, sort_order, is_primary")
         .order("sort_order");
       if (error) throw error;
       return (data ?? []).map(normalizeFilter);
@@ -239,6 +248,13 @@ function WebLanding() {
     () => effectiveFiltersForCategory(currentParent?.id ?? null, allFilters ?? [], categoriesById),
     [currentParent, allFilters, categoriesById],
   );
+  const { primary: primaryFilters, secondary: secondaryFilters } = useMemo(
+    () => splitPrimaryFilters(activeFilters),
+    [activeFilters],
+  );
+  // Collapse "flere valg" again whenever the drilled-into category changes.
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
+  useEffect(() => setMoreFiltersOpen(false), [currentParent?.id]);
 
   const [qFocused, setQFocused] = useState(false);
   // When a category is active, hint at what's searchable within it by typing
@@ -622,7 +638,7 @@ function WebLanding() {
                       {activeFilters.length > 0 && (
                         <div className="mt-4 space-y-4 border-t border-border pt-4">
                           <CategoryFilterFields
-                            filters={activeFilters}
+                            filters={primaryFilters}
                             values={filterValues}
                             onChange={(key, v) =>
                               setFilterValues((prev) => {
@@ -633,6 +649,37 @@ function WebLanding() {
                               })
                             }
                           />
+                          {secondaryFilters.length > 0 && (
+                            <Collapsible open={moreFiltersOpen} onOpenChange={setMoreFiltersOpen}>
+                              <CollapsibleTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="gap-1 px-0 text-primary hover:bg-transparent"
+                                >
+                                  {moreFiltersOpen ? "Vis færre valg" : "Se flere valg"}
+                                  <ChevronDown
+                                    className={`size-4 transition-transform ${moreFiltersOpen ? "rotate-180" : ""}`}
+                                  />
+                                </Button>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent className="space-y-4 pt-4 data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:slide-in-from-top-2 data-[state=closed]:animate-out data-[state=closed]:fade-out">
+                                <CategoryFilterFields
+                                  filters={secondaryFilters}
+                                  values={filterValues}
+                                  onChange={(key, v) =>
+                                    setFilterValues((prev) => {
+                                      const next = { ...prev };
+                                      if (v === undefined) delete next[key];
+                                      else next[key] = v;
+                                      return next;
+                                    })
+                                  }
+                                />
+                              </CollapsibleContent>
+                            </Collapsible>
+                          )}
                           <Button
                             onClick={() =>
                               navigate({

@@ -10,7 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { reconcilePromotionPayment } from "@/lib/promotions.functions";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, MapPin, Search } from "lucide-react";
+import { ArrowLeft, ChevronDown, MapPin, Search } from "lucide-react";
 import { toast } from "sonner";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { z } from "zod";
@@ -24,6 +24,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/use-auth";
 import { readLastSearchContext, type LastSearchContext } from "@/lib/last-search-context";
 import { CategoryFilterFields } from "@/components/category-filter-fields";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { buildTree, descendants, type Category } from "@/lib/categories";
 import { normalizeSlugForMatch } from "@/lib/slug";
@@ -31,6 +32,7 @@ import {
   applyAttributeFilters,
   effectiveFiltersForCategory,
   normalizeFilter,
+  splitPrimaryFilters,
   type AttributeFilterValue,
 } from "@/lib/category-filters";
 
@@ -216,7 +218,7 @@ function CategoryLandingPage({ main }: { main: Category }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("category_filters")
-        .select("id, category_id, key, label_nb, type, unit, options, sort_order")
+        .select("id, category_id, key, label_nb, type, unit, options, sort_order, is_primary")
         .order("sort_order");
       if (error) throw error;
       return (data ?? []).map(normalizeFilter);
@@ -232,6 +234,11 @@ function CategoryLandingPage({ main }: { main: Category }) {
     () => effectiveFiltersForCategory(main.id, allFilters ?? [], tree.byId),
     [main, allFilters, tree],
   );
+  const { primary: primaryFilters, secondary: secondaryFilters } = useMemo(
+    () => splitPrimaryFilters(filters),
+    [filters],
+  );
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
 
   const { data: listings, isLoading } = useQuery({
     queryKey: ["category-listings", main.id, filterValues],
@@ -298,7 +305,7 @@ function CategoryLandingPage({ main }: { main: Category }) {
           <aside className="mb-6 space-y-5 md:mb-0">
             <p className="text-sm font-medium">Filtrer</p>
             <CategoryFilterFields
-              filters={filters}
+              filters={primaryFilters}
               values={filterValues}
               onChange={(key, v) =>
                 setFilterValues((prev) => {
@@ -309,6 +316,37 @@ function CategoryLandingPage({ main }: { main: Category }) {
                 })
               }
             />
+            {secondaryFilters.length > 0 && (
+              <Collapsible open={moreFiltersOpen} onOpenChange={setMoreFiltersOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1 px-0 text-primary hover:bg-transparent"
+                  >
+                    {moreFiltersOpen ? "Vis færre valg" : "Se flere valg"}
+                    <ChevronDown
+                      className={`size-4 transition-transform ${moreFiltersOpen ? "rotate-180" : ""}`}
+                    />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-4 pt-4 data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:slide-in-from-top-2 data-[state=closed]:animate-out data-[state=closed]:fade-out">
+                  <CategoryFilterFields
+                    filters={secondaryFilters}
+                    values={filterValues}
+                    onChange={(key, v) =>
+                      setFilterValues((prev) => {
+                        const next = { ...prev };
+                        if (v === undefined) delete next[key];
+                        else next[key] = v;
+                        return next;
+                      })
+                    }
+                  />
+                </CollapsibleContent>
+              </Collapsible>
+            )}
             {Object.keys(filterValues).length > 0 && (
               <Button variant="outline" size="sm" onClick={() => setFilterValues({})}>
                 Nullstill filtre

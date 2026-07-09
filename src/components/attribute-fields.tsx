@@ -35,7 +35,7 @@ export function useAllCategoryFilters() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("category_filters")
-        .select("id, category_id, key, label_nb, type, unit, options, sort_order")
+        .select("id, category_id, key, label_nb, type, unit, options, sort_order, is_primary")
         .order("sort_order");
       if (error) throw error;
       return (data ?? []).map(normalizeFilter);

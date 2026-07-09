@@ -142,7 +142,7 @@ export const createListing = createServerFn({ method: "POST" })
     const [{ data: filterRows }, { data: categoryRows }, flowsResult] = await Promise.all([
       supabaseAdmin
         .from("category_filters")
-        .select("id, category_id, key, label_nb, type, unit, options, sort_order"),
+        .select("id, category_id, key, label_nb, type, unit, options, sort_order, is_primary"),
       supabaseAdmin.from("categories").select("id, parent_id"),
       supabaseAdmin
         .from("category_flows")

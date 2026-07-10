@@ -2,12 +2,14 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { Expand, LayoutList, LayoutGrid, Map as MapIcon, Save } from "lucide-react";
+import { Expand, LayoutList, LayoutGrid, Map as MapIcon, Save, SearchX } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
   Dialog,
@@ -19,9 +21,8 @@ import {
 import { SearchBar } from "@/components/search-bar";
 import { SaveSearchDialog } from "@/components/advanced-search-sheet";
 import { valueToCriteria, type AdvancedSearchValue } from "@/components/advanced-search-value";
-import { AdvancedSearchPanel } from "@/components/advanced-search-panel";
+import { DesktopFilterChips } from "@/components/desktop-filter-chips";
 import { ActiveFilters } from "@/components/active-filters";
-import { SortControl } from "@/components/sort-control";
 import type { LocationValue } from "@/components/location-filter";
 import type { TermGroup } from "@/lib/term-groups";
 import type { MapListing } from "@/components/listings-map";
@@ -179,7 +180,6 @@ function BrowsePage() {
   const [isDesktop, setIsDesktop] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [advOpen, setAdvOpen] = useState(false);
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
   const PAGE_SIZE = 20;
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -776,10 +776,10 @@ function BrowsePage() {
               updateSearch({ category: "", categories: slugs, catMode: "any" })
             }
             categories={categories ?? []}
-            hideCategory={advOpen}
+            hideCategory
             qMode={search.qMode}
             onQModeChange={(m) => updateSearch({ qMode: m })}
-            showQMode={advOpen}
+            showQMode={false}
           />
         )}
         {isNative ? (
@@ -808,31 +808,31 @@ function BrowsePage() {
             }
           />
         ) : (
-          <AdvancedSearchPanel
-            open={advOpen}
-            onOpenChange={setAdvOpen}
-            initial={advancedInitial}
+          <DesktopFilterChips
+            sort={search.sort}
+            onSortChange={(s) => updateSearch({ sort: s })}
             categories={categories ?? []}
-            onApply={handleApply}
-            sortControl={
-              <SortControl sort={search.sort} onSortChange={(s) => updateSearch({ sort: s })} />
+            selectedCategories={effectiveCategories}
+            onCategoriesChange={(slugs) =>
+              updateSearch({ category: "", categories: slugs, catMode: "any" })
             }
+            min={search.min}
+            max={search.max}
+            includeFree={search.includeFree ?? true}
+            onPriceChange={(mn, mx, free) => updateSearch({ min: mn, max: mx, includeFree: free })}
+            conditions={search.conditions ?? []}
+            onConditionsChange={(c) =>
+              updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
+            }
+            qMode={search.qMode}
+            onQModeChange={(m) => updateSearch({ qMode: m })}
+            extraGroups={search.extraGroups ?? []}
+            onExtraGroupsChange={(extraGroups) => updateSearch({ extraGroups })}
           />
         )}
       </div>
 
-      <ActiveFilters
-        search={search}
-        categories={categories ?? []}
-        terms={terms}
-        effectiveCategories={effectiveCategories}
-        onUpdate={(patch) =>
-          updateSearch({
-            ...patch,
-            conditions: patch.conditions as z.infer<typeof conditionEnum>[] | undefined,
-          })
-        }
-      />
+      <ActiveFilters search={search} terms={terms} onUpdate={(patch) => updateSearch(patch)} />
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
         <div className="flex items-center gap-2">
@@ -975,45 +975,45 @@ function BrowsePage() {
             {isLoading ? (
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                 {Array.from({ length: 8 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="animate-pulse overflow-hidden rounded-xl border border-border bg-card"
-                  >
-                    <div className="aspect-[4/3] bg-muted" />
+                  <div key={i} className="overflow-hidden rounded-xl border border-border bg-card">
+                    <Skeleton className="aspect-[4/3] rounded-none" />
                     <div className="space-y-2 p-3">
-                      <div className="h-4 w-4/5 rounded bg-muted" />
-                      <div className="h-4 w-1/3 rounded bg-muted" />
-                      <div className="h-3 w-1/2 rounded bg-muted" />
+                      <Skeleton className="h-4 w-4/5" />
+                      <Skeleton className="h-4 w-1/3" />
+                      <Skeleton className="h-3 w-1/2" />
                     </div>
                   </div>
                 ))}
               </div>
             ) : cards.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border bg-surface p-12 text-center">
-                <p className="text-lg font-medium">Ingen annonser funnet</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {search.q && effectiveCategories.length > 0
+              <EmptyState
+                icon={SearchX}
+                title="Ingen annonser funnet"
+                description={
+                  search.q && effectiveCategories.length > 0
                     ? `Ingen treff for «${search.q}» i valgt kategori. Prøv å søke i alle kategorier eller bruk andre søkeord.`
                     : search.q
                       ? `Ingen treff for «${search.q}». Prøv andre søkeord eller fjern filtre.`
                       : effectiveCategories.length > 0
                         ? "Ingen annonser i valgt kategori. Prøv å velge en bredere kategori."
-                        : "Prøv et bredere søk eller øk radiusen."}
-                </p>
-                <div className="mt-4 flex flex-wrap justify-center gap-2">
-                  {effectiveCategories.length > 0 && (
-                    <Button
-                      variant="outline"
-                      onClick={() => updateSearch({ category: "", categories: [] })}
-                    >
-                      Fjern kategorifilter
+                        : "Prøv et bredere søk eller øk radiusen."
+                }
+                action={
+                  <>
+                    {effectiveCategories.length > 0 && (
+                      <Button
+                        variant="outline"
+                        onClick={() => updateSearch({ category: "", categories: [] })}
+                      >
+                        Fjern kategorifilter
+                      </Button>
+                    )}
+                    <Button variant="outline" onClick={resetFilters}>
+                      Nullstill alle filtre
                     </Button>
-                  )}
-                  <Button variant="outline" onClick={resetFilters}>
-                    Nullstill alle filtre
-                  </Button>
-                </div>
-              </div>
+                  </>
+                }
+              />
             ) : (
               <div
                 className={

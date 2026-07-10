@@ -152,13 +152,13 @@ function ReceiptPage() {
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
         {data.listing.kaupet_code && (
-          <Button asChild size="lg">
+          <Button asChild>
             <Link to="/$kaupetCode" params={{ kaupetCode: data.listing.kaupet_code }}>
               Se annonsen
             </Link>
           </Button>
         )}
-        <Button asChild size="lg" variant="outline">
+        <Button asChild variant="outline">
           <Link to="/mine-annonser">Mine annonser</Link>
         </Button>
       </div>

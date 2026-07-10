@@ -19,49 +19,52 @@ function ModerationPage() {
   const { data: isAdmin } = useIsAdmin();
 
   return (
-    <Tabs defaultValue="reports" className="space-y-6">
-      <TabsList className="flex flex-wrap">
-        <TabsTrigger value="reports">Varsler</TabsTrigger>
-        <TabsTrigger value="vehicle-brands">Kjøretøymerker</TabsTrigger>
+    <div className="space-y-6">
+      <h2 className="font-display text-xl tracking-tight">Moderasjon</h2>
+      <Tabs defaultValue="reports" className="space-y-6">
+        <TabsList className="flex flex-wrap">
+          <TabsTrigger value="reports">Varsler</TabsTrigger>
+          <TabsTrigger value="vehicle-brands">Kjøretøymerker</TabsTrigger>
+          {isAdmin && (
+            <>
+              <TabsTrigger value="listings">Annonser</TabsTrigger>
+              <TabsTrigger value="bans">Utestengte</TabsTrigger>
+              <TabsTrigger value="suspensions">Svartelistede</TabsTrigger>
+              <TabsTrigger value="ips">IP-sperrer</TabsTrigger>
+              <TabsTrigger value="log">Logg</TabsTrigger>
+              <TabsTrigger value="errors">Feillogg</TabsTrigger>
+            </>
+          )}
+        </TabsList>
+        <TabsContent value="reports">
+          <ReportsTab />
+        </TabsContent>
+        <TabsContent value="vehicle-brands">
+          <VehicleBrandsTab />
+        </TabsContent>
         {isAdmin && (
           <>
-            <TabsTrigger value="listings">Annonser</TabsTrigger>
-            <TabsTrigger value="bans">Utestengte</TabsTrigger>
-            <TabsTrigger value="suspensions">Svartelistede</TabsTrigger>
-            <TabsTrigger value="ips">IP-sperrer</TabsTrigger>
-            <TabsTrigger value="log">Logg</TabsTrigger>
-            <TabsTrigger value="errors">Feillogg</TabsTrigger>
+            <TabsContent value="listings">
+              <ListingsTab />
+            </TabsContent>
+            <TabsContent value="bans">
+              <BansTab />
+            </TabsContent>
+            <TabsContent value="suspensions">
+              <SuspensionsTab />
+            </TabsContent>
+            <TabsContent value="ips">
+              <IpBansTab />
+            </TabsContent>
+            <TabsContent value="log">
+              <LogTab />
+            </TabsContent>
+            <TabsContent value="errors">
+              <ErrorLogTab />
+            </TabsContent>
           </>
         )}
-      </TabsList>
-      <TabsContent value="reports">
-        <ReportsTab />
-      </TabsContent>
-      <TabsContent value="vehicle-brands">
-        <VehicleBrandsTab />
-      </TabsContent>
-      {isAdmin && (
-        <>
-          <TabsContent value="listings">
-            <ListingsTab />
-          </TabsContent>
-          <TabsContent value="bans">
-            <BansTab />
-          </TabsContent>
-          <TabsContent value="suspensions">
-            <SuspensionsTab />
-          </TabsContent>
-          <TabsContent value="ips">
-            <IpBansTab />
-          </TabsContent>
-          <TabsContent value="log">
-            <LogTab />
-          </TabsContent>
-          <TabsContent value="errors">
-            <ErrorLogTab />
-          </TabsContent>
-        </>
-      )}
-    </Tabs>
+      </Tabs>
+    </div>
   );
 }

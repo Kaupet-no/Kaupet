@@ -73,7 +73,7 @@ function VippsWebhooksPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-4">
       <div>
-        <h1 className="text-2xl font-semibold">Vipps webhooks</h1>
+        <h2 className="font-display text-xl tracking-tight">Vipps webhooks</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Registrer webhook hos Vipps for å motta betalingshendelser. Den genererte secret-en lagres
           automatisk i databasen og brukes av webhook-handleren for å verifisere signaturen — ingen

@@ -79,8 +79,10 @@ export const Route = createFileRoute("/")({
 
 function LandingPage() {
   const native = useIsNative();
-  const [onboardingDone, setOnboardingDone] = useState(
-    () => localStorage.getItem("kaupet_onboarding_completed_v1") === "true",
+  const [onboardingDone, setOnboardingDone] = useState(() =>
+    typeof window === "undefined"
+      ? false
+      : localStorage.getItem("kaupet_onboarding_completed_v1") === "true",
   );
 
   if (native && !onboardingDone) {
@@ -115,6 +117,12 @@ function PopularCarousel({
   onRetry: () => void;
   autoplay: React.RefObject<ReturnType<typeof Autoplay>>;
 }) {
+  const isLoading = popular === undefined;
+
+  // Nothing to show yet (e.g. no traffic in the first week after launch) —
+  // hide the whole section rather than show a skeleton that never resolves.
+  if (!isLoading && !isError && popular.length === 0) return null;
+
   return (
     <div>
       <div className="mb-6 flex items-end justify-between gap-4">
@@ -137,7 +145,7 @@ function PopularCarousel({
             Prøv igjen
           </Button>
         </div>
-      ) : popular && popular.length > 0 ? (
+      ) : !isLoading && popular.length > 0 ? (
         <Carousel
           opts={{ align: "start", loop: true }}
           plugins={[autoplay.current]}

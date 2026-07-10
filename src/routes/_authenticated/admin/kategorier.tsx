@@ -345,6 +345,7 @@ function AdminCategories() {
 
   return (
     <div className="space-y-6">
+      <h2 className="font-display text-xl tracking-tight">Kategorier</h2>
       <div className="flex items-center justify-between gap-4">
         <p className="text-sm text-muted-foreground">
           Administrer kategorier og underkategorier. Endringer påvirker alle annonser.

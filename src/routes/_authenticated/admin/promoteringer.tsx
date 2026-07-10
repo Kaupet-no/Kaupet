@@ -160,6 +160,7 @@ function AdminPromotionsPage() {
 
   return (
     <div className="space-y-8">
+      <h2 className="font-display text-xl tracking-tight">Fremhevinger</h2>
       <Card>
         <CardHeader>
           <CardTitle>Priser</CardTitle>

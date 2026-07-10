@@ -19,6 +19,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/use-auth";
 import { signListingImageUrls } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { isUnread } from "@/lib/unread";
 import { usePushStatus } from "@/lib/use-push-status";
 import { formatErrorMessage } from "@/lib/errors";
@@ -301,19 +303,20 @@ function InboxPage() {
         {isLoading ? (
           <div className="space-y-3">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-20 animate-pulse rounded-xl bg-muted" />
+              <Skeleton key={i} className="h-20" />
             ))}
           </div>
         ) : groups.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border bg-surface p-12 text-center">
-            <p className="text-lg font-medium">Ingen samtaler enda</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Når du eller noen andre starter en samtale om en annonse, dukker den opp her.
-            </p>
-            <Link to="/annonser" search={{ q: "", category: "", sort: "new" }}>
-              <Button className="mt-6">Utforsk annonser</Button>
-            </Link>
-          </div>
+          <EmptyState
+            icon={MessageCircle}
+            title="Ingen samtaler enda"
+            description="Når du eller noen andre starter en samtale om en annonse, dukker den opp her."
+            action={
+              <Link to="/annonser" search={{ q: "", category: "", sort: "new" }}>
+                <Button>Utforsk annonser</Button>
+              </Link>
+            }
+          />
         ) : (
           groups.map((g) => {
             const isExpanded = expanded[g.listingId] ?? true;

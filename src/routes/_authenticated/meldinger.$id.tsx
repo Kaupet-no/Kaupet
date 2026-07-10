@@ -379,7 +379,7 @@ function ConversationPage() {
 
   return (
     <div
-      className="mx-auto flex max-w-3xl flex-col"
+      className="mx-auto flex max-w-2xl flex-col"
       style={{
         height: native
           ? keyboardVisible

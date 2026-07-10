@@ -29,6 +29,7 @@ import { useIsNative } from "@/lib/use-is-native";
 import { hapticImpact, hapticNotification } from "@/lib/haptics";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   DropdownMenu,
@@ -323,14 +324,16 @@ function MyListingsPage() {
                   <Loader2 className="size-4 animate-spin" /> Laster annonser…
                 </div>
               ) : filtered.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-border bg-surface px-6 py-12 text-center">
-                  <p className="text-sm text-muted-foreground">Ingen annonser å vise her.</p>
-                  <Link to="/ny-annonse" className="mt-4 inline-block">
-                    <Button size="sm" variant="outline">
-                      <Plus className="size-4" /> Opprett din første annonse
-                    </Button>
-                  </Link>
-                </div>
+                <EmptyState
+                  title="Ingen annonser å vise her."
+                  action={
+                    <Link to="/ny-annonse">
+                      <Button size="sm" variant="outline">
+                        <Plus className="size-4" /> Opprett din første annonse
+                      </Button>
+                    </Link>
+                  }
+                />
               ) : (
                 <ul className="space-y-3">
                   {filtered.map((r) => (
@@ -388,16 +391,16 @@ function MyListingsPage() {
                 <Loader2 className="size-4 animate-spin" /> Laster…
               </div>
             ) : wtbRows.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border bg-surface px-6 py-12 text-center">
-                <p className="text-sm text-muted-foreground">
-                  Du har ingen ønskes kjøpt-annonser ennå.
-                </p>
-                <Link to="/ny-ok-annonse" className="mt-4 inline-block">
-                  <Button size="sm" variant="outline">
-                    <Plus className="size-4" /> Opprett ønskes kjøpt
-                  </Button>
-                </Link>
-              </div>
+              <EmptyState
+                title="Du har ingen ønskes kjøpt-annonser ennå."
+                action={
+                  <Link to="/ny-ok-annonse">
+                    <Button size="sm" variant="outline">
+                      <Plus className="size-4" /> Opprett ønskes kjøpt
+                    </Button>
+                  </Link>
+                }
+              />
             ) : (
               <ul className="space-y-3">
                 {wtbRows.map((w) => (

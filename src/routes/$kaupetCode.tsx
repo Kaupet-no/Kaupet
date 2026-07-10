@@ -659,7 +659,7 @@ function ListingDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-5xl px-4 py-10">
+      <div className="mx-auto max-w-6xl px-4 py-10">
         <div className="aspect-[4/3] animate-pulse rounded-xl bg-muted" />
       </div>
     );
@@ -688,7 +688,7 @@ function ListingDetailPage() {
       : null;
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-8">
       <NativePageHeader title={data.title} />
       {!isNative &&
         (backTarget.mode === "history" ? (

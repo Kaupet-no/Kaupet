@@ -1440,6 +1440,62 @@ export type Database = {
       admin_reject_vehicle_brand: { Args: { _id: string }; Returns: undefined }
       admin_approve_vehicle_model: { Args: { _id: string }; Returns: undefined }
       admin_reject_vehicle_model: { Args: { _id: string }; Returns: undefined }
+      admin_create_vehicle_brand: {
+        Args: { _name: string; _category_group: string }
+        Returns: {
+          id: string
+          name: string
+          category_group: string
+          status: string
+          submitted_by: string | null
+          created_at: string
+        }
+      }
+      admin_update_vehicle_brand: {
+        Args: { _id: string; _name: string }
+        Returns: {
+          id: string
+          name: string
+          category_group: string
+          status: string
+          submitted_by: string | null
+          created_at: string
+        }
+      }
+      admin_delete_vehicle_brand: { Args: { _id: string }; Returns: undefined }
+      admin_create_vehicle_model: {
+        Args: { _brand_id: string; _name: string }
+        Returns: {
+          id: string
+          brand_id: string
+          name: string
+          status: string
+          submitted_by: string | null
+          created_at: string
+        }
+      }
+      admin_update_vehicle_model: {
+        Args: { _id: string; _name: string }
+        Returns: {
+          id: string
+          brand_id: string
+          name: string
+          status: string
+          submitted_by: string | null
+          created_at: string
+        }
+      }
+      admin_delete_vehicle_model: { Args: { _id: string }; Returns: undefined }
+      admin_list_vehicle_brands_with_models: {
+        Args: never
+        Returns: {
+          brand_id: string
+          brand_name: string
+          category_group: string
+          model_id: string | null
+          model_name: string | null
+        }[]
+      }
       submit_listing_report: {
         Args: { _listing_id: string; _reason: string; _comment?: string | null }
         Returns: undefined

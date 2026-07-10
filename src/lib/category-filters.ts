@@ -29,6 +29,14 @@ export type VehicleBrandGroup =
   | "bobil_campingvogn"
   | "henger";
 
+export const VEHICLE_BRAND_GROUP_LABELS_NB: Record<VehicleBrandGroup, string> = {
+  bil: "Bil",
+  motorsykkel: "Motorsykkel",
+  moped_atv: "Moped/ATV",
+  bobil_campingvogn: "Bobil/campingvogn",
+  henger: "Tilhenger",
+};
+
 export type CategoryFilter = {
   id: string;
   category_id: string;

@@ -37,6 +37,7 @@ import { Route as AuthenticatedBekrefterPromoIdRouteImport } from './routes/_aut
 import { Route as AuthenticatedAdminVippsWebhooksRouteImport } from './routes/_authenticated/admin/vipps-webhooks'
 import { Route as AuthenticatedAdminPromoteringerRouteImport } from './routes/_authenticated/admin/promoteringer'
 import { Route as AuthenticatedAdminModerasjonRouteImport } from './routes/_authenticated/admin/moderasjon'
+import { Route as AuthenticatedAdminKjoretoyRouteImport } from './routes/_authenticated/admin/kjoretoy'
 import { Route as AuthenticatedAdminKategorierRouteImport } from './routes/_authenticated/admin/kategorier'
 import { Route as AuthenticatedAdminBrukereRouteImport } from './routes/_authenticated/admin/brukere'
 import { Route as ApiPublicVippsWebhookRouteImport } from './routes/api/public/vipps/webhook'
@@ -192,6 +193,12 @@ const AuthenticatedAdminModerasjonRoute =
     path: '/moderasjon',
     getParentRoute: () => AuthenticatedAdminRouteRoute,
   } as any)
+const AuthenticatedAdminKjoretoyRoute =
+  AuthenticatedAdminKjoretoyRouteImport.update({
+    id: '/kjoretoy',
+    path: '/kjoretoy',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
 const AuthenticatedAdminKategorierRoute =
   AuthenticatedAdminKategorierRouteImport.update({
     id: '/kategorier',
@@ -248,6 +255,7 @@ export interface FileRoutesByFullPath {
   '/bruker/$id': typeof BrukerIdRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
+  '/admin/kjoretoy': typeof AuthenticatedAdminKjoretoyRoute
   '/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
   '/admin/promoteringer': typeof AuthenticatedAdminPromoteringerRoute
   '/admin/vipps-webhooks': typeof AuthenticatedAdminVippsWebhooksRoute
@@ -282,6 +290,7 @@ export interface FileRoutesByTo {
   '/bruker/$id': typeof BrukerIdRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
+  '/admin/kjoretoy': typeof AuthenticatedAdminKjoretoyRoute
   '/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
   '/admin/promoteringer': typeof AuthenticatedAdminPromoteringerRoute
   '/admin/vipps-webhooks': typeof AuthenticatedAdminVippsWebhooksRoute
@@ -319,6 +328,7 @@ export interface FileRoutesById {
   '/bruker/$id': typeof BrukerIdRoute
   '/_authenticated/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/_authenticated/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
+  '/_authenticated/admin/kjoretoy': typeof AuthenticatedAdminKjoretoyRoute
   '/_authenticated/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
   '/_authenticated/admin/promoteringer': typeof AuthenticatedAdminPromoteringerRoute
   '/_authenticated/admin/vipps-webhooks': typeof AuthenticatedAdminVippsWebhooksRoute
@@ -356,6 +366,7 @@ export interface FileRouteTypes {
     | '/bruker/$id'
     | '/admin/brukere'
     | '/admin/kategorier'
+    | '/admin/kjoretoy'
     | '/admin/moderasjon'
     | '/admin/promoteringer'
     | '/admin/vipps-webhooks'
@@ -390,6 +401,7 @@ export interface FileRouteTypes {
     | '/bruker/$id'
     | '/admin/brukere'
     | '/admin/kategorier'
+    | '/admin/kjoretoy'
     | '/admin/moderasjon'
     | '/admin/promoteringer'
     | '/admin/vipps-webhooks'
@@ -426,6 +438,7 @@ export interface FileRouteTypes {
     | '/bruker/$id'
     | '/_authenticated/admin/brukere'
     | '/_authenticated/admin/kategorier'
+    | '/_authenticated/admin/kjoretoy'
     | '/_authenticated/admin/moderasjon'
     | '/_authenticated/admin/promoteringer'
     | '/_authenticated/admin/vipps-webhooks'
@@ -655,6 +668,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminModerasjonRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
+    '/_authenticated/admin/kjoretoy': {
+      id: '/_authenticated/admin/kjoretoy'
+      path: '/kjoretoy'
+      fullPath: '/admin/kjoretoy'
+      preLoaderRoute: typeof AuthenticatedAdminKjoretoyRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
     '/_authenticated/admin/kategorier': {
       id: '/_authenticated/admin/kategorier'
       path: '/kategorier'
@@ -703,6 +723,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedAdminRouteRouteChildren {
   AuthenticatedAdminBrukereRoute: typeof AuthenticatedAdminBrukereRoute
   AuthenticatedAdminKategorierRoute: typeof AuthenticatedAdminKategorierRoute
+  AuthenticatedAdminKjoretoyRoute: typeof AuthenticatedAdminKjoretoyRoute
   AuthenticatedAdminModerasjonRoute: typeof AuthenticatedAdminModerasjonRoute
   AuthenticatedAdminPromoteringerRoute: typeof AuthenticatedAdminPromoteringerRoute
   AuthenticatedAdminVippsWebhooksRoute: typeof AuthenticatedAdminVippsWebhooksRoute
@@ -713,6 +734,7 @@ const AuthenticatedAdminRouteRouteChildren: AuthenticatedAdminRouteRouteChildren
   {
     AuthenticatedAdminBrukereRoute: AuthenticatedAdminBrukereRoute,
     AuthenticatedAdminKategorierRoute: AuthenticatedAdminKategorierRoute,
+    AuthenticatedAdminKjoretoyRoute: AuthenticatedAdminKjoretoyRoute,
     AuthenticatedAdminModerasjonRoute: AuthenticatedAdminModerasjonRoute,
     AuthenticatedAdminPromoteringerRoute: AuthenticatedAdminPromoteringerRoute,
     AuthenticatedAdminVippsWebhooksRoute: AuthenticatedAdminVippsWebhooksRoute,

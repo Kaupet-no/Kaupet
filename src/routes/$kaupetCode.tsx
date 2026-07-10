@@ -39,6 +39,8 @@ import {
 import { signListingImageUrls } from "@/lib/storage";
 import { CONDITION_LABEL } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { ImageGallery } from "@/components/listing-detail/image-gallery";
 import { OwnerStatsPanel } from "@/components/listing-detail/owner-stats-panel";
 import { SellerContactPanel } from "@/components/listing-detail/seller-contact-panel";
@@ -75,6 +77,8 @@ export const Route = createFileRoute("/$kaupetCode")({
     // Only used by the category-landing branch, to deep-link preselected
     // filter values (e.g. from the homepage's category picker).
     f: z.record(z.string(), z.any()).optional(),
+    priceMin: z.coerce.number().int().min(0).optional(),
+    priceMax: z.coerce.number().int().min(0).optional(),
   }),
   loader: async ({ params }) => {
     // A single dynamic root segment serves two purposes: an 8-digit code is
@@ -195,10 +199,20 @@ function RootSlugPage() {
 }
 
 function CategoryLandingPage({ main }: { main: Category }) {
-  const { f: initialFilters } = Route.useSearch() as { f?: Record<string, AttributeFilterValue> };
+  const {
+    f: initialFilters,
+    priceMin: initialPriceMin,
+    priceMax: initialPriceMax,
+  } = Route.useSearch() as {
+    f?: Record<string, AttributeFilterValue>;
+    priceMin?: number;
+    priceMax?: number;
+  };
   const [filterValues, setFilterValues] = useState<Record<string, AttributeFilterValue>>(
     () => initialFilters ?? {},
   );
+  const [priceMin, setPriceMin] = useState<number | undefined>(initialPriceMin);
+  const [priceMax, setPriceMax] = useState<number | undefined>(initialPriceMax);
 
   const { data: categories } = useQuery({
     queryKey: ["categories", "with-color"],
@@ -241,7 +255,7 @@ function CategoryLandingPage({ main }: { main: Category }) {
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
 
   const { data: listings, isLoading } = useQuery({
-    queryKey: ["category-listings", main.id, filterValues],
+    queryKey: ["category-listings", main.id, filterValues, priceMin, priceMax],
     queryFn: async () => {
       let qb = supabase
         .from("listings")
@@ -251,6 +265,8 @@ function CategoryLandingPage({ main }: { main: Category }) {
         .eq("status", "active")
         .in("category_id", categoryIds);
       qb = applyAttributeFilters(qb, filterValues);
+      if (typeof priceMin === "number") qb = qb.gte("price_nok", priceMin);
+      if (typeof priceMax === "number") qb = qb.lte("price_nok", priceMax);
       const { data, error } = await qb.order("created_at", { ascending: false }).limit(48);
       if (error) throw error;
       return (data ?? []).map<ListingCardData>((l) => {
@@ -301,59 +317,92 @@ function CategoryLandingPage({ main }: { main: Category }) {
       </section>
 
       <div className="mx-auto max-w-6xl gap-8 px-4 py-8 md:grid md:grid-cols-[16rem_1fr]">
-        {filters.length > 0 && (
-          <aside className="mb-6 space-y-5 md:mb-0">
-            <p className="text-sm font-medium">Filtrer</p>
-            <CategoryFilterFields
-              filters={primaryFilters}
-              values={filterValues}
-              onChange={(key, v) =>
-                setFilterValues((prev) => {
-                  const next = { ...prev };
-                  if (v === undefined) delete next[key];
-                  else next[key] = v;
-                  return next;
-                })
-              }
-            />
-            {secondaryFilters.length > 0 && (
-              <Collapsible open={moreFiltersOpen} onOpenChange={setMoreFiltersOpen}>
-                <CollapsibleTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="gap-1 px-0 text-primary hover:bg-transparent"
-                  >
-                    {moreFiltersOpen ? "Vis færre valg" : "Se flere valg"}
-                    <ChevronDown
-                      className={`size-4 transition-transform ${moreFiltersOpen ? "rotate-180" : ""}`}
+        <aside className="mb-6 space-y-5 md:mb-0">
+          <p className="text-sm font-medium">Filtrer</p>
+          <div className="space-y-2">
+            <Label>Pris (kr)</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                placeholder="Fra"
+                value={priceMin ?? ""}
+                onChange={(e) =>
+                  setPriceMin(e.target.value === "" ? undefined : Number(e.target.value))
+                }
+              />
+              <Input
+                type="number"
+                placeholder="Til"
+                value={priceMax ?? ""}
+                onChange={(e) =>
+                  setPriceMax(e.target.value === "" ? undefined : Number(e.target.value))
+                }
+              />
+            </div>
+          </div>
+          {filters.length > 0 && (
+            <>
+              <CategoryFilterFields
+                filters={primaryFilters}
+                values={filterValues}
+                onChange={(key, v) =>
+                  setFilterValues((prev) => {
+                    const next = { ...prev };
+                    if (v === undefined) delete next[key];
+                    else next[key] = v;
+                    return next;
+                  })
+                }
+              />
+              {secondaryFilters.length > 0 && (
+                <Collapsible open={moreFiltersOpen} onOpenChange={setMoreFiltersOpen}>
+                  <CollapsibleTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1 px-0 text-primary hover:bg-transparent"
+                    >
+                      {moreFiltersOpen ? "Vis færre valg" : "Se flere valg"}
+                      <ChevronDown
+                        className={`size-4 transition-transform ${moreFiltersOpen ? "rotate-180" : ""}`}
+                      />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-4 pt-4 data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:slide-in-from-top-2 data-[state=closed]:animate-out data-[state=closed]:fade-out">
+                    <CategoryFilterFields
+                      filters={secondaryFilters}
+                      values={filterValues}
+                      onChange={(key, v) =>
+                        setFilterValues((prev) => {
+                          const next = { ...prev };
+                          if (v === undefined) delete next[key];
+                          else next[key] = v;
+                          return next;
+                        })
+                      }
                     />
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-4 pt-4 data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:slide-in-from-top-2 data-[state=closed]:animate-out data-[state=closed]:fade-out">
-                  <CategoryFilterFields
-                    filters={secondaryFilters}
-                    values={filterValues}
-                    onChange={(key, v) =>
-                      setFilterValues((prev) => {
-                        const next = { ...prev };
-                        if (v === undefined) delete next[key];
-                        else next[key] = v;
-                        return next;
-                      })
-                    }
-                  />
-                </CollapsibleContent>
-              </Collapsible>
-            )}
-            {Object.keys(filterValues).length > 0 && (
-              <Button variant="outline" size="sm" onClick={() => setFilterValues({})}>
-                Nullstill filtre
-              </Button>
-            )}
-          </aside>
-        )}
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+            </>
+          )}
+          {(Object.keys(filterValues).length > 0 ||
+            priceMin !== undefined ||
+            priceMax !== undefined) && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setFilterValues({});
+                setPriceMin(undefined);
+                setPriceMax(undefined);
+              }}
+            >
+              Nullstill filtre
+            </Button>
+          )}
+        </aside>
 
         <div>
           {isLoading ? (

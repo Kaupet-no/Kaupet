@@ -178,6 +178,9 @@ function BrowsePage() {
   const [mobileMapOpen, setMobileMapOpen] = useState(false);
   const [bigMapOpen, setBigMapOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
+  // Kartet er på som standard på desktop, men kan skjules for å gi
+  // annonselisten full bredde — spesielt nyttig ved få treff.
+  const [desktopMapVisible, setDesktopMapVisible] = useState(true);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
@@ -885,6 +888,18 @@ function BrowsePage() {
               </SheetContent>
             </Sheet>
           )}
+          {isDesktop && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => setDesktopMapVisible((v) => !v)}
+              aria-pressed={desktopMapVisible}
+            >
+              <MapIcon className="size-4" /> {desktopMapVisible ? "Skjul kart" : "Vis kart"}
+            </Button>
+          )}
           {user && (
             <Button
               type="button"
@@ -963,7 +978,9 @@ function BrowsePage() {
           )}
         </div>
       ) : (
-        <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_420px]">
+        <div
+          className={`mt-4 grid gap-6 ${isDesktop && desktopMapVisible ? "lg:grid-cols-[1fr_420px]" : ""}`}
+        >
           <div>
             {!isLoading && (
               <FeaturedListingsSection
@@ -1019,7 +1036,7 @@ function BrowsePage() {
                 className={
                   isNative && viewMode === "list"
                     ? "flex flex-col gap-3"
-                    : "grid grid-cols-2 gap-4 sm:grid-cols-3"
+                    : `grid grid-cols-2 gap-4 sm:grid-cols-3 ${isDesktop && !desktopMapVisible ? "lg:grid-cols-4" : ""}`
                 }
               >
                 {cards.map((l) => (
@@ -1055,7 +1072,7 @@ function BrowsePage() {
             )}
           </div>
 
-          {isDesktop && (
+          {isDesktop && desktopMapVisible && (
             <aside>
               <div className="sticky top-20 h-[calc(100vh-6rem)]">
                 <div className="relative h-full overflow-hidden rounded-2xl border border-border shadow-sm">

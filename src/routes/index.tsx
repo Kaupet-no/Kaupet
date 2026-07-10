@@ -4,6 +4,7 @@ import {
   ArrowRight,
   ChevronDown,
   FolderOpen,
+  Hash,
   Heart,
   MapPin,
   Search,
@@ -18,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Carousel,
@@ -247,6 +249,8 @@ function WebLanding() {
   // back feels like retreating (from the left) — matching the hero swap.
   const [navDirection, setNavDirection] = useState<"forward" | "back">("forward");
   const [filterValues, setFilterValues] = useState<Record<string, AttributeFilterValue>>({});
+  const [priceMin, setPriceMin] = useState<number | undefined>(undefined);
+  const [priceMax, setPriceMax] = useState<number | undefined>(undefined);
   const subcatRef = useRef<HTMLDivElement>(null);
 
   // Filters configured for the deepest selected category (inherited up the
@@ -299,6 +303,8 @@ function WebLanding() {
     if (activeCategory?.id === cat.id) {
       setSelectedPath([]);
       setFilterValues({});
+      setPriceMin(undefined);
+      setPriceMax(undefined);
       setCategoriesOpen(false);
       return;
     }
@@ -309,6 +315,8 @@ function WebLanding() {
     }
     setSelectedPath([cat]);
     setFilterValues({});
+    setPriceMin(undefined);
+    setPriceMax(undefined);
     setCategoriesOpen(true);
     setNavDirection("forward");
     // Scroll so the newly revealed subcategories are visible after the slide-down.
@@ -326,6 +334,8 @@ function WebLanding() {
   const drillIntoSub = (sub: CategoryRow) => {
     setSelectedPath((prev) => [...prev, sub]);
     setFilterValues({});
+    setPriceMin(undefined);
+    setPriceMax(undefined);
     setNavDirection("forward");
     requestAnimationFrame(() => {
       setTimeout(
@@ -343,12 +353,16 @@ function WebLanding() {
       setCategoriesOpen(false);
     }
     setFilterValues({});
+    setPriceMin(undefined);
+    setPriceMax(undefined);
     setNavDirection("back");
   };
 
   const jumpToDepth = (index: number) => {
     setSelectedPath((prev) => prev.slice(0, index + 1));
     setFilterValues({});
+    setPriceMin(undefined);
+    setPriceMax(undefined);
     setNavDirection("back");
   };
 
@@ -555,6 +569,8 @@ function WebLanding() {
               if (!o) {
                 setSelectedPath([]);
                 setFilterValues({});
+                setPriceMin(undefined);
+                setPriceMax(undefined);
               }
             }}
           >
@@ -643,8 +659,33 @@ function WebLanding() {
                       {/* Filtre for valgt underkategori — under tag-raden,
                           full bredde, så det ikke blir tomrom ved siden av
                           en kompakt tag-rad når det ikke finnes filtre. */}
-                      {activeFilters.length > 0 && (
+                      {currentParent && (
                         <div className="mt-4 space-y-4 border-t border-border pt-4">
+                          <div className="space-y-2">
+                            <Label>Pris (kr)</Label>
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="number"
+                                placeholder="Fra"
+                                value={priceMin ?? ""}
+                                onChange={(e) =>
+                                  setPriceMin(
+                                    e.target.value === "" ? undefined : Number(e.target.value),
+                                  )
+                                }
+                              />
+                              <Input
+                                type="number"
+                                placeholder="Til"
+                                value={priceMax ?? ""}
+                                onChange={(e) =>
+                                  setPriceMax(
+                                    e.target.value === "" ? undefined : Number(e.target.value),
+                                  )
+                                }
+                              />
+                            </div>
+                          </div>
                           <CategoryFilterFields
                             filters={primaryFilters}
                             values={filterValues}
@@ -693,7 +734,7 @@ function WebLanding() {
                               navigate({
                                 to: "/$kaupetCode",
                                 params: { kaupetCode: currentParent.slug },
-                                search: { f: filterValues },
+                                search: { f: filterValues, priceMin, priceMax },
                               })
                             }
                           >
@@ -736,21 +777,31 @@ function WebLanding() {
                 </>
               ) : (
                 <>
-                  <KaupetCodeDialog />
+                  {/* Primær CTA — én tydelig handling ("bli med"), fremhevet
+                      med solid stil siden det er den vi vil at de fleste
+                      besøkende skal ta. Kaupet-kode er en sekundær, sjeldnere
+                      brukt handling (åpne en spesifikk annonse) og skal derfor
+                      ikke konkurrere visuelt med den. */}
                   <div className="relative flex flex-col items-center">
                     <Link to="/auth" search={{ mode: "signup" }}>
-                      <Button size="lg" variant="outline">
-                        Kom i gang gratis
-                      </Button>
+                      <Button size="lg">Kom i gang gratis</Button>
                     </Link>
                     {/* Flytende, leken merkelapp — på mobil (stablede knapper) ligger
                       den i normal flyt for å ikke dekke knappen under; fra sm og opp
                       er det rom til å la den flyte fritt over innholdet. */}
-                    <div className="pointer-events-none relative mt-3 w-44 rotate-[-3deg] rounded-2xl bg-primary px-3 py-2.5 text-center text-xs font-medium leading-snug text-primary-foreground shadow-lg sm:absolute sm:left-1/2 sm:top-full sm:z-20 sm:mt-3 sm:w-44 sm:-translate-x-1/2">
-                      <span className="absolute -top-1.5 left-9 size-3 rotate-45 rounded-[2px] bg-primary" />
+                    <div className="pointer-events-none relative mt-3 w-44 rotate-[-3deg] rounded-2xl bg-accent px-3 py-2.5 text-center text-xs font-medium leading-snug text-accent-foreground shadow-lg sm:absolute sm:left-1/2 sm:top-full sm:z-20 sm:mt-3 sm:w-44 sm:-translate-x-1/2">
+                      <span className="absolute -top-1.5 left-9 size-3 rotate-45 rounded-[2px] bg-accent" />
                       Det er alltid gratis å annonsere på Kaupet, uansett hva du selger.
                     </div>
                   </div>
+                  <KaupetCodeDialog
+                    trigger={
+                      <Button variant="ghost" size="lg" className="gap-2">
+                        <Hash className="size-4" />
+                        Har du en Kaupet-kode?
+                      </Button>
+                    }
+                  />
                 </>
               )}
             </div>

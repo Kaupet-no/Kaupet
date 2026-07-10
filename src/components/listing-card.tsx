@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Eye, MapPin } from "lucide-react";
+import { Eye, ImageOff, MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 import { signListingImageUrls } from "@/lib/storage";
 import { formatPrice } from "@/lib/format";
@@ -72,8 +72,9 @@ export function ListingCard({
               loading="lazy"
             />
           ) : (
-            <div className="flex size-full items-center justify-center text-xs text-muted-foreground">
-              Ingen bilde
+            <div className="flex size-full flex-col items-center justify-center gap-1 text-muted-foreground">
+              <ImageOff className="size-4" strokeWidth={1.5} />
+              <span className="text-[11px]">Ingen bilde</span>
             </div>
           )}
         </div>

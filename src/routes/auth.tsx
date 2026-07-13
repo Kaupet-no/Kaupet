@@ -192,9 +192,14 @@ function AuthPage() {
                   type="email"
                   placeholder="kari@eksempel.no"
                   aria-invalid={!!errors.email}
+                  aria-describedby={errors.email ? "email-error" : undefined}
                   {...register("email")}
                 />
-                {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+                {errors.email && (
+                  <p id="email-error" className="text-sm text-destructive">
+                    {errors.email.message}
+                  </p>
+                )}
               </div>
               <Button type="submit" className="w-full gap-2" disabled={loading}>
                 {loading && <Loader2 className="size-4 animate-spin" />}
@@ -231,10 +236,13 @@ function AuthPage() {
                   id="name"
                   placeholder="Kari Nordmann"
                   aria-invalid={!!errors.displayName}
+                  aria-describedby={errors.displayName ? "name-error" : undefined}
                   {...register("displayName")}
                 />
                 {errors.displayName && (
-                  <p className="text-sm text-destructive">{errors.displayName.message}</p>
+                  <p id="name-error" className="text-sm text-destructive">
+                    {errors.displayName.message}
+                  </p>
                 )}
               </div>
             )}
@@ -245,9 +253,14 @@ function AuthPage() {
                 type="email"
                 placeholder="kari@eksempel.no"
                 aria-invalid={!!errors.email}
+                aria-describedby={errors.email ? "email-error" : undefined}
                 {...register("email")}
               />
-              {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+              {errors.email && (
+                <p id="email-error" className="text-sm text-destructive">
+                  {errors.email.message}
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
@@ -266,10 +279,13 @@ function AuthPage() {
                 id="password"
                 type="password"
                 aria-invalid={!!errors.password}
+                aria-describedby={errors.password ? "password-error" : undefined}
                 {...register("password")}
               />
               {errors.password && (
-                <p className="text-sm text-destructive">{errors.password.message}</p>
+                <p id="password-error" className="text-sm text-destructive">
+                  {errors.password.message}
+                </p>
               )}
               {isSignUp && password.length > 0 && (
                 <div className="space-y-1">
@@ -298,6 +314,8 @@ function AuthPage() {
                     onCheckedChange={(v) =>
                       setValue("acceptedTerms", v === true, { shouldValidate: true })
                     }
+                    aria-invalid={!!errors.acceptedTerms}
+                    aria-describedby={errors.acceptedTerms ? "accept-terms-error" : undefined}
                     className="mt-0.5"
                   />
                   <span>
@@ -321,7 +339,9 @@ function AuthPage() {
                   </span>
                 </label>
                 {errors.acceptedTerms && (
-                  <p className="text-sm text-destructive">{errors.acceptedTerms.message}</p>
+                  <p id="accept-terms-error" className="text-sm text-destructive">
+                    {errors.acceptedTerms.message}
+                  </p>
                 )}
               </div>
             )}

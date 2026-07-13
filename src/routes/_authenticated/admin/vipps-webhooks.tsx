@@ -126,8 +126,8 @@ function VippsWebhooksPage() {
                 Webhook registrert og secret lagret automatisk
               </p>
               <p className="mt-1 text-xs text-green-900">
-                Webhook-id: <code className="rounded bg-white px-1">{savedId}</code>. Signaturen
-                verifiseres heretter mot lagret secret i databasen.
+                Webhook-id: <code className="rounded bg-background px-1">{savedId}</code>.
+                Signaturen verifiseres heretter mot lagret secret i databasen.
               </p>
             </div>
           )}

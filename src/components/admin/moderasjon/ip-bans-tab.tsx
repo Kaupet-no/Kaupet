@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, ShieldBan, Trash2 } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/dialog";
 import { adminBanIp, adminUnbanIp } from "@/lib/admin-moderation.functions";
 import { formatErrorMessage } from "@/lib/errors";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export function IpBansTab() {
   const qc = useQueryClient();
@@ -39,7 +40,12 @@ export function IpBansTab() {
   const [reason, setReason] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
 
-  const { data, isLoading } = useQuery({
+  const {
+    data,
+    isLoading,
+    isError,
+    error: queryError,
+  } = useQuery({
     queryKey: ["admin-ip-bans"],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("admin_list_ip_bans");
@@ -153,10 +159,23 @@ export function IpBansTab() {
                     <Loader2 className="mx-auto size-5 animate-spin text-muted-foreground" />
                   </TableCell>
                 </TableRow>
+              ) : isError ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="py-8 text-center">
+                    <p className="text-sm text-destructive">
+                      {formatErrorMessage(queryError, "Kunne ikke laste IP-sperrer")}
+                    </p>
+                  </TableCell>
+                </TableRow>
               ) : (data ?? []).length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
-                    Ingen IP-sperrer
+                  <TableCell colSpan={4} className="py-8">
+                    <EmptyState
+                      icon={ShieldBan}
+                      title="Ingen IP-sperrer"
+                      description="Sperrede IP-adresser vises her."
+                      className="border-none p-0"
+                    />
                   </TableCell>
                 </TableRow>
               ) : (

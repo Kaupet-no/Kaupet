@@ -11,6 +11,13 @@ import { TermGroupEditor } from "@/components/term-group-editor";
 import { CONDITIONS, type AdvancedSearchValue } from "@/components/advanced-search-value";
 import { SORT_OPTIONS, type SortValue, type Category } from "@/lib/categories";
 import type { TermGroup } from "@/lib/term-groups";
+import {
+  getSortChipState,
+  getCategoryChipState,
+  getPriceChipState,
+  getConditionChipState,
+} from "@/lib/filter-chip-labels";
+import { usePriceDraft } from "@/hooks/use-price-draft";
 
 type Props = {
   sort: SortValue;
@@ -56,29 +63,13 @@ export function DesktopFilterChips({
     null,
   );
 
-  const sortLabel = SORT_OPTIONS.find((s) => s.value === sort)?.label ?? "Nyeste";
-  const sortActive = sort !== "new";
-
-  const catActive = selectedCategories.length > 0;
-  const catLabel = catActive
-    ? selectedCategories.length === 1
-      ? (categories.find((c) => c.slug === selectedCategories[0])?.name_nb ?? "Kategori")
-      : `${selectedCategories.length} kat.`
-    : "Kategori";
-
-  const priceActive = min != null || max != null || !includeFree;
-  const priceLabel = priceActive
-    ? min != null && max != null
-      ? `${min}–${max} kr`
-      : min != null
-        ? `Fra ${min} kr`
-        : max != null
-          ? `Til ${max} kr`
-          : "Pris"
-    : "Pris";
-
-  const condActive = conditions.length > 0;
-  const condLabel = condActive ? `${conditions.length} tilstand` : "Tilstand";
+  const { label: sortLabel, active: sortActive } = getSortChipState(sort);
+  const { label: catLabel, active: catActive } = getCategoryChipState(
+    categories,
+    selectedCategories,
+  );
+  const { label: priceLabel, active: priceActive } = getPriceChipState(min, max, includeFree);
+  const { label: condLabel, active: condActive } = getConditionChipState(conditions);
 
   const moreCount = extraGroups.length + (qMode === "any" ? 1 : 0);
 
@@ -220,10 +211,11 @@ function Chip({
       {...rest}
       className={`relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm transition ${
         active
-          ? "border-primary bg-primary text-primary-foreground"
+          ? "border-primary bg-primary font-medium text-primary-foreground"
           : "border-border bg-card text-foreground hover:bg-muted"
       }`}
     >
+      {active && <span className="size-1.5 shrink-0 rounded-full bg-primary-foreground" />}
       {icon}
       <span className="max-w-[160px] truncate">{label}</span>
       <ChevronDown className="size-3.5 opacity-60" />
@@ -247,9 +239,8 @@ function PricePopoverContent({
   includeFree: boolean;
   onApply: (min: number | undefined, max: number | undefined, includeFree: boolean) => void;
 }) {
-  const [minDraft, setMinDraft] = useState(min != null ? String(min) : "");
-  const [maxDraft, setMaxDraft] = useState(max != null ? String(max) : "");
-  const [freeDraft, setFreeDraft] = useState(includeFree);
+  const { minDraft, setMinDraft, maxDraft, setMaxDraft, freeDraft, setFreeDraft, apply } =
+    usePriceDraft(min, max, includeFree, onApply);
 
   return (
     <div className="space-y-3">
@@ -274,16 +265,7 @@ function PricePopoverContent({
         <Checkbox checked={freeDraft} onCheckedChange={(c) => setFreeDraft(c === true)} />
         Inkluder gratis-annonser
       </label>
-      <Button
-        type="button"
-        size="sm"
-        className="w-full"
-        onClick={() => {
-          const mn = minDraft ? parseInt(minDraft) : undefined;
-          const mx = maxDraft ? parseInt(maxDraft) : undefined;
-          onApply(mn, mx, freeDraft);
-        }}
-      >
+      <Button type="button" size="sm" className="w-full" onClick={apply}>
         Bruk prisfilter
       </Button>
     </div>

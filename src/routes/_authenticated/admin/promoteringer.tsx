@@ -43,6 +43,8 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { formatErrorMessage } from "@/lib/errors";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_authenticated/admin/promoteringer")({
   head: () => ({ meta: [{ title: "Fremhevinger — Administrasjon" }] }),
@@ -167,7 +169,16 @@ function AdminPromotionsPage() {
         </CardHeader>
         <CardContent>
           {pricingQ.isLoading ? (
-            <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-20 w-full" />
+            </div>
+          ) : pricingQ.isError ? (
+            <p className="text-sm text-destructive">
+              {formatErrorMessage(pricingQ.error, "Kunne ikke laste priser")}
+            </p>
+          ) : (pricingQ.data ?? []).length === 0 ? (
+            <EmptyState title="Ingen priser satt opp" description="Legg til priser i databasen." />
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
               {(pricingQ.data ?? []).map((p) => (
@@ -273,10 +284,21 @@ function AdminPromotionsPage() {
                       <Loader2 className="mx-auto size-5 animate-spin text-muted-foreground" />
                     </TableCell>
                   </TableRow>
+                ) : promosQ.isError ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="py-6 text-center">
+                      <p className="text-sm text-destructive">
+                        {formatErrorMessage(promosQ.error, "Kunne ikke laste transaksjoner")}
+                      </p>
+                    </TableCell>
+                  </TableRow>
                 ) : rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="py-6 text-center text-muted-foreground">
-                      Ingen treff
+                    <TableCell colSpan={8} className="py-6">
+                      <EmptyState
+                        title="Ingen treff"
+                        description="Prøv et annet søk eller filter."
+                      />
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -369,6 +391,10 @@ function AdminPromotionsPage() {
                 <div className="max-h-48 overflow-auto rounded-lg border border-border">
                   {giftSearchQ.isLoading ? (
                     <div className="p-3 text-sm text-muted-foreground">Søker…</div>
+                  ) : giftSearchQ.isError ? (
+                    <div className="p-3 text-sm text-destructive">
+                      {formatErrorMessage(giftSearchQ.error, "Kunne ikke søke etter annonser")}
+                    </div>
                   ) : (giftSearchQ.data ?? []).length === 0 ? (
                     <div className="p-3 text-sm text-muted-foreground">Ingen treff</div>
                   ) : (
@@ -538,6 +564,10 @@ function DetailDialog({
                 {vippsQ.isLoading ? (
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Loader2 className="size-4 animate-spin" /> Henter status fra Vipps…
+                  </div>
+                ) : vippsQ.isError ? (
+                  <div className="rounded border border-destructive/40 bg-destructive/5 p-2 text-destructive">
+                    {formatErrorMessage(vippsQ.error, "Kunne ikke hente Vipps-status")}
                   </div>
                 ) : vippsQ.data && "error" in vippsQ.data && vippsQ.data.error ? (
                   <div className="rounded border border-destructive/40 bg-destructive/5 p-2 text-destructive">

@@ -14,14 +14,14 @@ import { ArrowLeft, ChevronDown, MapPin, Search } from "lucide-react";
 import { toast } from "sonner";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { z } from "zod";
-import { useIsNative } from "@/lib/use-is-native";
+import { useIsNative } from "@/hooks/use-is-native";
 import { NativePageHeader } from "@/components/native-page-header";
-import { useIsAdmin } from "@/lib/use-is-admin";
-import { useIsModerator } from "@/lib/use-is-moderator";
+import { useIsAdmin } from "@/hooks/use-is-admin";
+import { useIsModerator } from "@/hooks/use-is-moderator";
 import { ListingActionsMenu } from "@/components/listing-detail/listing-actions-menu";
 
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/lib/use-auth";
+import { useAuth } from "@/hooks/use-auth";
 import { readLastSearchContext, type LastSearchContext } from "@/lib/last-search-context";
 import { CategoryFilterFields } from "@/components/category-filter-fields";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -768,14 +768,21 @@ function ListingDetailPage() {
 
       <div className="mt-4 grid gap-8 md:grid-cols-[1.4fr_1fr]">
         <div>
-          <ImageGallery
-            images={images}
-            imgUrls={imgUrls}
-            activeImage={activeImage}
-            onSelect={setActiveImage}
-            title={data.title}
-            onImageClick={images.length > 0 ? setLightboxIndex : undefined}
-          />
+          <div className="relative mb-6">
+            <ImageGallery
+              images={images}
+              imgUrls={imgUrls}
+              activeImage={activeImage}
+              onSelect={setActiveImage}
+              title={data.title}
+              onImageClick={images.length > 0 ? setLightboxIndex : undefined}
+            />
+            {images.length > 0 && (
+              <div className="absolute -bottom-4 left-4 rounded-xl border border-border bg-card px-4 py-2.5 shadow-lg">
+                <p className="font-display text-xl leading-none text-primary">{priceLabel}</p>
+              </div>
+            )}
+          </div>
           {isVehicleCategory && (
             <VehicleTechTable vehicleLookup={vehicleLookup} mileageKm={mileageKm} />
           )}
@@ -806,7 +813,11 @@ function ListingDetailPage() {
                 {data.subtitle && (
                   <p className="mt-1 text-sm text-muted-foreground">{data.subtitle}</p>
                 )}
-                <p className="mt-3 font-display text-3xl text-primary">{priceLabel}</p>
+                {/* Prisen vises flytende over bildekanten når det finnes bilder
+                    (se galleriseksjonen) — her kun som fallback uten bilder. */}
+                {images.length === 0 && (
+                  <p className="mt-3 font-display text-3xl text-primary">{priceLabel}</p>
+                )}
               </div>
               {user && !isOwner && (
                 <div className="shrink-0 pt-0.5">

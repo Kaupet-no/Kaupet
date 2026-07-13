@@ -22,8 +22,8 @@ import {
   initNativePushNavigation,
 } from "@/lib/native-push";
 import { setupNative } from "@/lib/native-setup";
-import { useIsNative } from "@/lib/use-is-native";
-import { useKeyboardVisible } from "@/lib/use-keyboard-visible";
+import { useIsNative } from "@/hooks/use-is-native";
+import { useKeyboardVisible } from "@/hooks/use-keyboard-visible";
 import { AppBottomNav } from "@/components/app-bottom-nav";
 import { TestEnvBanner } from "@/components/test-env-banner";
 import { TestEnvGate } from "@/components/test-env-gate";

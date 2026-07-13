@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/lib/use-auth";
+import { useAuth } from "@/hooks/use-auth";
 
-export function useIsModerator() {
+export function useIsDemo() {
   const { user } = useAuth();
   return useQuery({
-    queryKey: ["is-moderator", user?.id],
+    queryKey: ["is-demo", user?.id],
     enabled: !!user,
     queryFn: async () => {
       if (!user) return false;
@@ -13,17 +13,10 @@ export function useIsModerator() {
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id)
-        .eq("role", "moderator")
-        .maybeSingle();
+        .in("role", ["demo", "admin"])
+        .limit(1);
       if (error) return false;
-      return !!data;
+      return (data ?? []).length > 0;
     },
   });
-}
-
-export function useIsAdminOrModerator(
-  isAdmin: boolean | undefined,
-  isModerator: boolean | undefined,
-) {
-  return !!(isAdmin || isModerator);
 }

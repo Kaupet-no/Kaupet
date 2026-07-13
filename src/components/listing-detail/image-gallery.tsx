@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useIsNative } from "@/lib/use-is-native";
+import { useIsNative } from "@/hooks/use-is-native";
 import {
   Carousel,
   CarouselContent,

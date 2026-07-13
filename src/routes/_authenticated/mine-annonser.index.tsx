@@ -24,8 +24,8 @@ import { signListingImageUrls } from "@/lib/storage";
 import { republishListing } from "@/lib/listings.functions";
 import { getMyActivePromotions } from "@/lib/promotions.functions";
 import { PromoteListingDialog } from "@/components/promote-listing-dialog";
-import { useIsDemo } from "@/lib/use-is-demo";
-import { useIsNative } from "@/lib/use-is-native";
+import { useIsDemo } from "@/hooks/use-is-demo";
+import { useIsNative } from "@/hooks/use-is-native";
 import { hapticImpact, hapticNotification } from "@/lib/haptics";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -434,7 +434,12 @@ function MyListingsPage() {
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
                       <Link to="/mine-annonser/ok/$id/rediger" params={{ id: w.id }}>
-                        <Button size="icon" variant="ghost" className="text-muted-foreground">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="text-muted-foreground"
+                          aria-label="Rediger"
+                        >
                           <Pencil className="size-4" />
                         </Button>
                       </Link>
@@ -444,6 +449,7 @@ function MyListingsPage() {
                             size="icon"
                             variant="ghost"
                             className="text-muted-foreground hover:text-destructive"
+                            aria-label="Slett"
                           >
                             <Trash2 className="size-4" />
                           </Button>
@@ -623,7 +629,7 @@ function ListingRow({
         <span className="text-xs text-muted-foreground">Ikke publisert</span>
       )}
       {activePromotion && (
-        <span className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-xs text-accent">
+        <span className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-xs text-accent-text">
           <Sparkles className="size-3" />
           {activePromotion.is_gift ? "Gratis fremhevet" : "Fremhevet"} til{" "}
           {activePromotion.expires_at
@@ -699,6 +705,7 @@ function ListingRow({
               className="shrink-0"
               disabled={busy}
               onClick={() => void hapticImpact("light")}
+              aria-label="Flere valg"
             >
               <MoreVertical className="size-5" />
             </Button>
@@ -837,7 +844,13 @@ function ListingRow({
         )}
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button size="sm" variant="ghost" className="text-destructive" disabled={busy}>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-destructive"
+              disabled={busy}
+              aria-label="Slett"
+            >
               <Trash2 className="size-4" />
             </Button>
           </AlertDialogTrigger>

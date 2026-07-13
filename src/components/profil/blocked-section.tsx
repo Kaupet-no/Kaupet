@@ -5,6 +5,8 @@ import { Loader2, ShieldOff } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { listMyBlocks, deleteBlock } from "@/lib/blocks.functions";
 import { formatErrorMessage } from "@/lib/errors";
 
@@ -13,7 +15,12 @@ export function BlockedSection() {
   const listFn = useServerFn(listMyBlocks);
   const deleteFn = useServerFn(deleteBlock);
 
-  const { data: blocks, isLoading } = useQuery({
+  const {
+    data: blocks,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
     queryKey: ["my-blocks"],
     queryFn: () => listFn(),
   });
@@ -31,11 +38,11 @@ export function BlockedSection() {
     return (
       <div className="space-y-3 overflow-hidden rounded-xl border border-border bg-card p-4">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="flex animate-pulse items-center gap-3">
-            <div className="size-10 rounded-full bg-muted" />
+          <div key={i} className="flex items-center gap-3">
+            <Skeleton className="size-10 rounded-full" />
             <div className="flex-1 space-y-1.5">
-              <div className="h-3.5 w-1/3 rounded bg-muted" />
-              <div className="h-3 w-1/2 rounded bg-muted" />
+              <Skeleton className="h-3.5 w-1/3" />
+              <Skeleton className="h-3 w-1/2" />
             </div>
           </div>
         ))}
@@ -43,11 +50,23 @@ export function BlockedSection() {
     );
   }
 
+  if (isError) {
+    return (
+      <div className="rounded-xl border border-border bg-card p-4">
+        <p className="text-sm text-destructive">
+          {formatErrorMessage(error, "Kunne ikke laste blokkerte brukere")}
+        </p>
+      </div>
+    );
+  }
+
   if (!blocks || blocks.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-border bg-surface p-10 text-center text-sm text-muted-foreground">
-        Du har ikke blokkert noen brukere eller samtaler.
-      </div>
+      <EmptyState
+        icon={ShieldOff}
+        title="Ingen blokkeringer"
+        description="Du har ikke blokkert noen brukere eller samtaler."
+      />
     );
   }
 

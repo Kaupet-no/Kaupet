@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronsUpDown,
+  FolderTree,
   GripVertical,
   Loader2,
   Pencil,
@@ -80,6 +81,8 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { formatErrorMessage } from "@/lib/errors";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { CATEGORY_ICON_OPTIONS, getCategoryIcon } from "@/lib/category-icons";
 import {
   FILTER_TYPE_LABELS,
@@ -166,7 +169,12 @@ function AdminCategories() {
     });
   };
 
-  const { data: categories, isLoading } = useQuery({
+  const {
+    data: categories,
+    isLoading,
+    isError,
+    error: categoriesError,
+  } = useQuery({
     queryKey: ["admin", "categories"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -365,13 +373,22 @@ function AdminCategories() {
       <Card>
         <CardContent className="p-2 sm:p-4">
           {isLoading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            <div className="space-y-2 py-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-9 w-full" />
+              ))}
             </div>
-          ) : visibleFlatItems.length === 0 ? (
-            <p className="py-8 text-center text-muted-foreground">
-              {search.trim() ? "Ingen kategorier matcher søket" : "Ingen kategorier ennå"}
+          ) : isError ? (
+            <p className="py-8 text-center text-sm text-destructive">
+              {formatErrorMessage(categoriesError, "Kunne ikke laste kategorier")}
             </p>
+          ) : visibleFlatItems.length === 0 ? (
+            <EmptyState
+              icon={FolderTree}
+              title={search.trim() ? "Ingen kategorier matcher søket" : "Ingen kategorier ennå"}
+              description={search.trim() ? "Prøv et annet søk." : undefined}
+              className="border-none"
+            />
           ) : (
             <DndContext
               sensors={sensors}
@@ -446,6 +463,10 @@ function AdminCategories() {
             <AlertDialogDescription>
               {usageQuery.isLoading ? (
                 "Sjekker bruk…"
+              ) : usageQuery.isError ? (
+                <span className="text-destructive">
+                  {formatErrorMessage(usageQuery.error, "Kunne ikke sjekke bruk av kategorien")}
+                </span>
               ) : usageQuery.data && usageQuery.data > 0 ? (
                 <>
                   <strong>{usageQuery.data}</strong> annonser er knyttet til denne kategorien. Velg
@@ -926,7 +947,12 @@ function CategoryFiltersDialog({ category, onClose }: { category: Category; onCl
   const [draft, setDraft] = useState<EditableFilter | null>(null);
   const [keyTouched, setKeyTouched] = useState(false);
 
-  const { data: filters, isLoading } = useQuery({
+  const {
+    data: filters,
+    isLoading,
+    isError,
+    error: filtersError,
+  } = useQuery({
     queryKey: ["admin", "category-filters", category.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -1030,9 +1056,14 @@ function CategoryFiltersDialog({ category, onClose }: { category: Category; onCl
         </DialogHeader>
 
         {isLoading ? (
-          <div className="flex justify-center py-6">
-            <Loader2 className="size-5 animate-spin text-muted-foreground" />
+          <div className="space-y-2 py-2">
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
           </div>
+        ) : isError ? (
+          <p className="py-2 text-sm text-destructive">
+            {formatErrorMessage(filtersError, "Kunne ikke laste filtre")}
+          </p>
         ) : (
           <ul className="space-y-1">
             {(filters ?? []).length === 0 && (
@@ -1318,7 +1349,12 @@ function FieldGroupPagesPreview({ label, pages }: { label: string; pages: string
 function CategoryFlowDialog({ category, onClose }: { category: Category; onClose: () => void }) {
   const qc = useQueryClient();
 
-  const { data: flowRow, isLoading } = useQuery({
+  const {
+    data: flowRow,
+    isLoading,
+    isError,
+    error: flowError,
+  } = useQuery({
     queryKey: ["admin", "category-flow", category.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -1453,6 +1489,10 @@ function CategoryFlowDialog({ category, onClose }: { category: Category; onClose
           <div className="flex justify-center py-6">
             <Loader2 className="size-5 animate-spin text-muted-foreground" />
           </div>
+        ) : isError ? (
+          <p className="py-2 text-sm text-destructive">
+            {formatErrorMessage(flowError, "Kunne ikke laste annonseflyten")}
+          </p>
         ) : (
           <div className="space-y-4">
             {!hasCustomFlow && (

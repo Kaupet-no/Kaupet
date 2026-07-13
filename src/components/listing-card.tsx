@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { signListingImageUrls } from "@/lib/storage";
 import { formatPrice } from "@/lib/format";
 import { FavoriteButton } from "@/components/favorite-button";
-import { useIsNative } from "@/lib/use-is-native";
+import { useIsNative } from "@/hooks/use-is-native";
 
 export type ListingCardData = {
   id: string;

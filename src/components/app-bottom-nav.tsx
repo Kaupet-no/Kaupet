@@ -3,7 +3,7 @@ import { Bell, MessageCircle, Plus, X, LogIn, Home } from "lucide-react";
 import { AdPickerOptions } from "@/components/ad-picker-options";
 import { useState } from "react";
 
-import { useAuth } from "@/lib/use-auth";
+import { useAuth } from "@/hooks/use-auth";
 import { hapticImpact } from "@/lib/haptics";
 import { isNative } from "@/lib/native";
 import { supabase } from "@/integrations/supabase/client";

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Ban, Loader2, Search } from "lucide-react";
+import { Ban, Loader2, PackageSearch, Search } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { adminDisableListing, adminEnableListing } from "@/lib/admin-moderation.functions";
 import { formatErrorMessage } from "@/lib/errors";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export function ListingsTab() {
   const qc = useQueryClient();
@@ -121,10 +122,23 @@ export function ListingsTab() {
                     <Loader2 className="mx-auto size-5 animate-spin text-muted-foreground" />
                   </TableCell>
                 </TableRow>
+              ) : search.isError ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="py-8 text-center">
+                    <p className="text-sm text-destructive">
+                      {formatErrorMessage(search.error, "Kunne ikke laste annonser")}
+                    </p>
+                  </TableCell>
+                </TableRow>
               ) : (search.data ?? []).length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
-                    Ingen treff
+                  <TableCell colSpan={4} className="py-8">
+                    <EmptyState
+                      icon={PackageSearch}
+                      title="Ingen treff"
+                      description="Prøv et annet søk eller filter."
+                      className="border-none p-0"
+                    />
                   </TableCell>
                 </TableRow>
               ) : (

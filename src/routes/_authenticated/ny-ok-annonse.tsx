@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useIsNative } from "@/lib/use-is-native";
+import { useIsNative } from "@/hooks/use-is-native";
 import { createFileRoute, useNavigate, useBlocker, useRouter, Link } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";

@@ -1,7 +1,7 @@
 import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
 import { BarChart3, Users, FolderTree, ShieldAlert, Sparkles, Webhook, Car } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useIsAdmin } from "@/lib/use-is-admin";
+import { useIsAdmin } from "@/hooks/use-is-admin";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   ssr: false,

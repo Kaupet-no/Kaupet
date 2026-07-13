@@ -8,7 +8,7 @@ import { LogTab } from "@/components/admin/moderasjon/log-tab";
 import { ErrorLogTab } from "@/components/admin/moderasjon/error-log-tab";
 import { ReportsTab } from "@/components/admin/moderasjon/reports-tab";
 import { VehicleBrandsTab } from "@/components/admin/moderasjon/vehicle-brands-tab";
-import { useIsAdmin } from "@/lib/use-is-admin";
+import { useIsAdmin } from "@/hooks/use-is-admin";
 
 export const Route = createFileRoute("/_authenticated/admin/moderasjon")({
   head: () => ({ meta: [{ title: "Moderasjon — Kaupet.no" }] }),

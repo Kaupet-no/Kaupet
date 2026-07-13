@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { hapticImpact } from "./haptics";
+import { hapticImpact } from "@/lib/haptics";
 
 type Options = {
   onRefresh: () => Promise<void> | void;

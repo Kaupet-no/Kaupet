@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { NativePageHeader } from "@/components/native-page-header";
-import { useIsNative } from "@/lib/use-is-native";
+import { useIsNative } from "@/hooks/use-is-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -16,13 +16,13 @@ import {
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/lib/use-auth";
+import { useAuth } from "@/hooks/use-auth";
 import { signListingImageUrls } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { isUnread } from "@/lib/unread";
-import { usePushStatus } from "@/lib/use-push-status";
+import { usePushStatus } from "@/hooks/use-push-status";
 import { formatErrorMessage } from "@/lib/errors";
 
 export const Route = createFileRoute("/_authenticated/meldinger/")({

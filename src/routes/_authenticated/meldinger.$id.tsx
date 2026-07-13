@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import type { ConvSummary } from "@/lib/use-unread";
+import type { ConvSummary } from "@/hooks/use-unread";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
@@ -7,7 +7,7 @@ import { ArrowLeft, Send, User as UserIcon } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/lib/use-auth";
+import { useAuth } from "@/hooks/use-auth";
 import { signListingImageUrls } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,10 +16,11 @@ import { listMyBlocks, listBlocksAgainstMe } from "@/lib/blocks.functions";
 import { confirmBuyer, getSaleForListing, unconfirmBuyer } from "@/lib/sales.functions";
 import { createReview, getMyReviewForListing } from "@/lib/reviews.functions";
 import { formatErrorMessage } from "@/lib/errors";
-import { useIsNative } from "@/lib/use-is-native";
+import { useIsNative } from "@/hooks/use-is-native";
 import { NativePageHeader } from "@/components/native-page-header";
-import { useKeyboardVisible } from "@/lib/use-keyboard-visible";
+import { useKeyboardVisible } from "@/hooks/use-keyboard-visible";
 import { ConversationErrorBoundary } from "@/components/meldinger/conversation-error-boundary";
+import { Skeleton } from "@/components/ui/skeleton";
 import { renderWithDayDividers, type Message } from "@/components/meldinger/message-list";
 import { SalePanel } from "@/components/meldinger/sale-panel";
 
@@ -69,7 +70,12 @@ function ConversationPage() {
     queryFn: () => listBlocksAgainstMeFn(),
   });
 
-  const { data: conv } = useQuery({
+  const {
+    data: conv,
+    isLoading: convLoading,
+    isError: convIsError,
+    error: convError,
+  } = useQuery({
     queryKey: ["conversation", id],
     enabled: !!user,
     queryFn: async () => {
@@ -106,7 +112,7 @@ function ConversationPage() {
     },
   });
 
-  const { data: messages } = useQuery({
+  const { data: messages, isLoading: messagesLoading } = useQuery({
     queryKey: ["messages", id],
     enabled: !!user,
     queryFn: async (): Promise<Message[]> => {
@@ -377,6 +383,22 @@ function ConversationPage() {
           ? "Du kan ikke sende meldinger i denne samtalen"
           : "Skriv en melding…";
 
+  if (convIsError) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-20 text-center">
+        <h1 className="font-display text-2xl">Samtalen finnes ikke</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {formatErrorMessage(convError, "Kunne ikke laste samtalen.")}
+        </p>
+        <Link to="/meldinger">
+          <Button className="mt-6" variant="outline">
+            Tilbake til meldinger
+          </Button>
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div
       className="mx-auto flex max-w-2xl flex-col"
@@ -403,6 +425,17 @@ function ConversationPage() {
           >
             <ArrowLeft className="size-4" /> Alle meldinger
           </Link>
+        )}
+
+        {convLoading && !(native && keyboardVisible) && (
+          <div className="mt-3 flex items-center gap-3 rounded-xl border border-border bg-card p-3">
+            <Skeleton className="size-12 shrink-0 rounded-lg" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton className="h-4 w-2/3" />
+              <Skeleton className="h-3 w-1/3" />
+            </div>
+            <Skeleton className="size-9 shrink-0 rounded-full" />
+          </div>
         )}
 
         {conv && !(native && keyboardVisible) && (
@@ -520,7 +553,13 @@ function ConversationPage() {
           ref={scrollRef}
           className="mt-3 flex-1 space-y-2 overflow-y-auto rounded-xl border border-border bg-surface p-4"
         >
-          {(messages ?? []).length === 0 ? (
+          {messagesLoading ? (
+            <div className="space-y-3 py-2">
+              <Skeleton className="h-10 w-2/3" />
+              <Skeleton className="ml-auto h-10 w-1/2" />
+              <Skeleton className="h-10 w-3/5" />
+            </div>
+          ) : (messages ?? []).length === 0 ? (
             <p className="py-10 text-center text-sm text-muted-foreground">
               {conv?.other?.display_name
                 ? `Send den første meldingen til ${conv.other.display_name}${conv.listing?.title ? ` om «${conv.listing.title}»` : ""}.`

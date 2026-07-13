@@ -1,10 +1,10 @@
 import { Link } from "@tanstack/react-router";
 import { MessageCircle } from "lucide-react";
-import { useAuth } from "@/lib/use-auth";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
 import { NotificationsBell } from "@/components/notifications-bell";
-import { useUnreadConversationsCount } from "@/lib/use-unread";
+import { useUnreadConversationsCount } from "@/hooks/use-unread";
 
 export function SiteHeader() {
   const { user } = useAuth();

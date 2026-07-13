@@ -244,6 +244,7 @@ function VehicleBrandsCrud() {
                       variant="ghost"
                       className="size-7"
                       onClick={() => setBrandDialog({ mode: "edit", brand: b })}
+                      aria-label={`Rediger ${b.name}`}
                     >
                       <Pencil className="size-3.5" />
                     </Button>
@@ -253,6 +254,7 @@ function VehicleBrandsCrud() {
                       variant="ghost"
                       className="size-7 text-destructive hover:text-destructive"
                       onClick={() => setDeletingBrand(b)}
+                      aria-label={`Slett ${b.name}`}
                     >
                       <Trash2 className="size-3.5" />
                     </Button>
@@ -299,6 +301,7 @@ function VehicleBrandsCrud() {
                           variant="ghost"
                           className="size-7"
                           onClick={() => setModelDialog({ mode: "edit", model: m })}
+                          aria-label={`Rediger ${m.name}`}
                         >
                           <Pencil className="size-3.5" />
                         </Button>
@@ -308,6 +311,7 @@ function VehicleBrandsCrud() {
                           variant="ghost"
                           className="size-7 text-destructive hover:text-destructive"
                           onClick={() => setDeletingModel(m)}
+                          aria-label={`Slett ${m.name}`}
                         >
                           <Trash2 className="size-3.5" />
                         </Button>

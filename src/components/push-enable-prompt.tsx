@@ -3,7 +3,7 @@ import { BellRing, Loader2 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
-import { usePushStatus } from "@/lib/use-push-status";
+import { usePushStatus } from "@/hooks/use-push-status";
 import { Button } from "@/components/ui/button";
 import { formatErrorMessage } from "@/lib/errors";
 

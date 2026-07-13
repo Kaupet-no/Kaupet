@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { isNative } from "./native";
+import { isNative } from "@/lib/native";
 
 export function useKeyboardVisible(): boolean {
   const [visible, setVisible] = useState(false);

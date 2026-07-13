@@ -1,36 +1,17 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import {
-  ArrowRight,
-  ChevronDown,
-  FolderOpen,
-  Hash,
-  Heart,
-  MapPin,
-  Search,
-  ShieldCheck,
-} from "lucide-react";
+import { ArrowRight, ChevronDown, FolderOpen, Hash, Search } from "lucide-react";
 import { z } from "zod";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Autoplay from "embla-carousel-autoplay";
 import { OnboardingFlow } from "@/components/onboarding-flow";
 
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/lib/use-auth";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel";
-import { ListingCard, type ListingCardData } from "@/components/listing-card";
 import { ChevronLeft } from "lucide-react";
-import { useIsNative } from "@/lib/use-is-native";
+import { useIsNative } from "@/hooks/use-is-native";
 import { AppLanding } from "@/components/app-landing";
 import { KaupetCodeDialog } from "@/components/kaupet-code-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -38,28 +19,21 @@ import { AdPickerOptions } from "@/components/ad-picker-options";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { findCategorySuggestion } from "@/lib/categories";
 import { Badge } from "@/components/ui/badge";
-import { useTypewriterText } from "@/lib/use-typewriter-text";
+import { useTypewriterText } from "@/hooks/use-typewriter-text";
 import { SEARCH_SUGGESTIONS } from "@/lib/search-suggestions";
 import { categoryHeadingFontStack } from "@/lib/category-fonts";
 import { CategoryFilterFields } from "@/components/category-filter-fields";
 import {
-  applyAttributeFilters,
   effectiveFiltersForCategory,
-  normalizeFilter,
   splitPrimaryFilters,
   type AttributeFilterValue,
 } from "@/lib/category-filters";
-
-type CategoryRow = {
-  id: string;
-  slug: string;
-  name_nb: string;
-  parent_id: string | null;
-  icon: string | null;
-  color: string | null;
-  heading_font: string | null;
-  search_examples: string[] | null;
-};
+import { PopularCarousel } from "@/components/popular-carousel";
+import { HowItWorksSection, OpenSourceCtaSection } from "@/components/landing-static-sections";
+import type { CategoryRow } from "@/features/landing/landing-types";
+import { useLandingCategories } from "@/features/landing/use-landing-categories";
+import { usePopularListings } from "@/features/landing/use-popular-listings";
+import { useLandingResultCount } from "@/features/landing/use-landing-result-count";
 
 const searchSchema = z.object({
   q: z.string().optional(),
@@ -103,95 +77,6 @@ function LandingPage() {
   return <WebLanding />;
 }
 
-// Defined at module scope (not inside WebLanding's render body) so it keeps
-// a stable component identity across re-renders — e.g. while the hero's
-// typewriter placeholder updates state every ~40-90ms. A component defined
-// inline inside another component's render is a *new* function on every
-// render, which makes React unmount and remount the whole subtree (every
-// <img> included) instead of just re-rendering it, causing visible flicker.
-function PopularCarousel({
-  popular,
-  isError,
-  onRetry,
-  autoplay,
-}: {
-  popular: ListingCardData[] | undefined;
-  isError: boolean;
-  onRetry: () => void;
-  autoplay: React.RefObject<ReturnType<typeof Autoplay>>;
-}) {
-  const isLoading = popular === undefined;
-
-  // Nothing to show yet (e.g. no traffic in the first week after launch) —
-  // hide the whole section rather than show a skeleton that never resolves.
-  if (!isLoading && !isError && popular.length === 0) return null;
-
-  return (
-    <div>
-      <div className="mb-6 flex items-end justify-between gap-4">
-        <h2 className="font-display text-2xl tracking-tight">Populært akkurat nå</h2>
-        <Link
-          to="/annonser"
-          search={{ q: "", category: "", sort: "new" }}
-          className="text-sm text-primary hover:underline"
-        >
-          Se alle →
-        </Link>
-      </div>
-
-      {isError ? (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-muted/40 py-10 text-center">
-          <p className="text-sm text-muted-foreground">
-            Klarte ikke å hente populære annonser akkurat nå.
-          </p>
-          <Button variant="outline" size="sm" onClick={onRetry}>
-            Prøv igjen
-          </Button>
-        </div>
-      ) : !isLoading && popular.length > 0 ? (
-        <Carousel
-          opts={{ align: "start", loop: true }}
-          plugins={[autoplay.current]}
-          className="w-full"
-        >
-          <CarouselContent>
-            {popular.map((listing) => (
-              <CarouselItem
-                key={listing.id}
-                className="basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5"
-              >
-                <ListingCard listing={listing} />
-              </CarouselItem>
-            ))}
-          </CarouselContent>
-          <CarouselPrevious className="-left-3" />
-          <CarouselNext className="-right-3" />
-        </Carousel>
-      ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-muted" />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Debounces by content (via JSON serialization) rather than by reference, so
-// passing a freshly-constructed object each render only restarts the timer
-// when its actual contents changed — not on every unrelated re-render.
-function useDebouncedValue<T>(value: T, delayMs: number): T {
-  const [debounced, setDebounced] = useState(value);
-  const serialized = JSON.stringify(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delayMs);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serialized, delayMs]);
-  return debounced;
-}
-
 function WebLanding() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -199,34 +84,7 @@ function WebLanding() {
   const [qDraft, setQDraft] = useState("");
   const autoplay = useRef(Autoplay({ delay: 4500, stopOnInteraction: true }));
 
-  const {
-    data: categories,
-    isError: categoriesIsError,
-    refetch: refetchCategories,
-  } = useQuery({
-    queryKey: ["categories"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("categories")
-        .select("id, slug, name_nb, parent_id, icon, color, heading_font, search_examples")
-        .order("sort_order")
-        .order("name_nb");
-      if (error) throw error;
-      return (data ?? []) as CategoryRow[];
-    },
-  });
-
-  const { data: allFilters } = useQuery({
-    queryKey: ["category-filters", "all"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("category_filters")
-        .select("id, category_id, key, label_nb, type, unit, options, sort_order, is_primary")
-        .order("sort_order");
-      if (error) throw error;
-      return (data ?? []).map(normalizeFilter);
-    },
-  });
+  const { categories, categoriesIsError, refetchCategories, allFilters } = useLandingCategories();
 
   // Only colored root categories are presented as main categories on the landing
   // page; the catch-all "Annet" (no color) stays reachable via search but is not
@@ -303,36 +161,11 @@ function WebLanding() {
     return ids;
   }, [currentParent, childrenByParent]);
 
-  // Debounced so typing in a text/number filter doesn't fire a query per
-  // keystroke; keyed on a serialized snapshot so unrelated re-renders (e.g.
-  // the hero's typewriter placeholder, which updates every ~40-90ms) don't
-  // keep restarting the timer.
-  const countQueryInput = useMemo(
-    () => ({ categoryIds: currentCategoryIds, filterValues, priceMin, priceMax }),
-    [currentCategoryIds, filterValues, priceMin, priceMax],
-  );
-  const debouncedCountInput = useDebouncedValue(countQueryInput, 300);
-
-  const { data: resultCount } = useQuery({
-    queryKey: ["landing-result-count", debouncedCountInput],
-    enabled: debouncedCountInput.categoryIds.length > 0,
-    queryFn: async () => {
-      let qb = supabase
-        .from("listings")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "active")
-        .in("category_id", debouncedCountInput.categoryIds);
-      qb = applyAttributeFilters(qb, debouncedCountInput.filterValues);
-      if (typeof debouncedCountInput.priceMin === "number") {
-        qb = qb.gte("price_nok", debouncedCountInput.priceMin);
-      }
-      if (typeof debouncedCountInput.priceMax === "number") {
-        qb = qb.lte("price_nok", debouncedCountInput.priceMax);
-      }
-      const { count, error } = await qb;
-      if (error) throw error;
-      return count ?? 0;
-    },
+  const resultCount = useLandingResultCount({
+    categoryIds: currentCategoryIds,
+    filterValues,
+    priceMin,
+    priceMax,
   });
 
   const [qFocused, setQFocused] = useState(false);
@@ -433,12 +266,13 @@ function WebLanding() {
     setNavDirection("back");
   };
 
-  // Shared look for every main-category icon — same neutral color regardless
-  // of the category, so the row reads as one consistent set rather than a
-  // rainbow of per-category accents.
+  // Each main category keeps its own configured color (the same one used for
+  // the hero tint above) on its icon, so the row reads as a set of distinct
+  // departments rather than a uniform list — faster to scan at a glance.
   const renderCategoryIcon = (cat: CategoryRow) => {
     const Icon = getCategoryIcon(cat.icon);
     const active = activeCategory?.id === cat.id;
+    const tint = cat.color ?? "var(--primary)";
     return (
       <button
         key={cat.id}
@@ -450,9 +284,15 @@ function WebLanding() {
         <span
           className={`flex size-10 items-center justify-center rounded-full transition ${
             active
-              ? "bg-primary text-primary-foreground"
-              : "bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground"
+              ? "bg-[var(--cat-tint)] text-primary-foreground"
+              : "bg-[var(--cat-tint-bg)] text-[var(--cat-tint)] group-hover:bg-[var(--cat-tint)] group-hover:text-primary-foreground"
           }`}
+          style={
+            {
+              "--cat-tint": tint,
+              "--cat-tint-bg": `color-mix(in oklab, ${tint} 15%, var(--card))`,
+            } as React.CSSProperties
+          }
         >
           <Icon className="size-4" />
         </span>
@@ -463,29 +303,7 @@ function WebLanding() {
     );
   };
 
-  const {
-    data: popular,
-    isError: popularIsError,
-    refetch: refetchPopular,
-  } = useQuery({
-    queryKey: ["popular-listings-last-week"],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("popular_listings_last_week", { _limit: 8 });
-      if (error) throw error;
-      return (data ?? []).map<ListingCardData>((l) => ({
-        id: l.listing_id,
-        kaupet_code: l.kaupet_code,
-        title: l.title,
-        price_nok: l.price_nok,
-        is_free: l.is_free,
-        city: l.city,
-        created_at: l.created_at,
-        cover_path: l.cover_path,
-        total_views: Number(l.total_views ?? 0),
-        views_last_week: Number(l.views_last_week ?? 0),
-      }));
-    },
-  });
+  const { popular, popularIsError, refetchPopular } = usePopularListings();
 
   const submitSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -514,7 +332,7 @@ function WebLanding() {
             transform: activeCategory ? "translateX(0)" : "translateX(-100%)",
           }}
         />
-        <div className="relative z-10 mx-auto max-w-2xl px-4 py-16 text-center md:py-24">
+        <div className="relative z-10 mx-auto max-w-2xl px-4 py-14 text-center md:py-20">
           {/* Hero text and the category heading are mutually exclusive, each
               sliding in from the direction matching the background tint and
               the subcategory grid below, so picking a category visibly moves
@@ -535,7 +353,7 @@ function WebLanding() {
             </div>
           )}
 
-          <form onSubmit={submitSearch} className="mx-auto mt-8 flex max-w-lg gap-2">
+          <form onSubmit={submitSearch} className="mx-auto mt-6 flex max-w-lg gap-2">
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -576,7 +394,7 @@ function WebLanding() {
               kant-fade som viser at det finnes flere; fra sm og opp brytes
               raden slik at alle kategoriene alltid er synlige uten scroll.
               Underkategorier ligger bak hvert valg. */}
-          <div className="relative mx-auto mt-6 max-w-lg sm:max-w-2xl">
+          <div className="relative mx-auto mt-5 max-w-lg sm:max-w-2xl">
             <div
               className="flex gap-4 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:justify-center sm:overflow-visible"
               style={{ scrollSnapType: "x proximity" }}
@@ -897,67 +715,8 @@ function WebLanding() {
         />
       </section>
 
-      {/* How it works */}
-      <section className="bg-surface">
-        <div className="mx-auto max-w-6xl px-4 py-16">
-          <h2 className="font-display text-3xl tracking-tight">Slik fungerer det</h2>
-          <div className="mt-8 grid gap-6 md:grid-cols-3">
-            {[
-              {
-                icon: Heart,
-                title: "Finn noe du liker",
-                body: "Søk etter brukte skatter fra hele Norge — eller bare nabolaget ditt.",
-              },
-              {
-                icon: MapPin,
-                title: "Møt selgeren",
-                body: "Send en melding, avtal henting lokalt eller post i posten.",
-              },
-              {
-                icon: ShieldCheck,
-                title: "Trygt og åpent",
-                body: "Kaupet.no utvikles som åpen kildekode. Du kan se nøyaktig hvordan dataene dine håndteres.",
-              },
-            ].map((item) => (
-              <div key={item.title} className="rounded-2xl border border-border bg-card p-6">
-                <div className="mb-4 flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <item.icon className="size-5" />
-                </div>
-                <h3 className="font-display text-xl">{item.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{item.body}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Open source CTA */}
-      <section className="mx-auto max-w-6xl px-4 py-20">
-        <div className="overflow-hidden rounded-3xl border border-border bg-primary px-8 py-12 text-primary-foreground md:px-16 md:py-16">
-          <div className="grid items-center gap-8 md:grid-cols-[1.5fr_1fr]">
-            <div>
-              <h2 className="font-display text-3xl tracking-tight md:text-4xl">
-                Et alternativ vi bygger sammen.
-              </h2>
-              <p className="mt-3 max-w-xl opacity-90">
-                Kaupet.no bygges på åpen kildekode, med rett til personvern som et grunnprinsipp. Vi
-                benytter derfor ingen sporende informasjonskapsler eller tredjeparts analyseverktøy.
-              </p>
-              <p>
-                Ønsker du å bidra? Sjekk ut repoet på GitHub. Alle bidragsytere er hjertelig
-                velkomne.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3 md:justify-end">
-              <a href="https://github.com/Kaupet-no/kaupet" target="_blank" rel="noreferrer">
-                <Button size="lg" variant="secondary">
-                  Bidra på GitHub
-                </Button>
-              </a>
-            </div>
-          </div>
-        </div>
-      </section>
+      <HowItWorksSection />
+      <OpenSourceCtaSection />
     </div>
   );
 }

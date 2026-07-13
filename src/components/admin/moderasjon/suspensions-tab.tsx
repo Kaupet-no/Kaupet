@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2 } from "lucide-react";
+import { Loader2, UserX } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -17,11 +17,17 @@ import {
 } from "@/components/ui/table";
 import { adminUnsuspendUser } from "@/lib/admin-moderation.functions";
 import { formatErrorMessage } from "@/lib/errors";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export function SuspensionsTab() {
   const qc = useQueryClient();
   const unsuspendFn = useServerFn(adminUnsuspendUser);
-  const { data, isLoading } = useQuery({
+  const {
+    data,
+    isLoading,
+    isError,
+    error: queryError,
+  } = useQuery({
     queryKey: ["admin-suspensions"],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("admin_list_suspensions");
@@ -57,10 +63,23 @@ export function SuspensionsTab() {
                   <Loader2 className="mx-auto size-5 animate-spin text-muted-foreground" />
                 </TableCell>
               </TableRow>
+            ) : isError ? (
+              <TableRow>
+                <TableCell colSpan={4} className="py-8 text-center">
+                  <p className="text-sm text-destructive">
+                    {formatErrorMessage(queryError, "Kunne ikke laste svartelistede brukere")}
+                  </p>
+                </TableCell>
+              </TableRow>
             ) : (data ?? []).length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
-                  Ingen svartelistede brukere
+                <TableCell colSpan={4} className="py-8">
+                  <EmptyState
+                    icon={UserX}
+                    title="Ingen svartelistede brukere"
+                    description="Svartelistede brukere vises her."
+                    className="border-none p-0"
+                  />
                 </TableCell>
               </TableRow>
             ) : (

@@ -1,5 +1,5 @@
-import { useScrollFadeOpacity } from "@/lib/use-scroll-fade-opacity";
-import { useKeyboardVisible } from "@/lib/use-keyboard-visible";
+import { useScrollFadeOpacity } from "@/hooks/use-scroll-fade-opacity";
+import { useKeyboardVisible } from "@/hooks/use-keyboard-visible";
 
 /** Large centered wordmark, fixed over the home hero, that fades out on scroll. */
 export function AppHeroLogo() {

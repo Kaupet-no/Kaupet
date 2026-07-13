@@ -39,8 +39,8 @@ import { classifyVehicleCategory } from "@/lib/vehicle-classification";
 import type { VehicleLookupResult } from "@/lib/vehicle-lookup.server";
 import type { VehicleClassification } from "@/lib/vehicle-classification";
 
-import { useIsDemo } from "@/lib/use-is-demo";
-import { useAuth } from "@/lib/use-auth";
+import { useIsDemo } from "@/hooks/use-is-demo";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {

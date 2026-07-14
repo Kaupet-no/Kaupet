@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { AlertOctagon, Loader2 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,9 +12,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { EmptyState } from "@/components/ui/empty-state";
+import { formatErrorMessage } from "@/lib/errors";
 
 export function ErrorLogTab() {
-  const { data, isLoading } = useQuery({
+  const {
+    data,
+    isLoading,
+    isError,
+    error: queryError,
+  } = useQuery({
     queryKey: ["admin-error-log"],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("admin_list_error_log", { _limit: 100 });
@@ -42,10 +49,23 @@ export function ErrorLogTab() {
                   <Loader2 className="mx-auto size-5 animate-spin text-muted-foreground" />
                 </TableCell>
               </TableRow>
+            ) : isError ? (
+              <TableRow>
+                <TableCell colSpan={5} className="py-8 text-center">
+                  <p className="text-sm text-destructive">
+                    {formatErrorMessage(queryError, "Kunne ikke laste feilloggen")}
+                  </p>
+                </TableCell>
+              </TableRow>
             ) : (data ?? []).length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                  Ingen feil registrert
+                <TableCell colSpan={5} className="py-8">
+                  <EmptyState
+                    icon={AlertOctagon}
+                    title="Ingen feil registrert"
+                    description="Feil fra systemet vises her etter hvert som de oppstår."
+                    className="border-none p-0"
+                  />
                 </TableCell>
               </TableRow>
             ) : (

@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VilkarRouteImport } from './routes/vilkar'
+import { Route as TilbakestillPassordRouteImport } from './routes/tilbakestill-passord'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as PersonvernRouteImport } from './routes/personvern'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -36,6 +37,7 @@ import { Route as AuthenticatedBekrefterPromoIdRouteImport } from './routes/_aut
 import { Route as AuthenticatedAdminVippsWebhooksRouteImport } from './routes/_authenticated/admin/vipps-webhooks'
 import { Route as AuthenticatedAdminPromoteringerRouteImport } from './routes/_authenticated/admin/promoteringer'
 import { Route as AuthenticatedAdminModerasjonRouteImport } from './routes/_authenticated/admin/moderasjon'
+import { Route as AuthenticatedAdminKjoretoyRouteImport } from './routes/_authenticated/admin/kjoretoy'
 import { Route as AuthenticatedAdminKategorierRouteImport } from './routes/_authenticated/admin/kategorier'
 import { Route as AuthenticatedAdminBrukereRouteImport } from './routes/_authenticated/admin/brukere'
 import { Route as ApiPublicVippsWebhookRouteImport } from './routes/api/public/vipps/webhook'
@@ -46,6 +48,11 @@ import { Route as AuthenticatedMineAnnonserOkIdRedigerRouteImport } from './rout
 const VilkarRoute = VilkarRouteImport.update({
   id: '/vilkar',
   path: '/vilkar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TilbakestillPassordRoute = TilbakestillPassordRouteImport.update({
+  id: '/tilbakestill-passord',
+  path: '/tilbakestill-passord',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -186,6 +193,12 @@ const AuthenticatedAdminModerasjonRoute =
     path: '/moderasjon',
     getParentRoute: () => AuthenticatedAdminRouteRoute,
   } as any)
+const AuthenticatedAdminKjoretoyRoute =
+  AuthenticatedAdminKjoretoyRouteImport.update({
+    id: '/kjoretoy',
+    path: '/kjoretoy',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
 const AuthenticatedAdminKategorierRoute =
   AuthenticatedAdminKategorierRouteImport.update({
     id: '/kategorier',
@@ -228,6 +241,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/personvern': typeof PersonvernRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/tilbakestill-passord': typeof TilbakestillPassordRoute
   '/vilkar': typeof VilkarRoute
   '/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/favoritter': typeof AuthenticatedFavoritterRoute
@@ -241,6 +255,7 @@ export interface FileRoutesByFullPath {
   '/bruker/$id': typeof BrukerIdRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
+  '/admin/kjoretoy': typeof AuthenticatedAdminKjoretoyRoute
   '/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
   '/admin/promoteringer': typeof AuthenticatedAdminPromoteringerRoute
   '/admin/vipps-webhooks': typeof AuthenticatedAdminVippsWebhooksRoute
@@ -262,6 +277,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/personvern': typeof PersonvernRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/tilbakestill-passord': typeof TilbakestillPassordRoute
   '/vilkar': typeof VilkarRoute
   '/favoritter': typeof AuthenticatedFavoritterRoute
   '/meg': typeof AuthenticatedMegRoute
@@ -274,6 +290,7 @@ export interface FileRoutesByTo {
   '/bruker/$id': typeof BrukerIdRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
+  '/admin/kjoretoy': typeof AuthenticatedAdminKjoretoyRoute
   '/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
   '/admin/promoteringer': typeof AuthenticatedAdminPromoteringerRoute
   '/admin/vipps-webhooks': typeof AuthenticatedAdminVippsWebhooksRoute
@@ -297,6 +314,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/personvern': typeof PersonvernRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/tilbakestill-passord': typeof TilbakestillPassordRoute
   '/vilkar': typeof VilkarRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/_authenticated/favoritter': typeof AuthenticatedFavoritterRoute
@@ -310,6 +328,7 @@ export interface FileRoutesById {
   '/bruker/$id': typeof BrukerIdRoute
   '/_authenticated/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/_authenticated/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
+  '/_authenticated/admin/kjoretoy': typeof AuthenticatedAdminKjoretoyRoute
   '/_authenticated/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
   '/_authenticated/admin/promoteringer': typeof AuthenticatedAdminPromoteringerRoute
   '/_authenticated/admin/vipps-webhooks': typeof AuthenticatedAdminVippsWebhooksRoute
@@ -333,6 +352,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/personvern'
     | '/sitemap.xml'
+    | '/tilbakestill-passord'
     | '/vilkar'
     | '/admin'
     | '/favoritter'
@@ -346,6 +366,7 @@ export interface FileRouteTypes {
     | '/bruker/$id'
     | '/admin/brukere'
     | '/admin/kategorier'
+    | '/admin/kjoretoy'
     | '/admin/moderasjon'
     | '/admin/promoteringer'
     | '/admin/vipps-webhooks'
@@ -367,6 +388,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/personvern'
     | '/sitemap.xml'
+    | '/tilbakestill-passord'
     | '/vilkar'
     | '/favoritter'
     | '/meg'
@@ -379,6 +401,7 @@ export interface FileRouteTypes {
     | '/bruker/$id'
     | '/admin/brukere'
     | '/admin/kategorier'
+    | '/admin/kjoretoy'
     | '/admin/moderasjon'
     | '/admin/promoteringer'
     | '/admin/vipps-webhooks'
@@ -401,6 +424,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/personvern'
     | '/sitemap.xml'
+    | '/tilbakestill-passord'
     | '/vilkar'
     | '/_authenticated/admin'
     | '/_authenticated/favoritter'
@@ -414,6 +438,7 @@ export interface FileRouteTypes {
     | '/bruker/$id'
     | '/_authenticated/admin/brukere'
     | '/_authenticated/admin/kategorier'
+    | '/_authenticated/admin/kjoretoy'
     | '/_authenticated/admin/moderasjon'
     | '/_authenticated/admin/promoteringer'
     | '/_authenticated/admin/vipps-webhooks'
@@ -437,6 +462,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   PersonvernRoute: typeof PersonvernRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  TilbakestillPassordRoute: typeof TilbakestillPassordRoute
   VilkarRoute: typeof VilkarRoute
   AnnonseListingIdRoute: typeof AnnonseListingIdRoute
   BrukerIdRoute: typeof BrukerIdRoute
@@ -451,6 +477,13 @@ declare module '@tanstack/react-router' {
       path: '/vilkar'
       fullPath: '/vilkar'
       preLoaderRoute: typeof VilkarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tilbakestill-passord': {
+      id: '/tilbakestill-passord'
+      path: '/tilbakestill-passord'
+      fullPath: '/tilbakestill-passord'
+      preLoaderRoute: typeof TilbakestillPassordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sitemap.xml': {
@@ -635,6 +668,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminModerasjonRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
+    '/_authenticated/admin/kjoretoy': {
+      id: '/_authenticated/admin/kjoretoy'
+      path: '/kjoretoy'
+      fullPath: '/admin/kjoretoy'
+      preLoaderRoute: typeof AuthenticatedAdminKjoretoyRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
     '/_authenticated/admin/kategorier': {
       id: '/_authenticated/admin/kategorier'
       path: '/kategorier'
@@ -683,6 +723,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedAdminRouteRouteChildren {
   AuthenticatedAdminBrukereRoute: typeof AuthenticatedAdminBrukereRoute
   AuthenticatedAdminKategorierRoute: typeof AuthenticatedAdminKategorierRoute
+  AuthenticatedAdminKjoretoyRoute: typeof AuthenticatedAdminKjoretoyRoute
   AuthenticatedAdminModerasjonRoute: typeof AuthenticatedAdminModerasjonRoute
   AuthenticatedAdminPromoteringerRoute: typeof AuthenticatedAdminPromoteringerRoute
   AuthenticatedAdminVippsWebhooksRoute: typeof AuthenticatedAdminVippsWebhooksRoute
@@ -693,6 +734,7 @@ const AuthenticatedAdminRouteRouteChildren: AuthenticatedAdminRouteRouteChildren
   {
     AuthenticatedAdminBrukereRoute: AuthenticatedAdminBrukereRoute,
     AuthenticatedAdminKategorierRoute: AuthenticatedAdminKategorierRoute,
+    AuthenticatedAdminKjoretoyRoute: AuthenticatedAdminKjoretoyRoute,
     AuthenticatedAdminModerasjonRoute: AuthenticatedAdminModerasjonRoute,
     AuthenticatedAdminPromoteringerRoute: AuthenticatedAdminPromoteringerRoute,
     AuthenticatedAdminVippsWebhooksRoute: AuthenticatedAdminVippsWebhooksRoute,
@@ -753,6 +795,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   PersonvernRoute: PersonvernRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  TilbakestillPassordRoute: TilbakestillPassordRoute,
   VilkarRoute: VilkarRoute,
   AnnonseListingIdRoute: AnnonseListingIdRoute,
   BrukerIdRoute: BrukerIdRoute,

@@ -71,6 +71,7 @@ function AdminDashboard() {
 
   return (
     <div className="space-y-8">
+      <h2 className="font-display text-xl tracking-tight">Oversikt</h2>
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Visninger (7 dager)"

@@ -1,6 +1,6 @@
 import { ChevronLeft } from "lucide-react";
 import { useRouter, useNavigate } from "@tanstack/react-router";
-import { useIsNative } from "@/lib/use-is-native";
+import { useIsNative } from "@/hooks/use-is-native";
 
 interface NativePageHeaderProps {
   title: string;

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useIsNative } from "@/lib/use-is-native";
+import { useIsNative } from "@/hooks/use-is-native";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ProfileSection } from "@/components/profil/profile-section";
 import { NotificationsSection } from "@/components/profil/notifications-section";

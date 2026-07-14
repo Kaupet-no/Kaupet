@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   ChevronRight,
+  FlaskConical,
   Heart,
   ListChecks,
   LogOut,
@@ -11,11 +12,18 @@ import {
   User,
 } from "lucide-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { useState } from "react";
 
-import { useAuth } from "@/lib/use-auth";
-import { useIsAdmin } from "@/lib/use-is-admin";
+import { useAuth } from "@/hooks/use-auth";
+import { useIsAdmin } from "@/hooks/use-is-admin";
+import { useIsDemo } from "@/hooks/use-is-demo";
+import { useIsTestEnv } from "@/lib/env";
+import { setTestMode } from "@/lib/test-mode.functions";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Switch } from "@/components/ui/switch";
 import { NativePageHeader } from "@/components/native-page-header";
 import { Link } from "@tanstack/react-router";
 
@@ -36,6 +44,24 @@ function MegPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { data: isAdmin } = useIsAdmin();
+  const { data: isDemo } = useIsDemo();
+  const canToggleTest = !!(isAdmin || isDemo);
+  const isTest = useIsTestEnv();
+  const [toggling, setToggling] = useState(false);
+  const callSetTestMode = useServerFn(setTestMode);
+
+  async function handleToggleTest(next: boolean) {
+    if (toggling) return;
+    setToggling(true);
+    try {
+      await callSetTestMode({ data: { enabled: next } });
+      showSuccessToast(next ? "Test-modus aktivert" : "Test-modus deaktivert");
+      window.location.reload();
+    } catch (e) {
+      showErrorToast(e instanceof Error ? e.message : "Kunne ikke endre test-modus");
+      setToggling(false);
+    }
+  }
 
   const { data: profile } = useQuery({
     queryKey: ["profile-menu", user?.id],
@@ -126,10 +152,30 @@ function MegPage() {
             )}
             <NavRow
               icon={<Settings className="size-5 text-primary" />}
-              label="Innstillinger"
-              last
+              label="Kontoinnstillinger"
+              last={!canToggleTest}
               onClick={() => void navigate({ to: "/profil", search: { tab: "konto" } })}
             />
+            {canToggleTest && (
+              <div
+                className="flex items-center justify-between gap-3 px-4 py-3.5"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <span className="flex items-center gap-3 text-sm font-medium">
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted/60">
+                    <FlaskConical className="size-5 text-primary" />
+                  </span>
+                  Test-modus
+                </span>
+                <Switch
+                  id="test-mode-toggle-meg"
+                  checked={isTest}
+                  disabled={toggling}
+                  onCheckedChange={handleToggleTest}
+                  aria-label="Aktiver test-modus for denne sesjonen"
+                />
+              </div>
+            )}
           </div>
         </div>
 

@@ -1,0 +1,106 @@
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+import type { VehicleLookupResult } from "@/lib/vehicle-lookup.server";
+
+const FUEL_LABEL_NB: Record<string, string> = {
+  bensin: "Bensin",
+  diesel: "Diesel",
+  el: "El",
+  hybrid: "Hybrid",
+};
+
+const TRANSMISSION_LABEL_NB: Record<string, string> = {
+  manuell: "Manuell",
+  automat: "Automat",
+};
+
+const DRIVE_TYPE_LABEL_NB: Record<string, string> = {
+  forhjul: "Forhjulsdrift",
+  bakhjul: "Bakhjulsdrift",
+  "4x4": "Firehjulsdrift",
+};
+
+type Row = { label: string; value: string };
+
+/**
+ * Full teknisk-data-tabell for kjøretøy-annonser. Rendrer kun rader det
+ * faktisk finnes data for — ingen tomme "—"-rader.
+ */
+export function VehicleTechTable({
+  vehicleLookup,
+  mileageKm,
+}: {
+  vehicleLookup: VehicleLookupResult | null;
+  mileageKm: number | null;
+}) {
+  const rows: Row[] = [];
+
+  if (mileageKm != null)
+    rows.push({ label: "Kilometerstand", value: `${mileageKm.toLocaleString("nb-NO")} km` });
+  if (vehicleLookup?.year) rows.push({ label: "Årsmodell", value: String(vehicleLookup.year) });
+  if (vehicleLookup?.brand) rows.push({ label: "Merke", value: vehicleLookup.brand });
+  if (vehicleLookup?.model) rows.push({ label: "Modell", value: vehicleLookup.model });
+  if (vehicleLookup?.fuel_type)
+    rows.push({
+      label: "Drivstoff",
+      value: FUEL_LABEL_NB[vehicleLookup.fuel_type] ?? vehicleLookup.fuel_type,
+    });
+  if (vehicleLookup?.transmission)
+    rows.push({
+      label: "Girkasse",
+      value: TRANSMISSION_LABEL_NB[vehicleLookup.transmission] ?? vehicleLookup.transmission,
+    });
+  if (vehicleLookup?.power_hk)
+    rows.push({ label: "Effekt", value: `${vehicleLookup.power_hk} hk` });
+  if (vehicleLookup?.drive_type)
+    rows.push({
+      label: "Hjuldrift",
+      value: DRIVE_TYPE_LABEL_NB[vehicleLookup.drive_type] ?? vehicleLookup.drive_type,
+    });
+  if (vehicleLookup?.weight_kg)
+    rows.push({ label: "Vekt", value: `${vehicleLookup.weight_kg} kg` });
+  if (vehicleLookup?.tow_hitch != null)
+    rows.push({
+      label: "Hengerfeste",
+      value: vehicleLookup.tow_hitch
+        ? `Ja${vehicleLookup.max_tow_weight_kg ? ` (${vehicleLookup.max_tow_weight_kg} kg)` : ""}`
+        : "Nei",
+    });
+  if (vehicleLookup?.seats)
+    rows.push({ label: "Antall seter", value: String(vehicleLookup.seats) });
+  if (vehicleLookup?.sleeping_places)
+    rows.push({ label: "Antall soveplasser", value: String(vehicleLookup.sleeping_places) });
+  if (vehicleLookup?.cylinders)
+    rows.push({ label: "Antall sylindre", value: String(vehicleLookup.cylinders) });
+  if (vehicleLookup?.engine_displacement_cc)
+    rows.push({ label: "Slagvolum", value: `${vehicleLookup.engine_displacement_cc} cc` });
+  if (vehicleLookup?.engine_code)
+    rows.push({ label: "Motorkode", value: vehicleLookup.engine_code });
+  if (vehicleLookup?.color) rows.push({ label: "Farge", value: vehicleLookup.color });
+  if (vehicleLookup?.imported_used != null)
+    rows.push({ label: "Bruktimportert", value: vehicleLookup.imported_used ? "Ja" : "Nei" });
+  if (vehicleLookup?.first_registration_date)
+    rows.push({ label: "Førstegangsregistrering", value: vehicleLookup.first_registration_date });
+  if (vehicleLookup?.next_eu_control)
+    rows.push({ label: "Neste EU-kontroll", value: vehicleLookup.next_eu_control });
+  if (vehicleLookup?.vin) rows.push({ label: "VIN", value: vehicleLookup.vin });
+
+  if (rows.length === 0) return null;
+
+  return (
+    <section className="mt-8">
+      <h2 className="font-display text-xl">Tekniske data</h2>
+      <div className="mt-3 rounded-xl border border-border">
+        <Table>
+          <TableBody>
+            {rows.map((row) => (
+              <TableRow key={row.label}>
+                <TableCell className="w-1/2 text-muted-foreground">{row.label}</TableCell>
+                <TableCell className="font-medium">{row.value}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </section>
+  );
+}

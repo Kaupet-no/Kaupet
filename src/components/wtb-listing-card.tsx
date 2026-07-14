@@ -6,7 +6,7 @@ import { nb } from "date-fns/locale";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/lib/use-auth";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { WtbListingWithProfile } from "@/lib/wtb-listings.functions";
@@ -65,6 +65,9 @@ export function WtbListingCard({ listing }: Props) {
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
           <h3 className="font-semibold leading-tight">{listing.title}</h3>
+          {listing.subtitle && (
+            <p className="line-clamp-1 text-sm text-muted-foreground">{listing.subtitle}</p>
+          )}
           {listing.description && (
             <p className="line-clamp-2 text-sm text-muted-foreground">{listing.description}</p>
           )}

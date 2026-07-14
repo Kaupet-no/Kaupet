@@ -6,6 +6,7 @@ import { ListChecks, Loader2, ShoppingBag, Star } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { StarRating } from "@/components/star-rating";
 import { getMyProfileStats } from "@/lib/reviews.functions";
+import { formatErrorMessage } from "@/lib/errors";
 
 export function StatCell({
   label,
@@ -36,10 +37,27 @@ export function StatCell({
 
 export function ProfileStats() {
   const getStats = useServerFn(getMyProfileStats);
-  const { data: stats, isLoading } = useQuery({
+  const {
+    data: stats,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
     queryKey: ["my-profile-stats"],
     queryFn: () => getStats({}),
   });
+
+  if (isError) {
+    return (
+      <Card>
+        <CardContent className="py-6">
+          <p className="text-sm text-destructive">
+            {formatErrorMessage(error, "Kunne ikke laste statistikken")}
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (isLoading || !stats) {
     return (

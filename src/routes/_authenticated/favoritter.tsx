@@ -1,15 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useIsNative } from "@/lib/use-is-native";
+import { useIsNative } from "@/hooks/use-is-native";
 import { Heart, X } from "lucide-react";
 
 import { NativePageHeader } from "@/components/native-page-header";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/lib/use-auth";
+import { useAuth } from "@/hooks/use-auth";
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { formatErrorMessage } from "@/lib/errors";
 
 export const Route = createFileRoute("/_authenticated/favoritter")({
@@ -38,7 +40,7 @@ function FavoritesPage() {
       const { data, error } = await supabase
         .from("favorites")
         .select(
-          "listing_id, created_at, listings(id, kaupet_code, title, price_nok, is_free, city, created_at, status, listing_images(storage_path, sort_order))",
+          "listing_id, created_at, listings(id, kaupet_code, title, subtitle, price_nok, is_free, city, created_at, status, listing_images(storage_path, sort_order))",
         )
         .eq("user_id", user!.id)
         .order("created_at", { ascending: false });
@@ -63,6 +65,7 @@ function FavoritesPage() {
             id: l.id,
             kaupet_code: l.kaupet_code,
             title: l.title,
+            subtitle: l.subtitle,
             price_nok: l.price_nok,
             is_free: l.is_free,
             city: l.city,
@@ -106,19 +109,20 @@ function FavoritesPage() {
           {isLoading ? (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
               {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-muted" />
+                <Skeleton key={i} className="aspect-[4/3]" />
               ))}
             </div>
           ) : (favorites ?? []).length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border bg-surface p-12 text-center">
-              <p className="text-lg font-medium">Du har ikke lagret noen favoritter ennå</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Trykk på hjertet på en annonse for å lagre den her.
-              </p>
-              <Link to="/annonser" search={{ q: "", category: "", sort: "new" }}>
-                <Button className="mt-6">Utforsk annonser</Button>
-              </Link>
-            </div>
+            <EmptyState
+              icon={Heart}
+              title="Du har ikke lagret noen favoritter ennå"
+              description="Trykk på hjertet på en annonse for å lagre den her."
+              action={
+                <Link to="/annonser" search={{ q: "", category: "", sort: "new" }}>
+                  <Button>Utforsk annonser</Button>
+                </Link>
+              }
+            />
           ) : (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
               {(favorites ?? []).map((row) =>

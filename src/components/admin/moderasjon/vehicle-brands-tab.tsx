@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Check, Loader2, X } from "lucide-react";
+import { Check, ClipboardCheck, Loader2, X } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import {
   adminRejectVehicleModel,
 } from "@/lib/admin-vehicle-brands.functions";
 import { formatErrorMessage } from "@/lib/errors";
+import { EmptyState } from "@/components/ui/empty-state";
 
 type PendingRow = {
   kind: string;
@@ -113,9 +114,11 @@ export function VehicleBrandsTab() {
       </div>
 
       {rows.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-          Ingen ventende forslag
-        </p>
+        <EmptyState
+          icon={ClipboardCheck}
+          title="Ingen ventende forslag"
+          description="Innsendte kjøretøymerker og -modeller venter her på godkjenning."
+        />
       ) : (
         <div className="rounded-xl border border-border overflow-hidden">
           <Table>

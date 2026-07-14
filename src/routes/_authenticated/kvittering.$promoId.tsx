@@ -86,8 +86,13 @@ function ReceiptPage() {
 
   if (isPending) {
     return (
-      <div className="mx-auto flex max-w-2xl items-center justify-center px-4 py-24">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      <div
+        role="status"
+        aria-live="polite"
+        className="mx-auto flex max-w-2xl items-center justify-center px-4 py-24"
+      >
+        <Loader2 className="size-6 animate-spin text-muted-foreground" aria-hidden="true" />
+        <span className="sr-only">Laster kvittering…</span>
       </div>
     );
   }
@@ -152,13 +157,13 @@ function ReceiptPage() {
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
         {data.listing.kaupet_code && (
-          <Button asChild size="lg">
+          <Button asChild>
             <Link to="/$kaupetCode" params={{ kaupetCode: data.listing.kaupet_code }}>
               Se annonsen
             </Link>
           </Button>
         )}
-        <Button asChild size="lg" variant="outline">
+        <Button asChild variant="outline">
           <Link to="/mine-annonser">Mine annonser</Link>
         </Button>
       </div>

@@ -1,7 +1,16 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, FlaskConical, Loader2, Plus, Search, Shield, ShieldOff } from "lucide-react";
+import {
+  Download,
+  FlaskConical,
+  Loader2,
+  Plus,
+  Search,
+  Shield,
+  ShieldOff,
+  UserX,
+} from "lucide-react";
 import { CreateDemoUserDialog } from "@/components/create-demo-user-dialog";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
@@ -29,6 +38,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { formatErrorMessage } from "@/lib/errors";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export const Route = createFileRoute("/_authenticated/admin/brukere")({
   head: () => ({ meta: [{ title: "Brukeradministrasjon — Kaupet.no" }] }),
@@ -63,6 +73,7 @@ function AdminUsers() {
   const search = useQuery({
     queryKey: ["admin", "users", query],
     enabled: query.length >= 2,
+    retry: false,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("admin_find_users_by_email", { _query: query });
       if (error) throw error;
@@ -177,6 +188,7 @@ function AdminUsers() {
 
   return (
     <div className="space-y-6">
+      <h2 className="font-display text-xl tracking-tight">Brukere</h2>
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -228,6 +240,14 @@ function AdminUsers() {
                   <TableRow>
                     <TableCell colSpan={5} className="py-8 text-center">
                       <Loader2 className="mx-auto size-5 animate-spin text-muted-foreground" />
+                    </TableCell>
+                  </TableRow>
+                ) : search.isError ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-8 text-center">
+                      <p className="text-sm text-destructive">
+                        {formatErrorMessage(search.error, "Kunne ikke søke etter brukere")}
+                      </p>
                     </TableCell>
                   </TableRow>
                 ) : search.data && search.data.length > 0 ? (
@@ -325,8 +345,13 @@ function AdminUsers() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                      Ingen treff
+                    <TableCell colSpan={5} className="py-8">
+                      <EmptyState
+                        icon={UserX}
+                        title="Ingen brukere funnet"
+                        description="Prøv et annet søk."
+                        className="border-none p-0"
+                      />
                     </TableCell>
                   </TableRow>
                 )}

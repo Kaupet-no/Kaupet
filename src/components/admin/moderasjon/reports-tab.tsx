@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { CheckCircle, ExternalLink, Loader2 } from "lucide-react";
+import { CheckCircle, ExternalLink, Flag, Loader2 } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { Link } from "@tanstack/react-router";
 
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/table";
 import { adminListReports, adminResolveReport } from "@/lib/admin-moderation.functions";
 import { formatErrorMessage } from "@/lib/errors";
+import { EmptyState } from "@/components/ui/empty-state";
 
 type ReportRow = {
   id: string;
@@ -93,9 +94,11 @@ export function ReportsTab() {
       </div>
 
       {open.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-          Ingen åpne varsler
-        </p>
+        <EmptyState
+          icon={Flag}
+          title="Ingen åpne varsler"
+          description="Innmeldte annonser vises her."
+        />
       ) : (
         <ReportsTable
           reports={open}

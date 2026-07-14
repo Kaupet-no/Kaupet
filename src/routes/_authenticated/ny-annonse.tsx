@@ -831,7 +831,12 @@ function NewListingPage() {
     setCategoryTouchedManually(true);
     setSelectedParentId(categoriesById.get(leafCategoryId)?.parent_id ?? leafCategoryId);
     setValue("category_id", leafCategoryId, { shouldValidate: true });
-    goToNextPage();
+    // Går rett til neste steg i stedet for å kalle goToNextPage(), siden den
+    // ville revalidert vehicle-confirm-steget med en categoryId som ennå ikke
+    // har rukket å oppdateres i state — og dermed feilaktig blokkert
+    // fremgangen på første klikk (måtte klikkes to ganger for å virke).
+    goNext();
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function rejectVehicleLookup() {

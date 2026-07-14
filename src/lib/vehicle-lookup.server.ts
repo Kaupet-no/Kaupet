@@ -1,6 +1,7 @@
 /**
  * Statens vegvesen kjøretøyoppslag (server-only).
- * Endepunkt, spørreparameter og responsfelter er verifisert mot Swagger/OpenAPI-
+ * Endepunkt, spørreparameter og grunnleggende responsfelter (merke/modell/år/
+ * drivstoff/farge/vekt/VIN/EU-kontroll) er verifisert mot Swagger/OpenAPI-
  * dokumentasjonen for Enkeltoppslag-APIet:
  * https://akfell-datautlevering.atlas.vegvesen.no/swagger-ui/index.html?configUrl=/v3/api-docs/swagger-config#/enkelt-oppslag-resource/hentKjoretoydata
  * (GET /enkeltoppslag/kjoretoydata?kjennemerke=...).
@@ -11,6 +12,24 @@
  * («SVV-Authorization: Apikey ...») er en antagelse — bekreft det faktiske
  * autentiseringsoppsettet mot portalen/avtalen for den utleverte nøkkelen
  * før dette går i prod.
+ *
+ * NB 2: Feltene lagt til i juli 2026 (effekt, hjuldrift, hengerfeste,
+ * seter, bruktimport, sylindre/slagvolum/motorkode, soveplasser, girkasse)
+ * er hentet fra Swagger-schemaet for `/v3/api-docs/Enkeltoppslag`, men
+ * stiene er IKKE verifisert mot et reelt API-svar i denne økten. All
+ * parsing under er derfor defensiv (optional chaining → null ved avvik) og
+ * bør dobbeltsjekkes mot et faktisk respons-payload før det stoles blindt
+ * på i produksjon.
+ *
+ * NB 3: `classification_code` (EU-kjøretøyklasse, f.eks. "M1"/"N1"/"L3e"/
+ * "O1", brukt til å utlede annonsekategori automatisk) og `body_type_hint`
+ * (fritekst karosseri/formål-streng, brukt kun til å skille bobil/
+ * campingvogn fra en ordinær M1-personbil) er lagt til august 2026 basert på
+ * offentlig SVV-dokumentasjon om `kjoretoyklassifisering`-strukturen, men
+ * stiene under er IKKE verifisert mot et reelt respons-payload. Forbrukeren
+ * ser og kan overstyre utledet kjøretøytype i bekreftelsessteget, så en feil
+ * her blokkerer aldri annonsering — men bør valideres mot ekte oppslag før
+ * dette stoles blindt på i produksjon.
  */
 
 function assertVehicleLookupConfigured() {
@@ -32,9 +51,32 @@ export type VehicleLookupResult = {
   weight_kg: number | null;
   vin: string | null;
   next_eu_control: string | null;
+  power_hk: number | null;
+  drive_type: string | null;
+  tow_hitch: boolean | null;
+  max_tow_weight_kg: number | null;
+  seats: number | null;
+  imported_used: boolean | null;
+  first_registration_date: string | null;
+  cylinders: number | null;
+  engine_displacement_cc: number | null;
+  engine_code: string | null;
+  sleeping_places: number | null;
+  classification_code: string | null;
+  body_type_hint: string | null;
 };
 
 const SVV_BASE_URL = "https://akfell-datautlevering.atlas.vegvesen.no/enkeltoppslag/kjoretoydata";
+
+/** SVV returns "-" (or blank) for fields that don't apply to a given vehicle
+ * (e.g. no specific model registered for the brand) — treat that as "no
+ * value" rather than a real string, so callers never try to match/propose it
+ * as an actual brand or model name. */
+function nullifyPlaceholder(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  return trimmed === "" || trimmed === "-" ? null : trimmed;
+}
 
 /** Best-effort mapping of common Norwegian fuel-type strings to our select options. */
 function mapFuelType(value: string | null | undefined): string | null {
@@ -45,6 +87,74 @@ function mapFuelType(value: string | null | undefined): string | null {
   if (v.includes("elektrisk") || v === "el") return "el";
   if (v.includes("hybrid")) return "hybrid";
   return null;
+}
+
+/** Best-effort mapping of girkassetype-kodeNavn to our select options. */
+function mapTransmission(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const v = value.toLowerCase();
+  if (v.includes("manuell")) return "manuell";
+  if (v.includes("automat")) return "automat";
+  return null;
+}
+
+/** Best-effort mapping of hjuldrift-kodeNavn to our select options. */
+function mapDriveType(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const v = value.toLowerCase();
+  if (v.includes("fire") || v.includes("4x4") || v.includes("firehjul")) return "4x4";
+  if (v.includes("bak")) return "bakhjul";
+  if (v.includes("for")) return "forhjul";
+  return null;
+}
+
+/** Next midnight in Europe/Oslo, as a Date — used to tell the user exactly
+ * when the SVV daily quota resets, instead of a vague "prøv igjen senere". */
+function nextNorwayMidnight(): Date {
+  const now = new Date();
+  const osloDateParts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Oslo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+  // osloDateParts is "YYYY-MM-DD" for "now" in Oslo time; midnight tonight in
+  // Oslo is that date + 1 day at 00:00, expressed back as a UTC instant via a
+  // round-trip through the Oslo offset at that moment.
+  const [y, m, d] = osloDateParts.split("-").map(Number);
+  const midnightUtcGuess = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0));
+  // Correct for Oslo's UTC offset (CET/CEST) at that instant.
+  const offsetMinutes = getOsloOffsetMinutes(midnightUtcGuess);
+  return new Date(midnightUtcGuess.getTime() - offsetMinutes * 60_000);
+}
+
+function getOsloOffsetMinutes(at: Date): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Oslo",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(at);
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
+  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
+  const localMinutes = hour * 60 + minute;
+  const utcMinutes = at.getUTCHours() * 60 + at.getUTCMinutes();
+  let diff = localMinutes - utcMinutes;
+  if (diff > 720) diff -= 1440;
+  if (diff < -720) diff += 1440;
+  return diff;
+}
+
+/** Formats a Date as "kl. HH:MM" in Europe/Oslo — shared by the SVV
+ * quota-exhausted message here and the per-user hourly rate limit message in
+ * vehicle-lookup.functions.ts. */
+export function formatRetryClockNorway(at: Date): string {
+  const time = new Intl.DateTimeFormat("nb-NO", {
+    timeZone: "Europe/Oslo",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(at);
+  return `kl. ${time}`;
 }
 
 export async function lookupVehicle(registrationNumber: string): Promise<VehicleLookupResult> {
@@ -64,7 +174,9 @@ export async function lookupVehicle(registrationNumber: string): Promise<Vehicle
   // 422 = "Antall kjoretoy i respons overstiger kvote" (kvote brukt opp), med
   // Retry-After-header ("Prøv igjen etter midnatt (norsk tid)").
   if (res.status === 422) {
-    throw new Error("Kvoten for kjøretøyoppslag er brukt opp for i dag. Prøv igjen etter midnatt.");
+    throw new Error(
+      `Kvoten for kjøretøyoppslag hos Statens vegvesen er brukt opp for i dag. Prøv igjen ${formatRetryClockNorway(nextNorwayMidnight())}, eller fyll inn kjøretøyopplysningene manuelt i mellomtiden.`,
+    );
   }
   if (!res.ok) {
     const text = await res.text();
@@ -78,6 +190,10 @@ export async function lookupVehicle(registrationNumber: string): Promise<Vehicle
     kjoretoydataListe?: Array<{
       godkjenning?: {
         tekniskGodkjenning?: {
+          kjoretoyklassifisering?: {
+            tekniskKode?: { kodeNavn?: string };
+            beskrivelse?: string;
+          };
           tekniskeData?: {
             generelt?: {
               merke?: Array<{ merke?: string }>;
@@ -85,15 +201,34 @@ export async function lookupVehicle(registrationNumber: string): Promise<Vehicle
             };
             karosseriOgLasteplan?: {
               rFarge?: Array<{ kodeNavn?: string }>;
+              antallSoveplasser?: number;
+              karosseritype?: { kodeNavn?: string };
             };
-            vekter?: { egenvekt?: number };
+            vekter?: {
+              egenvekt?: number;
+              tekniskTillattVektPahengsvogn?: number;
+              tillattTilhengervektMedBrems?: number;
+            };
             motorOgDrivverk?: {
-              motor?: Array<{ drivstoff?: Array<{ drivstoffKode?: { kodeNavn?: string } }> }>;
+              motor?: Array<{
+                drivstoff?: Array<{
+                  drivstoffKode?: { kodeNavn?: string };
+                  maksNettoEffekt?: number;
+                }>;
+                antallSylindre?: number;
+                slagvolum?: number;
+                motorKode?: string;
+              }>;
+              girkassetype?: { kodeNavn?: string };
+              hjuldrift?: { kodeNavn?: string };
             };
+            persontall?: { sitteplasserTotalt?: number };
+            tilhengerkopling?: { kopling?: Array<{ belastningLoddrettMaks?: number }> };
           };
         };
       };
       forstegangsregistrering?: { registrertForstegangNorgeDato?: string };
+      forstegangsGodkjenning?: { bruktimport?: unknown };
       periodiskKjoretoyKontroll?: { kontrollfrist?: string };
       kjoretoyId?: { understellsnummer?: string; kjennemerke?: string };
     }>;
@@ -105,22 +240,45 @@ export async function lookupVehicle(registrationNumber: string): Promise<Vehicle
   }
 
   const teknisk = vehicle.godkjenning?.tekniskGodkjenning?.tekniskeData;
-  const brand = teknisk?.generelt?.merke?.[0]?.merke ?? null;
-  const model = teknisk?.generelt?.handelsbetegnelse?.[0] ?? null;
-  const firstRegYear = vehicle.forstegangsregistrering?.registrertForstegangNorgeDato?.slice(0, 4);
+  const brand = nullifyPlaceholder(teknisk?.generelt?.merke?.[0]?.merke);
+  const model = nullifyPlaceholder(teknisk?.generelt?.handelsbetegnelse?.[0]);
+  const firstRegDate = vehicle.forstegangsregistrering?.registrertForstegangNorgeDato ?? null;
+  const firstRegYear = firstRegDate?.slice(0, 4);
+  const motor = teknisk?.motorOgDrivverk?.motor?.[0];
+  const fuelType = mapFuelType(motor?.drivstoff?.[0]?.drivstoffKode?.kodeNavn);
+  const tilhengerkopling = teknisk?.tilhengerkopling?.kopling?.[0];
+  const klassifisering = vehicle.godkjenning?.tekniskGodkjenning?.kjoretoyklassifisering;
 
   return {
     registrationNumber: regNr,
     brand,
     model,
     year: firstRegYear ? Number(firstRegYear) : null,
-    fuel_type: mapFuelType(
-      teknisk?.motorOgDrivverk?.motor?.[0]?.drivstoff?.[0]?.drivstoffKode?.kodeNavn,
-    ),
-    transmission: null,
-    color: teknisk?.karosseriOgLasteplan?.rFarge?.[0]?.kodeNavn ?? null,
+    fuel_type: fuelType,
+    transmission: mapTransmission(teknisk?.motorOgDrivverk?.girkassetype?.kodeNavn),
+    color: nullifyPlaceholder(teknisk?.karosseriOgLasteplan?.rFarge?.[0]?.kodeNavn),
     weight_kg: teknisk?.vekter?.egenvekt ?? null,
     vin: vehicle.kjoretoyId?.understellsnummer ?? null,
     next_eu_control: vehicle.periodiskKjoretoyKontroll?.kontrollfrist ?? null,
+    power_hk: motor?.drivstoff?.[0]?.maksNettoEffekt
+      ? Math.round(motor.drivstoff[0].maksNettoEffekt * 1.35962)
+      : null,
+    drive_type: mapDriveType(teknisk?.motorOgDrivverk?.hjuldrift?.kodeNavn),
+    tow_hitch: tilhengerkopling ? Boolean(tilhengerkopling.belastningLoddrettMaks) : null,
+    max_tow_weight_kg:
+      teknisk?.vekter?.tillattTilhengervektMedBrems ??
+      teknisk?.vekter?.tekniskTillattVektPahengsvogn ??
+      null,
+    seats: teknisk?.persontall?.sitteplasserTotalt ?? null,
+    imported_used: vehicle.forstegangsGodkjenning?.bruktimport != null ? true : null,
+    first_registration_date: firstRegDate,
+    cylinders: fuelType !== "el" ? (motor?.antallSylindre ?? null) : null,
+    engine_displacement_cc: fuelType !== "el" ? (motor?.slagvolum ?? null) : null,
+    engine_code: fuelType !== "el" ? nullifyPlaceholder(motor?.motorKode) : null,
+    sleeping_places: teknisk?.karosseriOgLasteplan?.antallSoveplasser ?? null,
+    classification_code: nullifyPlaceholder(klassifisering?.tekniskKode?.kodeNavn),
+    body_type_hint: nullifyPlaceholder(
+      teknisk?.karosseriOgLasteplan?.karosseritype?.kodeNavn ?? klassifisering?.beskrivelse,
+    ),
   };
 }

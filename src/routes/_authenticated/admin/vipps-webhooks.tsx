@@ -1,12 +1,23 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   listVippsWebhooks,
   registerVippsWebhook,
@@ -28,6 +39,8 @@ function VippsWebhooksPage() {
   const [hooks, setHooks] = useState<Array<{ id: string; url: string; events: string[] }>>([]);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const refresh = async (m: "test" | "production" = mode) => {
     setBusy(true);
@@ -40,6 +53,11 @@ function VippsWebhooksPage() {
       setBusy(false);
     }
   };
+
+  useEffect(() => {
+    void refresh("test").finally(() => setInitialLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const onRegister = async () => {
     setBusy(true);
@@ -57,7 +75,6 @@ function VippsWebhooksPage() {
   };
 
   const onDelete = async (id: string) => {
-    if (!confirm("Slette denne webhooken?")) return;
     setBusy(true);
     try {
       await remove({ data: { mode, id } });
@@ -73,7 +90,7 @@ function VippsWebhooksPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-4">
       <div>
-        <h1 className="text-2xl font-semibold">Vipps webhooks</h1>
+        <h2 className="font-display text-xl tracking-tight">Vipps webhooks</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Registrer webhook hos Vipps for å motta betalingshendelser. Den genererte secret-en lagres
           automatisk i databasen og brukes av webhook-handleren for å verifisere signaturen — ingen
@@ -126,8 +143,8 @@ function VippsWebhooksPage() {
                 Webhook registrert og secret lagret automatisk
               </p>
               <p className="mt-1 text-xs text-green-900">
-                Webhook-id: <code className="rounded bg-white px-1">{savedId}</code>. Signaturen
-                verifiseres heretter mot lagret secret i databasen.
+                Webhook-id: <code className="rounded bg-background px-1">{savedId}</code>.
+                Signaturen verifiseres heretter mot lagret secret i databasen.
               </p>
             </div>
           )}
@@ -139,7 +156,12 @@ function VippsWebhooksPage() {
           <CardTitle>Registrerte webhooks ({mode})</CardTitle>
         </CardHeader>
         <CardContent>
-          {hooks.length === 0 ? (
+          {initialLoading ? (
+            <div role="status" aria-live="polite" className="flex items-center gap-2 py-4">
+              <Loader2 className="size-4 animate-spin text-muted-foreground" aria-hidden="true" />
+              <span className="text-sm text-muted-foreground">Henter webhooks…</span>
+            </div>
+          ) : hooks.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               Ingen registrerte. Klikk "Oppdater liste" eller registrer en ny.
             </p>
@@ -159,7 +181,7 @@ function VippsWebhooksPage() {
                   <Button
                     variant="destructive"
                     size="sm"
-                    onClick={() => void onDelete(h.id)}
+                    onClick={() => setDeleteTargetId(h.id)}
                     disabled={busy}
                   >
                     Slett
@@ -170,6 +192,32 @@ function VippsWebhooksPage() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog
+        open={!!deleteTargetId}
+        onOpenChange={(open) => !open && setDeleteTargetId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Slette denne webhooken?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Kaupet slutter å motta Vipps-betalingshendelser fra denne webhooken. Dette kan ikke
+              angres.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteTargetId) void onDelete(deleteTargetId);
+                setDeleteTargetId(null);
+              }}
+            >
+              Slett
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

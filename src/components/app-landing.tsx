@@ -18,10 +18,10 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/location-filter";
 import { AnimatedSearchPlaceholder } from "@/components/animated-search-placeholder";
-import { useSavedLocation } from "@/lib/use-saved-location";
+import { useSavedLocation } from "@/hooks/use-saved-location";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { SEARCH_SUGGESTIONS } from "@/lib/search-suggestions";
-import { useIsNative } from "@/lib/use-is-native";
+import { useIsNative } from "@/hooks/use-is-native";
 import { AppHeroLogo } from "@/components/app-hero-logo";
 
 type CategoryRow = {
@@ -78,6 +78,7 @@ export function AppLanding() {
         id: l.listing_id,
         kaupet_code: l.kaupet_code,
         title: l.title,
+        subtitle: l.subtitle,
         price_nok: l.price_nok,
         is_free: l.is_free,
         city: l.city,

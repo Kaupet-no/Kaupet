@@ -1,4 +1,5 @@
-import { MessageCircle, Share2, User as UserIcon } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { MessageCircle, Share2, ShieldCheck, User as UserIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { FavoriteButton } from "@/components/favorite-button";
@@ -58,7 +59,16 @@ export function SellerContactPanel({
               )}
             </>
           ) : (
-            <p className="text-muted-foreground">Logg inn for å se informasjon om selger</p>
+            <div className="flex items-start gap-1.5 text-muted-foreground">
+              <ShieldCheck className="mt-0.5 size-3.5 shrink-0" />
+              <p>
+                Vi viser selgerinfo kun til innloggede brukere, for å beskytte selgere mot spam.{" "}
+                <Link to="/auth" className="underline hover:text-foreground">
+                  Logg inn
+                </Link>{" "}
+                for å se den.
+              </p>
+            </div>
           )}
         </div>
       </div>

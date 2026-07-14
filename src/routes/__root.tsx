@@ -15,15 +15,15 @@ import { ModerationBanner } from "@/components/moderation-banner";
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthProvider } from "@/lib/auth";
-import { initNativeOfflineWatcher } from "@/lib/native-offline";
+import { initOfflineWatcher } from "@/lib/native-offline";
 import {
   autoRestoreNativePush,
   initNativePushForeground,
   initNativePushNavigation,
 } from "@/lib/native-push";
 import { setupNative } from "@/lib/native-setup";
-import { useIsNative } from "@/lib/use-is-native";
-import { useKeyboardVisible } from "@/lib/use-keyboard-visible";
+import { useIsNative } from "@/hooks/use-is-native";
+import { useKeyboardVisible } from "@/hooks/use-keyboard-visible";
 import { AppBottomNav } from "@/components/app-bottom-nav";
 import { TestEnvBanner } from "@/components/test-env-banner";
 import { TestEnvGate } from "@/components/test-env-gate";
@@ -237,7 +237,7 @@ function RootComponent() {
   }, [router, queryClient]);
 
   useEffect(() => {
-    const cleanup = initNativeOfflineWatcher();
+    const cleanup = initOfflineWatcher();
     void setupNative();
     void autoRestoreNativePush();
     void initNativePushNavigation((url) => router.navigate({ href: url }));
@@ -285,10 +285,21 @@ function RootBody({ native }: { native: boolean }) {
 
   const content = (
     <div className="flex min-h-screen flex-col bg-background">
+      {!native && (
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground"
+        >
+          Hopp til innhold
+        </a>
+      )}
       {isTest && <TestEnvBanner />}
       {!native && <SiteHeader />}
       <ModerationBanner />
-      <main className={`flex-1${native && !keyboardVisible ? " pb-bottom-nav" : ""}`}>
+      <main
+        id="main-content"
+        className={`flex-1${native && !keyboardVisible ? " pb-bottom-nav" : ""}`}
+      >
         <Outlet />
       </main>
 

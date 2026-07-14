@@ -1,26 +1,17 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, FolderOpen, Heart, MapPin, Search, ShieldCheck } from "lucide-react";
+import { ArrowRight, ChevronDown, FolderOpen, Hash, Search } from "lucide-react";
 import { z } from "zod";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Autoplay from "embla-carousel-autoplay";
 import { OnboardingFlow } from "@/components/onboarding-flow";
 
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/lib/use-auth";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel";
-import { ListingCard, type ListingCardData } from "@/components/listing-card";
+import { Label } from "@/components/ui/label";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronLeft } from "lucide-react";
-import { useIsNative } from "@/lib/use-is-native";
+import { useIsNative } from "@/hooks/use-is-native";
 import { AppLanding } from "@/components/app-landing";
 import { KaupetCodeDialog } from "@/components/kaupet-code-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -28,26 +19,23 @@ import { AdPickerOptions } from "@/components/ad-picker-options";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { findCategorySuggestion } from "@/lib/categories";
 import { Badge } from "@/components/ui/badge";
-import { useTypewriterText } from "@/lib/use-typewriter-text";
+import { useTypewriterText } from "@/hooks/use-typewriter-text";
 import { SEARCH_SUGGESTIONS } from "@/lib/search-suggestions";
 import { categoryHeadingFontStack } from "@/lib/category-fonts";
 import { CategoryFilterFields } from "@/components/category-filter-fields";
 import {
   effectiveFiltersForCategory,
-  normalizeFilter,
+  splitPrimaryFilters,
   type AttributeFilterValue,
 } from "@/lib/category-filters";
-
-type CategoryRow = {
-  id: string;
-  slug: string;
-  name_nb: string;
-  parent_id: string | null;
-  icon: string | null;
-  color: string | null;
-  heading_font: string | null;
-  search_examples: string[] | null;
-};
+import { PopularCarousel } from "@/components/popular-carousel";
+import { HowItWorksSection, OpenSourceCtaSection } from "@/components/landing-static-sections";
+import { ListingCard } from "@/components/listing-card";
+import type { CategoryRow } from "@/features/landing/landing-types";
+import { useLandingCategories } from "@/features/landing/use-landing-categories";
+import { usePopularListings } from "@/features/landing/use-popular-listings";
+import { useLandingResultCount } from "@/features/landing/use-landing-result-count";
+import { useCategoryFeed, type CategoryFeedSort } from "@/features/landing/use-category-feed";
 
 const searchSchema = z.object({
   q: z.string().optional(),
@@ -70,8 +58,10 @@ export const Route = createFileRoute("/")({
 
 function LandingPage() {
   const native = useIsNative();
-  const [onboardingDone, setOnboardingDone] = useState(
-    () => localStorage.getItem("kaupet_onboarding_completed_v1") === "true",
+  const [onboardingDone, setOnboardingDone] = useState(() =>
+    typeof window === "undefined"
+      ? false
+      : localStorage.getItem("kaupet_onboarding_completed_v1") === "true",
   );
 
   if (native && !onboardingDone) {
@@ -89,75 +79,6 @@ function LandingPage() {
   return <WebLanding />;
 }
 
-// Defined at module scope (not inside WebLanding's render body) so it keeps
-// a stable component identity across re-renders — e.g. while the hero's
-// typewriter placeholder updates state every ~40-90ms. A component defined
-// inline inside another component's render is a *new* function on every
-// render, which makes React unmount and remount the whole subtree (every
-// <img> included) instead of just re-rendering it, causing visible flicker.
-function PopularCarousel({
-  popular,
-  isError,
-  onRetry,
-  autoplay,
-}: {
-  popular: ListingCardData[] | undefined;
-  isError: boolean;
-  onRetry: () => void;
-  autoplay: React.RefObject<ReturnType<typeof Autoplay>>;
-}) {
-  return (
-    <div>
-      <div className="mb-6 flex items-end justify-between gap-4">
-        <h2 className="font-display text-2xl tracking-tight">Populært akkurat nå</h2>
-        <Link
-          to="/annonser"
-          search={{ q: "", category: "", sort: "new" }}
-          className="text-sm text-primary hover:underline"
-        >
-          Se alle →
-        </Link>
-      </div>
-
-      {isError ? (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-muted/40 py-10 text-center">
-          <p className="text-sm text-muted-foreground">
-            Klarte ikke å hente populære annonser akkurat nå.
-          </p>
-          <Button variant="outline" size="sm" onClick={onRetry}>
-            Prøv igjen
-          </Button>
-        </div>
-      ) : popular && popular.length > 0 ? (
-        <Carousel
-          opts={{ align: "start", loop: true }}
-          plugins={[autoplay.current]}
-          className="w-full"
-        >
-          <CarouselContent>
-            {popular.map((listing) => (
-              <CarouselItem
-                key={listing.id}
-                className="basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5"
-              >
-                <ListingCard listing={listing} />
-              </CarouselItem>
-            ))}
-          </CarouselContent>
-          <CarouselPrevious className="-left-3" />
-          <CarouselNext className="-right-3" />
-        </Carousel>
-      ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-muted" />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function WebLanding() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -165,34 +86,7 @@ function WebLanding() {
   const [qDraft, setQDraft] = useState("");
   const autoplay = useRef(Autoplay({ delay: 4500, stopOnInteraction: true }));
 
-  const {
-    data: categories,
-    isError: categoriesIsError,
-    refetch: refetchCategories,
-  } = useQuery({
-    queryKey: ["categories"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("categories")
-        .select("id, slug, name_nb, parent_id, icon, color, heading_font, search_examples")
-        .order("sort_order")
-        .order("name_nb");
-      if (error) throw error;
-      return (data ?? []) as CategoryRow[];
-    },
-  });
-
-  const { data: allFilters } = useQuery({
-    queryKey: ["category-filters", "all"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("category_filters")
-        .select("id, category_id, key, label_nb, type, unit, options, sort_order")
-        .order("sort_order");
-      if (error) throw error;
-      return (data ?? []).map(normalizeFilter);
-    },
-  });
+  const { categories, categoriesIsError, refetchCategories, allFilters } = useLandingCategories();
 
   // Only colored root categories are presented as main categories on the landing
   // page; the catch-all "Annet" (no color) stays reachable via search but is not
@@ -230,6 +124,8 @@ function WebLanding() {
   // back feels like retreating (from the left) — matching the hero swap.
   const [navDirection, setNavDirection] = useState<"forward" | "back">("forward");
   const [filterValues, setFilterValues] = useState<Record<string, AttributeFilterValue>>({});
+  const [priceMin, setPriceMin] = useState<number | undefined>(undefined);
+  const [priceMax, setPriceMax] = useState<number | undefined>(undefined);
   const subcatRef = useRef<HTMLDivElement>(null);
 
   // Filters configured for the deepest selected category (inherited up the
@@ -239,6 +135,56 @@ function WebLanding() {
     () => effectiveFiltersForCategory(currentParent?.id ?? null, allFilters ?? [], categoriesById),
     [currentParent, allFilters, categoriesById],
   );
+  const { primary: primaryFilters, secondary: secondaryFilters } = useMemo(
+    () => splitPrimaryFilters(activeFilters),
+    [activeFilters],
+  );
+  // Collapse "flere valg" again whenever the drilled-into category changes,
+  // unless there are only a couple of secondary filters — cheap enough to
+  // show by default rather than hiding behind an extra click.
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
+  useEffect(
+    () => setMoreFiltersOpen(secondaryFilters.length > 0 && secondaryFilters.length <= 2),
+    [currentParent?.id, secondaryFilters.length],
+  );
+
+  // currentParent plus every descendant category — the same scope /$kaupetCode
+  // applies when it renders results for this category, so the live count below
+  // matches what "Vis treff" will actually navigate to.
+  const currentCategoryIds = useMemo(() => {
+    if (!currentParent) return [];
+    const ids = [currentParent.id];
+    const stack = [...(childrenByParent.get(currentParent.id) ?? [])];
+    while (stack.length > 0) {
+      const next = stack.pop()!;
+      ids.push(next.id);
+      stack.push(...(childrenByParent.get(next.id) ?? []));
+    }
+    return ids;
+  }, [currentParent, childrenByParent]);
+
+  const resultCount = useLandingResultCount({
+    categoryIds: currentCategoryIds,
+    filterValues,
+    priceMin,
+    priceMax,
+  });
+
+  // Sortering for kategori-feeden som erstatter "Populært akkurat nå" m.fl.
+  // nedenfor når en kategori er valgt. Nullstilles til default hver gang
+  // brukeren bytter til en annen rotkategori, i tråd med filter-resetten over.
+  const [feedSort, setFeedSort] = useState<CategoryFeedSort>("popular");
+  useEffect(() => setFeedSort("popular"), [activeCategory?.id]);
+  const {
+    data: feedPages,
+    isError: feedIsError,
+    isLoading: feedIsLoading,
+    hasNextPage: feedHasNextPage,
+    isFetchingNextPage: feedIsFetchingNextPage,
+    fetchNextPage: feedFetchNextPage,
+    refetch: refetchFeed,
+  } = useCategoryFeed({ categoryIds: currentCategoryIds, sort: feedSort });
+  const feedListings = useMemo(() => feedPages?.pages.flatMap((p) => p.rows) ?? [], [feedPages]);
 
   const [qFocused, setQFocused] = useState(false);
   // When a category is active, hint at what's searchable within it by typing
@@ -275,6 +221,8 @@ function WebLanding() {
     if (activeCategory?.id === cat.id) {
       setSelectedPath([]);
       setFilterValues({});
+      setPriceMin(undefined);
+      setPriceMax(undefined);
       setCategoriesOpen(false);
       return;
     }
@@ -285,6 +233,8 @@ function WebLanding() {
     }
     setSelectedPath([cat]);
     setFilterValues({});
+    setPriceMin(undefined);
+    setPriceMax(undefined);
     setCategoriesOpen(true);
     setNavDirection("forward");
     // Scroll so the newly revealed subcategories are visible after the slide-down.
@@ -302,6 +252,8 @@ function WebLanding() {
   const drillIntoSub = (sub: CategoryRow) => {
     setSelectedPath((prev) => [...prev, sub]);
     setFilterValues({});
+    setPriceMin(undefined);
+    setPriceMax(undefined);
     setNavDirection("forward");
     requestAnimationFrame(() => {
       setTimeout(
@@ -319,21 +271,27 @@ function WebLanding() {
       setCategoriesOpen(false);
     }
     setFilterValues({});
+    setPriceMin(undefined);
+    setPriceMax(undefined);
     setNavDirection("back");
   };
 
   const jumpToDepth = (index: number) => {
     setSelectedPath((prev) => prev.slice(0, index + 1));
     setFilterValues({});
+    setPriceMin(undefined);
+    setPriceMax(undefined);
     setNavDirection("back");
   };
 
-  // Shared look for every main-category icon — same neutral color regardless
-  // of the category, so the row reads as one consistent set rather than a
-  // rainbow of per-category accents.
+  // Icons stay neutral/monochrome at rest so the row doesn't compete with the
+  // search field for attention; each category's configured color only shows
+  // up once the user engages with it (hover or active selection), so the
+  // color still signals "this one is picked" without nine hues firing at once.
   const renderCategoryIcon = (cat: CategoryRow) => {
     const Icon = getCategoryIcon(cat.icon);
     const active = activeCategory?.id === cat.id;
+    const tint = cat.color ?? "var(--primary)";
     return (
       <button
         key={cat.id}
@@ -345,9 +303,10 @@ function WebLanding() {
         <span
           className={`flex size-10 items-center justify-center rounded-full transition ${
             active
-              ? "bg-primary text-primary-foreground"
-              : "bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground"
+              ? "bg-[var(--cat-tint)] text-primary-foreground"
+              : "bg-muted text-muted-foreground group-hover:bg-[var(--cat-tint)] group-hover:text-primary-foreground"
           }`}
+          style={{ "--cat-tint": tint } as React.CSSProperties}
         >
           <Icon className="size-4" />
         </span>
@@ -358,29 +317,7 @@ function WebLanding() {
     );
   };
 
-  const {
-    data: popular,
-    isError: popularIsError,
-    refetch: refetchPopular,
-  } = useQuery({
-    queryKey: ["popular-listings-last-week"],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("popular_listings_last_week", { _limit: 8 });
-      if (error) throw error;
-      return (data ?? []).map<ListingCardData>((l) => ({
-        id: l.listing_id,
-        kaupet_code: l.kaupet_code,
-        title: l.title,
-        price_nok: l.price_nok,
-        is_free: l.is_free,
-        city: l.city,
-        created_at: l.created_at,
-        cover_path: l.cover_path,
-        total_views: Number(l.total_views ?? 0),
-        views_last_week: Number(l.views_last_week ?? 0),
-      }));
-    },
-  });
+  const { popular, popularIsError, refetchPopular } = usePopularListings();
 
   const submitSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -409,7 +346,7 @@ function WebLanding() {
             transform: activeCategory ? "translateX(0)" : "translateX(-100%)",
           }}
         />
-        <div className="relative z-10 mx-auto max-w-2xl px-4 py-16 text-center md:py-24">
+        <div className="relative z-10 mx-auto max-w-2xl px-4 py-14 text-center md:py-20">
           {/* Hero text and the category heading are mutually exclusive, each
               sliding in from the direction matching the background tint and
               the subcategory grid below, so picking a category visibly moves
@@ -427,10 +364,13 @@ function WebLanding() {
               <h1 className="font-display text-5xl leading-[1.05] tracking-tight md:text-6xl">
                 Gi tingene dine <span className="italic text-accent">et nytt liv</span>.
               </h1>
+              <p className="mt-3 text-sm text-muted-foreground">
+                Det er alltid gratis å annonsere på Kaupet, uansett hva du selger.
+              </p>
             </div>
           )}
 
-          <form onSubmit={submitSearch} className="mx-auto mt-8 flex max-w-lg gap-2">
+          <form onSubmit={submitSearch} className="mx-auto mt-6 flex max-w-lg gap-2">
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -471,7 +411,7 @@ function WebLanding() {
               kant-fade som viser at det finnes flere; fra sm og opp brytes
               raden slik at alle kategoriene alltid er synlige uten scroll.
               Underkategorier ligger bak hvert valg. */}
-          <div className="relative mx-auto mt-6 max-w-lg sm:max-w-2xl">
+          <div className="relative mx-auto mt-5 max-w-lg sm:max-w-2xl">
             <div
               className="flex gap-4 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:justify-center sm:overflow-visible"
               style={{ scrollSnapType: "x proximity" }}
@@ -531,6 +471,8 @@ function WebLanding() {
               if (!o) {
                 setSelectedPath([]);
                 setFilterValues({});
+                setPriceMin(undefined);
+                setPriceMax(undefined);
               }
             }}
           >
@@ -538,115 +480,181 @@ function WebLanding() {
               {currentParent && (
                 // Underkategorier + filtre — bryter ut av hero-kolonnens
                 // max-w-2xl slik at panelet blir like bredt som seksjonene
-                // lenger ned på siden (max-w-6xl), og gir filtrene god plass
-                // ved siden av listen i stedet for å bli klemt sammen.
+                // lenger ned på siden (max-w-6xl); selve kortet under har sin
+                // egen border/shadow, så den fulle bredden leser som en
+                // bevisst "hylle" panelet står på, ikke bare et tomrom.
                 <div
                   className="relative left-1/2 -ml-[50vw] mt-3 w-screen text-left"
                   ref={subcatRef}
                 >
                   <div className="mx-auto max-w-6xl px-4">
-                    <button
-                      type="button"
-                      onClick={goBack}
-                      className="mb-2 flex items-center gap-1 rounded px-1.5 py-1 text-left text-xs text-muted-foreground hover:bg-muted"
+                    <form
+                      className="rounded-2xl border border-border bg-card p-4 shadow-sm md:p-6"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        navigate({
+                          to: "/$kaupetCode",
+                          params: { kaupetCode: currentParent.slug },
+                          search: { f: filterValues, priceMin, priceMax },
+                        });
+                      }}
                     >
-                      <ChevronLeft className="size-3.5" />
-                      {selectedPath.length > 1
-                        ? `Tilbake til ${selectedPath[selectedPath.length - 2].name_nb}`
-                        : "Lukk"}
-                    </button>
+                      <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                        <button
+                          type="button"
+                          onClick={goBack}
+                          className="flex items-center gap-1 rounded px-1.5 py-1 text-left text-xs text-muted-foreground hover:bg-muted"
+                        >
+                          <ChevronLeft className="size-3.5" />
+                          {selectedPath.length > 1
+                            ? `Tilbake til ${selectedPath[selectedPath.length - 2].name_nb}`
+                            : "Lukk"}
+                        </button>
 
-                    {selectedPath.length > 1 && (
-                      <div className="mb-3 flex flex-wrap items-center gap-1.5">
-                        {selectedPath.map((c, i) => (
-                          <Badge
-                            key={c.id}
-                            variant={i === selectedPath.length - 1 ? "default" : "secondary"}
-                            className="cursor-pointer"
-                            onClick={() => jumpToDepth(i)}
-                          >
-                            {c.name_nb}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-
-                    <div
-                      key={currentParent.id}
-                      className={`duration-700 animate-in fade-in ${
-                        navDirection === "forward"
-                          ? "slide-in-from-right-4"
-                          : "slide-in-from-left-4"
-                      }`}
-                    >
-                      {/* Underkategorier som kompakte tekst-tagger i en rad —
-                          bevisst uten ikon-sirkel/farge, så nivået leser som
-                          en nedtrapping fra hovedkategori-raden i stedet for
-                          en gjentakelse av samme visuelle mønster. */}
-                      <div className="flex flex-wrap gap-2">
-                        {(() => {
-                          const subs = childrenByParent.get(currentParent.id) ?? [];
-
-                          return (
-                            <>
-                              <Link
-                                to="/$kaupetCode"
-                                params={{ kaupetCode: currentParent.slug }}
-                                className="rounded-lg border border-primary bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition"
+                        {selectedPath.length > 1 && (
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {selectedPath.map((c, i) => (
+                              <Badge
+                                key={c.id}
+                                variant={i === selectedPath.length - 1 ? "default" : "secondary"}
+                                className="cursor-pointer"
+                                onClick={() => jumpToDepth(i)}
                               >
-                                Alt i {currentParent.name_nb}
-                              </Link>
-                              {subs.map((sub) => (
-                                <button
-                                  key={sub.id}
-                                  type="button"
-                                  onClick={() => drillIntoSub(sub)}
-                                  className="rounded-lg border border-border bg-card px-3 py-1.5 text-sm text-foreground transition hover:border-primary hover:text-primary"
-                                >
-                                  {sub.name_nb}
-                                </button>
-                              ))}
-                              {subs.length === 0 && (
-                                <p className="py-1.5 text-sm text-muted-foreground">
-                                  Ingen underkategorier — trykk over for å se alle annonser.
-                                </p>
-                              )}
-                            </>
-                          );
-                        })()}
+                                {c.name_nb}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
-                      {/* Filtre for valgt underkategori — under tag-raden,
-                          full bredde, så det ikke blir tomrom ved siden av
-                          en kompakt tag-rad når det ikke finnes filtre. */}
-                      {activeFilters.length > 0 && (
-                        <div className="mt-4 space-y-4 border-t border-border pt-4">
-                          <CategoryFilterFields
-                            filters={activeFilters}
-                            values={filterValues}
-                            onChange={(key, v) =>
-                              setFilterValues((prev) => {
-                                const next = { ...prev };
-                                if (v === undefined) delete next[key];
-                                else next[key] = v;
-                                return next;
-                              })
-                            }
-                          />
-                          <Button
-                            onClick={() =>
-                              navigate({
-                                to: "/$kaupetCode",
-                                params: { kaupetCode: currentParent.slug },
-                                search: { f: filterValues },
-                              })
-                            }
+                      <div
+                        key={currentParent.id}
+                        className={`grid gap-6 duration-700 animate-in fade-in md:grid-cols-[240px_1fr] ${
+                          navDirection === "forward"
+                            ? "slide-in-from-right-4"
+                            : "slide-in-from-left-4"
+                        }`}
+                      >
+                        {/* Venstre kolonne — underkategorier som en vertikal
+                            liste, så den leser som navigasjon, ikke som nok
+                            et sett filter-chips oppå breadcrumb-badgene. */}
+                        <div className="flex flex-col gap-1 md:border-r md:border-border md:pr-6">
+                          <Link
+                            to="/$kaupetCode"
+                            params={{ kaupetCode: currentParent.slug }}
+                            className="rounded-lg px-2.5 py-1.5 text-sm font-medium text-primary transition hover:bg-primary/10"
                           >
-                            Vis treff
-                          </Button>
+                            Alt i {currentParent.name_nb}
+                          </Link>
+                          {(childrenByParent.get(currentParent.id) ?? []).map((sub) => (
+                            <button
+                              key={sub.id}
+                              type="button"
+                              onClick={() => drillIntoSub(sub)}
+                              className="rounded-lg px-2.5 py-1.5 text-left text-sm text-foreground transition hover:bg-muted"
+                            >
+                              {sub.name_nb}
+                            </button>
+                          ))}
+                          {(childrenByParent.get(currentParent.id) ?? []).length === 0 && (
+                            <p className="px-2.5 py-1.5 text-sm text-muted-foreground">
+                              Ingen underkategorier — trykk over for å se alle annonser.
+                            </p>
+                          )}
                         </div>
-                      )}
-                    </div>
+
+                        {/* Høyre kolonne — filtre gruppert i et rutenett i
+                            stedet for én lang vertikal stabel. */}
+                        <div className="min-w-0">
+                          <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label>Pris (kr)</Label>
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  type="number"
+                                  placeholder="Fra"
+                                  value={priceMin ?? ""}
+                                  onChange={(e) =>
+                                    setPriceMin(
+                                      e.target.value === "" ? undefined : Number(e.target.value),
+                                    )
+                                  }
+                                />
+                                <Input
+                                  type="number"
+                                  placeholder="Til"
+                                  value={priceMax ?? ""}
+                                  onChange={(e) =>
+                                    setPriceMax(
+                                      e.target.value === "" ? undefined : Number(e.target.value),
+                                    )
+                                  }
+                                />
+                              </div>
+                            </div>
+                            <CategoryFilterFields
+                              filters={primaryFilters}
+                              values={filterValues}
+                              onChange={(key, v) =>
+                                setFilterValues((prev) => {
+                                  const next = { ...prev };
+                                  if (v === undefined) delete next[key];
+                                  else next[key] = v;
+                                  return next;
+                                })
+                              }
+                            />
+                          </div>
+                          {secondaryFilters.length > 0 && (
+                            <Collapsible
+                              open={moreFiltersOpen}
+                              onOpenChange={setMoreFiltersOpen}
+                              className="mt-4"
+                            >
+                              <CollapsibleTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="gap-1 px-0 text-primary hover:bg-transparent"
+                                >
+                                  {moreFiltersOpen
+                                    ? "Vis færre valg"
+                                    : `Se flere valg (+${secondaryFilters.length})`}
+                                  <ChevronDown
+                                    className={`size-4 transition-transform ${moreFiltersOpen ? "rotate-180" : ""}`}
+                                  />
+                                </Button>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent className="grid gap-4 pt-4 data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:slide-in-from-top-2 data-[state=closed]:animate-out data-[state=closed]:fade-out sm:grid-cols-2">
+                                <CategoryFilterFields
+                                  filters={secondaryFilters}
+                                  values={filterValues}
+                                  onChange={(key, v) =>
+                                    setFilterValues((prev) => {
+                                      const next = { ...prev };
+                                      if (v === undefined) delete next[key];
+                                      else next[key] = v;
+                                      return next;
+                                    })
+                                  }
+                                />
+                              </CollapsibleContent>
+                            </Collapsible>
+                          )}
+                          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+                            <span className="text-sm text-muted-foreground">
+                              {resultCount === undefined
+                                ? "Beregner antall treff …"
+                                : `${resultCount} ${resultCount === 1 ? "treff" : "treff"} akkurat nå`}
+                            </span>
+                            <Button type="submit">
+                              {resultCount === undefined ? "Vis treff" : `Vis ${resultCount} treff`}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </form>
                   </div>
                 </div>
               )}
@@ -681,21 +689,22 @@ function WebLanding() {
                 </>
               ) : (
                 <>
-                  <KaupetCodeDialog />
-                  <div className="relative flex flex-col items-center">
-                    <Link to="/auth" search={{ mode: "signup" }}>
-                      <Button size="lg" variant="outline">
-                        Kom i gang gratis
+                  {/* Primær CTA — én tydelig handling ("bli med"), fremhevet
+                      med solid stil siden det er den vi vil at de fleste
+                      besøkende skal ta. Kaupet-kode er en sekundær, sjeldnere
+                      brukt handling (åpne en spesifikk annonse) og skal derfor
+                      ikke konkurrere visuelt med den. */}
+                  <Link to="/auth" search={{ mode: "signup" }}>
+                    <Button size="lg">Kom i gang</Button>
+                  </Link>
+                  <KaupetCodeDialog
+                    trigger={
+                      <Button variant="ghost" size="lg" className="gap-2">
+                        <Hash className="size-4" />
+                        Har du en Kaupet-kode?
                       </Button>
-                    </Link>
-                    {/* Flytende, leken merkelapp — på mobil (stablede knapper) ligger
-                      den i normal flyt for å ikke dekke knappen under; fra sm og opp
-                      er det rom til å la den flyte fritt over innholdet. */}
-                    <div className="pointer-events-none relative mt-3 w-44 rotate-[-3deg] rounded-2xl bg-primary px-3 py-2.5 text-center text-xs font-medium leading-snug text-primary-foreground shadow-lg sm:absolute sm:left-1/2 sm:top-full sm:z-20 sm:mt-3 sm:w-44 sm:-translate-x-1/2">
-                      <span className="absolute -top-1.5 left-9 size-3 rotate-45 rounded-[2px] bg-primary" />
-                      Det er alltid gratis å annonsere på Kaupet, uansett hva du selger.
-                    </div>
-                  </div>
+                    }
+                  />
                 </>
               )}
             </div>
@@ -703,78 +712,97 @@ function WebLanding() {
         </div>
       </section>
 
-      {/* Populært akkurat nå — egen seksjon, lenger ned slik at søkefeltet
-          eier hero-seksjonen alene */}
-      <section className="mx-auto max-w-6xl px-4 pb-16">
-        <PopularCarousel
-          popular={popular}
-          isError={popularIsError}
-          onRetry={() => void refetchPopular()}
-          autoplay={autoplay}
-        />
-      </section>
+      {activeCategory ? (
+        <section className="mx-auto max-w-6xl px-4 pt-8 pb-16">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold">Annonser i {activeCategory.name_nb}</h2>
+            <div className="inline-flex rounded-lg border border-border bg-card p-0.5 text-sm">
+              <button
+                type="button"
+                onClick={() => setFeedSort("popular")}
+                className={`rounded-md px-3 py-1.5 transition ${
+                  feedSort === "popular"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Populært
+              </button>
+              <button
+                type="button"
+                onClick={() => setFeedSort("new")}
+                className={`rounded-md px-3 py-1.5 transition ${
+                  feedSort === "new"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Nyest
+              </button>
+            </div>
+          </div>
 
-      {/* How it works */}
-      <section className="bg-surface">
-        <div className="mx-auto max-w-6xl px-4 py-16">
-          <h2 className="font-display text-3xl tracking-tight">Slik fungerer det</h2>
-          <div className="mt-8 grid gap-6 md:grid-cols-3">
-            {[
-              {
-                icon: Heart,
-                title: "Finn noe du liker",
-                body: "Søk etter brukte skatter fra hele Norge — eller bare nabolaget ditt.",
-              },
-              {
-                icon: MapPin,
-                title: "Møt selgeren",
-                body: "Send en melding, avtal henting lokalt eller post i posten.",
-              },
-              {
-                icon: ShieldCheck,
-                title: "Trygt og åpent",
-                body: "Kaupet.no utvikles som åpen kildekode. Du kan se nøyaktig hvordan dataene dine håndteres.",
-              },
-            ].map((item) => (
-              <div key={item.title} className="rounded-2xl border border-border bg-card p-6">
-                <div className="mb-4 flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <item.icon className="size-5" />
-                </div>
-                <h3 className="font-display text-xl">{item.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{item.body}</p>
+          {feedIsError && (
+            <div className="flex flex-col items-center gap-2 rounded-xl border border-border bg-card py-10 text-center">
+              <p className="text-sm text-muted-foreground">Klarte ikke å hente annonser.</p>
+              <Button variant="outline" size="sm" onClick={() => void refetchFeed()}>
+                Prøv igjen
+              </Button>
+            </div>
+          )}
+
+          {!feedIsError && feedIsLoading && (
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-muted" />
+              ))}
+            </div>
+          )}
+
+          {!feedIsError && !feedIsLoading && feedListings.length === 0 && (
+            <p className="rounded-xl border border-border bg-card py-10 text-center text-sm text-muted-foreground">
+              Ingen annonser i denne kategorien ennå.
+            </p>
+          )}
+
+          {!feedIsError && feedListings.length > 0 && (
+            <>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+                {feedListings.map((listing) => (
+                  <ListingCard key={listing.id} listing={listing} />
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
+              {feedHasNextPage && (
+                <div className="mt-6 flex justify-center">
+                  <Button
+                    variant="outline"
+                    onClick={() => void feedFetchNextPage()}
+                    disabled={feedIsFetchingNextPage}
+                  >
+                    {feedIsFetchingNextPage ? "Laster …" : "Last inn flere annonser"}
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      ) : (
+        <>
+          {/* Populært akkurat nå — egen seksjon, lenger ned slik at søkefeltet
+              eier hero-seksjonen alene */}
+          <section className="mx-auto max-w-6xl px-4 pb-16">
+            <PopularCarousel
+              popular={popular}
+              isError={popularIsError}
+              onRetry={() => void refetchPopular()}
+              autoplay={autoplay}
+            />
+          </section>
 
-      {/* Open source CTA */}
-      <section className="mx-auto max-w-6xl px-4 py-20">
-        <div className="overflow-hidden rounded-3xl border border-border bg-primary px-8 py-12 text-primary-foreground md:px-16 md:py-16">
-          <div className="grid items-center gap-8 md:grid-cols-[1.5fr_1fr]">
-            <div>
-              <h2 className="font-display text-3xl tracking-tight md:text-4xl">
-                Et alternativ vi bygger sammen.
-              </h2>
-              <p className="mt-3 max-w-xl opacity-90">
-                Kaupet.no bygges på åpen kildekode, med rett til personvern som et grunnprinsipp. Vi
-                benytter derfor ingen sporende informasjonskapsler eller tredjeparts analyseverktøy.
-              </p>
-              <p>
-                Ønsker du å bidra? Sjekk ut repoet på GitHub. Alle bidragsytere er hjertelig
-                velkomne.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3 md:justify-end">
-              <a href="https://github.com/Kaupet-no/kaupet" target="_blank" rel="noreferrer">
-                <Button size="lg" variant="secondary">
-                  Bidra på GitHub
-                </Button>
-              </a>
-            </div>
-          </div>
-        </div>
-      </section>
+          <HowItWorksSection />
+          <OpenSourceCtaSection />
+        </>
+      )}
     </div>
   );
 }

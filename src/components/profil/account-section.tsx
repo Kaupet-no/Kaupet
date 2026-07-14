@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { formatErrorMessage } from "@/lib/errors";
 import { DeleteAccountSection } from "@/components/profil/delete-account-section";
 
@@ -29,7 +30,12 @@ const passwordSchema = z
 type PasswordForm = z.infer<typeof passwordSchema>;
 
 export function AccountSection() {
-  const { data: userData } = useQuery({
+  const {
+    data: userData,
+    isLoading: userLoading,
+    isError: userIsError,
+    error: userError,
+  } = useQuery({
     queryKey: ["current-user"],
     queryFn: async () => {
       const { data } = await supabase.auth.getUser();
@@ -76,6 +82,32 @@ export function AccountSection() {
   });
 
   const [signingOut, setSigningOut] = useState(false);
+
+  if (userLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="space-y-4 rounded-xl border border-border bg-card p-6">
+          <Skeleton className="h-5 w-40" />
+          <Skeleton className="h-9 w-full" />
+        </div>
+        <div className="space-y-4 rounded-xl border border-border bg-card p-6">
+          <Skeleton className="h-5 w-40" />
+          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-9 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (userIsError) {
+    return (
+      <div className="rounded-xl border border-border bg-card p-6">
+        <p className="text-sm text-destructive">
+          {formatErrorMessage(userError, "Kunne ikke laste kontoinformasjonen")}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

@@ -28,6 +28,7 @@ export function FeaturedListingsSection({ categorySlug, limit = 3, allowedIds }:
     id: l.id,
     kaupet_code: l.kaupet_code,
     title: l.title,
+    subtitle: l.subtitle,
     price_nok: l.price_nok,
     is_free: l.is_free,
     city: l.city,

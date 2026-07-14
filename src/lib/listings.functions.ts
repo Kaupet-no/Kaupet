@@ -8,6 +8,12 @@ import {
   normalizeFilter,
   type CategoryNode,
 } from "@/lib/category-filters";
+import {
+  effectiveFlowForCategory,
+  type CategoryFlowRow,
+} from "@/features/listing-creation/category-flows";
+import { validateModules } from "@/features/listing-creation/modules/validators";
+import { validateRequiredFieldGroups } from "@/features/listing-creation/field-groups/validators";
 
 export const saveDraftListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -16,9 +22,13 @@ export const saveDraftListing = createServerFn({ method: "POST" })
       .object({
         id: z.string().uuid().optional(),
         title: z.string().trim().min(1).max(120),
+        subtitle: z.string().trim().max(80).nullable().optional(),
         description: z.string().trim().max(4000).optional(),
         category_id: z.string().uuid().nullable().optional(),
-        condition: z.enum(["new", "like_new", "good", "acceptable", "for_parts"]).optional(),
+        condition: z
+          .enum(["new", "like_new", "good", "acceptable", "for_parts"])
+          .nullable()
+          .optional(),
         is_free: z.boolean().optional(),
         price_nok: z.number().int().min(0).max(10_000_000).nullable().optional(),
         postal_code: z
@@ -29,7 +39,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
         city: z.string().max(100).nullable().optional(),
         lat: z.number().nullable().optional(),
         lng: z.number().nullable().optional(),
-        can_ship: z.boolean().optional(),
+        can_ship: z.boolean().nullable().optional(),
         attributes: attributesSchema.optional(),
       })
       .parse(input),
@@ -40,6 +50,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
 
     const fields = {
       title: data.title,
+      ...(data.subtitle !== undefined && { subtitle: data.subtitle }),
       ...(data.description !== undefined && { description: data.description }),
       ...(data.category_id !== undefined && { category_id: data.category_id }),
       ...(data.condition !== undefined && { condition: data.condition }),
@@ -92,9 +103,10 @@ export const createListing = createServerFn({ method: "POST" })
       .object({
         draftId: z.string().uuid().optional(),
         title: z.string().trim().min(5).max(120),
+        subtitle: z.string().trim().max(80).nullable().optional(),
         description: z.string().trim().min(20).max(4000),
         category_id: z.string().uuid(),
-        condition: z.enum(["new", "like_new", "good", "acceptable", "for_parts"]),
+        condition: z.enum(["new", "like_new", "good", "acceptable", "for_parts"]).nullable(),
         is_free: z.boolean(),
         price_nok: z.number().int().min(0).max(10_000_000).nullable(),
         postal_code: z
@@ -104,9 +116,9 @@ export const createListing = createServerFn({ method: "POST" })
         city: z.string().max(100).nullable(),
         lat: z.number().nullable(),
         lng: z.number().nullable(),
-        can_ship: z.boolean(),
+        can_ship: z.boolean().nullable(),
         attributes: attributesSchema.optional(),
-        turnstileToken: z.string().optional(),
+        turnstileToken: z.string().nullable().optional(),
       })
       .parse(input),
   )
@@ -127,11 +139,14 @@ export const createListing = createServerFn({ method: "POST" })
       if (!cfJson.success) throw new Error("Turnstile-validering feilet. Prøv igjen.");
     }
 
-    const [{ data: filterRows }, { data: categoryRows }] = await Promise.all([
+    const [{ data: filterRows }, { data: categoryRows }, flowsResult] = await Promise.all([
       supabaseAdmin
         .from("category_filters")
-        .select("id, category_id, key, label_nb, type, unit, options, sort_order"),
+        .select("id, category_id, key, label_nb, type, unit, options, sort_order, is_primary"),
       supabaseAdmin.from("categories").select("id, parent_id"),
+      supabaseAdmin
+        .from("category_flows")
+        .select("id, category_id, field_groups, modules, sort_order"),
     ]);
     const categoriesById = new Map<string, CategoryNode>(
       (categoryRows ?? []).map((c) => [c.id as string, c as CategoryNode]),
@@ -146,8 +161,24 @@ export const createListing = createServerFn({ method: "POST" })
       throw new Error(`Fyll inn: ${missing.map((f) => f.label_nb).join(", ")}`);
     }
 
+    // category_flows may not exist yet in every environment (pre-migration); degrade to the default flow.
+    const flowRows = (flowsResult.data ?? []) as CategoryFlowRow[];
+    const { fieldGroups, modules } = effectiveFlowForCategory(
+      data.category_id,
+      flowRows,
+      categoriesById,
+    );
+    const moduleError = validateModules(modules, data.attributes ?? {});
+    if (moduleError) throw new Error(moduleError);
+    const fieldGroupError = validateRequiredFieldGroups(fieldGroups, {
+      condition: data.condition,
+      can_ship: data.can_ship,
+    });
+    if (fieldGroupError) throw new Error(fieldGroupError);
+
     const listingFields = {
       title: data.title,
+      subtitle: data.subtitle || null,
       description: data.description,
       category_id: data.category_id,
       condition: data.condition,

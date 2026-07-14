@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   ArrowLeft,
@@ -18,16 +18,16 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { CategoryPicker, SaveSearchDialog } from "@/components/advanced-search-sheet";
-import {
-  CONDITIONS,
-  defaultAdvancedSearchValue,
-  valueToCriteria,
-  type AdvancedSearchValue,
-} from "@/components/advanced-search-value";
+import { CONDITIONS, type AdvancedSearchValue } from "@/components/advanced-search-value";
 import type { Category } from "@/lib/categories";
-import { emptyTermGroup, mergeTermGroups, type TermGroup } from "@/lib/term-groups";
-import { useAuth } from "@/lib/use-auth";
-import { summarizeCriteria, type SearchCriteria } from "@/lib/saved-searches";
+import { emptyTermGroup, type TermGroup } from "@/lib/term-groups";
+import { useAuth } from "@/hooks/use-auth";
+import { useAdvancedSearchValue } from "@/hooks/use-advanced-search-value";
+import {
+  buildAdvancedSearchCriteria,
+  mergeAdvancedSearchGroups,
+  resetAdvancedSearchValue,
+} from "@/lib/advanced-search-actions";
 import { hapticImpact, hapticNotification } from "@/lib/haptics";
 
 type Props = {
@@ -40,26 +40,18 @@ type Props = {
 
 export function NativeAdvancedSearch({ open, onClose, initial, categories, onApply }: Props) {
   const { user } = useAuth();
-  const [v, setV] = useState<AdvancedSearchValue>(initial);
+  const [v, setV] = useAdvancedSearchValue(open, initial);
   const [saveOpen, setSaveOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<TermGroup | null>(null);
 
-  const initialRef = useRef(initial);
-  useEffect(() => {
-    initialRef.current = initial;
-  });
-  useEffect(() => {
-    if (open) setV(initialRef.current);
-  }, [open]);
-
   const handleReset = () => {
     void hapticImpact("light");
-    setV({ ...defaultAdvancedSearchValue(), terms: v.terms, location: v.location, sort: v.sort });
+    setV(resetAdvancedSearchValue(v));
   };
 
   const handleApply = () => {
     void hapticNotification("success");
-    onApply({ ...v, extraGroups: mergeTermGroups(v.extraGroups) });
+    onApply(mergeAdvancedSearchGroups(v));
     onClose();
   };
 
@@ -86,7 +78,7 @@ export function NativeAdvancedSearch({ open, onClose, initial, categories, onApp
     setV((prev) => ({ ...prev, extraGroups: prev.extraGroups.filter((g) => g.id !== id) }));
   };
 
-  const criteria: SearchCriteria = { ...valueToCriteria(v), sort: v.sort };
+  const { criteria, defaultName } = buildAdvancedSearchCriteria(v);
 
   // The Sheet (editingGroup) is rendered outside the portal so it sits in the
   // normal React tree. Its Radix portal uses z-[10000] and safely appears above
@@ -299,7 +291,7 @@ export function NativeAdvancedSearch({ open, onClose, initial, categories, onApp
             <SaveSearchDialog
               open={saveOpen}
               onOpenChange={setSaveOpen}
-              defaultName={summarizeCriteria(criteria)}
+              defaultName={defaultName}
               criteria={criteria}
               onSaved={() => setSaveOpen(false)}
             />

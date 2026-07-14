@@ -20,6 +20,8 @@ export type Message = {
   body: string;
   created_at: string;
   deleted_at: string | null;
+  /** True for meldinger som er sendt optimistisk og venter på bekreftelse fra serveren. */
+  pending?: boolean;
 };
 
 export function renderWithDayDividers(
@@ -62,7 +64,7 @@ export function renderWithDayDividers(
         key={m.id}
         className={`group flex items-end gap-1 ${mine ? "justify-end" : "justify-start"}`}
       >
-        {mine && !deleted && (
+        {mine && !deleted && !m.pending && (
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <button
@@ -94,7 +96,7 @@ export function renderWithDayDividers(
               : mine
                 ? "bg-primary text-primary-foreground"
                 : "bg-card text-foreground"
-          }`}
+          } ${m.pending ? "opacity-60" : ""}`}
         >
           <p className="whitespace-pre-wrap break-words">{deleted ? "Melding slettet" : m.body}</p>
           <p
@@ -102,10 +104,12 @@ export function renderWithDayDividers(
               mine && !deleted ? "text-primary-foreground/70" : "text-muted-foreground"
             }`}
           >
-            {d.toLocaleTimeString("nb-NO", {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
+            {m.pending
+              ? "Sender…"
+              : d.toLocaleTimeString("nb-NO", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
           </p>
         </div>
       </div>,

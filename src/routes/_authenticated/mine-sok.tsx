@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { NativePageHeader } from "@/components/native-page-header";
-import { useIsNative } from "@/lib/use-is-native";
+import { useIsNative } from "@/hooks/use-is-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
@@ -18,7 +18,7 @@ import { nb } from "date-fns/locale";
 import { toast } from "sonner";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
-import { usePushStatus } from "@/lib/use-push-status";
+import { usePushStatus } from "@/hooks/use-push-status";
 import { supabase } from "@/integrations/supabase/client";
 
 import { Button } from "@/components/ui/button";

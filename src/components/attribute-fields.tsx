@@ -21,7 +21,10 @@ import {
   type CategoryNode,
   type VehicleBrandGroup,
 } from "@/lib/category-filters";
-import { VehicleBrandField, VehicleModelField } from "@/components/vehicle-brand-model-fields";
+import {
+  VehicleBrandField,
+  VehicleModelField,
+} from "@/features/listing-creation/modules/generic-attributes/vehicle-brand-model-fields";
 
 export type AttributeMap = Record<string, AttributeValue>;
 
@@ -32,7 +35,7 @@ export function useAllCategoryFilters() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("category_filters")
-        .select("id, category_id, key, label_nb, type, unit, options, sort_order")
+        .select("id, category_id, key, label_nb, type, unit, options, sort_order, is_primary")
         .order("sort_order");
       if (error) throw error;
       return (data ?? []).map(normalizeFilter);

@@ -1,56 +1,48 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NativePageHeader } from "@/components/native-page-header";
-import { createFileRoute, useNavigate, useBlocker } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useBlocker, useRouter, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
-import {
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  ChevronDown,
-  Loader2,
-  MapPin,
-  Tag,
-  LocateFixed,
-  Hash,
-  Search,
-} from "lucide-react";
+import { AlertCircle, Check, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { createListing, saveDraftListing } from "@/lib/listings.functions";
 import { uploadListingImage } from "@/lib/storage";
 import { geocodeNorwayAddress, lookupPostalCode, reverseGeocodeAddress } from "@/lib/geocode";
-import { ImageUploader, type PendingImage } from "@/components/image-uploader";
-import { ListingLocationPicker } from "@/components/listing-location-picker";
+import { type PendingImage } from "@/components/image-uploader";
 import { FullscreenLocationPicker } from "@/components/fullscreen-location-picker";
 import { PromoteListingDialog } from "@/components/promote-listing-dialog";
 import { PublishedListingDialog } from "@/components/published-listing-dialog";
 import { CategoryPicker } from "@/components/category-picker";
+import { useAllCategoryFilters, type AttributeMap } from "@/components/attribute-fields";
+import { modulesForKeys } from "@/features/listing-creation/modules/registry";
 import {
-  AttributeFields,
-  useAllCategoryFilters,
-  type AttributeMap,
-} from "@/components/attribute-fields";
-import { VehicleLookupPanel } from "@/components/vehicle-lookup-panel";
+  effectiveFlowForCategory,
+  resolveWizardPages,
+} from "@/features/listing-creation/category-flows";
+import { useAllCategoryFlows } from "@/features/listing-creation/use-all-category-flows";
+import { useListingSteps, type WizardPage } from "@/features/listing-creation/use-listing-steps";
+import { fieldGroupsForKeys, pageLabel } from "@/features/listing-creation/field-groups/registry";
 import {
   categoryBreadcrumb,
   getMissingRequiredFilters,
+  vehicleCategoryGroupFor,
   type CategoryNode,
 } from "@/lib/category-filters";
-import { Turnstile } from "@marsidev/react-turnstile";
+import { lookupVehicleByRegNumber } from "@/lib/vehicle-lookup.functions";
+import { matchVehicleBrandModel } from "@/lib/vehicle-brand-match.functions";
+import { classifyVehicleCategory } from "@/lib/vehicle-classification";
+import type { VehicleLookupResult } from "@/lib/vehicle-lookup.server";
+import type { VehicleClassification } from "@/lib/vehicle-classification";
 
-import { useIsDemo } from "@/lib/use-is-demo";
-import { useAuth } from "@/lib/use-auth";
+import { useIsDemo } from "@/hooks/use-is-demo";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Progress } from "@/components/ui/progress";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -68,17 +60,21 @@ import { suggestKeywordsForListing } from "@/lib/keyword-suggestion.functions";
 import { matchWtbListingsForListing } from "@/lib/wtb-listings.functions";
 import { getCurrentPosition, requestLocationPermission, isNative } from "@/lib/native";
 
+import { PublishActions } from "@/features/listing-creation/field-groups/review-publish";
+import type { WizardSharedProps } from "@/features/listing-creation/field-groups/types";
+
 const listingSchema = z.object({
   title: z.string().trim().min(5, "Tittelen må være minst 5 tegn").max(120, "Maks 120 tegn"),
+  subtitle: z.string().trim().max(80, "Maks 80 tegn").optional().or(z.literal("")),
   description: z
     .string()
     .trim()
     .min(20, "Skriv litt mer — minst 20 tegn")
     .max(4000, "Maks 4000 tegn"),
   category_id: z.string().uuid("Velg en kategori"),
-  condition: z.enum(["new", "like_new", "good", "acceptable", "for_parts"]),
+  condition: z.enum(["new", "like_new", "good", "acceptable", "for_parts"]).nullable().optional(),
   is_free: z.boolean(),
-  can_ship: z.enum(["pickup", "ship", "both"]),
+  can_ship: z.enum(["pickup", "ship", "both"]).nullable().optional(),
   price_nok: z.union([z.coerce.number().int().min(0).max(10_000_000), z.literal("")]).optional(),
   postal_code: z
     .string()
@@ -170,81 +166,96 @@ export const Route = createFileRoute("/_authenticated/ny-annonse")({
     ],
   }),
   component: NewListingPage,
+  errorComponent: NewListingError,
 });
 
-function StepIndicator({ step, native }: { step: 1 | 2 | 3 | 4 | 5; native: boolean }) {
-  if (native) {
-    const labels = ["Tittel", "Detaljer", "Beskrivelse", "Sted", "Publiser"];
-    return (
-      <nav aria-label="Fremdrift i skjema" className="flex items-center gap-1.5">
-        {([1, 2, 3, 4, 5] as const).map((s) => (
-          <div key={s} className="flex items-center gap-1.5">
+function NewListingError({ error, reset }: { error: Error; reset: () => void }) {
+  const router = useRouter();
+  return (
+    <div className="mx-auto max-w-md px-4 py-16 text-center">
+      <AlertCircle className="mx-auto size-10 text-destructive" />
+      <h1 className="mt-4 font-display text-2xl">Noe gikk galt</h1>
+      <p className="mt-2 text-muted-foreground">{formatErrorMessage(error, "Ukjent feil")}</p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Utkastet ditt er lagret — du kan trygt prøve på nytt.
+      </p>
+      <div className="mt-6 flex justify-center gap-3">
+        <Button
+          variant="outline"
+          onClick={() => {
+            void router.invalidate();
+            reset();
+          }}
+        >
+          Prøv igjen
+        </Button>
+        <Button asChild>
+          <Link to="/mine-annonser">Mine annonser</Link>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function StepIndicator({
+  step,
+  pages,
+  native,
+}: {
+  step: number;
+  pages: WizardPage[];
+  native: boolean;
+}) {
+  const labels = pages.map((p) => pageLabel(p.groups, native));
+  const total = labels.length;
+  const gapClass = native ? "gap-1.5" : "gap-2";
+  const circleClass = native ? "size-6" : "size-7";
+  const checkClass = native ? "size-3" : "size-3.5";
+  const labelBreakpoint = native ? "lg:inline" : "sm:inline";
+  const lineWidth = native ? "w-4" : "w-6";
+
+  return (
+    <nav aria-label="Fremdrift i skjema" className={`flex items-center ${gapClass}`}>
+      {labels.map((label, i) => {
+        const s = i + 1;
+        return (
+          <div key={label + s} className={`flex items-center ${gapClass}`}>
             <div
-              className={`flex size-6 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
+              className={`flex ${circleClass} items-center justify-center rounded-full text-xs font-semibold transition-colors ${
                 s < step
                   ? "bg-primary text-primary-foreground"
                   : s === step
                     ? "bg-primary text-primary-foreground ring-2 ring-primary/30"
                     : "bg-muted text-muted-foreground"
               }`}
-              aria-label={`Steg ${s}: ${labels[s - 1]}${s < step ? " (fullført)" : s === step ? " (pågår)" : ""}`}
+              aria-label={`Steg ${s}: ${label}${s < step ? " (fullført)" : s === step ? " (pågår)" : ""}`}
             >
-              {s < step ? <Check className="size-3" /> : s}
+              {s < step ? <Check className={checkClass} /> : s}
             </div>
             <span
-              className={`hidden text-xs lg:inline ${s === step ? "font-medium text-foreground" : "text-muted-foreground"}`}
+              className={`text-xs ${
+                s === step
+                  ? "inline font-medium text-foreground"
+                  : `hidden ${labelBreakpoint} text-muted-foreground`
+              }`}
             >
-              {labels[s - 1]}
+              {label}
             </span>
-            {s < 5 && (
-              <div className={`h-px w-4 shrink-0 ${s < step ? "bg-primary" : "bg-border"}`} />
+            {s < total && (
+              <div
+                className={`h-px ${lineWidth} shrink-0 ${s < step ? "bg-primary" : "bg-border"}`}
+              />
             )}
           </div>
-        ))}
-      </nav>
-    );
-  }
-
-  const labels = ["Bilder & tittel", "Detaljer", "Lokasjon"];
-  return (
-    <nav aria-label="Fremdrift i skjema" className="flex items-center gap-2">
-      {([1, 2, 3] as const).map((s) => (
-        <div key={s} className="flex items-center gap-2">
-          <div
-            className={`flex size-7 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
-              s < step
-                ? "bg-primary text-primary-foreground"
-                : s === step
-                  ? "bg-primary text-primary-foreground ring-2 ring-primary/30"
-                  : "bg-muted text-muted-foreground"
-            }`}
-            aria-label={`Steg ${s}: ${labels[s - 1]}${s < step ? " (fullført)" : s === step ? " (pågår)" : ""}`}
-          >
-            {s < step ? <Check className="size-3.5" /> : s}
-          </div>
-          <span
-            className={`hidden text-xs sm:inline ${s === step ? "font-medium text-foreground" : "text-muted-foreground"}`}
-          >
-            {labels[s - 1]}
-          </span>
-          {s < 3 && (
-            <div className={`h-px w-6 shrink-0 ${s < step ? "bg-primary" : "bg-border"}`} />
-          )}
-        </div>
-      ))}
+        );
+      })}
     </nav>
   );
-}
-
-function FieldValid({ show }: { show: boolean }) {
-  if (!show) return null;
-  return <Check className="size-4 shrink-0 text-green-500" aria-hidden />;
 }
 
 function NewListingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [images, setImages] = useState<PendingImage[]>([]);
   const [publishedId, setPublishedId] = useState<string | null>(null);
   const [publishedCode, setPublishedCode] = useState<string | null>(null);
@@ -279,17 +290,36 @@ function NewListingPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
-        .select("id, name_nb, parent_id")
+        .select("id, name_nb, slug, parent_id, icon, color")
         .order("sort_order");
       if (error) throw error;
       return data;
     },
   });
 
+  const bilOgMcCategoryId = useMemo(
+    () => (categories ?? []).find((c) => c.slug === "bil-og-mc" && !c.parent_id)?.id ?? null,
+    [categories],
+  );
+
+  // Vehicle-first flow state (vehicle-registration / vehicle-confirm field groups)
+  const [vehicleRegistered, setVehicleRegistered] = useState(true);
+  const [vehicleLookupLoading, setVehicleLookupLoading] = useState(false);
+  const [vehicleLookupError, setVehicleLookupError] = useState<string | null>(null);
+  const [vehicleLookupResult, setVehicleLookupResult] = useState<VehicleLookupResult | null>(null);
+  const [vehicleClassification, setVehicleClassification] = useState<VehicleClassification | null>(
+    null,
+  );
+  const [vehiclePreviousClassificationMismatch, setVehiclePreviousClassificationMismatch] =
+    useState<{ slug: string | null; lookedUpAt: string } | null>(null);
+  const lookupVehicleFn = useServerFn(lookupVehicleByRegNumber);
+  const matchBrandModelFn = useServerFn(matchVehicleBrandModel);
+
   const parentCategories = (categories ?? []).filter((c) => !c.parent_id);
   const [selectedParentId, setSelectedParentId] = useState<string>("");
 
   const { data: allFilters } = useAllCategoryFilters();
+  const { data: allFlows } = useAllCategoryFlows();
   const categoriesById = useMemo(() => {
     const m = new Map<string, CategoryNode & { name_nb: string }>();
     for (const c of categories ?? []) m.set(c.id, c);
@@ -308,6 +338,7 @@ function NewListingPage() {
     mode: "onTouched",
     defaultValues: {
       title: "",
+      subtitle: "",
       description: "",
       category_id: "",
       condition: "good",
@@ -326,6 +357,7 @@ function NewListingPage() {
   const postalCode = watch("postal_code");
   const city = watch("city");
   const title = watch("title");
+  const subtitle = watch("subtitle");
   const description = watch("description");
   const priceNok = watch("price_nok");
 
@@ -333,6 +365,70 @@ function NewListingPage() {
     () =>
       getMissingRequiredFilters(categoryId || null, allFilters ?? [], categoriesById, attributes),
     [categoryId, allFilters, categoriesById, attributes],
+  );
+
+  const activeModules = useMemo(
+    () =>
+      modulesForKeys(
+        effectiveFlowForCategory(categoryId || null, allFlows ?? [], categoriesById).modules,
+      ),
+    [categoryId, allFlows, categoriesById],
+  );
+
+  const baseFieldGroupKeys = useMemo(
+    () => effectiveFlowForCategory(categoryId || null, allFlows ?? [], categoriesById).fieldGroups,
+    [categoryId, allFlows, categoriesById],
+  );
+
+  // Inject vehicle-confirm right after vehicle-registration once a lookup has
+  // succeeded — it's never part of a category's stored field_groups (see
+  // category-flows.ts), so it only ever appears in the live wizard state.
+  const fieldGroupKeys = useMemo(() => {
+    if (!vehicleLookupResult) return baseFieldGroupKeys;
+    const idx = baseFieldGroupKeys.indexOf("vehicle-registration");
+    if (idx === -1) return baseFieldGroupKeys;
+    return [
+      ...baseFieldGroupKeys.slice(0, idx + 1),
+      "vehicle-confirm",
+      ...baseFieldGroupKeys.slice(idx + 1),
+    ];
+  }, [baseFieldGroupKeys, vehicleLookupResult]);
+
+  const pages: WizardPage[] = useMemo(
+    () =>
+      resolveWizardPages(fieldGroupKeys, { native }).map((keys) => ({
+        groups: fieldGroupsForKeys(keys),
+      })),
+    [fieldGroupKeys, native],
+  );
+
+  const { step, setStep, currentPage, goNext, isFirst, isLast } = useListingSteps(pages);
+
+  /** Browser back should step the wizard backward instead of leaving the
+   * route entirely: push a history entry each time the step advances, and
+   * on popstate (back button or the in-page "Tilbake" button, which now
+   * delegates to `history.back()`) restore the step encoded in that entry
+   * — falling back to step 1 for the entry from before the first push.
+   * Mirrors the pushState/popstate pattern used by image-lightbox.tsx and
+   * map-overlay.tsx for overlay dismissal. */
+  const prevStepRef = useRef(step);
+  useEffect(() => {
+    if (step > prevStepRef.current) {
+      window.history.pushState({ wizardStep: step }, "");
+    }
+    prevStepRef.current = step;
+  }, [step]);
+
+  useEffect(() => {
+    function onPopState(e: PopStateEvent) {
+      const wizardStep = (e.state as { wizardStep?: number } | null)?.wizardStep;
+      setStep(wizardStep ?? 1);
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [setStep]);
+  const categoryAttributesPageIndex = pages.findIndex((p) =>
+    p.groups.some((g) => g.key === "category-attributes"),
   );
 
   const shouldBlockNav = publishedId === null && (title.trim().length > 0 || images.length > 0);
@@ -343,8 +439,8 @@ function NewListingPage() {
   });
 
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const lastEdited = useRef<"postal_code" | "city" | "map" | null>(null);
-  const markerMoved = useRef(false);
+  const lastEditedRef = useRef<"postal_code" | "city" | "map" | null>(null);
+  const markerMovedRef = useRef(false);
 
   // Load draft from localStorage on mount
   useEffect(() => {
@@ -395,6 +491,7 @@ function NewListingPage() {
           DRAFT_KEY,
           JSON.stringify({
             title,
+            subtitle,
             description,
             selectedParentId,
             category_id: categoryId,
@@ -415,6 +512,7 @@ function NewListingPage() {
     return () => window.clearTimeout(t);
   }, [
     title,
+    subtitle,
     description,
     selectedParentId,
     categoryId,
@@ -436,6 +534,7 @@ function NewListingPage() {
         data: {
           ...(draftId ? { id: draftId } : {}),
           title: currentTitle,
+          subtitle: (subtitle ?? "").trim() || null,
           description: (description ?? "").trim() || undefined,
           category_id: categoryId || null,
           condition: condition || undefined,
@@ -509,6 +608,7 @@ function NewListingPage() {
   function restoreDraft() {
     if (!hasDraftData) return;
     if (typeof hasDraftData.title === "string") setValue("title", hasDraftData.title);
+    if (typeof hasDraftData.subtitle === "string") setValue("subtitle", hasDraftData.subtitle);
     if (typeof hasDraftData.description === "string")
       setValue("description", hasDraftData.description);
     if (typeof hasDraftData.condition === "string")
@@ -537,21 +637,21 @@ function NewListingPage() {
 
   // Auto-fill city from postal code
   useEffect(() => {
-    if (lastEdited.current !== "postal_code") return;
+    if (lastEditedRef.current !== "postal_code") return;
     const p = (postalCode ?? "").trim();
     if (!/^\d{4}$/.test(p)) return;
     const t = window.setTimeout(async () => {
       const r = await lookupPostalCode(p);
       if (!r) return;
       if (r.city) setValue("city", r.city, { shouldValidate: false });
-      if (!markerMoved.current) setCoords({ lat: r.lat, lng: r.lng });
+      if (!markerMovedRef.current) setCoords({ lat: r.lat, lng: r.lng });
     }, 500);
     return () => window.clearTimeout(t);
   }, [postalCode, setValue]);
 
   // Reverse-geocode map position
   useEffect(() => {
-    if (lastEdited.current !== "map" || !coords) return;
+    if (lastEditedRef.current !== "map" || !coords) return;
     const t = window.setTimeout(async () => {
       const r = await reverseGeocodeAddress(coords);
       if (r.city) setValue("city", r.city, { shouldValidate: false });
@@ -654,47 +754,135 @@ function NewListingPage() {
     setValue("description", next, { shouldTouch: false });
   }
 
-  async function goToStep2() {
-    const valid = await trigger(["title"]);
-    if (!valid) return;
-    if (images.length === 0) {
-      setShowNoImageDialog(true);
-      return;
-    }
-    setStep(2);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  async function goToStep3(skipPriceCheck = false) {
-    const fields: (keyof ListingForm)[] = native
-      ? ["category_id", "condition", "price_nok"]
-      : ["description", "category_id", "condition", "price_nok"];
-    const valid = await trigger(fields);
-    if (!valid) return;
-    if (missingFilters.length > 0) {
-      setAttributesTouched(true);
-      showErrorToast(
-        `Fyll inn ${missingFilters.map((f) => f.label_nb).join(", ")} før du går videre.`,
+  async function runVehicleLookup(registrationNumber: string) {
+    setVehicleLookupLoading(true);
+    setVehicleLookupError(null);
+    try {
+      const { lookup, previousClassificationMismatch } = await lookupVehicleFn({
+        data: { registrationNumber },
+      });
+      setVehicleLookupResult(lookup);
+      setVehicleClassification(
+        classifyVehicleCategory(
+          lookup.classification_code,
+          lookup.body_type_hint,
+          lookup.sleeping_places,
+        ),
       );
-      return;
+      setVehiclePreviousClassificationMismatch(previousClassificationMismatch);
+    } catch (e) {
+      setVehicleLookupError(formatErrorMessage(e, "Kjøretøyoppslag feilet. Prøv igjen."));
+    } finally {
+      setVehicleLookupLoading(false);
     }
-    if (!skipPriceCheck && !isFree && (priceNok === "" || priceNok === undefined)) {
-      setShowNoPriceDialog(true);
-      return;
-    }
-    setStep(3);
+  }
+
+  /** Runs the deferred brand/model match for a chosen leaf category, so
+   * vehicle-confirm can show/resolve an unmatched brand or model to the user
+   * *before* they commit — rather than confirmVehicleData silently leaving
+   * brand/model unset. */
+  async function matchVehicleBrandForLeaf(leafCategoryId: string) {
+    const lookup = vehicleLookupResult;
+    if (!lookup) return null;
+    const categoryGroup = vehicleCategoryGroupFor(leafCategoryId, allFilters ?? [], categoriesById);
+    if (!categoryGroup) return null;
+    const { brandMatch, modelMatch } = await matchBrandModelFn({
+      data: { brand: lookup.brand, model: lookup.model, categoryGroup },
+    });
+    return { categoryGroup, brandMatch, modelMatch };
+  }
+
+  function confirmVehicleData(
+    leafCategoryId: string,
+    resolved?: { brandName?: string; modelName?: string },
+  ) {
+    const lookup = vehicleLookupResult;
+    if (!lookup) return;
+
+    const next: AttributeMap = {
+      ...attributes,
+      is_registered: true,
+      registration_number: lookup.registrationNumber,
+      vehicle_lookup: JSON.stringify(lookup),
+    };
+    if (lookup.year) next.year = lookup.year;
+    if (lookup.fuel_type) next.fuel_type = lookup.fuel_type;
+    if (lookup.weight_kg != null) next.weight_kg = lookup.weight_kg;
+    if (lookup.transmission) next.transmission = lookup.transmission;
+    if (lookup.color) next.color = lookup.color;
+    if (lookup.next_eu_control) next.next_eu_control = lookup.next_eu_control;
+    if (lookup.power_hk != null) next.power_hk = lookup.power_hk;
+    if (lookup.drive_type) next.drive_type = lookup.drive_type;
+    if (lookup.tow_hitch != null) next.tow_hitch = lookup.tow_hitch;
+    if (lookup.max_tow_weight_kg != null) next.max_tow_weight_kg = lookup.max_tow_weight_kg;
+    if (lookup.seats != null) next.seats = lookup.seats;
+    if (lookup.imported_used != null) next.imported_used = lookup.imported_used;
+    if (lookup.first_registration_date)
+      next.first_registration_date = lookup.first_registration_date;
+    if (lookup.cylinders != null) next.cylinders = lookup.cylinders;
+    if (lookup.engine_displacement_cc != null)
+      next.engine_displacement_cc = lookup.engine_displacement_cc;
+    if (lookup.engine_code) next.engine_code = lookup.engine_code;
+    if (lookup.sleeping_places != null) next.sleeping_places = lookup.sleeping_places;
+    if (resolved?.brandName) next.brand = resolved.brandName;
+    if (resolved?.modelName) next.model = resolved.modelName;
+
+    setAttributes(next);
+    setCategoryTouchedManually(true);
+    setSelectedParentId(categoriesById.get(leafCategoryId)?.parent_id ?? leafCategoryId);
+    setValue("category_id", leafCategoryId, { shouldValidate: true });
+    // Går rett til neste steg i stedet for å kalle goToNextPage(), siden den
+    // ville revalidert vehicle-confirm-steget med en categoryId som ennå ikke
+    // har rukket å oppdateres i state — og dermed feilaktig blokkert
+    // fremgangen på første klikk (måtte klikkes to ganger for å virke).
+    goNext();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function goToStep4() {
-    const valid = await trigger(["description"]);
+  function rejectVehicleLookup() {
+    setVehicleLookupResult(null);
+    setVehicleClassification(null);
+    setVehicleLookupError(null);
+    setVehiclePreviousClassificationMismatch(null);
+    setVehicleRegistered(false);
+    setStep(Math.max(1, step - 1));
+  }
+
+  async function goToNextPage(options?: { skipImageCheck?: boolean; skipPriceCheck?: boolean }) {
+    const groups = currentPage?.groups ?? [];
+    const fields = groups.flatMap((g) => g.fieldsToValidate ?? []);
+    const valid = fields.length > 0 ? await trigger(fields) : true;
     if (!valid) return;
-    setStep(4);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  function goToStep5() {
-    setStep(5);
+    const validateCtx = {
+      images,
+      attributes,
+      activeModules,
+      missingFilters,
+      isFree,
+      priceNok,
+      categoryId,
+      bilOgMcCategoryId,
+      vehicleLookupResult,
+    };
+    for (const group of groups) {
+      const result = group.validateExtra?.(validateCtx);
+      if (result === "SHOW_NO_IMAGE_DIALOG") {
+        if (options?.skipImageCheck) continue;
+        setShowNoImageDialog(true);
+        return;
+      }
+      if (result === "SHOW_NO_PRICE_DIALOG") {
+        if (options?.skipPriceCheck) continue;
+        setShowNoPriceDialog(true);
+        return;
+      }
+      if (typeof result === "string") {
+        if (group.key === "category-attributes") setAttributesTouched(true);
+        showErrorToast(result);
+        return;
+      }
+    }
+    goNext();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -703,24 +891,24 @@ function NewListingPage() {
     setCoords(null);
     setValue("postal_code", "");
     setValue("city", "");
-    markerMoved.current = false;
-    lastEdited.current = null;
+    markerMovedRef.current = false;
+    lastEditedRef.current = null;
   }
 
   function switchToPostal() {
     setCoords(null);
     setValue("postal_code", "");
     setValue("city", "");
-    markerMoved.current = false;
-    lastEdited.current = null;
+    markerMovedRef.current = false;
+    lastEditedRef.current = null;
     setLocationMethod("postal");
   }
 
   function switchToGps() {
     setValue("postal_code", "");
     setValue("city", "");
-    markerMoved.current = false;
-    lastEdited.current = null;
+    markerMovedRef.current = false;
+    lastEditedRef.current = null;
     void fetchMyLocation();
   }
 
@@ -744,8 +932,8 @@ function NewListingPage() {
       }
       const { lat, lng } = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       setCoords({ lat, lng });
-      markerMoved.current = false;
-      lastEdited.current = null;
+      markerMovedRef.current = false;
+      lastEditedRef.current = null;
       const geo = await reverseGeocodeAddress({ lat, lng });
       if (geo.city) setValue("city", geo.city, { shouldValidate: false });
       if (geo.postal_code && /^\d{4}$/.test(geo.postal_code)) {
@@ -779,9 +967,10 @@ function NewListingPage() {
         data: {
           ...(draftId ? { draftId } : {}),
           title: values.title,
+          subtitle: values.subtitle || null,
           description: values.description,
           category_id: values.category_id,
-          condition: values.condition,
+          condition: fieldGroupKeys.includes("condition") ? (values.condition ?? null) : null,
           is_free: values.is_free,
           price_nok: values.is_free
             ? null
@@ -792,7 +981,9 @@ function NewListingPage() {
           city: values.city || null,
           lat: finalCoords?.lat ?? null,
           lng: finalCoords?.lng ?? null,
-          can_ship: values.can_ship !== "pickup",
+          can_ship: fieldGroupKeys.includes("delivery-location")
+            ? values.can_ship !== "pickup"
+            : null,
           attributes,
           turnstileToken,
         },
@@ -868,6 +1059,97 @@ function NewListingPage() {
     }
   }, [listingType, hasDraftData, navigate]);
 
+  const sharedProps: WizardSharedProps = {
+    native,
+
+    register,
+    watch,
+    setValue,
+    trigger,
+    errors,
+    touchedFields,
+
+    title,
+    subtitle,
+    description,
+    categoryId,
+    condition,
+    isFree,
+    canShip,
+    priceNok,
+    postalCode,
+    city,
+
+    categories: categories ?? [],
+    categoryLabel,
+    setCategoryPickerOpen,
+    onCategorySelect: (id, parentId) => {
+      setCategoryTouchedManually(true);
+      setSelectedParentId(parentId);
+      setValue("category_id", id, { shouldValidate: true });
+      setCategorySuggestion(null);
+      if (currentPage?.groups?.some((g) => g.key === "category-select")) {
+        goToNextPage();
+      }
+    },
+    categorySuggestion,
+    categoryTouchedManually,
+    applyCategorySuggestion,
+    setSuggestionDismissed,
+    setCategorySuggestion,
+
+    attributes,
+    onAttributesChange: setAttributes,
+    attributesTouched,
+    activeModules,
+
+    bilOgMcCategoryId,
+    vehicleRegistered,
+    setVehicleRegistered,
+    vehicleLookupLoading,
+    vehicleLookupError,
+    vehicleLookupResult,
+    vehicleClassification,
+    vehiclePreviousClassificationMismatch,
+    runVehicleLookup,
+    matchVehicleBrandForLeaf,
+    confirmVehicleData,
+    rejectVehicleLookup,
+
+    conditionDescription,
+
+    wtbMatch,
+
+    keywordsFetching,
+    keywordSuggestions,
+    appendTagToDescription,
+
+    similarListings,
+
+    images,
+    setImages,
+    uploadProgress,
+
+    locationMethod,
+    setLocationMethod,
+    locationLoading,
+    coords,
+    setCoords,
+    switchToPostal,
+    switchToGps,
+    fetchMyLocation,
+    setFullscreenMapOpen,
+    markerMovedRef,
+    lastEditedRef,
+
+    previewPrice,
+    mutationIsPending: mutation.isPending,
+    turnstileEnabled,
+    turnstileToken,
+    setTurnstileToken,
+    onCancel: () => navigate({ to: "/" }),
+  };
+
   return (
     <div className="mx-auto max-w-3xl px-4 pt-6 pb-4">
       <NativePageHeader title="Ny annonse" backTo="/" />
@@ -897,7 +1179,7 @@ function NewListingPage() {
       {/* Sticky step indicator */}
       <div className="sticky top-0 z-10 -mx-4 bg-background/95 px-4 py-3 backdrop-blur border-b border-border mt-4">
         <div className="flex items-center justify-between">
-          <StepIndicator step={step} native={native} />
+          <StepIndicator step={step} pages={pages} native={native} />
           {draftSaveError ? (
             <p className="text-xs text-destructive">Utkast ble ikke lagret</p>
           ) : (
@@ -910,1154 +1192,61 @@ function NewListingPage() {
         onSubmit={handleSubmit((v) => {
           if (missingFilters.length > 0) {
             setAttributesTouched(true);
-            setStep(2);
+            if (categoryAttributesPageIndex >= 0) setStep(categoryAttributesPageIndex + 1);
             showErrorToast("Fyll inn alle obligatoriske egenskaper før du publiserer.");
             return;
           }
           mutation.mutate(v);
         })}
-        className={`mt-8 ${native ? (step >= 3 ? "overflow-hidden" : "pb-[calc(var(--app-bottom-nav-h)+1.5rem)]") : "pb-24"}`}
+        className={`mt-8 ${native ? (isLast ? "overflow-hidden" : "pb-[calc(var(--app-bottom-nav-h)+1.5rem)]") : "pb-24"}`}
       >
-        {/* ══ WEB: original 3-step flow ══════════════════════════════════ */}
+        {(() => {
+          const groups = currentPage?.groups ?? [];
+          const isNativeDescriptionSoloPage =
+            native && groups.length === 1 && groups[0].key === "description-keywords";
+          const nextGroups = pages[step]?.groups ?? [];
+          return (
+            <div
+              className={isNativeDescriptionSoloPage ? "flex flex-col" : "space-y-6"}
+              style={
+                isNativeDescriptionSoloPage
+                  ? { height: "calc(var(--vvh, 100dvh) - var(--app-bottom-nav-h) - 13.75rem)" }
+                  : undefined
+              }
+            >
+              {groups.map((g) => (
+                <g.Component key={g.key} {...sharedProps} />
+              ))}
 
-        {/* ── Web Step 1: Bilder & tittel ─────────────────────────────── */}
-        {!native && step === 1 && (
-          <div className="space-y-6">
-            <section className="space-y-2">
-              <Label>
-                Bilder{" "}
-                <span className="font-normal text-muted-foreground">(anbefalt — maks 8)</span>
-              </Label>
-              <ImageUploader images={images} onChange={setImages} uploadProgress={uploadProgress} />
-            </section>
-
-            <section className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="title">Tittel</Label>
-                <div className="flex items-center gap-1.5">
-                  <FieldValid show={!!touchedFields.title && !errors.title} />
-                  <span className="text-xs text-muted-foreground">
-                    {(title ?? "").length} / 120
-                  </span>
-                </div>
-              </div>
-              <Input
-                id="title"
-                placeholder="F.eks. Trek Marlin 5 sykkel 2022 — sort, lite brukt"
-                aria-invalid={!!errors.title}
-                aria-describedby={errors.title ? "title-error" : undefined}
-                {...register("title")}
-              />
-              {errors.title && (
-                <p id="title-error" className="text-sm text-destructive">
-                  {errors.title.message}
-                </p>
-              )}
-            </section>
-
-            <div className="flex justify-end border-t border-border pt-6">
-              <Button type="button" onClick={() => void goToStep2()}>
-                Neste: Detaljer <ChevronRight className="size-4" />
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Web Step 2: Detaljer ────────────────────────────────────── */}
-        {!native && step === 2 && (
-          <div className="space-y-6">
-            <section className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="description">Beskrivelse</Label>
-                <div className="flex items-center gap-1.5">
-                  <FieldValid show={!!touchedFields.description && !errors.description} />
-                  <span className="text-xs text-muted-foreground">
-                    {(description ?? "").length} / 4000
-                  </span>
-                </div>
-              </div>
-              <Textarea
-                id="description"
-                rows={5}
-                placeholder="Beskriv tilstand, alder, hvorfor du selger, og om henting/sending."
-                aria-invalid={!!errors.description}
-                aria-describedby={errors.description ? "description-error" : undefined}
-                {...register("description")}
-              />
-              {errors.description && (
-                <p id="description-error" className="text-sm text-destructive">
-                  {errors.description.message}
-                </p>
-              )}
-            </section>
-
-            <section className="space-y-2">
-              <div className="flex items-center gap-1.5">
-                <Label>Kategori</Label>
-                <FieldValid show={!!touchedFields.category_id && !errors.category_id} />
-              </div>
-
-              {categorySuggestion && !categoryTouchedManually && (
-                <div className="flex items-center gap-2 rounded-md border border-dashed bg-muted/40 px-3 py-2 text-sm">
-                  <span>
-                    Forslag:{" "}
-                    {categorySuggestion.parent_name_nb
-                      ? `${categorySuggestion.parent_name_nb} › ${categorySuggestion.name_nb}`
-                      : categorySuggestion.name_nb}{" "}
-                    — bruk denne?
-                  </span>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    onClick={applyCategorySuggestion}
-                  >
-                    Bruk
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setSuggestionDismissed(true);
-                      setCategorySuggestion(null);
-                    }}
-                  >
-                    ✕
-                  </Button>
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={() => setCategoryPickerOpen(true)}
-                aria-invalid={!!errors.category_id}
-                aria-describedby={errors.category_id ? "category-error" : undefined}
-                className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors ${
-                  errors.category_id
-                    ? "border-destructive"
-                    : categoryLabel
-                      ? "border-border bg-card"
-                      : "border-border bg-card text-muted-foreground"
-                } hover:border-primary/40`}
+              <div
+                className={`${
+                  native
+                    ? "fixed inset-x-0 bottom-[var(--app-bottom-nav-h)] z-40 bg-background/95 px-4 pt-3 pb-3 backdrop-blur border-t border-border"
+                    : "border-t border-border pt-6"
+                } flex items-center ${isFirst ? "justify-end" : "justify-between"}`}
               >
-                <span>{categoryLabel ?? "Velg kategori..."}</span>
-                <ChevronDown className="size-4 text-muted-foreground" />
-              </button>
-
-              {errors.category_id && (
-                <p id="category-error" className="text-sm text-destructive">
-                  {errors.category_id.message}
-                </p>
-              )}
-
-              <VehicleLookupPanel
-                categoryId={categoryId || null}
-                categories={categories ?? []}
-                value={attributes}
-                onChange={setAttributes}
-              />
-
-              <AttributeFields
-                categoryId={categoryId || null}
-                categories={categories ?? []}
-                value={attributes}
-                onChange={setAttributes}
-                required
-                showErrors={attributesTouched}
-              />
-            </section>
-
-            <section className="space-y-2">
-              <Label>Tilstand</Label>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {CONDITIONS.map((c) => (
-                  <button
-                    key={c.value}
-                    type="button"
-                    onClick={() =>
-                      setValue("condition", c.value as ListingForm["condition"], {
-                        shouldValidate: true,
-                      })
-                    }
-                    className={`flex flex-col items-start rounded-xl border px-3 py-2.5 text-left transition-colors ${
-                      condition === c.value
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border bg-card hover:border-primary/40 hover:bg-primary/5"
-                    }`}
-                  >
-                    <span className="text-sm font-medium">{c.label}</span>
-                    <span className="mt-0.5 text-xs text-muted-foreground line-clamp-2">
-                      {c.description}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            {categoryId &&
-              (keywordsFetching || (keywordSuggestions && keywordSuggestions.length > 0)) && (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <Tag className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                  {keywordsFetching && (
-                    <Loader2 className="size-3.5 animate-spin text-muted-foreground" aria-hidden />
-                  )}
-                  {keywordSuggestions?.map(({ word }) => (
-                    <button
-                      key={word}
-                      type="button"
-                      onClick={() => appendTagToDescription(word)}
-                      className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-foreground hover:bg-primary/10 hover:border-primary/40 transition-colors"
-                    >
-                      {word}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-            {similarListings && similarListings.length > 0 && (
-              <section className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Lignende annonser</p>
-                <ul className="divide-y divide-border rounded-lg border border-border">
-                  {similarListings.map((l) => (
-                    <li key={l.id} className="flex items-center justify-between px-3 py-2 text-sm">
-                      <span className="line-clamp-1 flex-1 text-foreground">{l.title}</span>
-                      <span className="ml-3 shrink-0 text-muted-foreground">
-                        {l.is_free
-                          ? "Gratis"
-                          : typeof l.price_nok === "number"
-                            ? `${l.price_nok.toLocaleString("nb-NO")} kr`
-                            : "—"}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
-            <section className="space-y-3">
-              <div className="flex items-center gap-1.5">
-                <Label>Pris</Label>
-                <FieldValid
-                  show={
-                    (!!touchedFields.price_nok || isFree) &&
-                    !errors.price_nok &&
-                    (isFree || typeof priceNok === "number")
-                  }
-                />
-              </div>
-              <div className="flex items-center gap-3">
-                <Input
-                  type="number"
-                  min={0}
-                  placeholder="kr"
-                  disabled={isFree}
-                  className="max-w-[200px]"
-                  aria-invalid={!!errors.price_nok}
-                  aria-describedby={errors.price_nok ? "price-error" : undefined}
-                  {...register("price_nok")}
-                />
-                <label className="flex items-center gap-2 text-sm">
-                  <Checkbox
-                    checked={isFree}
-                    onCheckedChange={(v) => setValue("is_free", Boolean(v))}
-                  />
-                  Gis bort gratis
-                </label>
-              </div>
-              {errors.price_nok && (
-                <p id="price-error" className="text-sm text-destructive">
-                  {errors.price_nok.message as string}
-                </p>
-              )}
-              {!isFree && wtbMatch && wtbMatch.count > 0 && (
-                <div className="flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm">
-                  <Search className="mt-0.5 size-4 shrink-0 text-primary" />
-                  <div>
-                    <span className="font-medium">
-                      {wtbMatch.count === 1
-                        ? "1 bruker ønsker å kjøpe noe lignende"
-                        : `${wtbMatch.count} brukere ønsker å kjøpe noe lignende`}
-                    </span>
-                    {wtbMatch.maxPrice != null && (
-                      <span className="text-muted-foreground">
-                        {" "}
-                        — høyeste budsjett{" "}
-                        <span className="font-medium text-foreground">
-                          {wtbMatch.maxPrice.toLocaleString("nb-NO")} kr
-                        </span>
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-            </section>
-
-            <div className="flex items-center justify-between border-t border-border pt-6">
-              <Button type="button" variant="ghost" onClick={() => setStep(1)}>
-                <ChevronLeft className="size-4" /> Tilbake
-              </Button>
-              <Button type="button" onClick={() => void goToStep3()}>
-                Neste: Lokasjon <ChevronRight className="size-4" />
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Web Step 3: Sted & publiser ──────────────────────────────── */}
-        {!native && step === 3 && (
-          <div className="space-y-6">
-            <section className="space-y-2">
-              <Label>Forhåndsvisning</Label>
-              <p className="text-xs text-muted-foreground">
-                Dette er slik annonsen din vil se ut i søkelisten
-              </p>
-              <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm sm:max-w-[220px]">
-                <div className="aspect-square bg-muted">
-                  {images[0] ? (
-                    <img
-                      src={images[0].previewUrl}
-                      alt=""
-                      className="size-full object-cover"
-                      aria-hidden
-                    />
-                  ) : (
-                    <div className="flex size-full flex-col items-center justify-center gap-1 text-muted-foreground">
-                      <span className="text-2xl">📷</span>
-                      <span className="text-xs">Ingen bilde</span>
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-0.5 p-3">
-                  <p className="line-clamp-2 text-sm font-medium leading-snug">{title || "—"}</p>
-                  {previewPrice && (
-                    <p className="font-display text-base font-semibold">{previewPrice}</p>
-                  )}
-                  {(city || postalCode) && (
-                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <MapPin className="size-3" /> {city || postalCode}
-                    </p>
-                  )}
-                  {categoryLabel && (
-                    <p className="text-xs text-muted-foreground truncate">{categoryLabel}</p>
-                  )}
-                </div>
-              </div>
-            </section>
-
-            <section className="space-y-3">
-              <Label>Levering</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {(
-                  [
-                    { value: "pickup", label: "Må hentes", description: "Kjøper henter selv" },
-                    { value: "ship", label: "Må sendes", description: "Selger sender" },
-                    {
-                      value: "both",
-                      label: "Begge deler",
-                      description: "Kan både hentes og sendes",
-                    },
-                  ] as const
-                ).map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setValue("can_ship", opt.value, { shouldValidate: true })}
-                    className={`flex flex-col items-center gap-1 rounded-lg border px-3 py-3 text-center text-sm transition-colors ${
-                      canShip === opt.value
-                        ? "border-primary bg-primary/10 font-medium text-primary"
-                        : "border-border bg-card text-foreground hover:border-primary/40 hover:bg-primary/5"
-                    }`}
-                  >
-                    <span className="font-medium">{opt.label}</span>
-                    <span className="text-xs text-muted-foreground">{opt.description}</span>
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            <section className="space-y-4">
-              <Label>Sted</Label>
-              {locationMethod === null && (
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => void fetchMyLocation()}
-                    className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card p-4 text-center transition-colors hover:border-primary hover:bg-accent active:scale-95"
-                  >
-                    <LocateFixed className="size-6 text-primary" />
-                    <span className="text-sm font-medium">Bruk min posisjon</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLocationMethod("postal")}
-                    className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card p-4 text-center transition-colors hover:border-primary hover:bg-accent active:scale-95"
-                  >
-                    <Hash className="size-6 text-primary" />
-                    <span className="text-sm font-medium">Skriv inn postnummer</span>
-                  </button>
-                </div>
-              )}
-              {locationMethod === "gps" && (
-                <div className="space-y-3">
-                  {locationLoading ? (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="size-4 animate-spin" />
-                      Henter posisjon…
-                    </div>
-                  ) : coords ? (
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-muted-foreground">
-                        <MapPin className="mr-1 inline size-3.5" />
-                        {[postalCode, city].filter(Boolean).join(" ") || "Posisjon funnet"}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={switchToPostal}
-                        className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                      >
-                        Benytt postnummer isteden
-                      </button>
-                    </div>
-                  ) : null}
-                  {coords && (
-                    <div className="space-y-2">
-                      {native ? (
-                        <div
-                          className="relative cursor-pointer"
-                          onClick={() => setFullscreenMapOpen(true)}
-                        >
-                          <ListingLocationPicker
-                            lat={coords.lat}
-                            lng={coords.lng}
-                            onChange={() => {}}
-                            readOnly
-                          />
-                          <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center">
-                            <span className="rounded-full bg-background/90 px-3 py-1.5 text-xs text-muted-foreground shadow">
-                              Trykk for å justere lokasjonen på annonsen
-                            </span>
-                          </div>
-                        </div>
-                      ) : (
-                        <ListingLocationPicker
-                          lat={coords.lat}
-                          lng={coords.lng}
-                          onChange={(next) => {
-                            markerMoved.current = true;
-                            lastEdited.current = "map";
-                            setCoords(next);
-                          }}
-                        />
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        Denne lokasjonen vises på annonsen din. Bare omtrentlig posisjon er synlig
-                        for andre.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-              {locationMethod === "postal" && (
-                <div className="space-y-3">
-                  <div className="flex items-end gap-3">
-                    <div className="w-36 space-y-2">
-                      <Label htmlFor="postal_code">Postnummer</Label>
-                      <Input
-                        id="postal_code"
-                        inputMode="numeric"
-                        maxLength={4}
-                        placeholder="0150"
-                        aria-invalid={!!errors.postal_code}
-                        aria-describedby={errors.postal_code ? "postal-code-error" : undefined}
-                        {...register("postal_code", {
-                          onChange: () => {
-                            lastEdited.current = "postal_code";
-                            markerMoved.current = false;
-                          },
-                        })}
-                      />
-                      {errors.postal_code && (
-                        <p id="postal-code-error" className="text-sm text-destructive">
-                          {errors.postal_code.message}
-                        </p>
-                      )}
-                    </div>
-                    {city && <p className="pb-2 text-sm text-muted-foreground">{city}</p>}
-                    <button
-                      type="button"
-                      onClick={switchToGps}
-                      className="mb-2 ml-auto text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                    >
-                      Bruk min posisjon isteden
-                    </button>
-                  </div>
-                  {coords && (
-                    <div className="space-y-2">
-                      {native ? (
-                        <div
-                          className="relative cursor-pointer"
-                          onClick={() => setFullscreenMapOpen(true)}
-                        >
-                          <ListingLocationPicker
-                            lat={coords.lat}
-                            lng={coords.lng}
-                            onChange={() => {}}
-                            readOnly
-                          />
-                          <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center">
-                            <span className="rounded-full bg-background/90 px-3 py-1.5 text-xs text-muted-foreground shadow">
-                              Trykk for å justere lokasjonen på annonsen
-                            </span>
-                          </div>
-                        </div>
-                      ) : (
-                        <ListingLocationPicker
-                          lat={coords.lat}
-                          lng={coords.lng}
-                          onChange={(next) => {
-                            markerMoved.current = true;
-                            lastEdited.current = "map";
-                            setCoords(next);
-                          }}
-                        />
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        Denne lokasjonen vises på annonsen din. Bare omtrentlig posisjon er synlig
-                        for andre.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </section>
-
-            {mutation.isPending && (
-              <div className="space-y-1.5">
-                <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
-                  {uploadProgress
-                    ? `Laster opp bilde ${uploadProgress.done} av ${uploadProgress.total}…`
-                    : "Forbereder opplasting…"}
-                </p>
-                <Progress
-                  value={uploadProgress ? (uploadProgress.done / uploadProgress.total) * 100 : null}
-                  className={uploadProgress ? "" : "animate-pulse"}
-                />
-              </div>
-            )}
-
-            <div className="flex items-center justify-between border-t border-border pt-6">
-              <Button type="button" variant="ghost" onClick={() => setStep(2)}>
-                <ChevronLeft className="size-4" /> Tilbake
-              </Button>
-              <div className="flex items-center gap-3">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => navigate({ to: "/" })}
-                  disabled={mutation.isPending}
-                >
-                  Avbryt
-                </Button>
-                {turnstileEnabled && (
-                  <Turnstile
-                    siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-                    onSuccess={(token) => setTurnstileToken(token)}
-                    onExpire={() => setTurnstileToken(null)}
-                    options={{ size: "invisible" }}
+                {!isFirst && (
+                  <Button type="button" variant="ghost" onClick={() => window.history.back()}>
+                    <ChevronLeft className="size-4" /> Tilbake
+                  </Button>
+                )}
+                {!isLast ? (
+                  <Button type="button" onClick={() => void goToNextPage()}>
+                    Neste: {pageLabel(nextGroups, native)} <ChevronRight className="size-4" />
+                  </Button>
+                ) : (
+                  <PublishActions
+                    turnstileEnabled={turnstileEnabled}
+                    turnstileToken={turnstileToken}
+                    setTurnstileToken={setTurnstileToken}
+                    mutationIsPending={mutation.isPending}
+                    onCancel={() => navigate({ to: "/" })}
                   />
                 )}
-                <Button
-                  type="submit"
-                  disabled={mutation.isPending || (turnstileEnabled && !turnstileToken)}
-                >
-                  {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
-                  Publiser annonse
-                </Button>
               </div>
             </div>
-          </div>
-        )}
-
-        {/* ══ NATIVE: new 5-step flow ════════════════════════════════════ */}
-
-        {/* ── Native Step 1: Tittel & bilder ─────────────────────────────────── */}
-        {native && step === 1 && (
-          <div className="space-y-6">
-            <section className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="title">Tittel</Label>
-                <div className="flex items-center gap-1.5">
-                  <FieldValid show={!!touchedFields.title && !errors.title} />
-                  <span className="text-xs text-muted-foreground">
-                    {(title ?? "").length} / 120
-                  </span>
-                </div>
-              </div>
-              <Input
-                id="title"
-                placeholder="F.eks. Trek Marlin 5 sykkel 2022 — sort, lite brukt"
-                aria-invalid={!!errors.title}
-                aria-describedby={errors.title ? "title-error" : undefined}
-                {...register("title")}
-              />
-              {errors.title && (
-                <p id="title-error" className="text-sm text-destructive">
-                  {errors.title.message}
-                </p>
-              )}
-            </section>
-
-            <section className="space-y-2">
-              <Label>
-                Bilder{" "}
-                <span className="font-normal text-muted-foreground">(anbefalt — maks 8)</span>
-              </Label>
-              <ImageUploader images={images} onChange={setImages} uploadProgress={uploadProgress} />
-            </section>
-
-            <div className="fixed inset-x-0 bottom-[var(--app-bottom-nav-h)] z-40 flex justify-end bg-background/95 px-4 pt-3 pb-3 backdrop-blur border-t border-border">
-              <Button type="button" onClick={() => void goToStep2()}>
-                Neste: Detaljer <ChevronRight className="size-4" />
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Native Step 2: Detaljer ────────────────────────────────────────── */}
-        {native && step === 2 && (
-          <div className="space-y-6">
-            {/* Category */}
-            <section className="space-y-2">
-              <div className="flex items-center gap-1.5">
-                <Label>Kategori</Label>
-                <FieldValid show={!!touchedFields.category_id && !errors.category_id} />
-              </div>
-
-              {categorySuggestion && !categoryTouchedManually && (
-                <div className="flex items-center gap-2 rounded-md border border-dashed bg-muted/40 px-3 py-2 text-sm">
-                  <span>
-                    Forslag:{" "}
-                    {categorySuggestion.parent_name_nb
-                      ? `${categorySuggestion.parent_name_nb} › ${categorySuggestion.name_nb}`
-                      : categorySuggestion.name_nb}{" "}
-                    — bruk denne?
-                  </span>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    onClick={applyCategorySuggestion}
-                  >
-                    Bruk
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setSuggestionDismissed(true);
-                      setCategorySuggestion(null);
-                    }}
-                  >
-                    ✕
-                  </Button>
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={() => setCategoryPickerOpen(true)}
-                aria-invalid={!!errors.category_id}
-                aria-describedby={errors.category_id ? "category-error" : undefined}
-                className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors ${
-                  errors.category_id
-                    ? "border-destructive"
-                    : categoryLabel
-                      ? "border-border bg-card"
-                      : "border-border bg-card text-muted-foreground"
-                } hover:border-primary/40`}
-              >
-                <span>{categoryLabel ?? "Velg kategori..."}</span>
-                <ChevronDown className="size-4 text-muted-foreground" />
-              </button>
-
-              {errors.category_id && (
-                <p id="category-error" className="text-sm text-destructive">
-                  {errors.category_id.message}
-                </p>
-              )}
-
-              <VehicleLookupPanel
-                categoryId={categoryId || null}
-                categories={categories ?? []}
-                value={attributes}
-                onChange={setAttributes}
-              />
-
-              <AttributeFields
-                categoryId={categoryId || null}
-                categories={categories ?? []}
-                value={attributes}
-                onChange={setAttributes}
-                required
-                showErrors={attributesTouched}
-              />
-            </section>
-
-            {/* Condition as horizontal chip row */}
-            <section className="space-y-2">
-              <Label>Tilstand</Label>
-              <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
-                {CONDITIONS.map((c) => (
-                  <button
-                    key={c.value}
-                    type="button"
-                    onClick={() =>
-                      setValue("condition", c.value as ListingForm["condition"], {
-                        shouldValidate: true,
-                      })
-                    }
-                    className={`shrink-0 rounded-full border px-3 py-1.5 text-sm whitespace-nowrap transition-colors ${
-                      condition === c.value
-                        ? "border-primary bg-primary/10 text-primary font-medium"
-                        : "border-border bg-card text-muted-foreground hover:border-primary/40"
-                    }`}
-                  >
-                    {c.label}
-                  </button>
-                ))}
-              </div>
-              {conditionDescription && (
-                <p className="text-xs text-muted-foreground">{conditionDescription}</p>
-              )}
-            </section>
-
-            {/* Price */}
-            <section className="space-y-3">
-              <div className="flex items-center gap-1.5">
-                <Label>Pris</Label>
-                <FieldValid
-                  show={
-                    (!!touchedFields.price_nok || isFree) &&
-                    !errors.price_nok &&
-                    (isFree || typeof priceNok === "number")
-                  }
-                />
-              </div>
-              <div className="flex items-center gap-3">
-                <Input
-                  type="number"
-                  min={0}
-                  placeholder="kr"
-                  disabled={isFree}
-                  className="max-w-[200px]"
-                  aria-invalid={!!errors.price_nok}
-                  aria-describedby={errors.price_nok ? "price-error" : undefined}
-                  {...register("price_nok")}
-                />
-                <label className="flex items-center gap-2 text-sm">
-                  <Checkbox
-                    checked={isFree}
-                    onCheckedChange={(v) => setValue("is_free", Boolean(v))}
-                  />
-                  Gis bort gratis
-                </label>
-              </div>
-              {errors.price_nok && (
-                <p id="price-error" className="text-sm text-destructive">
-                  {errors.price_nok.message as string}
-                </p>
-              )}
-            </section>
-
-            {/* Similar listings */}
-            {similarListings && similarListings.length > 0 && (
-              <section className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Lignende annonser</p>
-                <ul className="divide-y divide-border rounded-lg border border-border">
-                  {similarListings.map((l) => (
-                    <li key={l.id} className="flex items-center justify-between px-3 py-2 text-sm">
-                      <span className="line-clamp-1 flex-1 text-foreground">{l.title}</span>
-                      <span className="ml-3 shrink-0 text-muted-foreground">
-                        {l.is_free
-                          ? "Gratis"
-                          : typeof l.price_nok === "number"
-                            ? `${l.price_nok.toLocaleString("nb-NO")} kr`
-                            : "—"}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
-            <div className="fixed inset-x-0 bottom-[var(--app-bottom-nav-h)] z-40 flex items-center justify-between bg-background/95 px-4 pt-3 pb-3 backdrop-blur border-t border-border">
-              <Button type="button" variant="ghost" onClick={() => setStep(1)}>
-                <ChevronLeft className="size-4" /> Tilbake
-              </Button>
-              <Button type="button" onClick={() => void goToStep3()}>
-                Neste: Beskrivelse <ChevronRight className="size-4" />
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Native Step 3: Beskrivelse ──────────────────────────────────────── */}
-        {native && step === 3 && (
-          <div
-            className="flex flex-col"
-            style={{
-              height: "calc(var(--vvh, 100dvh) - var(--app-bottom-nav-h) - 13.75rem)",
-            }}
-          >
-            <section className="flex flex-1 flex-col gap-2 min-h-0">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="description">Beskrivelse</Label>
-                <div className="flex items-center gap-1.5">
-                  <FieldValid show={!!touchedFields.description && !errors.description} />
-                  <span className="text-xs text-muted-foreground">
-                    {(description ?? "").length} / 4000
-                  </span>
-                </div>
-              </div>
-              <Textarea
-                id="description"
-                className="flex-1 resize-none min-h-0"
-                placeholder="Beskriv tilstand, alder, hvorfor du selger, og om henting/sending."
-                aria-invalid={!!errors.description}
-                aria-describedby={errors.description ? "description-error" : undefined}
-                {...register("description")}
-              />
-              {errors.description && (
-                <p id="description-error" className="text-sm text-destructive">
-                  {errors.description.message}
-                </p>
-              )}
-            </section>
-
-            {/* Keyword suggestions */}
-            {categoryId &&
-              (keywordsFetching || (keywordSuggestions && keywordSuggestions.length > 0)) && (
-                <div className="flex flex-wrap items-center gap-1.5 mt-3">
-                  <Tag className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                  {keywordsFetching && (
-                    <Loader2 className="size-3.5 animate-spin text-muted-foreground" aria-hidden />
-                  )}
-                  {keywordSuggestions?.map(({ word }) => (
-                    <button
-                      key={word}
-                      type="button"
-                      onClick={() => appendTagToDescription(word)}
-                      className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-foreground hover:bg-primary/10 hover:border-primary/40 transition-colors"
-                    >
-                      {word}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-            <div className="fixed inset-x-0 bottom-[var(--app-bottom-nav-h)] z-40 flex items-center justify-between bg-background/95 px-4 pt-3 pb-3 backdrop-blur border-t border-border">
-              <Button type="button" variant="ghost" onClick={() => setStep(2)}>
-                <ChevronLeft className="size-4" /> Tilbake
-              </Button>
-              <Button type="button" onClick={() => void goToStep4()}>
-                Neste: Sted & levering <ChevronRight className="size-4" />
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Native Step 4: Sted & levering ──────────────────────────────────── */}
-        {native && step === 4 && (
-          <div className="space-y-6">
-            {/* Delivery options */}
-            <section className="space-y-3">
-              <Label>Levering</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {(
-                  [
-                    { value: "pickup", label: "Må hentes", description: "Kjøper henter selv" },
-                    { value: "ship", label: "Må sendes", description: "Selger sender" },
-                    {
-                      value: "both",
-                      label: "Begge deler",
-                      description: "Kan både hentes og sendes",
-                    },
-                  ] as const
-                ).map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setValue("can_ship", opt.value, { shouldValidate: true })}
-                    className={`flex flex-col items-center gap-1 rounded-lg border px-3 py-3 text-center text-sm transition-colors ${
-                      canShip === opt.value
-                        ? "border-primary bg-primary/10 font-medium text-primary"
-                        : "border-border bg-card text-foreground hover:border-primary/40 hover:bg-primary/5"
-                    }`}
-                  >
-                    <span className="font-medium">{opt.label}</span>
-                    <span className="text-xs text-muted-foreground">{opt.description}</span>
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            {/* Location */}
-            <section className="space-y-4">
-              <Label>Sted</Label>
-              {locationMethod === null && (
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => void fetchMyLocation()}
-                    className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card p-4 text-center transition-colors hover:border-primary hover:bg-accent active:scale-95"
-                  >
-                    <LocateFixed className="size-6 text-primary" />
-                    <span className="text-sm font-medium">Bruk min posisjon</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLocationMethod("postal")}
-                    className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card p-4 text-center transition-colors hover:border-primary hover:bg-accent active:scale-95"
-                  >
-                    <Hash className="size-6 text-primary" />
-                    <span className="text-sm font-medium">Skriv inn postnummer</span>
-                  </button>
-                </div>
-              )}
-              {locationMethod === "gps" && (
-                <div className="space-y-3">
-                  {locationLoading ? (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="size-4 animate-spin" />
-                      Henter posisjon…
-                    </div>
-                  ) : coords ? (
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-muted-foreground">
-                        <MapPin className="mr-1 inline size-3.5" />
-                        {[postalCode, city].filter(Boolean).join(" ") || "Posisjon funnet"}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={switchToPostal}
-                        className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                      >
-                        Benytt postnummer isteden
-                      </button>
-                    </div>
-                  ) : null}
-                  {coords && (
-                    <div className="space-y-2">
-                      {native ? (
-                        <div
-                          className="relative cursor-pointer"
-                          onClick={() => setFullscreenMapOpen(true)}
-                        >
-                          <ListingLocationPicker
-                            lat={coords.lat}
-                            lng={coords.lng}
-                            onChange={() => {}}
-                            readOnly
-                          />
-                          <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center">
-                            <span className="rounded-full bg-background/90 px-3 py-1.5 text-xs text-muted-foreground shadow">
-                              Trykk for å justere lokasjonen på annonsen
-                            </span>
-                          </div>
-                        </div>
-                      ) : (
-                        <ListingLocationPicker
-                          lat={coords.lat}
-                          lng={coords.lng}
-                          onChange={(next) => {
-                            markerMoved.current = true;
-                            lastEdited.current = "map";
-                            setCoords(next);
-                          }}
-                        />
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        Denne lokasjonen vises på annonsen din. Bare omtrentlig posisjon er synlig
-                        for andre.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-              {locationMethod === "postal" && (
-                <div className="space-y-3">
-                  <div className="flex items-end gap-3">
-                    <div className="w-36 space-y-2">
-                      <Label htmlFor="postal_code">Postnummer</Label>
-                      <Input
-                        id="postal_code"
-                        inputMode="numeric"
-                        maxLength={4}
-                        placeholder="0150"
-                        aria-invalid={!!errors.postal_code}
-                        aria-describedby={errors.postal_code ? "postal-code-error" : undefined}
-                        {...register("postal_code", {
-                          onChange: () => {
-                            lastEdited.current = "postal_code";
-                            markerMoved.current = false;
-                          },
-                        })}
-                      />
-                      {errors.postal_code && (
-                        <p id="postal-code-error" className="text-sm text-destructive">
-                          {errors.postal_code.message}
-                        </p>
-                      )}
-                    </div>
-                    {city && <p className="pb-2 text-sm text-muted-foreground">{city}</p>}
-                    <button
-                      type="button"
-                      onClick={switchToGps}
-                      className="mb-2 ml-auto text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                    >
-                      Bruk min posisjon isteden
-                    </button>
-                  </div>
-                  {coords && (
-                    <div className="space-y-2">
-                      {native ? (
-                        <div
-                          className="relative cursor-pointer"
-                          onClick={() => setFullscreenMapOpen(true)}
-                        >
-                          <ListingLocationPicker
-                            lat={coords.lat}
-                            lng={coords.lng}
-                            onChange={() => {}}
-                            readOnly
-                          />
-                          <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center">
-                            <span className="rounded-full bg-background/90 px-3 py-1.5 text-xs text-muted-foreground shadow">
-                              Trykk for å justere lokasjonen på annonsen
-                            </span>
-                          </div>
-                        </div>
-                      ) : (
-                        <ListingLocationPicker
-                          lat={coords.lat}
-                          lng={coords.lng}
-                          onChange={(next) => {
-                            markerMoved.current = true;
-                            lastEdited.current = "map";
-                            setCoords(next);
-                          }}
-                        />
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        Denne lokasjonen vises på annonsen din. Bare omtrentlig posisjon er synlig
-                        for andre.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </section>
-
-            <div className="fixed inset-x-0 bottom-[var(--app-bottom-nav-h)] z-40 flex items-center justify-between bg-background/95 px-4 pt-3 pb-3 backdrop-blur border-t border-border">
-              <Button type="button" variant="ghost" onClick={() => setStep(3)}>
-                <ChevronLeft className="size-4" /> Tilbake
-              </Button>
-              <Button type="button" onClick={goToStep5}>
-                Neste: Forhåndsvisning <ChevronRight className="size-4" />
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Native Step 5: Forhåndsvisning & publiser ──────────────────────── */}
-        {native && step === 5 && (
-          <div className="space-y-6">
-            <section className="space-y-2">
-              <Label>Forhåndsvisning</Label>
-              <p className="text-xs text-muted-foreground">
-                Dette er slik annonsen din vil se ut i søkelisten
-              </p>
-              <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm sm:max-w-[220px]">
-                <div className="aspect-square bg-muted">
-                  {images[0] ? (
-                    <img
-                      src={images[0].previewUrl}
-                      alt=""
-                      className="size-full object-cover"
-                      aria-hidden
-                    />
-                  ) : (
-                    <div className="flex size-full flex-col items-center justify-center gap-1 text-muted-foreground">
-                      <span className="text-2xl">📷</span>
-                      <span className="text-xs">Ingen bilde</span>
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-0.5 p-3">
-                  <p className="line-clamp-2 text-sm font-medium leading-snug">{title || "—"}</p>
-                  {previewPrice && (
-                    <p className="font-display text-base font-semibold">{previewPrice}</p>
-                  )}
-                  {(city || postalCode) && (
-                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <MapPin className="size-3" /> {city || postalCode}
-                    </p>
-                  )}
-                  {categoryLabel && (
-                    <p className="text-xs text-muted-foreground truncate">{categoryLabel}</p>
-                  )}
-                </div>
-              </div>
-            </section>
-
-            {mutation.isPending && (
-              <div className="space-y-1.5">
-                <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
-                  {uploadProgress
-                    ? `Laster opp bilde ${uploadProgress.done} av ${uploadProgress.total}…`
-                    : "Forbereder opplasting…"}
-                </p>
-                <Progress
-                  value={uploadProgress ? (uploadProgress.done / uploadProgress.total) * 100 : null}
-                  className={uploadProgress ? "" : "animate-pulse"}
-                />
-              </div>
-            )}
-
-            <div className="fixed inset-x-0 bottom-[var(--app-bottom-nav-h)] z-40 flex items-center justify-between bg-background/95 px-4 pt-3 pb-3 backdrop-blur border-t border-border">
-              <Button type="button" variant="ghost" onClick={() => setStep(4)}>
-                <ChevronLeft className="size-4" /> Tilbake
-              </Button>
-              <div className="flex items-center gap-3">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => navigate({ to: "/" })}
-                  disabled={mutation.isPending}
-                >
-                  Avbryt
-                </Button>
-                {turnstileEnabled && (
-                  <Turnstile
-                    siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-                    onSuccess={(token) => setTurnstileToken(token)}
-                    onExpire={() => setTurnstileToken(null)}
-                    options={{ size: "invisible" }}
-                  />
-                )}
-                <Button
-                  type="submit"
-                  disabled={mutation.isPending || (turnstileEnabled && !turnstileToken)}
-                >
-                  {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
-                  Publiser annonse
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
+          );
+        })()}
       </form>
 
       {/* Category picker bottom sheet */}
@@ -2089,8 +1278,7 @@ function NewListingPage() {
             <AlertDialogAction
               onClick={() => {
                 setShowNoImageDialog(false);
-                setStep(2);
-                window.scrollTo({ top: 0, behavior: "smooth" });
+                void goToNextPage({ skipImageCheck: true });
               }}
             >
               Fortsett uten bilde
@@ -2113,7 +1301,7 @@ function NewListingPage() {
             <AlertDialogAction
               onClick={() => {
                 setShowNoPriceDialog(false);
-                void goToStep3(true);
+                void goToNextPage({ skipPriceCheck: true });
               }}
             >
               Fortsett uten pris
@@ -2128,8 +1316,8 @@ function NewListingPage() {
           lat={coords.lat}
           lng={coords.lng}
           onConfirm={(next) => {
-            markerMoved.current = true;
-            lastEdited.current = "map";
+            markerMovedRef.current = true;
+            lastEditedRef.current = "map";
             setCoords(next);
           }}
           onClose={() => setFullscreenMapOpen(false)}

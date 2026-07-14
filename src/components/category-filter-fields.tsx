@@ -8,7 +8,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
+import type {
+  AttributeFilterValue,
+  CategoryFilter,
+  VehicleBrandGroup,
+} from "@/lib/category-filters";
+import {
+  VehicleBrandField,
+  VehicleModelField,
+} from "@/features/listing-creation/modules/generic-attributes/vehicle-brand-model-fields";
 
 /**
  * Renders the configurable filter controls for a category's `CategoryFilter`s
@@ -30,6 +38,32 @@ export function CategoryFilterFields({
       {filters.map((f) => {
         const current = values[f.key];
 
+        if (f.type === "brand_select") {
+          return (
+            <VehicleBrandField
+              key={f.id}
+              categoryGroup={(f.unit ?? "bil") as VehicleBrandGroup}
+              value={current?.kind === "select" ? current.value : undefined}
+              onChange={(v) => onChange(f.key, v ? { kind: "select", value: v } : undefined)}
+            />
+          );
+        }
+        if (f.type === "model_select") {
+          const brandFilter = filters.find((bf) => bf.type === "brand_select");
+          const brandName =
+            brandFilter && values[brandFilter.key]?.kind === "select"
+              ? (values[brandFilter.key] as { kind: "select"; value: string }).value
+              : undefined;
+          return (
+            <VehicleModelField
+              key={f.id}
+              categoryGroup={(brandFilter?.unit ?? "bil") as VehicleBrandGroup}
+              brandName={brandName}
+              value={current?.kind === "select" ? current.value : undefined}
+              onChange={(v) => onChange(f.key, v ? { kind: "select", value: v } : undefined)}
+            />
+          );
+        }
         if (f.type === "boolean") {
           return (
             <label key={f.id} className="flex items-center gap-2 text-sm">

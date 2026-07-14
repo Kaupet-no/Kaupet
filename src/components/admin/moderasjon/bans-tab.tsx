@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, ShieldOff } from "lucide-react";
+import { Loader2, Shield, ShieldOff } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -15,13 +16,30 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { adminUnbanUser } from "@/lib/admin-moderation.functions";
 import { formatErrorMessage } from "@/lib/errors";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export function BansTab() {
   const qc = useQueryClient();
   const unbanFn = useServerFn(adminUnbanUser);
-  const { data, isLoading } = useQuery({
+  const [target, setTarget] = useState<{ id: string; name: string } | null>(null);
+  const {
+    data,
+    isLoading,
+    isError,
+    error: queryError,
+  } = useQuery({
     queryKey: ["admin-bans"],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("admin_list_bans");
@@ -37,6 +55,7 @@ export function BansTab() {
     },
     onError: (e: Error) =>
       showErrorToast(formatErrorMessage(e, "Kunne ikke oppheve utestengingen")),
+    onSettled: () => setTarget(null),
   });
   return (
     <Card>
@@ -57,10 +76,23 @@ export function BansTab() {
                   <Loader2 className="mx-auto size-5 animate-spin text-muted-foreground" />
                 </TableCell>
               </TableRow>
+            ) : isError ? (
+              <TableRow>
+                <TableCell colSpan={4} className="py-8 text-center">
+                  <p className="text-sm text-destructive">
+                    {formatErrorMessage(queryError, "Kunne ikke laste utestengte brukere")}
+                  </p>
+                </TableCell>
+              </TableRow>
             ) : (data ?? []).length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
-                  Ingen utestengte brukere
+                <TableCell colSpan={4} className="py-8">
+                  <EmptyState
+                    icon={Shield}
+                    title="Ingen utestengte brukere"
+                    description="Utestengte brukere vises her."
+                    className="border-none p-0"
+                  />
                 </TableCell>
               </TableRow>
             ) : (
@@ -90,7 +122,9 @@ export function BansTab() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => unban.mutate(b.user_id)}
+                      onClick={() =>
+                        setTarget({ id: b.user_id, name: b.display_name ?? b.user_id.slice(0, 8) })
+                      }
                       disabled={unban.isPending}
                     >
                       <ShieldOff className="size-4" /> Opphev
@@ -102,6 +136,23 @@ export function BansTab() {
           </TableBody>
         </Table>
       </CardContent>
+
+      <AlertDialog open={!!target} onOpenChange={(open) => !open && setTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Oppheve utestengingen av {target?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Brukeren får igjen tilgang til Kaupet. Dette kan ikke angres uten å utestenge på nytt.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction onClick={() => target && unban.mutate(target.id)}>
+              Opphev
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

@@ -1,6 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { NativePageHeader } from "@/components/native-page-header";
-import { useIsNative } from "@/lib/use-is-native";
+import { useIsNative } from "@/hooks/use-is-native";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { User as UserIcon } from "lucide-react";
@@ -12,7 +12,9 @@ import { StarRating } from "@/components/star-rating";
 
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
 import { AdminUserActions } from "@/components/admin/suspend-user-menu";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getPublicProfile, listUserReviews } from "@/lib/reviews.functions";
+import { formatErrorMessage } from "@/lib/errors";
 
 export const Route = createFileRoute("/bruker/$id")({
   loader: async ({ params }) => {
@@ -60,18 +62,26 @@ function PublicProfilePage() {
   const { profile } = Route.useLoaderData();
   const listReviewsFn = useServerFn(listUserReviews);
 
-  const { data: reviews } = useQuery({
+  const {
+    data: reviews,
+    isError: reviewsIsError,
+    error: reviewsError,
+  } = useQuery({
     queryKey: ["public-reviews", id],
     queryFn: () => listReviewsFn({ data: { userId: id, limit: 50 } }),
   });
 
-  const { data: activeListings } = useQuery({
+  const {
+    data: activeListings,
+    isError: listingsIsError,
+    error: listingsError,
+  } = useQuery({
     queryKey: ["public-listings", id],
     queryFn: async (): Promise<ListingCardData[]> => {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order)",
+          "id, kaupet_code, title, subtitle, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order)",
         )
         .eq("seller_id", id)
         .eq("status", "active")
@@ -83,6 +93,7 @@ function PublicProfilePage() {
         id: string;
         kaupet_code: string;
         title: string;
+        subtitle: string | null;
         price_nok: number | null;
         is_free: boolean;
         city: string | null;
@@ -97,6 +108,7 @@ function PublicProfilePage() {
           id: l.id,
           kaupet_code: l.kaupet_code,
           title: l.title,
+          subtitle: l.subtitle,
           price_nok: l.price_nok,
           is_free: l.is_free,
           city: l.city,
@@ -151,15 +163,19 @@ function PublicProfilePage() {
       <section className="mt-10">
         <h2 className="font-display text-2xl tracking-tight">Vurderinger</h2>
         <div className="mt-4 space-y-3">
-          {!reviews ? (
+          {reviewsIsError ? (
+            <p className="text-sm text-destructive">
+              {formatErrorMessage(reviewsError, "Kunne ikke laste vurderingene")}
+            </p>
+          ) : !reviews ? (
             <div className="space-y-3">
               {[0, 1].map((i) => (
-                <div key={i} className="h-24 animate-pulse rounded-xl bg-muted" />
+                <Skeleton key={i} className="h-24 rounded-xl" />
               ))}
             </div>
           ) : reviews.length === 0 ? (
             <p className="rounded-xl border border-dashed border-border bg-surface p-8 text-center text-sm text-muted-foreground">
-              Ingen vurderinger å vise enda.
+              Ingen vurderinger ennå.
             </p>
           ) : (
             reviews.map((r) => (
@@ -227,9 +243,13 @@ function PublicProfilePage() {
       <section className="mt-10">
         <h2 className="font-display text-2xl tracking-tight">Aktive annonser</h2>
         <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {!activeListings ? (
+          {listingsIsError ? (
+            <p className="col-span-full text-sm text-destructive">
+              {formatErrorMessage(listingsError, "Kunne ikke laste annonsene")}
+            </p>
+          ) : !activeListings ? (
             Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-muted" />
+              <Skeleton key={i} className="aspect-[4/3] rounded-xl" />
             ))
           ) : activeListings.length === 0 ? (
             <p className="col-span-full rounded-xl border border-dashed border-border bg-surface p-8 text-center text-sm text-muted-foreground">

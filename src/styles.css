@@ -36,6 +36,7 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-accent-text: var(--accent-text);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
@@ -74,6 +75,11 @@
   /* Terracotta accent */
   --accent: oklch(0.66 0.16 45);
   --accent-foreground: oklch(0.99 0 0);
+  /* Darker terracotta for normal/small-size text — --accent itself is ~3.2:1
+     against the cream background, which clears the 3:1 UI/large-text bar but
+     not the 4.5:1 normal-text bar. Use this instead of --accent whenever
+     terracotta is the *text* color at body/label sizes. */
+  --accent-text: oklch(0.48 0.15 45);
 
   --destructive: oklch(0.55 0.22 27);
   --destructive-foreground: oklch(0.99 0 0);
@@ -100,6 +106,9 @@
   --muted-foreground: oklch(0.7 0.02 80);
   --accent: oklch(0.72 0.15 45);
   --accent-foreground: oklch(0.18 0.02 150);
+  /* Dark mode's --accent already clears 4.5:1 against --background (~7.2:1),
+     so no separate darker text variant is needed here. */
+  --accent-text: var(--accent);
   --destructive: oklch(0.65 0.2 27);
   --destructive-foreground: oklch(0.99 0 0);
   --border: oklch(1 0 0 / 12%);

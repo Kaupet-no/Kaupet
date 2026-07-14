@@ -117,6 +117,7 @@ export type Database = {
           category_id: string
           created_at: string
           id: string
+          is_primary: boolean
           key: string
           label_nb: string
           options: Json | null
@@ -128,6 +129,7 @@ export type Database = {
           category_id: string
           created_at?: string
           id?: string
+          is_primary?: boolean
           key: string
           label_nb: string
           options?: Json | null
@@ -139,6 +141,7 @@ export type Database = {
           category_id?: string
           created_at?: string
           id?: string
+          is_primary?: boolean
           key?: string
           label_nb?: string
           options?: Json | null
@@ -151,6 +154,44 @@ export type Database = {
             foreignKeyName: "category_filters_category_id_fkey"
             columns: ["category_id"]
             isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      category_flows: {
+        Row: {
+          category_id: string
+          created_at: string
+          field_groups: string[]
+          id: string
+          modules: string[]
+          sort_order: number
+          steps: string[]
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          field_groups?: string[]
+          id?: string
+          modules?: string[]
+          sort_order?: number
+          steps?: string[]
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          field_groups?: string[]
+          id?: string
+          modules?: string[]
+          sort_order?: number
+          steps?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "category_flows_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: true
             referencedRelation: "categories"
             referencedColumns: ["id"]
           },
@@ -224,18 +265,21 @@ export type Database = {
           user_id: string
           registration_number: string
           created_at: string
+          classification_result: Json | null
         }
         Insert: {
           id?: string
           user_id: string
           registration_number: string
           created_at?: string
+          classification_result?: Json | null
         }
         Update: {
           id?: string
           user_id?: string
           registration_number?: string
           created_at?: string
+          classification_result?: Json | null
         }
         Relationships: []
       }
@@ -295,6 +339,7 @@ export type Database = {
           id: string
           user_id: string
           title: string
+          subtitle: string | null
           description: string | null
           category_id: string | null
           max_price_nok: number | null
@@ -309,6 +354,7 @@ export type Database = {
           id?: string
           user_id: string
           title: string
+          subtitle?: string | null
           description?: string | null
           category_id?: string | null
           max_price_nok?: number | null
@@ -322,6 +368,7 @@ export type Database = {
           id?: string
           user_id?: string
           title?: string
+          subtitle?: string | null
           description?: string | null
           category_id?: string | null
           max_price_nok?: number | null
@@ -707,14 +754,14 @@ export type Database = {
           attributes: Json
           category_id: string | null
           city: string | null
-          condition: Database["public"]["Enums"]["listing_condition"]
+          condition: Database["public"]["Enums"]["listing_condition"] | null
           counted_category_id: string | null
           counted_lexemes: string[] | null
           created_at: string
           description: string
           display_lat: number | null
           display_lng: number | null
-          can_ship: boolean
+          can_ship: boolean | null
           expires_at: string | null
           id: string
           is_free: boolean
@@ -727,6 +774,7 @@ export type Database = {
           search_vector: unknown
           seller_id: string
           status: Database["public"]["Enums"]["listing_status"]
+          subtitle: string | null
           title: string
           updated_at: string
           view_count: number
@@ -735,14 +783,14 @@ export type Database = {
           attributes?: Json
           category_id?: string | null
           city?: string | null
-          condition?: Database["public"]["Enums"]["listing_condition"]
+          condition?: Database["public"]["Enums"]["listing_condition"] | null
           counted_category_id?: string | null
           counted_lexemes?: string[] | null
           created_at?: string
           description?: string
           display_lat?: number | null
           display_lng?: number | null
-          can_ship?: boolean
+          can_ship?: boolean | null
           expires_at?: string | null
           id?: string
           is_free?: boolean
@@ -755,16 +803,17 @@ export type Database = {
           search_vector?: unknown
           seller_id: string
           status?: Database["public"]["Enums"]["listing_status"]
+          subtitle?: string | null
           title: string
           updated_at?: string
           view_count?: number
         }
         Update: {
           attributes?: Json
-          can_ship?: boolean
+          can_ship?: boolean | null
           category_id?: string | null
           city?: string | null
-          condition?: Database["public"]["Enums"]["listing_condition"]
+          condition?: Database["public"]["Enums"]["listing_condition"] | null
           counted_category_id?: string | null
           counted_lexemes?: string[] | null
           created_at?: string
@@ -783,6 +832,7 @@ export type Database = {
           search_vector?: unknown
           seller_id?: string
           status?: Database["public"]["Enums"]["listing_status"]
+          subtitle?: string | null
           title?: string
           updated_at?: string
           view_count?: number
@@ -1390,6 +1440,62 @@ export type Database = {
       admin_reject_vehicle_brand: { Args: { _id: string }; Returns: undefined }
       admin_approve_vehicle_model: { Args: { _id: string }; Returns: undefined }
       admin_reject_vehicle_model: { Args: { _id: string }; Returns: undefined }
+      admin_create_vehicle_brand: {
+        Args: { _name: string; _category_group: string }
+        Returns: {
+          id: string
+          name: string
+          category_group: string
+          status: string
+          submitted_by: string | null
+          created_at: string
+        }
+      }
+      admin_update_vehicle_brand: {
+        Args: { _id: string; _name: string }
+        Returns: {
+          id: string
+          name: string
+          category_group: string
+          status: string
+          submitted_by: string | null
+          created_at: string
+        }
+      }
+      admin_delete_vehicle_brand: { Args: { _id: string }; Returns: undefined }
+      admin_create_vehicle_model: {
+        Args: { _brand_id: string; _name: string }
+        Returns: {
+          id: string
+          brand_id: string
+          name: string
+          status: string
+          submitted_by: string | null
+          created_at: string
+        }
+      }
+      admin_update_vehicle_model: {
+        Args: { _id: string; _name: string }
+        Returns: {
+          id: string
+          brand_id: string
+          name: string
+          status: string
+          submitted_by: string | null
+          created_at: string
+        }
+      }
+      admin_delete_vehicle_model: { Args: { _id: string }; Returns: undefined }
+      admin_list_vehicle_brands_with_models: {
+        Args: never
+        Returns: {
+          brand_id: string
+          brand_name: string
+          category_group: string
+          model_id: string | null
+          model_name: string | null
+        }[]
+      }
       submit_listing_report: {
         Args: { _listing_id: string; _reason: string; _comment?: string | null }
         Returns: undefined
@@ -1589,6 +1695,22 @@ export type Database = {
           suspension_reason: string
         }[]
       }
+      popular_listings_by_category: {
+        Args: { _category_ids: string[]; _limit?: number; _offset?: number }
+        Returns: {
+          city: string
+          cover_path: string
+          created_at: string
+          is_free: boolean
+          kaupet_code: string
+          listing_id: string
+          price_nok: number
+          title: string
+          subtitle: string | null
+          total_views: number
+          views_last_week: number
+        }[]
+      }
       popular_listings_last_week: {
         Args: { _limit?: number }
         Returns: {
@@ -1600,6 +1722,7 @@ export type Database = {
           listing_id: string
           price_nok: number
           title: string
+          subtitle: string | null
           total_views: number
           views_last_week: number
         }[]

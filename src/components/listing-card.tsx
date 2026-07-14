@@ -1,15 +1,16 @@
 import { Link } from "@tanstack/react-router";
-import { Eye, MapPin } from "lucide-react";
+import { Eye, ImageOff, MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 import { signListingImageUrls } from "@/lib/storage";
 import { formatPrice } from "@/lib/format";
 import { FavoriteButton } from "@/components/favorite-button";
-import { useIsNative } from "@/lib/use-is-native";
+import { useIsNative } from "@/hooks/use-is-native";
 
 export type ListingCardData = {
   id: string;
   kaupet_code: string;
   title: string;
+  subtitle?: string | null;
   price_nok: number | null;
   is_free: boolean;
   city: string | null;
@@ -71,13 +72,17 @@ export function ListingCard({
               loading="lazy"
             />
           ) : (
-            <div className="flex size-full items-center justify-center text-xs text-muted-foreground">
-              Ingen bilde
+            <div className="flex size-full flex-col items-center justify-center gap-1 text-muted-foreground">
+              <ImageOff className="size-4" strokeWidth={1.5} />
+              <span className="text-[11px]">Ingen bilde</span>
             </div>
           )}
         </div>
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
           <h3 className="line-clamp-2 text-sm font-medium leading-snug">{listing.title}</h3>
+          {listing.subtitle && (
+            <p className="line-clamp-1 text-xs text-muted-foreground">{listing.subtitle}</p>
+          )}
           <p className="font-display text-base font-semibold">{formatPrice(listing)}</p>
           {listing.city && <p className="text-xs text-muted-foreground">{listing.city}</p>}
         </div>
@@ -112,6 +117,9 @@ export function ListingCard({
       </div>
       <div className="space-y-1 p-3">
         <h3 className="line-clamp-2 text-sm font-medium leading-snug">{listing.title}</h3>
+        {listing.subtitle && (
+          <p className="line-clamp-1 text-xs text-muted-foreground">{listing.subtitle}</p>
+        )}
         <p className={`font-display ${isNative ? "text-lg font-semibold" : "text-base"}`}>
           {formatPrice(listing)}
         </p>

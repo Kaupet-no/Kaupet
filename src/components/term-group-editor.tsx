@@ -3,7 +3,7 @@ import { Eye, EyeOff, Plus, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ModeToggle } from "@/components/mode-toggle";
+import { ModeToggle } from "@/components/search-term-mode-toggle";
 import { describeTermGroup, emptyTermGroup, type TermGroup } from "@/lib/term-groups";
 
 type Props = {

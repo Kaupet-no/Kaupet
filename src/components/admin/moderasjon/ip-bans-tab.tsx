@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, ShieldBan, Trash2 } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -27,8 +27,19 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { adminBanIp, adminUnbanIp } from "@/lib/admin-moderation.functions";
 import { formatErrorMessage } from "@/lib/errors";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export function IpBansTab() {
   const qc = useQueryClient();
@@ -38,8 +49,14 @@ export function IpBansTab() {
   const [ip, setIp] = useState("");
   const [reason, setReason] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
+  const [target, setTarget] = useState<{ id: string; ip: string } | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const {
+    data,
+    isLoading,
+    isError,
+    error: queryError,
+  } = useQuery({
     queryKey: ["admin-ip-bans"],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("admin_list_ip_bans");
@@ -73,6 +90,7 @@ export function IpBansTab() {
       qc.invalidateQueries({ queryKey: ["admin-ip-bans"] });
     },
     onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke oppheve IP-sperren")),
+    onSettled: () => setTarget(null),
   });
 
   return (
@@ -153,10 +171,23 @@ export function IpBansTab() {
                     <Loader2 className="mx-auto size-5 animate-spin text-muted-foreground" />
                   </TableCell>
                 </TableRow>
+              ) : isError ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="py-8 text-center">
+                    <p className="text-sm text-destructive">
+                      {formatErrorMessage(queryError, "Kunne ikke laste IP-sperrer")}
+                    </p>
+                  </TableCell>
+                </TableRow>
               ) : (data ?? []).length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
-                    Ingen IP-sperrer
+                  <TableCell colSpan={4} className="py-8">
+                    <EmptyState
+                      icon={ShieldBan}
+                      title="Ingen IP-sperrer"
+                      description="Sperrede IP-adresser vises her."
+                      className="border-none p-0"
+                    />
                   </TableCell>
                 </TableRow>
               ) : (
@@ -178,7 +209,7 @@ export function IpBansTab() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => unban.mutate(b.id)}
+                        onClick={() => setTarget({ id: b.id, ip: b.ip_address })}
                         disabled={unban.isPending}
                       >
                         <Trash2 className="size-4" /> Opphev
@@ -191,6 +222,24 @@ export function IpBansTab() {
           </Table>
         </CardContent>
       </Card>
+
+      <AlertDialog open={!!target} onOpenChange={(open) => !open && setTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Oppheve sperren av {target?.ip}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Forespørsler fra denne IP-adressen slipper gjennom igjen. Dette kan ikke angres uten å
+              sperre på nytt.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction onClick={() => target && unban.mutate(target.id)}>
+              Opphev
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

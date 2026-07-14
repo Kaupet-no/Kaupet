@@ -1,6 +1,6 @@
 import { Toaster as Sonner } from "sonner";
 
-import { useIsNative } from "@/lib/use-is-native";
+import { useIsNative } from "@/hooks/use-is-native";
 
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 

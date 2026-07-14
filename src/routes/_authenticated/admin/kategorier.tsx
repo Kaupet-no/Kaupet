@@ -5,12 +5,14 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronsUpDown,
+  FolderTree,
   GripVertical,
   Loader2,
   Pencil,
   Plus,
   SlidersHorizontal,
   Trash2,
+  Workflow,
   X,
 } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
@@ -79,6 +81,8 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { formatErrorMessage } from "@/lib/errors";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { CATEGORY_ICON_OPTIONS, getCategoryIcon } from "@/lib/category-icons";
 import {
   FILTER_TYPE_LABELS,
@@ -88,6 +92,17 @@ import {
   type FilterType,
 } from "@/lib/category-filters";
 import { CATEGORY_HEADING_FONTS, DEFAULT_CATEGORY_HEADING_FONT } from "@/lib/category-fonts";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DEFAULT_FIELD_GROUPS,
+  DEFAULT_MODULES,
+  resolveWizardPages,
+} from "@/features/listing-creation/category-flows";
+import { MODULE_LABELS_NB, MODULE_REGISTRY } from "@/features/listing-creation/modules/registry";
+import {
+  FIELD_GROUP_LABELS_NB,
+  LOCKED_FIELD_GROUP_KEYS,
+} from "@/features/listing-creation/field-groups/registry";
 
 export const Route = createFileRoute("/_authenticated/admin/kategorier")({
   head: () => ({ meta: [{ title: "Kategoriadministrasjon — Kaupet.no" }] }),
@@ -140,6 +155,7 @@ function AdminCategories() {
   const [deleting, setDeleting] = useState<Category | null>(null);
   const [replacementId, setReplacementId] = useState<string>("__none__");
   const [managingFilters, setManagingFilters] = useState<Category | null>(null);
+  const [managingFlow, setManagingFlow] = useState<Category | null>(null);
   const [search, setSearch] = useState("");
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [dragOffsetX, setDragOffsetX] = useState(0);
@@ -153,7 +169,12 @@ function AdminCategories() {
     });
   };
 
-  const { data: categories, isLoading } = useQuery({
+  const {
+    data: categories,
+    isLoading,
+    isError,
+    error: categoriesError,
+  } = useQuery({
     queryKey: ["admin", "categories"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -332,6 +353,7 @@ function AdminCategories() {
 
   return (
     <div className="space-y-6">
+      <h2 className="font-display text-xl tracking-tight">Kategorier</h2>
       <div className="flex items-center justify-between gap-4">
         <p className="text-sm text-muted-foreground">
           Administrer kategorier og underkategorier. Endringer påvirker alle annonser.
@@ -351,13 +373,22 @@ function AdminCategories() {
       <Card>
         <CardContent className="p-2 sm:p-4">
           {isLoading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            <div className="space-y-2 py-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-9 w-full" />
+              ))}
             </div>
-          ) : visibleFlatItems.length === 0 ? (
-            <p className="py-8 text-center text-muted-foreground">
-              {search.trim() ? "Ingen kategorier matcher søket" : "Ingen kategorier ennå"}
+          ) : isError ? (
+            <p className="py-8 text-center text-sm text-destructive">
+              {formatErrorMessage(categoriesError, "Kunne ikke laste kategorier")}
             </p>
+          ) : visibleFlatItems.length === 0 ? (
+            <EmptyState
+              icon={FolderTree}
+              title={search.trim() ? "Ingen kategorier matcher søket" : "Ingen kategorier ennå"}
+              description={search.trim() ? "Prøv et annet søk." : undefined}
+              className="border-none"
+            />
           ) : (
             <DndContext
               sensors={sensors}
@@ -383,6 +414,7 @@ function AdminCategories() {
                       onDelete={setDeleting}
                       onAddChild={(parent) => setCreating({ parentId: parent.id })}
                       onManageFilters={setManagingFilters}
+                      onManageFlow={setManagingFlow}
                     />
                   ))}
                 </ul>
@@ -412,6 +444,10 @@ function AdminCategories() {
         />
       )}
 
+      {managingFlow && (
+        <CategoryFlowDialog category={managingFlow} onClose={() => setManagingFlow(null)} />
+      )}
+
       <AlertDialog
         open={!!deleting}
         onOpenChange={(o) => {
@@ -427,6 +463,10 @@ function AdminCategories() {
             <AlertDialogDescription>
               {usageQuery.isLoading ? (
                 "Sjekker bruk…"
+              ) : usageQuery.isError ? (
+                <span className="text-destructive">
+                  {formatErrorMessage(usageQuery.error, "Kunne ikke sjekke bruk av kategorien")}
+                </span>
               ) : usageQuery.data && usageQuery.data > 0 ? (
                 <>
                   <strong>{usageQuery.data}</strong> annonser er knyttet til denne kategorien. Velg
@@ -496,6 +536,7 @@ function SortableCategoryRow({
   onDelete,
   onAddChild,
   onManageFilters,
+  onManageFlow,
 }: {
   category: Category;
   depth: number;
@@ -507,6 +548,7 @@ function SortableCategoryRow({
   onDelete: (c: Category) => void;
   onAddChild: (c: Category) => void;
   onManageFilters: (c: Category) => void;
+  onManageFlow: (c: Category) => void;
 }) {
   const Icon = getCategoryIcon(category.icon);
   const listingCount = countsById.get(category.id) ?? 0;
@@ -579,6 +621,15 @@ function SortableCategoryRow({
             title="Administrer filtre"
           >
             <SlidersHorizontal className="size-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => onManageFlow(category)}
+            aria-label="Annonseflyt"
+            title="Administrer annonseflyt"
+          >
+            <Workflow className="size-4" />
           </Button>
           <Button variant="ghost" size="icon" onClick={() => onEdit(category)} aria-label="Rediger">
             <Pencil className="size-4" />
@@ -888,6 +939,7 @@ type EditableFilter = {
   type: FilterType;
   unit: string;
   options: FilterOption[];
+  is_primary: boolean;
 };
 
 function CategoryFiltersDialog({ category, onClose }: { category: Category; onClose: () => void }) {
@@ -895,12 +947,17 @@ function CategoryFiltersDialog({ category, onClose }: { category: Category; onCl
   const [draft, setDraft] = useState<EditableFilter | null>(null);
   const [keyTouched, setKeyTouched] = useState(false);
 
-  const { data: filters, isLoading } = useQuery({
+  const {
+    data: filters,
+    isLoading,
+    isError,
+    error: filtersError,
+  } = useQuery({
     queryKey: ["admin", "category-filters", category.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("category_filters")
-        .select("id, category_id, key, label_nb, type, unit, options, sort_order")
+        .select("id, category_id, key, label_nb, type, unit, options, sort_order, is_primary")
         .eq("category_id", category.id)
         .order("sort_order");
       if (error) throw error;
@@ -922,6 +979,7 @@ function CategoryFiltersDialog({ category, onClose }: { category: Category; onCl
         unit: f.unit.trim() || null,
         options: usesOptions ? f.options.filter((o) => o.value.trim()) : null,
         sort_order: (filters?.length ?? 0) * 10 + 10,
+        is_primary: f.is_primary,
       };
       if (f.id) {
         const { error } = await supabase.from("category_filters").update(payload).eq("id", f.id);
@@ -937,6 +995,15 @@ function CategoryFiltersDialog({ category, onClose }: { category: Category; onCl
       invalidate();
     },
     onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke lagre filteret")),
+  });
+
+  const toggleIsPrimary = useMutation({
+    mutationFn: async ({ id, is_primary }: { id: string; is_primary: boolean }) => {
+      const { error } = await supabase.from("category_filters").update({ is_primary }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke oppdatere filteret")),
   });
 
   const remove = useMutation({
@@ -959,6 +1026,7 @@ function CategoryFiltersDialog({ category, onClose }: { category: Category; onCl
       type: "select",
       unit: "",
       options: [{ value: "", label_nb: "" }],
+      is_primary: true,
     });
   }
 
@@ -971,6 +1039,7 @@ function CategoryFiltersDialog({ category, onClose }: { category: Category; onCl
       type: f.type,
       unit: f.unit ?? "",
       options: f.options && f.options.length > 0 ? f.options : [{ value: "", label_nb: "" }],
+      is_primary: f.is_primary,
     });
   }
 
@@ -987,9 +1056,14 @@ function CategoryFiltersDialog({ category, onClose }: { category: Category; onCl
         </DialogHeader>
 
         {isLoading ? (
-          <div className="flex justify-center py-6">
-            <Loader2 className="size-5 animate-spin text-muted-foreground" />
+          <div className="space-y-2 py-2">
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
           </div>
+        ) : isError ? (
+          <p className="py-2 text-sm text-destructive">
+            {formatErrorMessage(filtersError, "Kunne ikke laste filtre")}
+          </p>
         ) : (
           <ul className="space-y-1">
             {(filters ?? []).length === 0 && (
@@ -1007,7 +1081,16 @@ function CategoryFiltersDialog({ category, onClose }: { category: Category; onCl
                     {f.unit ? ` · ${f.unit}` : ""} · {f.key}
                   </span>
                 </div>
-                <div className="flex shrink-0 gap-1">
+                <div className="flex shrink-0 items-center gap-2">
+                  <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Checkbox
+                      checked={f.is_primary}
+                      onCheckedChange={(c) =>
+                        toggleIsPrimary.mutate({ id: f.id, is_primary: c === true })
+                      }
+                    />
+                    Vis alltid
+                  </label>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -1104,6 +1187,13 @@ function CategoryFiltersDialog({ category, onClose }: { category: Category; onCl
                 placeholder="f.eks. tommer, km"
               />
             </div>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={draft.is_primary}
+                onCheckedChange={(c) => setDraft((d) => (d ? { ...d, is_primary: c === true } : d))}
+              />
+              Vis alltid (av = under «Flere valg»)
+            </label>
             {usesOptions && (
               <div className="space-y-2">
                 <Label>Valg</Label>
@@ -1185,6 +1275,359 @@ function CategoryFiltersDialog({ category, onClose }: { category: Category; onCl
           <Button type="button" onClick={onClose}>
             Lukk
           </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const MODULE_KEYS = Object.keys(MODULE_REGISTRY);
+
+/**
+ * The only field groups whose relative order actually affects the wizard's
+ * pagination (resolveWizardPages always pins title-photos first and
+ * review-publish/delivery-location last, regardless of their array
+ * position) — so this is the only set the admin UI lets an admin drag.
+ */
+const MIDDLE_FIELD_GROUP_KEYS = [
+  "category-attributes",
+  "condition",
+  "price",
+  "description-keywords",
+];
+
+function SortableFieldGroupRow({
+  id,
+  checked,
+  disabled,
+  onToggle,
+}: {
+  id: string;
+  checked: boolean;
+  disabled: boolean;
+  onToggle: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+  return (
+    <li ref={setNodeRef} style={style} className="flex items-center gap-2 rounded-md px-1 py-1">
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        className="cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
+        aria-label="Dra for å endre rekkefølge"
+      >
+        <GripVertical className="size-4" />
+      </button>
+      <label className="flex items-center gap-2 text-sm">
+        <Checkbox checked={checked} disabled={disabled} onCheckedChange={onToggle} />
+        {FIELD_GROUP_LABELS_NB[id] ?? id}
+      </label>
+    </li>
+  );
+}
+
+function FieldGroupPagesPreview({ label, pages }: { label: string; pages: string[][] }) {
+  return (
+    <p>
+      <span className="font-medium text-foreground">{label}</span> — {pages.length}{" "}
+      {pages.length === 1 ? "side" : "sider"}:{" "}
+      {pages
+        .map((p, i) => `${i + 1}) ${p.map((k) => FIELD_GROUP_LABELS_NB[k] ?? k).join(", ")}`)
+        .join("  ")}
+    </p>
+  );
+}
+
+function CategoryFlowDialog({ category, onClose }: { category: Category; onClose: () => void }) {
+  const qc = useQueryClient();
+
+  const {
+    data: flowRow,
+    isLoading,
+    isError,
+    error: flowError,
+  } = useQuery({
+    queryKey: ["admin", "category-flow", category.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("category_flows")
+        .select("id, category_id, field_groups, modules, sort_order")
+        .eq("category_id", category.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const [modules, setModules] = useState<string[] | null>(null);
+  const activeModules = modules ?? flowRow?.modules ?? DEFAULT_MODULES;
+  const hasCustomFlow = !!flowRow;
+
+  const [fieldGroups, setFieldGroups] = useState<string[] | null>(null);
+  const storedFieldGroups = fieldGroups ?? flowRow?.field_groups ?? DEFAULT_FIELD_GROUPS;
+  const middleOrder = [
+    ...storedFieldGroups.filter((k) => MIDDLE_FIELD_GROUP_KEYS.includes(k)),
+    ...MIDDLE_FIELD_GROUP_KEYS.filter((k) => !storedFieldGroups.includes(k)),
+  ];
+  const deliveryActive = storedFieldGroups.includes("delivery-location");
+  // vehicle-registration (Statens vegvesen-oppslag for Bil og MC) isn't part
+  // of MIDDLE_FIELD_GROUP_KEYS — this simple editor doesn't support letting
+  // admins reorder/toggle it yet — but it must survive a save if the
+  // category already has it (seeded via migration), or the vehicle-first
+  // flow silently breaks the next time someone touches this dialog.
+  const hasVehicleRegistration = storedFieldGroups.includes("vehicle-registration");
+  const activeFieldGroups = [
+    ...(hasVehicleRegistration ? ["vehicle-registration"] : []),
+    "title-photos",
+    ...middleOrder.filter(
+      (k) => LOCKED_FIELD_GROUP_KEYS.includes(k) || storedFieldGroups.includes(k),
+    ),
+    ...(deliveryActive ? ["delivery-location"] : []),
+    "review-publish",
+  ];
+
+  const fieldGroupSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+  );
+
+  const invalidate = () =>
+    qc.invalidateQueries({ queryKey: ["admin", "category-flow", category.id] });
+
+  const save = useMutation({
+    mutationFn: async ({
+      nextModules,
+      nextFieldGroups,
+    }: {
+      nextModules: string[];
+      nextFieldGroups: string[];
+    }) => {
+      const { error } = await supabase
+        .from("category_flows")
+        .upsert(
+          { category_id: category.id, field_groups: nextFieldGroups, modules: nextModules },
+          { onConflict: "category_id" },
+        );
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      showSuccessToast("Annonseflyt lagret");
+      invalidate();
+    },
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke lagre annonseflyten")),
+  });
+
+  const resetToDefault = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("category_flows")
+        .delete()
+        .eq("category_id", category.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      showSuccessToast("Tilbakestilt til standardflyt");
+      setModules(null);
+      setFieldGroups(null);
+      invalidate();
+    },
+    onError: (e: Error) =>
+      showErrorToast(formatErrorMessage(e, "Kunne ikke tilbakestille annonseflyten")),
+  });
+
+  function toggle(key: string) {
+    const current = modules ?? flowRow?.modules ?? DEFAULT_MODULES;
+    const next = current.includes(key) ? current.filter((k) => k !== key) : [...current, key];
+    setModules(next);
+  }
+
+  function toggleFieldGroup(key: string) {
+    if (LOCKED_FIELD_GROUP_KEYS.includes(key)) return;
+    const next = storedFieldGroups.includes(key)
+      ? storedFieldGroups.filter((k) => k !== key)
+      : [...storedFieldGroups, key];
+    setFieldGroups(next);
+  }
+
+  function handleFieldGroupDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = middleOrder.indexOf(String(active.id));
+    const newIndex = middleOrder.indexOf(String(over.id));
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(middleOrder, oldIndex, newIndex);
+    setFieldGroups([
+      "title-photos",
+      ...reordered.filter(
+        (k) => LOCKED_FIELD_GROUP_KEYS.includes(k) || storedFieldGroups.includes(k),
+      ),
+      ...(deliveryActive ? ["delivery-location"] : []),
+      "review-publish",
+    ]);
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Annonseflyt for «{category.name_nb}»</DialogTitle>
+          <DialogDescription>
+            Velg og sorter hvilke feltgrupper og moduler som vises i annonseskjemaet for denne
+            kategorien og dens underkategorier. Uten egen flyt her arves nærmeste overordnede
+            kategoris flyt, eller standardflyten hvis ingen har en.
+          </DialogDescription>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="flex justify-center py-6">
+            <Loader2 className="size-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : isError ? (
+          <p className="py-2 text-sm text-destructive">
+            {formatErrorMessage(flowError, "Kunne ikke laste annonseflyten")}
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {!hasCustomFlow && (
+              <p className="rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">
+                Denne kategorien har ingen egen flyt ennå — bruker standardflyten (eller nærmeste
+                overordnede kategoris flyt, hvis satt).
+              </p>
+            )}
+
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">Feltgrupper</p>
+              {hasVehicleRegistration && (
+                <p className="rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">
+                  Denne kategorien har kjøretøyregistrering (Statens vegvesen-oppslag) satt opp via
+                  migrasjon. Bekreftelsessteget som vises etter et vellykket oppslag legges alltid
+                  til automatisk og kan ikke konfigureres her.
+                </p>
+              )}
+              <ul>
+                {hasVehicleRegistration && (
+                  <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm text-muted-foreground">
+                    <span className="inline-block size-4 shrink-0" aria-hidden />
+                    <Checkbox checked disabled />
+                    {FIELD_GROUP_LABELS_NB["vehicle-registration"]}
+                    <span className="text-xs">(alltid først, kan ikke fjernes her)</span>
+                  </li>
+                )}
+                <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm text-muted-foreground">
+                  <span className="inline-block size-4 shrink-0" aria-hidden />
+                  <Checkbox checked disabled />
+                  {FIELD_GROUP_LABELS_NB["title-photos"]}
+                  <span className="text-xs">(alltid først)</span>
+                </li>
+              </ul>
+              <DndContext
+                sensors={fieldGroupSensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleFieldGroupDragEnd}
+              >
+                <SortableContext items={middleOrder} strategy={verticalListSortingStrategy}>
+                  <ul>
+                    {middleOrder.map((key) => (
+                      <SortableFieldGroupRow
+                        key={key}
+                        id={key}
+                        checked={
+                          LOCKED_FIELD_GROUP_KEYS.includes(key) || storedFieldGroups.includes(key)
+                        }
+                        disabled={LOCKED_FIELD_GROUP_KEYS.includes(key)}
+                        onToggle={() => toggleFieldGroup(key)}
+                      />
+                    ))}
+                  </ul>
+                </SortableContext>
+              </DndContext>
+              <ul>
+                <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm">
+                  <span className="inline-block size-4 shrink-0" aria-hidden />
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={deliveryActive}
+                      onCheckedChange={() => toggleFieldGroup("delivery-location")}
+                    />
+                    {FIELD_GROUP_LABELS_NB["delivery-location"]}
+                  </label>
+                </li>
+                <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm text-muted-foreground">
+                  <span className="inline-block size-4 shrink-0" aria-hidden />
+                  <Checkbox checked disabled />
+                  {FIELD_GROUP_LABELS_NB["review-publish"]}
+                  <span className="text-xs">(alltid sist)</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="space-y-1 rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">
+              <p className="font-medium text-foreground">Forhåndsvisning av annonseskjemaet</p>
+              <FieldGroupPagesPreview
+                label="Web"
+                pages={resolveWizardPages(activeFieldGroups, { native: false })}
+              />
+              <FieldGroupPagesPreview
+                label="Native"
+                pages={resolveWizardPages(activeFieldGroups, { native: true })}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">Moduler</p>
+              <ul className="space-y-2">
+                {MODULE_KEYS.map((key) => (
+                  <li key={key}>
+                    <label className="flex items-center gap-2 text-sm">
+                      <Checkbox
+                        checked={activeModules.includes(key)}
+                        onCheckedChange={() => toggle(key)}
+                      />
+                      {MODULE_LABELS_NB[key] ?? key}
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+
+        <DialogFooter className="gap-2 sm:justify-between">
+          {hasCustomFlow && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => resetToDefault.mutate()}
+              disabled={resetToDefault.isPending}
+            >
+              {resetToDefault.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                "Tilbakestill til standard"
+              )}
+            </Button>
+          )}
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Lukk
+            </Button>
+            <Button
+              type="button"
+              disabled={save.isPending || isLoading}
+              onClick={() =>
+                save.mutate({ nextModules: activeModules, nextFieldGroups: activeFieldGroups })
+              }
+            >
+              {save.isPending ? <Loader2 className="size-4 animate-spin" /> : "Lagre"}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

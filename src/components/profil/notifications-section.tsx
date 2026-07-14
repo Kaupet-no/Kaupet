@@ -97,12 +97,22 @@ export function NotificationsSection() {
   const getDevices = useServerFn(getUserPushSubscriptions);
   const deleteDevice = useServerFn(deletePushSubscriptionById);
 
-  const { data: prefs, isLoading } = useQuery({
+  const {
+    data: prefs,
+    isLoading,
+    isError: prefsIsError,
+    error: prefsError,
+  } = useQuery({
     queryKey: ["notification-preferences"],
     queryFn: () => getPrefs({}),
   });
 
-  const { data: devices, isLoading: devicesLoading } = useQuery({
+  const {
+    data: devices,
+    isLoading: devicesLoading,
+    isError: devicesIsError,
+    error: devicesError,
+  } = useQuery({
     queryKey: ["push-subscriptions"],
     queryFn: () => getDevices({}),
   });
@@ -237,6 +247,10 @@ export function NotificationsSection() {
         <div className="mt-4">
           {devicesLoading ? (
             <Loader2 className="size-5 animate-spin text-muted-foreground" />
+          ) : devicesIsError ? (
+            <p className="text-sm text-destructive">
+              {formatErrorMessage(devicesError, "Kunne ikke laste enhetene")}
+            </p>
           ) : !devices || devices.length === 0 ? (
             <p className="text-sm text-muted-foreground">Ingen enheter med push-varsler.</p>
           ) : (
@@ -300,9 +314,13 @@ export function NotificationsSection() {
           dem på enheten over; e-postvarsler sendes til kontoens e-postadresse.
         </p>
 
-        {isLoading || !prefs ? (
+        {isLoading ? (
           <Loader2 className="mt-4 size-5 animate-spin text-muted-foreground" />
-        ) : (
+        ) : prefsIsError ? (
+          <p className="mt-4 text-sm text-destructive">
+            {formatErrorMessage(prefsError, "Kunne ikke laste varslingsinnstillingene")}
+          </p>
+        ) : !prefs ? null : (
           <div className="mt-6">
             <div className="grid grid-cols-[1fr_3rem_3rem] items-center gap-x-2 pb-2 text-xs font-medium text-muted-foreground">
               <span />

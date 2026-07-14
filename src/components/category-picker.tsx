@@ -1,15 +1,23 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { getCategoryIcon } from "@/lib/category-icons";
 
 type Category = {
   id: string;
   name_nb: string;
   parent_id: string | null;
+  icon?: string | null;
+  color?: string | null;
 };
+
+/** How long the checkmark confirmation is shown on the picked item before
+ * `onSelect` fires and the picker closes. Gives the user visible feedback
+ * that their tap registered before the page navigates away. */
+const SELECTION_CONFIRM_MS = 320;
 
 type Props = {
   open: boolean;
@@ -18,6 +26,17 @@ type Props = {
   selectedId: string;
   onSelect: (categoryId: string, parentId: string) => void;
   trigger?: React.ReactNode;
+  /** Renders the drill-down list + search directly in the page flow, with no
+   * Dialog/Sheet/Popover wrapper. Used for the category-select field group,
+   * where category choice is the page content rather than a triggered
+   * overlay. `open`/`onOpenChange`/`trigger` are ignored in this mode. */
+  inline?: boolean;
+  /** Category ids that should be selectable as a terminal choice even though
+   * they have children — e.g. "Bil og MC" itself, so the vehicle-first flow
+   * can treat picking the top-level vehicle category as done, deferring the
+   * actual leaf (personbil/varebil/...) to the Statens Vegvesen lookup
+   * instead of forcing manual drill-down. */
+  selectableGroups?: string[];
 };
 
 function useIsDesktop() {
@@ -46,10 +65,20 @@ export function CategoryPicker({
   selectedId,
   onSelect,
   trigger,
+  inline,
+  selectableGroups,
 }: Props) {
   const isDesktop = useIsDesktop();
   const [path, setPath] = useState<Category[]>([]);
   const [search, setSearch] = useState("");
+  const [pendingSelection, setPendingSelection] = useState<string | null>(null);
+  const confirmTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (confirmTimeoutRef.current) clearTimeout(confirmTimeoutRef.current);
+    };
+  }, []);
 
   const currentParentId = path.at(-1)?.id ?? null;
   const currentLevel = categories.filter((c) => c.parent_id === currentParentId);
@@ -67,13 +96,17 @@ export function CategoryPicker({
   }
 
   function handleItemClick(item: Category) {
-    if (hasChildren(item.id)) {
+    if (pendingSelection) return;
+    if (hasChildren(item.id) && !selectableGroups?.includes(item.id)) {
       setPath((p) => [...p, item]);
       setSearch("");
     } else {
-      onSelect(item.id, currentParentId ?? item.id);
-      onOpenChange(false);
-      resetState();
+      setPendingSelection(item.id);
+      confirmTimeoutRef.current = setTimeout(() => {
+        onSelect(item.id, currentParentId ?? item.id);
+        onOpenChange(false);
+        resetState();
+      }, SELECTION_CONFIRM_MS);
     }
   }
 
@@ -85,6 +118,11 @@ export function CategoryPicker({
   function resetState() {
     setPath([]);
     setSearch("");
+    setPendingSelection(null);
+    if (confirmTimeoutRef.current) {
+      clearTimeout(confirmTimeoutRef.current);
+      confirmTimeoutRef.current = null;
+    }
   }
 
   function handleOpenChange(v: boolean) {
@@ -101,6 +139,44 @@ export function CategoryPicker({
 
   const breadcrumb = path.map((p) => p.name_nb).join(" › ");
 
+  /** Every drill-down level (main → sub → leaf) is shown as a visual grid of
+   * icon/color cards, so the picker stays "pretty visual" all the way down —
+   * only a live search (which spans multiple parents) falls back to the
+   * compact list, since a grid doesn't suit mixed-breadcrumb results. */
+  const showGrid = !searchResults;
+
+  function rowItem(cat: Category, opts: { parentLabel?: string | null } = {}) {
+    const isSelected = selectedId === cat.id;
+    const isPending = pendingSelection === cat.id;
+    return (
+      <button
+        key={cat.id}
+        type="button"
+        onClick={() => handleItemClick(cat)}
+        disabled={!!pendingSelection}
+        className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
+          isPending
+            ? "bg-primary/15 text-primary font-medium ring-1 ring-primary/40"
+            : isSelected
+              ? "bg-primary/10 text-primary font-medium"
+              : "hover:bg-muted"
+        }`}
+      >
+        <span>
+          {opts.parentLabel && <span className="text-muted-foreground">{opts.parentLabel} / </span>}
+          {cat.name_nb}
+        </span>
+        {isPending || isSelected ? (
+          <Check
+            className={`size-4 shrink-0 transition-transform ${isPending ? "scale-125" : ""}`}
+          />
+        ) : hasChildren(cat.id) ? (
+          <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
+        ) : null}
+      </button>
+    );
+  }
+
   const drillDownContent = (
     <>
       {/* Search */}
@@ -115,71 +191,96 @@ export function CategoryPicker({
         />
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+      <div className="flex-1 overflow-y-auto p-2">
         {searchResults ? (
-          <>
+          <div className="space-y-0.5">
             {searchResults.length === 0 && (
               <p className="py-4 text-center text-sm text-muted-foreground">
                 Ingen kategorier funnet
               </p>
             )}
-            {searchResults.map((cat) => {
-              const isSelected = selectedId === cat.id;
-              const parentLabel = categoryParentLabel(cat);
-              return (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => handleItemClick(cat)}
-                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                    isSelected ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted"
-                  }`}
-                >
-                  <span>
-                    {parentLabel && <span className="text-muted-foreground">{parentLabel} / </span>}
-                    {cat.name_nb}
-                  </span>
-                  {isSelected ? (
-                    <Check className="size-4 shrink-0" />
-                  ) : hasChildren(cat.id) ? (
-                    <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
-                  ) : null}
-                </button>
-              );
-            })}
-          </>
-        ) : (
-          <>
+            {searchResults.map((cat) => rowItem(cat, { parentLabel: categoryParentLabel(cat) }))}
+          </div>
+        ) : showGrid ? (
+          <div className="grid grid-cols-2 gap-2 p-1 sm:grid-cols-3">
             {filteredCurrentLevel.map((cat) => {
-              const isSelected = selectedId === cat.id;
+              const isPending = pendingSelection === cat.id;
+              const Icon = getCategoryIcon(cat.icon);
               return (
                 <button
                   key={cat.id}
                   type="button"
                   onClick={() => handleItemClick(cat)}
-                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                    isSelected ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted"
+                  disabled={!!pendingSelection}
+                  className={`flex flex-col items-center gap-2 rounded-xl border px-3 py-4 text-center transition-colors ${
+                    isPending
+                      ? "border-primary bg-primary/10 ring-1 ring-primary/40"
+                      : "border-border hover:border-primary/40 hover:bg-muted/50"
                   }`}
                 >
-                  <span>{cat.name_nb}</span>
-                  {hasChildren(cat.id) ? (
-                    <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
-                  ) : isSelected ? (
-                    <Check className="size-3.5 shrink-0" />
-                  ) : null}
+                  <span
+                    className={`flex size-11 items-center justify-center rounded-full transition-transform ${
+                      isPending ? "scale-110" : ""
+                    } ${cat.color ? "" : isPending ? "bg-primary/20" : "bg-primary/10"}`}
+                    style={{
+                      backgroundColor: cat.color
+                        ? isPending
+                          ? cat.color
+                          : `color-mix(in oklch, ${cat.color} 16%, transparent)`
+                        : undefined,
+                      color: cat.color && isPending ? "white" : cat.color || undefined,
+                    }}
+                  >
+                    {isPending ? (
+                      <Check className={`size-5 ${cat.color ? "" : "text-primary"}`} />
+                    ) : (
+                      <Icon className={`size-5 ${cat.color ? "" : "text-primary"}`} />
+                    )}
+                  </span>
+                  <span className="text-sm font-medium leading-tight">{cat.name_nb}</span>
                 </button>
               );
             })}
+            {filteredCurrentLevel.length === 0 && (
+              <p className="col-span-full py-4 text-center text-sm text-muted-foreground">
+                Ingen underkategorier
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-0.5">
+            {filteredCurrentLevel.map((cat) => rowItem(cat))}
             {filteredCurrentLevel.length === 0 && (
               <p className="py-4 text-center text-sm text-muted-foreground">
                 Ingen underkategorier
               </p>
             )}
-          </>
+          </div>
         )}
       </div>
     </>
   );
+
+  if (inline) {
+    return (
+      <div className="flex h-full min-h-[420px] flex-col rounded-lg border border-border">
+        {path.length > 0 && (
+          <div className="flex items-center gap-2 border-b px-3 py-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleBack}
+              className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-muted"
+              aria-label="Tilbake til kategorier"
+            >
+              <ChevronLeft className="size-4" />
+            </button>
+            <span className="text-sm font-medium">{breadcrumb}</span>
+          </div>
+        )}
+        {drillDownContent}
+      </div>
+    );
+  }
 
   // Desktop: single-column drill-down dialog/popover
   if (isDesktop) {

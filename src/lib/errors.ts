@@ -134,7 +134,12 @@ function looksTechnical(s: string): boolean {
     lower.includes("foreign key") ||
     lower.includes("postgrest") ||
     lower.includes("jwt") ||
-    lower.includes("rls")
+    lower.includes("rls") ||
+    lower.includes("json input") ||
+    lower.includes("unexpected token") ||
+    lower.includes("is not valid json") ||
+    lower.includes("networkerror") ||
+    lower.includes("typeerror")
   );
 }
 

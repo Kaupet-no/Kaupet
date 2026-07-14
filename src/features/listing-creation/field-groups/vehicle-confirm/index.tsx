@@ -149,11 +149,13 @@ export function VehicleConfirm({
             Vi klarte ikke å avgjøre kjøretøytype automatisk. Velg riktig type under.
           </p>
         )}
-        <div className="flex flex-wrap gap-2">
+        <div role="radiogroup" aria-label="Kjøretøytype" className="flex flex-wrap gap-2">
           {VEHICLE_LEAF_SLUGS.filter((slug) => leafBySlug.has(slug)).map((slug) => (
             <button
               key={slug}
               type="button"
+              role="radio"
+              aria-checked={selectedSlug === slug}
               onClick={() => setSelectedSlug(slug)}
               className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
                 selectedSlug === slug
@@ -197,7 +199,9 @@ export function VehicleConfirm({
             </span>
           </p>
         )}
-        {matching && <p className="mt-1 text-xs text-muted-foreground">Sjekker merke/modell…</p>}
+        <p role="status" aria-live="polite" className="mt-1 text-xs text-muted-foreground">
+          {matching && "Sjekker merke/modell…"}
+        </p>
         <dl className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1">
           {(brandName ?? lookup.brand) && (
             <>

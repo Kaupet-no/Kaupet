@@ -48,6 +48,7 @@ export function CategorySelect({
             type="button"
             size="sm"
             variant="ghost"
+            aria-label="Lukk kategoriforslag"
             onClick={() => {
               setSuggestionDismissed(true);
               setCategorySuggestion(null);

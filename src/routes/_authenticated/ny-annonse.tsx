@@ -771,7 +771,7 @@ function NewListingPage() {
       );
       setVehiclePreviousClassificationMismatch(previousClassificationMismatch);
     } catch (e) {
-      setVehicleLookupError(e instanceof Error ? e.message : "Kjøretøyoppslag feilet.");
+      setVehicleLookupError(formatErrorMessage(e, "Kjøretøyoppslag feilet. Prøv igjen."));
     } finally {
       setVehicleLookupLoading(false);
     }

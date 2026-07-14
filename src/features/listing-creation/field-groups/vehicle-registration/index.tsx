@@ -34,7 +34,7 @@ export function VehicleRegistration({
 
   return (
     <section className="space-y-3">
-      <Label>
+      <Label htmlFor="vehicle-reg-nr">
         Registreringsnummer
         <RequiredMark />
       </Label>
@@ -55,11 +55,14 @@ export function VehicleRegistration({
           </p>
           <div className="flex gap-2">
             <Input
+              id="vehicle-reg-nr"
               value={regNr}
               onChange={(e) => setRegNr(e.target.value.toUpperCase())}
               placeholder="F.eks. AB12345"
               className="max-w-[200px]"
               disabled={vehicleLookupLoading}
+              aria-invalid={!!vehicleLookupError}
+              aria-describedby={vehicleLookupError ? "vehicle-reg-nr-error" : undefined}
             />
             <Button
               type="button"
@@ -70,23 +73,27 @@ export function VehicleRegistration({
               {vehicleLookupLoading ? "Slår opp…" : "Slå opp"}
             </Button>
           </div>
-          {vehicleLookupError && (
-            <div className="space-y-1.5">
-              <p className="text-sm text-destructive">{vehicleLookupError}</p>
-              <button
-                type="button"
-                onClick={() => setVehicleRegistered(false)}
-                className="text-sm text-muted-foreground underline-offset-2 hover:underline"
-              >
-                Fyll inn kjøretøyopplysninger manuelt i stedet
-              </button>
-            </div>
-          )}
-          {vehicleLookupResult && (
-            <p className="text-sm text-muted-foreground">
-              Fant kjøretøyet. Gå videre for å bekrefte opplysningene.
-            </p>
-          )}
+          <div role="status" aria-live="polite">
+            {vehicleLookupError && (
+              <div className="space-y-1.5">
+                <p id="vehicle-reg-nr-error" className="text-sm text-destructive">
+                  {vehicleLookupError}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setVehicleRegistered(false)}
+                  className="text-sm text-muted-foreground underline-offset-2 hover:underline"
+                >
+                  Fyll inn kjøretøyopplysninger manuelt i stedet
+                </button>
+              </div>
+            )}
+            {vehicleLookupResult && (
+              <p className="text-sm text-muted-foreground">
+                Fant kjøretøyet. Gå videre for å bekrefte opplysningene.
+              </p>
+            )}
+          </div>
         </div>
       ) : (
         <div className="space-y-2">

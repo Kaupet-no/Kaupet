@@ -22,11 +22,17 @@ export function Condition({
           Tilstand
           <RequiredMark />
         </Label>
-        <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
+        <div
+          role="radiogroup"
+          aria-label="Tilstand"
+          className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4"
+        >
           {CONDITIONS.map((c) => (
             <button
               key={c.value}
               type="button"
+              role="radio"
+              aria-checked={condition === c.value}
               onClick={() =>
                 setValue("condition", c.value as ListingFormShape["condition"], {
                   shouldValidate: true,
@@ -52,11 +58,17 @@ export function Condition({
   return (
     <section className="space-y-2">
       <Label>Tilstand</Label>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <div
+        role="radiogroup"
+        aria-label="Tilstand"
+        className="grid grid-cols-2 gap-2 sm:grid-cols-3"
+      >
         {CONDITIONS.map((c) => (
           <button
             key={c.value}
             type="button"
+            role="radio"
+            aria-checked={condition === c.value}
             onClick={() =>
               setValue("condition", c.value as ListingFormShape["condition"], {
                 shouldValidate: true,

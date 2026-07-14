@@ -17,6 +17,13 @@ import { CONDITIONS } from "@/components/advanced-search-value";
 import { SORT_OPTIONS, type SortValue, type Category } from "@/lib/categories";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { hapticImpact } from "@/lib/haptics";
+import {
+  getSortChipState,
+  getCategoryChipState,
+  getPriceChipState,
+  getConditionChipState,
+} from "@/lib/filter-chip-labels";
+import { usePriceDraft } from "@/hooks/use-price-draft";
 
 type Props = {
   sort: SortValue;
@@ -67,26 +74,13 @@ export function NativeFilterChips({
   const close = () => setOpenSheet(null);
 
   // Labels for active filters
-  const sortLabel = SORT_OPTIONS.find((s) => s.value === sort)?.label ?? "Nyeste";
-  const sortActive = sort !== "new";
-  const catActive = selectedCategories.length > 0;
-  const catLabel = catActive
-    ? selectedCategories.length === 1
-      ? (categories.find((c) => c.slug === selectedCategories[0])?.name_nb ?? "Kategori")
-      : `${selectedCategories.length} kat.`
-    : "Kategori";
-  const priceActive = min != null || max != null || !includeFree;
-  const priceLabel = priceActive
-    ? min != null && max != null
-      ? `${min}–${max} kr`
-      : min != null
-        ? `Fra ${min} kr`
-        : max != null
-          ? `Til ${max} kr`
-          : "Pris"
-    : "Pris";
-  const condActive = conditions.length > 0;
-  const condLabel = condActive ? `${conditions.length} tilstand` : "Tilstand";
+  const { label: sortLabel, active: sortActive } = getSortChipState(sort);
+  const { label: catLabel, active: catActive } = getCategoryChipState(
+    categories,
+    selectedCategories,
+  );
+  const { label: priceLabel, active: priceActive } = getPriceChipState(min, max, includeFree);
+  const { label: condLabel, active: condActive } = getConditionChipState(conditions);
   const locActive = location.lat != null;
   const locLabel = locActive ? (location.label ? location.label.split(",")[0] : "Sted") : "Sted";
 
@@ -453,9 +447,8 @@ function PriceSheetContent({
   onApply: (min: number | undefined, max: number | undefined, includeFree: boolean) => void;
   resultBtn: React.ReactNode;
 }) {
-  const [minDraft, setMinDraft] = useState(min != null ? String(min) : "");
-  const [maxDraft, setMaxDraft] = useState(max != null ? String(max) : "");
-  const [freeDraft, setFreeDraft] = useState(includeFree);
+  const { minDraft, setMinDraft, maxDraft, setMaxDraft, freeDraft, setFreeDraft, apply } =
+    usePriceDraft(min, max, includeFree, onApply);
 
   return (
     <>
@@ -512,9 +505,7 @@ function PriceSheetContent({
         className="mt-4 w-full"
         onClick={() => {
           void hapticImpact("medium");
-          const mn = minDraft ? parseInt(minDraft) : undefined;
-          const mx = maxDraft ? parseInt(maxDraft) : undefined;
-          onApply(mn, mx, freeDraft);
+          apply();
         }}
       >
         Bruk prisfilter

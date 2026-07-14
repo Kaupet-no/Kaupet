@@ -24,11 +24,12 @@ import { signListingImageUrls } from "@/lib/storage";
 import { republishListing } from "@/lib/listings.functions";
 import { getMyActivePromotions } from "@/lib/promotions.functions";
 import { PromoteListingDialog } from "@/components/promote-listing-dialog";
-import { useIsDemo } from "@/lib/use-is-demo";
-import { useIsNative } from "@/lib/use-is-native";
+import { useIsDemo } from "@/hooks/use-is-demo";
+import { useIsNative } from "@/hooks/use-is-native";
 import { hapticImpact, hapticNotification } from "@/lib/haptics";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   DropdownMenu,
@@ -323,14 +324,16 @@ function MyListingsPage() {
                   <Loader2 className="size-4 animate-spin" /> Laster annonser…
                 </div>
               ) : filtered.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-border bg-surface px-6 py-12 text-center">
-                  <p className="text-sm text-muted-foreground">Ingen annonser å vise her.</p>
-                  <Link to="/ny-annonse" className="mt-4 inline-block">
-                    <Button size="sm" variant="outline">
-                      <Plus className="size-4" /> Opprett din første annonse
-                    </Button>
-                  </Link>
-                </div>
+                <EmptyState
+                  title="Ingen annonser å vise her."
+                  action={
+                    <Link to="/ny-annonse">
+                      <Button size="sm" variant="outline">
+                        <Plus className="size-4" /> Opprett din første annonse
+                      </Button>
+                    </Link>
+                  }
+                />
               ) : (
                 <ul className="space-y-3">
                   {filtered.map((r) => (
@@ -388,16 +391,16 @@ function MyListingsPage() {
                 <Loader2 className="size-4 animate-spin" /> Laster…
               </div>
             ) : wtbRows.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border bg-surface px-6 py-12 text-center">
-                <p className="text-sm text-muted-foreground">
-                  Du har ingen ønskes kjøpt-annonser ennå.
-                </p>
-                <Link to="/ny-ok-annonse" className="mt-4 inline-block">
-                  <Button size="sm" variant="outline">
-                    <Plus className="size-4" /> Opprett ønskes kjøpt
-                  </Button>
-                </Link>
-              </div>
+              <EmptyState
+                title="Du har ingen ønskes kjøpt-annonser ennå."
+                action={
+                  <Link to="/ny-ok-annonse">
+                    <Button size="sm" variant="outline">
+                      <Plus className="size-4" /> Opprett ønskes kjøpt
+                    </Button>
+                  </Link>
+                }
+              />
             ) : (
               <ul className="space-y-3">
                 {wtbRows.map((w) => (
@@ -431,7 +434,12 @@ function MyListingsPage() {
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
                       <Link to="/mine-annonser/ok/$id/rediger" params={{ id: w.id }}>
-                        <Button size="icon" variant="ghost" className="text-muted-foreground">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="text-muted-foreground"
+                          aria-label="Rediger"
+                        >
                           <Pencil className="size-4" />
                         </Button>
                       </Link>
@@ -441,6 +449,7 @@ function MyListingsPage() {
                             size="icon"
                             variant="ghost"
                             className="text-muted-foreground hover:text-destructive"
+                            aria-label="Slett"
                           >
                             <Trash2 className="size-4" />
                           </Button>
@@ -620,7 +629,7 @@ function ListingRow({
         <span className="text-xs text-muted-foreground">Ikke publisert</span>
       )}
       {activePromotion && (
-        <span className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-xs text-accent">
+        <span className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-xs text-accent-text">
           <Sparkles className="size-3" />
           {activePromotion.is_gift ? "Gratis fremhevet" : "Fremhevet"} til{" "}
           {activePromotion.expires_at
@@ -696,6 +705,7 @@ function ListingRow({
               className="shrink-0"
               disabled={busy}
               onClick={() => void hapticImpact("light")}
+              aria-label="Flere valg"
             >
               <MoreVertical className="size-5" />
             </Button>
@@ -834,7 +844,13 @@ function ListingRow({
         )}
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button size="sm" variant="ghost" className="text-destructive" disabled={busy}>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-destructive"
+              disabled={busy}
+              aria-label="Slett"
+            >
               <Trash2 className="size-4" />
             </Button>
           </AlertDialogTrigger>

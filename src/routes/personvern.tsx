@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { NativePageHeader } from "@/components/native-page-header";
-import { useIsNative } from "@/lib/use-is-native";
+import { useIsNative } from "@/hooks/use-is-native";
 
 export const Route = createFileRoute("/personvern")({
   head: () => ({

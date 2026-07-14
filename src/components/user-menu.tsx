@@ -14,8 +14,8 @@ import {
   FlaskConical,
 } from "lucide-react";
 
-import { useIsAdmin } from "@/lib/use-is-admin";
-import { useIsDemo } from "@/lib/use-is-demo";
+import { useIsAdmin } from "@/hooks/use-is-admin";
+import { useIsDemo } from "@/hooks/use-is-demo";
 import { useIsTestEnv } from "@/lib/env";
 import { setTestMode } from "@/lib/test-mode.functions";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";

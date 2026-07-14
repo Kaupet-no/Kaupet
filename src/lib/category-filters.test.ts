@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   effectiveFiltersForCategory,
   normalizeFilter,
+  splitPrimaryFilters,
   type CategoryFilter,
   type CategoryNode,
 } from "./category-filters";
@@ -24,6 +25,7 @@ function f(
     unit: null,
     options: null,
     sort_order: 0,
+    is_primary: true,
     ...partial,
   };
 }
@@ -80,10 +82,24 @@ describe("normalizeFilter", () => {
       unit: "km",
       options: null as unknown,
       sort_order: 0,
+      is_primary: true,
     };
     expect(normalizeFilter(row).options).toBeNull();
     expect(normalizeFilter({ ...row, options: [{ value: "a", label_nb: "A" }] }).options).toEqual([
       { value: "a", label_nb: "A" },
     ]);
+  });
+});
+
+describe("splitPrimaryFilters", () => {
+  it("puts is_primary filters first, secondary the rest, preserving order within each", () => {
+    const filters = [
+      f({ category_id: "sub", key: "a", is_primary: true }),
+      f({ category_id: "sub", key: "b", is_primary: false }),
+      f({ category_id: "sub", key: "c", is_primary: true }),
+    ];
+    const { primary, secondary } = splitPrimaryFilters(filters);
+    expect(primary.map((x) => x.key)).toEqual(["a", "c"]);
+    expect(secondary.map((x) => x.key)).toEqual(["b"]);
   });
 });

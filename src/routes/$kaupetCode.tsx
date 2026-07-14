@@ -10,20 +10,21 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { reconcilePromotionPayment } from "@/lib/promotions.functions";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, MapPin, Search } from "lucide-react";
+import { ArrowLeft, ChevronDown, MapPin, Search } from "lucide-react";
 import { toast } from "sonner";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { z } from "zod";
-import { useIsNative } from "@/lib/use-is-native";
+import { useIsNative } from "@/hooks/use-is-native";
 import { NativePageHeader } from "@/components/native-page-header";
-import { useIsAdmin } from "@/lib/use-is-admin";
-import { useIsModerator } from "@/lib/use-is-moderator";
+import { useIsAdmin } from "@/hooks/use-is-admin";
+import { useIsModerator } from "@/hooks/use-is-moderator";
 import { ListingActionsMenu } from "@/components/listing-detail/listing-actions-menu";
 
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/lib/use-auth";
+import { useAuth } from "@/hooks/use-auth";
 import { readLastSearchContext, type LastSearchContext } from "@/lib/last-search-context";
 import { CategoryFilterFields } from "@/components/category-filter-fields";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { buildTree, descendants, type Category } from "@/lib/categories";
 import { normalizeSlugForMatch } from "@/lib/slug";
@@ -31,16 +32,23 @@ import {
   applyAttributeFilters,
   effectiveFiltersForCategory,
   normalizeFilter,
+  splitPrimaryFilters,
   type AttributeFilterValue,
 } from "@/lib/category-filters";
 
 import { signListingImageUrls } from "@/lib/storage";
 import { CONDITION_LABEL } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { ImageGallery } from "@/components/listing-detail/image-gallery";
 import { OwnerStatsPanel } from "@/components/listing-detail/owner-stats-panel";
 import { SellerContactPanel } from "@/components/listing-detail/seller-contact-panel";
+import { VehicleSpecBar } from "@/components/listing-detail/vehicle/vehicle-spec-bar";
+import { VehicleTechTable } from "@/components/listing-detail/vehicle/vehicle-tech-table";
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
+import { VEHICLE_LEAF_SLUGS, type VehicleLeafSlug } from "@/lib/vehicle-classification";
+import type { VehicleLookupResult } from "@/lib/vehicle-lookup.server";
 
 const ListingDetailMap = lazy(() =>
   import("@/components/listing-detail-map").then((m) => ({ default: m.ListingDetailMap })),
@@ -69,6 +77,8 @@ export const Route = createFileRoute("/$kaupetCode")({
     // Only used by the category-landing branch, to deep-link preselected
     // filter values (e.g. from the homepage's category picker).
     f: z.record(z.string(), z.any()).optional(),
+    priceMin: z.coerce.number().int().min(0).optional(),
+    priceMax: z.coerce.number().int().min(0).optional(),
   }),
   loader: async ({ params }) => {
     // A single dynamic root segment serves two purposes: an 8-digit code is
@@ -189,10 +199,20 @@ function RootSlugPage() {
 }
 
 function CategoryLandingPage({ main }: { main: Category }) {
-  const { f: initialFilters } = Route.useSearch() as { f?: Record<string, AttributeFilterValue> };
+  const {
+    f: initialFilters,
+    priceMin: initialPriceMin,
+    priceMax: initialPriceMax,
+  } = Route.useSearch() as {
+    f?: Record<string, AttributeFilterValue>;
+    priceMin?: number;
+    priceMax?: number;
+  };
   const [filterValues, setFilterValues] = useState<Record<string, AttributeFilterValue>>(
     () => initialFilters ?? {},
   );
+  const [priceMin, setPriceMin] = useState<number | undefined>(initialPriceMin);
+  const [priceMax, setPriceMax] = useState<number | undefined>(initialPriceMax);
 
   const { data: categories } = useQuery({
     queryKey: ["categories", "with-color"],
@@ -212,7 +232,7 @@ function CategoryLandingPage({ main }: { main: Category }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("category_filters")
-        .select("id, category_id, key, label_nb, type, unit, options, sort_order")
+        .select("id, category_id, key, label_nb, type, unit, options, sort_order, is_primary")
         .order("sort_order");
       if (error) throw error;
       return (data ?? []).map(normalizeFilter);
@@ -228,18 +248,25 @@ function CategoryLandingPage({ main }: { main: Category }) {
     () => effectiveFiltersForCategory(main.id, allFilters ?? [], tree.byId),
     [main, allFilters, tree],
   );
+  const { primary: primaryFilters, secondary: secondaryFilters } = useMemo(
+    () => splitPrimaryFilters(filters),
+    [filters],
+  );
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
 
   const { data: listings, isLoading } = useQuery({
-    queryKey: ["category-listings", main.id, filterValues],
+    queryKey: ["category-listings", main.id, filterValues, priceMin, priceMax],
     queryFn: async () => {
       let qb = supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order)",
+          "id, kaupet_code, title, subtitle, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order)",
         )
         .eq("status", "active")
         .in("category_id", categoryIds);
       qb = applyAttributeFilters(qb, filterValues);
+      if (typeof priceMin === "number") qb = qb.gte("price_nok", priceMin);
+      if (typeof priceMax === "number") qb = qb.lte("price_nok", priceMax);
       const { data, error } = await qb.order("created_at", { ascending: false }).limit(48);
       if (error) throw error;
       return (data ?? []).map<ListingCardData>((l) => {
@@ -248,6 +275,7 @@ function CategoryLandingPage({ main }: { main: Category }) {
           id: l.id,
           kaupet_code: l.kaupet_code,
           title: l.title,
+          subtitle: l.subtitle,
           price_nok: l.price_nok,
           is_free: l.is_free,
           city: l.city,
@@ -289,28 +317,92 @@ function CategoryLandingPage({ main }: { main: Category }) {
       </section>
 
       <div className="mx-auto max-w-6xl gap-8 px-4 py-8 md:grid md:grid-cols-[16rem_1fr]">
-        {filters.length > 0 && (
-          <aside className="mb-6 space-y-5 md:mb-0">
-            <p className="text-sm font-medium">Filtrer</p>
-            <CategoryFilterFields
-              filters={filters}
-              values={filterValues}
-              onChange={(key, v) =>
-                setFilterValues((prev) => {
-                  const next = { ...prev };
-                  if (v === undefined) delete next[key];
-                  else next[key] = v;
-                  return next;
-                })
-              }
-            />
-            {Object.keys(filterValues).length > 0 && (
-              <Button variant="outline" size="sm" onClick={() => setFilterValues({})}>
-                Nullstill filtre
-              </Button>
-            )}
-          </aside>
-        )}
+        <aside className="mb-6 space-y-5 md:mb-0">
+          <p className="text-sm font-medium">Filtrer</p>
+          <div className="space-y-2">
+            <Label>Pris (kr)</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                placeholder="Fra"
+                value={priceMin ?? ""}
+                onChange={(e) =>
+                  setPriceMin(e.target.value === "" ? undefined : Number(e.target.value))
+                }
+              />
+              <Input
+                type="number"
+                placeholder="Til"
+                value={priceMax ?? ""}
+                onChange={(e) =>
+                  setPriceMax(e.target.value === "" ? undefined : Number(e.target.value))
+                }
+              />
+            </div>
+          </div>
+          {filters.length > 0 && (
+            <>
+              <CategoryFilterFields
+                filters={primaryFilters}
+                values={filterValues}
+                onChange={(key, v) =>
+                  setFilterValues((prev) => {
+                    const next = { ...prev };
+                    if (v === undefined) delete next[key];
+                    else next[key] = v;
+                    return next;
+                  })
+                }
+              />
+              {secondaryFilters.length > 0 && (
+                <Collapsible open={moreFiltersOpen} onOpenChange={setMoreFiltersOpen}>
+                  <CollapsibleTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1 px-0 text-primary hover:bg-transparent"
+                    >
+                      {moreFiltersOpen ? "Vis færre valg" : "Se flere valg"}
+                      <ChevronDown
+                        className={`size-4 transition-transform ${moreFiltersOpen ? "rotate-180" : ""}`}
+                      />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-4 pt-4 data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:slide-in-from-top-2 data-[state=closed]:animate-out data-[state=closed]:fade-out">
+                    <CategoryFilterFields
+                      filters={secondaryFilters}
+                      values={filterValues}
+                      onChange={(key, v) =>
+                        setFilterValues((prev) => {
+                          const next = { ...prev };
+                          if (v === undefined) delete next[key];
+                          else next[key] = v;
+                          return next;
+                        })
+                      }
+                    />
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+            </>
+          )}
+          {(Object.keys(filterValues).length > 0 ||
+            priceMin !== undefined ||
+            priceMax !== undefined) && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setFilterValues({});
+                setPriceMin(undefined);
+                setPriceMax(undefined);
+              }}
+            >
+              Nullstill filtre
+            </Button>
+          )}
+        </aside>
 
         <div>
           {isLoading ? (
@@ -471,7 +563,7 @@ function ListingDetailPage() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, description, price_nok, is_free, condition, city, postal_code, display_lat, display_lng, created_at, updated_at, published_at, status, seller_id, category_id, listing_images(storage_path, sort_order), categories(name_nb, slug)",
+          "id, kaupet_code, title, subtitle, description, price_nok, is_free, condition, city, postal_code, display_lat, display_lng, created_at, updated_at, published_at, status, seller_id, category_id, attributes, listing_images(storage_path, sort_order), categories(name_nb, slug)",
         )
         .eq("kaupet_code", kaupetCode)
         .maybeSingle();
@@ -616,7 +708,7 @@ function ListingDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-5xl px-4 py-10">
+      <div className="mx-auto max-w-6xl px-4 py-10">
         <div className="aspect-[4/3] animate-pulse rounded-xl bg-muted" />
       </div>
     );
@@ -632,8 +724,20 @@ function ListingDetailPage() {
   const seller = data.seller;
   const category = Array.isArray(data.categories) ? data.categories[0] : data.categories;
 
+  const attributes = (data.attributes ?? {}) as Record<string, unknown>;
+  const isVehicleCategory =
+    !!category?.slug && VEHICLE_LEAF_SLUGS.includes(category.slug as VehicleLeafSlug);
+  const vehicleLookup = isVehicleCategory
+    ? ((attributes.vehicle_lookup as VehicleLookupResult | undefined) ?? null)
+    : null;
+  const mileageKmRaw = attributes.mileage_km;
+  const mileageKm =
+    isVehicleCategory && typeof mileageKmRaw === "number" && Number.isFinite(mileageKmRaw)
+      ? mileageKmRaw
+      : null;
+
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-8">
       <NativePageHeader title={data.title} />
       {!isNative &&
         (backTarget.mode === "history" ? (
@@ -664,14 +768,24 @@ function ListingDetailPage() {
 
       <div className="mt-4 grid gap-8 md:grid-cols-[1.4fr_1fr]">
         <div>
-          <ImageGallery
-            images={images}
-            imgUrls={imgUrls}
-            activeImage={activeImage}
-            onSelect={setActiveImage}
-            title={data.title}
-            onImageClick={images.length > 0 ? setLightboxIndex : undefined}
-          />
+          <div className="relative mb-6">
+            <ImageGallery
+              images={images}
+              imgUrls={imgUrls}
+              activeImage={activeImage}
+              onSelect={setActiveImage}
+              title={data.title}
+              onImageClick={images.length > 0 ? setLightboxIndex : undefined}
+            />
+            {images.length > 0 && (
+              <div className="absolute -bottom-4 left-4 rounded-xl border border-border bg-card px-4 py-2.5 shadow-lg">
+                <p className="font-display text-xl leading-none text-primary">{priceLabel}</p>
+              </div>
+            )}
+          </div>
+          {isVehicleCategory && (
+            <VehicleTechTable vehicleLookup={vehicleLookup} mileageKm={mileageKm} />
+          )}
           <section className="mt-8">
             <h2 className="font-display text-xl">Beskrivelse</h2>
             <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
@@ -696,7 +810,14 @@ function ListingDetailPage() {
                 <h1 className="mt-1 font-display text-3xl leading-tight tracking-tight">
                   {data.title}
                 </h1>
-                <p className="mt-3 font-display text-3xl text-primary">{priceLabel}</p>
+                {data.subtitle && (
+                  <p className="mt-1 text-sm text-muted-foreground">{data.subtitle}</p>
+                )}
+                {/* Prisen vises flytende over bildekanten når det finnes bilder
+                    (se galleriseksjonen) — her kun som fallback uten bilder. */}
+                {images.length === 0 && (
+                  <p className="mt-3 font-display text-3xl text-primary">{priceLabel}</p>
+                )}
               </div>
               {user && !isOwner && (
                 <div className="shrink-0 pt-0.5">
@@ -709,6 +830,10 @@ function ListingDetailPage() {
               )}
             </div>
           </div>
+
+          {isVehicleCategory && (
+            <VehicleSpecBar vehicleLookup={vehicleLookup} mileageKm={mileageKm} />
+          )}
 
           {(() => {
             const fmt = (s: string) =>
@@ -734,12 +859,14 @@ function ListingDetailPage() {
 
             return (
               <dl className="grid grid-cols-2 gap-3 rounded-xl border border-border bg-card p-4 text-sm sm:grid-cols-3">
-                <div>
-                  <dt className="text-muted-foreground">Tilstand</dt>
-                  <dd className="font-medium">
-                    {CONDITION_LABEL[data.condition] ?? data.condition}
-                  </dd>
-                </div>
+                {data.condition && (
+                  <div>
+                    <dt className="text-muted-foreground">Tilstand</dt>
+                    <dd className="font-medium">
+                      {CONDITION_LABEL[data.condition] ?? data.condition}
+                    </dd>
+                  </div>
+                )}
                 <div>
                   <dt className="text-muted-foreground">Lokasjon</dt>
                   <dd className="flex items-center gap-1 font-medium">

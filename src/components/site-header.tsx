@@ -1,17 +1,20 @@
 import { Link } from "@tanstack/react-router";
 import { MessageCircle } from "lucide-react";
-import { useAuth } from "@/lib/use-auth";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
 import { NotificationsBell } from "@/components/notifications-bell";
-import { useUnreadConversationsCount } from "@/lib/use-unread";
+import { useUnreadConversationsCount } from "@/hooks/use-unread";
 
 export function SiteHeader() {
   const { user } = useAuth();
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur pt-safe">
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4">
+      <nav
+        aria-label="Hovednavigasjon"
+        className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4"
+      >
         <Link to="/" className="flex items-baseline gap-1">
           <span className="font-display text-2xl font-semibold tracking-tight text-primary">
             kaupet
@@ -40,7 +43,7 @@ export function SiteHeader() {
             </>
           )}
         </div>
-      </div>
+      </nav>
     </header>
   );
 }

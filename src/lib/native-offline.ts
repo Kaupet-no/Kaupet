@@ -1,6 +1,7 @@
-// Native-only: shows a toast when the device loses or regains connectivity
-// while the app is running. The bundled `capacitor-shell/offline.html` handles
-// the case where the app cannot reach kaupet.no at launch.
+// Shows a toast when the device loses or regains connectivity while the app
+// is running (web and native). On native, the bundled
+// `capacitor-shell/offline.html` handles the case where the app cannot reach
+// kaupet.no at launch, and the Android hardware back button is wired up here.
 
 import { toast } from "sonner";
 import { hapticImpact, hapticNotification } from "./haptics";
@@ -8,8 +9,8 @@ import { isNative } from "./native";
 
 let initialized = false;
 
-export function initNativeOfflineWatcher(): () => void {
-  if (initialized || !isNative() || typeof window === "undefined") {
+export function initOfflineWatcher(): () => void {
+  if (initialized || typeof window === "undefined") {
     return () => {};
   }
   initialized = true;
@@ -39,6 +40,7 @@ export function initNativeOfflineWatcher(): () => void {
   // Wire up Android hardware back button to navigate router history.
   let appCleanup: (() => void) | undefined;
   void (async () => {
+    if (!isNative()) return;
     try {
       const { App } = await import("@capacitor/app");
       const handle = await App.addListener("backButton", ({ canGoBack }) => {

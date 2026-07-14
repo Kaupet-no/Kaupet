@@ -1,49 +1,28 @@
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
 
-import { hapticImpact } from "@/lib/haptics";
-import { useIsNative } from "@/lib/use-is-native";
 import { TermGroupChips } from "@/components/term-group-editor";
-import { CONDITIONS } from "@/components/advanced-search-value";
-import type { Category } from "@/lib/categories";
 import type { TermGroup } from "@/lib/term-groups";
 
 type SearchLike = {
   q: string;
   qMode: "all" | "any";
   extraGroups: TermGroup[];
-  category: string;
-  categories: string[];
-  conditions: string[];
-  min?: number;
-  max?: number;
-  includeFree: boolean;
-  lat?: number;
-  lng?: number;
-  radius?: number;
-  loc?: string;
 };
 
 type Props = {
   search: SearchLike;
-  categories: Category[];
   terms: string[];
-  effectiveCategories: string[];
   onUpdate: (patch: Partial<SearchLike>) => void;
 };
 
-export function ActiveFilters({ search, categories, terms, effectiveCategories, onUpdate }: Props) {
+// Category, price, condition and location now have their own always-visible
+// filter pills (DesktopFilterChips / NativeFilterChips) that show their own
+// active state directly, so this component only needs to surface what those
+// pills can't express compactly: free-text search terms and extra search
+// lines. Showing them again here would just duplicate the pills.
+export function ActiveFilters({ search, terms, onUpdate }: Props) {
   const hasLine1 = terms.length > 0;
-  const hasPrice = search.min != null || search.max != null;
-  const hasLocation = search.lat != null && search.lng != null;
-  const hasAnyFilter =
-    hasLine1 ||
-    search.extraGroups.length > 0 ||
-    effectiveCategories.length > 0 ||
-    search.conditions.length > 0 ||
-    hasPrice ||
-    !search.includeFree ||
-    hasLocation;
+  const hasAnyFilter = hasLine1 || search.extraGroups.length > 0;
 
   const [collapsed, setCollapsed] = useState(true);
   const [overflowStart, setOverflowStart] = useState<number | null>(null);
@@ -60,27 +39,6 @@ export function ActiveFilters({ search, categories, terms, effectiveCategories, 
       .filter((g) => g.terms.length > 0);
     onUpdate({ extraGroups: next });
   };
-
-  const removeCategory = (slug: string) => {
-    onUpdate({
-      categories: effectiveCategories.filter((s) => s !== slug),
-      category: search.category === slug ? "" : search.category,
-    });
-  };
-
-  const removeCondition = (value: string) => {
-    onUpdate({ conditions: search.conditions.filter((c) => c !== value) });
-  };
-
-  const removePrice = () => onUpdate({ min: undefined, max: undefined });
-  const removeIncludeFree = () => onUpdate({ includeFree: true });
-  const removeLocation = () =>
-    onUpdate({ lat: undefined, lng: undefined, radius: undefined, loc: undefined });
-
-  let priceLabel = "";
-  if (search.min != null && search.max != null) priceLabel = `${search.min} kr – ${search.max} kr`;
-  else if (search.min != null) priceLabel = `Fra ${search.min} kr`;
-  else if (search.max != null) priceLabel = `Til ${search.max} kr`;
 
   const allItems: { key: string; node: ReactNode }[] = [];
 
@@ -107,47 +65,6 @@ export function ActiveFilters({ search, categories, terms, effectiveCategories, 
       ),
     });
   }
-  for (const slug of effectiveCategories) {
-    const name = categories.find((c) => c.slug === slug)?.name_nb ?? slug;
-    allItems.push({
-      key: `cat_${slug}`,
-      node: <FilterChip key={`cat_${slug}`} label={name} onRemove={() => removeCategory(slug)} />,
-    });
-  }
-  if (priceLabel) {
-    allItems.push({
-      key: "__price__",
-      node: <FilterChip key="__price__" label={priceLabel} onRemove={removePrice} />,
-    });
-  }
-  if (!search.includeFree) {
-    allItems.push({
-      key: "__free__",
-      node: <FilterChip key="__free__" label="Uten gratis annonser" onRemove={removeIncludeFree} />,
-    });
-  }
-  for (const value of search.conditions) {
-    const label = CONDITIONS.find((c) => c.value === value)?.label ?? value;
-    allItems.push({
-      key: `cond_${value}`,
-      node: (
-        <FilterChip key={`cond_${value}`} label={label} onRemove={() => removeCondition(value)} />
-      ),
-    });
-  }
-  if (hasLocation) {
-    allItems.push({
-      key: "__loc__",
-      node: (
-        <FilterChip
-          key="__loc__"
-          label={`${search.loc || "Valgt sted"}${search.radius ? ` (${search.radius} km)` : ""}`}
-          onRemove={removeLocation}
-        />
-      ),
-    });
-  }
-
   const itemCount = allItems.length;
 
   useEffect(() => {
@@ -205,27 +122,5 @@ export function ActiveFilters({ search, categories, terms, effectiveCategories, 
         </button>
       )}
     </div>
-  );
-}
-
-function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }) {
-  const isNative = useIsNative();
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full bg-muted px-2.5 text-xs ${isNative ? "h-9 py-0" : "py-1"}`}
-    >
-      {label}
-      <button
-        type="button"
-        onClick={() => {
-          void hapticImpact("light");
-          onRemove();
-        }}
-        className={`-m-1.5 rounded-full text-muted-foreground hover:text-foreground ${isNative ? "p-2" : "p-1.5"}`}
-        aria-label={`Fjern ${label}`}
-      >
-        <X className="size-3" />
-      </button>
-    </span>
   );
 }

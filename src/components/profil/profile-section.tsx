@@ -12,6 +12,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getMyProfileStats } from "@/lib/reviews.functions";
 import { formatErrorMessage } from "@/lib/errors";
 import {
@@ -32,7 +33,11 @@ export function ProfileSection() {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const { data: userData } = useQuery({
+  const {
+    data: userData,
+    isError: userIsError,
+    error: userError,
+  } = useQuery({
     queryKey: ["current-user"],
     queryFn: async () => {
       const { data } = await supabase.auth.getUser();
@@ -41,7 +46,12 @@ export function ProfileSection() {
   });
   const userId = userData?.id ?? null;
 
-  const { data: profile, isLoading } = useQuery({
+  const {
+    data: profile,
+    isLoading,
+    isError: profileIsError,
+    error: profileError,
+  } = useQuery({
     queryKey: ["profile-edit", userId],
     enabled: !!userId,
     queryFn: async () => {
@@ -56,7 +66,11 @@ export function ProfileSection() {
   });
 
   const getStats = useServerFn(getMyProfileStats);
-  const { data: stats } = useQuery({
+  const {
+    data: stats,
+    isError: statsIsError,
+    error: statsError,
+  } = useQuery({
     queryKey: ["my-profile-stats"],
     queryFn: () => getStats({}),
   });
@@ -137,11 +151,23 @@ export function ProfileSection() {
     return (
       <Card>
         <CardContent className="flex items-center gap-5 py-6">
-          <div className="size-20 shrink-0 animate-pulse rounded-full bg-muted" />
+          <Skeleton className="size-20 shrink-0 rounded-full" />
           <div className="max-w-xs flex-1 space-y-2">
-            <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-            <div className="h-9 w-full animate-pulse rounded bg-muted" />
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-9 w-full" />
           </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (userIsError || profileIsError) {
+    return (
+      <Card>
+        <CardContent className="py-6">
+          <p className="text-sm text-destructive">
+            {formatErrorMessage(userError ?? profileError, "Kunne ikke laste profilen")}
+          </p>
         </CardContent>
       </Card>
     );
@@ -213,7 +239,13 @@ export function ProfileSection() {
         </form>
       </Card>
 
-      <ProfileStats />
+      {statsIsError ? (
+        <p className="text-sm text-destructive">
+          {formatErrorMessage(statsError, "Kunne ikke laste statistikken")}
+        </p>
+      ) : (
+        <ProfileStats />
+      )}
     </div>
   );
 }

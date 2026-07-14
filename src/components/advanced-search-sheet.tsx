@@ -31,23 +31,23 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { LocationPicker, RadiusPicker } from "@/components/location-filter";
-import { ModeToggle } from "@/components/mode-toggle";
+import { ModeToggle } from "@/components/search-term-mode-toggle";
 import { TermGroupEditor } from "@/components/term-group-editor";
 import type { Category } from "@/lib/categories";
-import { mergeTermGroups } from "@/lib/term-groups";
-import { useAuth } from "@/lib/use-auth";
-import { createSavedSearch, summarizeCriteria, type SearchCriteria } from "@/lib/saved-searches";
+import { useAuth } from "@/hooks/use-auth";
+import { useAdvancedSearchValue } from "@/hooks/use-advanced-search-value";
+import {
+  buildAdvancedSearchCriteria,
+  mergeAdvancedSearchGroups,
+  resetAdvancedSearchValue,
+} from "@/lib/advanced-search-actions";
+import { createSavedSearch, type SearchCriteria } from "@/lib/saved-searches";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
 
 export { ModeToggle };
 
-import {
-  CONDITIONS,
-  defaultAdvancedSearchValue,
-  valueToCriteria,
-  type AdvancedSearchValue,
-} from "@/components/advanced-search-value";
+import { CONDITIONS, type AdvancedSearchValue } from "@/components/advanced-search-value";
 
 type Props = {
   open: boolean;
@@ -76,16 +76,13 @@ export function AdvancedSearchSheet({
   hideSaveAction = false,
 }: Props) {
   const { user } = useAuth();
-  const [v, setV] = useState<AdvancedSearchValue>(initial);
+  const [v, setV] = useAdvancedSearchValue(open, initial);
   const [termDraft, setTermDraft] = useState("");
   const [saveOpen, setSaveOpen] = useState(false);
 
   useEffect(() => {
-    if (open) {
-      setV(initial);
-      setTermDraft("");
-    }
-  }, [open, initial]);
+    if (open) setTermDraft("");
+  }, [open]);
 
   const addTerm = () => {
     const t = termDraft.trim();
@@ -108,14 +105,13 @@ export function AdvancedSearchSheet({
         : [...v.conditions, val],
     });
 
-  const handleReset = () => setV({ ...defaultAdvancedSearchValue(), sort: v.sort });
+  const handleReset = () => setV(resetAdvancedSearchValue(v));
   const handleApply = () => {
-    onApply({ ...v, extraGroups: mergeTermGroups(v.extraGroups) });
+    onApply(mergeAdvancedSearchGroups(v));
     onOpenChange(false);
   };
 
-  const criteria: SearchCriteria = { ...valueToCriteria(v), sort: currentSort ?? v.sort };
-  const defaultName = summarizeCriteria(criteria);
+  const { criteria, defaultName } = buildAdvancedSearchCriteria(v, currentSort);
 
   return (
     <>

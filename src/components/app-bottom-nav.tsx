@@ -3,7 +3,7 @@ import { Bell, MessageCircle, Plus, X, LogIn, Home } from "lucide-react";
 import { AdPickerOptions } from "@/components/ad-picker-options";
 import { useState } from "react";
 
-import { useAuth } from "@/lib/use-auth";
+import { useAuth } from "@/hooks/use-auth";
 import { hapticImpact } from "@/lib/haptics";
 import { isNative } from "@/lib/native";
 import { supabase } from "@/integrations/supabase/client";
@@ -39,12 +39,18 @@ export function AppBottomNav() {
 
   return (
     <nav
+      aria-label="Bunnavigasjon"
       className="fixed inset-x-0 bottom-0 z-50 px-3 pointer-events-none"
       style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)" }}
     >
       <div className="pointer-events-auto mx-auto flex max-w-md items-end justify-around gap-1 rounded-3xl border border-border bg-background/95 px-3 pb-3 pt-3 shadow-xl backdrop-blur">
         {/* Hjem */}
-        <Link to="/" className="flex flex-1 flex-col items-center gap-0.5" aria-label="Hjem">
+        <Link
+          to="/"
+          className="flex flex-1 flex-col items-center gap-0.5"
+          aria-label="Hjem"
+          aria-current={pathname === "/" ? "page" : undefined}
+        >
           <span className="flex h-11 w-11 items-center justify-center">
             {isActive("/") && pathname === "/" ? (
               <span className="font-display text-2xl font-semibold leading-none text-primary">
@@ -63,7 +69,8 @@ export function AppBottomNav() {
 
         {/* Varsler */}
         <div
-          className={`flex flex-1 flex-col items-center gap-0.5 transition-opacity ${isOnVarsler ? "pointer-events-none opacity-30" : ""}`}
+          className="flex flex-1 flex-col items-center gap-0.5"
+          aria-current={isOnVarsler ? "page" : undefined}
         >
           {user ? (
             <div className="relative flex h-11 w-11 items-center justify-center">
@@ -79,7 +86,11 @@ export function AppBottomNav() {
               <Bell className="size-6" />
             </button>
           )}
-          <span className="text-[11px] text-muted-foreground">Varsler</span>
+          <span
+            className={`text-[11px] ${isOnVarsler ? "font-medium text-primary" : "text-muted-foreground"}`}
+          >
+            Varsler
+          </span>
         </div>
 
         {/* Ny annonse (FAB) — midten */}
@@ -122,7 +133,8 @@ export function AppBottomNav() {
 
         {/* Meldinger */}
         <div
-          className={`flex flex-1 flex-col items-center gap-0.5 transition-opacity ${isOnMeldinger ? "pointer-events-none opacity-30" : ""}`}
+          className="flex flex-1 flex-col items-center gap-0.5"
+          aria-current={isOnMeldinger ? "page" : undefined}
         >
           {user ? (
             <div className="relative flex h-11 w-11 items-center justify-center">
@@ -138,12 +150,17 @@ export function AppBottomNav() {
               <MessageCircle className="size-6" />
             </button>
           )}
-          <span className="text-[11px] text-muted-foreground">Meldinger</span>
+          <span
+            className={`text-[11px] ${isOnMeldinger ? "font-medium text-primary" : "text-muted-foreground"}`}
+          >
+            Meldinger
+          </span>
         </div>
 
         {/* Bruker */}
         <div
-          className={`flex flex-1 flex-col items-center gap-0.5 transition-opacity ${isOnMeg ? "pointer-events-none opacity-30" : ""}`}
+          className="flex flex-1 flex-col items-center gap-0.5"
+          aria-current={isOnMeg ? "page" : undefined}
         >
           {user ? (
             <UserAvatarButton userId={user.id} email={user.email ?? null} />
@@ -156,7 +173,11 @@ export function AppBottomNav() {
               <LogIn className="size-6" />
             </Link>
           )}
-          <span className="text-[11px] text-muted-foreground">{user ? "Meg" : "Logg inn"}</span>
+          <span
+            className={`text-[11px] ${isOnMeg ? "font-medium text-primary" : "text-muted-foreground"}`}
+          >
+            {user ? "Meg" : "Logg inn"}
+          </span>
         </div>
       </div>
 

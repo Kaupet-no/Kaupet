@@ -29,6 +29,14 @@ export type VehicleBrandGroup =
   | "bobil_campingvogn"
   | "henger";
 
+export const VEHICLE_BRAND_GROUP_LABELS_NB: Record<VehicleBrandGroup, string> = {
+  bil: "Bil",
+  motorsykkel: "Motorsykkel",
+  moped_atv: "Moped/ATV",
+  bobil_campingvogn: "Bobil/campingvogn",
+  henger: "Tilhenger",
+};
+
 export type CategoryFilter = {
   id: string;
   category_id: string;
@@ -38,6 +46,7 @@ export type CategoryFilter = {
   unit: string | null;
   options: FilterOption[] | null;
   sort_order: number;
+  is_primary: boolean;
 };
 
 export const FILTER_TYPE_LABELS: Record<FilterType, string> = {
@@ -61,6 +70,7 @@ export function normalizeFilter(row: {
   unit: string | null;
   options: unknown;
   sort_order: number;
+  is_primary: boolean;
 }): CategoryFilter {
   return {
     id: row.id,
@@ -71,6 +81,21 @@ export function normalizeFilter(row: {
     unit: row.unit,
     options: Array.isArray(row.options) ? (row.options as FilterOption[]) : null,
     sort_order: row.sort_order,
+    is_primary: row.is_primary,
+  };
+}
+
+/**
+ * Splits an already-resolved filter list into those always shown on the
+ * landing/category filter panel vs. those tucked behind "Se flere valg".
+ */
+export function splitPrimaryFilters(filters: CategoryFilter[]): {
+  primary: CategoryFilter[];
+  secondary: CategoryFilter[];
+} {
+  return {
+    primary: filters.filter((f) => f.is_primary),
+    secondary: filters.filter((f) => !f.is_primary),
   };
 }
 
@@ -125,6 +150,24 @@ export function getMissingRequiredFilters(
     if (Array.isArray(v)) return v.length === 0;
     return false;
   });
+}
+
+/**
+ * Returns the vehicle_brands.category_group a category should look up
+ * brands/models from, or null if the category has no `brand_select` filter
+ * (i.e. isn't a vehicle category). Shared by the vehicle-lookup module and
+ * the title-photos field group so both agree on what counts as "a vehicle
+ * category" — driven by admin-configured category_filters, not a hardcoded
+ * category name/slug.
+ */
+export function vehicleCategoryGroupFor(
+  categoryId: string | null,
+  allFilters: CategoryFilter[],
+  categoriesById: Map<string, CategoryNode>,
+): VehicleBrandGroup | null {
+  const filters = effectiveFiltersForCategory(categoryId, allFilters, categoriesById);
+  const brandFilter = filters.find((f) => f.type === "brand_select");
+  return (brandFilter?.unit as VehicleBrandGroup | undefined) ?? null;
 }
 
 /**

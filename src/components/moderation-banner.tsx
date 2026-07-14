@@ -1,5 +1,5 @@
 import { AlertTriangle, ShieldAlert } from "lucide-react";
-import { useMyModerationStatus } from "@/lib/use-my-moderation-status";
+import { useMyModerationStatus } from "@/hooks/use-my-moderation-status";
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString("nb-NO", {

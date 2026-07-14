@@ -8,6 +8,7 @@ export type WtbListing = {
   id: string;
   user_id: string;
   title: string;
+  subtitle: string | null;
   description: string | null;
   category_id: string | null;
   max_price_nok: number | null;
@@ -24,6 +25,7 @@ export type WtbListingWithProfile = WtbListing & {
 
 const wtbInputSchema = z.object({
   title: z.string().trim().min(3, "Tittelen må være minst 3 tegn").max(120, "Maks 120 tegn"),
+  subtitle: z.string().trim().max(80, "Maks 80 tegn").nullable().optional(),
   description: z.string().trim().max(2000, "Maks 2000 tegn").optional(),
   category_id: z.string().uuid().nullable().optional(),
   max_price_nok: z.number().int().min(0).max(10_000_000).nullable().optional(),
@@ -55,6 +57,7 @@ export const createWtbListing = createServerFn({ method: "POST" })
       .insert({
         user_id: userId,
         title: data.title,
+        subtitle: data.subtitle ?? null,
         description: data.description ?? null,
         category_id: data.category_id ?? null,
         max_price_nok: data.max_price_nok ?? null,
@@ -74,6 +77,7 @@ const wtbUpdateSchema = z.object({
     .min(3, "Tittelen må være minst 3 tegn")
     .max(120, "Maks 120 tegn")
     .optional(),
+  subtitle: z.string().trim().max(80, "Maks 80 tegn").nullable().optional(),
   description: z.string().trim().max(2000, "Maks 2000 tegn").optional(),
   category_id: z.string().uuid().nullable().optional(),
   max_price_nok: z.number().int().min(0).max(10_000_000).nullable().optional(),
@@ -90,6 +94,7 @@ export const updateWtbListing = createServerFn({ method: "POST" })
 
     const fields = {
       ...(data.title !== undefined && { title: data.title }),
+      ...(data.subtitle !== undefined && { subtitle: data.subtitle }),
       ...(data.description !== undefined && { description: data.description }),
       ...(data.category_id !== undefined && { category_id: data.category_id }),
       ...(data.max_price_nok !== undefined && { max_price_nok: data.max_price_nok }),

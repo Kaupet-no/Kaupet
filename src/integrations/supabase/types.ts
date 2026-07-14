@@ -1695,6 +1695,22 @@ export type Database = {
           suspension_reason: string
         }[]
       }
+      popular_listings_by_category: {
+        Args: { _category_ids: string[]; _limit?: number; _offset?: number }
+        Returns: {
+          city: string
+          cover_path: string
+          created_at: string
+          is_free: boolean
+          kaupet_code: string
+          listing_id: string
+          price_nok: number
+          title: string
+          subtitle: string | null
+          total_views: number
+          views_last_week: number
+        }[]
+      }
       popular_listings_last_week: {
         Args: { _limit?: number }
         Returns: {

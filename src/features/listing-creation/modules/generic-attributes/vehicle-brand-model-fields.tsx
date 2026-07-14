@@ -36,6 +36,10 @@ export function VehicleBrandField({
     () => (allBrands ?? []).filter((b) => b.category_group === categoryGroup),
     [allBrands, categoryGroup],
   );
+  // Et nylig lagt til merke er ikke godkjent ennå og finnes derfor ikke i
+  // `brands` — uten dette forsvinner valgt verdi sporløst fra den synlige
+  // kontrollen (viser tom boks i stedet for merket brukeren nettopp bekreftet).
+  const hasPendingValue = !!value && !brands.some((b) => b.name === value);
 
   return (
     <div className="space-y-2">
@@ -45,6 +49,7 @@ export function VehicleBrandField({
           <SelectValue placeholder="Velg merke…" />
         </SelectTrigger>
         <SelectContent>
+          {hasPendingValue && <SelectItem value={value!}>{value} (venter godkjenning)</SelectItem>}
           {brands.map((b) => (
             <SelectItem key={b.id} value={b.name}>
               {b.name}
@@ -86,6 +91,9 @@ export function VehicleModelField({
     () => (allModels ?? []).filter((m) => m.brand_id === brandId),
     [allModels, brandId],
   );
+  // Samme resonnement som for merke: en nylig lagt til modell er ikke
+  // godkjent ennå og finnes derfor ikke i `models`.
+  const hasPendingValue = !!value && !models.some((m) => m.name === value);
 
   if (freeText) {
     return (
@@ -113,6 +121,7 @@ export function VehicleModelField({
           <SelectValue placeholder={brandId ? "Velg modell…" : "Velg merke først"} />
         </SelectTrigger>
         <SelectContent>
+          {hasPendingValue && <SelectItem value={value!}>{value} (venter godkjenning)</SelectItem>}
           {models.map((m) => (
             <SelectItem key={m.id} value={m.name}>
               {m.name}

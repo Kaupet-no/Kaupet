@@ -53,9 +53,7 @@ export function OpenSourceCtaSection() {
               Kaupet.no bygges på åpen kildekode, med rett til personvern som et grunnprinsipp. Vi
               benytter derfor ingen sporende informasjonskapsler eller tredjeparts analyseverktøy.
             </p>
-            <p>
-              Ønsker du å bidra? Sjekk ut repoet på GitHub. Alle bidragsytere er hjertelig velkomne.
-            </p>
+            <p>Ønsker du å bidra? Sjekk ut repoet på GitHub. Alle bidrag er hjertelig velkommen.</p>
           </div>
           <div className="flex flex-wrap gap-3 md:justify-end">
             <a href="https://github.com/Kaupet-no/kaupet" target="_blank" rel="noreferrer">

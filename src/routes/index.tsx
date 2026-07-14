@@ -713,7 +713,7 @@ function WebLanding() {
       </section>
 
       {activeCategory ? (
-        <section className="mx-auto max-w-6xl px-4 pb-16">
+        <section className="mx-auto max-w-6xl px-4 pt-8 pb-16">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-semibold">Annonser i {activeCategory.name_nb}</h2>
             <div className="inline-flex rounded-lg border border-border bg-card p-0.5 text-sm">

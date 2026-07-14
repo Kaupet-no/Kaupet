@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -15,6 +16,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { adminUnsuspendUser } from "@/lib/admin-moderation.functions";
 import { formatErrorMessage } from "@/lib/errors";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -22,6 +33,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 export function SuspensionsTab() {
   const qc = useQueryClient();
   const unsuspendFn = useServerFn(adminUnsuspendUser);
+  const [target, setTarget] = useState<{ id: string; name: string } | null>(null);
   const {
     data,
     isLoading,
@@ -43,6 +55,7 @@ export function SuspensionsTab() {
     },
     onError: (e: Error) =>
       showErrorToast(formatErrorMessage(e, "Kunne ikke oppheve svartelistingen")),
+    onSettled: () => setTarget(null),
   });
   return (
     <Card>
@@ -110,7 +123,9 @@ export function SuspensionsTab() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => unsuspend.mutate(s.user_id)}
+                      onClick={() =>
+                        setTarget({ id: s.user_id, name: s.display_name ?? s.user_id.slice(0, 8) })
+                      }
                       disabled={unsuspend.isPending}
                     >
                       Opphev
@@ -122,6 +137,24 @@ export function SuspensionsTab() {
           </TableBody>
         </Table>
       </CardContent>
+
+      <AlertDialog open={!!target} onOpenChange={(open) => !open && setTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Oppheve svartelistingen av {target?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Brukeren mister ikke lenger begrensningene fra svartelistingen. Dette kan ikke angres
+              uten å svarteliste på nytt.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction onClick={() => target && unsuspend.mutate(target.id)}>
+              Opphev
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

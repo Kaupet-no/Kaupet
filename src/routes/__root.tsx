@@ -285,10 +285,21 @@ function RootBody({ native }: { native: boolean }) {
 
   const content = (
     <div className="flex min-h-screen flex-col bg-background">
+      {!native && (
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground"
+        >
+          Hopp til innhold
+        </a>
+      )}
       {isTest && <TestEnvBanner />}
       {!native && <SiteHeader />}
       <ModerationBanner />
-      <main className={`flex-1${native && !keyboardVisible ? " pb-bottom-nav" : ""}`}>
+      <main
+        id="main-content"
+        className={`flex-1${native && !keyboardVisible ? " pb-bottom-nav" : ""}`}
+      >
         <Outlet />
       </main>
 

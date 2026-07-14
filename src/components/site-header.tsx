@@ -11,7 +11,10 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur pt-safe">
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4">
+      <nav
+        aria-label="Hovednavigasjon"
+        className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4"
+      >
         <Link to="/" className="flex items-baseline gap-1">
           <span className="font-display text-2xl font-semibold tracking-tight text-primary">
             kaupet
@@ -40,7 +43,7 @@ export function SiteHeader() {
             </>
           )}
         </div>
-      </div>
+      </nav>
     </header>
   );
 }

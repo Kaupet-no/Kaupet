@@ -39,6 +39,7 @@ export function AppBottomNav() {
 
   return (
     <nav
+      aria-label="Bunnavigasjon"
       className="fixed inset-x-0 bottom-0 z-50 px-3 pointer-events-none"
       style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)" }}
     >

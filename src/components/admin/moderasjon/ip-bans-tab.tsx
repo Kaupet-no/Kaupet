@@ -27,6 +27,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { adminBanIp, adminUnbanIp } from "@/lib/admin-moderation.functions";
 import { formatErrorMessage } from "@/lib/errors";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -39,6 +49,7 @@ export function IpBansTab() {
   const [ip, setIp] = useState("");
   const [reason, setReason] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
+  const [target, setTarget] = useState<{ id: string; ip: string } | null>(null);
 
   const {
     data,
@@ -79,6 +90,7 @@ export function IpBansTab() {
       qc.invalidateQueries({ queryKey: ["admin-ip-bans"] });
     },
     onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke oppheve IP-sperren")),
+    onSettled: () => setTarget(null),
   });
 
   return (
@@ -197,7 +209,7 @@ export function IpBansTab() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => unban.mutate(b.id)}
+                        onClick={() => setTarget({ id: b.id, ip: b.ip_address })}
                         disabled={unban.isPending}
                       >
                         <Trash2 className="size-4" /> Opphev
@@ -210,6 +222,24 @@ export function IpBansTab() {
           </Table>
         </CardContent>
       </Card>
+
+      <AlertDialog open={!!target} onOpenChange={(open) => !open && setTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Oppheve sperren av {target?.ip}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Forespørsler fra denne IP-adressen slipper gjennom igjen. Dette kan ikke angres uten å
+              sperre på nytt.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction onClick={() => target && unban.mutate(target.id)}>
+              Opphev
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

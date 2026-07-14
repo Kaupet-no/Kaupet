@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -15,6 +16,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { adminUnbanUser } from "@/lib/admin-moderation.functions";
 import { formatErrorMessage } from "@/lib/errors";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -22,6 +33,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 export function BansTab() {
   const qc = useQueryClient();
   const unbanFn = useServerFn(adminUnbanUser);
+  const [target, setTarget] = useState<{ id: string; name: string } | null>(null);
   const {
     data,
     isLoading,
@@ -43,6 +55,7 @@ export function BansTab() {
     },
     onError: (e: Error) =>
       showErrorToast(formatErrorMessage(e, "Kunne ikke oppheve utestengingen")),
+    onSettled: () => setTarget(null),
   });
   return (
     <Card>
@@ -109,7 +122,9 @@ export function BansTab() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => unban.mutate(b.user_id)}
+                      onClick={() =>
+                        setTarget({ id: b.user_id, name: b.display_name ?? b.user_id.slice(0, 8) })
+                      }
                       disabled={unban.isPending}
                     >
                       <ShieldOff className="size-4" /> Opphev
@@ -121,6 +136,23 @@ export function BansTab() {
           </TableBody>
         </Table>
       </CardContent>
+
+      <AlertDialog open={!!target} onOpenChange={(open) => !open && setTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Oppheve utestengingen av {target?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Brukeren får igjen tilgang til Kaupet. Dette kan ikke angres uten å utestenge på nytt.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction onClick={() => target && unban.mutate(target.id)}>
+              Opphev
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

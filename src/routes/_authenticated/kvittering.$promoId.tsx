@@ -86,8 +86,13 @@ function ReceiptPage() {
 
   if (isPending) {
     return (
-      <div className="mx-auto flex max-w-2xl items-center justify-center px-4 py-24">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      <div
+        role="status"
+        aria-live="polite"
+        className="mx-auto flex max-w-2xl items-center justify-center px-4 py-24"
+      >
+        <Loader2 className="size-6 animate-spin text-muted-foreground" aria-hidden="true" />
+        <span className="sr-only">Laster kvittering…</span>
       </div>
     );
   }

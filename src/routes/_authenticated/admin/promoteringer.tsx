@@ -27,6 +27,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -92,6 +102,7 @@ function AdminPromotionsPage() {
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [detailPromo, setDetailPromo] = useState<PromoRow | null>(null);
+  const [refundTargetId, setRefundTargetId] = useState<string | null>(null);
 
   const pricingQ = useQuery({ queryKey: ["admin-promo-pricing"], queryFn: () => listPricing() });
   const promosQ = useQuery({
@@ -361,13 +372,34 @@ function AdminPromotionsPage() {
       <DetailDialog
         promo={detailPromo}
         onClose={() => setDetailPromo(null)}
-        onRefund={(id) => {
-          if (confirm("Refundere denne fremhevingen? Beløpet føres tilbake i Vipps.")) {
-            refund.mutate(id);
-          }
-        }}
+        onRefund={(id) => setRefundTargetId(id)}
         refunding={refund.isPending}
       />
+
+      <AlertDialog
+        open={!!refundTargetId}
+        onOpenChange={(open) => !open && setRefundTargetId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Refundere denne fremhevingen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Beløpet føres tilbake i Vipps. Dette kan ikke angres.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (refundTargetId) refund.mutate(refundTargetId);
+                setRefundTargetId(null);
+              }}
+            >
+              Refunder
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={giftOpen} onOpenChange={setGiftOpen}>
         <DialogContent className="sm:max-w-lg">

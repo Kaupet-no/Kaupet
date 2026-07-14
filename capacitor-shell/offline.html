@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="nb">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Ingen forbindelse — Kaupet</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #fbf9f3;
+        --surface: #ffffff;
+        --fg: #1a1a1a;
+        --muted: #6b6b6b;
+        --primary: #2f5d44;
+        --accent: #d97a3c;
+        --primary-fg: #fbf9f3;
+        --border: #e5e1d6;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          color-scheme: dark;
+          --bg: #0f0f0f;
+          --surface: #1a1a1a;
+          --fg: #f5f5f5;
+          --muted: #a3a3a3;
+          --border: #2a2a2a;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+      }
+      body {
+        background: var(--bg);
+        color: var(--fg);
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        padding-top: max(24px, env(safe-area-inset-top));
+        padding-bottom: max(24px, calc(6rem + env(safe-area-inset-bottom)));
+      }
+      .card {
+        position: relative;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 32px 24px;
+        max-width: 380px;
+        width: 100%;
+        text-align: center;
+        box-shadow: 0 10px 30px -20px rgba(0, 0, 0, 0.25);
+      }
+      #timer-overlay {
+        display: none;
+        position: absolute;
+        inset: 0;
+        border-radius: 20px;
+        background: var(--surface);
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        z-index: 10;
+      }
+      #timer-overlay.visible { display: flex; }
+      #timer-display {
+        font-family: monospace;
+        font-size: 8px;
+        font-weight: normal;
+        letter-spacing: 0.15em;
+        color: var(--fg);
+        zoom: 5;
+        -webkit-font-smoothing: none;
+      }
+      #restart-btn {
+        appearance: none;
+        border: 1px solid var(--border);
+        background: var(--primary);
+        color: var(--primary-fg);
+        font: inherit;
+        font-size: 15px;
+        font-weight: 500;
+        padding: 10px 28px;
+        border-radius: 9999px;
+        cursor: pointer;
+      }
+      .wordmark {
+        display: flex;
+        align-items: baseline;
+        justify-content: center;
+        gap: 0.1em;
+        margin-bottom: 20px;
+        font-family: Georgia, "Times New Roman", ui-serif, serif;
+        font-size: 52px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1;
+      }
+      .wordmark__name { color: var(--primary); }
+      .wordmark__dot  { color: var(--accent); transition: opacity 0.1s; }
+      .wordmark__dot--hidden { opacity: 0; }
+      .wordmark__tld  { color: var(--muted); font-size: 42px; }
+      @keyframes tld-tip {
+        0%   { transform: rotate(0deg) translateY(0); }
+        55%  { transform: rotate(22deg) translateY(6px); }
+        75%  { transform: rotate(15deg) translateY(4px); }
+        100% { transform: rotate(18deg) translateY(5px); }
+      }
+      .wordmark__tld--tipping {
+        display: inline-block;
+        transform-origin: left bottom;
+        animation: tld-tip 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+      }
+      #ball-canvas {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 100;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 22px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.5;
+      }
+      .bottom-nav {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 50;
+        padding: 0 12px;
+        padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+        pointer-events: none;
+      }
+      .bottom-nav__bar {
+        pointer-events: auto;
+        margin: 0 auto;
+        max-width: 28rem;
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-around;
+        gap: 4px;
+        background: color-mix(in srgb, var(--surface) 95%, transparent);
+        border: 1px solid var(--border);
+        border-radius: 1.5rem;
+        padding: 12px;
+        box-shadow: 0 10px 30px -20px rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(8px);
+      }
+      .bottom-nav__item {
+        appearance: none;
+        border: none;
+        background: none;
+        font: inherit;
+        margin: 0;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        color: var(--muted);
+        cursor: default;
+        opacity: 0.5;
+      }
+      .bottom-nav__icon {
+        display: flex;
+        height: 2.75rem;
+        width: 2.75rem;
+        align-items: center;
+        justify-content: center;
+      }
+      .bottom-nav__label {
+        font-size: 11px;
+      }
+      .bottom-nav__fab {
+        margin-top: -1.75rem;
+        height: 4rem;
+        width: 4rem;
+        border-radius: 9999px;
+        background: var(--primary);
+        color: var(--primary-fg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 10px 20px -8px rgba(0, 0, 0, 0.5);
+        border: 4px solid var(--bg);
+        opacity: 0.5;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card" role="alert" aria-live="polite">
+      <div class="wordmark" aria-label="kaupet.no">
+        <span class="wordmark__name">kaupet</span><span class="wordmark__dot">.</span><span class="wordmark__tld">no</span>
+      </div>
+
+      <h1>Oi, da.</h1>
+      <p>Vi har visst litt problemer med å nå baksystemet vårt. Vennligst prøv igjen senere.</p>
+
+      <div id="timer-overlay" aria-live="polite">
+        <div id="timer-display">00:00:00</div>
+        <button id="restart-btn" type="button">Start på nytt</button>
+      </div>
+    </main>
+
+    <canvas id="ball-canvas" aria-hidden="true"></canvas>
+
+    <!-- Static stand-in for the app's bottom navigation. All items disabled
+         since navigation is not functional without a connection. -->
+    <nav class="bottom-nav" aria-hidden="true">
+      <div class="bottom-nav__bar">
+        <button type="button" class="bottom-nav__item" disabled aria-label="Hjem">
+          <span class="bottom-nav__icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7" /><path d="M5 10v10a1 1 0 0 0 1 1h3v-6h6v6h3a1 1 0 0 0 1-1V10" /></svg>
+          </span>
+          <span class="bottom-nav__label">Hjem</span>
+        </button>
+
+        <button type="button" class="bottom-nav__item" disabled aria-label="Varsler">
+          <span class="bottom-nav__icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0" /><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" /></svg>
+          </span>
+          <span class="bottom-nav__label">Varsler</span>
+        </button>
+
+        <div class="bottom-nav__item" style="margin-top: 0">
+          <span class="bottom-nav__fab" aria-hidden="true">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
+          </span>
+          <span class="bottom-nav__label">Selg</span>
+        </div>
+
+        <button type="button" class="bottom-nav__item" disabled aria-label="Meldinger">
+          <span class="bottom-nav__icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" /></svg>
+          </span>
+          <span class="bottom-nav__label">Meldinger</span>
+        </button>
+
+        <button type="button" class="bottom-nav__item" disabled aria-label="Logg inn">
+          <span class="bottom-nav__icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><path d="M10 17l5-5-5-5" /><path d="M15 12H3" /></svg>
+          </span>
+          <span class="bottom-nav__label">Logg inn</span>
+        </button>
+      </div>
+    </nav>
+    <script>
+    (function () {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+      const canvas = document.getElementById('ball-canvas');
+      const ctx = canvas.getContext('2d');
+      const dot = document.querySelector('.wordmark__dot');
+
+      const RADIUS = 10;
+      const GRAVITY = 0.45;
+      const RESTITUTION = 0.68;
+      const FRICTION = 0.91;
+      const IMPULSE = 15;
+      const COLOR = '#d97a3c';
+      const PARTICLE_COUNT = 10;
+
+      let active = false;
+      let gameStartTime = 0;
+      let gameEndTime = 0;
+      let ball = { x: 0, y: 0, vx: 0, vy: 0, scaleY: 1, scaleX: 1 };
+      let rafId = null;
+      let lastTs = 0;
+      let particles = [];
+      let charSpans = [];
+      let charRects = [];
+      let charIsWordmark = [];
+      let originalTexts = [];
+
+      // ── Haptic feedback ──────────────────────────────────────────────────────
+      // navigator.vibrate works on Android; iOS WebView silently ignores it.
+      function haptic(durationMs) {
+        try { navigator.vibrate && navigator.vibrate(durationMs); } catch (_) {}
+      }
+
+      // ── Timer ────────────────────────────────────────────────────────────────
+      function pad(n) { return n < 10 ? '0' + n : '' + n; }
+      function formatTime(ms) {
+        var cs      = Math.floor(ms / 10) % 100;
+        var seconds = Math.floor(ms / 1000) % 60;
+        var minutes = Math.floor(ms / 60000);
+        return pad(minutes) + ':' + pad(seconds) + ':' + pad(cs);
+      }
+
+      function showResult() {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        document.getElementById('timer-display').textContent = formatTime(gameEndTime - gameStartTime);
+        document.getElementById('timer-overlay').classList.add('visible');
+      }
+
+      // ── Character wrapping & collision ───────────────────────────────────────
+      function cacheCharRects() {
+        charRects = charSpans.map(function(s) { return s.getBoundingClientRect(); });
+      }
+
+      function initChars() {
+        var wordmarkEls = ['.wordmark__name', '.wordmark__tld'];
+        var contentEls  = ['.card h1', '.card p'];
+        originalTexts = [];
+        [wordmarkEls, contentEls].forEach(function(group, gi) {
+          group.forEach(function(sel) {
+            var el = document.querySelector(sel);
+            if (!el) return;
+            var text = el.textContent;
+            originalTexts.push({ sel: sel, text: text });
+            el.textContent = '';
+            for (var ci = 0; ci < text.length; ci++) {
+              var ch = text[ci];
+              var span = document.createElement('span');
+              span.textContent = ch;
+              el.appendChild(span);
+              if (ch.trim()) {
+                charSpans.push(span);
+                charIsWordmark.push(gi === 0);
+              }
+            }
+          });
+        });
+        // Freeze card height so char removal never causes reflow
+        var card = document.querySelector('.card');
+        card.style.height = card.getBoundingClientRect().height + 'px';
+        cacheCharRects();
+      }
+
+      function resetGame() {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        originalTexts.forEach(function(item) {
+          var el = document.querySelector(item.sel);
+          if (el) el.textContent = item.text;
+        });
+
+        var card = document.querySelector('.card');
+        card.style.height = '';
+
+        dot.classList.remove('wordmark__dot--hidden');
+        document.querySelector('.wordmark__tld').classList.remove('wordmark__tld--tipping');
+        document.getElementById('timer-overlay').classList.remove('visible');
+        document.getElementById('timer-display').textContent = '00:00:00';
+
+        active = false;
+        gameStartTime = 0;
+        gameEndTime = 0;
+        lastTs = 0;
+        particles = [];
+        charSpans = [];
+        charRects = [];
+        charIsWordmark = [];
+        originalTexts = [];
+        ball = { x: 0, y: 0, vx: 0, vy: 0, scaleY: 1, scaleX: 1 };
+      }
+
+      function checkCharCollisions() {
+        var now = performance.now();
+        var graceActive = (now - gameStartTime) < 1000;
+        for (var i = charSpans.length - 1; i >= 0; i--) {
+          if (graceActive && charIsWordmark[i]) continue;
+          var r = charRects[i];
+          var nearX = Math.max(r.left, Math.min(ball.x, r.right));
+          var nearY = Math.max(r.top, Math.min(ball.y, r.bottom));
+          var dx = ball.x - nearX;
+          var dy = ball.y - nearY;
+          if (dx * dx + dy * dy >= RADIUS * RADIUS) continue;
+
+          if (Math.abs(dx) >= Math.abs(dy)) {
+            ball.vx *= -RESTITUTION;
+          } else {
+            ball.vy *= -RESTITUTION;
+          }
+
+          var span = charSpans[i];
+          span.style.visibility = 'hidden';
+          haptic(6);
+          spawnExplosion(r.left + r.width / 2, r.top + r.height / 2);
+          charSpans.splice(i, 1);
+          charRects.splice(i, 1);
+          charIsWordmark.splice(i, 1);
+
+          if (charSpans.length === 0) {
+            gameEndTime = performance.now();
+            setTimeout(showResult, 300);
+          }
+        }
+      }
+
+      // ── Canvas sizing ────────────────────────────────────────────────────────
+      function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        if (active) cacheCharRects();
+      }
+      window.addEventListener('resize', resize);
+      resize();
+
+      function getDotCenter() {
+        const r = dot.getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      }
+
+      function applyImpulse(tapX, tapY) {
+        const dx = ball.x - tapX;
+        const dy = ball.y - tapY;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        ball.vx += (dx / dist) * IMPULSE;
+        ball.vy += (dy / dist) * IMPULSE;
+      }
+
+      function launch(tapX, tapY) {
+        const center = getDotCenter();
+        ball.x = center.x;
+        ball.y = center.y;
+        ball.vx = (tapX - center.x) * 0.08;
+        ball.vy = -8;
+        dot.classList.add('wordmark__dot--hidden');
+        document.querySelector('.wordmark__tld').classList.add('wordmark__tld--tipping');
+        active = true;
+        gameStartTime = performance.now();
+        initChars();
+        rafId = requestAnimationFrame(tick);
+      }
+
+      function tick(ts) {
+        const dt = lastTs ? Math.min((ts - lastTs) / (1000 / 60), 3) : 1;
+        lastTs = ts;
+
+        const W = canvas.width;
+        const H = canvas.height;
+
+        ball.vy += GRAVITY * dt;
+        ball.x += ball.vx * dt;
+        ball.y += ball.vy * dt;
+
+        // Reset squash/stretch
+        ball.scaleX = 1;
+        ball.scaleY = 1;
+
+        // Floor
+        if (ball.y + RADIUS >= H) {
+          ball.y = H - RADIUS;
+          const speed = Math.abs(ball.vy);
+          if (speed > 1) {
+            ball.vy *= -RESTITUTION;
+            ball.vx *= Math.pow(FRICTION, dt);
+            const squash = Math.min(0.35, speed * 0.018);
+            ball.scaleY = 1 - squash;
+            ball.scaleX = 1 + squash * 0.6;
+          } else {
+            ball.vy = 0;
+            ball.vx *= Math.pow(FRICTION, dt);
+          }
+        }
+
+        // Ceiling
+        if (ball.y - RADIUS <= 0) {
+          ball.y = RADIUS;
+          ball.vy *= -RESTITUTION;
+        }
+
+        // Characters
+        checkCharCollisions();
+
+        // Sides
+        if (ball.x + RADIUS >= W) {
+          ball.x = W - RADIUS;
+          ball.vx *= -RESTITUTION;
+        }
+        if (ball.x - RADIUS <= 0) {
+          ball.x = RADIUS;
+          ball.vx *= -RESTITUTION;
+        }
+
+        // Draw
+        ctx.clearRect(0, 0, W, H);
+
+        // Particles
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          p.vx *= Math.pow(0.92, dt);
+          p.vy *= Math.pow(0.92, dt);
+          p.life -= 0.06 * dt;
+          if (p.life <= 0) { particles.splice(i, 1); continue; }
+          ctx.save();
+          ctx.globalAlpha = p.life;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius * p.life, 0, Math.PI * 2);
+          ctx.fillStyle = COLOR;
+          ctx.fill();
+          ctx.restore();
+        }
+        ctx.save();
+        ctx.translate(ball.x, ball.y);
+        ctx.scale(ball.scaleX, ball.scaleY);
+
+        ctx.shadowColor = 'rgba(0,0,0,0.3)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 3;
+
+        ctx.beginPath();
+        ctx.arc(0, 0, RADIUS, 0, Math.PI * 2);
+        ctx.fillStyle = COLOR;
+        ctx.fill();
+
+        // Highlight
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetY = 0;
+        ctx.beginPath();
+        ctx.arc(-RADIUS * 0.28, -RADIUS * 0.32, RADIUS * 0.28, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.fill();
+
+        ctx.restore();
+
+        rafId = requestAnimationFrame(tick);
+      }
+
+      function spawnExplosion(x, y) {
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          const angle = (Math.PI * 2 * i) / PARTICLE_COUNT + Math.random() * 0.4;
+          const speed = 2 + Math.random() * 4;
+          particles.push({
+            x: x, y: y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 1,
+            radius: 2 + Math.random() * 3,
+          });
+        }
+      }
+
+      function onInteract(x, y) {
+        haptic(8);
+        spawnExplosion(x, y);
+        if (!active) {
+          launch(x, y);
+        } else {
+          applyImpulse(x, y);
+        }
+      }
+
+      document.addEventListener('pointerdown', function (e) {
+        onInteract(e.clientX, e.clientY);
+      });
+
+      document.getElementById('restart-btn').addEventListener('click', function (e) {
+        e.stopPropagation();
+        resetGame();
+      });
+    })();
+    </script>
+  </body>
+</html>

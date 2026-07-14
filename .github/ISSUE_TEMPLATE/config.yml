@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Spørsmål og diskusjoner
+    url: https://github.com/Kaupet-no/kaupet/discussions
+    about: For generelle spørsmål, idéer og diskusjoner — bruk Discussions i stedet for issues.
+  - name: Sikkerhetssårbarheter
+    url: https://github.com/Kaupet-no/kaupet/blob/main/SECURITY.md
+    about: Rapporter sårbarheter privat — ikke i offentlige issues.

@@ -1,0 +1,221 @@
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { z } from "zod";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
+import { Loader2 } from "lucide-react";
+
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { isNative } from "@/lib/native";
+import { formatErrorMessage } from "@/lib/errors";
+
+const TERMS_VERSION = "1.0";
+
+function passwordStrength(password: string): { label: string; score: 0 | 1 | 2 | 3 } {
+  if (password.length < 6) return { label: "For kort", score: 0 };
+  let score = 0;
+  if (password.length >= 10) score++;
+  if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score++;
+  if (/[0-9]/.test(password) || /[^A-Za-z0-9]/.test(password)) score++;
+  if (score <= 1) return { label: "Svakt", score: 1 };
+  if (score === 2) return { label: "Middels", score: 2 };
+  return { label: "Sterkt", score: 3 };
+}
+
+const searchSchema = z.object({
+  mode: z.enum(["signin", "signup"]).optional().default("signin"),
+});
+
+export const Route = createFileRoute("/auth")({
+  validateSearch: searchSchema,
+  head: () => ({
+    meta: [
+      { title: "Logg inn — Kaupet.no" },
+      { name: "description", content: "Logg inn eller bli medlem på Kaupet.no." },
+    ],
+  }),
+  component: AuthPage,
+});
+
+function AuthPage() {
+  const { mode } = Route.useSearch();
+  const navigate = useNavigate();
+  const [isSignUp, setIsSignUp] = useState(mode === "signup");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => setIsSignUp(mode === "signup"), [mode]);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) navigate({ to: "/", replace: true });
+    });
+  }, [navigate]);
+
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      if (isSignUp) {
+        if (!acceptedTerms) {
+          showErrorToast(
+            "Du må godta brukervilkårene og personvernerklæringen for å opprette konto.",
+          );
+          setLoading(false);
+          return;
+        }
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: isNative() ? "https://kaupet.no/" : window.location.origin,
+            data: {
+              display_name: displayName || email.split("@")[0],
+              terms_accepted_version: TERMS_VERSION,
+              terms_accepted_at: new Date().toISOString(),
+            },
+          },
+        });
+        if (error) throw error;
+        showSuccessToast("Konto opprettet! Sjekk e-posten for å bekrefte adressen.");
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        showSuccessToast("Velkommen tilbake!");
+        navigate({ to: "/", replace: true });
+      }
+    } catch (err: unknown) {
+      showErrorToast(formatErrorMessage(err, "Noe gikk galt. Prøv igjen."));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="mx-auto flex max-w-md flex-col px-4 py-16">
+      <div className="rounded-2xl border border-border bg-card p-8 shadow-sm">
+        <h1 className="font-display text-3xl tracking-tight">
+          {isSignUp ? "Bli medlem" : "Logg inn"}
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {isSignUp
+            ? "Det tar bare et halvt minutt og er helt gratis."
+            : "Velkommen tilbake til Kaupet."}
+        </p>
+
+        <form onSubmit={handleEmailAuth} className="mt-6 space-y-4">
+          {isSignUp && (
+            <div className="space-y-1.5">
+              <Label htmlFor="name">Visningsnavn</Label>
+              <Input
+                id="name"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Kari Nordmann"
+              />
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label htmlFor="email">E-post</Label>
+            <Input
+              id="email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="kari@eksempel.no"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="password">Passord</Label>
+            <Input
+              id="password"
+              type="password"
+              required
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            {isSignUp && password.length > 0 && (
+              <div className="space-y-1">
+                <div className="flex gap-1">
+                  {[1, 2, 3].map((i) => (
+                    <div
+                      key={i}
+                      className={`h-1 flex-1 rounded-full ${
+                        passwordStrength(password).score >= i ? "bg-primary" : "bg-muted"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Passordstyrke: {passwordStrength(password).label}
+                </p>
+              </div>
+            )}
+          </div>
+          {isSignUp && (
+            <label className="flex items-start gap-2 text-sm text-muted-foreground">
+              <Checkbox
+                id="accept-terms"
+                checked={acceptedTerms}
+                onCheckedChange={(v) => setAcceptedTerms(v === true)}
+                className="mt-0.5"
+              />
+              <span>
+                Jeg har lest og godtar{" "}
+                <Link
+                  to="/vilkar"
+                  target="_blank"
+                  className="underline text-foreground hover:text-primary"
+                >
+                  brukervilkårene
+                </Link>{" "}
+                og{" "}
+                <Link
+                  to="/personvern"
+                  target="_blank"
+                  className="underline text-foreground hover:text-primary"
+                >
+                  personvernerklæringen
+                </Link>
+                .
+              </span>
+            </label>
+          )}
+          <Button
+            type="submit"
+            className="w-full gap-2"
+            disabled={loading || (isSignUp && !acceptedTerms)}
+          >
+            {loading && <Loader2 className="size-4 animate-spin" />}
+            {isSignUp ? "Opprett konto" : "Logg inn"}
+          </Button>
+        </form>
+
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          {isSignUp ? "Har du allerede en konto? " : "Ny på Kaupet? "}
+          <button
+            type="button"
+            className="font-medium text-primary hover:underline"
+            onClick={() => setIsSignUp(!isSignUp)}
+          >
+            {isSignUp ? "Logg inn" : "Bli medlem"}
+          </button>
+        </p>
+      </div>
+
+      <p className="mt-6 text-center text-xs text-muted-foreground">
+        <Link to="/" className="hover:underline">
+          ← Tilbake til forsiden
+        </Link>
+      </p>
+    </div>
+  );
+}

@@ -1,0 +1,15 @@
+# Kaupet.no
+
+> Kaupet.no er en norsk markedsplass for kjøp og salg av brukte ting mellom privatpersoner. Åpen kildekode, ingen reklame, ingen mellomledd.
+
+Kaupet.no er drevet av frivillige og bygges åpent på GitHub under AGPL-3.0. Vi sporer ikke brukere og bruker ingen tredjeparts analyseverktøy. Tjenesten er kun tilgjengelig på norsk og rettet mot det norske bruktmarkedet.
+
+## Pages
+
+- [Forsiden](/): Introduksjon til Kaupet.no, hvordan det fungerer og hvorfor det finnes.
+- [Alle annonser](/annonser): Søk og bla gjennom brukte ting til salgs over hele Norge. Filtrer på kategori, pris, tilstand og lokasjon.
+- [Personvern](/personvern): Personvernerklæring som beskriver hvilke data vi lagrer og hvordan kontoer slettes.
+
+## Optional
+
+- [Logg inn / registrer](/auth): Innlogging og kontoregistrering for å publisere annonser og sende meldinger.

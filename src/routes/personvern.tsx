@@ -1,0 +1,377 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { NativePageHeader } from "@/components/native-page-header";
+import { useIsNative } from "@/lib/use-is-native";
+
+export const Route = createFileRoute("/personvern")({
+  head: () => ({
+    meta: [
+      { title: "Personvernerklæring — Kaupet.no" },
+      {
+        name: "description",
+        content:
+          "Slik behandler Kaupet.no personopplysninger. Vi lagrer kun det som er nødvendig for at tjenesten skal fungere, og bruker ingen sporing eller markedsføringscookies.",
+      },
+      { property: "og:title", content: "Personvernerklæring — Kaupet.no" },
+      {
+        property: "og:description",
+        content: "Vi bruker kun nødvendige cookies. Ingen tredjepartssporing, ingen markedsføring.",
+      },
+    ],
+  }),
+  component: PersonvernPage,
+});
+
+function PersonvernPage() {
+  const native = useIsNative();
+  return (
+    <article className="mx-auto max-w-3xl px-4 py-12">
+      <NativePageHeader title="Personvern" />
+      {!native && (
+        <header className="mb-10">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Personvern</p>
+          <h1 className="mt-2 font-display text-4xl leading-tight tracking-tight">
+            Personvernerklæring
+          </h1>
+          <p className="mt-3 text-sm text-muted-foreground">Sist oppdatert 26. juni 2026</p>
+        </header>
+      )}
+
+      <div className="space-y-10 text-sm leading-relaxed text-foreground/90">
+        <section>
+          <p>
+            Hos Kaupet.no lagrer vi kun det som er nødvendig for at tjenesten skal fungere. Vi
+            bruker <strong>ingen tredjepartssporing</strong>,{" "}
+            <strong>ingen markedsføringscookies</strong> og{" "}
+            <strong>ingen eksterne analyseplattformer</strong>. Derfor benytter vi heller ikke en
+            cookie-banner som ber om samtykke.
+          </p>
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="font-display text-2xl">Informasjonen vi lagrer</h2>
+
+          <details className="group rounded-lg border border-border">
+            <summary className="flex cursor-pointer items-center justify-between px-4 py-3 font-medium select-none list-none">
+              <span>På serveren</span>
+              <span className="text-muted-foreground transition-transform group-open:rotate-180">
+                ▾
+              </span>
+            </summary>
+            <ul className="space-y-2 border-t border-border px-4 py-4 list-disc pl-9">
+              <li>
+                <strong>Brukerprofil</strong>: navn og eventuelt profilbilde. Visningsnavn og
+                profilbilde er <strong>offentlig synlig</strong> for alle besøkende på din
+                profilside. E-postadressen er privat og vises ikke offentlig.
+              </li>
+              <li>
+                <strong>Annonser</strong> du har lagt ut, med tilhørende bilder, beskrivelse,
+                kategori og lokasjon (postnummer, by og koordinater for kartvisning).
+              </li>
+              <li>
+                <strong>Meldinger</strong> mellom deg og andre brukere.
+              </li>
+              <li>
+                <strong>Lest-status på samtaler</strong> — tidspunkt for når du sist åpnet en
+                samtale, brukt til ulest-indikatoren i meldingsinnboksen.
+              </li>
+              <li>
+                <strong>Favoritter</strong> du har lagret.
+              </li>
+              <li>
+                <strong>Vurderinger</strong> du gir eller mottar etter et salg (stjerner og
+                eventuell kommentar). Disse er <strong>offentlig synlige</strong> på brukerprofilen.
+              </li>
+              <li>
+                <strong>Lagrede søk</strong> med søkekriterier, og varsler om nye treff på disse
+                søkene.
+              </li>
+              <li>
+                <strong>Rapporter</strong> du sender inn om upassende annonser, lagres slik at
+                moderator kan behandle dem.
+              </li>
+              <li>
+                <strong>Blokkeringer</strong> — hvilke brukere eller samtaler du har blokkert. Dette
+                er privat og kun synlig for deg.
+              </li>
+              <li>
+                <strong>Bekreftede salg</strong> — når en selger markerer en annonse som solgt via
+                en samtale, lagres koblingen mellom annonse, kjøper og selger. Denne er kun synlig
+                for partene i salget.
+              </li>
+              <li>
+                <strong>Visninger</strong> av annonser, for å gi selger statistikk. Hvis du er
+                innlogget når du ser en annonse, knyttes visningen til brukeren din. Hvis du ikke er
+                innlogget, knyttes den kun til en anonym sesjons-ID.
+              </li>
+              <li>
+                <strong>Push-varslinger</strong> — hvis du slår på varsler, lagrer vi et
+                kryptografisk abonnementsnøkkelpar (offentlig/privat), nettleserinformasjon og dine
+                preferanser for hva du vil varsles om (nye meldinger, lagrede søk).
+              </li>
+              <li>
+                <strong>Betaling og annonsepromotering</strong> — hvis du betaler for å fremheve en
+                annonse, lagres transaksjonsdata fra betalingsleverandøren Vipps, samt hvilken
+                annonse betalingen gjelder.
+              </li>
+              <li>
+                <strong>Varsler om prisendringer</strong> — hvis du har lagt til en annonse som
+                favoritt eller har et lagret søk, kan vi lagre at det er sendt varsel til deg om
+                prisendring eller nytt treff, slik at du ikke varsles flere ganger om det samme.
+              </li>
+              <li>
+                <strong>Moderering</strong> — ved brudd på reglene kan administrator registrere en{" "}
+                <em>utestengelse</em>, <em>midlertidig suspensjon</em> eller <em>IP-blokkering</em>.
+                Ved IP-blokkering lagres IP-adressen som er blokkert. Slike administrative
+                handlinger logges internt med tidspunkt og årsak.
+              </li>
+              <li>
+                <strong>Sletteforespørsler</strong> — når du ber om å slette kontoen, lagrer vi
+                e-post og tidsstempel i den 7 dager lange angrefristen før permanent sletting
+                utføres.
+              </li>
+            </ul>
+            <p className="border-t border-border px-4 py-3 text-muted-foreground">
+              Data lagres og behandles av <strong>Supabase</strong> på servere i Europa. Du kan lese
+              deres personvernerklæring på{" "}
+              <a
+                href="https://supabase.com/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary underline underline-offset-2"
+              >
+                supabase.com/privacy
+              </a>
+              .
+            </p>
+          </details>
+
+          <details className="group rounded-lg border border-border">
+            <summary className="flex cursor-pointer items-center justify-between px-4 py-3 font-medium select-none list-none">
+              <span>Lokalt i nettleseren din</span>
+              <span className="text-muted-foreground transition-transform group-open:rotate-180">
+                ▾
+              </span>
+            </summary>
+            <ul className="space-y-2 border-t border-border px-4 py-4 list-disc pl-9">
+              <li>
+                <strong>Innloggingssesjon</strong> — nødvendig for at du skal kunne være logget inn
+                mellom besøk. Lagres i nettleserens <code>localStorage</code> av
+                autentiseringsleverandøren Supabase.
+              </li>
+              <li>
+                <strong>kaupet_visitor_id</strong> — en tilfeldig, anonym ID som identifiserer
+                nettleseren din uten å være knyttet til navn, e-post eller IP-adresse. Brukes
+                utelukkende for å gi selger en grov teller på unike besøk per annonse, og for å
+                hindre at samme besøkende telles flere ganger ved refresh eller gjenåpning. ID-en
+                deles ikke med tredjepart og brukes ikke til sporing, profilering eller
+                markedsføring.
+              </li>
+              <li>
+                <strong>kaupet_push_msg_hint_dismissed_v1</strong> — husker at du har lukket
+                informasjonsmeldingen om push-varsler i meldingsoversikten, slik at den ikke vises
+                på nytt.
+              </li>
+              <li>
+                <strong>kaupet_recent_searches_v1</strong> — de siste søkene du har gjort, slik at
+                du kan navigere tilbake til søkereslutatene dine etter å ha sett på en annonse.
+                Forlater ikke enheten din.
+              </li>
+              <li>
+                <strong>kaupet_draft_ny_annonse</strong> og <strong>kaupet_draft_id</strong> —
+                utkast til annonse (tittel, pris, beskrivelse m.m.) lagres automatisk mens du fyller
+                ut annonseregistreringen, slik at du ikke mister innholdet ved utilsiktet lukking.
+                Slettes når annonsen er publisert eller forkastet.
+              </li>
+              <li>
+                <strong>kaupet_view_mode</strong> — husker om du foretrekker annonser vist i
+                rutenett eller liste. Forlater ikke enheten din.
+              </li>
+              <li>
+                <strong>kaupet_photo_guide_seen</strong> — husker at du har sett veiledningen for
+                opplasting av bilder, slik at den ikke vises på nytt.
+              </li>
+            </ul>
+          </details>
+
+          <details className="group rounded-lg border border-border">
+            <summary className="flex cursor-pointer items-center justify-between px-4 py-3 font-medium select-none list-none">
+              <span>Lokalt i appen (iOS og Android)</span>
+              <span className="text-muted-foreground transition-transform group-open:rotate-180">
+                ▾
+              </span>
+            </summary>
+            <ul className="space-y-2 border-t border-border px-4 py-4 list-disc pl-9">
+              <li>
+                <strong>kaupet.app.location</strong> — husker posisjonen og søkeradius du sist
+                brukte i stedsfilteret (koordinater, radius i km og stedsnavn), slik at filteret er
+                forhåndsutfylt neste gang du åpner appen. Dataene forlater ikke enheten din og
+                brukes ikke til sporing.
+              </li>
+              <li>
+                <strong>kaupet_onboarding_completed_v1</strong> — husker at du har fullført
+                introduksjonsguiden ved første gangs bruk av appen, slik at den ikke vises på nytt.
+              </li>
+            </ul>
+          </details>
+        </section>
+
+        <section>
+          <h2 className="font-display text-2xl">Push-varslinger</h2>
+          <p className="mt-3">
+            Push-varslinger er <strong>frivillige og krever eksplisitt samtykke</strong>. Du
+            aktiverer dem selv i nettleseren eller appen. Vi lagrer kun det som er nødvendig for å
+            sende varsler:
+          </p>
+          <ul className="mt-3 space-y-2 list-disc pl-5">
+            <li>
+              <strong>Abonnementsnøkler</strong> — et kryptografisk nøkkelpar generert av
+              nettleseren din. Vi kan ikke bruke disse til å spore deg på tvers av nettsteder.
+            </li>
+            <li>
+              <strong>Enhets- og nettleserinformasjon</strong> — brukes til å sende varslet til
+              riktig enhet.
+            </li>
+            <li>
+              <strong>Varselformål</strong> — hvilke hendelser du vil varsles om (for eksempel nye
+              meldinger eller treff på lagrede søk).
+            </li>
+          </ul>
+          <p className="mt-4">
+            Du kan når som helst <strong>skru av varsler</strong> i nettleserens innstillinger eller
+            i profilen din på Kaupet.no. Da slettes abonnementsdataene automatisk fra serveren.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="font-display text-2xl">Juridisk grunnlag</h2>
+          <p className="mt-3">
+            Behandlingen skjer på grunnlag av <strong>avtale</strong> (nødvendig for å levere
+            tjenesten du har bedt om), <strong>samtykke</strong> (push-varslinger og eventuelle
+            preferanser) og <strong>berettiget interesse</strong> (statistikk til selgere og
+            sikkerhet i tjenesten).
+          </p>
+        </section>
+
+        <section>
+          <h2 className="font-display text-2xl">Dine rettigheter</h2>
+          <p className="mt-3">
+            Du har rett til innsyn, retting, sletting og dataportabilitet for opplysningene vi har
+            om deg. Du kan også trekke tilbake samtykke og klage til Datatilsynet. Kontakt oss for å
+            utøve rettighetene dine.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="font-display text-2xl">Sletting av brukerkonto</h2>
+          <p className="mt-3">
+            Du kan slette kontoen din når som helst fra <strong>Profil → Kontoinnstillinger</strong>
+            . Av sikkerhetshensyn settes kontoen først som <em>inaktiv</em> i 7 dager. I denne
+            perioden kan du logge inn igjen for å angre slettingen. Etter 7 dager fjernes kontoen
+            permanent fra systemet.
+          </p>
+          <p className="mt-3">
+            For å bevare samtalehistorikken for andre brukere blir profilen din{" "}
+            <strong>anonymisert</strong> ved permanent sletting: navn og profilbilde fjernes, og du
+            vises som "Slettet bruker" i tidligere meldinger. Annonsene dine slettes. E-postadresse
+            og innloggingsdata fjernes fullstendig.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="font-display text-2xl">Tredjeparter</h2>
+          <ul className="mt-3 space-y-2 list-disc pl-5">
+            <li>
+              <strong>Supabase</strong> — databehandler for autentisering, database og fillagring.
+            </li>
+            <li>
+              <strong>Cloudflare</strong> — vi bruker Cloudflare Workers som driftsplattform. Det
+              betyr at trafikk til og fra Kaupet.no går gjennom Cloudflare sin infrastruktur, som
+              dermed ser IP-adressen din og annen teknisk informasjon om forespørselen din. Du kan
+              lese Cloudflares personvernerklæring på{" "}
+              <a
+                href="https://www.cloudflare.com/privacypolicy/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary underline underline-offset-2"
+              >
+                cloudflare.com/privacypolicy
+              </a>
+              .
+            </li>
+            <li>
+              <strong>Vipps</strong> — betalingsleverandør for kjøp av annonsepromotering. Vipps
+              behandler betalingsopplysninger som navn og telefonnummer i forbindelse med
+              transaksjonen. Du kan lese Vipps sin personvernerklæring på{" "}
+              <a
+                href="https://www.vipps.no/personvern/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary underline underline-offset-2"
+              >
+                vipps.no/personvern
+              </a>
+              .
+            </li>
+            <li>
+              <strong>Google Firebase Cloud Messaging (FCM)</strong> — brukes for å sende
+              push-varslinger til Kaupet-appen på iOS og Android. Varsler leveres via Googles
+              infrastruktur, som dermed ser enhetsinformasjon og varselinnhold. FCM brukes kun når
+              du har aktivert push-varslinger. Du kan lese Googles personvernerklæring på{" "}
+              <a
+                href="https://policies.google.com/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary underline underline-offset-2"
+              >
+                policies.google.com/privacy
+              </a>
+              .
+            </li>
+            <li>
+              <strong>Google Fonts</strong> — skrifttyper lastes direkte fra Googles servere.
+              IP-adressen din blir synlig for Google ved henting av skrifttypene.
+            </li>
+            <li>
+              <strong>OpenStreetMap / CARTO</strong> — kartfliser og adressesøk (Nominatim) for
+              visning og geokoding av lokasjon på annonser. IP-adressen din blir synlig for disse
+              tjenestene når kart eller adressesøk brukes.
+            </li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 className="font-display text-2xl">Endringer</h2>
+          <p className="mt-3">
+            Vi oppdaterer denne erklæringen ved endringer i tjenesten. Versjon og dato øverst på
+            siden viser når den sist ble endret.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="font-display text-2xl">Behandlingsansvarlig</h2>
+          <p className="mt-3">
+            Kaupet.no forvaltes av <strong>Happy Pixel AS</strong>, organisasjonsnummer{" "}
+            <strong>933 197 867</strong>. Happy Pixel AS er behandlingsansvarlig for
+            personopplysninger som samles inn gjennom tjenesten. Henvendelser om personvern kan
+            sendes til kontaktadressen oppgitt nedenfor.
+          </p>
+          <p className="mt-3">
+            <strong>E-post:</strong>{" "}
+            <a
+              href="mailto:kontakt@kaupet.no"
+              className="text-primary underline underline-offset-2"
+            >
+              kontakt@kaupet.no
+            </a>
+          </p>
+        </section>
+
+        <div className="pt-4">
+          <Link to="/" className="text-sm text-primary underline underline-offset-2">
+            Tilbake til forsiden
+          </Link>
+        </div>
+      </div>
+    </article>
+  );
+}

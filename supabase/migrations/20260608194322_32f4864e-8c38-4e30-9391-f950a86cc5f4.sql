@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Anyone can read active promotions" ON public.listing_promotions;

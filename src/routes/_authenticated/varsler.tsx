@@ -11,6 +11,7 @@ import { nb } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   listNotifications,
   listPriceDrops,
@@ -155,15 +156,15 @@ function VarslerPage() {
               ))}
             </div>
           ) : items.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border bg-surface p-12 text-center">
-              <p className="text-lg font-medium">Ingen varsler ennå</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Lagre et søk for å bli varslet om nye treff.
-              </p>
-              <Link to="/mine-sok" className="mt-4 inline-block">
-                <Button>Mine søk</Button>
-              </Link>
-            </div>
+            <EmptyState
+              title="Ingen varsler ennå"
+              description="Lagre et søk for å bli varslet om nye treff."
+              action={
+                <Link to="/mine-sok">
+                  <Button>Mine søk</Button>
+                </Link>
+              }
+            />
           ) : (
             <ul className="divide-y divide-border rounded-xl border border-border bg-card">
               {items.map((n) => (

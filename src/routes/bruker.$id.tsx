@@ -13,6 +13,7 @@ import { StarRating } from "@/components/star-rating";
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
 import { AdminUserActions } from "@/components/admin/suspend-user-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { getPublicProfile, listUserReviews } from "@/lib/reviews.functions";
 import { formatErrorMessage } from "@/lib/errors";
 
@@ -174,9 +175,7 @@ function PublicProfilePage() {
               ))}
             </div>
           ) : reviews.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-border bg-surface p-8 text-center text-sm text-muted-foreground">
-              Ingen vurderinger ennå.
-            </p>
+            <EmptyState title="Ingen vurderinger ennå" className="p-8" />
           ) : (
             reviews.map((r) => (
               <article key={r.id} className="rounded-xl border border-border bg-card p-4">
@@ -252,9 +251,7 @@ function PublicProfilePage() {
               <Skeleton key={i} className="aspect-[4/3] rounded-xl" />
             ))
           ) : activeListings.length === 0 ? (
-            <p className="col-span-full rounded-xl border border-dashed border-border bg-surface p-8 text-center text-sm text-muted-foreground">
-              Brukeren har ingen aktive annonser.
-            </p>
+            <EmptyState title="Brukeren har ingen aktive annonser" className="col-span-full p-8" />
           ) : (
             activeListings.map((l) => <ListingCard key={l.id} listing={l} />)
           )}

@@ -48,6 +48,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { PushEnablePrompt } from "@/components/push-enable-prompt";
+import { EmptyState } from "@/components/ui/empty-state";
 import { AdvancedSearchSheet } from "@/components/advanced-search-sheet";
 import { criteriaToValue, valueToCriteria } from "@/components/advanced-search-value";
 import {
@@ -205,21 +206,17 @@ function MineSokPage() {
               ))}
             </div>
           ) : searches.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border bg-surface p-12 text-center">
-              <p className="text-lg font-medium">Ingen lagrede søk ennå</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Gjør et søk på annonse-siden og lagre kriteriene dine.
-              </p>
-              <Link
-                to="/annonser"
-                search={{ q: "", category: "", sort: "new" } as never}
-                className="mt-4 inline-block"
-              >
-                <Button>
-                  <SearchIcon className="size-4" /> Gå til annonser
-                </Button>
-              </Link>
-            </div>
+            <EmptyState
+              title="Ingen lagrede søk ennå"
+              description="Gjør et søk på annonse-siden og lagre kriteriene dine."
+              action={
+                <Link to="/annonser" search={{ q: "", category: "", sort: "new" } as never}>
+                  <Button>
+                    <SearchIcon className="size-4" /> Gå til annonser
+                  </Button>
+                </Link>
+              }
+            />
           ) : (
             <ul className="space-y-3">
               {searches.map((s) => {

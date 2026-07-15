@@ -8,6 +8,7 @@ import { nb } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useIsNative } from "@/hooks/use-is-native";
+import { useUnreadConversationsCount } from "@/hooks/use-unread";
 import { isUnread } from "@/lib/unread";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -169,13 +170,13 @@ export function MessagesButton() {
     };
   }, [user, qc]);
 
+  // Delt med SiteHeader (MessagesIconLink) slik at uleste-tallet er likt på
+  // tvers av desktop-header og mobil-bunnav — se useUnreadConversationsCount.
+  const unreadCount = useUnreadConversationsCount();
+
   if (!user) return null;
 
   const conversations = data ?? [];
-  const unreadCount = conversations.filter((c) => {
-    const myLastReadAt = c.buyer_id === user.id ? c.buyer_last_read_at : c.seller_last_read_at;
-    return isUnread(c.last_message_at, c.last_message_sender_id, user.id, myLastReadAt);
-  }).length;
 
   const trigger = (
     <Button variant="ghost" size="icon" aria-label="Meldinger" className="relative">

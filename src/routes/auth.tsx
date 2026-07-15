@@ -32,7 +32,7 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
-type AuthMode = "signin" | "signup" | "reset";
+type AuthMode = "signin" | "signup" | "reset" | "resend";
 
 const emailField = z
   .string()
@@ -172,14 +172,22 @@ function AuthPage() {
     <div className="mx-auto flex max-w-md flex-col px-4 py-16">
       <div className="rounded-2xl border border-border bg-card p-8 shadow-sm">
         <h1 className="font-display text-3xl tracking-tight">
-          {authMode === "reset" ? "Glemt passord" : isSignUp ? "Bli medlem" : "Logg inn"}
+          {authMode === "reset"
+            ? "Glemt passord"
+            : authMode === "resend"
+              ? "Bekreft e-post"
+              : isSignUp
+                ? "Bli medlem"
+                : "Logg inn"}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {authMode === "reset"
             ? "Skriv inn e-postadressen din, så sender vi deg en lenke for å sette nytt passord."
-            : isSignUp
-              ? "Det tar bare et halvt minutt og er helt gratis."
-              : "Velkommen tilbake til Kaupet."}
+            : authMode === "resend"
+              ? "Skriv inn e-postadressen din, så sender vi deg en ny bekreftelseslenke."
+              : isSignUp
+                ? "Det tar bare et halvt minutt og er helt gratis."
+                : "Velkommen tilbake til Kaupet."}
         </p>
 
         {authMode === "reset" ? (
@@ -206,17 +214,47 @@ function AuthPage() {
                 Send lenke
               </Button>
             </form>
-            <div className="mt-4 rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
-              Har du ikke bekreftet e-postadressen din enda?{" "}
+            <p className="mt-6 text-center text-sm text-muted-foreground">
               <button
                 type="button"
-                className="font-medium text-primary hover:underline disabled:opacity-50"
-                onClick={handleResendConfirmation}
-                disabled={resendLoading}
+                className="font-medium text-primary hover:underline"
+                onClick={() => setAuthMode("signin")}
               >
-                {resendLoading ? "Sender…" : "Send bekreftelses-e-post på nytt"}
+                ← Tilbake til innlogging
               </button>
-            </div>
+            </p>
+          </>
+        ) : authMode === "resend" ? (
+          <>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleResendConfirmation();
+              }}
+              className="mt-6 space-y-4"
+              noValidate
+            >
+              <div className="space-y-1.5">
+                <Label htmlFor="email">E-post</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="kari@eksempel.no"
+                  aria-invalid={!!errors.email}
+                  aria-describedby={errors.email ? "email-error" : undefined}
+                  {...register("email")}
+                />
+                {errors.email && (
+                  <p id="email-error" className="text-sm text-destructive">
+                    {errors.email.message}
+                  </p>
+                )}
+              </div>
+              <Button type="submit" className="w-full gap-2" disabled={resendLoading}>
+                {resendLoading && <Loader2 className="size-4 animate-spin" />}
+                Send bekreftelses-e-post på nytt
+              </Button>
+            </form>
             <p className="mt-6 text-center text-sm text-muted-foreground">
               <button
                 type="button"
@@ -285,6 +323,18 @@ function AuthPage() {
               {errors.password && (
                 <p id="password-error" className="text-sm text-destructive">
                   {errors.password.message}
+                </p>
+              )}
+              {!isSignUp && (
+                <p className="text-xs text-muted-foreground">
+                  Ikke bekreftet e-postadressen din?{" "}
+                  <button
+                    type="button"
+                    className="font-medium text-primary hover:underline"
+                    onClick={() => setAuthMode("resend")}
+                  >
+                    Send bekreftelse på nytt
+                  </button>
                 </p>
               )}
               {isSignUp && password.length > 0 && (
@@ -356,7 +406,7 @@ function AuthPage() {
           </form>
         )}
 
-        {authMode !== "reset" && (
+        {authMode !== "reset" && authMode !== "resend" && (
           <p className="mt-6 text-center text-sm text-muted-foreground">
             {isSignUp ? "Har du allerede en konto? " : "Ny på Kaupet? "}
             <button

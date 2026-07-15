@@ -10,7 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { reconcilePromotionPayment } from "@/lib/promotions.functions";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ChevronDown, MapPin, Search } from "lucide-react";
+import { ArrowLeft, Loader2, MapPin, PackageSearch, Search } from "lucide-react";
 import { toast } from "sonner";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { z } from "zod";
@@ -23,8 +23,8 @@ import { ListingActionsMenu } from "@/components/listing-detail/listing-actions-
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { readLastSearchContext, type LastSearchContext } from "@/lib/last-search-context";
-import { CategoryFilterFields } from "@/components/category-filter-fields";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { CategoryFilterFields, MoreFiltersToggle } from "@/components/category-filter-fields";
+import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { buildTree, descendants, type Category } from "@/lib/categories";
 import { normalizeSlugForMatch } from "@/lib/slug";
@@ -32,6 +32,7 @@ import {
   applyAttributeFilters,
   effectiveFiltersForCategory,
   normalizeFilter,
+  setAttributeFilterValue,
   splitPrimaryFilters,
   type AttributeFilterValue,
 } from "@/lib/category-filters";
@@ -47,6 +48,7 @@ import { SellerContactPanel } from "@/components/listing-detail/seller-contact-p
 import { VehicleSpecBar } from "@/components/listing-detail/vehicle/vehicle-spec-bar";
 import { VehicleTechTable } from "@/components/listing-detail/vehicle/vehicle-tech-table";
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { VEHICLE_LEAF_SLUGS, type VehicleLeafSlug } from "@/lib/vehicle-classification";
 import type { VehicleLookupResult } from "@/lib/vehicle-lookup.server";
 
@@ -59,6 +61,19 @@ const ImageLightbox = lazy(() =>
 const MapOverlay = lazy(() =>
   import("@/components/listing-detail/map-overlay").then((m) => ({ default: m.MapOverlay })),
 );
+
+function LightboxLoadingFallback() {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80"
+      role="status"
+      aria-live="polite"
+    >
+      <Loader2 className="size-8 animate-spin text-muted-foreground" aria-hidden="true" />
+      <span className="sr-only">Laster …</span>
+    </div>
+  );
+}
 
 // crypto.randomUUID() requires a secure context and isn't available in every
 // WebView — fall back to a non-crypto random ID so anonymous view-count
@@ -316,7 +331,7 @@ function CategoryLandingPage({ main }: { main: Category }) {
         </div>
       </section>
 
-      <div className="mx-auto max-w-6xl gap-8 px-4 py-8 md:grid md:grid-cols-[16rem_1fr]">
+      <div className="mx-auto max-w-6xl gap-8 px-4 py-8 md:grid md:grid-cols-[240px_1fr]">
         <aside className="mb-6 space-y-5 md:mb-0">
           <p className="text-sm font-medium">Filtrer</p>
           <div className="space-y-2">
@@ -346,40 +361,18 @@ function CategoryLandingPage({ main }: { main: Category }) {
                 filters={primaryFilters}
                 values={filterValues}
                 onChange={(key, v) =>
-                  setFilterValues((prev) => {
-                    const next = { ...prev };
-                    if (v === undefined) delete next[key];
-                    else next[key] = v;
-                    return next;
-                  })
+                  setFilterValues((prev) => setAttributeFilterValue(prev, key, v))
                 }
               />
               {secondaryFilters.length > 0 && (
                 <Collapsible open={moreFiltersOpen} onOpenChange={setMoreFiltersOpen}>
-                  <CollapsibleTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="gap-1 px-0 text-primary hover:bg-transparent"
-                    >
-                      {moreFiltersOpen ? "Vis færre valg" : "Se flere valg"}
-                      <ChevronDown
-                        className={`size-4 transition-transform ${moreFiltersOpen ? "rotate-180" : ""}`}
-                      />
-                    </Button>
-                  </CollapsibleTrigger>
+                  <MoreFiltersToggle open={moreFiltersOpen} />
                   <CollapsibleContent className="space-y-4 pt-4 data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:slide-in-from-top-2 data-[state=closed]:animate-out data-[state=closed]:fade-out">
                     <CategoryFilterFields
                       filters={secondaryFilters}
                       values={filterValues}
                       onChange={(key, v) =>
-                        setFilterValues((prev) => {
-                          const next = { ...prev };
-                          if (v === undefined) delete next[key];
-                          else next[key] = v;
-                          return next;
-                        })
+                        setFilterValues((prev) => setAttributeFilterValue(prev, key, v))
                       }
                     />
                   </CollapsibleContent>
@@ -412,9 +405,11 @@ function CategoryLandingPage({ main }: { main: Category }) {
               ))}
             </div>
           ) : (listings ?? []).length === 0 ? (
-            <p className="py-16 text-center text-muted-foreground">
-              Ingen annonser i denne kategorien ennå.
-            </p>
+            <EmptyState
+              icon={PackageSearch}
+              title="Ingen annonser i denne kategorien ennå"
+              description="Prøv å justere filtrene, eller kom tilbake senere."
+            />
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {(listings ?? []).map((l) => (
@@ -451,6 +446,31 @@ type BackTarget =
   | { mode: "history"; label: string }
   | { mode: "search"; label: string; search: LastSearchContext["search"] }
   | { mode: "default" };
+
+const backLinkClass =
+  "inline-flex items-center gap-1 py-2 pr-2 text-sm text-muted-foreground hover:text-foreground";
+
+function BackNavLink({ target, onHistoryBack }: { target: BackTarget; onHistoryBack: () => void }) {
+  if (target.mode === "history") {
+    return (
+      <button type="button" onClick={onHistoryBack} className={backLinkClass}>
+        <ArrowLeft className="size-4" /> Tilbake til {target.label}
+      </button>
+    );
+  }
+  if (target.mode === "search") {
+    return (
+      <Link to="/annonser" search={target.search as never} className={backLinkClass}>
+        <ArrowLeft className="size-4" /> Tilbake til {target.label}
+      </Link>
+    );
+  }
+  return (
+    <Link to="/annonser" search={{ q: "", category: "", sort: "new" }} className={backLinkClass}>
+      <ArrowLeft className="size-4" /> Tilbake til annonser
+    </Link>
+  );
+}
 
 function ListingDetailPage() {
   const { kaupetCode } = Route.useParams();
@@ -708,8 +728,25 @@ function ListingDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-6xl px-4 py-10">
-        <div className="aspect-[4/3] animate-pulse rounded-xl bg-muted" />
+      <div className="mx-auto max-w-6xl px-4 py-8">
+        <div className="mt-4 grid gap-8 md:grid-cols-[1.4fr_1fr]">
+          <div>
+            <div className="aspect-[4/3] animate-pulse rounded-xl bg-muted" />
+            <div className="mt-8 space-y-3">
+              <div className="h-5 w-32 animate-pulse rounded bg-muted" />
+              <div className="h-4 w-full animate-pulse rounded bg-muted" />
+              <div className="h-4 w-5/6 animate-pulse rounded bg-muted" />
+            </div>
+          </div>
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+              <div className="h-8 w-3/4 animate-pulse rounded bg-muted" />
+            </div>
+            <div className="h-24 animate-pulse rounded-xl bg-muted" />
+            <div className="h-40 animate-pulse rounded-xl bg-muted" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -739,32 +776,7 @@ function ListingDetailPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
       <NativePageHeader title={data.title} />
-      {!isNative &&
-        (backTarget.mode === "history" ? (
-          <button
-            type="button"
-            onClick={() => router.history.back()}
-            className="inline-flex items-center gap-1 py-2 pr-2 text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="size-4" /> Tilbake til {backTarget.label}
-          </button>
-        ) : backTarget.mode === "search" ? (
-          <Link
-            to="/annonser"
-            search={backTarget.search as never}
-            className="inline-flex items-center gap-1 py-2 pr-2 text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="size-4" /> Tilbake til {backTarget.label}
-          </Link>
-        ) : (
-          <Link
-            to="/annonser"
-            search={{ q: "", category: "", sort: "new" }}
-            className="inline-flex items-center gap-1 py-2 pr-2 text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="size-4" /> Tilbake til annonser
-          </Link>
-        ))}
+      {!isNative && <BackNavLink target={backTarget} onHistoryBack={() => router.history.back()} />}
 
       <div className="mt-4 grid gap-8 md:grid-cols-[1.4fr_1fr]">
         <div>
@@ -816,7 +828,7 @@ function ListingDetailPage() {
                 {/* Prisen vises flytende over bildekanten når det finnes bilder
                     (se galleriseksjonen) — her kun som fallback uten bilder. */}
                 {images.length === 0 && (
-                  <p className="mt-3 font-display text-3xl text-primary">{priceLabel}</p>
+                  <p className="mt-3 font-display text-xl text-primary">{priceLabel}</p>
                 )}
               </div>
               {user && !isOwner && (
@@ -939,7 +951,7 @@ function ListingDetailPage() {
       )}
 
       {lightboxIndex !== null && (
-        <Suspense>
+        <Suspense fallback={<LightboxLoadingFallback />}>
           <ImageLightbox
             images={images}
             imgUrls={imgUrls}
@@ -951,7 +963,7 @@ function ListingDetailPage() {
       )}
 
       {mapOverlayOpen && data.display_lat != null && data.display_lng != null && (
-        <Suspense>
+        <Suspense fallback={<LightboxLoadingFallback />}>
           <MapOverlay lat={data.display_lat} lng={data.display_lng} onClose={closeMapOverlay} />
         </Suspense>
       )}

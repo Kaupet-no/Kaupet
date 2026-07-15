@@ -28,6 +28,35 @@ type Props = {
   linkState?: Record<string, unknown>;
 };
 
+function ListingImage({
+  imgUrl,
+  alt,
+  compact,
+}: {
+  imgUrl: string | null;
+  alt: string;
+  compact: boolean;
+}) {
+  if (imgUrl) {
+    return (
+      <img
+        src={imgUrl}
+        alt={alt}
+        className={`size-full object-cover ${compact ? "" : "transition group-hover:scale-[1.02]"}`}
+        loading="lazy"
+      />
+    );
+  }
+  return (
+    <div
+      className={`flex size-full flex-col items-center justify-center gap-1 text-muted-foreground ${compact ? "" : "text-xs"}`}
+    >
+      <ImageOff className={compact ? "size-4" : "size-5"} strokeWidth={1.5} />
+      <span className={compact ? "text-[11px]" : ""}>Ingen bilde</span>
+    </div>
+  );
+}
+
 export function ListingCard({
   listing,
   highlighted,
@@ -49,7 +78,7 @@ export function ListingCard({
     };
   }, [listing.cover_path]);
 
-  const linkClass = `group block overflow-hidden rounded-xl border bg-card transition hover:shadow-md ${
+  const linkClass = `group block overflow-hidden rounded-xl border bg-card transition hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
     highlighted
       ? "border-primary shadow-md ring-2 ring-primary/30"
       : "border-border hover:border-primary"
@@ -64,19 +93,11 @@ export function ListingCard({
         className={`${linkClass} flex gap-3 p-2`}
       >
         <div className="relative size-20 shrink-0 overflow-hidden rounded-lg bg-muted">
-          {imgUrl ? (
-            <img
-              src={imgUrl}
-              alt={`${listing.title} — ${formatPrice(listing)}`}
-              className="size-full object-cover"
-              loading="lazy"
-            />
-          ) : (
-            <div className="flex size-full flex-col items-center justify-center gap-1 text-muted-foreground">
-              <ImageOff className="size-4" strokeWidth={1.5} />
-              <span className="text-[11px]">Ingen bilde</span>
-            </div>
-          )}
+          <ListingImage
+            imgUrl={imgUrl}
+            alt={`${listing.title} — ${formatPrice(listing)}`}
+            compact
+          />
         </div>
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
           <h3 className="line-clamp-2 text-sm font-medium leading-snug">{listing.title}</h3>
@@ -101,18 +122,11 @@ export function ListingCard({
       className={linkClass}
     >
       <div className="relative aspect-[4/3] bg-muted">
-        {imgUrl ? (
-          <img
-            src={imgUrl}
-            alt={`${listing.title} — ${formatPrice(listing)}`}
-            className="size-full object-cover transition group-hover:scale-[1.02]"
-            loading="lazy"
-          />
-        ) : (
-          <div className="flex size-full items-center justify-center text-xs text-muted-foreground">
-            Ingen bilde
-          </div>
-        )}
+        <ListingImage
+          imgUrl={imgUrl}
+          alt={`${listing.title} — ${formatPrice(listing)}`}
+          compact={false}
+        />
         <FavoriteButton listingId={listing.id} size="sm" className="absolute right-2 top-2" />
       </div>
       <div className="space-y-1 p-3">

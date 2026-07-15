@@ -100,6 +100,23 @@ export function splitPrimaryFilters(filters: CategoryFilter[]): {
 }
 
 /**
+ * Applies a single attribute-filter change to a values map, used by every
+ * `CategoryFilterFields` `onChange` handler (landing page, category page).
+ * Removes the key entirely when the value is cleared, so empty filters don't
+ * linger in the query/search state.
+ */
+export function setAttributeFilterValue(
+  values: Record<string, AttributeFilterValue>,
+  key: string,
+  value: AttributeFilterValue | undefined,
+): Record<string, AttributeFilterValue> {
+  const next = { ...values };
+  if (value === undefined) delete next[key];
+  else next[key] = value;
+  return next;
+}
+
+/**
  * Returns the filters that apply to a category: its own filters plus those
  * inherited from its parent (so a filter defined on a main category is shared
  * by all its subcategories). Sorted by sort_order, deduped by key (the more

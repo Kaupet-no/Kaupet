@@ -1,6 +1,9 @@
+import { ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
+import { CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Select,
   SelectContent,
@@ -17,6 +20,27 @@ import {
   VehicleBrandField,
   VehicleModelField,
 } from "@/features/listing-creation/modules/generic-attributes/vehicle-brand-model-fields";
+
+/**
+ * Trigger button for the "Se flere valg" `Collapsible` wrapping a category's
+ * secondary filters — shared by the landing page and category page so the
+ * label/icon behavior (and the +count hint) can't drift between the two.
+ */
+export function MoreFiltersToggle({ open, count }: { open: boolean; count?: number }) {
+  return (
+    <CollapsibleTrigger asChild>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="gap-1 px-0 text-primary hover:bg-transparent"
+      >
+        {open ? "Vis færre valg" : count ? `Se flere valg (+${count})` : "Se flere valg"}
+        <ChevronDown className={`size-4 transition-transform ${open ? "rotate-180" : ""}`} />
+      </Button>
+    </CollapsibleTrigger>
+  );
+}
 
 /**
  * Renders the configurable filter controls for a category's `CategoryFilter`s

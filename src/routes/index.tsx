@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, ChevronDown, FolderOpen, Hash, Search } from "lucide-react";
+import { ArrowRight, FolderOpen, Hash, Search } from "lucide-react";
 import { z } from "zod";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Autoplay from "embla-carousel-autoplay";
@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { ChevronLeft } from "lucide-react";
 import { useIsNative } from "@/hooks/use-is-native";
 import { AppLanding } from "@/components/app-landing";
@@ -22,9 +22,10 @@ import { Badge } from "@/components/ui/badge";
 import { useTypewriterText } from "@/hooks/use-typewriter-text";
 import { SEARCH_SUGGESTIONS } from "@/lib/search-suggestions";
 import { categoryHeadingFontStack } from "@/lib/category-fonts";
-import { CategoryFilterFields } from "@/components/category-filter-fields";
+import { CategoryFilterFields, MoreFiltersToggle } from "@/components/category-filter-fields";
 import {
   effectiveFiltersForCategory,
+  setAttributeFilterValue,
   splitPrimaryFilters,
   type AttributeFilterValue,
 } from "@/lib/category-filters";
@@ -596,12 +597,7 @@ function WebLanding() {
                               filters={primaryFilters}
                               values={filterValues}
                               onChange={(key, v) =>
-                                setFilterValues((prev) => {
-                                  const next = { ...prev };
-                                  if (v === undefined) delete next[key];
-                                  else next[key] = v;
-                                  return next;
-                                })
+                                setFilterValues((prev) => setAttributeFilterValue(prev, key, v))
                               }
                             />
                           </div>
@@ -611,32 +607,16 @@ function WebLanding() {
                               onOpenChange={setMoreFiltersOpen}
                               className="mt-4"
                             >
-                              <CollapsibleTrigger asChild>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="gap-1 px-0 text-primary hover:bg-transparent"
-                                >
-                                  {moreFiltersOpen
-                                    ? "Vis færre valg"
-                                    : `Se flere valg (+${secondaryFilters.length})`}
-                                  <ChevronDown
-                                    className={`size-4 transition-transform ${moreFiltersOpen ? "rotate-180" : ""}`}
-                                  />
-                                </Button>
-                              </CollapsibleTrigger>
+                              <MoreFiltersToggle
+                                open={moreFiltersOpen}
+                                count={secondaryFilters.length}
+                              />
                               <CollapsibleContent className="grid gap-4 pt-4 data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:slide-in-from-top-2 data-[state=closed]:animate-out data-[state=closed]:fade-out sm:grid-cols-2">
                                 <CategoryFilterFields
                                   filters={secondaryFilters}
                                   values={filterValues}
                                   onChange={(key, v) =>
-                                    setFilterValues((prev) => {
-                                      const next = { ...prev };
-                                      if (v === undefined) delete next[key];
-                                      else next[key] = v;
-                                      return next;
-                                    })
+                                    setFilterValues((prev) => setAttributeFilterValue(prev, key, v))
                                   }
                                 />
                               </CollapsibleContent>
@@ -661,7 +641,7 @@ function WebLanding() {
             </CollapsibleContent>
           </Collapsible>
 
-          {!activeCategory && (
+          {!activeCategory ? (
             <div className="mt-6 flex flex-wrap justify-center gap-3">
               {user ? (
                 <>
@@ -708,6 +688,19 @@ function WebLanding() {
                 </>
               )}
             </div>
+          ) : (
+            !user && (
+              // Slank versjon av signup-CTA-en over — holdes synlig mens en
+              // kategori utforskes, slik at ikke-innloggede ikke mister
+              // registreringsinngangen bak filterpanelet.
+              <div className="mt-4 flex justify-center">
+                <Link to="/auth" search={{ mode: "signup" }}>
+                  <Button variant="outline" size="sm">
+                    Kom i gang på Kaupet
+                  </Button>
+                </Link>
+              </div>
+            )
           )}
         </div>
       </section>

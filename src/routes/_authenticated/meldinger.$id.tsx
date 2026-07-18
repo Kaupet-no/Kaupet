@@ -260,10 +260,9 @@ function ConversationPage() {
         .select("id, conversation_id, sender_id, body, created_at, deleted_at")
         .single();
       if (error) throw error;
-      await supabase
-        .from("conversations")
-        .update({ last_message_at: data.created_at })
-        .eq("id", id);
+      // conversations.last_message_at oppdateres nå atomisk av en
+      // databasetrigger (messages_bump_conversation_last_message_at_trg)
+      // for å unngå at feltet kan drifte fra faktisk siste melding.
       return data as Message;
     },
     // Optimistisk: vis meldingen og tøm feltet umiddelbart; rull tilbake ved feil.

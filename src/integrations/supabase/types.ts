@@ -1133,6 +1133,24 @@ export type Database = {
           },
         ]
       }
+      site_settings: {
+        Row: {
+          default_search_examples: string[]
+          id: boolean
+          updated_at: string
+        }
+        Insert: {
+          default_search_examples?: string[]
+          id?: boolean
+          updated_at?: string
+        }
+        Update: {
+          default_search_examples?: string[]
+          id?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       saved_searches: {
         Row: {
           created_at: string

@@ -20,7 +20,7 @@ import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/l
 import { AnimatedSearchPlaceholder } from "@/components/animated-search-placeholder";
 import { useSavedLocation } from "@/hooks/use-saved-location";
 import { getCategoryIcon } from "@/lib/category-icons";
-import { SEARCH_SUGGESTIONS } from "@/lib/search-suggestions";
+import { useDefaultSearchExamples } from "@/hooks/use-default-search-examples";
 import { useIsNative } from "@/hooks/use-is-native";
 import { AppHeroLogo } from "@/components/app-hero-logo";
 
@@ -113,15 +113,16 @@ export function AppLanding() {
   // Hint at what's searchable within the selected category by rotating its
   // curated example words instead of the generic suggestions, mirroring the
   // web landing page's typewriter behavior (src/routes/index.tsx).
+  const defaultSearchExamples = useDefaultSearchExamples();
   const typewriterWords = useMemo(() => {
-    if (!activeCategory) return SEARCH_SUGGESTIONS;
+    if (!activeCategory) return defaultSearchExamples;
     if (activeCategory.search_examples?.length) {
       return activeCategory.search_examples.map((w) => w.toLocaleLowerCase("nb-NO"));
     }
     const subs = childrenByParent.get(activeCategory.id) ?? [];
     const words = subs.map((s) => s.name_nb.toLocaleLowerCase("nb-NO"));
     return words.length > 0 ? words : [activeCategory.name_nb.toLocaleLowerCase("nb-NO")];
-  }, [activeCategory, childrenByParent]);
+  }, [activeCategory, childrenByParent, defaultSearchExamples]);
 
   const pickCategory = (cat: CategoryRow) => {
     const subs = childrenByParent.get(cat.id) ?? [];

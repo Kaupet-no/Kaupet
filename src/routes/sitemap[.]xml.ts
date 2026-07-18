@@ -39,7 +39,35 @@ export const Route = createFileRoute("/sitemap.xml")({
           // If the database can't be reached during build, still ship the static sitemap.
         }
 
-        const entries = [...staticEntries, ...listingEntries];
+        let categoryEntries: SitemapEntry[] = [];
+        try {
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          const { data } = await supabaseAdmin
+            .from("categories")
+            .select("id, slug, parent_id, color");
+          const all = data ?? [];
+          // Main categories are colored root categories — same rule used across the app.
+          const mains = all.filter((c) => c.parent_id == null && !!c.color);
+          const mainById = new Map(mains.map((m) => [m.id, m]));
+          categoryEntries = [
+            ...mains.map((m) => ({
+              path: `/${m.slug}`,
+              changefreq: "weekly" as const,
+              priority: "0.6",
+            })),
+            ...all
+              .filter((c) => c.parent_id && mainById.has(c.parent_id))
+              .map((c) => ({
+                path: `/${mainById.get(c.parent_id!)!.slug}/${c.slug}`,
+                changefreq: "weekly" as const,
+                priority: "0.5",
+              })),
+          ];
+        } catch {
+          // If the database can't be reached during build, still ship the static sitemap.
+        }
+
+        const entries = [...staticEntries, ...listingEntries, ...categoryEntries];
         const urls = entries.map((e) =>
           [
             `  <url>`,

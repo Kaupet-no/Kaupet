@@ -68,6 +68,24 @@ export function breadcrumbPath(category: Category, tree: CatTree): Category[] {
   return path;
 }
 
+/**
+ * Categories strictly between `ancestor` and `descendant`, plus `descendant`
+ * itself, in root-to-leaf order — e.g. pathFromAncestor(Interiør, Sofa)
+ * returns [Møbler, Sofa]. Returns [] if `descendant` is `ancestor` itself or
+ * isn't actually one of its descendants (e.g. a stale/tampered URL param).
+ */
+export function pathFromAncestor(
+  ancestor: Category,
+  descendant: Category,
+  tree: CatTree,
+): Category[] {
+  if (descendant.id === ancestor.id) return [];
+  const full = breadcrumbPath(descendant, tree);
+  const idx = full.findIndex((c) => c.id === ancestor.id);
+  if (idx === -1) return [];
+  return full.slice(idx + 1);
+}
+
 export function categoryLabel(selectedSlugs: string[], tree: CatTree): string {
   if (selectedSlugs.length === 0) return "Alle kategorier";
   const set = new Set(selectedSlugs);

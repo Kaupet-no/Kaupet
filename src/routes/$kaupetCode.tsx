@@ -10,7 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { reconcilePromotionPayment } from "@/lib/promotions.functions";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Loader2, MapPin, PackageSearch, Search } from "lucide-react";
+import { ArrowLeft, Loader2, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { z } from "zod";
@@ -23,32 +23,18 @@ import { ListingActionsMenu } from "@/components/listing-detail/listing-actions-
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { readLastSearchContext, type LastSearchContext } from "@/lib/last-search-context";
-import { CategoryFilterFields, MoreFiltersToggle } from "@/components/category-filter-fields";
-import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
-import { getCategoryIcon } from "@/lib/category-icons";
-import { buildTree, descendants, type Category } from "@/lib/categories";
+import { CategoryLandingPage } from "@/components/category-landing-page";
+import { type Category } from "@/lib/categories";
 import { normalizeSlugForMatch } from "@/lib/slug";
-import {
-  applyAttributeFilters,
-  effectiveFiltersForCategory,
-  normalizeFilter,
-  setAttributeFilterValue,
-  splitPrimaryFilters,
-  type AttributeFilterValue,
-} from "@/lib/category-filters";
 
 import { signListingImageUrls } from "@/lib/storage";
 import { CONDITION_LABEL } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { ImageGallery } from "@/components/listing-detail/image-gallery";
 import { OwnerStatsPanel } from "@/components/listing-detail/owner-stats-panel";
 import { SellerContactPanel } from "@/components/listing-detail/seller-contact-panel";
 import { VehicleSpecBar } from "@/components/listing-detail/vehicle/vehicle-spec-bar";
 import { VehicleTechTable } from "@/components/listing-detail/vehicle/vehicle-tech-table";
-import { ListingCard, type ListingCardData } from "@/components/listing-card";
-import { EmptyState } from "@/components/ui/empty-state";
 import { VEHICLE_LEAF_SLUGS, type VehicleLeafSlug } from "@/lib/vehicle-classification";
 import type { VehicleLookupResult } from "@/lib/vehicle-lookup.server";
 
@@ -94,6 +80,9 @@ export const Route = createFileRoute("/$kaupetCode")({
     f: z.record(z.string(), z.any()).optional(),
     priceMin: z.coerce.number().int().min(0).optional(),
     priceMax: z.coerce.number().int().min(0).optional(),
+    // Slug of a descendant category to scope the page to, without leaving
+    // this URL — e.g. Interiør > Møbler > Sofa still lands on /interiør.
+    sub: z.string().optional(),
   }),
   loader: async ({ params }) => {
     // A single dynamic root segment serves two purposes: an 8-digit code is
@@ -128,7 +117,47 @@ export const Route = createFileRoute("/$kaupetCode")({
   head: ({ params, loaderData }) => {
     if (loaderData?.kind === "category") {
       const c = loaderData.category;
-      return { meta: [{ title: `/${c.name_nb} — Kaupet.no` }] };
+      const title = `${c.name_nb} — kjøp og selg brukt på Kaupet.no`;
+      const description = `Se annonser i ${c.name_nb} på Kaupet.no. Kjøp og selg brukt trygt og enkelt.`;
+      const url = `https://kaupet.no/${c.slug}`;
+      return {
+        meta: [
+          { title },
+          { name: "description", content: description },
+          { property: "og:title", content: title },
+          { property: "og:description", content: description },
+          { property: "og:url", content: url },
+        ],
+        links: [{ rel: "canonical", href: url }],
+        scripts: [
+          {
+            type: "application/ld+json",
+            children: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "BreadcrumbList",
+              itemListElement: [
+                {
+                  "@type": "ListItem",
+                  position: 1,
+                  name: "Alle kategorier",
+                  item: "https://kaupet.no/annonser",
+                },
+                { "@type": "ListItem", position: 2, name: c.name_nb, item: url },
+              ],
+            }),
+          },
+          {
+            type: "application/ld+json",
+            children: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "CollectionPage",
+              name: title,
+              description,
+              url,
+            }),
+          },
+        ],
+      };
     }
     const l = loaderData?.kind === "listing" ? loaderData.listing : undefined;
     if (!l) {
@@ -209,218 +238,20 @@ export const Route = createFileRoute("/$kaupetCode")({
 
 function RootSlugPage() {
   const loaderData = Route.useLoaderData();
-  if (loaderData.kind === "category") return <CategoryLandingPage main={loaderData.category} />;
+  const { f, priceMin, priceMax, sub } = Route.useSearch();
+  if (loaderData.kind === "category")
+    return (
+      <CategoryLandingPage
+        category={loaderData.category}
+        breadcrumb={[loaderData.category]}
+        subSlug={sub}
+        subSlugParam="sub"
+        initialFilters={f}
+        initialPriceMin={priceMin}
+        initialPriceMax={priceMax}
+      />
+    );
   return <ListingDetailPage />;
-}
-
-function CategoryLandingPage({ main }: { main: Category }) {
-  const {
-    f: initialFilters,
-    priceMin: initialPriceMin,
-    priceMax: initialPriceMax,
-  } = Route.useSearch() as {
-    f?: Record<string, AttributeFilterValue>;
-    priceMin?: number;
-    priceMax?: number;
-  };
-  const [filterValues, setFilterValues] = useState<Record<string, AttributeFilterValue>>(
-    () => initialFilters ?? {},
-  );
-  const [priceMin, setPriceMin] = useState<number | undefined>(initialPriceMin);
-  const [priceMax, setPriceMax] = useState<number | undefined>(initialPriceMax);
-
-  const { data: categories } = useQuery({
-    queryKey: ["categories", "with-color"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("categories")
-        .select("id, slug, name_nb, parent_id, icon, color")
-        .order("sort_order")
-        .order("name_nb");
-      if (error) throw error;
-      return (data ?? []) as Category[];
-    },
-  });
-
-  const { data: allFilters } = useQuery({
-    queryKey: ["category-filters", "all"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("category_filters")
-        .select("id, category_id, key, label_nb, type, unit, options, sort_order, is_primary")
-        .order("sort_order");
-      if (error) throw error;
-      return (data ?? []).map(normalizeFilter);
-    },
-  });
-
-  const tree = useMemo(() => buildTree(categories ?? []), [categories]);
-  const categoryIds = useMemo(
-    () => [main.id, ...descendants(main, tree).map((c) => c.id)],
-    [main, tree],
-  );
-  const filters = useMemo(
-    () => effectiveFiltersForCategory(main.id, allFilters ?? [], tree.byId),
-    [main, allFilters, tree],
-  );
-  const { primary: primaryFilters, secondary: secondaryFilters } = useMemo(
-    () => splitPrimaryFilters(filters),
-    [filters],
-  );
-  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
-
-  const { data: listings, isLoading } = useQuery({
-    queryKey: ["category-listings", main.id, filterValues, priceMin, priceMax],
-    queryFn: async () => {
-      let qb = supabase
-        .from("listings")
-        .select(
-          "id, kaupet_code, title, subtitle, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order)",
-        )
-        .eq("status", "active")
-        .in("category_id", categoryIds);
-      qb = applyAttributeFilters(qb, filterValues);
-      if (typeof priceMin === "number") qb = qb.gte("price_nok", priceMin);
-      if (typeof priceMax === "number") qb = qb.lte("price_nok", priceMax);
-      const { data, error } = await qb.order("created_at", { ascending: false }).limit(48);
-      if (error) throw error;
-      return (data ?? []).map<ListingCardData>((l) => {
-        const imgs = (l.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
-        return {
-          id: l.id,
-          kaupet_code: l.kaupet_code,
-          title: l.title,
-          subtitle: l.subtitle,
-          price_nok: l.price_nok,
-          is_free: l.is_free,
-          city: l.city,
-          created_at: l.created_at,
-          cover_path: imgs[0]?.storage_path ?? null,
-        };
-      });
-    },
-  });
-
-  const Icon = getCategoryIcon(main.icon ?? null);
-  const accent = main.color ?? undefined;
-
-  return (
-    <div>
-      <section
-        className="relative overflow-hidden"
-        style={accent ? { background: accent } : undefined}
-      >
-        <div className="absolute inset-0 bg-background/80" aria-hidden />
-        <div className="relative z-10 mx-auto max-w-6xl px-4 py-12">
-          <div className="flex items-center gap-3">
-            <span
-              className="flex size-12 items-center justify-center rounded-full text-white"
-              style={{ background: accent ?? "var(--primary)" }}
-            >
-              <Icon className="size-6" />
-            </span>
-            <h1 className="font-display text-4xl tracking-tight">/{main.name_nb}</h1>
-          </div>
-          <Link
-            to="/annonser"
-            search={{ q: "", category: main.slug, sort: "new" }}
-            className="mt-3 inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
-          >
-            <Search className="size-4" /> Søk i alle kategorier
-          </Link>
-        </div>
-      </section>
-
-      <div className="mx-auto max-w-6xl gap-8 px-4 py-8 md:grid md:grid-cols-[240px_1fr]">
-        <aside className="mb-6 space-y-5 md:mb-0">
-          <p className="text-sm font-medium">Filtrer</p>
-          <div className="space-y-2">
-            <Label>Pris (kr)</Label>
-            <div className="flex items-center gap-2">
-              <Input
-                type="number"
-                placeholder="Fra"
-                value={priceMin ?? ""}
-                onChange={(e) =>
-                  setPriceMin(e.target.value === "" ? undefined : Number(e.target.value))
-                }
-              />
-              <Input
-                type="number"
-                placeholder="Til"
-                value={priceMax ?? ""}
-                onChange={(e) =>
-                  setPriceMax(e.target.value === "" ? undefined : Number(e.target.value))
-                }
-              />
-            </div>
-          </div>
-          {filters.length > 0 && (
-            <>
-              <CategoryFilterFields
-                filters={primaryFilters}
-                values={filterValues}
-                onChange={(key, v) =>
-                  setFilterValues((prev) => setAttributeFilterValue(prev, key, v))
-                }
-              />
-              {secondaryFilters.length > 0 && (
-                <Collapsible open={moreFiltersOpen} onOpenChange={setMoreFiltersOpen}>
-                  <MoreFiltersToggle open={moreFiltersOpen} />
-                  <CollapsibleContent className="space-y-4 pt-4 data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:slide-in-from-top-2 data-[state=closed]:animate-out data-[state=closed]:fade-out">
-                    <CategoryFilterFields
-                      filters={secondaryFilters}
-                      values={filterValues}
-                      onChange={(key, v) =>
-                        setFilterValues((prev) => setAttributeFilterValue(prev, key, v))
-                      }
-                    />
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
-            </>
-          )}
-          {(Object.keys(filterValues).length > 0 ||
-            priceMin !== undefined ||
-            priceMax !== undefined) && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setFilterValues({});
-                setPriceMin(undefined);
-                setPriceMax(undefined);
-              }}
-            >
-              Nullstill filtre
-            </Button>
-          )}
-        </aside>
-
-        <div>
-          {isLoading ? (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-muted" />
-              ))}
-            </div>
-          ) : (listings ?? []).length === 0 ? (
-            <EmptyState
-              icon={PackageSearch}
-              title="Ingen annonser i denne kategorien ennå"
-              description="Prøv å justere filtrene, eller kom tilbake senere."
-            />
-          ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {(listings ?? []).map((l) => (
-                <ListingCard key={l.id} listing={l} />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
 }
 
 function ListingErrorBoundary({ error, reset }: { error: Error; reset: () => void }) {

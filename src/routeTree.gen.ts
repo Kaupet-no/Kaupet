@@ -27,6 +27,7 @@ import { Route as AuthenticatedNyAnnonseRouteImport } from './routes/_authentica
 import { Route as AuthenticatedMineSokRouteImport } from './routes/_authenticated/mine-sok'
 import { Route as AuthenticatedMegRouteImport } from './routes/_authenticated/meg'
 import { Route as AuthenticatedFavoritterRouteImport } from './routes/_authenticated/favoritter'
+import { Route as KaupetCodeSubRouteImport } from './routes/$kaupetCode_.$sub'
 import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authenticated/admin/route'
 import { Route as AuthenticatedMineAnnonserIndexRouteImport } from './routes/_authenticated/mine-annonser.index'
 import { Route as AuthenticatedMeldingerIndexRouteImport } from './routes/_authenticated/meldinger.index'
@@ -134,6 +135,11 @@ const AuthenticatedFavoritterRoute = AuthenticatedFavoritterRouteImport.update({
   id: '/favoritter',
   path: '/favoritter',
   getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const KaupetCodeSubRoute = KaupetCodeSubRouteImport.update({
+  id: '/$kaupetCode_/$sub',
+  path: '/$kaupetCode/$sub',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAdminRouteRoute = AuthenticatedAdminRouteRouteImport.update({
   id: '/admin',
@@ -244,6 +250,7 @@ export interface FileRoutesByFullPath {
   '/tilbakestill-passord': typeof TilbakestillPassordRoute
   '/vilkar': typeof VilkarRoute
   '/admin': typeof AuthenticatedAdminRouteRouteWithChildren
+  '/$kaupetCode/$sub': typeof KaupetCodeSubRoute
   '/favoritter': typeof AuthenticatedFavoritterRoute
   '/meg': typeof AuthenticatedMegRoute
   '/mine-sok': typeof AuthenticatedMineSokRoute
@@ -279,6 +286,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/tilbakestill-passord': typeof TilbakestillPassordRoute
   '/vilkar': typeof VilkarRoute
+  '/$kaupetCode/$sub': typeof KaupetCodeSubRoute
   '/favoritter': typeof AuthenticatedFavoritterRoute
   '/meg': typeof AuthenticatedMegRoute
   '/mine-sok': typeof AuthenticatedMineSokRoute
@@ -317,6 +325,7 @@ export interface FileRoutesById {
   '/tilbakestill-passord': typeof TilbakestillPassordRoute
   '/vilkar': typeof VilkarRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteRouteWithChildren
+  '/$kaupetCode_/$sub': typeof KaupetCodeSubRoute
   '/_authenticated/favoritter': typeof AuthenticatedFavoritterRoute
   '/_authenticated/meg': typeof AuthenticatedMegRoute
   '/_authenticated/mine-sok': typeof AuthenticatedMineSokRoute
@@ -355,6 +364,7 @@ export interface FileRouteTypes {
     | '/tilbakestill-passord'
     | '/vilkar'
     | '/admin'
+    | '/$kaupetCode/$sub'
     | '/favoritter'
     | '/meg'
     | '/mine-sok'
@@ -390,6 +400,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/tilbakestill-passord'
     | '/vilkar'
+    | '/$kaupetCode/$sub'
     | '/favoritter'
     | '/meg'
     | '/mine-sok'
@@ -427,6 +438,7 @@ export interface FileRouteTypes {
     | '/tilbakestill-passord'
     | '/vilkar'
     | '/_authenticated/admin'
+    | '/$kaupetCode_/$sub'
     | '/_authenticated/favoritter'
     | '/_authenticated/meg'
     | '/_authenticated/mine-sok'
@@ -464,6 +476,7 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TilbakestillPassordRoute: typeof TilbakestillPassordRoute
   VilkarRoute: typeof VilkarRoute
+  KaupetCodeSubRoute: typeof KaupetCodeSubRoute
   AnnonseListingIdRoute: typeof AnnonseListingIdRoute
   BrukerIdRoute: typeof BrukerIdRoute
   ApiPublicPushDispatchRoute: typeof ApiPublicPushDispatchRoute
@@ -597,6 +610,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/favoritter'
       preLoaderRoute: typeof AuthenticatedFavoritterRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/$kaupetCode_/$sub': {
+      id: '/$kaupetCode_/$sub'
+      path: '/$kaupetCode/$sub'
+      fullPath: '/$kaupetCode/$sub'
+      preLoaderRoute: typeof KaupetCodeSubRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin': {
       id: '/_authenticated/admin'
@@ -797,6 +817,7 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TilbakestillPassordRoute: TilbakestillPassordRoute,
   VilkarRoute: VilkarRoute,
+  KaupetCodeSubRoute: KaupetCodeSubRoute,
   AnnonseListingIdRoute: AnnonseListingIdRoute,
   BrukerIdRoute: BrukerIdRoute,
   ApiPublicPushDispatchRoute: ApiPublicPushDispatchRoute,

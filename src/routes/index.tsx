@@ -216,6 +216,22 @@ function WebLanding() {
     navigate({ to: "/annonser", search: { q: "", category: cat.slug, sort: "new" } });
   };
 
+  // Any depth of category selection lands on the root main category's own
+  // landing page (/{main}) — the deeper picks (e.g. Interiør > Møbler > Sofa)
+  // are represented by the `sub` search param instead of a nested URL, so
+  // the page can show the full breadcrumb and let the user step back up to a
+  // sibling (Bord, Seng, …) without leaving /{main}.
+  const goToCategoryPage = (path: CategoryRow[]) => {
+    if (path.length === 0) return;
+    const root = path[0];
+    const deepest = path[path.length - 1];
+    navigate({
+      to: "/$kaupetCode",
+      params: { kaupetCode: root.slug },
+      search: deepest.id === root.id ? {} : { sub: deepest.slug },
+    });
+  };
+
   const handlePickCategory = (cat: CategoryRow) => {
     // Clicking the already-active root category again closes it and returns
     // the landing page to its default state, instead of just re-selecting it.
@@ -493,10 +509,16 @@ function WebLanding() {
                       className="rounded-2xl border border-border bg-card p-4 shadow-sm md:p-6"
                       onSubmit={(e) => {
                         e.preventDefault();
+                        const root = selectedPath[0];
                         navigate({
                           to: "/$kaupetCode",
-                          params: { kaupetCode: currentParent.slug },
-                          search: { f: filterValues, priceMin, priceMax },
+                          params: { kaupetCode: root.slug },
+                          search: {
+                            f: filterValues,
+                            priceMin,
+                            priceMax,
+                            sub: currentParent.id === root.id ? undefined : currentParent.slug,
+                          },
                         });
                       }}
                     >
@@ -540,13 +562,13 @@ function WebLanding() {
                             liste, så den leser som navigasjon, ikke som nok
                             et sett filter-chips oppå breadcrumb-badgene. */}
                         <div className="flex flex-col gap-1 md:border-r md:border-border md:pr-6">
-                          <Link
-                            to="/$kaupetCode"
-                            params={{ kaupetCode: currentParent.slug }}
-                            className="rounded-lg px-2.5 py-1.5 text-sm font-medium text-primary transition hover:bg-primary/10"
+                          <button
+                            type="button"
+                            onClick={() => goToCategoryPage(selectedPath)}
+                            className="rounded-lg px-2.5 py-1.5 text-left text-sm font-medium text-primary transition hover:bg-primary/10"
                           >
                             Alt i {currentParent.name_nb}
-                          </Link>
+                          </button>
                           {(childrenByParent.get(currentParent.id) ?? []).map((sub) => (
                             <button
                               key={sub.id}
@@ -557,11 +579,6 @@ function WebLanding() {
                               {sub.name_nb}
                             </button>
                           ))}
-                          {(childrenByParent.get(currentParent.id) ?? []).length === 0 && (
-                            <p className="px-2.5 py-1.5 text-sm text-muted-foreground">
-                              Ingen underkategorier — trykk over for å se alle annonser.
-                            </p>
-                          )}
                         </div>
 
                         {/* Høyre kolonne — filtre gruppert i et rutenett i

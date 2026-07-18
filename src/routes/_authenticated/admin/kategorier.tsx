@@ -41,6 +41,7 @@ import {
 } from "@/lib/category-admin-tree";
 
 import { supabase } from "@/integrations/supabase/client";
+import { CategoryPicker } from "@/components/category-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -93,6 +94,7 @@ import {
 } from "@/lib/category-filters";
 import { CATEGORY_HEADING_FONTS, DEFAULT_CATEGORY_HEADING_FONT } from "@/lib/category-fonts";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   DEFAULT_FIELD_GROUPS,
   DEFAULT_MODULES,
@@ -229,12 +231,13 @@ function DefaultSearchExamplesCard() {
 
 function AdminCategories() {
   const qc = useQueryClient();
-  const [editing, setEditing] = useState<Category | null>(null);
-  const [creating, setCreating] = useState<{ parentId: string | null } | null>(null);
+  const [dialogState, setDialogState] = useState<{
+    category: Category | null;
+    parentId: string | null;
+    initialTab: "details" | "filters" | "flow";
+  } | null>(null);
   const [deleting, setDeleting] = useState<Category | null>(null);
   const [replacementId, setReplacementId] = useState<string>("__none__");
-  const [managingFilters, setManagingFilters] = useState<Category | null>(null);
-  const [managingFlow, setManagingFlow] = useState<Category | null>(null);
   const [search, setSearch] = useState("");
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [dragOffsetX, setDragOffsetX] = useState(0);
@@ -390,6 +393,44 @@ function AdminCategories() {
     onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke lagre rekkefølgen")),
   });
 
+  const moveChildrenUpMutation = useMutation({
+    mutationFn: async ({
+      children,
+      newParentId,
+    }: {
+      children: Category[];
+      newParentId: string | null;
+    }) => {
+      const siblingMaxSortOrder = Math.max(
+        0,
+        ...(categories ?? [])
+          .filter((c) => (c.parent_id ?? null) === newParentId)
+          .map((c) => c.sort_order),
+      );
+      const updates = children.map((c, i) => ({
+        id: c.id,
+        sort_order: siblingMaxSortOrder + (i + 1) * 10,
+        parent_id: newParentId,
+      }));
+      const results = await Promise.all(
+        updates.map((u) =>
+          supabase
+            .from("categories")
+            .update({ sort_order: u.sort_order, parent_id: u.parent_id })
+            .eq("id", u.id),
+        ),
+      );
+      const failed = results.find((r) => r.error);
+      if (failed?.error) throw failed.error;
+    },
+    onSuccess: () => {
+      showSuccessToast("Underkategorier flyttet");
+      qc.invalidateQueries({ queryKey: ["admin", "categories"] });
+    },
+    onError: (e: Error) =>
+      showErrorToast(formatErrorMessage(e, "Kunne ikke flytte underkategoriene")),
+  });
+
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
   function handleDragMove(event: DragMoveEvent) {
@@ -437,7 +478,9 @@ function AdminCategories() {
         <p className="text-sm text-muted-foreground">
           Administrer kategorier og underkategorier. Endringer påvirker alle annonser.
         </p>
-        <Button onClick={() => setCreating({ parentId: null })}>
+        <Button
+          onClick={() => setDialogState({ category: null, parentId: null, initialTab: "details" })}
+        >
           <Plus className="size-4" /> Ny kategori
         </Button>
       </div>
@@ -491,11 +534,23 @@ function AdminCategories() {
                       collapsed={collapsedIds.has(c.id)}
                       onToggleCollapse={toggleCollapsed}
                       countsById={countsById}
-                      onEdit={setEditing}
+                      onEdit={(cat) =>
+                        setDialogState({ category: cat, parentId: null, initialTab: "details" })
+                      }
                       onDelete={setDeleting}
-                      onAddChild={(parent) => setCreating({ parentId: parent.id })}
-                      onManageFilters={setManagingFilters}
-                      onManageFlow={setManagingFlow}
+                      onAddChild={(parent) =>
+                        setDialogState({
+                          category: null,
+                          parentId: parent.id,
+                          initialTab: "details",
+                        })
+                      }
+                      onManageFilters={(cat) =>
+                        setDialogState({ category: cat, parentId: null, initialTab: "filters" })
+                      }
+                      onManageFlow={(cat) =>
+                        setDialogState({ category: cat, parentId: null, initialTab: "flow" })
+                      }
                     />
                   ))}
                 </ul>
@@ -505,28 +560,15 @@ function AdminCategories() {
         </CardContent>
       </Card>
 
-      {(editing || creating) && (
-        <CategoryFormDialog
-          category={editing}
-          parentId={creating?.parentId ?? null}
+      {dialogState && (
+        <CategoryDialog
+          category={dialogState.category}
+          parentId={dialogState.parentId}
+          initialTab={dialogState.initialTab}
           categories={categories ?? []}
-          onClose={() => {
-            setEditing(null);
-            setCreating(null);
-          }}
+          onClose={() => setDialogState(null)}
           onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "categories"] })}
         />
-      )}
-
-      {managingFilters && (
-        <CategoryFiltersDialog
-          category={managingFilters}
-          onClose={() => setManagingFilters(null)}
-        />
-      )}
-
-      {managingFlow && (
-        <CategoryFlowDialog category={managingFlow} onClose={() => setManagingFlow(null)} />
       )}
 
       <AlertDialog
@@ -563,6 +605,30 @@ function AdminCategories() {
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {(tree.get(deleting?.id ?? null)?.length ?? 0) > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={moveChildrenUpMutation.isPending}
+              onClick={() => {
+                if (!deleting) return;
+                const children = tree.get(deleting.id) ?? [];
+                moveChildrenUpMutation.mutate({ children, newParentId: deleting.parent_id });
+              }}
+            >
+              {moveChildrenUpMutation.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <>
+                  <Workflow className="size-4" /> Flytt underkategorier til{" "}
+                  {deleting?.parent_id
+                    ? `«${categories?.find((c) => c.id === deleting.parent_id)?.name_nb ?? "overordnet"}»`
+                    : "toppnivå"}
+                </>
+              )}
+            </Button>
+          )}
           {!usageQuery.isLoading && (usageQuery.data ?? 0) > 0 && (
             <div className="space-y-2">
               <Label>Erstatningskategori</Label>
@@ -730,7 +796,67 @@ function SortableCategoryRow({
   );
 }
 
-function CategoryFormDialog({
+function CategoryDialog({
+  category,
+  parentId,
+  initialTab,
+  categories,
+  onClose,
+  onSaved,
+}: {
+  category: Category | null;
+  parentId: string | null;
+  initialTab: "details" | "filters" | "flow";
+  categories: Category[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [savedCategory, setSavedCategory] = useState<Category | null>(category);
+  const [activeTab, setActiveTab] = useState<"details" | "filters" | "flow">(initialTab);
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{savedCategory ? savedCategory.name_nb : "Ny kategori"}</DialogTitle>
+        </DialogHeader>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="details">Detaljer</TabsTrigger>
+            <TabsTrigger value="filters" disabled={!savedCategory}>
+              Filtre
+            </TabsTrigger>
+            <TabsTrigger value="flow" disabled={!savedCategory}>
+              Annonseflyt
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="details">
+            <CategoryDetailsPanel
+              category={savedCategory}
+              parentId={parentId}
+              categories={categories}
+              onClose={onClose}
+              onSaved={(saved) => {
+                const isNewCategory = !savedCategory;
+                setSavedCategory(saved);
+                onSaved();
+                if (isNewCategory) setActiveTab("filters");
+              }}
+            />
+          </TabsContent>
+          <TabsContent value="filters">
+            {savedCategory && <CategoryFiltersPanel category={savedCategory} />}
+          </TabsContent>
+          <TabsContent value="flow">
+            {savedCategory && <CategoryFlowPanel category={savedCategory} />}
+          </TabsContent>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CategoryDetailsPanel({
   category,
   parentId,
   categories,
@@ -741,15 +867,15 @@ function CategoryFormDialog({
   parentId: string | null;
   categories: Category[];
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (saved: Category) => void;
 }) {
   const [name, setName] = useState(category?.name_nb ?? "");
   const [slug, setSlug] = useState(category?.slug ?? "");
-  const [sortOrder, setSortOrder] = useState(category?.sort_order ?? 0);
   const [parent, setParent] = useState<string>(category?.parent_id ?? parentId ?? "__none__");
   const [slugTouched, setSlugTouched] = useState(!!category);
   const [icon, setIcon] = useState<string | null>(category?.icon ?? null);
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
+  const [parentPickerOpen, setParentPickerOpen] = useState(false);
   const [color, setColor] = useState<string>(category?.color ?? "");
   const [headingFont, setHeadingFont] = useState<string>(
     category?.heading_font ?? DEFAULT_CATEGORY_HEADING_FONT,
@@ -760,14 +886,11 @@ function CategoryFormDialog({
 
   const save = useMutation({
     mutationFn: async () => {
-      if (parent !== "__none__" && depthOf(parent, categories) >= MAX_CATEGORY_DEPTH - 1) {
-        throw new Error(`Maks kategoridybde er ${MAX_CATEGORY_DEPTH} nivåer`);
-      }
+      const newParentId = parent === "__none__" ? null : parent;
       const payload = {
         name_nb: name.trim(),
         slug: slug.trim() || slugify(name),
-        sort_order: sortOrder,
-        parent_id: parent === "__none__" ? null : parent,
+        parent_id: newParentId,
         icon,
         // Color and heading font only apply to main (top-level) categories.
         color: parent === "__none__" ? color.trim() || null : null,
@@ -778,17 +901,39 @@ function CategoryFormDialog({
           .filter(Boolean),
       };
       if (category) {
-        const { error } = await supabase.from("categories").update(payload).eq("id", category.id);
+        const { data, error } = await supabase
+          .from("categories")
+          .update(payload)
+          .eq("id", category.id)
+          .select(
+            "id, name_nb, slug, parent_id, sort_order, icon, color, heading_font, search_examples",
+          )
+          .single();
         if (error) throw error;
+        return data as Category;
       } else {
-        const { error } = await supabase.from("categories").insert(payload);
+        // New categories are appended last within their sibling group;
+        // drag-and-drop is the only way to reorder afterwards.
+        const siblingMaxSortOrder = Math.max(
+          0,
+          ...categories
+            .filter((c) => (c.parent_id ?? null) === newParentId)
+            .map((c) => c.sort_order),
+        );
+        const { data, error } = await supabase
+          .from("categories")
+          .insert({ ...payload, sort_order: siblingMaxSortOrder + 10 })
+          .select(
+            "id, name_nb, slug, parent_id, sort_order, icon, color, heading_font, search_examples",
+          )
+          .single();
         if (error) throw error;
+        return data as Category;
       }
     },
-    onSuccess: () => {
+    onSuccess: (saved) => {
       showSuccessToast(category ? "Kategori oppdatert" : "Kategori opprettet");
-      onSaved();
-      onClose();
+      onSaved(saved);
     },
     onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke lagre kategorien")),
   });
@@ -800,210 +945,209 @@ function CategoryFormDialog({
     .filter((c) => depthOf(c.id, categories) < MAX_CATEGORY_DEPTH - 1);
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{category ? "Rediger kategori" : "Ny kategori"}</DialogTitle>
-          <DialogDescription>
-            {parentId && !category ? "Opprettes som underkategori." : ""}
-          </DialogDescription>
-        </DialogHeader>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!name.trim()) {
-              showErrorToast("Navn er påkrevd");
-              return;
-            }
-            save.mutate();
-          }}
-          className="space-y-4"
-        >
-          <div className="space-y-2">
-            <Label htmlFor="name">Navn</Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                if (!slugTouched) setSlug(slugify(e.target.value));
-              }}
-              required
-              maxLength={80}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="slug">Slug</Label>
-            <Input
-              id="slug"
-              value={slug}
-              onChange={(e) => {
-                setSlug(e.target.value);
-                setSlugTouched(true);
-              }}
-              maxLength={80}
-              placeholder="auto-generert fra navn"
-            />
-            {parent === "__none__" && slug.trim() && (
-              <p className="text-xs text-muted-foreground">Landingsside: kaupet.no/{slug.trim()}</p>
-            )}
-          </div>
-          <div className="space-y-2">
-            <Label>Ikon</Label>
-            <Popover open={iconPickerOpen} onOpenChange={setIconPickerOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={iconPickerOpen}
-                  className="w-full justify-between"
-                >
-                  <span className="flex items-center gap-2">
-                    {(() => {
-                      const SelectedIcon = getCategoryIcon(icon);
-                      return <SelectedIcon className="size-4" />;
-                    })()}
-                    {icon ?? "Velg ikon"}
-                  </span>
-                  <ChevronsUpDown className="size-4 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-(--radix-popover-trigger-width) p-0">
-                <Command>
-                  <CommandInput placeholder="Søk etter ikon…" />
-                  <CommandList>
-                    <CommandEmpty>Ingen ikoner funnet</CommandEmpty>
-                    <CommandGroup>
-                      {CATEGORY_ICON_OPTIONS.map(({ name: iconName, icon: IconComponent }) => (
-                        <CommandItem
-                          key={iconName}
-                          value={iconName}
-                          onSelect={() => {
-                            setIcon(iconName);
-                            setIconPickerOpen(false);
-                          }}
-                        >
-                          <IconComponent className="size-4" />
-                          {iconName}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          </div>
-          {parent === "__none__" && (
-            <div className="space-y-2">
-              <Label htmlFor="color">Farge (hovedkategori)</Label>
-              <div className="flex items-center gap-2">
-                <span
-                  className="size-9 shrink-0 rounded-md border"
-                  style={{ background: color || "transparent" }}
-                  aria-hidden
-                />
-                <Input
-                  id="color"
-                  value={color}
-                  onChange={(e) => setColor(e.target.value)}
-                  placeholder="oklch(0.62 0.13 250)"
-                />
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {MAIN_CATEGORY_COLOR_PRESETS.map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => setColor(preset)}
-                    className="size-6 rounded-full border ring-offset-background transition hover:ring-2 hover:ring-ring"
-                    style={{ background: preset }}
-                    aria-label={`Velg farge ${preset}`}
-                  />
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Brukes som bakgrunn på landingssiden og som aksent på kategorisiden. La stå tom for
-                å skjule kategorien som hovedkategori.
-              </p>
-            </div>
+    <>
+      {parentId && !category && (
+        <p className="text-sm text-muted-foreground">Opprettes som underkategori.</p>
+      )}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!name.trim()) {
+            showErrorToast("Navn er påkrevd");
+            return;
+          }
+          if (parent !== "__none__" && depthOf(parent, categories) >= MAX_CATEGORY_DEPTH - 1) {
+            showErrorToast(`Maks kategoridybde er ${MAX_CATEGORY_DEPTH} nivåer`);
+            return;
+          }
+          save.mutate();
+        }}
+        className="space-y-4"
+      >
+        <div className="space-y-2">
+          <Label htmlFor="name">Navn</Label>
+          <Input
+            id="name"
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              if (!slugTouched) setSlug(slugify(e.target.value));
+            }}
+            required
+            maxLength={80}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="slug">Slug</Label>
+          <Input
+            id="slug"
+            value={slug}
+            onChange={(e) => {
+              setSlug(e.target.value);
+              setSlugTouched(true);
+            }}
+            maxLength={80}
+            placeholder="auto-generert fra navn"
+          />
+          {parent === "__none__" && slug.trim() && (
+            <p className="text-xs text-muted-foreground">Landingsside: kaupet.no/{slug.trim()}</p>
           )}
-          {parent === "__none__" && (
-            <div className="space-y-2">
-              <Label htmlFor="heading-font">Overskriftsfont (hovedkategori)</Label>
-              <Select value={headingFont} onValueChange={setHeadingFont}>
-                <SelectTrigger id="heading-font">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(CATEGORY_HEADING_FONTS).map(([token, { label, stack }]) => (
-                    <SelectItem key={token} value={token}>
-                      <span style={{ fontFamily: stack }}>{label}</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Brukes på kategori-overskriften som vises på landingssiden når kategorien er valgt.
-              </p>
-            </div>
-          )}
+        </div>
+        <div className="space-y-2">
+          <Label>Ikon</Label>
+          <Popover open={iconPickerOpen} onOpenChange={setIconPickerOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                role="combobox"
+                aria-expanded={iconPickerOpen}
+                className="w-full justify-between"
+              >
+                <span className="flex items-center gap-2">
+                  {(() => {
+                    const SelectedIcon = getCategoryIcon(icon);
+                    return <SelectedIcon className="size-4" />;
+                  })()}
+                  {icon ?? "Velg ikon"}
+                </span>
+                <ChevronsUpDown className="size-4 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-(--radix-popover-trigger-width) p-0">
+              <Command>
+                <CommandInput placeholder="Søk etter ikon…" />
+                <CommandList>
+                  <CommandEmpty>Ingen ikoner funnet</CommandEmpty>
+                  <CommandGroup>
+                    {CATEGORY_ICON_OPTIONS.map(({ name: iconName, icon: IconComponent }) => (
+                      <CommandItem
+                        key={iconName}
+                        value={iconName}
+                        onSelect={() => {
+                          setIcon(iconName);
+                          setIconPickerOpen(false);
+                        }}
+                      >
+                        <IconComponent className="size-4" />
+                        {iconName}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        </div>
+        {parent === "__none__" && (
           <div className="space-y-2">
-            <Label htmlFor="search-examples">Eksempelsøkeord</Label>
-            <Textarea
-              id="search-examples"
-              value={searchExamples}
-              onChange={(e) => setSearchExamples(e.target.value)}
-              placeholder={"iPhone 15\nPlayStation 5\nairpods"}
-              rows={4}
-            />
-            <p className="text-xs text-muted-foreground">
-              Ett ord/uttrykk per linje. Rulleres i søkefeltets typewriter-animasjon på
-              landingssiden når kategorien er valgt. Tom liste faller tilbake til underkategorinavn.
-            </p>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="sort">Sorteringsrekkefølge</Label>
+            <Label htmlFor="color">Farge (hovedkategori)</Label>
+            <div className="flex items-center gap-2">
+              <span
+                className="size-9 shrink-0 rounded-md border"
+                style={{ background: color || "transparent" }}
+                aria-hidden
+              />
               <Input
-                id="sort"
-                type="number"
-                value={sortOrder}
-                onChange={(e) => setSortOrder(Number(e.target.value))}
+                id="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                placeholder="oklch(0.62 0.13 250)"
               />
             </div>
-            <div className="space-y-2">
-              <Label>Overordnet kategori</Label>
-              <Select value={parent} onValueChange={setParent}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Ingen (toppnivå)</SelectItem>
-                  {possibleParents
-                    .slice()
-                    .sort((a, b) => depthOf(a.id, categories) - depthOf(b.id, categories))
-                    .map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {" ".repeat(depthOf(c.id, categories))}
-                        {c.name_nb}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+            <div className="flex flex-wrap gap-1.5">
+              {MAIN_CATEGORY_COLOR_PRESETS.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setColor(preset)}
+                  className="size-6 rounded-full border ring-offset-background transition hover:ring-2 hover:ring-ring"
+                  style={{ background: preset }}
+                  aria-label={`Velg farge ${preset}`}
+                />
+              ))}
             </div>
+            <p className="text-xs text-muted-foreground">
+              Brukes som bakgrunn på landingssiden og som aksent på kategorisiden. La stå tom for å
+              skjule kategorien som hovedkategori.
+            </p>
           </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
-              Avbryt
-            </Button>
-            <Button type="submit" disabled={save.isPending}>
-              {save.isPending ? <Loader2 className="size-4 animate-spin" /> : "Lagre"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+        )}
+        {parent === "__none__" && (
+          <div className="space-y-2">
+            <Label htmlFor="heading-font">Overskriftsfont (hovedkategori)</Label>
+            <Select value={headingFont} onValueChange={setHeadingFont}>
+              <SelectTrigger id="heading-font">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(CATEGORY_HEADING_FONTS).map(([token, { label, stack }]) => (
+                  <SelectItem key={token} value={token}>
+                    <span style={{ fontFamily: stack }}>{label}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Brukes på kategori-overskriften som vises på landingssiden når kategorien er valgt.
+            </p>
+          </div>
+        )}
+        <div className="space-y-2">
+          <Label htmlFor="search-examples">Eksempelsøkeord</Label>
+          <Textarea
+            id="search-examples"
+            value={searchExamples}
+            onChange={(e) => setSearchExamples(e.target.value)}
+            placeholder={"iPhone 15\nPlayStation 5\nairpods"}
+            rows={4}
+          />
+          <p className="text-xs text-muted-foreground">
+            Ett ord/uttrykk per linje. Rulleres i søkefeltets typewriter-animasjon på landingssiden
+            når kategorien er valgt. Tom liste faller tilbake til underkategorinavn.
+          </p>
+        </div>
+        <div className="grid gap-4">
+          <div className="space-y-2">
+            <Label>Overordnet kategori</Label>
+            <CategoryPicker
+              open={parentPickerOpen}
+              onOpenChange={setParentPickerOpen}
+              categories={possibleParents}
+              selectedId={parent}
+              allowSelectAny
+              onSelect={(categoryId) => setParent(categoryId)}
+              trigger={
+                <Button type="button" variant="outline" className="w-full justify-between">
+                  {parent === "__none__"
+                    ? "Ingen (toppnivå)"
+                    : (categories.find((c) => c.id === parent)?.name_nb ??
+                      "Velg overordnet kategori")}
+                  <ChevronsUpDown className="size-4 opacity-50" />
+                </Button>
+              }
+            />
+            {parent !== "__none__" &&
+              (color.trim() ||
+                searchExamples.trim() ||
+                headingFont !== DEFAULT_CATEGORY_HEADING_FONT) && (
+                <p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
+                  Denne kategorien har farge, font eller søkeeksempler satt som hovedkategori. Disse
+                  fjernes når du lagrer med en overordnet kategori valgt.
+                </p>
+              )}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>
+            Avbryt
+          </Button>
+          <Button type="submit" disabled={save.isPending}>
+            {save.isPending ? <Loader2 className="size-4 animate-spin" /> : "Lagre"}
+          </Button>
+        </DialogFooter>
+      </form>
+    </>
   );
 }
 
@@ -1023,7 +1167,75 @@ type EditableFilter = {
   is_primary: boolean;
 };
 
-function CategoryFiltersDialog({ category, onClose }: { category: Category; onClose: () => void }) {
+function SortableFilterRow({
+  filter,
+  onTogglePrimary,
+  onEdit,
+  onDelete,
+}: {
+  filter: CategoryFilter;
+  onTogglePrimary: (checked: boolean) => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: filter.id,
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 hover:bg-accent/40"
+    >
+      <div className="flex min-w-0 items-center gap-2">
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          className="cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
+          aria-label="Dra for å endre rekkefølge"
+        >
+          <GripVertical className="size-4" />
+        </button>
+        <div className="min-w-0">
+          <span className="font-medium">{filter.label_nb}</span>{" "}
+          <span className="text-xs text-muted-foreground">
+            {FILTER_TYPE_LABELS[filter.type]}
+            {filter.unit ? ` · ${filter.unit}` : ""} · {filter.key}
+          </span>
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Checkbox
+            checked={filter.is_primary}
+            onCheckedChange={(c) => onTogglePrimary(c === true)}
+          />
+          Vis alltid
+        </label>
+        <Button variant="ghost" size="icon" onClick={onEdit} aria-label="Rediger">
+          <Pencil className="size-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onDelete}
+          aria-label="Slett"
+          className="text-destructive hover:text-destructive"
+        >
+          <Trash2 className="size-4" />
+        </Button>
+      </div>
+    </li>
+  );
+}
+
+function CategoryFiltersPanel({ category }: { category: Category }) {
   const qc = useQueryClient();
   const [draft, setDraft] = useState<EditableFilter | null>(null);
   const [keyTouched, setKeyTouched] = useState(false);
@@ -1099,6 +1311,35 @@ function CategoryFiltersDialog({ category, onClose }: { category: Category; onCl
     onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke slette filteret")),
   });
 
+  const reorderFilters = useMutation({
+    mutationFn: async (updates: { id: string; sort_order: number }[]) => {
+      const results = await Promise.all(
+        updates.map((u) =>
+          supabase.from("category_filters").update({ sort_order: u.sort_order }).eq("id", u.id),
+        ),
+      );
+      const failed = results.find((r) => r.error);
+      if (failed?.error) throw failed.error;
+    },
+    onSuccess: invalidate,
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke lagre rekkefølgen")),
+  });
+
+  const filterSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+  );
+
+  function handleFilterDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const current = filters ?? [];
+    const oldIndex = current.findIndex((f) => f.id === active.id);
+    const newIndex = current.findIndex((f) => f.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(current, oldIndex, newIndex);
+    reorderFilters.mutate(reordered.map((f, i) => ({ id: f.id, sort_order: (i + 1) * 10 })));
+  }
+
   function startNew() {
     setKeyTouched(false);
     setDraft({
@@ -1127,238 +1368,210 @@ function CategoryFiltersDialog({ category, onClose }: { category: Category; onCl
   const usesOptions = draft?.type === "select" || draft?.type === "multiselect";
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Filtre for «{category.name_nb}»</DialogTitle>
-          <DialogDescription>
-            Filtre vises i annonseskjema og søk for denne kategorien og dens underkategorier.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <p className="text-sm text-muted-foreground">
+        Filtre vises i annonseskjema og søk for denne kategorien og dens underkategorier.
+      </p>
 
-        {isLoading ? (
-          <div className="space-y-2 py-2">
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-full" />
-          </div>
-        ) : isError ? (
-          <p className="py-2 text-sm text-destructive">
-            {formatErrorMessage(filtersError, "Kunne ikke laste filtre")}
-          </p>
-        ) : (
-          <ul className="space-y-1">
-            {(filters ?? []).length === 0 && (
-              <li className="py-2 text-sm text-muted-foreground">Ingen filtre ennå.</li>
-            )}
-            {(filters ?? []).map((f) => (
-              <li
-                key={f.id}
-                className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 hover:bg-accent/40"
+      {isLoading ? (
+        <div className="space-y-2 py-2">
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-full" />
+        </div>
+      ) : isError ? (
+        <p className="py-2 text-sm text-destructive">
+          {formatErrorMessage(filtersError, "Kunne ikke laste filtre")}
+        </p>
+      ) : (
+        <>
+          {(filters ?? []).length === 0 ? (
+            <p className="py-2 text-sm text-muted-foreground">Ingen filtre ennå.</p>
+          ) : (
+            <DndContext
+              sensors={filterSensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleFilterDragEnd}
+            >
+              <SortableContext
+                items={(filters ?? []).map((f) => f.id)}
+                strategy={verticalListSortingStrategy}
               >
-                <div className="min-w-0">
-                  <span className="font-medium">{f.label_nb}</span>{" "}
-                  <span className="text-xs text-muted-foreground">
-                    {FILTER_TYPE_LABELS[f.type]}
-                    {f.unit ? ` · ${f.unit}` : ""} · {f.key}
-                  </span>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Checkbox
-                      checked={f.is_primary}
-                      onCheckedChange={(c) =>
-                        toggleIsPrimary.mutate({ id: f.id, is_primary: c === true })
+                <ul className="space-y-1">
+                  {(filters ?? []).map((f) => (
+                    <SortableFilterRow
+                      key={f.id}
+                      filter={f}
+                      onTogglePrimary={(is_primary) =>
+                        toggleIsPrimary.mutate({ id: f.id, is_primary })
                       }
+                      onEdit={() => startEdit(f)}
+                      onDelete={() => remove.mutate(f.id)}
                     />
-                    Vis alltid
-                  </label>
+                  ))}
+                </ul>
+              </SortableContext>
+            </DndContext>
+          )}
+        </>
+      )}
+
+      {draft ? (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!draft.label_nb.trim()) {
+              showErrorToast("Navn er påkrevd");
+              return;
+            }
+            save.mutate(draft);
+          }}
+          className="space-y-4 rounded-md border p-3"
+        >
+          <div className="space-y-2">
+            <Label htmlFor="f-label">Navn</Label>
+            <Input
+              id="f-label"
+              value={draft.label_nb}
+              onChange={(e) =>
+                setDraft((d) =>
+                  d
+                    ? {
+                        ...d,
+                        label_nb: e.target.value,
+                        key: keyTouched ? d.key : filterKeyify(e.target.value),
+                      }
+                    : d,
+                )
+              }
+              placeholder="f.eks. Skjermstørrelse"
+              required
+            />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="f-key">Nøkkel</Label>
+              <Input
+                id="f-key"
+                value={draft.key}
+                onChange={(e) => {
+                  setKeyTouched(true);
+                  setDraft((d) => (d ? { ...d, key: e.target.value } : d));
+                }}
+                placeholder="tv_size_inch"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Type</Label>
+              <Select
+                value={draft.type}
+                onValueChange={(v) => setDraft((d) => (d ? { ...d, type: v as FilterType } : d))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FILTER_TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {FILTER_TYPE_LABELS[t]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="f-unit">Enhet (valgfritt)</Label>
+            <Input
+              id="f-unit"
+              value={draft.unit}
+              onChange={(e) => setDraft((d) => (d ? { ...d, unit: e.target.value } : d))}
+              placeholder="f.eks. tommer, km"
+            />
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox
+              checked={draft.is_primary}
+              onCheckedChange={(c) => setDraft((d) => (d ? { ...d, is_primary: c === true } : d))}
+            />
+            Vis alltid (av = under «Flere valg»)
+          </label>
+          {usesOptions && (
+            <div className="space-y-2">
+              <Label>Valg</Label>
+              {draft.options.map((opt, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Input
+                    value={opt.label_nb}
+                    onChange={(e) =>
+                      setDraft((d) => {
+                        if (!d) return d;
+                        const options = [...d.options];
+                        options[i] = {
+                          label_nb: e.target.value,
+                          value: options[i].value.trim() || filterKeyify(e.target.value),
+                        };
+                        return { ...d, options };
+                      })
+                    }
+                    placeholder="Visningsnavn (f.eks. OLED)"
+                  />
+                  <Input
+                    value={opt.value}
+                    onChange={(e) =>
+                      setDraft((d) => {
+                        if (!d) return d;
+                        const options = [...d.options];
+                        options[i] = { ...options[i], value: e.target.value };
+                        return { ...d, options };
+                      })
+                    }
+                    placeholder="verdi (oled)"
+                    className="max-w-[8rem]"
+                  />
                   <Button
+                    type="button"
                     variant="ghost"
                     size="icon"
-                    onClick={() => startEdit(f)}
-                    aria-label="Rediger"
+                    onClick={() =>
+                      setDraft((d) =>
+                        d ? { ...d, options: d.options.filter((_, j) => j !== i) } : d,
+                      )
+                    }
+                    aria-label="Fjern valg"
                   >
-                    <Pencil className="size-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => remove.mutate(f.id)}
-                    aria-label="Slett"
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="size-4" />
+                    <X className="size-4" />
                   </Button>
                 </div>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {draft ? (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!draft.label_nb.trim()) {
-                showErrorToast("Navn er påkrevd");
-                return;
-              }
-              save.mutate(draft);
-            }}
-            className="space-y-4 rounded-md border p-3"
-          >
-            <div className="space-y-2">
-              <Label htmlFor="f-label">Navn</Label>
-              <Input
-                id="f-label"
-                value={draft.label_nb}
-                onChange={(e) =>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
                   setDraft((d) =>
-                    d
-                      ? {
-                          ...d,
-                          label_nb: e.target.value,
-                          key: keyTouched ? d.key : filterKeyify(e.target.value),
-                        }
-                      : d,
+                    d ? { ...d, options: [...d.options, { value: "", label_nb: "" }] } : d,
                   )
                 }
-                placeholder="f.eks. Skjermstørrelse"
-                required
-              />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="f-key">Nøkkel</Label>
-                <Input
-                  id="f-key"
-                  value={draft.key}
-                  onChange={(e) => {
-                    setKeyTouched(true);
-                    setDraft((d) => (d ? { ...d, key: e.target.value } : d));
-                  }}
-                  placeholder="tv_size_inch"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Type</Label>
-                <Select
-                  value={draft.type}
-                  onValueChange={(v) => setDraft((d) => (d ? { ...d, type: v as FilterType } : d))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {FILTER_TYPES.map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {FILTER_TYPE_LABELS[t]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="f-unit">Enhet (valgfritt)</Label>
-              <Input
-                id="f-unit"
-                value={draft.unit}
-                onChange={(e) => setDraft((d) => (d ? { ...d, unit: e.target.value } : d))}
-                placeholder="f.eks. tommer, km"
-              />
-            </div>
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={draft.is_primary}
-                onCheckedChange={(c) => setDraft((d) => (d ? { ...d, is_primary: c === true } : d))}
-              />
-              Vis alltid (av = under «Flere valg»)
-            </label>
-            {usesOptions && (
-              <div className="space-y-2">
-                <Label>Valg</Label>
-                {draft.options.map((opt, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <Input
-                      value={opt.label_nb}
-                      onChange={(e) =>
-                        setDraft((d) => {
-                          if (!d) return d;
-                          const options = [...d.options];
-                          options[i] = {
-                            label_nb: e.target.value,
-                            value: options[i].value.trim() || filterKeyify(e.target.value),
-                          };
-                          return { ...d, options };
-                        })
-                      }
-                      placeholder="Visningsnavn (f.eks. OLED)"
-                    />
-                    <Input
-                      value={opt.value}
-                      onChange={(e) =>
-                        setDraft((d) => {
-                          if (!d) return d;
-                          const options = [...d.options];
-                          options[i] = { ...options[i], value: e.target.value };
-                          return { ...d, options };
-                        })
-                      }
-                      placeholder="verdi (oled)"
-                      className="max-w-[8rem]"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() =>
-                        setDraft((d) =>
-                          d ? { ...d, options: d.options.filter((_, j) => j !== i) } : d,
-                        )
-                      }
-                      aria-label="Fjern valg"
-                    >
-                      <X className="size-4" />
-                    </Button>
-                  </div>
-                ))}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setDraft((d) =>
-                      d ? { ...d, options: [...d.options, { value: "", label_nb: "" }] } : d,
-                    )
-                  }
-                >
-                  <Plus className="size-4" /> Legg til valg
-                </Button>
-              </div>
-            )}
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setDraft(null)}>
-                Avbryt
-              </Button>
-              <Button type="submit" disabled={save.isPending}>
-                {save.isPending ? <Loader2 className="size-4 animate-spin" /> : "Lagre filter"}
+              >
+                <Plus className="size-4" /> Legg til valg
               </Button>
             </div>
-          </form>
-        ) : (
-          <Button type="button" variant="outline" onClick={startNew}>
-            <Plus className="size-4" /> Nytt filter
-          </Button>
-        )}
-
-        <DialogFooter>
-          <Button type="button" onClick={onClose}>
-            Lukk
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setDraft(null)}>
+              Avbryt
+            </Button>
+            <Button type="submit" disabled={save.isPending}>
+              {save.isPending ? <Loader2 className="size-4 animate-spin" /> : "Lagre filter"}
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <Button type="button" variant="outline" onClick={startNew}>
+          <Plus className="size-4" /> Nytt filter
+        </Button>
+      )}
+    </>
   );
 }
 
@@ -1427,7 +1640,7 @@ function FieldGroupPagesPreview({ label, pages }: { label: string; pages: string
   );
 }
 
-function CategoryFlowDialog({ category, onClose }: { category: Category; onClose: () => void }) {
+function CategoryFlowPanel({ category }: { category: Category }) {
   const qc = useQueryClient();
 
   const {
@@ -1555,162 +1768,152 @@ function CategoryFlowDialog({ category, onClose }: { category: Category; onClose
   }
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Annonseflyt for «{category.name_nb}»</DialogTitle>
-          <DialogDescription>
-            Velg og sorter hvilke feltgrupper og moduler som vises i annonseskjemaet for denne
-            kategorien og dens underkategorier. Uten egen flyt her arves nærmeste overordnede
-            kategoris flyt, eller standardflyten hvis ingen har en.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <p className="text-sm text-muted-foreground">
+        Velg og sorter hvilke feltgrupper og moduler som vises i annonseskjemaet for denne
+        kategorien og dens underkategorier. Uten egen flyt her arves nærmeste overordnede kategoris
+        flyt, eller standardflyten hvis ingen har en.
+      </p>
 
-        {isLoading ? (
-          <div className="flex justify-center py-6">
-            <Loader2 className="size-5 animate-spin text-muted-foreground" />
-          </div>
-        ) : isError ? (
-          <p className="py-2 text-sm text-destructive">
-            {formatErrorMessage(flowError, "Kunne ikke laste annonseflyten")}
-          </p>
-        ) : (
-          <div className="space-y-4">
-            {!hasCustomFlow && (
+      {isLoading ? (
+        <div className="flex justify-center py-6">
+          <Loader2 className="size-5 animate-spin text-muted-foreground" />
+        </div>
+      ) : isError ? (
+        <p className="py-2 text-sm text-destructive">
+          {formatErrorMessage(flowError, "Kunne ikke laste annonseflyten")}
+        </p>
+      ) : (
+        <div className="space-y-4">
+          {!hasCustomFlow && (
+            <p className="rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">
+              Denne kategorien har ingen egen flyt ennå — bruker standardflyten (eller nærmeste
+              overordnede kategoris flyt, hvis satt).
+            </p>
+          )}
+
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-muted-foreground">Feltgrupper</p>
+            {hasVehicleRegistration && (
               <p className="rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">
-                Denne kategorien har ingen egen flyt ennå — bruker standardflyten (eller nærmeste
-                overordnede kategoris flyt, hvis satt).
+                Denne kategorien har kjøretøyregistrering (Statens vegvesen-oppslag) satt opp via
+                migrasjon. Bekreftelsessteget som vises etter et vellykket oppslag legges alltid til
+                automatisk og kan ikke konfigureres her.
               </p>
             )}
-
-            <div className="space-y-1">
-              <p className="text-xs font-medium text-muted-foreground">Feltgrupper</p>
+            <ul>
               {hasVehicleRegistration && (
-                <p className="rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">
-                  Denne kategorien har kjøretøyregistrering (Statens vegvesen-oppslag) satt opp via
-                  migrasjon. Bekreftelsessteget som vises etter et vellykket oppslag legges alltid
-                  til automatisk og kan ikke konfigureres her.
-                </p>
-              )}
-              <ul>
-                {hasVehicleRegistration && (
-                  <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm text-muted-foreground">
-                    <span className="inline-block size-4 shrink-0" aria-hidden />
-                    <Checkbox checked disabled />
-                    {FIELD_GROUP_LABELS_NB["vehicle-registration"]}
-                    <span className="text-xs">(alltid først, kan ikke fjernes her)</span>
-                  </li>
-                )}
                 <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm text-muted-foreground">
                   <span className="inline-block size-4 shrink-0" aria-hidden />
                   <Checkbox checked disabled />
-                  {FIELD_GROUP_LABELS_NB["title-photos"]}
-                  <span className="text-xs">(alltid først)</span>
+                  {FIELD_GROUP_LABELS_NB["vehicle-registration"]}
+                  <span className="text-xs">(alltid først, kan ikke fjernes her)</span>
                 </li>
-              </ul>
-              <DndContext
-                sensors={fieldGroupSensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleFieldGroupDragEnd}
-              >
-                <SortableContext items={middleOrder} strategy={verticalListSortingStrategy}>
-                  <ul>
-                    {middleOrder.map((key) => (
-                      <SortableFieldGroupRow
-                        key={key}
-                        id={key}
-                        checked={
-                          LOCKED_FIELD_GROUP_KEYS.includes(key) || storedFieldGroups.includes(key)
-                        }
-                        disabled={LOCKED_FIELD_GROUP_KEYS.includes(key)}
-                        onToggle={() => toggleFieldGroup(key)}
-                      />
-                    ))}
-                  </ul>
-                </SortableContext>
-              </DndContext>
-              <ul>
-                <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm">
-                  <span className="inline-block size-4 shrink-0" aria-hidden />
+              )}
+              <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm text-muted-foreground">
+                <span className="inline-block size-4 shrink-0" aria-hidden />
+                <Checkbox checked disabled />
+                {FIELD_GROUP_LABELS_NB["title-photos"]}
+                <span className="text-xs">(alltid først)</span>
+              </li>
+            </ul>
+            <DndContext
+              sensors={fieldGroupSensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleFieldGroupDragEnd}
+            >
+              <SortableContext items={middleOrder} strategy={verticalListSortingStrategy}>
+                <ul>
+                  {middleOrder.map((key) => (
+                    <SortableFieldGroupRow
+                      key={key}
+                      id={key}
+                      checked={
+                        LOCKED_FIELD_GROUP_KEYS.includes(key) || storedFieldGroups.includes(key)
+                      }
+                      disabled={LOCKED_FIELD_GROUP_KEYS.includes(key)}
+                      onToggle={() => toggleFieldGroup(key)}
+                    />
+                  ))}
+                </ul>
+              </SortableContext>
+            </DndContext>
+            <ul>
+              <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm">
+                <span className="inline-block size-4 shrink-0" aria-hidden />
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={deliveryActive}
+                    onCheckedChange={() => toggleFieldGroup("delivery-location")}
+                  />
+                  {FIELD_GROUP_LABELS_NB["delivery-location"]}
+                </label>
+              </li>
+              <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm text-muted-foreground">
+                <span className="inline-block size-4 shrink-0" aria-hidden />
+                <Checkbox checked disabled />
+                {FIELD_GROUP_LABELS_NB["review-publish"]}
+                <span className="text-xs">(alltid sist)</span>
+              </li>
+            </ul>
+          </div>
+
+          <div className="space-y-1 rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">
+            <p className="font-medium text-foreground">Forhåndsvisning av annonseskjemaet</p>
+            <FieldGroupPagesPreview
+              label="Web"
+              pages={resolveWizardPages(activeFieldGroups, { native: false })}
+            />
+            <FieldGroupPagesPreview
+              label="Native"
+              pages={resolveWizardPages(activeFieldGroups, { native: true })}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-muted-foreground">Moduler</p>
+            <ul className="space-y-2">
+              {MODULE_KEYS.map((key) => (
+                <li key={key}>
                   <label className="flex items-center gap-2 text-sm">
                     <Checkbox
-                      checked={deliveryActive}
-                      onCheckedChange={() => toggleFieldGroup("delivery-location")}
+                      checked={activeModules.includes(key)}
+                      onCheckedChange={() => toggle(key)}
                     />
-                    {FIELD_GROUP_LABELS_NB["delivery-location"]}
+                    {MODULE_LABELS_NB[key] ?? key}
                   </label>
                 </li>
-                <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm text-muted-foreground">
-                  <span className="inline-block size-4 shrink-0" aria-hidden />
-                  <Checkbox checked disabled />
-                  {FIELD_GROUP_LABELS_NB["review-publish"]}
-                  <span className="text-xs">(alltid sist)</span>
-                </li>
-              </ul>
-            </div>
-
-            <div className="space-y-1 rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">
-              <p className="font-medium text-foreground">Forhåndsvisning av annonseskjemaet</p>
-              <FieldGroupPagesPreview
-                label="Web"
-                pages={resolveWizardPages(activeFieldGroups, { native: false })}
-              />
-              <FieldGroupPagesPreview
-                label="Native"
-                pages={resolveWizardPages(activeFieldGroups, { native: true })}
-              />
-            </div>
-
-            <div className="space-y-1">
-              <p className="text-xs font-medium text-muted-foreground">Moduler</p>
-              <ul className="space-y-2">
-                {MODULE_KEYS.map((key) => (
-                  <li key={key}>
-                    <label className="flex items-center gap-2 text-sm">
-                      <Checkbox
-                        checked={activeModules.includes(key)}
-                        onCheckedChange={() => toggle(key)}
-                      />
-                      {MODULE_LABELS_NB[key] ?? key}
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            </div>
+              ))}
+            </ul>
           </div>
+        </div>
+      )}
+
+      <DialogFooter className="gap-2 sm:justify-between">
+        {hasCustomFlow && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => resetToDefault.mutate()}
+            disabled={resetToDefault.isPending}
+          >
+            {resetToDefault.isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              "Tilbakestill til standard"
+            )}
+          </Button>
         )}
-
-        <DialogFooter className="gap-2 sm:justify-between">
-          {hasCustomFlow && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => resetToDefault.mutate()}
-              disabled={resetToDefault.isPending}
-            >
-              {resetToDefault.isPending ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                "Tilbakestill til standard"
-              )}
-            </Button>
-          )}
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" onClick={onClose}>
-              Lukk
-            </Button>
-            <Button
-              type="button"
-              disabled={save.isPending || isLoading}
-              onClick={() =>
-                save.mutate({ nextModules: activeModules, nextFieldGroups: activeFieldGroups })
-              }
-            >
-              {save.isPending ? <Loader2 className="size-4 animate-spin" /> : "Lagre"}
-            </Button>
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        <Button
+          type="button"
+          disabled={save.isPending || isLoading}
+          onClick={() =>
+            save.mutate({ nextModules: activeModules, nextFieldGroups: activeFieldGroups })
+          }
+        >
+          {save.isPending ? <Loader2 className="size-4 animate-spin" /> : "Lagre"}
+        </Button>
+      </DialogFooter>
+    </>
   );
 }

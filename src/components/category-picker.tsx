@@ -37,6 +37,12 @@ type Props = {
    * actual leaf (personbil/varebil/...) to the Statens Vegvesen lookup
    * instead of forcing manual drill-down. */
   selectableGroups?: string[];
+  /** Admin use case (choosing a *parent* category rather than a leaf): shows
+   * a pinned "select this level" row at the top of every level (including
+   * the root, as "Ingen (toppnivå)"), so any category — not just leaves —
+   * can be the final choice, while drilling down to inspect children still
+   * works via the normal grid/list clicks. */
+  allowSelectAny?: boolean;
 };
 
 function useIsDesktop() {
@@ -67,6 +73,7 @@ export function CategoryPicker({
   trigger,
   inline,
   selectableGroups,
+  allowSelectAny,
 }: Props) {
   const isDesktop = useIsDesktop();
   const [path, setPath] = useState<Category[]>([]);
@@ -108,6 +115,17 @@ export function CategoryPicker({
         resetState();
       }, SELECTION_CONFIRM_MS);
     }
+  }
+
+  function handleSelectCurrentLevel() {
+    if (pendingSelection) return;
+    const id = currentParentId ?? "__none__";
+    setPendingSelection(id);
+    confirmTimeoutRef.current = setTimeout(() => {
+      onSelect(id, currentParentId ?? id);
+      onOpenChange(false);
+      resetState();
+    }, SELECTION_CONFIRM_MS);
   }
 
   function handleBack() {
@@ -192,6 +210,25 @@ export function CategoryPicker({
       </div>
 
       <div className="flex-1 overflow-y-auto p-2">
+        {allowSelectAny && !searchResults && (
+          <button
+            type="button"
+            onClick={handleSelectCurrentLevel}
+            disabled={!!pendingSelection}
+            className={`mb-2 flex w-full items-center justify-between rounded-lg border border-dashed px-3 py-2 text-left text-sm transition-colors ${
+              pendingSelection === (currentParentId ?? "__none__")
+                ? "border-primary bg-primary/15 text-primary font-medium"
+                : selectedId === (currentParentId ?? "__none__")
+                  ? "border-primary/40 bg-primary/10 text-primary font-medium"
+                  : "hover:bg-muted"
+            }`}
+          >
+            <span>{path.length > 0 ? `Velg «${path.at(-1)!.name_nb}»` : "Ingen (toppnivå)"}</span>
+            {pendingSelection === (currentParentId ?? "__none__") && (
+              <Check className="size-4 shrink-0" />
+            )}
+          </button>
+        )}
         {searchResults ? (
           <div className="space-y-0.5">
             {searchResults.length === 0 && (

@@ -20,7 +20,7 @@ import { getCategoryIcon } from "@/lib/category-icons";
 import { findCategorySuggestion } from "@/lib/categories";
 import { Badge } from "@/components/ui/badge";
 import { useTypewriterText } from "@/hooks/use-typewriter-text";
-import { SEARCH_SUGGESTIONS } from "@/lib/search-suggestions";
+import { useDefaultSearchExamples } from "@/hooks/use-default-search-examples";
 import { categoryHeadingFontStack } from "@/lib/category-fonts";
 import { CategoryFilterFields, MoreFiltersToggle } from "@/components/category-filter-fields";
 import {
@@ -188,17 +188,18 @@ function WebLanding() {
   const feedListings = useMemo(() => feedPages?.pages.flatMap((p) => p.rows) ?? [], [feedPages]);
 
   const [qFocused, setQFocused] = useState(false);
+  const defaultSearchExamples = useDefaultSearchExamples();
   // When a category is active, hint at what's searchable within it by typing
   // its (deepest-level) subcategory names instead of the generic suggestions.
   const typewriterWords = useMemo(() => {
-    if (!currentParent) return SEARCH_SUGGESTIONS;
+    if (!currentParent) return defaultSearchExamples;
     if (currentParent.search_examples?.length) {
       return currentParent.search_examples.map((w) => w.toLocaleLowerCase("nb-NO"));
     }
     const subs = childrenByParent.get(currentParent.id) ?? [];
     const words = subs.map((s) => s.name_nb.toLocaleLowerCase("nb-NO"));
     return words.length > 0 ? words : [currentParent.name_nb.toLocaleLowerCase("nb-NO")];
-  }, [currentParent, childrenByParent]);
+  }, [currentParent, childrenByParent, defaultSearchExamples]);
   const typewriterPlaceholder = useTypewriterText(typewriterWords, {
     paused: qFocused || qDraft.length > 0,
     resetKey: currentParent?.id ?? "all",

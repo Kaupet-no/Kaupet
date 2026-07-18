@@ -141,6 +141,11 @@ function ConversationPage() {
   // lastMarkedRef hindrer at samme (eller eldre) tidsstempel skrives på nytt
   // for hver realtime-INSERT eller cache-oppdatering.
   const lastMarkedRef = useRef<string | null>(null);
+  // Nullstill guarden når man navigerer til en annen samtale, ellers kan et
+  // nyere tidsstempel fra forrige samtale blokkere lest-markering av denne.
+  useEffect(() => {
+    lastMarkedRef.current = null;
+  }, [id]);
   const markReadMutation = useMutation({
     mutationFn: async (readAt: string) => {
       if (!conv || !user) return;
@@ -164,6 +169,10 @@ function ConversationPage() {
       );
       queryClient.invalidateQueries({ queryKey: ["unread-conversations"] });
       queryClient.invalidateQueries({ queryKey: ["my-conversations"] });
+    },
+    onError: (e: Error) => {
+      lastMarkedRef.current = null;
+      showErrorToast(formatErrorMessage(e, "Kunne ikke markere samtalen som lest"));
     },
   });
 

@@ -24,6 +24,7 @@ export function CategoryAttributes({
   attributes,
   onAttributesChange,
   attributesTouched,
+  vehicleAttributeHiddenKeys,
 }: WizardSharedProps) {
   return (
     <section className="space-y-2">
@@ -95,6 +96,7 @@ export function CategoryAttributes({
           value={attributes}
           onChange={onAttributesChange}
           showErrors={attributesTouched}
+          hiddenKeys={vehicleAttributeHiddenKeys}
         />
       ))}
     </section>

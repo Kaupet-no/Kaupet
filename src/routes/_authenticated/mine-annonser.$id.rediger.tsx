@@ -973,6 +973,7 @@ function EditListingPage() {
             onAttributesChange: setAttributes,
             attributesTouched,
             activeModules,
+            vehicleAttributeHiddenKeys: undefined,
 
             // Vehicle-first lookup/confirm never re-trigger on edit (see
             // `fieldGroups` filter above) — these are unused no-ops here.
@@ -984,10 +985,16 @@ function EditListingPage() {
             vehicleLookupResult: null,
             vehicleClassification: null,
             vehiclePreviousClassificationMismatch: null,
-            runVehicleLookup: () => {},
+            vehicleConfirmFooterSlot: null,
+            vehicleLookupConfirmOpen: false,
+            setVehicleLookupConfirmOpen: () => {},
+            adjustVehicleRegistrationNumber: () => {},
+            confirmVehicleLookupAndContinue: () => {},
+            vehicleRegNrInput: "",
+            setVehicleRegNrInput: () => {},
+            runVehicleLookup: async () => false,
             matchVehicleBrandForLeaf: async () => null,
             confirmVehicleData: () => {},
-            rejectVehicleLookup: () => {},
 
             conditionDescription,
 

@@ -1,7 +1,17 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,7 +25,9 @@ import {
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { createVehicleBrand, createVehicleModel } from "@/lib/vehicle-brands.functions";
 import { VEHICLE_LEAF_SLUGS, type VehicleLeafSlug } from "@/lib/vehicle-classification";
+import { VehicleModelField } from "@/features/listing-creation/modules/generic-attributes/vehicle-brand-model-fields";
 import type { VehicleBrandGroup } from "@/lib/category-filters";
+import type { VehicleLookupResult } from "@/lib/vehicle-lookup.server";
 
 import type { WizardSharedProps } from "../types";
 
@@ -29,12 +41,90 @@ const LEAF_LABELS_NB: Record<VehicleLeafSlug, string> = {
   "tilhenger-leaf": "Tilhenger",
 };
 
+const FUEL_TYPE_OPTIONS = [
+  { value: "diesel", label: "Diesel" },
+  { value: "bensin", label: "Bensin" },
+  { value: "el", label: "Elektrisk" },
+  { value: "hybrid", label: "Hybrid" },
+];
+
+const TRANSMISSION_OPTIONS = [
+  { value: "manuell", label: "Manuell" },
+  { value: "automat", label: "Automat" },
+];
+
+const DRIVE_TYPE_OPTIONS = [
+  { value: "4x4", label: "Firehjulsdrift" },
+  { value: "bakhjul", label: "Bakhjulsdrift" },
+  { value: "forhjul", label: "Forhjulsdrift" },
+];
+
+/** The subset of vehicle-confirm's fields that are also `category_filters`
+ * for vehicle leaves — editable here so they're never asked again in the
+ * later category-attributes step (see VEHICLE_LOOKUP_FILTER_KEYS). */
+type EditableSpec = {
+  year: string;
+  fuel_type: string;
+  transmission: string;
+  drive_type: string;
+  weight_kg: string;
+  power_hk: string;
+  tow_hitch: boolean;
+  max_tow_weight_kg: string;
+  seats: string;
+  color: string;
+  next_eu_control: string;
+};
+
+function specFromLookup(lookup: VehicleLookupResult | null): EditableSpec {
+  return {
+    year: lookup?.year != null ? String(lookup.year) : "",
+    fuel_type: lookup?.fuel_type ?? "",
+    transmission: lookup?.transmission ?? "",
+    drive_type: lookup?.drive_type ?? "",
+    weight_kg: lookup?.weight_kg != null ? String(lookup.weight_kg) : "",
+    power_hk: lookup?.power_hk != null ? String(lookup.power_hk) : "",
+    tow_hitch: lookup?.tow_hitch ?? false,
+    max_tow_weight_kg: lookup?.max_tow_weight_kg != null ? String(lookup.max_tow_weight_kg) : "",
+    seats: lookup?.seats != null ? String(lookup.seats) : "",
+    color: lookup?.color ?? "",
+    next_eu_control: lookup?.next_eu_control ?? "",
+  };
+}
+
+function specOverridesFrom(spec: EditableSpec) {
+  return {
+    year: spec.year.trim() ? Number(spec.year) : undefined,
+    fuel_type: spec.fuel_type || undefined,
+    transmission: spec.transmission || undefined,
+    drive_type: spec.drive_type || undefined,
+    weight_kg: spec.weight_kg.trim() ? Number(spec.weight_kg) : undefined,
+    power_hk: spec.power_hk.trim() ? Number(spec.power_hk) : undefined,
+    tow_hitch: spec.tow_hitch,
+    max_tow_weight_kg: spec.max_tow_weight_kg.trim() ? Number(spec.max_tow_weight_kg) : undefined,
+    seats: spec.seats.trim() ? Number(spec.seats) : undefined,
+    color: spec.color || undefined,
+    next_eu_control: spec.next_eu_control || undefined,
+  };
+}
+
 /**
  * Dedicated confirmation step for the vehicle-first flow: shown only after a
  * successful Statens Vegvesen lookup. Displays the auto-detected vehicle
  * type (editable, in case classification is missing/low-confidence or the
  * user disagrees) plus the full fetched data set, and requires an explicit
  * "Bekreft og fortsett" before the category/attributes are committed.
+ *
+ * Modell (a dropdown of approved models for the matched brand, same as
+ * category-attributes' brand/model fields, plus a "legg til ny modell"
+ * escape hatch for values not in the list) and the core spec fields (year/
+ * drivstoff/girkasse/hjuldrift/vekt/effekt/hengerfeste/seter/farge/
+ * EU-kontroll) are editable directly here via "Rediger opplysninger" — SVV
+ * has no field for trim/variant badges (e.g. "N", "GTI"), so a manual model
+ * correction is the only way to get those into the listing. The spec fields
+ * are hidden from the later category-attributes ("Detaljer") step (see
+ * VEHICLE_LOOKUP_FILTER_KEYS) so the user is never asked to fill them in
+ * twice. If the user doesn't choose to edit, nothing here forces them to.
  *
  * Also resolves the SVV brand/model against approved vehicle_brands/
  * vehicle_models as soon as a vehicle type is selected, and — if unmatched —
@@ -47,9 +137,9 @@ export function VehicleConfirm({
   vehicleLookupResult,
   vehicleClassification,
   vehiclePreviousClassificationMismatch,
+  vehicleConfirmFooterSlot,
   matchVehicleBrandForLeaf,
   confirmVehicleData,
-  rejectVehicleLookup,
 }: WizardSharedProps) {
   const detectedSlug = vehicleClassification?.slug ?? null;
   const [selectedSlug, setSelectedSlug] = useState<VehicleLeafSlug | null>(detectedSlug);
@@ -63,6 +153,11 @@ export function VehicleConfirm({
     name: string;
   } | null>(null);
   const [pendingModelName, setPendingModelName] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [spec, setSpec] = useState<EditableSpec>(() => specFromLookup(vehicleLookupResult));
+  const [modelOverride, setModelOverride] = useState<string | null>(null);
+  const [addingModel, setAddingModel] = useState(false);
+  const [newModelName, setNewModelName] = useState("");
 
   const leafBySlug = new Map(
     categories
@@ -109,14 +204,14 @@ export function VehicleConfirm({
         });
         setBrandName(brand.name);
         setBrandId(brand.id);
-        showSuccessToast(`«${brand.name}» er sendt til admin for godkjenning.`);
+        showSuccessToast(`«${brand.name}» er sendt til godkjenning.`);
         if (pendingModelName) chainToModel = pendingModelName;
       } else if (!brandId) {
         showErrorToast("Velg merke før du legger til modell.");
       } else {
         const model = await createVehicleModel({ data: { brandId, name: confirmValue.name } });
         setModelName(model.name);
-        showSuccessToast(`«${model.name}» er sendt til admin for godkjenning.`);
+        showSuccessToast(`«${model.name}» er sendt til godkjenning.`);
       }
     } catch {
       showErrorToast("Klarte ikke å legge til ny verdi. Prøv igjen.");
@@ -131,8 +226,34 @@ export function VehicleConfirm({
     }
   }
 
+  /** Used when the desired model isn't in the dropdown at all (e.g. a trim
+   * variant like "IONIQ 5 N" that SVV has no data for) — adds it as a new
+   * pending-approval model, same as an auto-detected-but-unmatched value. */
+  async function submitNewModel() {
+    const name = newModelName.trim();
+    if (!name) return;
+    if (!brandId) {
+      showErrorToast("Velg merke før du legger til modell.");
+      return;
+    }
+    try {
+      const model = await createVehicleModel({ data: { brandId, name } });
+      setModelName(model.name);
+      setModelOverride(null);
+      showSuccessToast(`«${model.name}» er sendt til godkjenning.`);
+      setAddingModel(false);
+      setNewModelName("");
+    } catch {
+      showErrorToast("Klarte ikke å legge til ny modell. Prøv igjen.");
+    }
+  }
+
   if (!vehicleLookupResult) return null;
   const lookup = vehicleLookupResult;
+
+  function setSpecField<K extends keyof EditableSpec>(key: K, value: EditableSpec[K]) {
+    setSpec((s) => ({ ...s, [key]: value }));
+  }
 
   return (
     <section className="space-y-3">
@@ -142,7 +263,7 @@ export function VehicleConfirm({
           <p className="text-sm text-muted-foreground">
             Vi har funnet ut at dette er en{" "}
             <span className="font-medium text-foreground">{LEAF_LABELS_NB[detectedSlug]}</span>.
-            Stemmer ikke dette?
+            Stemmer dette?
           </p>
         ) : (
           <p className="text-sm text-muted-foreground">
@@ -190,175 +311,353 @@ export function VehicleConfirm({
       </div>
 
       <div className="rounded-md bg-muted/40 p-3 text-sm">
-        <p className="font-medium">Data fra Statens vegvesen</p>
-        {(lookup.year || lookup.brand || lookup.model) && (
+        <div className="flex items-center justify-between gap-2">
+          <p className="font-medium">Data fra Statens vegvesen</p>
+          <button
+            type="button"
+            onClick={() => setEditing((e) => !e)}
+            className="text-sm text-primary underline-offset-2 hover:underline"
+          >
+            {editing ? "Ferdig med å redigere" : "Rediger opplysninger"}
+          </button>
+        </div>
+        {(spec.year || lookup.brand || lookup.model) && (
           <p className="mt-1 text-muted-foreground">
             Tittel blir:{" "}
             <span className="font-medium text-foreground">
-              {[lookup.year, lookup.brand, lookup.model].filter(Boolean).join(" ")}
+              {[spec.year, brandName ?? lookup.brand, modelOverride ?? modelName ?? lookup.model]
+                .filter(Boolean)
+                .join(" ")}
             </span>
           </p>
         )}
         <p role="status" aria-live="polite" className="mt-1 text-xs text-muted-foreground">
           {matching && "Sjekker merke/modell…"}
         </p>
-        <dl className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1">
-          {(brandName ?? lookup.brand) && (
-            <>
-              <dt className="text-muted-foreground">Merke</dt>
-              <dd>{brandName ?? lookup.brand}</dd>
-            </>
-          )}
-          {(modelName ?? lookup.model) && (
-            <>
-              <dt className="text-muted-foreground">Modell</dt>
-              <dd>{modelName ?? lookup.model}</dd>
-            </>
-          )}
-          {lookup.year && (
-            <>
-              <dt className="text-muted-foreground">Årsmodell</dt>
-              <dd>{lookup.year}</dd>
-            </>
-          )}
-          {lookup.fuel_type && (
-            <>
-              <dt className="text-muted-foreground">Drivstoff</dt>
-              <dd>{lookup.fuel_type}</dd>
-            </>
-          )}
-          {lookup.weight_kg && (
-            <>
-              <dt className="text-muted-foreground">Egenvekt</dt>
-              <dd>{lookup.weight_kg} kg</dd>
-            </>
-          )}
-        </dl>
 
-        {/* Secondary fields collapsed by default — keeps the confirm step
-            from being one long scroll on small/native screens; still all
-            visible/editable via "Vis flere detaljer". */}
-        <details className="mt-2 group">
-          <summary className="cursor-pointer text-xs text-primary select-none">
-            <span className="group-open:hidden">Vis flere detaljer</span>
-            <span className="hidden group-open:inline">Skjul flere detaljer</span>
-          </summary>
-          <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1">
-            {lookup.power_hk && (
-              <>
-                <dt className="text-muted-foreground">Effekt</dt>
-                <dd>{lookup.power_hk} hk</dd>
-              </>
-            )}
-            {lookup.drive_type && (
-              <>
-                <dt className="text-muted-foreground">Hjuldrift</dt>
-                <dd>
-                  {lookup.drive_type === "4x4"
-                    ? "Firehjulsdrift"
-                    : lookup.drive_type === "bakhjul"
-                      ? "Bakhjulsdrift"
-                      : "Forhjulsdrift"}
-                </dd>
-              </>
-            )}
-            {lookup.transmission && (
-              <>
-                <dt className="text-muted-foreground">Girkasse</dt>
-                <dd>{lookup.transmission === "automat" ? "Automat" : "Manuell"}</dd>
-              </>
-            )}
-            {lookup.tow_hitch != null && (
-              <>
-                <dt className="text-muted-foreground">Hengerfeste</dt>
-                <dd>
-                  {lookup.tow_hitch
-                    ? `Ja${lookup.max_tow_weight_kg ? ` (${lookup.max_tow_weight_kg} kg)` : ""}`
-                    : "Nei"}
-                </dd>
-              </>
-            )}
-            {lookup.seats && (
-              <>
-                <dt className="text-muted-foreground">Antall seter</dt>
-                <dd>{lookup.seats}</dd>
-              </>
-            )}
-            {selectedSlug === "bobil-og-campingvogn" && lookup.sleeping_places && (
-              <>
-                <dt className="text-muted-foreground">Antall soveplasser</dt>
-                <dd>{lookup.sleeping_places}</dd>
-              </>
-            )}
-            {lookup.imported_used != null && (
-              <>
-                <dt className="text-muted-foreground">Bruktimportert</dt>
-                <dd>{lookup.imported_used ? "Ja" : "Nei"}</dd>
-              </>
-            )}
-            {lookup.first_registration_date && (
-              <>
-                <dt className="text-muted-foreground">Førstegangsregistrering</dt>
-                <dd>{lookup.first_registration_date}</dd>
-              </>
-            )}
-            {lookup.color && (
-              <>
-                <dt className="text-muted-foreground">Farge</dt>
-                <dd>{lookup.color}</dd>
-              </>
-            )}
-            {lookup.next_eu_control && (
-              <>
-                <dt className="text-muted-foreground">Neste EU-kontroll</dt>
-                <dd>{lookup.next_eu_control}</dd>
-              </>
-            )}
-            {lookup.fuel_type !== "el" && lookup.cylinders && (
-              <>
-                <dt className="text-muted-foreground">Antall sylindre</dt>
-                <dd>{lookup.cylinders}</dd>
-              </>
-            )}
-            {lookup.fuel_type !== "el" && lookup.engine_displacement_cc && (
-              <>
-                <dt className="text-muted-foreground">Slagvolum</dt>
-                <dd>{lookup.engine_displacement_cc} cc</dd>
-              </>
-            )}
-            {lookup.fuel_type !== "el" && lookup.engine_code && (
-              <>
-                <dt className="text-muted-foreground">Motorkode</dt>
-                <dd>{lookup.engine_code}</dd>
-              </>
-            )}
-          </dl>
-        </details>
+        {editing ? (
+          <div className="mt-3 space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2 space-y-1">
+                <VehicleModelField
+                  categoryGroup={categoryGroup ?? "bil"}
+                  brandName={brandName ?? undefined}
+                  value={modelOverride ?? modelName ?? lookup.model ?? undefined}
+                  onChange={(v) => setModelOverride(v ?? null)}
+                />
+                {addingModel ? (
+                  <div className="flex gap-2">
+                    <Input
+                      value={newModelName}
+                      onChange={(e) => setNewModelName(e.target.value)}
+                      placeholder="F.eks. IONIQ 5 N"
+                      className="flex-1"
+                    />
+                    <Button type="button" size="sm" onClick={() => void submitNewModel()}>
+                      Legg til
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setAddingModel(false)}
+                    >
+                      Avbryt
+                    </Button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setAddingModel(true)}
+                    className="text-xs text-primary underline-offset-2 hover:underline"
+                  >
+                    Fant du ikke modellen? Legg til ny
+                  </button>
+                )}
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="vc-year">Årsmodell</Label>
+                <Input
+                  id="vc-year"
+                  type="number"
+                  value={spec.year}
+                  onChange={(e) => setSpecField("year", e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="vc-weight">Egenvekt (kg)</Label>
+                <Input
+                  id="vc-weight"
+                  type="number"
+                  value={spec.weight_kg}
+                  onChange={(e) => setSpecField("weight_kg", e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Drivstoff</Label>
+                <Select value={spec.fuel_type} onValueChange={(v) => setSpecField("fuel_type", v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Velg…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FUEL_TYPE_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Girkasse</Label>
+                <Select
+                  value={spec.transmission}
+                  onValueChange={(v) => setSpecField("transmission", v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Velg…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TRANSMISSION_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Hjuldrift</Label>
+                <Select
+                  value={spec.drive_type}
+                  onValueChange={(v) => setSpecField("drive_type", v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Velg…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DRIVE_TYPE_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="vc-power">Effekt (hk)</Label>
+                <Input
+                  id="vc-power"
+                  type="number"
+                  value={spec.power_hk}
+                  onChange={(e) => setSpecField("power_hk", e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="vc-seats">Antall seter</Label>
+                <Input
+                  id="vc-seats"
+                  type="number"
+                  value={spec.seats}
+                  onChange={(e) => setSpecField("seats", e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="vc-color">Farge</Label>
+                <Input
+                  id="vc-color"
+                  value={spec.color}
+                  onChange={(e) => setSpecField("color", e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="vc-eu-control">Neste EU-kontroll</Label>
+                <Input
+                  id="vc-eu-control"
+                  value={spec.next_eu_control}
+                  onChange={(e) => setSpecField("next_eu_control", e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={spec.tow_hitch}
+                  onCheckedChange={(c) => setSpecField("tow_hitch", c === true)}
+                />
+                Hengerfeste
+              </label>
+              {spec.tow_hitch && (
+                <div className="max-w-[220px] space-y-1">
+                  <Label htmlFor="vc-max-tow-weight">Maks tilhengervekt (kg)</Label>
+                  <Input
+                    id="vc-max-tow-weight"
+                    type="number"
+                    value={spec.max_tow_weight_kg}
+                    onChange={(e) => setSpecField("max_tow_weight_kg", e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <>
+            <dl className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1">
+              {(brandName ?? lookup.brand) && (
+                <>
+                  <dt className="text-muted-foreground">Merke</dt>
+                  <dd>{brandName ?? lookup.brand}</dd>
+                </>
+              )}
+              {(modelOverride ?? modelName ?? lookup.model) && (
+                <>
+                  <dt className="text-muted-foreground">Modell</dt>
+                  <dd>{modelOverride ?? modelName ?? lookup.model}</dd>
+                </>
+              )}
+              {spec.year && (
+                <>
+                  <dt className="text-muted-foreground">Årsmodell</dt>
+                  <dd>{spec.year}</dd>
+                </>
+              )}
+              {spec.fuel_type && (
+                <>
+                  <dt className="text-muted-foreground">Drivstoff</dt>
+                  <dd>{FUEL_TYPE_OPTIONS.find((o) => o.value === spec.fuel_type)?.label}</dd>
+                </>
+              )}
+              {spec.weight_kg && (
+                <>
+                  <dt className="text-muted-foreground">Egenvekt</dt>
+                  <dd>{spec.weight_kg} kg</dd>
+                </>
+              )}
+            </dl>
+
+            {/* Secondary fields collapsed by default — keeps the confirm
+                step from being one long scroll on small/native screens;
+                still all visible via "Vis flere detaljer" (or the "Rediger
+                opplysninger" toggle above, for the editable subset). */}
+            <details className="mt-2 group">
+              <summary className="cursor-pointer text-xs text-primary select-none">
+                <span className="group-open:hidden">Vis flere detaljer</span>
+                <span className="hidden group-open:inline">Skjul flere detaljer</span>
+              </summary>
+              <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1">
+                {lookup.body_type_hint && (
+                  <>
+                    <dt className="text-muted-foreground">Karosseri</dt>
+                    <dd>{lookup.body_type_hint}</dd>
+                  </>
+                )}
+                {spec.power_hk && (
+                  <>
+                    <dt className="text-muted-foreground">Effekt</dt>
+                    <dd>{spec.power_hk} hk</dd>
+                  </>
+                )}
+                {spec.drive_type && (
+                  <>
+                    <dt className="text-muted-foreground">Hjuldrift</dt>
+                    <dd>{DRIVE_TYPE_OPTIONS.find((o) => o.value === spec.drive_type)?.label}</dd>
+                  </>
+                )}
+                {spec.transmission && (
+                  <>
+                    <dt className="text-muted-foreground">Girkasse</dt>
+                    <dd>
+                      {TRANSMISSION_OPTIONS.find((o) => o.value === spec.transmission)?.label}
+                    </dd>
+                  </>
+                )}
+                <>
+                  <dt className="text-muted-foreground">Hengerfeste</dt>
+                  <dd>
+                    {spec.tow_hitch
+                      ? `Ja${spec.max_tow_weight_kg ? ` (${spec.max_tow_weight_kg} kg)` : ""}`
+                      : "Nei"}
+                  </dd>
+                </>
+                {spec.seats && (
+                  <>
+                    <dt className="text-muted-foreground">Antall seter</dt>
+                    <dd>{spec.seats}</dd>
+                  </>
+                )}
+                {selectedSlug === "bobil-og-campingvogn" && lookup.sleeping_places && (
+                  <>
+                    <dt className="text-muted-foreground">Antall soveplasser</dt>
+                    <dd>{lookup.sleeping_places}</dd>
+                  </>
+                )}
+                {lookup.imported_used != null && (
+                  <>
+                    <dt className="text-muted-foreground">Bruktimportert</dt>
+                    <dd>{lookup.imported_used ? "Ja" : "Nei"}</dd>
+                  </>
+                )}
+                {lookup.first_registration_date && (
+                  <>
+                    <dt className="text-muted-foreground">Førstegangsregistrering</dt>
+                    <dd>{lookup.first_registration_date}</dd>
+                  </>
+                )}
+                {spec.color && (
+                  <>
+                    <dt className="text-muted-foreground">Farge</dt>
+                    <dd>{spec.color}</dd>
+                  </>
+                )}
+                {spec.next_eu_control && (
+                  <>
+                    <dt className="text-muted-foreground">Neste EU-kontroll</dt>
+                    <dd>{spec.next_eu_control}</dd>
+                  </>
+                )}
+                {lookup.fuel_type !== "el" && lookup.cylinders && (
+                  <>
+                    <dt className="text-muted-foreground">Antall sylindre</dt>
+                    <dd>{lookup.cylinders}</dd>
+                  </>
+                )}
+                {lookup.fuel_type !== "el" && lookup.engine_displacement_cc && (
+                  <>
+                    <dt className="text-muted-foreground">Slagvolum</dt>
+                    <dd>{lookup.engine_displacement_cc} cc</dd>
+                  </>
+                )}
+                {lookup.fuel_type !== "el" && lookup.engine_code && (
+                  <>
+                    <dt className="text-muted-foreground">Motorkode</dt>
+                    <dd>{lookup.engine_code}</dd>
+                  </>
+                )}
+              </dl>
+            </details>
+          </>
+        )}
       </div>
 
-      <div className="flex items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={rejectVehicleLookup}
-          className="text-sm text-muted-foreground underline-offset-2 hover:underline"
-        >
-          Feil treff / kjøretøyet er ikke registrert
-        </button>
-        <Button
-          type="button"
-          disabled={!selectedSlug || matching || !!confirmValue}
-          onClick={() => {
-            const leaf = selectedSlug ? leafBySlug.get(selectedSlug) : null;
-            if (leaf)
-              void confirmVehicleData(leaf.id, {
-                brandName: brandName ?? undefined,
-                modelName: modelName ?? undefined,
-              });
-          }}
-        >
-          Bekreft og fortsett
-        </Button>
-      </div>
+      {vehicleConfirmFooterSlot &&
+        createPortal(
+          <Button
+            type="button"
+            disabled={!selectedSlug || matching || !!confirmValue}
+            onClick={() => {
+              const leaf = selectedSlug ? leafBySlug.get(selectedSlug) : null;
+              if (leaf)
+                void confirmVehicleData(leaf.id, {
+                  brandName: brandName ?? undefined,
+                  modelName: modelOverride ?? modelName ?? undefined,
+                  specOverrides: specOverridesFrom(spec),
+                });
+            }}
+          >
+            Bekreft og fortsett
+          </Button>,
+          vehicleConfirmFooterSlot,
+        )}
 
       <AlertDialog open={!!confirmValue} onOpenChange={(open) => !open && setConfirmValue(null)}>
         <AlertDialogContent>
@@ -368,8 +667,8 @@ export function VehicleConfirm({
               {confirmValue?.kind === "brand" ? "merke" : "modell"}-liste
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Stemmer dette? Vi bruker det på annonsen din nå, og sender det til admin for
-              godkjenning før det blir valgbart for andre.
+              Stemmer dette? Vi bruker det på annonsen din nå, og sender det til intern godkjenning
+              før det blir valgbart for andre.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

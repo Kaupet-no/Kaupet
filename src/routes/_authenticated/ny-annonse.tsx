@@ -36,6 +36,7 @@ import {
 import { lookupVehicleByRegNumber } from "@/lib/vehicle-lookup.functions";
 import { matchVehicleBrandModel } from "@/lib/vehicle-brand-match.functions";
 import { classifyVehicleCategory } from "@/lib/vehicle-classification";
+import { VEHICLE_LOOKUP_FILTER_KEYS } from "@/lib/vehicle-lookup.server";
 import type { VehicleLookupResult } from "@/lib/vehicle-lookup.server";
 import type { VehicleClassification } from "@/lib/vehicle-classification";
 
@@ -197,6 +198,28 @@ function NewListingError({ error, reset }: { error: Error; reset: () => void }) 
   );
 }
 
+/** A page (1-based index into `pages`) whose only group is `vehicle-confirm`
+ * doesn't get its own dot in the step indicator — it's the same logical
+ * "Registreringsnummer" step as the vehicle-registration page right before
+ * it (SVV lookup + confirmation are one user-facing step, even though
+ * they're two separate wizard pages internally). */
+type DisplayStep = { label: string; startIndex: number; endIndex: number };
+
+function buildDisplaySteps(pages: WizardPage[], native: boolean): DisplayStep[] {
+  const steps: DisplayStep[] = [];
+  pages.forEach((p, i) => {
+    const index = i + 1;
+    const isVehicleConfirmPage = p.groups.length === 1 && p.groups[0].key === "vehicle-confirm";
+    const prev = steps[steps.length - 1];
+    if (isVehicleConfirmPage && prev) {
+      prev.endIndex = index;
+      return;
+    }
+    steps.push({ label: pageLabel(p.groups, native), startIndex: index, endIndex: index });
+  });
+  return steps;
+}
+
 function StepIndicator({
   step,
   pages,
@@ -206,8 +229,8 @@ function StepIndicator({
   pages: WizardPage[];
   native: boolean;
 }) {
-  const labels = pages.map((p) => pageLabel(p.groups, native));
-  const total = labels.length;
+  const displaySteps = buildDisplaySteps(pages, native);
+  const total = displaySteps.length;
   const gapClass = native ? "gap-1.5" : "gap-2";
   const circleClass = native ? "size-6" : "size-7";
   const checkClass = native ? "size-3" : "size-3.5";
@@ -216,34 +239,36 @@ function StepIndicator({
 
   return (
     <nav aria-label="Fremdrift i skjema" className={`flex items-center ${gapClass}`}>
-      {labels.map((label, i) => {
+      {displaySteps.map((ds, i) => {
         const s = i + 1;
+        const isDone = step > ds.endIndex;
+        const isActive = step >= ds.startIndex && step <= ds.endIndex;
         return (
-          <div key={label + s} className={`flex items-center ${gapClass}`}>
+          <div key={ds.label + s} className={`flex items-center ${gapClass}`}>
             <div
               className={`flex ${circleClass} items-center justify-center rounded-full text-xs font-semibold transition-colors ${
-                s < step
+                isDone
                   ? "bg-primary text-primary-foreground"
-                  : s === step
+                  : isActive
                     ? "bg-primary text-primary-foreground ring-2 ring-primary/30"
                     : "bg-muted text-muted-foreground"
               }`}
-              aria-label={`Steg ${s}: ${label}${s < step ? " (fullført)" : s === step ? " (pågår)" : ""}`}
+              aria-label={`Steg ${s}: ${ds.label}${isDone ? " (fullført)" : isActive ? " (pågår)" : ""}`}
             >
-              {s < step ? <Check className={checkClass} /> : s}
+              {isDone ? <Check className={checkClass} /> : s}
             </div>
             <span
               className={`text-xs ${
-                s === step
+                isActive
                   ? "inline font-medium text-foreground"
                   : `hidden ${labelBreakpoint} text-muted-foreground`
               }`}
             >
-              {label}
+              {ds.label}
             </span>
             {s < total && (
               <div
-                className={`h-px ${lineWidth} shrink-0 ${s < step ? "bg-primary" : "bg-border"}`}
+                className={`h-px ${lineWidth} shrink-0 ${isDone ? "bg-primary" : "bg-border"}`}
               />
             )}
           </div>
@@ -312,6 +337,15 @@ function NewListingPage() {
   );
   const [vehiclePreviousClassificationMismatch, setVehiclePreviousClassificationMismatch] =
     useState<{ slug: string | null; lookedUpAt: string } | null>(null);
+  const [vehicleLookupConfirmOpen, setVehicleLookupConfirmOpen] = useState(false);
+  /** DOM node for the shared step footer's primary-action slot, on the
+   * vehicle-confirm page — lets VehicleConfirm portal its "Bekreft og
+   * fortsett" button there instead of rendering it inline, so it sits on the
+   * same row as "Tilbake" like every other step's primary action. */
+  const [vehicleConfirmFooterSlot, setVehicleConfirmFooterSlot] = useState<HTMLDivElement | null>(
+    null,
+  );
+  const [vehicleRegNrInput, setVehicleRegNrInput] = useState("");
   const lookupVehicleFn = useServerFn(lookupVehicleByRegNumber);
   const matchBrandModelFn = useServerFn(matchVehicleBrandModel);
 
@@ -375,6 +409,8 @@ function NewListingPage() {
     [categoryId, allFlows, categoriesById],
   );
 
+  const vehicleAttributeHiddenKeys = vehicleLookupResult ? VEHICLE_LOOKUP_FILTER_KEYS : undefined;
+
   const baseFieldGroupKeys = useMemo(
     () => effectiveFlowForCategory(categoryId || null, allFlows ?? [], categoriesById).fieldGroups,
     [categoryId, allFlows, categoriesById],
@@ -427,6 +463,26 @@ function NewListingPage() {
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, [setStep]);
+
+  /** Stepping back from vehicle-confirm to vehicle-registration (via
+   * "Tilbake") is the only way to reach vehicle-registration a second time —
+   * clear the stale lookup so the reg-nr field is editable again and
+   * pressing "Neste" re-runs the lookup instead of bouncing straight back to
+   * vehicle-confirm with old data. Replaces the old dedicated "Feil treff /
+   * kjøretøyet er ikke registrert" link, since Tilbake now covers that. */
+  const prevPageKeyRef = useRef<string | undefined>(currentPage?.groups?.[0]?.key);
+  useEffect(() => {
+    const key = currentPage?.groups?.[0]?.key;
+    if (key === "vehicle-registration" && prevPageKeyRef.current === "vehicle-confirm") {
+      setVehicleLookupResult(null);
+      setVehicleClassification(null);
+      setVehicleLookupError(null);
+      setVehiclePreviousClassificationMismatch(null);
+      setVehicleLookupConfirmOpen(false);
+    }
+    prevPageKeyRef.current = key;
+  }, [currentPage]);
+
   const categoryAttributesPageIndex = pages.findIndex((p) =>
     p.groups.some((g) => g.key === "category-attributes"),
   );
@@ -754,7 +810,7 @@ function NewListingPage() {
     setValue("description", next, { shouldTouch: false });
   }
 
-  async function runVehicleLookup(registrationNumber: string) {
+  async function runVehicleLookup(registrationNumber: string): Promise<boolean> {
     setVehicleLookupLoading(true);
     setVehicleLookupError(null);
     try {
@@ -765,13 +821,22 @@ function NewListingPage() {
       setVehicleClassification(
         classifyVehicleCategory(
           lookup.classification_code,
+          lookup.avgiftsklasse_code,
           lookup.body_type_hint,
           lookup.sleeping_places,
         ),
       );
       setVehiclePreviousClassificationMismatch(previousClassificationMismatch);
+      setVehicleLookupConfirmOpen(true);
+      return true;
     } catch (e) {
-      setVehicleLookupError(formatErrorMessage(e, "Kjøretøyoppslag feilet. Prøv igjen."));
+      setVehicleLookupError(
+        formatErrorMessage(
+          e,
+          "Kjøretøyoppslag feilet. Kontroller at du har skrevet riktig og prøv igjen.",
+        ),
+      );
+      return false;
     } finally {
       setVehicleLookupLoading(false);
     }
@@ -794,10 +859,27 @@ function NewListingPage() {
 
   function confirmVehicleData(
     leafCategoryId: string,
-    resolved?: { brandName?: string; modelName?: string },
+    resolved?: {
+      brandName?: string;
+      modelName?: string;
+      specOverrides?: Partial<{
+        year: number;
+        fuel_type: string;
+        transmission: string;
+        drive_type: string;
+        weight_kg: number;
+        power_hk: number;
+        tow_hitch: boolean;
+        max_tow_weight_kg: number;
+        seats: number;
+        color: string;
+        next_eu_control: string;
+      }>;
+    },
   ) {
     const lookup = vehicleLookupResult;
     if (!lookup) return;
+    const spec = resolved?.specOverrides;
 
     const next: AttributeMap = {
       ...attributes,
@@ -805,17 +887,28 @@ function NewListingPage() {
       registration_number: lookup.registrationNumber,
       vehicle_lookup: JSON.stringify(lookup),
     };
-    if (lookup.year) next.year = lookup.year;
-    if (lookup.fuel_type) next.fuel_type = lookup.fuel_type;
-    if (lookup.weight_kg != null) next.weight_kg = lookup.weight_kg;
-    if (lookup.transmission) next.transmission = lookup.transmission;
-    if (lookup.color) next.color = lookup.color;
-    if (lookup.next_eu_control) next.next_eu_control = lookup.next_eu_control;
-    if (lookup.power_hk != null) next.power_hk = lookup.power_hk;
-    if (lookup.drive_type) next.drive_type = lookup.drive_type;
-    if (lookup.tow_hitch != null) next.tow_hitch = lookup.tow_hitch;
-    if (lookup.max_tow_weight_kg != null) next.max_tow_weight_kg = lookup.max_tow_weight_kg;
-    if (lookup.seats != null) next.seats = lookup.seats;
+    const year = spec?.year ?? lookup.year;
+    if (year) next.year = year;
+    const fuelType = spec?.fuel_type ?? lookup.fuel_type;
+    if (fuelType) next.fuel_type = fuelType;
+    const weightKg = spec?.weight_kg ?? lookup.weight_kg;
+    if (weightKg != null) next.weight_kg = weightKg;
+    const transmission = spec?.transmission ?? lookup.transmission;
+    if (transmission) next.transmission = transmission;
+    const color = spec?.color ?? lookup.color;
+    if (color) next.color = color;
+    const nextEuControl = spec?.next_eu_control ?? lookup.next_eu_control;
+    if (nextEuControl) next.next_eu_control = nextEuControl;
+    const powerHk = spec?.power_hk ?? lookup.power_hk;
+    if (powerHk != null) next.power_hk = powerHk;
+    const driveType = spec?.drive_type ?? lookup.drive_type;
+    if (driveType) next.drive_type = driveType;
+    const towHitch = spec?.tow_hitch ?? lookup.tow_hitch;
+    if (towHitch != null) next.tow_hitch = towHitch;
+    const maxTowWeightKg = spec?.max_tow_weight_kg ?? lookup.max_tow_weight_kg;
+    if (maxTowWeightKg != null) next.max_tow_weight_kg = maxTowWeightKg;
+    const seats = spec?.seats ?? lookup.seats;
+    if (seats != null) next.seats = seats;
     if (lookup.imported_used != null) next.imported_used = lookup.imported_used;
     if (lookup.first_registration_date)
       next.first_registration_date = lookup.first_registration_date;
@@ -839,17 +932,47 @@ function NewListingPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function rejectVehicleLookup() {
+  /** Called from the post-lookup confirm overlay's "Juster registreringsnummer"
+   * action: clears the lookup so the user can retype and re-search, without
+   * touching vehicleRegistered or navigating away from the current step. */
+  function adjustVehicleRegistrationNumber() {
+    setVehicleLookupConfirmOpen(false);
     setVehicleLookupResult(null);
     setVehicleClassification(null);
     setVehicleLookupError(null);
     setVehiclePreviousClassificationMismatch(null);
-    setVehicleRegistered(false);
-    setStep(Math.max(1, step - 1));
+  }
+
+  /** "Stemmer, fortsett" i bekreftelsesoverlayet: lukker overlayet og tar
+   * brukeren rett videre til vehicle-confirm-steget (type-valg + detaljtabell),
+   * fremfor å kreve et ekstra klikk på Neste. */
+  async function confirmVehicleLookupAndContinue() {
+    setVehicleLookupConfirmOpen(false);
+    await goToNextPage();
   }
 
   async function goToNextPage(options?: { skipImageCheck?: boolean; skipPriceCheck?: boolean }) {
     const groups = currentPage?.groups ?? [];
+
+    // "Slå opp"-knappen er fjernet — oppslaget kjøres nå fra selve
+    // Neste-knappen når brukeren står på vehicle-registration-steget med et
+    // uslått-opp regnr. Ved treff åpner runVehicleLookup bekreftelsesoverlayet
+    // (Regnr/Merke/Modell) og vi blir stående på steget til brukeren
+    // bekrefter der; ved feil vises vehicleLookupError og vi blir også
+    // stående, slik at brukeren kan rette registreringsnummeret.
+    if (
+      groups.some((g) => g.key === "vehicle-registration") &&
+      vehicleRegistered &&
+      !vehicleLookupResult
+    ) {
+      if (!vehicleRegNrInput.trim()) {
+        showErrorToast("Skriv inn registreringsnummer.");
+        return;
+      }
+      await runVehicleLookup(vehicleRegNrInput);
+      return;
+    }
+
     const fields = groups.flatMap((g) => g.fieldsToValidate ?? []);
     const valid = fields.length > 0 ? await trigger(fields) : true;
     if (!valid) return;
@@ -1102,6 +1225,7 @@ function NewListingPage() {
     onAttributesChange: setAttributes,
     attributesTouched,
     activeModules,
+    vehicleAttributeHiddenKeys,
 
     bilOgMcCategoryId,
     vehicleRegistered,
@@ -1111,10 +1235,16 @@ function NewListingPage() {
     vehicleLookupResult,
     vehicleClassification,
     vehiclePreviousClassificationMismatch,
+    vehicleConfirmFooterSlot,
+    vehicleLookupConfirmOpen,
+    setVehicleLookupConfirmOpen,
+    adjustVehicleRegistrationNumber,
+    confirmVehicleLookupAndContinue,
+    vehicleRegNrInput,
+    setVehicleRegNrInput,
     runVehicleLookup,
     matchVehicleBrandForLeaf,
     confirmVehicleData,
-    rejectVehicleLookup,
 
     conditionDescription,
 
@@ -1204,6 +1334,11 @@ function NewListingPage() {
           const groups = currentPage?.groups ?? [];
           const isNativeDescriptionSoloPage =
             native && groups.length === 1 && groups[0].key === "description-keywords";
+          // vehicle-confirm has its own "Bekreft og fortsett" button that
+          // commits the data and advances the wizard itself — the generic
+          // footer "Neste" button would be a redundant second way to do the
+          // same thing, so it's suppressed on this page.
+          const isVehicleConfirmPage = groups.length === 1 && groups[0].key === "vehicle-confirm";
           const nextGroups = pages[step]?.groups ?? [];
           return (
             <div
@@ -1230,9 +1365,21 @@ function NewListingPage() {
                     <ChevronLeft className="size-4" /> Tilbake
                   </Button>
                 )}
-                {!isLast ? (
-                  <Button type="button" onClick={() => void goToNextPage()}>
-                    Neste: {pageLabel(nextGroups, native)} <ChevronRight className="size-4" />
+                {isVehicleConfirmPage ? (
+                  <div ref={setVehicleConfirmFooterSlot} className="contents" />
+                ) : !isLast ? (
+                  <Button
+                    type="button"
+                    disabled={vehicleLookupLoading}
+                    onClick={() => void goToNextPage()}
+                  >
+                    {vehicleLookupLoading ? (
+                      "Slår opp kjøretøy…"
+                    ) : (
+                      <>
+                        Neste: {pageLabel(nextGroups, native)} <ChevronRight className="size-4" />
+                      </>
+                    )}
                   </Button>
                 ) : (
                   <PublishActions

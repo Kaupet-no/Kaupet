@@ -1,16 +1,23 @@
 /**
- * Maps Statens Vegvesen's EU vehicle classification code (from
- * `godkjenning.tekniskGodkjenning.kjoretoyklassifisering`, e.g. "M1"/"N1"/
- * "L3e"/"O1") to one of Kaupet's vehicle leaf category slugs. Shared between
- * client (vehicle-registration field group, to pick the next step) and
- * server (not currently used server-side, but kept slug/code-only so it can
- * be if needed).
+ * Maps a vehicle to one of Kaupet's vehicle leaf category slugs. Shared
+ * between client (vehicle-registration field group, to pick the next step)
+ * and server (not currently used server-side, but kept slug/code-only so it
+ * can be if needed).
  *
- * NB: the mapping below (in particular L5e/L6e/L7e -> atv-og-snoscooter, and
- * the M1 + bobil/campingvogn body-type heuristic) is a best-effort table and
- * has not been validated against real Statens Vegvesen payloads — see the
- * matching caveat in vehicle-lookup.server.ts. Treat low-confidence mappings
- * as a suggestion the user must confirm, not a fact.
+ * Primary signal is `avgiftsklasse_code` — Statens Vegvesen's Norwegian
+ * "kjøretøygruppe avgift" code (`godkjenning.tekniskGodkjenning.
+ * kjoretoyklassifisering.kjoretoyAvgiftsKode.kodeVerdi`, e.g. "101"
+ * Personbil, "601" Moped, "630" Beltemotorsykkel — see kodeverket "AVGIFT":
+ * https://autosys-kjoretoy-api.atlas.vegvesen.no/kodeverk-ui/index-kodeverk.html?kodeverkId=AVGIFT).
+ * It maps far more directly onto Kaupet's categories than the generic EU
+ * technical class, so it's checked first; the EU code (`classificationCode`,
+ * e.g. "M1"/"N1"/"L3e"/"O1") is only a fallback for the (rare) cases where
+ * avgiftsklasse is missing or falls in a group Kaupet doesn't sell (buss,
+ * lastebil, traktor, motorredskap, prøvekjennemerker).
+ *
+ * NB: neither mapping has been validated against real Statens Vegvesen
+ * payloads — see the matching caveat in vehicle-lookup.server.ts. Treat
+ * low-confidence mappings as a suggestion the user must confirm, not a fact.
  */
 
 export type VehicleLeafSlug =
@@ -35,18 +42,73 @@ function looksLikeCamper(bodyTypeHint: string | null): boolean {
   return CAMPER_BODY_TYPE_HINTS.some((hint) => v.includes(hint));
 }
 
+/** Avgiftsklasse ("kjøretøygruppe avgift") kodeVerdi -> Kaupet leaf slug.
+ * Only codes that map cleanly onto a Kaupet category are listed; buss
+ * (2xx), lastebil/trekkbil/beltebil/tankbil/bergingsbil (most of 3xx),
+ * traktor (401), motorredskap (5xx) and prøvekjennemerker (8xx) have no
+ * matching leaf and are intentionally omitted, falling through to the EU
+ * technical-class fallback (or null/low-confidence if that's also absent). */
+const AVGIFTSKLASSE_TO_SLUG: Record<string, VehicleLeafSlug> = {
+  "101": "personbil",
+  "106": "personbil", // Ambulanse (personbil)
+  "107": "personbil", // Leilighetsambulanse (personbil)
+  "312": "personbil", // Begravelsesbil (personbil)
+  "313": "bobil-og-campingvogn", // Campingbil (personbil) før 1.1.2009
+  "316": "bobil-og-campingvogn", // Campingbil (personbil) etter 1.1.2009
+  "336": "bobil-og-campingvogn", // Campingbil (lastebil) før 1.1.2009
+  "301": "varebil", // Kombinert bil
+  "310": "varebil",
+  "311": "varebil",
+  "314": "varebil",
+  "315": "varebil",
+  "601": "moped-og-scooter",
+  "610": "motorsykkel", // Lett motorsykkel
+  "620": "motorsykkel", // Tung motorsykkel
+  "621": "motorsykkel", // Tung motorsykkel (chopper-ombygd)
+  "630": "atv-og-snoscooter", // Beltemotorsykkel (snøscooter)
+  "701": "tilhenger-leaf",
+  "702": "tilhenger-leaf",
+  "703": "tilhenger-leaf",
+  "709": "tilhenger-leaf",
+  "711": "tilhenger-leaf",
+  "712": "tilhenger-leaf",
+  "713": "tilhenger-leaf",
+  "719": "tilhenger-leaf",
+  "721": "tilhenger-leaf",
+  "722": "tilhenger-leaf",
+  "723": "tilhenger-leaf",
+  "729": "tilhenger-leaf",
+};
+
 /**
- * `classificationCode` is SVV's raw technical class (M1, N1, L3e, O2, ...).
+ * `avgiftsklasseCode` is SVV's Norwegian tax/vehicle-group code (see module
+ * doc above) — the primary signal. `classificationCode` is SVV's raw EU
+ * technical class (M1, N1, L3e, O2, ...), used only as a fallback.
  * `bodyTypeHint` is a free-text body/purpose string (from karosseri data)
- * used only to distinguish bobil/campingvogn from an ordinary M1 personbil.
+ * used to distinguish bobil/campingvogn from an ordinary personbil when
+ * avgiftsklasse hasn't been updated to reflect a camper conversion.
  * `sleepingPlaces` (antallSoveplasser > 0) is a secondary camper signal,
  * since ordinary cars never populate it.
  */
 export function classifyVehicleCategory(
   classificationCode: string | null,
+  avgiftsklasseCode: string | null,
   bodyTypeHint: string | null,
   sleepingPlaces: number | null,
 ): VehicleClassification {
+  const avgiftsklasseSlug = avgiftsklasseCode
+    ? (AVGIFTSKLASSE_TO_SLUG[avgiftsklasseCode.trim()] ?? null)
+    : null;
+  if (avgiftsklasseSlug) {
+    if (
+      avgiftsklasseSlug === "personbil" &&
+      (looksLikeCamper(bodyTypeHint) || (sleepingPlaces ?? 0) > 0)
+    ) {
+      return { slug: "bobil-og-campingvogn", confidence: "high" };
+    }
+    return { slug: avgiftsklasseSlug, confidence: "high" };
+  }
+
   if (!classificationCode) return { slug: null, confidence: "low" };
   const code = classificationCode.trim().toUpperCase();
 

@@ -10,6 +10,9 @@ export type CategoryModuleProps = {
   onChange: (next: AttributeMap) => void;
   /** Whether to show "required" errors for empty fields (generic-attributes only). */
   showErrors?: boolean;
+  /** Filter keys to skip rendering (generic-attributes only) — see
+   * AttributeFields' `hiddenKeys` for why. */
+  hiddenKeys?: readonly string[];
 };
 
 export type CategoryModule = {

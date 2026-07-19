@@ -56,6 +56,7 @@ export function AttributeFields({
   onChange,
   required = false,
   showErrors = false,
+  hiddenKeys,
 }: {
   categoryId: string | null;
   categories: CategoryNode[];
@@ -65,6 +66,11 @@ export function AttributeFields({
   required?: boolean;
   /** When true (and `required`), shows "required" errors for empty filters. */
   showErrors?: boolean;
+  /** Filter keys to skip rendering entirely — e.g. vehicle spec fields
+   * already reviewed/edited in the vehicle-confirm step, so the user isn't
+   * asked to fill them in a second time here. Values already set for a
+   * hidden key are left untouched in `value`/`onChange`. */
+  hiddenKeys?: readonly string[];
 }) {
   const { data: allFilters } = useAllCategoryFilters();
 
@@ -74,9 +80,14 @@ export function AttributeFields({
     return m;
   }, [categories]);
 
+  const hiddenKeySet = useMemo(() => new Set(hiddenKeys ?? []), [hiddenKeys]);
+
   const filters = useMemo(
-    () => effectiveFiltersForCategory(categoryId, allFilters ?? [], categoriesById),
-    [categoryId, allFilters, categoriesById],
+    () =>
+      effectiveFiltersForCategory(categoryId, allFilters ?? [], categoriesById).filter(
+        (f) => !hiddenKeySet.has(f.key),
+      ),
+    [categoryId, allFilters, categoriesById, hiddenKeySet],
   );
 
   const missingKeys = useMemo(() => {

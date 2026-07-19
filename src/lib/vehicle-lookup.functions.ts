@@ -48,6 +48,7 @@ export const lookupVehicleByRegNumber = createServerFn({ method: "POST" })
     const result = await lookupVehicle(data.registrationNumber);
     const classification = classifyVehicleCategory(
       result.classification_code,
+      result.avgiftsklasse_code,
       result.body_type_hint,
       result.sleeping_places,
     );

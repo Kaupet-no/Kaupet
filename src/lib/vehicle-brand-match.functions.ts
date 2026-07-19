@@ -4,6 +4,35 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { VehicleBrandGroup } from "@/lib/category-filters";
 
+/** SVV's model text often carries a trim/variant suffix beyond the plain
+ * model name (e.g. "Leaf 30kWh", "Golf GTE 1.4"). An exact match against
+ * `vehicle_models` would miss these even though the base model ("Leaf") is
+ * registered — so once an exact match fails, fall back to finding an
+ * approved model name that appears as a whole word within the SVV text,
+ * preferring the longest (most specific) match. Returns the *registered*
+ * row so its canonical name (not the raw SVV variant text) is what gets
+ * used downstream, matching the user's expectation that a known model like
+ * "Leaf" is what should be selected rather than proposed as a new value. */
+function findModelContainedIn(
+  models: { id: string; name: string }[],
+  modelText: string,
+): { id: string; name: string } | null {
+  const lower = modelText.toLowerCase();
+  const isWordChar = (ch: string) => /[a-z0-9æøå]/i.test(ch);
+  const candidates = models
+    .filter((m) => m.name.trim().length > 0)
+    .sort((a, b) => b.name.length - a.name.length);
+  for (const m of candidates) {
+    const nameLower = m.name.toLowerCase();
+    const idx = lower.indexOf(nameLower);
+    if (idx === -1) continue;
+    const before = idx === 0 ? "" : lower[idx - 1];
+    const after = idx + nameLower.length >= lower.length ? "" : lower[idx + nameLower.length];
+    if (!isWordChar(before) && !isWordChar(after)) return m;
+  }
+  return null;
+}
+
 /** Matches a raw SVV brand/model string against already-approved
  * vehicle_brands/vehicle_models rows for the given category group. Shared by
  * `lookupVehicleByRegNumber` (categoryGroup known up front, e.g. manual leaf
@@ -42,7 +71,16 @@ export async function matchVehicleBrandAndModel(
           .eq("status", "approved")
           .ilike("name", model)
           .maybeSingle();
-        if (modelRow) modelMatch = modelRow;
+        if (modelRow) {
+          modelMatch = modelRow;
+        } else {
+          const { data: brandModels } = await supabaseAdmin
+            .from("vehicle_models")
+            .select("id, name")
+            .eq("brand_id", brandRow.id)
+            .eq("status", "approved");
+          modelMatch = findModelContainedIn(brandModels ?? [], model);
+        }
       }
     }
   }

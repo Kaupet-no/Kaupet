@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { format, isValid, parse } from "date-fns";
+import { CalendarIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -34,7 +38,8 @@ import type { WizardSharedProps } from "../types";
 const LEAF_LABELS_NB: Record<VehicleLeafSlug, string> = {
   personbil: "Personbil",
   varebil: "Varebil",
-  "bobil-og-campingvogn": "Bobil/campingvogn",
+  bobil: "Bobil",
+  campingvogn: "Campingvogn",
   motorsykkel: "Motorsykkel",
   "moped-og-scooter": "Moped/scooter",
   "atv-og-snoscooter": "ATV/snøscooter",
@@ -59,6 +64,64 @@ const DRIVE_TYPE_OPTIONS = [
   { value: "forhjul", label: "Forhjulsdrift" },
 ];
 
+/** `next_eu_control` is stored/submitted as an ISO date (`yyyy-MM-dd`) —
+ * matching the format SVV's `kontrollfrist` already comes in as — but shown
+ * to the user as a calendar-picked `dd.MM.yyyy`, same field used by every
+ * vehicle leaf (not a trailer-specific control). */
+function parseIsoDate(value: string): Date | undefined {
+  if (!value) return undefined;
+  const parsed = parse(value, "yyyy-MM-dd", new Date());
+  return isValid(parsed) ? parsed : undefined;
+}
+
+function startOfToday(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function EuControlDateField({
+  id,
+  value,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selectedDate = parseIsoDate(value);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          id={id}
+          className="w-full justify-start font-normal"
+        >
+          <CalendarIcon className="mr-2 size-4 text-muted-foreground" />
+          {selectedDate ? format(selectedDate, "dd.MM.yyyy") : "Velg dato"}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="single"
+          captionLayout="dropdown"
+          selected={selectedDate}
+          disabled={{ before: startOfToday() }}
+          startMonth={startOfToday()}
+          endMonth={new Date(new Date().getFullYear() + 4, 11)}
+          onSelect={(date) => {
+            if (date) onChange(format(date, "yyyy-MM-dd"));
+            setOpen(false);
+          }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 /** The subset of vehicle-confirm's fields that are also `category_filters`
  * for vehicle leaves — editable here so they're never asked again in the
  * later category-attributes step (see VEHICLE_LOOKUP_FILTER_KEYS). */
@@ -74,6 +137,7 @@ type EditableSpec = {
   seats: string;
   color: string;
   next_eu_control: string;
+  eu_control_exempt: boolean | null;
 };
 
 function specFromLookup(lookup: VehicleLookupResult | null): EditableSpec {
@@ -89,6 +153,10 @@ function specFromLookup(lookup: VehicleLookupResult | null): EditableSpec {
     seats: lookup?.seats != null ? String(lookup.seats) : "",
     color: lookup?.color ?? "",
     next_eu_control: lookup?.next_eu_control ?? "",
+    // Statens vegvesen-oppslaget inneholder ikke pålitelig informasjon om
+    // Tempo 100-registrering, så dette kan aldri utledes automatisk — brukeren
+    // må alltid svare eksplisitt (se spørsmålet under datakortet i UI-en).
+    eu_control_exempt: null,
   };
 }
 
@@ -105,6 +173,7 @@ function specOverridesFrom(spec: EditableSpec) {
     seats: spec.seats.trim() ? Number(spec.seats) : undefined,
     color: spec.color || undefined,
     next_eu_control: spec.next_eu_control || undefined,
+    eu_control_exempt: spec.eu_control_exempt ?? undefined,
   };
 }
 
@@ -250,6 +319,7 @@ export function VehicleConfirm({
 
   if (!vehicleLookupResult) return null;
   const lookup = vehicleLookupResult;
+  const isTrailer = selectedSlug === "tilhenger-leaf";
 
   function setSpecField<K extends keyof EditableSpec>(key: K, value: EditableSpec[K]) {
     setSpec((s) => ({ ...s, [key]: value }));
@@ -307,7 +377,7 @@ export function VehicleConfirm({
       <div className="rounded-md border border-amber-400/50 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
         Opplysningene under er hentet fra Statens vegvesen. Du kan endre feltene under dersom noe er
         feil, men husk at du etter forbrukerkjøpsloven er ansvarlig for at opplysningene om
-        kjøretøyet du oppgir i annonsen er korrekte — rett kun det som faktisk er feil.
+        kjøretøyet du oppgir i annonsen er korrekte. Rett kun det som faktisk er feil.
       </div>
 
       <div className="rounded-md bg-muted/40 p-3 text-sm">
@@ -393,75 +463,88 @@ export function VehicleConfirm({
                   onChange={(e) => setSpecField("weight_kg", e.target.value)}
                 />
               </div>
-              <div className="space-y-1">
-                <Label>Drivstoff</Label>
-                <Select value={spec.fuel_type} onValueChange={(v) => setSpecField("fuel_type", v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Velg…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {FUEL_TYPE_OPTIONS.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>
-                        {o.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label>Girkasse</Label>
-                <Select
-                  value={spec.transmission}
-                  onValueChange={(v) => setSpecField("transmission", v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Velg…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TRANSMISSION_OPTIONS.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>
-                        {o.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label>Hjuldrift</Label>
-                <Select
-                  value={spec.drive_type}
-                  onValueChange={(v) => setSpecField("drive_type", v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Velg…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DRIVE_TYPE_OPTIONS.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>
-                        {o.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="vc-power">Effekt (hk)</Label>
-                <Input
-                  id="vc-power"
-                  type="number"
-                  value={spec.power_hk}
-                  onChange={(e) => setSpecField("power_hk", e.target.value)}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="vc-seats">Antall seter</Label>
-                <Input
-                  id="vc-seats"
-                  type="number"
-                  value={spec.seats}
-                  onChange={(e) => setSpecField("seats", e.target.value)}
-                />
-              </div>
+              {!isTrailer && (
+                <div className="space-y-1">
+                  <Label>Drivstoff</Label>
+                  <Select
+                    value={spec.fuel_type}
+                    onValueChange={(v) => setSpecField("fuel_type", v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Velg…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FUEL_TYPE_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {!isTrailer && (
+                <div className="space-y-1">
+                  <Label>Girkasse</Label>
+                  <Select
+                    value={spec.transmission}
+                    onValueChange={(v) => setSpecField("transmission", v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Velg…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TRANSMISSION_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {!isTrailer && (
+                <div className="space-y-1">
+                  <Label>Hjuldrift</Label>
+                  <Select
+                    value={spec.drive_type}
+                    onValueChange={(v) => setSpecField("drive_type", v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Velg…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DRIVE_TYPE_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {!isTrailer && (
+                <div className="space-y-1">
+                  <Label htmlFor="vc-power">Effekt (hk)</Label>
+                  <Input
+                    id="vc-power"
+                    type="number"
+                    value={spec.power_hk}
+                    onChange={(e) => setSpecField("power_hk", e.target.value)}
+                  />
+                </div>
+              )}
+              {!isTrailer && (
+                <div className="space-y-1">
+                  <Label htmlFor="vc-seats">Antall seter</Label>
+                  <Input
+                    id="vc-seats"
+                    type="number"
+                    value={spec.seats}
+                    onChange={(e) => setSpecField("seats", e.target.value)}
+                  />
+                </div>
+              )}
               <div className="space-y-1">
                 <Label htmlFor="vc-color">Farge</Label>
                 <Input
@@ -470,35 +553,39 @@ export function VehicleConfirm({
                   onChange={(e) => setSpecField("color", e.target.value)}
                 />
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="vc-eu-control">Neste EU-kontroll</Label>
-                <Input
-                  id="vc-eu-control"
-                  value={spec.next_eu_control}
-                  onChange={(e) => setSpecField("next_eu_control", e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <label className="flex items-center gap-2 text-sm">
-                <Checkbox
-                  checked={spec.tow_hitch}
-                  onCheckedChange={(c) => setSpecField("tow_hitch", c === true)}
-                />
-                Hengerfeste
-              </label>
-              {spec.tow_hitch && (
-                <div className="max-w-[220px] space-y-1">
-                  <Label htmlFor="vc-max-tow-weight">Maks tilhengervekt (kg)</Label>
-                  <Input
-                    id="vc-max-tow-weight"
-                    type="number"
-                    value={spec.max_tow_weight_kg}
-                    onChange={(e) => setSpecField("max_tow_weight_kg", e.target.value)}
+              {!isTrailer && (
+                <div className="space-y-1">
+                  <Label htmlFor="vc-eu-control">Neste EU-kontroll</Label>
+                  <EuControlDateField
+                    id="vc-eu-control"
+                    value={spec.next_eu_control}
+                    onChange={(v) => setSpecField("next_eu_control", v)}
                   />
                 </div>
               )}
             </div>
+            {!isTrailer && (
+              <div className="space-y-1">
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={spec.tow_hitch}
+                    onCheckedChange={(c) => setSpecField("tow_hitch", c === true)}
+                  />
+                  Hengerfeste
+                </label>
+                {spec.tow_hitch && (
+                  <div className="max-w-[220px] space-y-1">
+                    <Label htmlFor="vc-max-tow-weight">Maks tilhengervekt (kg)</Label>
+                    <Input
+                      id="vc-max-tow-weight"
+                      type="number"
+                      value={spec.max_tow_weight_kg}
+                      onChange={(e) => setSpecField("max_tow_weight_kg", e.target.value)}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ) : (
           <>
@@ -551,19 +638,19 @@ export function VehicleConfirm({
                     <dd>{lookup.body_type_hint}</dd>
                   </>
                 )}
-                {spec.power_hk && (
+                {!isTrailer && spec.power_hk && (
                   <>
                     <dt className="text-muted-foreground">Effekt</dt>
                     <dd>{spec.power_hk} hk</dd>
                   </>
                 )}
-                {spec.drive_type && (
+                {!isTrailer && spec.drive_type && (
                   <>
                     <dt className="text-muted-foreground">Hjuldrift</dt>
                     <dd>{DRIVE_TYPE_OPTIONS.find((o) => o.value === spec.drive_type)?.label}</dd>
                   </>
                 )}
-                {spec.transmission && (
+                {!isTrailer && spec.transmission && (
                   <>
                     <dt className="text-muted-foreground">Girkasse</dt>
                     <dd>
@@ -571,26 +658,35 @@ export function VehicleConfirm({
                     </dd>
                   </>
                 )}
-                <>
-                  <dt className="text-muted-foreground">Hengerfeste</dt>
-                  <dd>
-                    {spec.tow_hitch
-                      ? `Ja${spec.max_tow_weight_kg ? ` (${spec.max_tow_weight_kg} kg)` : ""}`
-                      : "Nei"}
-                  </dd>
-                </>
-                {spec.seats && (
+                {!isTrailer && (
+                  <>
+                    <dt className="text-muted-foreground">Hengerfeste</dt>
+                    <dd>
+                      {spec.tow_hitch
+                        ? `Ja${spec.max_tow_weight_kg ? ` (${spec.max_tow_weight_kg} kg)` : ""}`
+                        : "Nei"}
+                    </dd>
+                  </>
+                )}
+                {!isTrailer && spec.seats && (
                   <>
                     <dt className="text-muted-foreground">Antall seter</dt>
                     <dd>{spec.seats}</dd>
                   </>
                 )}
-                {selectedSlug === "bobil-og-campingvogn" && lookup.sleeping_places && (
+                {isTrailer && spec.eu_control_exempt != null && (
                   <>
-                    <dt className="text-muted-foreground">Antall soveplasser</dt>
-                    <dd>{lookup.sleeping_places}</dd>
+                    <dt className="text-muted-foreground">Fritatt for EU-kontroll</dt>
+                    <dd>{spec.eu_control_exempt ? "Ja" : "Nei"}</dd>
                   </>
                 )}
+                {(selectedSlug === "bobil" || selectedSlug === "campingvogn") &&
+                  lookup.sleeping_places && (
+                    <>
+                      <dt className="text-muted-foreground">Antall soveplasser</dt>
+                      <dd>{lookup.sleeping_places}</dd>
+                    </>
+                  )}
                 {lookup.imported_used != null && (
                   <>
                     <dt className="text-muted-foreground">Bruktimportert</dt>
@@ -612,7 +708,12 @@ export function VehicleConfirm({
                 {spec.next_eu_control && (
                   <>
                     <dt className="text-muted-foreground">Neste EU-kontroll</dt>
-                    <dd>{spec.next_eu_control}</dd>
+                    <dd>
+                      {(() => {
+                        const d = parseIsoDate(spec.next_eu_control);
+                        return d ? format(d, "dd.MM.yyyy") : spec.next_eu_control;
+                      })()}
+                    </dd>
                   </>
                 )}
                 {lookup.fuel_type !== "el" && lookup.cylinders && (
@@ -639,11 +740,66 @@ export function VehicleConfirm({
         )}
       </div>
 
+      {isTrailer && (
+        <div className="space-y-1 rounded-md border border-border p-3">
+          <Label>Er hengeren fritatt for periodisk kjøretøykontroll (EU-kontroll)?</Label>
+          <p className="text-xs text-muted-foreground">
+            Dette henter vi ikke fra Statens vegvesen, så du må svare selv. Tilhengere med tillatt
+            totalvekt t.o.m. 3500 kg som ikke er registrert som Tempo 100 er fritatt for kontroll.
+            Tempo 100-tilhengere t.o.m. 3500 kg må kontrolleres hvert 2. år fra de er 4 år gamle,
+            mens tyngre tilhengere (over 3500 kg) må kontrolleres årlig uansett.
+          </p>
+          <div role="radiogroup" aria-label="Fritatt for EU-kontroll" className="flex gap-2 pt-1">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={spec.eu_control_exempt === true}
+              onClick={() => setSpecField("eu_control_exempt", true)}
+              className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                spec.eu_control_exempt === true
+                  ? "border-primary bg-primary/10 text-primary font-medium"
+                  : "border-border hover:border-primary/40"
+              }`}
+            >
+              Ja, fritatt
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={spec.eu_control_exempt === false}
+              onClick={() => setSpecField("eu_control_exempt", false)}
+              className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                spec.eu_control_exempt === false
+                  ? "border-primary bg-primary/10 text-primary font-medium"
+                  : "border-border hover:border-primary/40"
+              }`}
+            >
+              Nei, kontrollpliktig
+            </button>
+          </div>
+          {spec.eu_control_exempt === false && (
+            <div className="max-w-[220px] space-y-1 pt-2">
+              <Label htmlFor="vc-eu-control">Neste EU-kontroll</Label>
+              <EuControlDateField
+                id="vc-eu-control"
+                value={spec.next_eu_control}
+                onChange={(v) => setSpecField("next_eu_control", v)}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
       {vehicleConfirmFooterSlot &&
         createPortal(
           <Button
             type="button"
-            disabled={!selectedSlug || matching || !!confirmValue}
+            disabled={
+              !selectedSlug ||
+              matching ||
+              !!confirmValue ||
+              (isTrailer && spec.eu_control_exempt === null)
+            }
             onClick={() => {
               const leaf = selectedSlug ? leafBySlug.get(selectedSlug) : null;
               if (leaf)

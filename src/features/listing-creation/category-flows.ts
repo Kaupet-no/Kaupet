@@ -97,9 +97,20 @@ const SOLO_FIELD_GROUP_KEYS = new Set([
 
 export function resolveWizardPages(
   fieldGroupKeys: string[],
-  options: { native: boolean },
+  options: {
+    native: boolean;
+    /** Keys that always start a fresh page (flushing whatever came before),
+     * without being solo themselves — unlike `SOLO_FIELD_GROUP_KEYS`, keys
+     * after a force-break one still bundle together up to `chunkSize`. Used
+     * to split the Bil og MC flow into an images-only page (title-photos)
+     * and a combined Tittel/Tilstand/Kilometerstand/Pris/Beskrivelse page
+     * (description-keywords), without changing chunking for every other
+     * category. Optional — omitting it preserves prior behavior exactly. */
+    forceBreakBeforeKeys?: ReadonlySet<string>;
+  },
 ): string[][] {
   const chunkSize = options.native ? 3 : 4;
+  const forceBreakBeforeKeys = options.forceBreakBeforeKeys;
 
   const withoutEnds = fieldGroupKeys.filter(
     (k) => k !== "review-publish" && k !== "delivery-location",
@@ -121,6 +132,7 @@ export function resolveWizardPages(
       flush();
       pages.push([key]);
     } else {
+      if (forceBreakBeforeKeys?.has(key)) flush();
       buffer.push(key);
       if (buffer.length >= chunkSize) flush();
     }

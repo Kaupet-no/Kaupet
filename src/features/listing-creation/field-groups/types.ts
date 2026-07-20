@@ -25,6 +25,9 @@ export type ListingFormShape = {
   price_nok?: number | "" | undefined;
   postal_code?: string | undefined;
   city?: string | undefined;
+  known_issues?: string | undefined;
+  no_known_issues?: boolean;
+  maintenance_history?: string | undefined;
 };
 
 /**
@@ -36,6 +39,15 @@ export type ListingFormShape = {
  */
 export type WizardSharedProps = {
   native: boolean;
+  /** Whether the current category is under the "Bil og MC" vehicle tree
+   * (has a `brand_select` filter, per `vehicleCategoryGroupFor`). Drives the
+   * kjøretøy-tilpassede varianter of category-attributes/condition/price/
+   * description-keywords. */
+  isVehicle: boolean;
+  /** Whether to show/require the Kilometerstand field on the beskrivelse
+   * step — true for motorized vehicle leaves, false for `tilhenger-leaf` and
+   * `campingvogn` (no odometer). Meaningless when `isVehicle` is false. */
+  showMileage: boolean;
 
   register: UseFormRegister<ListingFormShape>;
   watch: UseFormWatch<ListingFormShape>;
@@ -55,6 +67,9 @@ export type WizardSharedProps = {
   priceNok: ListingFormShape["price_nok"];
   postalCode: string | undefined;
   city: string | undefined;
+  knownIssues: string | undefined;
+  noKnownIssues: boolean;
+  maintenanceHistory: string | undefined;
 
   // category
   categories: (CategoryNode & {
@@ -151,6 +166,7 @@ export type WizardSharedProps = {
         seats: number;
         color: string;
         next_eu_control: string;
+        eu_control_exempt: boolean;
       }>;
     },
   ) => void | Promise<void>;

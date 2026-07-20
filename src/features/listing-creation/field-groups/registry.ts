@@ -24,6 +24,10 @@ export type ValidateCtx = {
   categoryId: string;
   bilOgMcCategoryId: string | null;
   vehicleLookupResult: WizardSharedProps["vehicleLookupResult"];
+  isVehicle: boolean;
+  knownIssues: WizardSharedProps["knownIssues"];
+  noKnownIssues: WizardSharedProps["noKnownIssues"];
+  showMileage: WizardSharedProps["showMileage"];
 };
 
 export type FieldGroup = {
@@ -72,6 +76,11 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
     Component: CategoryAttributes,
     fieldsToValidate: ["category_id"],
     validateExtra: (ctx) => {
+      // For kjøretøy er kategori og Egenskaper allerede bekreftet i
+      // vehicle-confirm — denne field group-en rendrer ingenting for
+      // kjøretøy (se CategoryAttributes), så den skal heller ikke validere
+      // noe her.
+      if (ctx.isVehicle) return null;
       if (ctx.missingFilters.length > 0) {
         return `Fyll inn ${ctx.missingFilters.map((f) => f.label_nb).join(", ")} før du går videre.`;
       }
@@ -100,6 +109,24 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
     key: "description-keywords",
     Component: DescriptionKeywordsGroup,
     fieldsToValidate: ["description"],
+    validateExtra: (ctx) => {
+      // For Bil og MC, Tittel/Tilstand/Pris/Kilometerstand live on this same
+      // page (see DescriptionKeywordsGroup) rather than as separate
+      // "condition"/"price" field groups, so their validation moves here too.
+      if (ctx.isVehicle && !ctx.isFree && (ctx.priceNok === "" || ctx.priceNok === undefined)) {
+        return "SHOW_NO_PRICE_DIALOG";
+      }
+      if (ctx.isVehicle && ctx.showMileage) {
+        const km = ctx.attributes.mileage_km;
+        if (typeof km !== "number" || !Number.isFinite(km) || km < 0) {
+          return "Fyll inn kilometerstand før du går videre.";
+        }
+      }
+      if (!ctx.isVehicle) return null;
+      if (ctx.noKnownIssues) return null;
+      if ((ctx.knownIssues ?? "").trim().length > 0) return null;
+      return "Beskriv kjente feil og mangler, eller kryss av for at kjøretøyet ikke har noen.";
+    },
   },
   "delivery-location": {
     key: "delivery-location",

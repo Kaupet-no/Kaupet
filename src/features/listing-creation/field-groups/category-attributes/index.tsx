@@ -7,7 +7,13 @@ import type { WizardSharedProps } from "../types";
 import { FieldValid } from "../field-valid";
 import { RequiredMark } from "../required-mark";
 
-/** Category picker + suggestion banner + activeModules (vehicle-lookup/generic-attributes). */
+/**
+ * Category picker + suggestion banner + activeModules (vehicle-lookup/
+ * generic-attributes). For Bil og MC (`isVehicle`), category and Egenskaper
+ * are already locked in via vehicle-registration/vehicle-confirm earlier in
+ * the flow, so this group renders nothing — it stays in the flow (it's a
+ * `LOCKED_FIELD_GROUP_KEYS` entry) but is a no-op page for vehicle listings.
+ */
 export function CategoryAttributes({
   errors,
   touchedFields,
@@ -25,7 +31,10 @@ export function CategoryAttributes({
   onAttributesChange,
   attributesTouched,
   vehicleAttributeHiddenKeys,
+  isVehicle,
 }: WizardSharedProps) {
+  if (isVehicle) return null;
+
   return (
     <section className="space-y-2">
       <div className="flex items-center gap-1.5">

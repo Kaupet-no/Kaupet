@@ -941,10 +941,8 @@ function EditListingPage() {
 
           {vehicleGroup ? (
             <VehicleTitleFields
-              register={register}
               setValue={setValue}
               errors={errors}
-              touchedFields={touchedFields}
               title={title}
               attributes={attributes}
             />

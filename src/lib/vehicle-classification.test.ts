@@ -11,27 +11,27 @@ describe("classifyVehicleCategory", () => {
       });
     });
 
-    it("maps 313/316 to bobil-og-campingvogn", () => {
+    it("maps 313/316 to bobil", () => {
       expect(classifyVehicleCategory(null, "313", null, null)).toEqual({
-        slug: "bobil-og-campingvogn",
+        slug: "bobil",
         confidence: "high",
       });
       expect(classifyVehicleCategory(null, "316", null, null)).toEqual({
-        slug: "bobil-og-campingvogn",
+        slug: "bobil",
         confidence: "high",
       });
     });
 
-    it("upgrades a personbil-taxed vehicle to bobil-og-campingvogn on a camper body-type hint", () => {
+    it("upgrades a personbil-taxed vehicle to bobil on a camper body-type hint", () => {
       expect(classifyVehicleCategory(null, "101", "Bobil", null)).toEqual({
-        slug: "bobil-og-campingvogn",
+        slug: "bobil",
         confidence: "high",
       });
     });
 
-    it("upgrades a personbil-taxed vehicle to bobil-og-campingvogn on sleeping places", () => {
+    it("upgrades a personbil-taxed vehicle to bobil on sleeping places", () => {
       expect(classifyVehicleCategory(null, "101", null, 4)).toEqual({
-        slug: "bobil-og-campingvogn",
+        slug: "bobil",
         confidence: "high",
       });
     });
@@ -91,16 +91,16 @@ describe("classifyVehicleCategory", () => {
       });
     });
 
-    it("maps M1 with a bobil body-type hint to bobil-og-campingvogn", () => {
+    it("maps M1 with a bobil body-type hint to bobil", () => {
       expect(classifyVehicleCategory("M1", null, "Bobil", null)).toEqual({
-        slug: "bobil-og-campingvogn",
+        slug: "bobil",
         confidence: "high",
       });
     });
 
-    it("maps M1 with sleeping places to bobil-og-campingvogn", () => {
+    it("maps M1 with sleeping places to bobil", () => {
       expect(classifyVehicleCategory("M1", null, null, 4)).toEqual({
-        slug: "bobil-og-campingvogn",
+        slug: "bobil",
         confidence: "high",
       });
     });

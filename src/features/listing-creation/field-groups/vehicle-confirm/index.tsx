@@ -38,7 +38,8 @@ import type { WizardSharedProps } from "../types";
 const LEAF_LABELS_NB: Record<VehicleLeafSlug, string> = {
   personbil: "Personbil",
   varebil: "Varebil",
-  "bobil-og-campingvogn": "Bobil/campingvogn",
+  bobil: "Bobil",
+  campingvogn: "Campingvogn",
   motorsykkel: "Motorsykkel",
   "moped-og-scooter": "Moped/scooter",
   "atv-og-snoscooter": "ATV/snøscooter",
@@ -679,12 +680,13 @@ export function VehicleConfirm({
                     <dd>{spec.eu_control_exempt ? "Ja" : "Nei"}</dd>
                   </>
                 )}
-                {selectedSlug === "bobil-og-campingvogn" && lookup.sleeping_places && (
-                  <>
-                    <dt className="text-muted-foreground">Antall soveplasser</dt>
-                    <dd>{lookup.sleeping_places}</dd>
-                  </>
-                )}
+                {(selectedSlug === "bobil" || selectedSlug === "campingvogn") &&
+                  lookup.sleeping_places && (
+                    <>
+                      <dt className="text-muted-foreground">Antall soveplasser</dt>
+                      <dd>{lookup.sleeping_places}</dd>
+                    </>
+                  )}
                 {lookup.imported_used != null && (
                   <>
                     <dt className="text-muted-foreground">Bruktimportert</dt>

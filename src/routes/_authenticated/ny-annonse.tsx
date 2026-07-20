@@ -35,10 +35,13 @@ import {
 } from "@/lib/category-filters";
 import { lookupVehicleByRegNumber } from "@/lib/vehicle-lookup.functions";
 import { matchVehicleBrandModel } from "@/lib/vehicle-brand-match.functions";
-import { classifyVehicleCategory } from "@/lib/vehicle-classification";
+import {
+  classifyVehicleCategory,
+  VEHICLE_LEAF_SLUGS_WITHOUT_MILEAGE,
+} from "@/lib/vehicle-classification";
 import { VEHICLE_LOOKUP_FILTER_KEYS } from "@/lib/vehicle-lookup.server";
 import type { VehicleLookupResult } from "@/lib/vehicle-lookup.server";
-import type { VehicleClassification } from "@/lib/vehicle-classification";
+import type { VehicleClassification, VehicleLeafSlug } from "@/lib/vehicle-classification";
 
 import { useIsDemo } from "@/hooks/use-is-demo";
 import { useAuth } from "@/hooks/use-auth";
@@ -92,6 +95,13 @@ type ListingForm = z.infer<typeof listingSchema>;
 
 const DRAFT_KEY = "kaupet_draft_ny_annonse";
 const DRAFT_ID_KEY = "kaupet_draft_id";
+
+/** Forces the Bil og MC beskrivelse step (description-keywords, which also
+ * carries Tittel/Tilstand/Kilometerstand/Pris for vehicles — see
+ * description-keywords/index.tsx) onto its own page, separate from
+ * title-photos (images only for vehicles) — see resolveWizardPages'
+ * `forceBreakBeforeKeys`. */
+const VEHICLE_FORCE_BREAK_BEFORE_KEYS = new Set(["description-keywords"]);
 
 const SIMILAR_STOPWORDS = new Set([
   "og",
@@ -358,7 +368,7 @@ function NewListingPage() {
   const { data: allFilters } = useAllCategoryFilters();
   const { data: allFlows } = useAllCategoryFlows();
   const categoriesById = useMemo(() => {
-    const m = new Map<string, CategoryNode & { name_nb: string }>();
+    const m = new Map<string, CategoryNode & { name_nb: string; slug?: string }>();
     for (const c of categories ?? []) m.set(c.id, c);
     return m;
   }, [categories]);
@@ -415,6 +425,12 @@ function NewListingPage() {
     [categoryId, allFilters, categoriesById],
   );
 
+  const showMileage = useMemo(() => {
+    if (!isVehicle) return false;
+    const slug = categoriesById.get(categoryId)?.slug;
+    return !VEHICLE_LEAF_SLUGS_WITHOUT_MILEAGE.includes(slug as VehicleLeafSlug);
+  }, [isVehicle, categoryId, categoriesById]);
+
   const activeModules = useMemo(
     () =>
       modulesForKeys(
@@ -446,10 +462,13 @@ function NewListingPage() {
 
   const pages: WizardPage[] = useMemo(
     () =>
-      resolveWizardPages(fieldGroupKeys, { native }).map((keys) => ({
+      resolveWizardPages(fieldGroupKeys, {
+        native,
+        forceBreakBeforeKeys: isVehicle ? VEHICLE_FORCE_BREAK_BEFORE_KEYS : undefined,
+      }).map((keys) => ({
         groups: fieldGroupsForKeys(keys),
       })),
-    [fieldGroupKeys, native],
+    [fieldGroupKeys, native, isVehicle],
   );
 
   const { step, setStep, currentPage, goNext, isFirst, isLast } = useListingSteps(pages);
@@ -1005,6 +1024,7 @@ function NewListingPage() {
       isVehicle,
       knownIssues,
       noKnownIssues: !!noKnownIssues,
+      showMileage,
     };
     for (const group of groups) {
       const result = group.validateExtra?.(validateCtx);
@@ -1209,6 +1229,7 @@ function NewListingPage() {
   const sharedProps: WizardSharedProps = {
     native,
     isVehicle,
+    showMileage,
 
     register,
     watch,

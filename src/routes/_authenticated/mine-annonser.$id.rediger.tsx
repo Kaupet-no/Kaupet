@@ -56,9 +56,12 @@ import {
   FIELD_GROUP_LABELS_NB,
 } from "@/features/listing-creation/field-groups/registry";
 import { validateRequiredFieldGroups } from "@/features/listing-creation/field-groups/validators";
-import { VehicleTitleFields } from "@/features/listing-creation/field-groups/title-photos";
 import type { WizardSharedProps } from "@/features/listing-creation/field-groups/types";
 import { CONDITIONS } from "@/lib/constants";
+import {
+  VEHICLE_LEAF_SLUGS_WITHOUT_MILEAGE,
+  type VehicleLeafSlug,
+} from "@/lib/vehicle-classification";
 import { suggestKeywordsForListing } from "@/lib/keyword-suggestion.functions";
 import { matchWtbListingsForListing } from "@/lib/wtb-listings.functions";
 import { getCurrentPosition, requestLocationPermission, isNative } from "@/lib/native";
@@ -199,7 +202,7 @@ function EditListingPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
-        .select("id, name_nb, parent_id, icon, color")
+        .select("id, name_nb, slug, parent_id, icon, color")
         .order("sort_order");
       if (error) throw error;
       return data;
@@ -363,7 +366,7 @@ function EditListingPage() {
 
   const { data: allFilters } = useAllCategoryFilters();
   const categoriesById = useMemo(() => {
-    const m = new Map<string, CategoryNode & { name_nb: string }>();
+    const m = new Map<string, CategoryNode & { name_nb: string; slug?: string }>();
     for (const c of categories ?? []) m.set(c.id, c);
     return m;
   }, [categories]);
@@ -377,6 +380,11 @@ function EditListingPage() {
     () => vehicleCategoryGroupFor(categoryId || null, allFilters ?? [], categoriesById),
     [categoryId, allFilters, categoriesById],
   );
+  const showMileage = useMemo(() => {
+    if (!vehicleGroup) return false;
+    const slug = categoriesById.get(categoryId)?.slug;
+    return !VEHICLE_LEAF_SLUGS_WITHOUT_MILEAGE.includes(slug as VehicleLeafSlug);
+  }, [vehicleGroup, categoryId, categoriesById]);
 
   // Initialize attributes from existing listing when it loads (once)
   useEffect(() => {
@@ -833,6 +841,13 @@ function EditListingPage() {
             );
             return;
           }
+          if (showMileage) {
+            const km = attributes.mileage_km;
+            if (typeof km !== "number" || !Number.isFinite(km) || km < 0) {
+              showErrorToast("Fyll inn kilometerstand før du lagrer.");
+              return;
+            }
+          }
           mutation.mutate(v);
         })}
         className="mt-8 space-y-8"
@@ -939,14 +954,7 @@ function EditListingPage() {
             </div>
           </section>
 
-          {vehicleGroup ? (
-            <VehicleTitleFields
-              setValue={setValue}
-              errors={errors}
-              title={title}
-              attributes={attributes}
-            />
-          ) : (
+          {!vehicleGroup && (
             <section className="space-y-2">
               <Label htmlFor="title">Tittel</Label>
               <Input id="title" {...register("title")} />
@@ -959,6 +967,7 @@ function EditListingPage() {
           const sharedProps: WizardSharedProps = {
             native,
             isVehicle: !!vehicleGroup,
+            showMileage,
 
             register,
             watch,

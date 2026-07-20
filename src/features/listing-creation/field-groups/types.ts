@@ -44,6 +44,10 @@ export type WizardSharedProps = {
    * kjøretøy-tilpassede varianter of category-attributes/condition/price/
    * description-keywords. */
   isVehicle: boolean;
+  /** Whether to show/require the Kilometerstand field on the beskrivelse
+   * step — true for motorized vehicle leaves, false for `tilhenger-leaf` and
+   * `campingvogn` (no odometer). Meaningless when `isVehicle` is false. */
+  showMileage: boolean;
 
   register: UseFormRegister<ListingFormShape>;
   watch: UseFormWatch<ListingFormShape>;

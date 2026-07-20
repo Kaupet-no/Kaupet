@@ -55,7 +55,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { formatErrorMessage } from "@/lib/errors";
-import { CONDITIONS } from "@/lib/constants";
+import { CONDITIONS, VEHICLE_CONDITIONS } from "@/lib/constants";
 import { suggestCategoryForTitle } from "@/lib/category-suggestion.functions";
 import { suggestKeywordsForListing } from "@/lib/keyword-suggestion.functions";
 import { matchWtbListingsForListing } from "@/lib/wtb-listings.functions";
@@ -84,6 +84,9 @@ const listingSchema = z.object({
     .optional()
     .or(z.literal("")),
   city: z.string().trim().max(100).optional().or(z.literal("")),
+  known_issues: z.string().trim().max(2000).optional().or(z.literal("")),
+  no_known_issues: z.boolean().optional(),
+  maintenance_history: z.string().trim().max(2000).optional().or(z.literal("")),
 });
 type ListingForm = z.infer<typeof listingSchema>;
 
@@ -381,6 +384,9 @@ function NewListingPage() {
       price_nok: "",
       postal_code: "",
       city: "",
+      known_issues: "",
+      no_known_issues: false,
+      maintenance_history: "",
     },
   });
 
@@ -394,11 +400,19 @@ function NewListingPage() {
   const subtitle = watch("subtitle");
   const description = watch("description");
   const priceNok = watch("price_nok");
+  const knownIssues = watch("known_issues");
+  const noKnownIssues = watch("no_known_issues");
+  const maintenanceHistory = watch("maintenance_history");
 
   const missingFilters = useMemo(
     () =>
       getMissingRequiredFilters(categoryId || null, allFilters ?? [], categoriesById, attributes),
     [categoryId, allFilters, categoriesById, attributes],
+  );
+
+  const isVehicle = useMemo(
+    () => vehicleCategoryGroupFor(categoryId || null, allFilters ?? [], categoriesById) !== null,
+    [categoryId, allFilters, categoriesById],
   );
 
   const activeModules = useMemo(
@@ -988,6 +1002,9 @@ function NewListingPage() {
       categoryId,
       bilOgMcCategoryId,
       vehicleLookupResult,
+      isVehicle,
+      knownIssues,
+      noKnownIssues: !!noKnownIssues,
     };
     for (const group of groups) {
       const result = group.validateExtra?.(validateCtx);
@@ -1109,6 +1126,9 @@ function NewListingPage() {
           can_ship: fieldGroupKeys.includes("delivery-location")
             ? values.can_ship !== "pickup"
             : null,
+          known_issues: isVehicle ? values.known_issues || null : null,
+          no_known_issues: isVehicle ? !!values.no_known_issues : null,
+          maintenance_history: isVehicle ? values.maintenance_history || null : null,
           attributes,
           turnstileToken,
         },
@@ -1160,7 +1180,9 @@ function NewListingPage() {
     },
   });
 
-  const conditionDescription = CONDITIONS.find((c) => c.value === condition)?.description;
+  const conditionDescription = (isVehicle ? VEHICLE_CONDITIONS : CONDITIONS).find(
+    (c) => c.value === condition,
+  )?.description;
 
   const parsedPriceNok =
     typeof priceNok === "number" ? priceNok : priceNok !== "" ? Number(priceNok) : NaN;
@@ -1186,6 +1208,7 @@ function NewListingPage() {
 
   const sharedProps: WizardSharedProps = {
     native,
+    isVehicle,
 
     register,
     watch,
@@ -1204,6 +1227,9 @@ function NewListingPage() {
     priceNok,
     postalCode,
     city,
+    knownIssues,
+    noKnownIssues: !!noKnownIssues,
+    maintenanceHistory,
 
     categories: categories ?? [],
     categoryLabel,
@@ -1310,14 +1336,14 @@ function NewListingPage() {
 
       {/* Sticky step indicator */}
       <div className="sticky top-0 z-10 -mx-4 bg-background/95 px-4 py-3 backdrop-blur border-b border-border mt-4">
-        <div className="flex items-center justify-between">
-          <StepIndicator step={step} pages={pages} native={native} />
-          {draftSaveError ? (
-            <p className="text-xs text-destructive">Utkast ble ikke lagret</p>
-          ) : (
-            savedTimeLabel && <p className="text-xs text-muted-foreground">{savedTimeLabel}</p>
-          )}
-        </div>
+        <StepIndicator step={step} pages={pages} native={native} />
+        {draftSaveError ? (
+          <p className="mt-1 text-right text-xs text-destructive">Utkast ble ikke lagret</p>
+        ) : (
+          savedTimeLabel && (
+            <p className="mt-1 text-right text-xs text-muted-foreground">{savedTimeLabel}</p>
+          )
+        )}
       </div>
 
       <form

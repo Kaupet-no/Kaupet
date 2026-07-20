@@ -143,6 +143,9 @@ const schema = z.object({
     .optional()
     .or(z.literal("")),
   city: z.string().trim().max(100).optional().or(z.literal("")),
+  known_issues: z.string().trim().max(2000).optional().or(z.literal("")),
+  no_known_issues: z.boolean().optional(),
+  maintenance_history: z.string().trim().max(2000).optional().or(z.literal("")),
 });
 type FormValues = z.infer<typeof schema>;
 
@@ -210,7 +213,7 @@ function EditListingPage() {
         supabase
           .from("listings")
           .select(
-            "id, title, subtitle, description, category_id, condition, is_free, price_nok, can_ship, postal_code, city, status, attributes, listing_images(id, storage_path, sort_order)",
+            "id, title, subtitle, description, category_id, condition, is_free, price_nok, can_ship, postal_code, city, status, attributes, known_issues, no_known_issues, maintenance_history, listing_images(id, storage_path, sort_order)",
           )
           .eq("id", id)
           .single(),
@@ -235,6 +238,9 @@ function EditListingPage() {
       price_nok: listing.price_nok ?? "",
       postal_code: listing.postal_code ?? "",
       city: listing.city ?? "",
+      known_issues: listing.known_issues ?? "",
+      no_known_issues: listing.no_known_issues ?? false,
+      maintenance_history: listing.maintenance_history ?? "",
     };
   }, [listing]);
 
@@ -258,6 +264,9 @@ function EditListingPage() {
       price_nok: "",
       postal_code: "",
       city: "",
+      known_issues: "",
+      no_known_issues: false,
+      maintenance_history: "",
     },
   });
 
@@ -271,6 +280,9 @@ function EditListingPage() {
   const title = watch("title");
   const subtitle = watch("subtitle");
   const description = watch("description");
+  const knownIssues = watch("known_issues");
+  const noKnownIssues = watch("no_known_issues");
+  const maintenanceHistory = watch("maintenance_history");
 
   const [showPublishWarning, setShowPublishWarning] = useState(false);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -652,6 +664,9 @@ function EditListingPage() {
           city: parsed.city || null,
           lat: finalCoords?.lat ?? null,
           lng: finalCoords?.lng ?? null,
+          known_issues: vehicleGroup ? parsed.known_issues || null : null,
+          no_known_issues: vehicleGroup ? !!parsed.no_known_issues : false,
+          maintenance_history: vehicleGroup ? parsed.maintenance_history || null : null,
           attributes,
         })
         .eq("id", id);
@@ -812,6 +827,12 @@ function EditListingPage() {
             showErrorToast(fieldGroupError);
             return;
           }
+          if (vehicleGroup && !v.no_known_issues && !(v.known_issues ?? "").trim()) {
+            showErrorToast(
+              "Beskriv kjente feil og mangler, eller kryss av for at kjøretøyet ikke har noen.",
+            );
+            return;
+          }
           mutation.mutate(v);
         })}
         className="mt-8 space-y-8"
@@ -925,7 +946,6 @@ function EditListingPage() {
               errors={errors}
               touchedFields={touchedFields}
               title={title}
-              subtitle={subtitle}
               attributes={attributes}
             />
           ) : (
@@ -940,6 +960,7 @@ function EditListingPage() {
         {(() => {
           const sharedProps: WizardSharedProps = {
             native,
+            isVehicle: !!vehicleGroup,
 
             register,
             watch,
@@ -958,6 +979,9 @@ function EditListingPage() {
             priceNok,
             postalCode,
             city,
+            knownIssues,
+            noKnownIssues: !!noKnownIssues,
+            maintenanceHistory,
 
             categories: categories ?? [],
             categoryLabel,

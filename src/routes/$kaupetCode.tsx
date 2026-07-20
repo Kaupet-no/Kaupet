@@ -28,7 +28,7 @@ import { type Category } from "@/lib/categories";
 import { normalizeSlugForMatch } from "@/lib/slug";
 
 import { signListingImageUrls } from "@/lib/storage";
-import { CONDITION_LABEL } from "@/lib/constants";
+import { CONDITION_LABEL, VEHICLE_CONDITION_LABEL } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { ImageGallery } from "@/components/listing-detail/image-gallery";
 import { OwnerStatsPanel } from "@/components/listing-detail/owner-stats-panel";
@@ -414,7 +414,7 @@ function ListingDetailPage() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, subtitle, description, price_nok, is_free, condition, city, postal_code, display_lat, display_lng, created_at, updated_at, published_at, status, seller_id, category_id, attributes, listing_images(storage_path, sort_order), categories(name_nb, slug)",
+          "id, kaupet_code, title, subtitle, description, price_nok, is_free, condition, city, postal_code, display_lat, display_lng, created_at, updated_at, published_at, status, seller_id, category_id, attributes, known_issues, no_known_issues, maintenance_history, listing_images(storage_path, sort_order), categories(name_nb, slug)",
         )
         .eq("kaupet_code", kaupetCode)
         .maybeSingle();
@@ -642,6 +642,26 @@ function ListingDetailPage() {
               {data.description}
             </p>
           </section>
+
+          {isVehicleCategory && (
+            <section className="mt-8">
+              <h2 className="font-display text-xl">Kjente feil og mangler</h2>
+              <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+                {data.no_known_issues
+                  ? "Ingen kjente feil eller mangler oppgitt av selger"
+                  : data.known_issues}
+              </p>
+            </section>
+          )}
+
+          {isVehicleCategory && data.maintenance_history && (
+            <section className="mt-8">
+              <h2 className="font-display text-xl">Vedlikeholdshistorikk</h2>
+              <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+                {data.maintenance_history}
+              </p>
+            </section>
+          )}
         </div>
 
         <aside className="space-y-5">
@@ -713,7 +733,9 @@ function ListingDetailPage() {
                   <div>
                     <dt className="text-muted-foreground">Tilstand</dt>
                     <dd className="font-medium">
-                      {CONDITION_LABEL[data.condition] ?? data.condition}
+                      {(isVehicleCategory ? VEHICLE_CONDITION_LABEL : CONDITION_LABEL)[
+                        data.condition
+                      ] ?? data.condition}
                     </dd>
                   </div>
                 )}

@@ -8,6 +8,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import type { WizardSharedProps } from "../types";
 import { FieldValid } from "../field-valid";
 import { RequiredMark } from "../required-mark";
+import { VehicleTitleFields } from "../title-photos";
+import { Condition } from "../condition";
+import { PriceGroup } from "../price";
 
 /**
  * Description textarea. Rendered with a fixed-height flex-fill wrapper on
@@ -131,6 +134,42 @@ function SubtitleField({
 }
 
 /**
+ * Kilometerstand — kun for motoriserte kjøretøy (`showMileage`); skjules for
+ * campingvogn og tilhenger, som ikke har kilometerteller. Lagres i
+ * `attributes.mileage_km`, samme sted den publiserte annonsesiden allerede
+ * leser den fra (se src/routes/$kaupetCode.tsx).
+ */
+function MileageField({
+  attributes,
+  onAttributesChange,
+}: Pick<WizardSharedProps, "attributes" | "onAttributesChange">) {
+  const raw = attributes.mileage_km;
+  const value = typeof raw === "number" ? String(raw) : typeof raw === "string" ? raw : "";
+  return (
+    <section className="space-y-2">
+      <Label htmlFor="mileage_km">
+        Kilometerstand
+        <RequiredMark />
+      </Label>
+      <Input
+        id="mileage_km"
+        type="number"
+        min={0}
+        placeholder="km"
+        value={value}
+        onChange={(e) => {
+          const v = e.target.value;
+          const next = { ...attributes };
+          if (v === "") delete next.mileage_km;
+          else next.mileage_km = Number(v);
+          onAttributesChange(next);
+        }}
+      />
+    </section>
+  );
+}
+
+/**
  * Kjente feil og mangler + vedlikeholdshistorikk — kun for kjøretøy (Bil og
  * MC). Kjente feil og mangler er obligatorisk med mindre "ingen kjente feil
  * eller mangler" er krysset av (håndhevet i registry.ts sin `validateExtra`
@@ -208,13 +247,23 @@ function VehicleConditionDetails({
  * where KeywordChips sits on web (previously further down, after Condition)
  * but keeps native's existing adjacent layout unchanged.
  *
- * For kjøretøy (`isVehicle`), Undertittel and the feil/mangler +
- * vedlikeholdshistorikk fields are added — see SubtitleField and
- * VehicleConditionDetails above.
+ * For kjøretøy (`isVehicle`), this step also carries Tittel, Tilstand,
+ * Kilometerstand and Pris — moved here from their own steps/field-groups
+ * (title-photos is images-only for vehicles; "condition"/"price" are removed
+ * entirely from the Bil og MC category flow, see the
+ * 20260721130000_bil_og_mc_flow_beskrivelse_step migration) so that step 3
+ * of vehicle listing creation is images-only, and everything else about the
+ * vehicle (beyond what Statens vegvesen-oppslaget already covers) lives on
+ * one "Beskrivelse" step. Order: Tittel, Tilstand, Kilometerstand, Pris,
+ * Undertittel, Beskrivelse, nøkkelord, feil/mangler, vedlikeholdshistorikk.
  */
 export function DescriptionKeywordsGroup(props: WizardSharedProps) {
   return (
     <>
+      {props.isVehicle && <VehicleTitleFields {...props} />}
+      {props.isVehicle && <Condition {...props} />}
+      {props.isVehicle && props.showMileage && <MileageField {...props} />}
+      {props.isVehicle && <PriceGroup {...props} />}
       {props.isVehicle && <SubtitleField {...props} />}
       <DescriptionField {...props} />
       <KeywordChips {...props} />

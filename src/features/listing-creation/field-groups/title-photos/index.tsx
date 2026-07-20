@@ -1,10 +1,8 @@
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ImageUploader } from "@/components/image-uploader";
-import { useAllCategoryFilters } from "@/components/attribute-fields";
-import { vehicleCategoryGroupFor, type CategoryNode } from "@/lib/category-filters";
 
 import type { WizardSharedProps } from "../types";
 import { FieldValid } from "../field-valid";
@@ -67,33 +65,16 @@ export function VehicleTitleFields({
   );
 }
 
+/**
+ * Non-vehicle title input. Vehicle categories never reach this component —
+ * `TitlePhotos` below skips it entirely for `isVehicle` (their title moved to
+ * the beskrivelse step, see `VehicleTitleFields` usage in
+ * description-keywords/index.tsx), so it no longer needs its own
+ * vehicle-vs-generic branch.
+ */
 function TitleSection(
-  props: Pick<
-    WizardSharedProps,
-    | "register"
-    | "setValue"
-    | "errors"
-    | "touchedFields"
-    | "title"
-    | "subtitle"
-    | "categoryId"
-    | "categories"
-    | "attributes"
-  >,
+  props: Pick<WizardSharedProps, "register" | "errors" | "touchedFields" | "title">,
 ) {
-  const { data: allFilters } = useAllCategoryFilters();
-  const categoriesById = useMemo(() => {
-    const m = new Map<string, CategoryNode>();
-    for (const c of props.categories) m.set(c.id, c);
-    return m;
-  }, [props.categories]);
-  const vehicleGroup = useMemo(
-    () => vehicleCategoryGroupFor(props.categoryId || null, allFilters ?? [], categoriesById),
-    [props.categoryId, allFilters, categoriesById],
-  );
-
-  if (vehicleGroup) return <VehicleTitleFields {...props} />;
-
   return (
     <section className="space-y-2">
       <div className="flex items-center justify-between">
@@ -138,15 +119,18 @@ function ImagesSection({
 }
 
 /**
- * Title + photo upload. Web shows images first then title; native shows title
- * first then images — same content, different order, preserved verbatim from
- * the original per-platform JSX.
+ * Photo upload + (for non-vehicle categories) title. For Bil og MC
+ * (`isVehicle`), this step is images only — Tittel/Tilstand/Pris/
+ * Kilometerstand all live on the next step (beskrivelse), see
+ * description-keywords/index.tsx. Web shows images first then title; native
+ * shows title first then images — same content, different order, preserved
+ * verbatim from the original per-platform JSX.
  */
 export function TitlePhotos(props: WizardSharedProps) {
   if (props.native) {
     return (
       <div className="space-y-6">
-        <TitleSection {...props} />
+        {!props.isVehicle && <TitleSection {...props} />}
         <ImagesSection {...props} />
       </div>
     );
@@ -154,7 +138,7 @@ export function TitlePhotos(props: WizardSharedProps) {
   return (
     <div className="space-y-6">
       <ImagesSection {...props} />
-      <TitleSection {...props} />
+      {!props.isVehicle && <TitleSection {...props} />}
     </div>
   );
 }

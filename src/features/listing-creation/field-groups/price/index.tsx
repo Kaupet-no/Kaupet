@@ -23,6 +23,7 @@ export function Price({
   setValue,
   priceNok,
   wtbMatch,
+  isVehicle,
 }: WizardSharedProps) {
   return (
     <section className="space-y-3">
@@ -50,10 +51,12 @@ export function Price({
           aria-describedby={errors.price_nok ? "price-error" : undefined}
           {...register("price_nok")}
         />
-        <label className="flex items-center gap-2 text-sm">
-          <Checkbox checked={isFree} onCheckedChange={(v) => setValue("is_free", Boolean(v))} />
-          Gis bort gratis
-        </label>
+        {!isVehicle && (
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox checked={isFree} onCheckedChange={(v) => setValue("is_free", Boolean(v))} />
+            Gis bort gratis
+          </label>
+        )}
       </div>
       {errors.price_nok && (
         <p id="price-error" className="text-sm text-destructive">

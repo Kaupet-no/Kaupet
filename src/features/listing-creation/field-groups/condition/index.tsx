@@ -1,5 +1,5 @@
 import { Label } from "@/components/ui/label";
-import { CONDITIONS } from "@/lib/constants";
+import { CONDITIONS, VEHICLE_CONDITIONS } from "@/lib/constants";
 
 import type { WizardSharedProps, ListingFormShape } from "../types";
 import { RequiredMark } from "../required-mark";
@@ -8,13 +8,20 @@ import { RequiredMark } from "../required-mark";
  * Tilstand (condition). Web renders a grid of description-cards; native
  * renders a horizontal scrollable chip row plus a single description line
  * below — two genuinely different layouts preserved verbatim per platform.
+ * For Bil og MC (`isVehicle`), only the vehicle-appropriate subset
+ * (Ny/Brukt/Reparasjonsobjekt) is shown, reusing the same enum values.
  */
 export function Condition({
   native,
   setValue,
   condition,
   conditionDescription,
-}: Pick<WizardSharedProps, "native" | "setValue" | "condition" | "conditionDescription">) {
+  isVehicle,
+}: Pick<
+  WizardSharedProps,
+  "native" | "setValue" | "condition" | "conditionDescription" | "isVehicle"
+>) {
+  const options = isVehicle ? VEHICLE_CONDITIONS : CONDITIONS;
   if (native) {
     return (
       <section className="space-y-2">
@@ -27,7 +34,7 @@ export function Condition({
           aria-label="Tilstand"
           className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4"
         >
-          {CONDITIONS.map((c) => (
+          {options.map((c) => (
             <button
               key={c.value}
               type="button"
@@ -63,7 +70,7 @@ export function Condition({
         aria-label="Tilstand"
         className="grid grid-cols-2 gap-2 sm:grid-cols-3"
       >
-        {CONDITIONS.map((c) => (
+        {options.map((c) => (
           <button
             key={c.value}
             type="button"

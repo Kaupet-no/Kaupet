@@ -18,12 +18,12 @@ function capitalizeWord(value: unknown): string | null {
 }
 
 /**
- * Tittel + undertittel for kjøretøy-kategorier (de med en `brand_select`-
- * filter, se `vehicleCategoryGroupFor`): tittelen bygges automatisk av
- * Årsmodell/Merke/Modell (fylt av kjøretøyoppslaget eller manuelt valgt i
- * category-attributes-steget, som for disse kategoriene kommer før dette
- * steget), men brukeren kan alltid overstyre manuelt. Undertittel er fri
- * tekst for utstyrsvariant/modellkode/annen info. Eksportert slik at
+ * Tittel for kjøretøy-kategorier (de med en `brand_select`-filter, se
+ * `vehicleCategoryGroupFor`): tittelen bygges automatisk av Årsmodell/Merke/
+ * Modell (fylt av kjøretøyoppslaget eller manuelt valgt i category-
+ * attributes-steget, som for disse kategoriene kommer før dette steget), men
+ * brukeren kan alltid overstyre manuelt. Undertittel er flyttet til
+ * beskrivelse-steget (`description-keywords`) — se der. Eksportert slik at
  * redigeringsruten (som ikke gjenbruker hele TitlePhotos-komponenten) kan
  * bruke samme oppførsel.
  */
@@ -33,11 +33,10 @@ export function VehicleTitleFields({
   errors,
   touchedFields,
   title,
-  subtitle,
   attributes,
 }: Pick<
   WizardSharedProps,
-  "register" | "setValue" | "errors" | "touchedFields" | "title" | "subtitle" | "attributes"
+  "register" | "setValue" | "errors" | "touchedFields" | "title" | "attributes"
 >) {
   const [manualOverride, setManualOverride] = useState(false);
 
@@ -92,22 +91,6 @@ export function VehicleTitleFields({
             {errors.title.message}
           </p>
         )}
-      </div>
-
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label htmlFor="subtitle">
-            Undertittel <span className="font-normal text-muted-foreground">(valgfritt)</span>
-          </Label>
-          <span className="text-xs text-muted-foreground">{(subtitle ?? "").length} / 80</span>
-        </div>
-        <Input
-          id="subtitle"
-          placeholder="F.eks. Utstyrspakke, modellkode eller annen viktig info"
-          aria-invalid={!!errors.subtitle}
-          {...register("subtitle")}
-        />
-        {errors.subtitle && <p className="text-sm text-destructive">{errors.subtitle.message}</p>}
       </div>
     </section>
   );

@@ -151,6 +151,7 @@ export type WizardSharedProps = {
         seats: number;
         color: string;
         next_eu_control: string;
+        eu_control_exempt: boolean;
       }>;
     },
   ) => void | Promise<void>;

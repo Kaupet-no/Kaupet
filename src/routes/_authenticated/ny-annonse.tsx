@@ -874,6 +874,7 @@ function NewListingPage() {
         seats: number;
         color: string;
         next_eu_control: string;
+        eu_control_exempt: boolean;
       }>;
     },
   ) {
@@ -899,6 +900,7 @@ function NewListingPage() {
     if (color) next.color = color;
     const nextEuControl = spec?.next_eu_control ?? lookup.next_eu_control;
     if (nextEuControl) next.next_eu_control = nextEuControl;
+    if (spec?.eu_control_exempt != null) next.eu_control_exempt = spec.eu_control_exempt;
     const powerHk = spec?.power_hk ?? lookup.power_hk;
     if (powerHk != null) next.power_hk = powerHk;
     const driveType = spec?.drive_type ?? lookup.drive_type;

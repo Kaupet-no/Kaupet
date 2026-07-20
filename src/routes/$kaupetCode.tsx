@@ -603,6 +603,9 @@ function ListingDetailPage() {
     isVehicleCategory && typeof mileageKmRaw === "number" && Number.isFinite(mileageKmRaw)
       ? mileageKmRaw
       : null;
+  const euControlExemptRaw = attributes.eu_control_exempt;
+  const euControlExempt =
+    isVehicleCategory && typeof euControlExemptRaw === "boolean" ? euControlExemptRaw : null;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
@@ -627,7 +630,11 @@ function ListingDetailPage() {
             )}
           </div>
           {isVehicleCategory && (
-            <VehicleTechTable vehicleLookup={vehicleLookup} mileageKm={mileageKm} />
+            <VehicleTechTable
+              vehicleLookup={vehicleLookup}
+              mileageKm={mileageKm}
+              euControlExempt={euControlExempt}
+            />
           )}
           <section className="mt-8">
             <h2 className="font-display text-xl">Beskrivelse</h2>

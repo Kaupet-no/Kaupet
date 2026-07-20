@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { ImageUploader } from "@/components/image-uploader";
 import { useAllCategoryFilters } from "@/components/attribute-fields";
 import { vehicleCategoryGroupFor, type CategoryNode } from "@/lib/category-filters";
@@ -21,25 +20,19 @@ function capitalizeWord(value: unknown): string | null {
  * Tittel for kjøretøy-kategorier (de med en `brand_select`-filter, se
  * `vehicleCategoryGroupFor`): tittelen bygges automatisk av Årsmodell/Merke/
  * Modell (fylt av kjøretøyoppslaget eller manuelt valgt i category-
- * attributes-steget, som for disse kategoriene kommer før dette steget), men
- * brukeren kan alltid overstyre manuelt. Undertittel er flyttet til
+ * attributes-steget, som for disse kategoriene kommer før dette steget).
+ * Brukeren kan ikke redigere denne selv — kjøretøyannonser skal alltid ha en
+ * tittel generert av kjøretøysopplysningene. Undertittel er flyttet til
  * beskrivelse-steget (`description-keywords`) — se der. Eksportert slik at
  * redigeringsruten (som ikke gjenbruker hele TitlePhotos-komponenten) kan
  * bruke samme oppførsel.
  */
 export function VehicleTitleFields({
-  register,
   setValue,
   errors,
-  touchedFields,
   title,
   attributes,
-}: Pick<
-  WizardSharedProps,
-  "register" | "setValue" | "errors" | "touchedFields" | "title" | "attributes"
->) {
-  const [manualOverride, setManualOverride] = useState(false);
-
+}: Pick<WizardSharedProps, "setValue" | "errors" | "title" | "attributes">) {
   const computedTitle = [
     attributes.year,
     capitalizeWord(attributes.brand),
@@ -49,43 +42,21 @@ export function VehicleTitleFields({
     .join(" ");
 
   useEffect(() => {
-    if (manualOverride) return;
     if (computedTitle && computedTitle !== title) {
       setValue("title", computedTitle, { shouldValidate: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [computedTitle, manualOverride]);
+  }, [computedTitle]);
 
   return (
     <section className="space-y-4">
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label htmlFor="title">
-            Tittel
-            <RequiredMark />
-          </Label>
-          <div className="flex items-center gap-1.5">
-            <FieldValid show={!!touchedFields.title && !errors.title} />
-            <span className="text-xs text-muted-foreground">{(title ?? "").length} / 120</span>
-          </div>
+        <Label>Tittel</Label>
+        <div className="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
+          <span className={computedTitle ? "" : "text-muted-foreground"}>
+            {computedTitle || "Fylles ut fra Årsmodell, Merke og Modell"}
+          </span>
         </div>
-        {manualOverride ? (
-          <Input
-            id="title"
-            aria-invalid={!!errors.title}
-            aria-describedby={errors.title ? "title-error" : undefined}
-            {...register("title")}
-          />
-        ) : (
-          <div className="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
-            <span className={computedTitle ? "" : "text-muted-foreground"}>
-              {computedTitle || "Fylles ut fra Årsmodell, Merke og Modell"}
-            </span>
-            <Button type="button" size="sm" variant="ghost" onClick={() => setManualOverride(true)}>
-              Rediger manuelt
-            </Button>
-          </div>
-        )}
         {errors.title && (
           <p id="title-error" className="text-sm text-destructive">
             {errors.title.message}

@@ -63,6 +63,9 @@ export function VehicleTechTable({
     });
   if (vehicleLookup?.weight_kg)
     rows.push({ label: "Vekt", value: `${vehicleLookup.weight_kg} kg` });
+  if (vehicleLookup?.max_total_weight_kg)
+    rows.push({ label: "Tillatt totalvekt", value: `${vehicleLookup.max_total_weight_kg} kg` });
+  if (vehicleLookup?.length_m) rows.push({ label: "Lengde", value: `${vehicleLookup.length_m} m` });
   if (vehicleLookup?.tow_hitch != null)
     rows.push({
       label: "Hengerfeste",

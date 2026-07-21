@@ -131,6 +131,11 @@ type EditableSpec = {
   transmission: string;
   drive_type: string;
   weight_kg: string;
+  /** Tillatt totalvekt — kun relevant for varebil/bobil/campingvogn/tilhenger
+   * (se `showWeightAndLength` under). */
+  max_total_weight_kg: string;
+  /** Lengde i meter — samme kategorier som over. */
+  length_m: string;
   power_hk: string;
   tow_hitch: boolean;
   max_tow_weight_kg: string;
@@ -138,6 +143,12 @@ type EditableSpec = {
   color: string;
   next_eu_control: string;
   eu_control_exempt: boolean | null;
+  /** Antall soveplasser — kun relevant for bobil/campingvogn (se `isCamper`
+   * under). Statens vegvesens Enkeltoppslag-API har ikke dette feltet i det
+   * hele tatt (verifisert mot det reelle OpenAPI-skjemaet), så `lookup.
+   * sleeping_places` er alltid `null` — dette er derfor et rent manuelt felt,
+   * ikke en SVV-verdi brukeren kan korrigere. */
+  sleeping_places: string;
 };
 
 function specFromLookup(lookup: VehicleLookupResult | null): EditableSpec {
@@ -147,6 +158,9 @@ function specFromLookup(lookup: VehicleLookupResult | null): EditableSpec {
     transmission: lookup?.transmission ?? "",
     drive_type: lookup?.drive_type ?? "",
     weight_kg: lookup?.weight_kg != null ? String(lookup.weight_kg) : "",
+    max_total_weight_kg:
+      lookup?.max_total_weight_kg != null ? String(lookup.max_total_weight_kg) : "",
+    length_m: lookup?.length_m != null ? String(lookup.length_m) : "",
     power_hk: lookup?.power_hk != null ? String(lookup.power_hk) : "",
     tow_hitch: lookup?.tow_hitch ?? false,
     max_tow_weight_kg: lookup?.max_tow_weight_kg != null ? String(lookup.max_tow_weight_kg) : "",
@@ -157,6 +171,7 @@ function specFromLookup(lookup: VehicleLookupResult | null): EditableSpec {
     // Tempo 100-registrering, så dette kan aldri utledes automatisk — brukeren
     // må alltid svare eksplisitt (se spørsmålet under datakortet i UI-en).
     eu_control_exempt: null,
+    sleeping_places: lookup?.sleeping_places != null ? String(lookup.sleeping_places) : "",
   };
 }
 
@@ -167,6 +182,10 @@ function specOverridesFrom(spec: EditableSpec) {
     transmission: spec.transmission || undefined,
     drive_type: spec.drive_type || undefined,
     weight_kg: spec.weight_kg.trim() ? Number(spec.weight_kg) : undefined,
+    max_total_weight_kg: spec.max_total_weight_kg.trim()
+      ? Number(spec.max_total_weight_kg)
+      : undefined,
+    length_m: spec.length_m.trim() ? Number(spec.length_m) : undefined,
     power_hk: spec.power_hk.trim() ? Number(spec.power_hk) : undefined,
     tow_hitch: spec.tow_hitch,
     max_tow_weight_kg: spec.max_tow_weight_kg.trim() ? Number(spec.max_tow_weight_kg) : undefined,
@@ -174,6 +193,7 @@ function specOverridesFrom(spec: EditableSpec) {
     color: spec.color || undefined,
     next_eu_control: spec.next_eu_control || undefined,
     eu_control_exempt: spec.eu_control_exempt ?? undefined,
+    sleeping_places: spec.sleeping_places.trim() ? Number(spec.sleeping_places) : undefined,
   };
 }
 
@@ -190,8 +210,13 @@ function specOverridesFrom(spec: EditableSpec) {
  * drivstoff/girkasse/hjuldrift/vekt/effekt/hengerfeste/seter/farge/
  * EU-kontroll) are editable directly here via "Rediger opplysninger" — SVV
  * has no field for trim/variant badges (e.g. "N", "GTI"), so a manual model
- * correction is the only way to get those into the listing. The spec fields
- * are hidden from the later category-attributes ("Detaljer") step (see
+ * correction is the only way to get those into the listing. "Rediger
+ * opplysninger" is reserved for *correcting* SVV-fetched data, though — antall
+ * soveplasser (bobil/campingvogn) is never populated by SVV at all (the field
+ * doesn't exist in Enkeltoppslag's schema), so it's a required, always-visible
+ * input of its own further down, not tucked behind that toggle where a seller
+ * has no reason to think to look for a field we never claimed to have fetched.
+ * The spec fields are hidden from the later category-attributes ("Detaljer") step (see
  * VEHICLE_LOOKUP_FILTER_KEYS) so the user is never asked to fill them in
  * twice. If the user doesn't choose to edit, nothing here forces them to.
  *
@@ -320,6 +345,12 @@ export function VehicleConfirm({
   if (!vehicleLookupResult) return null;
   const lookup = vehicleLookupResult;
   const isTrailer = selectedSlug === "tilhenger-leaf";
+  const isCamper = selectedSlug === "bobil" || selectedSlug === "campingvogn";
+  /** Tillatt totalvekt og lengde er særlig relevant for varebil, bobil,
+   * campingvogn og tilhenger (nyttelast/kapasitet og parkerings-/garasjeplass
+   * er kjøpsrelevant på en måte de ikke er for en vanlig personbil/MC). */
+  const showWeightAndLength =
+    selectedSlug === "varebil" || isCamper || selectedSlug === "tilhenger-leaf";
 
   function setSpecField<K extends keyof EditableSpec>(key: K, value: EditableSpec[K]) {
     setSpec((s) => ({ ...s, [key]: value }));
@@ -463,6 +494,29 @@ export function VehicleConfirm({
                   onChange={(e) => setSpecField("weight_kg", e.target.value)}
                 />
               </div>
+              {showWeightAndLength && (
+                <div className="space-y-1">
+                  <Label htmlFor="vc-max-total-weight">Tillatt totalvekt (kg)</Label>
+                  <Input
+                    id="vc-max-total-weight"
+                    type="number"
+                    value={spec.max_total_weight_kg}
+                    onChange={(e) => setSpecField("max_total_weight_kg", e.target.value)}
+                  />
+                </div>
+              )}
+              {showWeightAndLength && (
+                <div className="space-y-1">
+                  <Label htmlFor="vc-length">Lengde (m)</Label>
+                  <Input
+                    id="vc-length"
+                    type="number"
+                    step="0.01"
+                    value={spec.length_m}
+                    onChange={(e) => setSpecField("length_m", e.target.value)}
+                  />
+                </div>
+              )}
               {!isTrailer && (
                 <div className="space-y-1">
                   <Label>Drivstoff</Label>
@@ -620,6 +674,18 @@ export function VehicleConfirm({
                   <dd>{spec.weight_kg} kg</dd>
                 </>
               )}
+              {showWeightAndLength && spec.max_total_weight_kg && (
+                <>
+                  <dt className="text-muted-foreground">Tillatt totalvekt</dt>
+                  <dd>{spec.max_total_weight_kg} kg</dd>
+                </>
+              )}
+              {showWeightAndLength && spec.length_m && (
+                <>
+                  <dt className="text-muted-foreground">Lengde</dt>
+                  <dd>{spec.length_m} m</dd>
+                </>
+              )}
             </dl>
 
             {/* Secondary fields collapsed by default — keeps the confirm
@@ -680,13 +746,6 @@ export function VehicleConfirm({
                     <dd>{spec.eu_control_exempt ? "Ja" : "Nei"}</dd>
                   </>
                 )}
-                {(selectedSlug === "bobil" || selectedSlug === "campingvogn") &&
-                  lookup.sleeping_places && (
-                    <>
-                      <dt className="text-muted-foreground">Antall soveplasser</dt>
-                      <dd>{lookup.sleeping_places}</dd>
-                    </>
-                  )}
                 {lookup.imported_used != null && (
                   <>
                     <dt className="text-muted-foreground">Bruktimportert</dt>
@@ -739,6 +798,24 @@ export function VehicleConfirm({
           </>
         )}
       </div>
+
+      {isCamper && (
+        <div className="space-y-1 rounded-md border border-border p-3">
+          <Label htmlFor="vc-sleeping-places">Antall soveplasser</Label>
+          <p className="text-xs text-muted-foreground">
+            Statens vegvesen har ikke denne opplysningen, så du må fylle den inn selv — den er
+            relevant for kjøpere og vises på annonsen.
+          </p>
+          <Input
+            id="vc-sleeping-places"
+            type="number"
+            min={0}
+            className="max-w-[140px]"
+            value={spec.sleeping_places}
+            onChange={(e) => setSpecField("sleeping_places", e.target.value)}
+          />
+        </div>
+      )}
 
       {isTrailer && (
         <div className="space-y-1 rounded-md border border-border p-3">

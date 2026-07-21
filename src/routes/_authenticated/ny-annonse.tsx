@@ -79,7 +79,7 @@ const listingSchema = z.object({
   condition: z.enum(["new", "like_new", "good", "acceptable", "for_parts"]).nullable().optional(),
   is_free: z.boolean(),
   can_ship: z.enum(["pickup", "ship", "both"]).nullable().optional(),
-  price_nok: z.union([z.coerce.number().int().min(0).max(10_000_000), z.literal("")]).optional(),
+  price_nok: z.union([z.coerce.number().int().min(0).max(999_999_999), z.literal("")]).optional(),
   postal_code: z
     .string()
     .trim()
@@ -471,31 +471,39 @@ function NewListingPage() {
     [fieldGroupKeys, native, isVehicle],
   );
 
-  const { step, setStep, currentPage, goNext, isFirst, isLast } = useListingSteps(pages);
+  const { step, setStep, currentPage, goNext, goBack, isFirst, isLast } = useListingSteps(pages);
 
-  /** Browser back should step the wizard backward instead of leaving the
-   * route entirely: push a history entry each time the step advances, and
-   * on popstate (back button or the in-page "Tilbake" button, which now
-   * delegates to `history.back()`) restore the step encoded in that entry
-   * — falling back to step 1 for the entry from before the first push.
-   * Mirrors the pushState/popstate pattern used by image-lightbox.tsx and
-   * map-overlay.tsx for overlay dismissal. */
-  const prevStepRef = useRef(step);
+  /** The in-page "Tilbake" button calls `goBack()` directly (see the footer
+   * button below) — it steps the wizard's own `pages` array backward and is
+   * unaffected by how many pages currently exist, so it stays correct even
+   * when `pages` changes shape at runtime (e.g. the vehicle-confirm page
+   * being inserted/removed for Bil og MC, see the effect below).
+   *
+   * The physical browser back button (and mobile swipe-back) should behave
+   * the same way instead of leaving the route entirely. We push a single
+   * guard entry on mount and, on every popstate while the wizard isn't on
+   * its first step, call the same `goBack()` and immediately re-push the
+   * guard so the browser history stack can never run out mid-wizard. There
+   * is no stored step number to go stale — `goBack` always acts on the live
+   * `pages` array, so this can't desync the way a stored step index could. */
   useEffect(() => {
-    if (step > prevStepRef.current) {
-      window.history.pushState({ wizardStep: step }, "");
-    }
-    prevStepRef.current = step;
-  }, [step]);
+    window.history.pushState({ wizardGuard: true }, "");
+  }, []);
 
+  const isFirstRef = useRef(isFirst);
+  isFirstRef.current = isFirst;
+  const goBackRef = useRef(goBack);
+  goBackRef.current = goBack;
   useEffect(() => {
-    function onPopState(e: PopStateEvent) {
-      const wizardStep = (e.state as { wizardStep?: number } | null)?.wizardStep;
-      setStep(wizardStep ?? 1);
+    function onPopState() {
+      if (!isFirstRef.current) {
+        goBackRef.current();
+        window.history.pushState({ wizardGuard: true }, "");
+      }
     }
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
-  }, [setStep]);
+  }, []);
 
   /** Stepping back from vehicle-confirm to vehicle-registration (via
    * "Tilbake") is the only way to reach vehicle-registration a second time —
@@ -520,7 +528,9 @@ function NewListingPage() {
     p.groups.some((g) => g.key === "category-attributes"),
   );
 
-  const shouldBlockNav = publishedId === null && (title.trim().length > 0 || images.length > 0);
+  const shouldBlockNav =
+    publishedId === null &&
+    (title.trim().length > 0 || images.length > 0 || vehicleLookupResult !== null);
   const blocker = useBlocker({
     shouldBlockFn: () => shouldBlockNav,
     withResolver: true,
@@ -908,6 +918,9 @@ function NewListingPage() {
         color: string;
         next_eu_control: string;
         eu_control_exempt: boolean;
+        sleeping_places: number;
+        max_total_weight_kg: number;
+        length_m: number;
       }>;
     },
   ) {
@@ -942,6 +955,10 @@ function NewListingPage() {
     if (towHitch != null) next.tow_hitch = towHitch;
     const maxTowWeightKg = spec?.max_tow_weight_kg ?? lookup.max_tow_weight_kg;
     if (maxTowWeightKg != null) next.max_tow_weight_kg = maxTowWeightKg;
+    const maxTotalWeightKg = spec?.max_total_weight_kg ?? lookup.max_total_weight_kg;
+    if (maxTotalWeightKg != null) next.max_total_weight_kg = maxTotalWeightKg;
+    const lengthM = spec?.length_m ?? lookup.length_m;
+    if (lengthM != null) next.length_m = lengthM;
     const seats = spec?.seats ?? lookup.seats;
     if (seats != null) next.seats = seats;
     if (lookup.imported_used != null) next.imported_used = lookup.imported_used;
@@ -951,7 +968,8 @@ function NewListingPage() {
     if (lookup.engine_displacement_cc != null)
       next.engine_displacement_cc = lookup.engine_displacement_cc;
     if (lookup.engine_code) next.engine_code = lookup.engine_code;
-    if (lookup.sleeping_places != null) next.sleeping_places = lookup.sleeping_places;
+    const sleepingPlaces = spec?.sleeping_places ?? lookup.sleeping_places;
+    if (sleepingPlaces != null) next.sleeping_places = sleepingPlaces;
     if (resolved?.brandName) next.brand = resolved.brandName;
     if (resolved?.modelName) next.model = resolved.modelName;
 
@@ -1008,7 +1026,13 @@ function NewListingPage() {
       return;
     }
 
-    const fields = groups.flatMap((g) => g.fieldsToValidate ?? []);
+    // For kjøretøy rendrer title-photos kun bilder (se TitlePhotos) — feltet
+    // "title" fylles først på description-keywords-steget (VehicleTitleFields),
+    // så det skal ikke valideres her, ellers blokkeres Neste stille uten
+    // synlig feilmelding.
+    const fields = groups
+      .flatMap((g) => g.fieldsToValidate ?? [])
+      .filter((f) => !(isVehicle && f === "title"));
     const valid = fields.length > 0 ? await trigger(fields) : true;
     if (!valid) return;
     const validateCtx = {
@@ -1410,7 +1434,7 @@ function NewListingPage() {
                 } flex items-center ${isFirst ? "justify-end" : "justify-between"}`}
               >
                 {!isFirst && (
-                  <Button type="button" variant="ghost" onClick={() => window.history.back()}>
+                  <Button type="button" variant="ghost" onClick={goBack}>
                     <ChevronLeft className="size-4" /> Tilbake
                   </Button>
                 )}

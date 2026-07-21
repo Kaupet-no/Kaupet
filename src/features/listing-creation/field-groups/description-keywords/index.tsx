@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { digitsOnlyClamped, formatThousands } from "@/lib/number-input";
 
 import type { WizardSharedProps } from "../types";
 import { FieldValid } from "../field-valid";
@@ -133,38 +134,49 @@ function SubtitleField({
   );
 }
 
+/** Highest mileage a vehicle can report — same cap as the price field, and
+ * for the same reason: clamp in the input itself instead of letting the user
+ * type past a limit and only finding out afterwards. */
+const MAX_MILEAGE_KM = 999_999_999;
+
 /**
  * Kilometerstand — kun for motoriserte kjøretøy (`showMileage`); skjules for
  * campingvogn og tilhenger, som ikke har kilometerteller. Lagres i
  * `attributes.mileage_km`, samme sted den publiserte annonsesiden allerede
- * leser den fra (se src/routes/$kaupetCode.tsx).
+ * leser den fra (se src/routes/$kaupetCode.tsx). Formateres som
+ * mellomrom-gruppert tall med "km"-etikett, samme mønster som prisfeltet.
  */
 function MileageField({
   attributes,
   onAttributesChange,
 }: Pick<WizardSharedProps, "attributes" | "onAttributesChange">) {
   const raw = attributes.mileage_km;
-  const value = typeof raw === "number" ? String(raw) : typeof raw === "string" ? raw : "";
   return (
     <section className="space-y-2">
       <Label htmlFor="mileage_km">
         Kilometerstand
         <RequiredMark />
       </Label>
-      <Input
-        id="mileage_km"
-        type="number"
-        min={0}
-        placeholder="km"
-        value={value}
-        onChange={(e) => {
-          const v = e.target.value;
-          const next = { ...attributes };
-          if (v === "") delete next.mileage_km;
-          else next.mileage_km = Number(v);
-          onAttributesChange(next);
-        }}
-      />
+      <div className="relative max-w-[200px]">
+        <Input
+          id="mileage_km"
+          type="text"
+          inputMode="numeric"
+          placeholder="0"
+          className="pr-10 text-right"
+          value={formatThousands(raw as string | number | undefined, MAX_MILEAGE_KM)}
+          onChange={(e) => {
+            const digits = digitsOnlyClamped(e.target.value, MAX_MILEAGE_KM);
+            const next = { ...attributes };
+            if (digits === "") delete next.mileage_km;
+            else next.mileage_km = Number(digits);
+            onAttributesChange(next);
+          }}
+        />
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+          km
+        </span>
+      </div>
     </section>
   );
 }
@@ -255,19 +267,20 @@ function VehicleConditionDetails({
  * of vehicle listing creation is images-only, and everything else about the
  * vehicle (beyond what Statens vegvesen-oppslaget already covers) lives on
  * one "Beskrivelse" step. Order: Tittel, Tilstand, Kilometerstand, Pris,
- * Undertittel, Beskrivelse, nøkkelord, feil/mangler, vedlikeholdshistorikk.
+ * Undertittel, Beskrivelse, nøkkelord, feil/mangler, vedlikeholdshistorikk,
+ * Tilstand (sistnevnte flyttet nederst, etter vedlikeholdshistorikk).
  */
 export function DescriptionKeywordsGroup(props: WizardSharedProps) {
   return (
     <>
       {props.isVehicle && <VehicleTitleFields {...props} />}
-      {props.isVehicle && <Condition {...props} />}
       {props.isVehicle && props.showMileage && <MileageField {...props} />}
       {props.isVehicle && <PriceGroup {...props} />}
       {props.isVehicle && <SubtitleField {...props} />}
       <DescriptionField {...props} />
       <KeywordChips {...props} />
       {props.isVehicle && <VehicleConditionDetails {...props} />}
+      {props.isVehicle && <Condition {...props} />}
     </>
   );
 }

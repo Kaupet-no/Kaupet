@@ -35,7 +35,11 @@ import { OwnerStatsPanel } from "@/components/listing-detail/owner-stats-panel";
 import { SellerContactPanel } from "@/components/listing-detail/seller-contact-panel";
 import { VehicleSpecBar } from "@/components/listing-detail/vehicle/vehicle-spec-bar";
 import { VehicleTechTable } from "@/components/listing-detail/vehicle/vehicle-tech-table";
-import { VEHICLE_LEAF_SLUGS, type VehicleLeafSlug } from "@/lib/vehicle-classification";
+import {
+  VEHICLE_LEAF_SLUGS,
+  computeOmregistreringsavgift,
+  type VehicleLeafSlug,
+} from "@/lib/vehicle-classification";
 import type { VehicleLookupResult } from "@/lib/vehicle-lookup.server";
 
 const ListingDetailMap = lazy(() =>
@@ -606,6 +610,18 @@ function ListingDetailPage() {
   const euControlExemptRaw = attributes.eu_control_exempt;
   const euControlExempt =
     isVehicleCategory && typeof euControlExemptRaw === "boolean" ? euControlExemptRaw : null;
+  const avgiftOverrideRaw = attributes.omregistreringsavgift_override_kr;
+  const omregistreringsavgiftKr = isVehicleCategory
+    ? typeof avgiftOverrideRaw === "number"
+      ? avgiftOverrideRaw
+      : computeOmregistreringsavgift(
+          (category?.slug as VehicleLeafSlug) ?? null,
+          vehicleLookup?.weight_kg ?? null,
+          vehicleLookup?.first_registration_date
+            ? Number(vehicleLookup.first_registration_date.slice(0, 4))
+            : null,
+        )
+    : null;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
@@ -687,6 +703,12 @@ function ListingDetailPage() {
                     (se galleriseksjonen) — her kun som fallback uten bilder. */}
                 {images.length === 0 && (
                   <p className="mt-3 font-display text-xl text-primary">{priceLabel}</p>
+                )}
+                {isVehicleCategory && omregistreringsavgiftKr != null && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    + {omregistreringsavgiftKr.toLocaleString("nb-NO")} kr i omregistreringsavgift
+                    til staten (betales av kjøper ved eierskifte)
+                  </p>
                 )}
               </div>
               {user && !isOwner && (

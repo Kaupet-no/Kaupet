@@ -35,10 +35,13 @@ import {
 } from "@/lib/category-filters";
 import { lookupVehicleByRegNumber } from "@/lib/vehicle-lookup.functions";
 import { matchVehicleBrandModel } from "@/lib/vehicle-brand-match.functions";
-import { classifyVehicleCategory } from "@/lib/vehicle-classification";
+import {
+  classifyVehicleCategory,
+  VEHICLE_LEAF_SLUGS_WITHOUT_MILEAGE,
+} from "@/lib/vehicle-classification";
 import { VEHICLE_LOOKUP_FILTER_KEYS } from "@/lib/vehicle-lookup.server";
 import type { VehicleLookupResult } from "@/lib/vehicle-lookup.server";
-import type { VehicleClassification } from "@/lib/vehicle-classification";
+import type { VehicleClassification, VehicleLeafSlug } from "@/lib/vehicle-classification";
 
 import { useIsDemo } from "@/hooks/use-is-demo";
 import { useAuth } from "@/hooks/use-auth";
@@ -55,7 +58,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { formatErrorMessage } from "@/lib/errors";
-import { CONDITIONS } from "@/lib/constants";
+import { CONDITIONS, VEHICLE_CONDITIONS } from "@/lib/constants";
 import { suggestCategoryForTitle } from "@/lib/category-suggestion.functions";
 import { suggestKeywordsForListing } from "@/lib/keyword-suggestion.functions";
 import { matchWtbListingsForListing } from "@/lib/wtb-listings.functions";
@@ -84,11 +87,21 @@ const listingSchema = z.object({
     .optional()
     .or(z.literal("")),
   city: z.string().trim().max(100).optional().or(z.literal("")),
+  known_issues: z.string().trim().max(2000).optional().or(z.literal("")),
+  no_known_issues: z.boolean().optional(),
+  maintenance_history: z.string().trim().max(2000).optional().or(z.literal("")),
 });
 type ListingForm = z.infer<typeof listingSchema>;
 
 const DRAFT_KEY = "kaupet_draft_ny_annonse";
 const DRAFT_ID_KEY = "kaupet_draft_id";
+
+/** Forces the Bil og MC beskrivelse step (description-keywords, which also
+ * carries Tittel/Tilstand/Kilometerstand/Pris for vehicles — see
+ * description-keywords/index.tsx) onto its own page, separate from
+ * title-photos (images only for vehicles) — see resolveWizardPages'
+ * `forceBreakBeforeKeys`. */
+const VEHICLE_FORCE_BREAK_BEFORE_KEYS = new Set(["description-keywords"]);
 
 const SIMILAR_STOPWORDS = new Set([
   "og",
@@ -355,7 +368,7 @@ function NewListingPage() {
   const { data: allFilters } = useAllCategoryFilters();
   const { data: allFlows } = useAllCategoryFlows();
   const categoriesById = useMemo(() => {
-    const m = new Map<string, CategoryNode & { name_nb: string }>();
+    const m = new Map<string, CategoryNode & { name_nb: string; slug?: string }>();
     for (const c of categories ?? []) m.set(c.id, c);
     return m;
   }, [categories]);
@@ -381,6 +394,9 @@ function NewListingPage() {
       price_nok: "",
       postal_code: "",
       city: "",
+      known_issues: "",
+      no_known_issues: false,
+      maintenance_history: "",
     },
   });
 
@@ -394,12 +410,26 @@ function NewListingPage() {
   const subtitle = watch("subtitle");
   const description = watch("description");
   const priceNok = watch("price_nok");
+  const knownIssues = watch("known_issues");
+  const noKnownIssues = watch("no_known_issues");
+  const maintenanceHistory = watch("maintenance_history");
 
   const missingFilters = useMemo(
     () =>
       getMissingRequiredFilters(categoryId || null, allFilters ?? [], categoriesById, attributes),
     [categoryId, allFilters, categoriesById, attributes],
   );
+
+  const isVehicle = useMemo(
+    () => vehicleCategoryGroupFor(categoryId || null, allFilters ?? [], categoriesById) !== null,
+    [categoryId, allFilters, categoriesById],
+  );
+
+  const showMileage = useMemo(() => {
+    if (!isVehicle) return false;
+    const slug = categoriesById.get(categoryId)?.slug;
+    return !VEHICLE_LEAF_SLUGS_WITHOUT_MILEAGE.includes(slug as VehicleLeafSlug);
+  }, [isVehicle, categoryId, categoriesById]);
 
   const activeModules = useMemo(
     () =>
@@ -432,10 +462,13 @@ function NewListingPage() {
 
   const pages: WizardPage[] = useMemo(
     () =>
-      resolveWizardPages(fieldGroupKeys, { native }).map((keys) => ({
+      resolveWizardPages(fieldGroupKeys, {
+        native,
+        forceBreakBeforeKeys: isVehicle ? VEHICLE_FORCE_BREAK_BEFORE_KEYS : undefined,
+      }).map((keys) => ({
         groups: fieldGroupsForKeys(keys),
       })),
-    [fieldGroupKeys, native],
+    [fieldGroupKeys, native, isVehicle],
   );
 
   const { step, setStep, currentPage, goNext, isFirst, isLast } = useListingSteps(pages);
@@ -874,6 +907,7 @@ function NewListingPage() {
         seats: number;
         color: string;
         next_eu_control: string;
+        eu_control_exempt: boolean;
       }>;
     },
   ) {
@@ -899,6 +933,7 @@ function NewListingPage() {
     if (color) next.color = color;
     const nextEuControl = spec?.next_eu_control ?? lookup.next_eu_control;
     if (nextEuControl) next.next_eu_control = nextEuControl;
+    if (spec?.eu_control_exempt != null) next.eu_control_exempt = spec.eu_control_exempt;
     const powerHk = spec?.power_hk ?? lookup.power_hk;
     if (powerHk != null) next.power_hk = powerHk;
     const driveType = spec?.drive_type ?? lookup.drive_type;
@@ -986,6 +1021,10 @@ function NewListingPage() {
       categoryId,
       bilOgMcCategoryId,
       vehicleLookupResult,
+      isVehicle,
+      knownIssues,
+      noKnownIssues: !!noKnownIssues,
+      showMileage,
     };
     for (const group of groups) {
       const result = group.validateExtra?.(validateCtx);
@@ -1107,6 +1146,9 @@ function NewListingPage() {
           can_ship: fieldGroupKeys.includes("delivery-location")
             ? values.can_ship !== "pickup"
             : null,
+          known_issues: isVehicle ? values.known_issues || null : null,
+          no_known_issues: isVehicle ? !!values.no_known_issues : null,
+          maintenance_history: isVehicle ? values.maintenance_history || null : null,
           attributes,
           turnstileToken,
         },
@@ -1158,7 +1200,9 @@ function NewListingPage() {
     },
   });
 
-  const conditionDescription = CONDITIONS.find((c) => c.value === condition)?.description;
+  const conditionDescription = (isVehicle ? VEHICLE_CONDITIONS : CONDITIONS).find(
+    (c) => c.value === condition,
+  )?.description;
 
   const parsedPriceNok =
     typeof priceNok === "number" ? priceNok : priceNok !== "" ? Number(priceNok) : NaN;
@@ -1184,6 +1228,8 @@ function NewListingPage() {
 
   const sharedProps: WizardSharedProps = {
     native,
+    isVehicle,
+    showMileage,
 
     register,
     watch,
@@ -1202,6 +1248,9 @@ function NewListingPage() {
     priceNok,
     postalCode,
     city,
+    knownIssues,
+    noKnownIssues: !!noKnownIssues,
+    maintenanceHistory,
 
     categories: categories ?? [],
     categoryLabel,
@@ -1308,14 +1357,14 @@ function NewListingPage() {
 
       {/* Sticky step indicator */}
       <div className="sticky top-0 z-10 -mx-4 bg-background/95 px-4 py-3 backdrop-blur border-b border-border mt-4">
-        <div className="flex items-center justify-between">
-          <StepIndicator step={step} pages={pages} native={native} />
-          {draftSaveError ? (
-            <p className="text-xs text-destructive">Utkast ble ikke lagret</p>
-          ) : (
-            savedTimeLabel && <p className="text-xs text-muted-foreground">{savedTimeLabel}</p>
-          )}
-        </div>
+        <StepIndicator step={step} pages={pages} native={native} />
+        {draftSaveError ? (
+          <p className="mt-1 text-right text-xs text-destructive">Utkast ble ikke lagret</p>
+        ) : (
+          savedTimeLabel && (
+            <p className="mt-1 text-right text-xs text-muted-foreground">{savedTimeLabel}</p>
+          )
+        )}
       </div>
 
       <form

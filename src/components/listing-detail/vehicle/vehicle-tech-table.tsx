@@ -28,9 +28,14 @@ type Row = { label: string; value: string };
 export function VehicleTechTable({
   vehicleLookup,
   mileageKm,
+  euControlExempt,
 }: {
   vehicleLookup: VehicleLookupResult | null;
   mileageKm: number | null;
+  /** Ikke en del av SVV-oppslaget — brukerens eget svar på om tilhengeren er
+   * fritatt for periodisk kjøretøykontroll, lagret som en vanlig attributt
+   * (ikke i `vehicle_lookup`-snapshoten). */
+  euControlExempt?: boolean | null;
 }) {
   const rows: Row[] = [];
 
@@ -80,8 +85,14 @@ export function VehicleTechTable({
     rows.push({ label: "Bruktimportert", value: vehicleLookup.imported_used ? "Ja" : "Nei" });
   if (vehicleLookup?.first_registration_date)
     rows.push({ label: "Førstegangsregistrering", value: vehicleLookup.first_registration_date });
-  if (vehicleLookup?.next_eu_control)
-    rows.push({ label: "Neste EU-kontroll", value: vehicleLookup.next_eu_control });
+  if (euControlExempt == null) {
+    if (vehicleLookup?.next_eu_control)
+      rows.push({ label: "Neste EU-kontroll", value: vehicleLookup.next_eu_control });
+  } else {
+    rows.push({ label: "Fritatt for EU-kontroll", value: euControlExempt ? "Ja" : "Nei" });
+    if (!euControlExempt && vehicleLookup?.next_eu_control)
+      rows.push({ label: "Neste EU-kontroll", value: vehicleLookup.next_eu_control });
+  }
   if (vehicleLookup?.vin) rows.push({ label: "VIN", value: vehicleLookup.vin });
 
   if (rows.length === 0) return null;

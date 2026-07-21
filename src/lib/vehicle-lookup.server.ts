@@ -106,6 +106,7 @@ export const VEHICLE_LOOKUP_FILTER_KEYS = [
   "seats",
   "color",
   "next_eu_control",
+  "eu_control_exempt",
 ] as const;
 
 const SVV_BASE_URL = "https://akfell-datautlevering.atlas.vegvesen.no/enkeltoppslag/kjoretoydata";

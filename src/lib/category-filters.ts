@@ -187,6 +187,17 @@ export function vehicleCategoryGroupFor(
   return (brandFilter?.unit as VehicleBrandGroup | undefined) ?? null;
 }
 
+/** Convenience boolean wrapper around `vehicleCategoryGroupFor`, for call
+ * sites that only need to know "is this a vehicle category?" without caring
+ * which brand group. */
+export function isVehicleCategory(
+  categoryId: string | null,
+  allFilters: CategoryFilter[],
+  categoriesById: Map<string, CategoryNode>,
+): boolean {
+  return vehicleCategoryGroupFor(categoryId, allFilters, categoriesById) !== null;
+}
+
 /**
  * Builds a " › "-separated breadcrumb label for a category by walking up its
  * parent chain, e.g. "Elektronikk › TV og lyd › TV". Works for any depth.

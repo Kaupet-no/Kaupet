@@ -35,6 +35,9 @@ export type VehicleClassification = {
   confidence: "high" | "low";
 };
 
+/** Matches "bobil"/"campingbil" (motorized) and, via the shared "camping"
+ * substring, also "campingvogn"/"campingtilhenger" (towed) — used both to
+ * upgrade a personbil to bobil and a tilhenger-leaf to campingvogn below. */
 const CAMPER_BODY_TYPE_HINTS = ["bobil", "campingbil", "camping"];
 
 function looksLikeCamper(bodyTypeHint: string | null): boolean {
@@ -69,15 +72,15 @@ const AVGIFTSKLASSE_TO_SLUG: Record<string, VehicleLeafSlug> = {
   "630": "atv-og-snoscooter", // Beltemotorsykkel (snøscooter)
   "701": "tilhenger-leaf",
   "702": "tilhenger-leaf",
-  "703": "tilhenger-leaf",
+  "703": "campingvogn", // Påhengsvogn (campingtilhenger)
   "709": "tilhenger-leaf",
   "711": "tilhenger-leaf",
   "712": "tilhenger-leaf",
-  "713": "tilhenger-leaf",
+  "713": "campingvogn", // Slepvogn (campingtilhenger)
   "719": "tilhenger-leaf",
   "721": "tilhenger-leaf",
   "722": "tilhenger-leaf",
-  "723": "tilhenger-leaf",
+  "723": "campingvogn", // Semitrailer (campingtilhenger)
   "729": "tilhenger-leaf",
 };
 
@@ -107,6 +110,12 @@ export function classifyVehicleCategory(
     ) {
       return { slug: "bobil", confidence: "high" };
     }
+    // Generic trailer avgiftsklasse codes (701/702/709/711/712/719/721/722/
+    // 729) don't distinguish campingtilhenger the way 703/713/723 do — fall
+    // back to the body-type hint here too, same as personbil -> bobil above.
+    if (avgiftsklasseSlug === "tilhenger-leaf" && looksLikeCamper(bodyTypeHint)) {
+      return { slug: "campingvogn", confidence: "high" };
+    }
     return { slug: avgiftsklasseSlug, confidence: "high" };
   }
 
@@ -129,6 +138,7 @@ export function classifyVehicleCategory(
     return { slug: "atv-og-snoscooter", confidence: "low" };
   }
   if (["O1", "O2", "O3", "O4"].includes(code)) {
+    if (looksLikeCamper(bodyTypeHint)) return { slug: "campingvogn", confidence: "high" };
     return { slug: "tilhenger-leaf", confidence: "high" };
   }
 
@@ -153,3 +163,83 @@ export const VEHICLE_LEAF_SLUGS_WITHOUT_MILEAGE: VehicleLeafSlug[] = [
   "campingvogn",
   "tilhenger-leaf",
 ];
+
+/**
+ * Omregistreringsavgift (re-registration fee), payable to the state on
+ * ownership transfer of any previously Norwegian-registered vehicle or
+ * trailer over 350 kg. Rates per Stortingets vedtak om omregistreringsavgift
+ * for 2026 (https://lovdata.no/LTI/forskrift/2025-12-18-2758 §1) — a fixed
+ * table by vehicle group and age, not a formula, so this needs a one-line
+ * update (`OMREGISTRERINGSAVGIFT_YEAR` + the rate table) whenever a new
+ * vedtak is published each December.
+ *
+ * Four groups (a-d in the vedtak):
+ *  a) Moped/motorsykkel/beltemotorsykkel (ATV/snøscooter) — flat, all ages.
+ *  b) Personbil — by egenvekt (≤1200 kg / >1200 kg).
+ *  c) Varebil/kombinert/campingbil (bobil)/buss t.o.m. 7500 kg — flat.
+ *  d) Biltilhenger/campingtilhenger med egenvekt over 350 kg — flat; trailers
+ *     at or under 350 kg pay no fee at all (own weight is what's checked, not
+ *     the max towable/lastet weight).
+ */
+export const OMREGISTRERINGSAVGIFT_YEAR = 2026;
+
+type AvgiftAgeBracket = "0-3" | "4-11" | "12+";
+
+function avgiftAgeBracket(firstRegistrationYear: number): AvgiftAgeBracket {
+  const age = OMREGISTRERINGSAVGIFT_YEAR - firstRegistrationYear;
+  if (age <= 3) return "0-3";
+  if (age <= 11) return "4-11";
+  return "12+";
+}
+
+const GROUP_A_LEAFS: VehicleLeafSlug[] = ["motorsykkel", "moped-og-scooter", "atv-og-snoscooter"];
+const GROUP_C_LEAFS: VehicleLeafSlug[] = ["varebil", "bobil"];
+const GROUP_D_LEAFS: VehicleLeafSlug[] = ["campingvogn", "tilhenger-leaf"];
+
+const GROUP_A_RATE_NOK = 645;
+const GROUP_B_RATE_NOK: Record<"le1200" | "gt1200", Record<AvgiftAgeBracket, number>> = {
+  le1200: { "0-3": 4918, "4-11": 3236, "12+": 1942 },
+  gt1200: { "0-3": 7505, "4-11": 4532, "12+": 1942 },
+};
+const GROUP_C_RATE_NOK: Record<AvgiftAgeBracket, number> = {
+  "0-3": 2459,
+  "4-11": 1553,
+  "12+": 1296,
+};
+const GROUP_D_RATE_NOK = 645;
+const GROUP_D_WEIGHT_THRESHOLD_KG = 350;
+
+/**
+ * Computes the omregistreringsavgift for a vehicle in NOK, or `null` when the
+ * leaf isn't subject to the fee at all (incl. group d at/under the 350 kg
+ * threshold — genuinely exempt, not "unknown"), or when required data
+ * (weight for personbil/tilhenger, first-registration year) is missing.
+ * Callers should fall back to linking Skatteetatens kalkulator on `null`
+ * rather than guessing.
+ */
+export function computeOmregistreringsavgift(
+  leafSlug: VehicleLeafSlug | null,
+  weightKg: number | null,
+  firstRegistrationYear: number | null,
+): number | null {
+  if (!leafSlug || firstRegistrationYear == null) return null;
+
+  if (GROUP_A_LEAFS.includes(leafSlug)) return GROUP_A_RATE_NOK;
+
+  const bracket = avgiftAgeBracket(firstRegistrationYear);
+
+  if (leafSlug === "personbil") {
+    if (weightKg == null) return null;
+    return GROUP_B_RATE_NOK[weightKg <= 1200 ? "le1200" : "gt1200"][bracket];
+  }
+
+  if (GROUP_C_LEAFS.includes(leafSlug)) return GROUP_C_RATE_NOK[bracket];
+
+  if (GROUP_D_LEAFS.includes(leafSlug)) {
+    if (weightKg == null) return null;
+    if (weightKg <= GROUP_D_WEIGHT_THRESHOLD_KG) return null;
+    return GROUP_D_RATE_NOK;
+  }
+
+  return null;
+}

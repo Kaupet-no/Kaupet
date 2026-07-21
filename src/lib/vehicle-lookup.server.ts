@@ -14,12 +14,14 @@
  * før dette går i prod.
  *
  * NB 2: Feltene lagt til i juli 2026 (effekt, hjuldrift, hengerfeste,
- * seter, bruktimport, sylindre/slagvolum/motorkode, soveplasser, girkasse)
- * er hentet fra Swagger-schemaet for `/v3/api-docs/Enkeltoppslag`, men
- * stiene er IKKE verifisert mot et reelt API-svar i denne økten. All
- * parsing under er derfor defensiv (optional chaining → null ved avvik) og
- * bør dobbeltsjekkes mot et faktisk respons-payload før det stoles blindt
- * på i produksjon.
+ * seter, bruktimport, sylindre/slagvolum/motorkode, girkasse) er hentet fra
+ * Swagger-schemaet for `/v3/api-docs/Enkeltoppslag`, men stiene er IKKE
+ * verifisert mot et reelt API-svar i denne økten. All parsing under er
+ * derfor defensiv (optional chaining → null ved avvik) og bør dobbeltsjekkes
+ * mot et faktisk respons-payload før det stoles blindt på i produksjon.
+ * (Soveplasser ble opprinnelig antatt å høre hjemme her også, men er
+ * fjernet igjen — se `sleeping_places` under, feltet finnes ikke i
+ * skjemaet.)
  *
  * NB 3: `classification_code` (EU-kjøretøyklasse, f.eks. "M1"/"N1"/"L3e"/
  * "O1") og `body_type_hint`/`body_type_code` (karosseritype) er lagt til
@@ -71,6 +73,15 @@ export type VehicleLookupResult = {
   transmission: string | null;
   color: string | null;
   weight_kg: number | null;
+  /** Tillatt totalvekt ("gross vehicle weight") — distinct from `weight_kg`
+   * (egenvekt, the vehicle's own empty weight). Most relevant for varebil,
+   * bobil, campingvogn and tilhenger, where the margin between the two
+   * (nyttelast/payload) matters to a buyer. */
+  max_total_weight_kg: number | null;
+  /** Vehicle length in meters — same unit as the pre-existing `length_m`
+   * category_filter (bobil/campingvogn already had a manual "Lengde" field;
+   * this makes it SVV-sourced like the rest of the spec instead). */
+  length_m: number | null;
   vin: string | null;
   next_eu_control: string | null;
   power_hk: number | null;
@@ -100,6 +111,8 @@ export const VEHICLE_LOOKUP_FILTER_KEYS = [
   "transmission",
   "drive_type",
   "weight_kg",
+  "max_total_weight_kg",
+  "length_m",
   "power_hk",
   "tow_hitch",
   "max_tow_weight_kg",
@@ -107,6 +120,7 @@ export const VEHICLE_LOOKUP_FILTER_KEYS = [
   "color",
   "next_eu_control",
   "eu_control_exempt",
+  "sleeping_places",
 ] as const;
 
 const SVV_BASE_URL = "https://akfell-datautlevering.atlas.vegvesen.no/enkeltoppslag/kjoretoydata";
@@ -272,13 +286,16 @@ export async function lookupVehicle(registrationNumber: string): Promise<Vehicle
             };
             karosseriOgLasteplan?: {
               rFarge?: Array<{ kodeNavn?: string }>;
-              antallSoveplasser?: number;
               karosseritype?: { kodeVerdi?: string; kodeNavn?: string };
             };
             vekter?: {
               egenvekt?: number;
+              tillattTotalvekt?: number;
               tekniskTillattVektPahengsvogn?: number;
               tillattTilhengervektMedBrems?: number;
+            };
+            dimensjoner?: {
+              lengde?: number;
             };
             motorOgDrivverk?: {
               motor?: Array<{
@@ -332,6 +349,13 @@ export async function lookupVehicle(registrationNumber: string): Promise<Vehicle
     transmission: mapTransmission(teknisk?.motorOgDrivverk?.girkassetype?.kodeNavn),
     color: nullifyPlaceholder(teknisk?.karosseriOgLasteplan?.rFarge?.[0]?.kodeNavn),
     weight_kg: teknisk?.vekter?.egenvekt ?? null,
+    max_total_weight_kg: teknisk?.vekter?.tillattTotalvekt ?? null,
+    // `dimensjoner.lengde` er i mm i SVV-skjemaet (samme konvensjon som andre
+    // dimensjonsfelt), konvertert her til meter for å matche den eksisterende
+    // `length_m`-category_filteren (tidligere kun et manuelt felt for bobil/
+    // campingvogn). Ikke verifisert mot et reelt respons-payload ennå — se
+    // NB 2.
+    length_m: teknisk?.dimensjoner?.lengde != null ? teknisk.dimensjoner.lengde / 1000 : null,
     vin: vehicle.kjoretoyId?.understellsnummer ?? null,
     next_eu_control: vehicle.periodiskKjoretoyKontroll?.kontrollfrist ?? null,
     power_hk: (() => {
@@ -350,7 +374,15 @@ export async function lookupVehicle(registrationNumber: string): Promise<Vehicle
     cylinders: fuelType !== "el" ? (motor?.antallSylindre ?? null) : null,
     engine_displacement_cc: fuelType !== "el" ? (motor?.slagvolum ?? null) : null,
     engine_code: fuelType !== "el" ? nullifyPlaceholder(motor?.motorKode) : null,
-    sleeping_places: teknisk?.karosseriOgLasteplan?.antallSoveplasser ?? null,
+    // Statens vegvesens Enkeltoppslag-API har ingen felt for antall
+    // soveplasser i det hele tatt (verifisert mot det reelle OpenAPI-skjemaet
+    // for /v3/api-docs/Enkeltoppslag, august 2026 — "antallSoveplasser"
+    // finnes ikke der; NB 2 lenger opp i filen tok feil om dette). Sannsynlig
+    // årsak: soveplasser er ikke en lovregulert teknisk/avgiftsrelevant
+    // opplysning slik vekt/seter/effekt er, så vognkortet/kjøretøyregisteret
+    // sporer det trolig ikke. `sleeping_places` er derfor alltid `null` her —
+    // selger må fylle det inn manuelt i vehicle-confirm (se EditableSpec).
+    sleeping_places: null,
     classification_code: nullifyPlaceholder(klassifisering?.tekniskKode?.kodeNavn),
     avgiftsklasse_code: nullifyPlaceholder(klassifisering?.kjoretoyAvgiftsKode?.kodeVerdi),
     avgiftsklasse_name: nullifyPlaceholder(klassifisering?.kjoretoyAvgiftsKode?.kodeNavn),

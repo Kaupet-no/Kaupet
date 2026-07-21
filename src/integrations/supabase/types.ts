@@ -766,8 +766,11 @@ export type Database = {
           id: string
           is_free: boolean
           kaupet_code: string
+          known_issues: string | null
           lat: number | null
           lng: number | null
+          maintenance_history: string | null
+          no_known_issues: boolean
           postal_code: string | null
           price_nok: number | null
           published_at: string | null
@@ -795,8 +798,11 @@ export type Database = {
           id?: string
           is_free?: boolean
           kaupet_code?: string
+          known_issues?: string | null
           lat?: number | null
           lng?: number | null
+          maintenance_history?: string | null
+          no_known_issues?: boolean
           postal_code?: string | null
           price_nok?: number | null
           published_at?: string | null
@@ -824,8 +830,11 @@ export type Database = {
           id?: string
           is_free?: boolean
           kaupet_code?: string
+          known_issues?: string | null
           lat?: number | null
           lng?: number | null
+          maintenance_history?: string | null
+          no_known_issues?: boolean
           postal_code?: string | null
           price_nok?: number | null
           published_at?: string | null

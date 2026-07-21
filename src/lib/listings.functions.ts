@@ -40,6 +40,9 @@ export const saveDraftListing = createServerFn({ method: "POST" })
         lat: z.number().nullable().optional(),
         lng: z.number().nullable().optional(),
         can_ship: z.boolean().nullable().optional(),
+        known_issues: z.string().trim().max(2000).nullable().optional(),
+        no_known_issues: z.boolean().nullable().optional(),
+        maintenance_history: z.string().trim().max(2000).nullable().optional(),
         attributes: attributesSchema.optional(),
       })
       .parse(input),
@@ -61,6 +64,11 @@ export const saveDraftListing = createServerFn({ method: "POST" })
       ...(data.lat !== undefined && { lat: data.lat }),
       ...(data.lng !== undefined && { lng: data.lng }),
       ...(data.can_ship !== undefined && { can_ship: data.can_ship }),
+      ...(data.known_issues !== undefined && { known_issues: data.known_issues }),
+      ...(data.no_known_issues !== undefined && { no_known_issues: !!data.no_known_issues }),
+      ...(data.maintenance_history !== undefined && {
+        maintenance_history: data.maintenance_history,
+      }),
       ...(data.attributes !== undefined && { attributes: data.attributes }),
     };
 
@@ -117,6 +125,9 @@ export const createListing = createServerFn({ method: "POST" })
         lat: z.number().nullable(),
         lng: z.number().nullable(),
         can_ship: z.boolean().nullable(),
+        known_issues: z.string().trim().max(2000).nullable().optional(),
+        no_known_issues: z.boolean().nullable().optional(),
+        maintenance_history: z.string().trim().max(2000).nullable().optional(),
         attributes: attributesSchema.optional(),
         turnstileToken: z.string().nullable().optional(),
       })
@@ -189,6 +200,9 @@ export const createListing = createServerFn({ method: "POST" })
       lat: data.lat,
       lng: data.lng,
       can_ship: data.can_ship,
+      known_issues: data.known_issues ?? null,
+      no_known_issues: !!data.no_known_issues,
+      maintenance_history: data.maintenance_history ?? null,
       ...(data.attributes !== undefined && { attributes: data.attributes }),
       status: "active" as const,
       published_at: new Date().toISOString(),

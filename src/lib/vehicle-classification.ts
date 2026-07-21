@@ -23,7 +23,8 @@
 export type VehicleLeafSlug =
   | "personbil"
   | "varebil"
-  | "bobil-og-campingvogn"
+  | "bobil"
+  | "campingvogn"
   | "motorsykkel"
   | "moped-og-scooter"
   | "atv-og-snoscooter"
@@ -53,9 +54,9 @@ const AVGIFTSKLASSE_TO_SLUG: Record<string, VehicleLeafSlug> = {
   "106": "personbil", // Ambulanse (personbil)
   "107": "personbil", // Leilighetsambulanse (personbil)
   "312": "personbil", // Begravelsesbil (personbil)
-  "313": "bobil-og-campingvogn", // Campingbil (personbil) før 1.1.2009
-  "316": "bobil-og-campingvogn", // Campingbil (personbil) etter 1.1.2009
-  "336": "bobil-og-campingvogn", // Campingbil (lastebil) før 1.1.2009
+  "313": "bobil", // Campingbil (personbil) før 1.1.2009
+  "316": "bobil", // Campingbil (personbil) etter 1.1.2009
+  "336": "bobil", // Campingbil (lastebil) før 1.1.2009
   "301": "varebil", // Kombinert bil
   "310": "varebil",
   "311": "varebil",
@@ -104,7 +105,7 @@ export function classifyVehicleCategory(
       avgiftsklasseSlug === "personbil" &&
       (looksLikeCamper(bodyTypeHint) || (sleepingPlaces ?? 0) > 0)
     ) {
-      return { slug: "bobil-og-campingvogn", confidence: "high" };
+      return { slug: "bobil", confidence: "high" };
     }
     return { slug: avgiftsklasseSlug, confidence: "high" };
   }
@@ -114,7 +115,7 @@ export function classifyVehicleCategory(
 
   if (code === "M1") {
     if (looksLikeCamper(bodyTypeHint) || (sleepingPlaces ?? 0) > 0) {
-      return { slug: "bobil-og-campingvogn", confidence: "high" };
+      return { slug: "bobil", confidence: "high" };
     }
     return { slug: "personbil", confidence: "high" };
   }
@@ -137,9 +138,18 @@ export function classifyVehicleCategory(
 export const VEHICLE_LEAF_SLUGS: VehicleLeafSlug[] = [
   "personbil",
   "varebil",
-  "bobil-og-campingvogn",
+  "bobil",
+  "campingvogn",
   "motorsykkel",
   "moped-og-scooter",
   "atv-og-snoscooter",
+  "tilhenger-leaf",
+];
+
+/** Vehicle leaves with no odometer — the annonseopprettelse "Kilometerstand"
+ * field is hidden (and not required) for these. `campingvogn` and
+ * `tilhenger-leaf` are towed, not motorized; every other leaf has an engine. */
+export const VEHICLE_LEAF_SLUGS_WITHOUT_MILEAGE: VehicleLeafSlug[] = [
+  "campingvogn",
   "tilhenger-leaf",
 ];

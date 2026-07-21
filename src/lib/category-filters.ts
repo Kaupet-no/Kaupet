@@ -23,11 +23,7 @@ export type FilterOption = { value: string; label_nb: string };
 
 /** For brand_select filters, `unit` stores which vehicle_brands.category_group to read from. */
 export type VehicleBrandGroup =
-  | "bil"
-  | "motorsykkel"
-  | "moped_atv"
-  | "bobil_campingvogn"
-  | "henger";
+  "bil" | "motorsykkel" | "moped_atv" | "bobil_campingvogn" | "henger";
 
 export const VEHICLE_BRAND_GROUP_LABELS_NB: Record<VehicleBrandGroup, string> = {
   bil: "Bil",

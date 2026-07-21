@@ -56,12 +56,7 @@ type FoundUser = {
 };
 
 type PendingAction =
-  | "grant"
-  | "revoke"
-  | "grant_demo"
-  | "revoke_demo"
-  | "grant_moderator"
-  | "revoke_moderator";
+  "grant" | "revoke" | "grant_demo" | "revoke_demo" | "grant_moderator" | "revoke_moderator";
 
 function AdminUsers() {
   const [input, setInput] = useState("");

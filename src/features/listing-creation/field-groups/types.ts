@@ -167,6 +167,14 @@ export type WizardSharedProps = {
         color: string;
         next_eu_control: string;
         eu_control_exempt: boolean;
+        sleeping_places: number;
+        max_total_weight_kg: number;
+        length_m: number;
+        imported_used: boolean;
+        first_registration_date: string;
+        cylinders: number;
+        engine_displacement_cc: number;
+        engine_code: string;
       }>;
     },
   ) => void | Promise<void>;

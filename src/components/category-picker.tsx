@@ -34,7 +34,7 @@ type Props = {
   /** Category ids that should be selectable as a terminal choice even though
    * they have children — e.g. "Bil og MC" itself, so the vehicle-first flow
    * can treat picking the top-level vehicle category as done, deferring the
-   * actual leaf (personbil/varebil/...) to the Statens Vegvesen lookup
+   * actual leaf (bil/motorsykkel/...) to the Statens Vegvesen lookup
    * instead of forcing manual drill-down. */
   selectableGroups?: string[];
   /** Admin use case (choosing a *parent* category rather than a leaf): shows

@@ -309,27 +309,33 @@ export function CategoryPicker({
 }) {
   const ALL = "__all__";
   const parents = useMemo(() => categories.filter((c) => c.parent_id == null), [categories]);
-  const childrenById = useMemo(() => {
+  const childrenByParent = useMemo(() => {
     const map = new Map<string, Category[]>();
-    for (const p of parents) {
-      map.set(
-        p.id,
-        categories.filter((c) => c.parent_id === p.id),
-      );
+    for (const c of categories) {
+      if (!c.parent_id) continue;
+      const arr = map.get(c.parent_id) ?? [];
+      arr.push(c);
+      map.set(c.parent_id, arr);
     }
     return map;
-  }, [categories, parents]);
+  }, [categories]);
 
-  // Derive main category from selected slugs (all selected must belong to same parent)
+  // Derive main category from selected slugs by walking up to the root
+  // ancestor, so the "hovedkategori" select reflects the right branch no
+  // matter which depth the user picked a subcategory at.
   const selectedCats = categories.filter((c) => selected.includes(c.slug));
   const firstSel = selectedCats[0];
-  const mainCat = firstSel
-    ? firstSel.parent_id == null
-      ? firstSel
-      : (categories.find((c) => c.id === firstSel.parent_id) ?? null)
-    : null;
+  const mainCat = useMemo(() => {
+    if (!firstSel) return null;
+    let cur = firstSel;
+    while (cur.parent_id) {
+      const parent = categories.find((c) => c.id === cur.parent_id);
+      if (!parent) break;
+      cur = parent;
+    }
+    return cur;
+  }, [firstSel, categories]);
   const mainSlug = mainCat?.slug ?? "";
-  const subs = mainCat ? (childrenById.get(mainCat.id) ?? []) : [];
   const selectedSubSlugs = new Set(
     selectedCats.filter((c) => c.parent_id != null).map((c) => c.slug),
   );
@@ -349,6 +355,33 @@ export function CategoryPicker({
     else onChange(Array.from(next));
   };
 
+  // Renders every descendant level below the main category, not just its
+  // direct children, indented by depth — so a 3-level branch like "Bil og
+  // MC" exposes leaves such as "Personbil" here too, matching the depth the
+  // create-listing and homepage category pickers already allow.
+  function renderLevel(parentId: string, depth: number) {
+    const items = childrenByParent.get(parentId) ?? [];
+    if (items.length === 0) return null;
+    return (
+      <div className={depth > 0 ? "ml-4 space-y-0.5" : "space-y-0.5"}>
+        {items.map((s) => (
+          <div key={s.id}>
+            <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted">
+              <Checkbox
+                checked={selectedSubSlugs.has(s.slug)}
+                onCheckedChange={() => toggleSub(s.slug)}
+              />
+              <span>{s.name_nb}</span>
+            </label>
+            {renderLevel(s.id, depth + 1)}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  const hasSubs = !!mainCat && (childrenByParent.get(mainCat.id) ?? []).length > 0;
+
   return (
     <section className="space-y-2">
       <Label className="text-sm font-medium">Kategori</Label>
@@ -365,24 +398,13 @@ export function CategoryPicker({
           ))}
         </SelectContent>
       </Select>
-      {mainCat && subs.length > 0 && (
+      {mainCat && hasSubs && (
         <div className="space-y-1.5">
           <p className="text-xs text-muted-foreground">
             Underkategorier (velg én eller flere — tomt = alle)
           </p>
-          <div className="grid max-h-56 grid-cols-1 gap-1 overflow-y-auto rounded-md border border-border p-2 sm:grid-cols-2">
-            {subs.map((s) => (
-              <label
-                key={s.id}
-                className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted"
-              >
-                <Checkbox
-                  checked={selectedSubSlugs.has(s.slug)}
-                  onCheckedChange={() => toggleSub(s.slug)}
-                />
-                <span>{s.name_nb}</span>
-              </label>
-            ))}
+          <div className="max-h-56 overflow-y-auto rounded-md border border-border p-2">
+            {renderLevel(mainCat.id, 0)}
           </div>
         </div>
       )}

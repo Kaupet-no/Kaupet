@@ -28,7 +28,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { createVehicleBrand, createVehicleModel } from "@/lib/vehicle-brands.functions";
-import { VEHICLE_LEAF_SLUGS, type VehicleLeafSlug } from "@/lib/vehicle-classification";
+import {
+  VEHICLE_LEAF_SLUGS,
+  avgiftskodeGruppeFromCode,
+  type AvgiftskodeGruppe,
+  type VehicleLeafSlug,
+} from "@/lib/vehicle-classification";
 import {
   VehicleBrandField,
   VehicleModelField,
@@ -39,14 +44,23 @@ import type { VehicleLookupResult } from "@/lib/vehicle-lookup.server";
 import type { WizardSharedProps } from "../types";
 
 const LEAF_LABELS_NB: Record<VehicleLeafSlug, string> = {
-  personbil: "Personbil",
-  varebil: "Varebil",
+  bil: "Bil",
   bobil: "Bobil",
   campingvogn: "Campingvogn",
   motorsykkel: "Motorsykkel",
   "moped-og-scooter": "Moped/scooter",
-  "atv-og-snoscooter": "ATV/snøscooter",
+  atv: "ATV",
+  snoscooter: "Snøscooter",
   "tilhenger-leaf": "Tilhenger",
+  "lastebil-og-henger": "Lastebil/henger",
+  "buss-og-minibuss": "Buss/minibuss",
+  "traktor-og-redskap": "Traktor/redskap",
+  anleggsmaskiner: "Anleggsmaskin",
+};
+
+const AVGIFTSKODE_GRUPPE_LABELS_NB: Record<AvgiftskodeGruppe, string> = {
+  personbil: "Personbil",
+  varebil: "Varebil",
 };
 
 const FUEL_TYPE_OPTIONS = [
@@ -188,8 +202,8 @@ type EditableSpec = {
   transmission: string;
   drive_type: string;
   weight_kg: string;
-  /** Tillatt totalvekt — kun relevant for varebil/bobil/campingvogn/tilhenger
-   * (se `showWeightAndLength` under). */
+  /** Tillatt totalvekt — kun relevant for bil/bobil/campingvogn/tilhenger/de
+   * tyngre kjøretøykategoriene (se `showWeightAndLength` under). */
   max_total_weight_kg: string;
   /** Lengde i meter — samme kategorier som over. */
   length_m: string;
@@ -211,6 +225,11 @@ type EditableSpec = {
   cylinders: string;
   engine_displacement_cc: string;
   engine_code: string;
+  /** Personbil/Varebil, utledet automatisk fra avgiftsklassekoden (se
+   * avgiftskodeGruppeFromCode) — kun relevant når kjøretøyet er klassifisert
+   * som "bil". Ikke et redigerbart felt (vises kun som informasjon), men
+   * lagres i attributes.avgiftskode_gruppe slik at det blir søkbart. */
+  avgiftskode_gruppe: AvgiftskodeGruppe | null;
 };
 
 function specFromLookup(lookup: VehicleLookupResult | null): EditableSpec {
@@ -240,6 +259,10 @@ function specFromLookup(lookup: VehicleLookupResult | null): EditableSpec {
     engine_displacement_cc:
       lookup?.engine_displacement_cc != null ? String(lookup.engine_displacement_cc) : "",
     engine_code: lookup?.engine_code ?? "",
+    avgiftskode_gruppe: avgiftskodeGruppeFromCode(
+      lookup?.avgiftsklasse_code ?? null,
+      lookup?.classification_code ?? null,
+    ),
   };
 }
 
@@ -269,6 +292,7 @@ function specOverridesFrom(spec: EditableSpec) {
       ? Number(spec.engine_displacement_cc)
       : undefined,
     engine_code: spec.engine_code || undefined,
+    avgiftskode_gruppe: spec.avgiftskode_gruppe ?? undefined,
   };
 }
 
@@ -455,11 +479,16 @@ export function VehicleConfirm({
   const lookup = vehicleLookupResult;
   const isTrailer = selectedSlug === "tilhenger-leaf";
   const isCamper = selectedSlug === "bobil" || selectedSlug === "campingvogn";
-  /** Tillatt totalvekt og lengde er særlig relevant for varebil, bobil,
-   * campingvogn og tilhenger (nyttelast/kapasitet og parkerings-/garasjeplass
-   * er kjøpsrelevant på en måte de ikke er for en vanlig personbil/MC). */
+  /** Tillatt totalvekt og lengde er særlig relevant for bil, bobil,
+   * campingvogn, tilhenger og de tyngre kjøretøykategoriene (nyttelast/
+   * kapasitet og parkerings-/garasjeplass er kjøpsrelevant på en måte de
+   * ikke er for MC/moped/ATV/snøscooter). */
   const showWeightAndLength =
-    selectedSlug === "varebil" || isCamper || selectedSlug === "tilhenger-leaf";
+    selectedSlug === "bil" ||
+    isCamper ||
+    selectedSlug === "tilhenger-leaf" ||
+    selectedSlug === "lastebil-og-henger" ||
+    selectedSlug === "buss-og-minibuss";
 
   function setSpecField<K extends keyof EditableSpec>(key: K, value: EditableSpec[K]) {
     setSpec((s) => ({ ...s, [key]: value }));
@@ -498,6 +527,15 @@ export function VehicleConfirm({
             </button>
           ))}
         </div>
+        {selectedSlug === "bil" && spec.avgiftskode_gruppe && (
+          <p className="text-sm text-muted-foreground">
+            Avgiftskode:{" "}
+            <span className="font-medium text-foreground">
+              {AVGIFTSKODE_GRUPPE_LABELS_NB[spec.avgiftskode_gruppe]}
+            </span>{" "}
+            (hentet fra Statens vegvesen, brukes til søk og filtrering)
+          </p>
+        )}
       </div>
 
       {vehiclePreviousClassificationMismatch && (

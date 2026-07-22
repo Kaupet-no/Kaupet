@@ -29,7 +29,10 @@ import {
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { createVehicleBrand, createVehicleModel } from "@/lib/vehicle-brands.functions";
 import { VEHICLE_LEAF_SLUGS, type VehicleLeafSlug } from "@/lib/vehicle-classification";
-import { VehicleModelField } from "@/features/listing-creation/modules/generic-attributes/vehicle-brand-model-fields";
+import {
+  VehicleBrandField,
+  VehicleModelField,
+} from "@/features/listing-creation/modules/generic-attributes/vehicle-brand-model-fields";
 import type { VehicleBrandGroup } from "@/lib/category-filters";
 import type { VehicleLookupResult } from "@/lib/vehicle-lookup.server";
 
@@ -63,6 +66,53 @@ const DRIVE_TYPE_OPTIONS = [
   { value: "bakhjul", label: "Bakhjulsdrift" },
   { value: "forhjul", label: "Forhjulsdrift" },
 ];
+
+/** Mirrors the `color` category_filters options (see
+ * supabase/migrations/20260722100000_vehicle_color_select_options.sql) so
+ * registered and manually-entered vehicles store the same fixed values —
+ * needed for the "uregistrert" search filter to work identically either way. */
+const COLOR_OPTIONS = [
+  { value: "black", label: "Svart" },
+  { value: "white", label: "Hvit" },
+  { value: "silver", label: "Sølv" },
+  { value: "gray", label: "Grå" },
+  { value: "red", label: "Rød" },
+  { value: "blue", label: "Blå" },
+  { value: "green", label: "Grønn" },
+  { value: "yellow", label: "Gul" },
+  { value: "orange", label: "Oransje" },
+  { value: "brown", label: "Brun" },
+  { value: "beige", label: "Beige" },
+  { value: "purple", label: "Lilla" },
+  { value: "other", label: "Annen farge" },
+];
+
+/** SVV returns color as free text (e.g. "SORT", "SØLV METALLIC") — best-effort
+ * maps it onto the fixed color list as a preselected suggestion the user can
+ * correct via the dropdown, rather than leaving the field empty or storing
+ * raw text that wouldn't match the "manual entry" path's fixed values. */
+function guessColorOption(raw: string | null | undefined): string {
+  if (!raw) return "";
+  const s = raw.toLowerCase();
+  const matchers: [string, string[]][] = [
+    ["black", ["sort", "svart"]],
+    ["white", ["hvit"]],
+    ["silver", ["sølv", "solv"]],
+    ["gray", ["grå", "gra"]],
+    ["red", ["rød", "rod"]],
+    ["blue", ["blå", "bla"]],
+    ["green", ["grønn", "gronn"]],
+    ["yellow", ["gul"]],
+    ["orange", ["oransje"]],
+    ["brown", ["brun"]],
+    ["beige", ["beige"]],
+    ["purple", ["lilla", "fiolett"]],
+  ];
+  for (const [value, keywords] of matchers) {
+    if (keywords.some((k) => s.includes(k))) return value;
+  }
+  return "other";
+}
 
 /** `next_eu_control` is stored/submitted as an ISO date (`yyyy-MM-dd`) —
  * matching the format SVV's `kontrollfrist` already comes in as — but shown
@@ -177,7 +227,7 @@ function specFromLookup(lookup: VehicleLookupResult | null): EditableSpec {
     tow_hitch: lookup?.tow_hitch ?? false,
     max_tow_weight_kg: lookup?.max_tow_weight_kg != null ? String(lookup.max_tow_weight_kg) : "",
     seats: lookup?.seats != null ? String(lookup.seats) : "",
-    color: lookup?.color ?? "",
+    color: guessColorOption(lookup?.color),
     next_eu_control: lookup?.next_eu_control ?? "",
     // Statens vegvesen-oppslaget inneholder ikke pålitelig informasjon om
     // Tempo 100-registrering, så dette kan aldri utledes automatisk — brukeren
@@ -279,7 +329,10 @@ export function VehicleConfirm({
   const [pendingModelName, setPendingModelName] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [spec, setSpec] = useState<EditableSpec>(() => specFromLookup(vehicleLookupResult));
+  const [brandOverride, setBrandOverride] = useState<string | null>(null);
   const [modelOverride, setModelOverride] = useState<string | null>(null);
+  const [addingBrand, setAddingBrand] = useState(false);
+  const [newBrandName, setNewBrandName] = useState("");
   const [addingModel, setAddingModel] = useState(false);
   const [newModelName, setNewModelName] = useState("");
   /** Fixed at mount from the raw lookup, not `spec.drive_type` — so the
@@ -353,6 +406,26 @@ export function VehicleConfirm({
         setConfirmValue(null);
         setPendingModelName(null);
       }
+    }
+  }
+
+  /** Used when the desired brand isn't in the dropdown at all — adds it as a
+   * new pending-approval brand, same as an auto-detected-but-unmatched value. */
+  async function submitNewBrand() {
+    const name = newBrandName.trim();
+    if (!name || !categoryGroup) return;
+    try {
+      const brand = await createVehicleBrand({ data: { name, categoryGroup } });
+      setBrandOverride(brand.name);
+      setBrandName(brand.name);
+      setBrandId(brand.id);
+      setModelOverride(null);
+      setModelName(null);
+      showSuccessToast(`«${brand.name}» er sendt til godkjenning.`);
+      setAddingBrand(false);
+      setNewBrandName("");
+    } catch {
+      showErrorToast("Klarte ikke å legge til nytt merke. Prøv igjen.");
     }
   }
 
@@ -462,7 +535,11 @@ export function VehicleConfirm({
           <p className="mt-1 text-muted-foreground">
             Tittel blir:{" "}
             <span className="font-medium text-foreground">
-              {[spec.year, brandName ?? lookup.brand, modelOverride ?? modelName ?? lookup.model]
+              {[
+                spec.year,
+                brandOverride ?? brandName ?? lookup.brand,
+                modelOverride ?? modelName ?? lookup.model,
+              ]
                 .filter(Boolean)
                 .join(" ")}
             </span>
@@ -476,9 +553,51 @@ export function VehicleConfirm({
           <div className="mt-3 space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2 space-y-1">
+                <VehicleBrandField
+                  categoryGroup={categoryGroup ?? "bil"}
+                  value={brandOverride ?? brandName ?? lookup.brand ?? undefined}
+                  onChange={(v) => {
+                    setBrandOverride(v ?? null);
+                    // Modellisten avhenger av merket, så en tidligere valgt
+                    // modell gir ikke lenger mening når merket endres.
+                    setModelOverride(null);
+                    setModelName(null);
+                  }}
+                />
+                {addingBrand ? (
+                  <div className="flex gap-2">
+                    <Input
+                      value={newBrandName}
+                      onChange={(e) => setNewBrandName(e.target.value)}
+                      placeholder="F.eks. BYD"
+                      className="flex-1"
+                    />
+                    <Button type="button" size="sm" onClick={() => void submitNewBrand()}>
+                      Legg til
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setAddingBrand(false)}
+                    >
+                      Avbryt
+                    </Button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setAddingBrand(true)}
+                    className="text-xs text-primary underline-offset-2 hover:underline"
+                  >
+                    Fant du ikke merket? Legg til nytt
+                  </button>
+                )}
+              </div>
+              <div className="col-span-2 space-y-1">
                 <VehicleModelField
                   categoryGroup={categoryGroup ?? "bil"}
-                  brandName={brandName ?? undefined}
+                  brandName={brandOverride ?? brandName ?? undefined}
                   value={modelOverride ?? modelName ?? lookup.model ?? undefined}
                   onChange={(v) => setModelOverride(v ?? null)}
                 />
@@ -617,11 +736,18 @@ export function VehicleConfirm({
               )}
               <div className="space-y-1">
                 <Label htmlFor="vc-color">Farge</Label>
-                <Input
-                  id="vc-color"
-                  value={spec.color}
-                  onChange={(e) => setSpecField("color", e.target.value)}
-                />
+                <Select value={spec.color} onValueChange={(v) => setSpecField("color", v)}>
+                  <SelectTrigger id="vc-color">
+                    <SelectValue placeholder="Velg…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COLOR_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               {!isTrailer && (
                 <div className="space-y-1">
@@ -708,10 +834,10 @@ export function VehicleConfirm({
         ) : (
           <>
             <dl className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1">
-              {(brandName ?? lookup.brand) && (
+              {(brandOverride ?? brandName ?? lookup.brand) && (
                 <>
                   <dt className="text-muted-foreground">Merke</dt>
-                  <dd>{brandName ?? lookup.brand}</dd>
+                  <dd>{brandOverride ?? brandName ?? lookup.brand}</dd>
                 </>
               )}
               {(modelOverride ?? modelName ?? lookup.model) && (
@@ -830,7 +956,9 @@ export function VehicleConfirm({
                 {spec.color && (
                   <>
                     <dt className="text-muted-foreground">Farge</dt>
-                    <dd>{spec.color}</dd>
+                    <dd>
+                      {COLOR_OPTIONS.find((o) => o.value === spec.color)?.label ?? spec.color}
+                    </dd>
                   </>
                 )}
                 {spec.next_eu_control && (
@@ -973,7 +1101,7 @@ export function VehicleConfirm({
               const leaf = selectedSlug ? leafBySlug.get(selectedSlug) : null;
               if (leaf)
                 void confirmVehicleData(leaf.id, {
-                  brandName: brandName ?? undefined,
+                  brandName: brandOverride ?? brandName ?? undefined,
                   modelName: modelOverride ?? modelName ?? undefined,
                   specOverrides: specOverridesFrom(spec),
                 });
@@ -993,12 +1121,21 @@ export function VehicleConfirm({
             </AlertDialogTitle>
             <AlertDialogDescription>
               Stemmer dette? Vi bruker det på annonsen din nå, og sender det til intern godkjenning
-              før det blir valgbart for andre.
+              før det blir valgbart for andre. Stemmer det ikke, kan du velge riktig{" "}
+              {confirmValue?.kind === "brand" ? "merke" : "modell"} selv fra listen vår i stedet.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setConfirmValue(null)}>Avbryt</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmAddValue}>Legg til</AlertDialogAction>
+            <AlertDialogCancel
+              onClick={() => {
+                setConfirmValue(null);
+                setPendingModelName(null);
+                setEditing(true);
+              }}
+            >
+              Nei, velg selv
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={confirmAddValue}>Ja, stemmer</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

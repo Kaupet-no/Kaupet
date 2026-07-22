@@ -39,7 +39,10 @@ import {
   classifyVehicleCategory,
   VEHICLE_LEAF_SLUGS_WITHOUT_MILEAGE,
 } from "@/lib/vehicle-classification";
-import { VEHICLE_LOOKUP_FILTER_KEYS } from "@/lib/vehicle-lookup.server";
+import {
+  VEHICLE_LOOKUP_FILTER_KEYS,
+  VEHICLE_WIZARD_MANAGED_KEYS,
+} from "@/lib/vehicle-lookup.server";
 import type { VehicleLookupResult } from "@/lib/vehicle-lookup.server";
 import type { VehicleClassification, VehicleLeafSlug } from "@/lib/vehicle-classification";
 
@@ -443,7 +446,10 @@ function NewListingPage() {
     [categoryId, allFlows, categoriesById],
   );
 
-  const vehicleAttributeHiddenKeys = vehicleLookupResult ? VEHICLE_LOOKUP_FILTER_KEYS : undefined;
+  const vehicleAttributeHiddenKeys = [
+    ...(vehicleLookupResult ? VEHICLE_LOOKUP_FILTER_KEYS : []),
+    ...VEHICLE_WIZARD_MANAGED_KEYS,
+  ];
 
   const baseFieldGroupKeys = useMemo(
     () => effectiveFlowForCategory(categoryId || null, allFlows ?? [], categoriesById).fieldGroups,
@@ -1327,6 +1333,22 @@ function NewListingPage() {
       setCategorySuggestion(null);
       if (currentPage?.groups?.some((g) => g.key === "category-select")) {
         goToNextPage();
+      } else if (
+        currentPage?.groups?.some((g) => g.key === "vehicle-registration") &&
+        id !== bilOgMcCategoryId
+      ) {
+        // Uregistrert kjøretøy: lagre det som et eget, søkbart attributt (i
+        // stedet for bare transient wizard-state) og rydd bort ev. tidligere
+        // SVV-oppslagsdata, symmetrisk med is_registered: true i
+        // confirmVehicleData. Ikke goNext() her — brukeren skal fylle inn de
+        // samme tekniske feltene manuelt rett under kategorivelgeren på dette
+        // steget før de går videre (se VehicleRegistration).
+        setAttributes((prev) => {
+          const next: AttributeMap = { ...prev, is_registered: false };
+          delete next.registration_number;
+          delete next.vehicle_lookup;
+          return next;
+        });
       }
     },
     categorySuggestion,

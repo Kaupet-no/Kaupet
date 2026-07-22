@@ -9,13 +9,12 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { reconcilePromotionPayment } from "@/lib/promotions.functions";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Loader2, MapPin } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { z } from "zod";
 import { useIsNative } from "@/hooks/use-is-native";
-import { NativePageHeader } from "@/components/native-page-header";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import { useIsModerator } from "@/hooks/use-is-moderator";
 import { ListingActionsMenu } from "@/components/listing-detail/listing-actions-menu";
@@ -28,42 +27,10 @@ import { type Category } from "@/lib/categories";
 import { normalizeSlugForMatch } from "@/lib/slug";
 
 import { signListingImageUrls } from "@/lib/storage";
-import { CONDITION_LABEL, VEHICLE_CONDITION_LABEL } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
-import { ImageGallery } from "@/components/listing-detail/image-gallery";
 import { OwnerStatsPanel } from "@/components/listing-detail/owner-stats-panel";
 import { SellerContactPanel } from "@/components/listing-detail/seller-contact-panel";
-import { VehicleSpecBar } from "@/components/listing-detail/vehicle/vehicle-spec-bar";
-import { VehicleTechTable } from "@/components/listing-detail/vehicle/vehicle-tech-table";
-import {
-  VEHICLE_LEAF_SLUGS,
-  computeOmregistreringsavgift,
-  type VehicleLeafSlug,
-} from "@/lib/vehicle-classification";
-import type { VehicleLookupResult } from "@/lib/vehicle-lookup.server";
-
-const ListingDetailMap = lazy(() =>
-  import("@/components/listing-detail-map").then((m) => ({ default: m.ListingDetailMap })),
-);
-const ImageLightbox = lazy(() =>
-  import("@/components/listing-detail/image-lightbox").then((m) => ({ default: m.ImageLightbox })),
-);
-const MapOverlay = lazy(() =>
-  import("@/components/listing-detail/map-overlay").then((m) => ({ default: m.MapOverlay })),
-);
-
-function LightboxLoadingFallback() {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80"
-      role="status"
-      aria-live="polite"
-    >
-      <Loader2 className="size-8 animate-spin text-muted-foreground" aria-hidden="true" />
-      <span className="sr-only">Laster …</span>
-    </div>
-  );
-}
+import { ListingDetailView } from "@/components/listing-detail/listing-detail-view";
 
 // crypto.randomUUID() requires a secure context and isn't available in every
 // WebView — fall back to a non-crypto random ID so anonymous view-count
@@ -317,9 +284,7 @@ function ListingDetailPage() {
   const isNative = useIsNative();
   const { data: isAdmin } = useIsAdmin();
   const { data: isModerator } = useIsModerator();
-  const [activeImage, setActiveImage] = useState(0);
   const [imgUrls, setImgUrls] = useState<Record<string, string>>({});
-  const [mounted, setMounted] = useState(false);
   const [statsInfoOpen, setStatsInfoOpen] = useState(false);
   const [promoteOpen, setPromoteOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -327,11 +292,6 @@ function ListingDetailPage() {
   const fromSearch = useRouterState({
     select: (s) => (s.location.state as { fromSearch?: boolean } | null)?.fromSearch === true,
   });
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const [mapOverlayOpen, setMapOverlayOpen] = useState(false);
-  const closeLightbox = useCallback(() => setLightboxIndex(null), []);
-  const closeMapOverlay = useCallback(() => setMapOverlayOpen(false), []);
-  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     const last = readLastSearchContext();
@@ -587,268 +547,71 @@ function ListingDetailPage() {
   }
   if (!data) return null;
 
-  const priceLabel = data.is_free
-    ? "Gis bort"
-    : data.price_nok != null
-      ? `${data.price_nok.toLocaleString("nb-NO")} kr`
-      : "Pris ved henvendelse";
-
   const seller = data.seller;
   const category = Array.isArray(data.categories) ? data.categories[0] : data.categories;
-
   const attributes = (data.attributes ?? {}) as Record<string, unknown>;
-  const isVehicleCategory =
-    !!category?.slug && VEHICLE_LEAF_SLUGS.includes(category.slug as VehicleLeafSlug);
-  const vehicleLookup = isVehicleCategory
-    ? ((attributes.vehicle_lookup as VehicleLookupResult | undefined) ?? null)
-    : null;
-  const mileageKmRaw = attributes.mileage_km;
-  const mileageKm =
-    isVehicleCategory && typeof mileageKmRaw === "number" && Number.isFinite(mileageKmRaw)
-      ? mileageKmRaw
-      : null;
-  const euControlExemptRaw = attributes.eu_control_exempt;
-  const euControlExempt =
-    isVehicleCategory && typeof euControlExemptRaw === "boolean" ? euControlExemptRaw : null;
-  const avgiftOverrideRaw = attributes.omregistreringsavgift_override_kr;
-  const omregistreringsavgiftKr = isVehicleCategory
-    ? typeof avgiftOverrideRaw === "number"
-      ? avgiftOverrideRaw
-      : computeOmregistreringsavgift(
-          (category?.slug as VehicleLeafSlug) ?? null,
-          vehicleLookup?.weight_kg ?? null,
-          vehicleLookup?.first_registration_date
-            ? Number(vehicleLookup.first_registration_date.slice(0, 4))
-            : null,
-        )
-    : null;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
-      <NativePageHeader title={data.title} />
-      {!isNative && <BackNavLink target={backTarget} onHistoryBack={() => router.history.back()} />}
-
-      <div className="mt-4 grid gap-8 md:grid-cols-[1.4fr_1fr]">
-        <div>
-          <div className="relative mb-6">
-            <ImageGallery
-              images={images}
-              imgUrls={imgUrls}
-              activeImage={activeImage}
-              onSelect={setActiveImage}
-              title={data.title}
-              onImageClick={images.length > 0 ? setLightboxIndex : undefined}
-            />
-            {images.length > 0 && (
-              <div className="absolute -bottom-4 left-4 rounded-xl border border-border bg-card px-4 py-2.5 shadow-lg">
-                <p className="font-display text-xl leading-none text-primary">{priceLabel}</p>
-              </div>
-            )}
-          </div>
-          {isVehicleCategory && (
-            <VehicleTechTable
-              vehicleLookup={vehicleLookup}
-              mileageKm={mileageKm}
-              euControlExempt={euControlExempt}
-            />
-          )}
-          <section className="mt-8">
-            <h2 className="font-display text-xl">Beskrivelse</h2>
-            <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
-              {data.description}
-            </p>
-          </section>
-
-          {isVehicleCategory && (
-            <section className="mt-8">
-              <h2 className="font-display text-xl">Kjente feil og mangler</h2>
-              <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
-                {data.no_known_issues
-                  ? "Ingen kjente feil eller mangler oppgitt av selger"
-                  : data.known_issues}
-              </p>
-            </section>
-          )}
-
-          {isVehicleCategory && data.maintenance_history && (
-            <section className="mt-8">
-              <h2 className="font-display text-xl">Vedlikeholdshistorikk</h2>
-              <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
-                {data.maintenance_history}
-              </p>
-            </section>
-          )}
-        </div>
-
-        <aside className="space-y-5">
-          <div>
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                {category && (
-                  <Link
-                    to="/annonser"
-                    search={{ q: "", category: category.slug, sort: "new" }}
-                    className="text-xs uppercase tracking-wide text-muted-foreground hover:text-foreground"
-                  >
-                    {category.name_nb}
-                  </Link>
-                )}
-                <h1 className="mt-1 font-display text-3xl leading-tight tracking-tight">
-                  {data.title}
-                </h1>
-                {data.subtitle && (
-                  <p className="mt-1 text-sm text-muted-foreground">{data.subtitle}</p>
-                )}
-                {/* Prisen vises flytende over bildekanten når det finnes bilder
-                    (se galleriseksjonen) — her kun som fallback uten bilder. */}
-                {images.length === 0 && (
-                  <p className="mt-3 font-display text-xl text-primary">{priceLabel}</p>
-                )}
-                {isVehicleCategory && omregistreringsavgiftKr != null && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    + {omregistreringsavgiftKr.toLocaleString("nb-NO")} kr i omregistreringsavgift
-                    til staten (betales av kjøper ved eierskifte)
-                  </p>
-                )}
-              </div>
-              {user && !isOwner && (
-                <div className="shrink-0 pt-0.5">
-                  <ListingActionsMenu
-                    listingId={data.id}
-                    listingTitle={data.title}
-                    isAdminOrModerator={!!(isAdmin || isModerator)}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {isVehicleCategory && (
-            <VehicleSpecBar vehicleLookup={vehicleLookup} mileageKm={mileageKm} />
-          )}
-
-          {(() => {
-            const fmt = (s: string) =>
-              new Date(s).toLocaleDateString("nb-NO", {
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              });
-            const publishedRaw = (data as { published_at: string | null }).published_at;
-            const updatedRaw = (data as { updated_at: string | null }).updated_at;
-            const publishedDate = publishedRaw ? new Date(publishedRaw) : new Date(data.created_at);
-            const updatedDate = updatedRaw ? new Date(updatedRaw) : null;
-
-            const isEditedLater =
-              updatedDate != null &&
-              (updatedDate.getFullYear() > publishedDate.getFullYear() ||
-                updatedDate.getMonth() > publishedDate.getMonth() ||
-                updatedDate.getDate() > publishedDate.getDate());
-
-            const label = isEditedLater ? "Sist redigert" : "Publisert";
-            const dateStr =
-              isEditedLater && updatedRaw ? fmt(updatedRaw) : fmt(publishedRaw ?? data.created_at);
-
-            return (
-              <dl className="grid grid-cols-2 gap-3 rounded-xl border border-border bg-card p-4 text-sm sm:grid-cols-3">
-                {data.condition && (
-                  <div>
-                    <dt className="text-muted-foreground">Tilstand</dt>
-                    <dd className="font-medium">
-                      {(isVehicleCategory ? VEHICLE_CONDITION_LABEL : CONDITION_LABEL)[
-                        data.condition
-                      ] ?? data.condition}
-                    </dd>
-                  </div>
-                )}
-                <div>
-                  <dt className="text-muted-foreground">Lokasjon</dt>
-                  <dd className="flex items-center gap-1 font-medium">
-                    <MapPin className="size-3.5 text-muted-foreground" />
-                    {data.city || data.postal_code || "Ikke oppgitt"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">{label}</dt>
-                  <dd className="font-medium">{dateStr}</dd>
-                </div>
-              </dl>
-            );
-          })()}
-
-          {isOwner && (
-            <OwnerStatsPanel
-              listingId={data.id}
-              status={data.status}
-              stats={stats}
-              activePromotion={activePromotion}
-              promoteOpen={promoteOpen}
-              onPromoteOpenChange={setPromoteOpen}
-              statsInfoOpen={statsInfoOpen}
-              onStatsInfoOpenChange={setStatsInfoOpen}
-            />
-          )}
-
-          <SellerContactPanel
-            isLoggedIn={!!user}
-            seller={seller ?? null}
-            isOwner={isOwner}
+    <ListingDetailView
+      title={data.title}
+      subtitle={data.subtitle}
+      description={data.description}
+      priceNok={data.price_nok}
+      isFree={data.is_free}
+      condition={data.condition}
+      city={data.city}
+      postalCode={data.postal_code}
+      displayLat={data.display_lat}
+      displayLng={data.display_lng}
+      createdAt={data.created_at}
+      updatedAt={data.updated_at}
+      publishedAt={data.published_at}
+      knownIssues={data.known_issues}
+      noKnownIssues={data.no_known_issues}
+      maintenanceHistory={data.maintenance_history}
+      category={category ?? null}
+      images={images}
+      imgUrls={imgUrls}
+      attributes={attributes}
+      backSlot={<BackNavLink target={backTarget} onHistoryBack={() => router.history.back()} />}
+      actionsMenuSlot={
+        user && !isOwner ? (
+          <ListingActionsMenu
             listingId={data.id}
-            kaupetCode={data.kaupet_code}
-            title={data.title}
-            onContact={() => contactMutation.mutate()}
-            contacting={contactMutation.isPending}
-            shareOpen={shareOpen}
-            onShareOpenChange={handleShareOpenChange}
-            isNative={isNative}
+            listingTitle={data.title}
+            isAdminOrModerator={!!(isAdmin || isModerator)}
           />
-        </aside>
-      </div>
-
-      {data.display_lat != null && data.display_lng != null && (
-        <section className="mt-10">
-          <button
-            type="button"
-            onClick={() => setMapOverlayOpen(true)}
-            aria-label="Se kart i fullskjerm"
-            className="block h-80 w-full cursor-pointer overflow-hidden rounded-2xl border border-border"
-          >
-            {mounted ? (
-              <Suspense fallback={<div className="h-full w-full animate-pulse bg-muted" />}>
-                <ListingDetailMap
-                  lat={data.display_lat}
-                  lng={data.display_lng}
-                  interactive={false}
-                />
-              </Suspense>
-            ) : (
-              <div className="h-full w-full animate-pulse bg-muted" />
-            )}
-          </button>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Lokasjonen er omtrentlig. Gjenstanden befinner seg ikke nødvendigvis innenfor det
-            markerte området.
-          </p>
-        </section>
-      )}
-
-      {lightboxIndex !== null && (
-        <Suspense fallback={<LightboxLoadingFallback />}>
-          <ImageLightbox
-            images={images}
-            imgUrls={imgUrls}
-            initialIndex={lightboxIndex}
-            title={data.title}
-            onClose={closeLightbox}
+        ) : undefined
+      }
+      ownerStatsSlot={
+        isOwner ? (
+          <OwnerStatsPanel
+            listingId={data.id}
+            status={data.status}
+            stats={stats}
+            activePromotion={activePromotion}
+            promoteOpen={promoteOpen}
+            onPromoteOpenChange={setPromoteOpen}
+            statsInfoOpen={statsInfoOpen}
+            onStatsInfoOpenChange={setStatsInfoOpen}
           />
-        </Suspense>
-      )}
-
-      {mapOverlayOpen && data.display_lat != null && data.display_lng != null && (
-        <Suspense fallback={<LightboxLoadingFallback />}>
-          <MapOverlay lat={data.display_lat} lng={data.display_lng} onClose={closeMapOverlay} />
-        </Suspense>
-      )}
-    </div>
+        ) : undefined
+      }
+      sellerContactSlot={
+        <SellerContactPanel
+          isLoggedIn={!!user}
+          seller={seller ?? null}
+          isOwner={isOwner}
+          listingId={data.id}
+          kaupetCode={data.kaupet_code}
+          title={data.title}
+          onContact={() => contactMutation.mutate()}
+          contacting={contactMutation.isPending}
+          shareOpen={shareOpen}
+          onShareOpenChange={handleShareOpenChange}
+          isNative={isNative}
+        />
+      }
+    />
   );
 }

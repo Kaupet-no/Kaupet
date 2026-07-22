@@ -217,8 +217,8 @@ export function Price({
           </div>
           {omregistreringsavgiftKr == null && (
             <p className="text-muted-foreground">
-              Vi klarte ikke å beregne avgiften automatisk — vanligvis fordi kjøretøyet ikke ble
-              slått opp med registreringsnummer. Sett beløpet selv over.
+              Vi klarte ikke å beregne avgiften automatisk. Dette kan for eksempel skje dersom
+              kjøretøyet ikke ble funnet hos Statens Vegvesen. Sett beløpet selv over.
             </p>
           )}
           {avgiftOverrideKr != null && calculatedAvgiftKr != null && (

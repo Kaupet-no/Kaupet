@@ -74,7 +74,7 @@ export type VehicleLookupResult = {
   color: string | null;
   weight_kg: number | null;
   /** Tillatt totalvekt ("gross vehicle weight") — distinct from `weight_kg`
-   * (egenvekt, the vehicle's own empty weight). Most relevant for varebil,
+   * (egenvekt, the vehicle's own empty weight). Most relevant for bil,
    * bobil, campingvogn and tilhenger, where the margin between the two
    * (nyttelast/payload) matters to a buyer. */
   max_total_weight_kg: number | null;

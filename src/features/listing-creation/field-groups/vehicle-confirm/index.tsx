@@ -80,17 +80,24 @@ function startOfToday(): Date {
   return d;
 }
 
+/** `mode="future"` (default) is for dates like EU-kontroll that must lie
+ * ahead of today; `mode="past"` is for dates like førstegangsregistrering
+ * that must lie behind it. Both share the same ISO-in/dd.MM.yyyy-out
+ * behavior — only which half of the calendar is selectable differs. */
 function EuControlDateField({
   id,
   value,
   onChange,
+  mode = "future",
 }: {
   id: string;
   value: string;
   onChange: (v: string) => void;
+  mode?: "future" | "past";
 }) {
   const [open, setOpen] = useState(false);
   const selectedDate = parseIsoDate(value);
+  const today = startOfToday();
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -109,9 +116,9 @@ function EuControlDateField({
           mode="single"
           captionLayout="dropdown"
           selected={selectedDate}
-          disabled={{ before: startOfToday() }}
-          startMonth={startOfToday()}
-          endMonth={new Date(new Date().getFullYear() + 4, 11)}
+          disabled={mode === "future" ? { before: today } : { after: today }}
+          startMonth={mode === "future" ? today : new Date(1970, 0)}
+          endMonth={mode === "future" ? new Date(new Date().getFullYear() + 4, 11) : today}
           onSelect={(date) => {
             if (date) onChange(format(date, "yyyy-MM-dd"));
             setOpen(false);
@@ -149,6 +156,11 @@ type EditableSpec = {
    * sleeping_places` er alltid `null` — dette er derfor et rent manuelt felt,
    * ikke en SVV-verdi brukeren kan korrigere. */
   sleeping_places: string;
+  imported_used: boolean | null;
+  first_registration_date: string;
+  cylinders: string;
+  engine_displacement_cc: string;
+  engine_code: string;
 };
 
 function specFromLookup(lookup: VehicleLookupResult | null): EditableSpec {
@@ -172,6 +184,12 @@ function specFromLookup(lookup: VehicleLookupResult | null): EditableSpec {
     // må alltid svare eksplisitt (se spørsmålet under datakortet i UI-en).
     eu_control_exempt: null,
     sleeping_places: lookup?.sleeping_places != null ? String(lookup.sleeping_places) : "",
+    imported_used: lookup?.imported_used ?? null,
+    first_registration_date: lookup?.first_registration_date ?? "",
+    cylinders: lookup?.cylinders != null ? String(lookup.cylinders) : "",
+    engine_displacement_cc:
+      lookup?.engine_displacement_cc != null ? String(lookup.engine_displacement_cc) : "",
+    engine_code: lookup?.engine_code ?? "",
   };
 }
 
@@ -194,6 +212,13 @@ function specOverridesFrom(spec: EditableSpec) {
     next_eu_control: spec.next_eu_control || undefined,
     eu_control_exempt: spec.eu_control_exempt ?? undefined,
     sleeping_places: spec.sleeping_places.trim() ? Number(spec.sleeping_places) : undefined,
+    imported_used: spec.imported_used ?? undefined,
+    first_registration_date: spec.first_registration_date || undefined,
+    cylinders: spec.cylinders.trim() ? Number(spec.cylinders) : undefined,
+    engine_displacement_cc: spec.engine_displacement_cc.trim()
+      ? Number(spec.engine_displacement_cc)
+      : undefined,
+    engine_code: spec.engine_code || undefined,
   };
 }
 
@@ -206,9 +231,10 @@ function specOverridesFrom(spec: EditableSpec) {
  *
  * Modell (a dropdown of approved models for the matched brand, same as
  * category-attributes' brand/model fields, plus a "legg til ny modell"
- * escape hatch for values not in the list) and the core spec fields (year/
- * drivstoff/girkasse/hjuldrift/vekt/effekt/hengerfeste/seter/farge/
- * EU-kontroll) are editable directly here via "Rediger opplysninger" — SVV
+ * escape hatch for values not in the list) and every other SVV-fetched spec
+ * field (year/drivstoff/girkasse/hjuldrift/vekt/effekt/hengerfeste/seter/
+ * farge/EU-kontroll/bruktimport/førstegangsregistrering/sylindre/slagvolum/
+ * motorkode) are editable directly here via "Rediger opplysninger" — SVV
  * has no field for trim/variant badges (e.g. "N", "GTI"), so a manual model
  * correction is the only way to get those into the listing. "Rediger
  * opplysninger" is reserved for *correcting* SVV-fetched data, though — antall
@@ -216,9 +242,13 @@ function specOverridesFrom(spec: EditableSpec) {
  * doesn't exist in Enkeltoppslag's schema), so it's a required, always-visible
  * input of its own further down, not tucked behind that toggle where a seller
  * has no reason to think to look for a field we never claimed to have fetched.
- * The spec fields are hidden from the later category-attributes ("Detaljer") step (see
- * VEHICLE_LOOKUP_FILTER_KEYS) so the user is never asked to fill them in
- * twice. If the user doesn't choose to edit, nothing here forces them to.
+ * (`classification_code`/`avgiftsklasse_*`/`body_type_hint` are the one
+ * exception — those only drive internal category classification and are
+ * never written to the listing's attributes, so there's nothing an edit here
+ * could change.) The spec fields are hidden from the later category-attributes
+ * ("Detaljer") step (see VEHICLE_LOOKUP_FILTER_KEYS) so the user is never
+ * asked to fill them in twice. If the user doesn't choose to edit, nothing
+ * here forces them to.
  *
  * Also resolves the SVV brand/model against approved vehicle_brands/
  * vehicle_models as soon as a vehicle type is selected, and — if unmatched —
@@ -252,6 +282,12 @@ export function VehicleConfirm({
   const [modelOverride, setModelOverride] = useState<string | null>(null);
   const [addingModel, setAddingModel] = useState(false);
   const [newModelName, setNewModelName] = useState("");
+  /** Fixed at mount from the raw lookup, not `spec.drive_type` — so the
+   * "velg selv" field stays visible once the user has answered it instead of
+   * vanishing the instant they pick a value (which read as the choice not
+   * having registered). Declared here (before the `!vehicleLookupResult`
+   * early return below) so hook order stays stable across renders. */
+  const [driveTypeWasAmbiguous] = useState(!vehicleLookupResult?.drive_type);
 
   const leafBySlug = new Map(
     categories
@@ -413,7 +449,7 @@ export function VehicleConfirm({
 
       <div className="rounded-md bg-muted/40 p-3 text-sm">
         <div className="flex items-center justify-between gap-2">
-          <p className="font-medium">Data fra Statens vegvesen</p>
+          <p className="font-medium">Tekniske data</p>
           <button
             type="button"
             onClick={() => setEditing((e) => !e)}
@@ -559,26 +595,6 @@ export function VehicleConfirm({
               )}
               {!isTrailer && (
                 <div className="space-y-1">
-                  <Label>Hjuldrift</Label>
-                  <Select
-                    value={spec.drive_type}
-                    onValueChange={(v) => setSpecField("drive_type", v)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Velg…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DRIVE_TYPE_OPTIONS.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              {!isTrailer && (
-                <div className="space-y-1">
                   <Label htmlFor="vc-power">Effekt (hk)</Label>
                   <Input
                     id="vc-power"
@@ -617,7 +633,55 @@ export function VehicleConfirm({
                   />
                 </div>
               )}
+              <div className="space-y-1">
+                <Label htmlFor="vc-first-reg">Førstegangsregistrering</Label>
+                <EuControlDateField
+                  id="vc-first-reg"
+                  mode="past"
+                  value={spec.first_registration_date}
+                  onChange={(v) => setSpecField("first_registration_date", v)}
+                />
+              </div>
+              {!isTrailer && spec.fuel_type !== "el" && (
+                <div className="space-y-1">
+                  <Label htmlFor="vc-cylinders">Antall sylindre</Label>
+                  <Input
+                    id="vc-cylinders"
+                    type="number"
+                    value={spec.cylinders}
+                    onChange={(e) => setSpecField("cylinders", e.target.value)}
+                  />
+                </div>
+              )}
+              {!isTrailer && spec.fuel_type !== "el" && (
+                <div className="space-y-1">
+                  <Label htmlFor="vc-displacement">Slagvolum (cc)</Label>
+                  <Input
+                    id="vc-displacement"
+                    type="number"
+                    value={spec.engine_displacement_cc}
+                    onChange={(e) => setSpecField("engine_displacement_cc", e.target.value)}
+                  />
+                </div>
+              )}
+              {!isTrailer && spec.fuel_type !== "el" && (
+                <div className="space-y-1">
+                  <Label htmlFor="vc-engine-code">Motorkode</Label>
+                  <Input
+                    id="vc-engine-code"
+                    value={spec.engine_code}
+                    onChange={(e) => setSpecField("engine_code", e.target.value)}
+                  />
+                </div>
+              )}
             </div>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={spec.imported_used ?? false}
+                onCheckedChange={(c) => setSpecField("imported_used", c === true)}
+              />
+              Bruktimportert
+            </label>
             {!isTrailer && (
               <div className="space-y-1">
                 <label className="flex items-center gap-2 text-sm">
@@ -746,16 +810,21 @@ export function VehicleConfirm({
                     <dd>{spec.eu_control_exempt ? "Ja" : "Nei"}</dd>
                   </>
                 )}
-                {lookup.imported_used != null && (
+                {spec.imported_used != null && (
                   <>
                     <dt className="text-muted-foreground">Bruktimportert</dt>
-                    <dd>{lookup.imported_used ? "Ja" : "Nei"}</dd>
+                    <dd>{spec.imported_used ? "Ja" : "Nei"}</dd>
                   </>
                 )}
-                {lookup.first_registration_date && (
+                {spec.first_registration_date && (
                   <>
                     <dt className="text-muted-foreground">Førstegangsregistrering</dt>
-                    <dd>{lookup.first_registration_date}</dd>
+                    <dd>
+                      {(() => {
+                        const d = parseIsoDate(spec.first_registration_date);
+                        return d ? format(d, "dd.MM.yyyy") : spec.first_registration_date;
+                      })()}
+                    </dd>
                   </>
                 )}
                 {spec.color && (
@@ -775,22 +844,22 @@ export function VehicleConfirm({
                     </dd>
                   </>
                 )}
-                {lookup.fuel_type !== "el" && lookup.cylinders && (
+                {spec.fuel_type !== "el" && spec.cylinders && (
                   <>
                     <dt className="text-muted-foreground">Antall sylindre</dt>
-                    <dd>{lookup.cylinders}</dd>
+                    <dd>{spec.cylinders}</dd>
                   </>
                 )}
-                {lookup.fuel_type !== "el" && lookup.engine_displacement_cc && (
+                {spec.fuel_type !== "el" && spec.engine_displacement_cc && (
                   <>
                     <dt className="text-muted-foreground">Slagvolum</dt>
-                    <dd>{lookup.engine_displacement_cc} cc</dd>
+                    <dd>{spec.engine_displacement_cc} cc</dd>
                   </>
                 )}
-                {lookup.fuel_type !== "el" && lookup.engine_code && (
+                {spec.fuel_type !== "el" && spec.engine_code && (
                   <>
                     <dt className="text-muted-foreground">Motorkode</dt>
-                    <dd>{lookup.engine_code}</dd>
+                    <dd>{spec.engine_code}</dd>
                   </>
                 )}
               </dl>
@@ -798,6 +867,28 @@ export function VehicleConfirm({
           </>
         )}
       </div>
+
+      {!isTrailer && driveTypeWasAmbiguous && (
+        <div className="space-y-1 rounded-md border border-border p-3">
+          <Label htmlFor="vc-drive-type">Hjuldrift</Label>
+          <p className="text-xs text-muted-foreground">
+            Statens vegvesen gir oss ikke nok informasjon til å avgjøre om kjøretøyet trekker på
+            for- eller bakaksel, så du må velge selv.
+          </p>
+          <Select value={spec.drive_type} onValueChange={(v) => setSpecField("drive_type", v)}>
+            <SelectTrigger id="vc-drive-type" className="max-w-[220px]">
+              <SelectValue placeholder="Velg…" />
+            </SelectTrigger>
+            <SelectContent>
+              {DRIVE_TYPE_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {isCamper && (
         <div className="space-y-1 rounded-md border border-border p-3">
@@ -875,7 +966,8 @@ export function VehicleConfirm({
               !selectedSlug ||
               matching ||
               !!confirmValue ||
-              (isTrailer && spec.eu_control_exempt === null)
+              (isTrailer && spec.eu_control_exempt === null) ||
+              (!isTrailer && !spec.drive_type)
             }
             onClick={() => {
               const leaf = selectedSlug ? leafBySlug.get(selectedSlug) : null;

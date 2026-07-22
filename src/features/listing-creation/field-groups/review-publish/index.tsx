@@ -86,6 +86,7 @@ type PublishActionsProps = {
   setTurnstileToken: (token: string | null) => void;
   mutationIsPending: boolean;
   onCancel: () => void;
+  onPreview: () => void;
 };
 
 /**
@@ -127,11 +128,15 @@ export function PublishActions({
   setTurnstileToken,
   mutationIsPending,
   onCancel,
+  onPreview,
 }: PublishActionsProps) {
   return (
     <div className="flex items-center gap-3">
       <Button type="button" variant="ghost" onClick={onCancel} disabled={mutationIsPending}>
         Avbryt
+      </Button>
+      <Button type="button" variant="outline" onClick={onPreview} disabled={mutationIsPending}>
+        Forhåndsvis annonse
       </Button>
       {turnstileEnabled && (
         <Turnstile

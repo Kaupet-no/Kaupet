@@ -182,13 +182,31 @@ function mapTransmission(value: string | null | undefined): string | null {
   return null;
 }
 
-/** Best-effort mapping of hjuldrift-kodeNavn to our select options. */
-function mapDriveType(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const v = value.toLowerCase();
-  if (v.includes("fire") || v.includes("4x4") || v.includes("firehjul")) return "4x4";
-  if (v.includes("bak")) return "bakhjul";
-  if (v.includes("for")) return "forhjul";
+/** Derives drive type from `tekniskeData.akslinger` (verified against the
+ * Enkeltoppslag Swagger schema, August 2026): `antallAksler` gives the total
+ * axle count, and each axle in `akselGruppe[].akselListe[]` carries its own
+ * `drivAksel` flag — but the schema does NOT document that this list is
+ * ordered front-to-back, so a single driven axle can't be reliably mapped to
+ * "forhjul" vs. "bakhjul" from this data alone. We therefore only resolve the
+ * unambiguous case (two axles, both driven → 4x4) automatically; everything
+ * else (one driven axle of two, more than two axles, or missing axle data at
+ * all) returns `null` so vehicle-confirm asks the seller directly instead of
+ * guessing. This replaces the previous `hjuldrift.kodeNavn` string-matching
+ * approach, which SVV's schema doesn't actually expose at that path. */
+function driveTypeFromAxles(
+  akslinger:
+    | {
+        antallAksler?: number;
+        akselGruppe?: Array<{ akselListe?: Array<{ drivAksel?: boolean }> }>;
+      }
+    | null
+    | undefined,
+): string | null {
+  if (!akslinger) return null;
+  const axles = (akslinger.akselGruppe ?? []).flatMap((g) => g.akselListe ?? []);
+  if (axles.length === 0) return null;
+  const drivenCount = axles.filter((a) => a.drivAksel).length;
+  if (akslinger.antallAksler === 2 && axles.length === 2 && drivenCount === 2) return "4x4";
   return null;
 }
 
@@ -309,7 +327,10 @@ export async function lookupVehicle(registrationNumber: string): Promise<Vehicle
                 motorKode?: string;
               }>;
               girkassetype?: { kodeNavn?: string };
-              hjuldrift?: { kodeNavn?: string };
+            };
+            akslinger?: {
+              antallAksler?: number;
+              akselGruppe?: Array<{ akselListe?: Array<{ drivAksel?: boolean }> }>;
             };
             persontall?: { sitteplasserTotalt?: number };
             tilhengerkopling?: { kopling?: Array<{ belastningLoddrettMaks?: number }> };
@@ -362,7 +383,7 @@ export async function lookupVehicle(registrationNumber: string): Promise<Vehicle
       const kw = motor?.drivstoff?.[0]?.maksNettoEffekt || motor?.drivstoff?.[0]?.maksEffektPrTime;
       return kw ? Math.round(kw * 1.35962) : null;
     })(),
-    drive_type: mapDriveType(teknisk?.motorOgDrivverk?.hjuldrift?.kodeNavn),
+    drive_type: driveTypeFromAxles(teknisk?.akslinger),
     tow_hitch: tilhengerkopling ? Boolean(tilhengerkopling.belastningLoddrettMaks) : null,
     max_tow_weight_kg:
       teknisk?.vekter?.tillattTilhengervektMedBrems ??

@@ -10,6 +10,7 @@ import { RequiredMark } from "../required-mark";
 /** Delivery-method buttons + location section (GPS/postal/map). Identical on web and native. */
 export function DeliveryLocation({
   native,
+  isVehicle,
   canShip,
   setValue,
   locationMethod,
@@ -30,39 +31,41 @@ export function DeliveryLocation({
 }: WizardSharedProps) {
   return (
     <>
-      <section className="space-y-3">
-        <Label>
-          Levering
-          <RequiredMark />
-        </Label>
-        <div className="grid grid-cols-3 gap-2">
-          {(
-            [
-              { value: "pickup", label: "Må hentes", description: "Kjøper henter selv" },
-              { value: "ship", label: "Må sendes", description: "Selger sender" },
-              {
-                value: "both",
-                label: "Begge deler",
-                description: "Kan både hentes og sendes",
-              },
-            ] as const
-          ).map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => setValue("can_ship", opt.value, { shouldValidate: true })}
-              className={`flex flex-col items-center gap-1 rounded-lg border px-3 py-3 text-center text-sm transition-colors ${
-                canShip === opt.value
-                  ? "border-primary bg-primary/10 font-medium text-primary"
-                  : "border-border bg-card text-foreground hover:border-primary/40 hover:bg-primary/5"
-              }`}
-            >
-              <span className="font-medium">{opt.label}</span>
-              <span className="text-xs text-muted-foreground">{opt.description}</span>
-            </button>
-          ))}
-        </div>
-      </section>
+      {!isVehicle && (
+        <section className="space-y-3">
+          <Label>
+            Levering
+            <RequiredMark />
+          </Label>
+          <div className="grid grid-cols-3 gap-2">
+            {(
+              [
+                { value: "pickup", label: "Må hentes", description: "Kjøper henter selv" },
+                { value: "ship", label: "Må sendes", description: "Selger sender" },
+                {
+                  value: "both",
+                  label: "Begge deler",
+                  description: "Kan både hentes og sendes",
+                },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setValue("can_ship", opt.value, { shouldValidate: true })}
+                className={`flex flex-col items-center gap-1 rounded-lg border px-3 py-3 text-center text-sm transition-colors ${
+                  canShip === opt.value
+                    ? "border-primary bg-primary/10 font-medium text-primary"
+                    : "border-border bg-card text-foreground hover:border-primary/40 hover:bg-primary/5"
+                }`}
+              >
+                <span className="font-medium">{opt.label}</span>
+                <span className="text-xs text-muted-foreground">{opt.description}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="space-y-4">
         <Label>

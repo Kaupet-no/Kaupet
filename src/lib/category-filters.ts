@@ -154,7 +154,11 @@ export function getMissingRequiredFilters(
   attributes: Record<string, AttributeValue>,
 ): CategoryFilter[] {
   const filters = effectiveFiltersForCategory(categoryId, allFilters, categoriesById).filter(
-    (f) => f.type !== "range" && f.type !== "boolean",
+    // "range" is search-only, "boolean" can't distinguish unanswered from
+    // false, and "registration_number" is set by the vehicle wizard itself
+    // (SVV lookup, or left unset for a manually entered unregistered
+    // vehicle) rather than filled in by the user as a generic attribute.
+    (f) => f.type !== "range" && f.type !== "boolean" && f.key !== "registration_number",
   );
   return filters.filter((f) => {
     const v = attributes[f.key];

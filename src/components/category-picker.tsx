@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -43,6 +43,11 @@ type Props = {
    * can be the final choice, while drilling down to inspect children still
    * works via the normal grid/list clicks. */
   allowSelectAny?: boolean;
+  /** Seeds the drill-down at this category's children instead of the root —
+   * e.g. when the surrounding step has already scoped the user to "Bil og
+   * MC" and the root category itself shouldn't be shown as a choice again.
+   * The back button never goes above this level. */
+  initialParentId?: string;
 };
 
 function useIsDesktop() {
@@ -74,9 +79,16 @@ export function CategoryPicker({
   inline,
   selectableGroups,
   allowSelectAny,
+  initialParentId,
 }: Props) {
   const isDesktop = useIsDesktop();
-  const [path, setPath] = useState<Category[]>([]);
+  const initialPath = useMemo(() => {
+    if (!initialParentId) return [];
+    const root = categories.find((c) => c.id === initialParentId);
+    return root ? [root] : [];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialParentId]);
+  const [path, setPath] = useState<Category[]>(initialPath);
   const [search, setSearch] = useState("");
   const [pendingSelection, setPendingSelection] = useState<string | null>(null);
   const confirmTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -102,6 +114,27 @@ export function CategoryPicker({
     return categories.some((c) => c.parent_id === id);
   }
 
+  /** In inline mode the picker never closes, so fully resetting the drilled
+   * path after a selection (as the Sheet/Dialog/Popover variants do to
+   * prepare for next time they open) would snap the grid back up to the
+   * scoped root — looking exactly like nothing had been picked yet, even
+   * though `onSelect` already fired. Inline just clears the transient
+   * pending/search state and leaves `path` where the user drilled to, so the
+   * chosen leaf stays visible (highlighted via `selectedId`) at its parent
+   * level. */
+  function finishSelection() {
+    if (inline) {
+      setPendingSelection(null);
+      setSearch("");
+      if (confirmTimeoutRef.current) {
+        clearTimeout(confirmTimeoutRef.current);
+        confirmTimeoutRef.current = null;
+      }
+    } else {
+      resetState();
+    }
+  }
+
   function handleItemClick(item: Category) {
     if (pendingSelection) return;
     if (hasChildren(item.id) && !selectableGroups?.includes(item.id)) {
@@ -112,7 +145,7 @@ export function CategoryPicker({
       confirmTimeoutRef.current = setTimeout(() => {
         onSelect(item.id, currentParentId ?? item.id);
         onOpenChange(false);
-        resetState();
+        finishSelection();
       }, SELECTION_CONFIRM_MS);
     }
   }
@@ -124,17 +157,17 @@ export function CategoryPicker({
     confirmTimeoutRef.current = setTimeout(() => {
       onSelect(id, currentParentId ?? id);
       onOpenChange(false);
-      resetState();
+      finishSelection();
     }, SELECTION_CONFIRM_MS);
   }
 
   function handleBack() {
-    setPath((p) => p.slice(0, -1));
+    setPath((p) => (p.length > initialPath.length ? p.slice(0, -1) : p));
     setSearch("");
   }
 
   function resetState() {
-    setPath([]);
+    setPath(initialPath);
     setSearch("");
     setPendingSelection(null);
     if (confirmTimeoutRef.current) {
@@ -301,7 +334,7 @@ export function CategoryPicker({
   if (inline) {
     return (
       <div className="flex h-full min-h-[420px] flex-col rounded-lg border border-border">
-        {path.length > 0 && (
+        {path.length > initialPath.length && (
           <div className="flex items-center gap-2 border-b px-3 py-2 shrink-0">
             <button
               type="button"
@@ -323,7 +356,7 @@ export function CategoryPicker({
   if (isDesktop) {
     const desktopContent = (
       <div className="flex flex-col h-full">
-        {path.length > 0 && (
+        {path.length > initialPath.length && (
           <div className="flex items-center gap-2 border-b px-3 py-2 shrink-0">
             <button
               type="button"
@@ -370,7 +403,7 @@ export function CategoryPicker({
       <SheetContent side="bottom" className="h-[80vh] rounded-t-2xl flex flex-col p-0">
         <SheetHeader className="px-4 pt-4 pb-2 shrink-0">
           <div className="flex items-center gap-2">
-            {path.length > 0 && (
+            {path.length > initialPath.length && (
               <button
                 type="button"
                 onClick={handleBack}

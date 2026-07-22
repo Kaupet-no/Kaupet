@@ -6,7 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 
-import { computeOmregistreringsavgift, type VehicleLeafSlug } from "@/lib/vehicle-classification";
+import {
+  computeOmregistreringsavgift,
+  type AvgiftskodeGruppe,
+  type VehicleLeafSlug,
+} from "@/lib/vehicle-classification";
 import { digitsOnlyClamped, formatThousands } from "@/lib/number-input";
 
 import type { WizardSharedProps } from "../types";
@@ -60,6 +64,7 @@ export function Price({
         vehicleLookupResult?.first_registration_date
           ? Number(vehicleLookupResult.first_registration_date.slice(0, 4))
           : null,
+        (attributes.avgiftskode_gruppe as AvgiftskodeGruppe | undefined) ?? null,
       )
     : null;
   const avgiftOverrideRaw = attributes.omregistreringsavgift_override_kr;

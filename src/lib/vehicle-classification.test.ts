@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { classifyVehicleCategory } from "./vehicle-classification";
+import { avgiftskodeGruppeFromCode, classifyVehicleCategory } from "./vehicle-classification";
 
 describe("classifyVehicleCategory", () => {
   describe("avgiftsklasse (primary signal)", () => {
-    it("maps 101 to personbil", () => {
+    it("maps 101 to bil", () => {
       expect(classifyVehicleCategory(null, "101", null, null)).toEqual({
-        slug: "personbil",
+        slug: "bil",
         confidence: "high",
       });
     });
@@ -36,9 +36,9 @@ describe("classifyVehicleCategory", () => {
       });
     });
 
-    it.each(["301", "310", "311", "314", "315"])("maps %s to varebil", (code) => {
+    it.each(["301", "310", "311", "314", "315"])("maps %s to bil", (code) => {
       expect(classifyVehicleCategory(null, code, null, null)).toEqual({
-        slug: "varebil",
+        slug: "bil",
         confidence: "high",
       });
     });
@@ -57,9 +57,9 @@ describe("classifyVehicleCategory", () => {
       });
     });
 
-    it("maps 630 (beltemotorsykkel) to atv-og-snoscooter", () => {
+    it("maps 630 (beltemotorsykkel) to snoscooter", () => {
       expect(classifyVehicleCategory(null, "630", null, null)).toEqual({
-        slug: "atv-og-snoscooter",
+        slug: "snoscooter",
         confidence: "high",
       });
     });
@@ -73,7 +73,7 @@ describe("classifyVehicleCategory", () => {
 
     it("falls through to the EU-code fallback for unmapped avgiftsklasse groups (buss/lastebil/traktor/motorredskap)", () => {
       expect(classifyVehicleCategory("M1", "201", null, null)).toEqual({
-        slug: "personbil",
+        slug: "bil",
         confidence: "high",
       });
       expect(classifyVehicleCategory(null, "401", null, null)).toEqual({
@@ -84,9 +84,9 @@ describe("classifyVehicleCategory", () => {
   });
 
   describe("EU technical class (fallback when avgiftsklasse is missing)", () => {
-    it("maps M1 to personbil by default", () => {
+    it("maps M1 to bil by default", () => {
       expect(classifyVehicleCategory("M1", null, null, null)).toEqual({
-        slug: "personbil",
+        slug: "bil",
         confidence: "high",
       });
     });
@@ -105,9 +105,9 @@ describe("classifyVehicleCategory", () => {
       });
     });
 
-    it("maps N1 to varebil", () => {
+    it("maps N1 to bil", () => {
       expect(classifyVehicleCategory("N1", null, null, null)).toEqual({
-        slug: "varebil",
+        slug: "bil",
         confidence: "high",
       });
     });
@@ -126,9 +126,9 @@ describe("classifyVehicleCategory", () => {
       });
     });
 
-    it.each(["L5e", "L6e", "L7e"])("maps %s to atv-og-snoscooter with low confidence", (code) => {
+    it.each(["L5e", "L6e", "L7e"])("maps %s to atv with low confidence", (code) => {
       expect(classifyVehicleCategory(code, null, null, null)).toEqual({
-        slug: "atv-og-snoscooter",
+        slug: "atv",
         confidence: "low",
       });
     });
@@ -153,5 +153,25 @@ describe("classifyVehicleCategory", () => {
         confidence: "low",
       });
     });
+  });
+});
+
+describe("avgiftskodeGruppeFromCode", () => {
+  it.each(["101", "106", "107", "312"])("maps %s to personbil", (code) => {
+    expect(avgiftskodeGruppeFromCode(code, null)).toBe("personbil");
+  });
+
+  it.each(["301", "310", "311", "314", "315"])("maps %s to varebil", (code) => {
+    expect(avgiftskodeGruppeFromCode(code, null)).toBe("varebil");
+  });
+
+  it("falls back to EU class M1/N1 when avgiftsklasse is missing", () => {
+    expect(avgiftskodeGruppeFromCode(null, "M1")).toBe("personbil");
+    expect(avgiftskodeGruppeFromCode(null, "N1")).toBe("varebil");
+  });
+
+  it("returns null for codes outside the bil group", () => {
+    expect(avgiftskodeGruppeFromCode("601", null)).toBeNull();
+    expect(avgiftskodeGruppeFromCode(null, null)).toBeNull();
   });
 });

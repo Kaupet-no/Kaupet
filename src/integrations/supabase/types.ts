@@ -1037,8 +1037,9 @@ export type Database = {
           comment: string | null
           created_at: string
           id: string
-          listing_id: string
+          listing_id: string | null
           reason: string
+          reported_user_id: string | null
           reporter_id: string
           resolved_at: string | null
           resolved_by: string | null
@@ -1048,8 +1049,9 @@ export type Database = {
           comment?: string | null
           created_at?: string
           id?: string
-          listing_id: string
+          listing_id?: string | null
           reason: string
+          reported_user_id?: string | null
           reporter_id: string
           resolved_at?: string | null
           resolved_by?: string | null
@@ -1059,8 +1061,9 @@ export type Database = {
           comment?: string | null
           created_at?: string
           id?: string
-          listing_id?: string
+          listing_id?: string | null
           reason?: string
+          reported_user_id?: string | null
           reporter_id?: string
           resolved_at?: string | null
           resolved_by?: string | null
@@ -1442,6 +1445,8 @@ export type Database = {
           reporter_name: string | null
           owner_id: string | null
           owner_name: string | null
+          reported_user_id: string | null
+          reported_user_name: string | null
           reason: string | null
           comment: string | null
           status: string | null
@@ -1525,6 +1530,10 @@ export type Database = {
       }
       submit_listing_report: {
         Args: { _listing_id: string; _reason: string; _comment?: string | null }
+        Returns: undefined
+      }
+      submit_user_report: {
+        Args: { _reported_user_id: string; _reason: string; _comment?: string | null }
         Returns: undefined
       }
       admin_list_bans: {

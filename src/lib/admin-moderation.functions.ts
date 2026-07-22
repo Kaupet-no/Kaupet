@@ -156,6 +156,27 @@ export const submitReport = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const submitUserReport = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        reportedUserId: uuid,
+        reason: z.string().trim().min(1, "Grunn er påkrevd").max(500),
+        comment: z.string().trim().max(1000).optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.rpc("submit_user_report", {
+      _reported_user_id: data.reportedUserId,
+      _reason: data.reason,
+      _comment: data.comment ?? null,
+    });
+    if (error) throw error;
+    return { ok: true };
+  });
+
 export const adminDisableListingWithMessage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ id: uuid, reason, message }).parse(i))

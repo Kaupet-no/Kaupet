@@ -389,7 +389,22 @@ function ListingDetailPage() {
         .select("display_name, avatar_url, created_at")
         .eq("id", data.seller_id)
         .maybeSingle();
-      return { ...data, seller: profile };
+      // Requires an authenticated session (RPC grant is authenticated-only); for
+      // anonymous visitors this errors and we simply fall back to no rating.
+      const { data: ratingRows } = await supabase.rpc("user_review_summary", {
+        _user_id: data.seller_id,
+      });
+      const ratingRow = Array.isArray(ratingRows) ? ratingRows[0] : ratingRows;
+      return {
+        ...data,
+        seller: profile
+          ? {
+              ...profile,
+              avg_rating: Number(ratingRow?.avg_rating ?? 0),
+              review_count: Number(ratingRow?.review_count ?? 0),
+            }
+          : null,
+      };
     },
   });
 
@@ -579,6 +594,7 @@ function ListingDetailPage() {
           <ListingActionsMenu
             listingId={data.id}
             listingTitle={data.title}
+            sellerId={data.seller_id}
             isAdminOrModerator={!!(isAdmin || isModerator)}
           />
         ) : undefined

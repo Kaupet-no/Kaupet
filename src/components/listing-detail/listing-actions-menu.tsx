@@ -15,14 +15,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -35,47 +27,47 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  ReportDialog,
+  LISTING_REPORT_REASONS,
+  USER_REPORT_REASONS,
+} from "@/components/report-dialog";
 import {
   submitReport,
+  submitUserReport,
   adminDisableListingWithMessage,
   adminDeleteListing,
 } from "@/lib/admin-moderation.functions";
 
-const REPORT_REASONS = [
-  "Upassende innhold",
-  "Misvisende beskrivelse",
-  "Feil kategori",
-  "Mistenkelig aktivitet / mulig svindel",
-  "Spam / duplikat annonse",
-  "Ulovlig vare eller tjeneste",
-  "Annet",
-] as const;
-
 type Props = {
   listingId: string;
   listingTitle: string;
+  sellerId: string;
   isAdminOrModerator: boolean;
 };
 
 type ConfirmAction = "disable" | "delete";
 
-export function ListingActionsMenu({ listingId, listingTitle, isAdminOrModerator }: Props) {
+export function ListingActionsMenu({
+  listingId,
+  listingTitle,
+  sellerId,
+  isAdminOrModerator,
+}: Props) {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
   const submitFn = useServerFn(submitReport);
+  const submitUserFn = useServerFn(submitUserReport);
   const disableFn = useServerFn(adminDisableListingWithMessage);
   const deleteFn = useServerFn(adminDeleteListing);
 
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [reportComment, setReportComment] = useState("");
+
+  const [userReportOpen, setUserReportOpen] = useState(false);
+  const [userReportReason, setUserReportReason] = useState("");
+  const [userReportComment, setUserReportComment] = useState("");
 
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const [adminMessage, setAdminMessage] = useState("");
@@ -95,6 +87,24 @@ export function ListingActionsMenu({ listingId, listingTitle, isAdminOrModerator
       setReportOpen(false);
       setReportReason("");
       setReportComment("");
+    },
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke sende inn rapporten")),
+  });
+
+  const userReportMut = useMutation({
+    mutationFn: () =>
+      submitUserFn({
+        data: {
+          reportedUserId: sellerId,
+          reason: userReportReason,
+          comment: userReportComment || undefined,
+        },
+      }),
+    onSuccess: () => {
+      showSuccessToast("Rapporten er sendt inn");
+      setUserReportOpen(false);
+      setUserReportReason("");
+      setUserReportComment("");
     },
     onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke sende inn rapporten")),
   });
@@ -148,11 +158,14 @@ export function ListingActionsMenu({ listingId, listingTitle, isAdminOrModerator
           <DropdownMenuItem onSelect={() => setReportOpen(true)}>
             Rapporter annonse
           </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setUserReportOpen(true)}>
+            Rapporter bruker
+          </DropdownMenuItem>
           {isAdminOrModerator && (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
+                className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
                 onSelect={() => {
                   setAdminMessage("");
                   setAdminReason("");
@@ -162,7 +175,7 @@ export function ListingActionsMenu({ listingId, listingTitle, isAdminOrModerator
                 Avpubliser annonse
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
+                className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
                 onSelect={() => {
                   setAdminMessage("");
                   setConfirmAction("delete");
@@ -176,61 +189,34 @@ export function ListingActionsMenu({ listingId, listingTitle, isAdminOrModerator
       </DropdownMenu>
 
       {/* Report dialog */}
-      <Dialog open={reportOpen} onOpenChange={(o) => !reportMut.isPending && setReportOpen(o)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Rapporter annonse</DialogTitle>
-            <DialogDescription>
-              Beskriv hva du mener er galt med annonsen «{listingTitle}». Rapporten vil bli
-              gjennomgått av moderatorene våre.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="report-reason">Grunn</Label>
-              <Select value={reportReason} onValueChange={setReportReason}>
-                <SelectTrigger id="report-reason">
-                  <SelectValue placeholder="Velg en grunn…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {REPORT_REASONS.map((r) => (
-                    <SelectItem key={r} value={r}>
-                      {r}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="report-comment">Kommentar (valgfri)</Label>
-              <Textarea
-                id="report-comment"
-                placeholder="Legg til mer informasjon om hva du reagerer på…"
-                value={reportComment}
-                onChange={(e) => setReportComment(e.target.value)}
-                maxLength={1000}
-                rows={3}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => setReportOpen(false)}
-              disabled={reportMut.isPending}
-            >
-              Avbryt
-            </Button>
-            <Button
-              onClick={() => reportMut.mutate()}
-              disabled={!reportReason || reportMut.isPending}
-            >
-              {reportMut.isPending && <Loader2 className="size-4 animate-spin" />}
-              Send inn rapport
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        title="Rapporter annonse"
+        description={`Beskriv hva du mener er galt med annonsen «${listingTitle}». Rapporten vil bli gjennomgått av moderatorene våre.`}
+        reasons={LISTING_REPORT_REASONS}
+        reason={reportReason}
+        onReasonChange={setReportReason}
+        comment={reportComment}
+        onCommentChange={setReportComment}
+        onSubmit={() => reportMut.mutate()}
+        pending={reportMut.isPending}
+      />
+
+      {/* Report user dialog */}
+      <ReportDialog
+        open={userReportOpen}
+        onOpenChange={setUserReportOpen}
+        title="Rapporter bruker"
+        description="Beskriv hva du mener er galt med denne brukeren. Rapporten vil bli gjennomgått av moderatorene våre."
+        reasons={USER_REPORT_REASONS}
+        reason={userReportReason}
+        onReasonChange={setUserReportReason}
+        comment={userReportComment}
+        onCommentChange={setUserReportComment}
+        onSubmit={() => userReportMut.mutate()}
+        pending={userReportMut.isPending}
+      />
 
       {/* Disable confirmation */}
       <AlertDialog

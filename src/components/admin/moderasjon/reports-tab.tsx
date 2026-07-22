@@ -28,6 +28,8 @@ type ReportRow = {
   reporter_name: string | null;
   owner_id: string | null;
   owner_name: string | null;
+  reported_user_id: string | null;
+  reported_user_name: string | null;
   reason: string | null;
   comment: string | null;
   status: string | null;
@@ -134,7 +136,7 @@ function ReportsTable({
             <TableHead>Dato</TableHead>
             <TableHead>Innmelder</TableHead>
             <TableHead>Grunn / kommentar</TableHead>
-            <TableHead>Annonseeier</TableHead>
+            <TableHead>Annonseeier / rapportert bruker</TableHead>
             <TableHead>Annonse</TableHead>
             <TableHead>Status</TableHead>
             {onResolve && <TableHead />}
@@ -157,7 +159,9 @@ function ReportsTable({
                   <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{r.comment}</p>
                 )}
               </TableCell>
-              <TableCell className="text-sm">{r.owner_name ?? "Ukjent"}</TableCell>
+              <TableCell className="text-sm">
+                {r.owner_name ?? r.reported_user_name ?? "Ukjent"}
+              </TableCell>
               <TableCell>
                 {r.kaupet_code ? (
                   <Link
@@ -169,6 +173,8 @@ function ReportsTable({
                     {r.listing_title ?? r.kaupet_code}
                     <ExternalLink className="size-3" />
                   </Link>
+                ) : r.reported_user_id ? (
+                  <Badge variant="outline">Bruker</Badge>
                 ) : (
                   <span className="text-xs text-muted-foreground">Annonse slettet</span>
                 )}

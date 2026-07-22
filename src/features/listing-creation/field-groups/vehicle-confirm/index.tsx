@@ -282,6 +282,12 @@ export function VehicleConfirm({
   const [modelOverride, setModelOverride] = useState<string | null>(null);
   const [addingModel, setAddingModel] = useState(false);
   const [newModelName, setNewModelName] = useState("");
+  /** Fixed at mount from the raw lookup, not `spec.drive_type` — so the
+   * "velg selv" field stays visible once the user has answered it instead of
+   * vanishing the instant they pick a value (which read as the choice not
+   * having registered). Declared here (before the `!vehicleLookupResult`
+   * early return below) so hook order stays stable across renders. */
+  const [driveTypeWasAmbiguous] = useState(!vehicleLookupResult?.drive_type);
 
   const leafBySlug = new Map(
     categories
@@ -381,11 +387,6 @@ export function VehicleConfirm({
    * er kjøpsrelevant på en måte de ikke er for en vanlig personbil/MC). */
   const showWeightAndLength =
     selectedSlug === "varebil" || isCamper || selectedSlug === "tilhenger-leaf";
-  /** Fixed at mount from the raw lookup, not `spec.drive_type` — so the
-   * "velg selv" field stays visible once the user has answered it instead of
-   * vanishing the instant they pick a value (which read as the choice not
-   * having registered). */
-  const [driveTypeWasAmbiguous] = useState(!lookup.drive_type);
 
   function setSpecField<K extends keyof EditableSpec>(key: K, value: EditableSpec[K]) {
     setSpec((s) => ({ ...s, [key]: value }));

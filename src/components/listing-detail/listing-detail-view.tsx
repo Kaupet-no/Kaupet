@@ -11,6 +11,7 @@ import { CONDITION_LABEL, VEHICLE_CONDITION_LABEL } from "@/lib/constants";
 import {
   VEHICLE_LEAF_SLUGS,
   computeOmregistreringsavgift,
+  type AvgiftskodeGruppe,
   type VehicleLeafSlug,
 } from "@/lib/vehicle-classification";
 import type { VehicleLookupResult } from "@/lib/vehicle-lookup.server";
@@ -148,6 +149,7 @@ export function ListingDetailView({
           vehicleLookup?.first_registration_date
             ? Number(vehicleLookup.first_registration_date.slice(0, 4))
             : null,
+          (attributes.avgiftskode_gruppe as AvgiftskodeGruppe | undefined) ?? null,
         )
     : null;
 

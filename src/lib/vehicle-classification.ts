@@ -12,8 +12,7 @@
  * It maps far more directly onto Kaupet's categories than the generic EU
  * technical class, so it's checked first; the EU code (`classificationCode`,
  * e.g. "M1"/"N1"/"L3e"/"O1") is only a fallback for the (rare) cases where
- * avgiftsklasse is missing or falls in a group Kaupet doesn't sell (buss,
- * lastebil, traktor, motorredskap, prøvekjennemerker).
+ * avgiftsklasse is missing.
  *
  * NB: neither mapping has been validated against real Statens Vegvesen
  * payloads — see the matching caveat in vehicle-lookup.server.ts. Treat
@@ -21,19 +20,30 @@
  */
 
 export type VehicleLeafSlug =
-  | "personbil"
-  | "varebil"
+  | "bil"
   | "bobil"
   | "campingvogn"
   | "motorsykkel"
   | "moped-og-scooter"
-  | "atv-og-snoscooter"
-  | "tilhenger-leaf";
+  | "atv"
+  | "snoscooter"
+  | "tilhenger-leaf"
+  | "lastebil-og-henger"
+  | "buss-og-minibuss"
+  | "traktor-og-redskap"
+  | "anleggsmaskiner";
 
 export type VehicleClassification = {
   slug: VehicleLeafSlug | null;
   confidence: "high" | "low";
 };
+
+/** "Bil" merger av Personbil og Varebil (kategoriene ble slått sammen — se
+ * 20260722120000_bil_og_mc_category_restructure.sql); avgiftskoden er ikke
+ * lenger en kategoriskillelinje, men lagres som et eget søkbart filter
+ * (`avgiftskode_gruppe`) på annonsen. `avgiftskodeGruppeFromCode` under
+ * utleder den gruppen fra samme kode-tabell som klassifiseringen bruker. */
+export type AvgiftskodeGruppe = "personbil" | "varebil";
 
 /** Matches "bobil"/"campingbil" (motorized) and, via the shared "camping"
  * substring, also "campingvogn"/"campingtilhenger" (towed) — used both to
@@ -47,29 +57,29 @@ function looksLikeCamper(bodyTypeHint: string | null): boolean {
 }
 
 /** Avgiftsklasse ("kjøretøygruppe avgift") kodeVerdi -> Kaupet leaf slug.
- * Only codes that map cleanly onto a Kaupet category are listed; buss
- * (2xx), lastebil/trekkbil/beltebil/tankbil/bergingsbil (most of 3xx),
- * traktor (401), motorredskap (5xx) and prøvekjennemerker (8xx) have no
- * matching leaf and are intentionally omitted, falling through to the EU
- * technical-class fallback (or null/low-confidence if that's also absent). */
+ * Personbil- og varebil-koder mapper nå begge til "bil"; hvilken av de to
+ * det faktisk var beholdes separat via `AVGIFTSKLASSE_TO_GRUPPE` for
+ * `avgiftskode_gruppe`-filteret. Buss (2xx), traktor (401) og motorredskap
+ * (5xx/prøvekjennemerker 8xx) har fortsatt ingen matchende leaf og faller
+ * gjennom til EU-teknisk-klasse-fallback (eller null/low-confidence). */
 const AVGIFTSKLASSE_TO_SLUG: Record<string, VehicleLeafSlug> = {
-  "101": "personbil",
-  "106": "personbil", // Ambulanse (personbil)
-  "107": "personbil", // Leilighetsambulanse (personbil)
-  "312": "personbil", // Begravelsesbil (personbil)
+  "101": "bil",
+  "106": "bil", // Ambulanse (personbil)
+  "107": "bil", // Leilighetsambulanse (personbil)
+  "312": "bil", // Begravelsesbil (personbil)
   "313": "bobil", // Campingbil (personbil) før 1.1.2009
   "316": "bobil", // Campingbil (personbil) etter 1.1.2009
   "336": "bobil", // Campingbil (lastebil) før 1.1.2009
-  "301": "varebil", // Kombinert bil
-  "310": "varebil",
-  "311": "varebil",
-  "314": "varebil",
-  "315": "varebil",
+  "301": "bil", // Kombinert bil (varebil)
+  "310": "bil",
+  "311": "bil",
+  "314": "bil",
+  "315": "bil",
   "601": "moped-og-scooter",
   "610": "motorsykkel", // Lett motorsykkel
   "620": "motorsykkel", // Tung motorsykkel
   "621": "motorsykkel", // Tung motorsykkel (chopper-ombygd)
-  "630": "atv-og-snoscooter", // Beltemotorsykkel (snøscooter)
+  "630": "snoscooter", // Beltemotorsykkel (snøscooter)
   "701": "tilhenger-leaf",
   "702": "tilhenger-leaf",
   "703": "campingvogn", // Påhengsvogn (campingtilhenger)
@@ -83,6 +93,40 @@ const AVGIFTSKLASSE_TO_SLUG: Record<string, VehicleLeafSlug> = {
   "723": "campingvogn", // Semitrailer (campingtilhenger)
   "729": "tilhenger-leaf",
 };
+
+/** Avgiftsklasse-koder som mapper til "bil" ovenfor, splittet i sin
+ * opprinnelige Personbil/Varebil-gruppe for `avgiftskode_gruppe`-filteret. */
+const AVGIFTSKLASSE_TO_GRUPPE: Record<string, AvgiftskodeGruppe> = {
+  "101": "personbil",
+  "106": "personbil",
+  "107": "personbil",
+  "312": "personbil",
+  "301": "varebil",
+  "310": "varebil",
+  "311": "varebil",
+  "314": "varebil",
+  "315": "varebil",
+};
+
+/** Utleder Personbil/Varebil-gruppen fra en rå avgiftsklasse-kode, til bruk
+ * i det søkbare `avgiftskode_gruppe`-feltet på "Bil"-annonser. Returnerer
+ * `null` for koder som ikke havner i "bil" (bobil, MC, osv. har ikke dette
+ * feltet), eller EU-teknisk-klasse-fallback der avgiftsklasse mangler. */
+export function avgiftskodeGruppeFromCode(
+  avgiftsklasseCode: string | null,
+  classificationCode: string | null,
+): AvgiftskodeGruppe | null {
+  if (avgiftsklasseCode) {
+    const gruppe = AVGIFTSKLASSE_TO_GRUPPE[avgiftsklasseCode.trim()];
+    if (gruppe) return gruppe;
+  }
+  if (classificationCode) {
+    const code = classificationCode.trim().toUpperCase();
+    if (code === "M1") return "personbil";
+    if (code === "N1") return "varebil";
+  }
+  return null;
+}
 
 /**
  * `avgiftsklasseCode` is SVV's Norwegian tax/vehicle-group code (see module
@@ -105,7 +149,7 @@ export function classifyVehicleCategory(
     : null;
   if (avgiftsklasseSlug) {
     if (
-      avgiftsklasseSlug === "personbil" &&
+      avgiftsklasseSlug === "bil" &&
       (looksLikeCamper(bodyTypeHint) || (sleepingPlaces ?? 0) > 0)
     ) {
       return { slug: "bobil", confidence: "high" };
@@ -126,16 +170,16 @@ export function classifyVehicleCategory(
     if (looksLikeCamper(bodyTypeHint) || (sleepingPlaces ?? 0) > 0) {
       return { slug: "bobil", confidence: "high" };
     }
-    return { slug: "personbil", confidence: "high" };
+    return { slug: "bil", confidence: "high" };
   }
-  if (code === "N1") return { slug: "varebil", confidence: "high" };
+  if (code === "N1") return { slug: "bil", confidence: "high" };
   if (code === "L3E" || code === "L4E") return { slug: "motorsykkel", confidence: "high" };
   if (code === "L1E" || code === "L2E") return { slug: "moped-og-scooter", confidence: "high" };
-  // L5e/L6e/L7e -> ATV/snøscooter-ish quads: least certain mapping in this
-  // table, may also cover light utility vehicles that don't fit a consumer
-  // marketplace "ATV" listing well.
+  // L5e/L6e -> ATV/quad; L7e is a heavier quad that could also be a
+  // beltemotorsykkel (snøscooter) — least certain mapping in this table,
+  // kept as ATV since that's the more common consumer-marketplace listing.
   if (code === "L5E" || code === "L6E" || code === "L7E") {
-    return { slug: "atv-og-snoscooter", confidence: "low" };
+    return { slug: "atv", confidence: "low" };
   }
   if (["O1", "O2", "O3", "O4"].includes(code)) {
     if (looksLikeCamper(bodyTypeHint)) return { slug: "campingvogn", confidence: "high" };
@@ -146,19 +190,25 @@ export function classifyVehicleCategory(
 }
 
 export const VEHICLE_LEAF_SLUGS: VehicleLeafSlug[] = [
-  "personbil",
-  "varebil",
+  "bil",
   "bobil",
   "campingvogn",
   "motorsykkel",
   "moped-og-scooter",
-  "atv-og-snoscooter",
+  "atv",
+  "snoscooter",
   "tilhenger-leaf",
+  "lastebil-og-henger",
+  "buss-og-minibuss",
+  "traktor-og-redskap",
+  "anleggsmaskiner",
 ];
 
 /** Vehicle leaves with no odometer — the annonseopprettelse "Kilometerstand"
  * field is hidden (and not required) for these. `campingvogn` and
- * `tilhenger-leaf` are towed, not motorized; every other leaf has an engine. */
+ * `tilhenger-leaf` are towed, not motorized; every other leaf has an engine.
+ * `lastebil-og-henger` mixes both (trucks and trailers) but is left off this
+ * list since trucks are the more common listing and do have an odometer. */
 export const VEHICLE_LEAF_SLUGS_WITHOUT_MILEAGE: VehicleLeafSlug[] = [
   "campingvogn",
   "tilhenger-leaf",
@@ -175,7 +225,8 @@ export const VEHICLE_LEAF_SLUGS_WITHOUT_MILEAGE: VehicleLeafSlug[] = [
  *
  * Four groups (a-d in the vedtak):
  *  a) Moped/motorsykkel/beltemotorsykkel (ATV/snøscooter) — flat, all ages.
- *  b) Personbil — by egenvekt (≤1200 kg / >1200 kg).
+ *  b) Personbil (a "bil" listing tagged Personbil via avgiftskode_gruppe) —
+ *     by egenvekt (≤1200 kg / >1200 kg).
  *  c) Varebil/kombinert/campingbil (bobil)/buss t.o.m. 7500 kg — flat.
  *  d) Biltilhenger/campingtilhenger med egenvekt over 350 kg — flat; trailers
  *     at or under 350 kg pay no fee at all (own weight is what's checked, not
@@ -192,8 +243,8 @@ function avgiftAgeBracket(firstRegistrationYear: number): AvgiftAgeBracket {
   return "12+";
 }
 
-const GROUP_A_LEAFS: VehicleLeafSlug[] = ["motorsykkel", "moped-og-scooter", "atv-og-snoscooter"];
-const GROUP_C_LEAFS: VehicleLeafSlug[] = ["varebil", "bobil"];
+const GROUP_A_LEAFS: VehicleLeafSlug[] = ["motorsykkel", "moped-og-scooter", "atv", "snoscooter"];
+const GROUP_C_LEAFS: VehicleLeafSlug[] = ["bobil"];
 const GROUP_D_LEAFS: VehicleLeafSlug[] = ["campingvogn", "tilhenger-leaf"];
 
 const GROUP_A_RATE_NOK = 645;
@@ -214,6 +265,10 @@ const GROUP_D_WEIGHT_THRESHOLD_KG = 350;
  * leaf isn't subject to the fee at all (incl. group d at/under the 350 kg
  * threshold — genuinely exempt, not "unknown"), or when required data
  * (weight for personbil/tilhenger, first-registration year) is missing.
+ * For `leafSlug === "bil"`, `avgiftskodeGruppe` distinguishes the personbil
+ * (group b, weight-based) from the varebil (group c, flat) rate — required
+ * whenever `leafSlug` is "bil" since the fee differs meaningfully between
+ * the two; omitting it returns `null` rather than guessing.
  * Callers should fall back to linking Skatteetatens kalkulator on `null`
  * rather than guessing.
  */
@@ -221,6 +276,7 @@ export function computeOmregistreringsavgift(
   leafSlug: VehicleLeafSlug | null,
   weightKg: number | null,
   firstRegistrationYear: number | null,
+  avgiftskodeGruppe?: AvgiftskodeGruppe | null,
 ): number | null {
   if (!leafSlug || firstRegistrationYear == null) return null;
 
@@ -228,9 +284,13 @@ export function computeOmregistreringsavgift(
 
   const bracket = avgiftAgeBracket(firstRegistrationYear);
 
-  if (leafSlug === "personbil") {
-    if (weightKg == null) return null;
-    return GROUP_B_RATE_NOK[weightKg <= 1200 ? "le1200" : "gt1200"][bracket];
+  if (leafSlug === "bil") {
+    if (avgiftskodeGruppe === "varebil") return GROUP_C_RATE_NOK[bracket];
+    if (avgiftskodeGruppe === "personbil") {
+      if (weightKg == null) return null;
+      return GROUP_B_RATE_NOK[weightKg <= 1200 ? "le1200" : "gt1200"][bracket];
+    }
+    return null;
   }
 
   if (GROUP_C_LEAFS.includes(leafSlug)) return GROUP_C_RATE_NOK[bracket];

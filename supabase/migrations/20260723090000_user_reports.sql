@@ -29,6 +29,9 @@ GRANT EXECUTE ON FUNCTION public.submit_user_report TO authenticated;
 
 -- admin_list_reports: include the reported-user target alongside the
 -- existing listing target so user reports show up in the same admin queue.
+-- Adding columns changes the function's return type, which CREATE OR REPLACE
+-- can't do in place — the existing function must be dropped first.
+DROP FUNCTION IF EXISTS public.admin_list_reports(int);
 CREATE OR REPLACE FUNCTION public.admin_list_reports(_limit int DEFAULT 100)
 RETURNS TABLE(
   id uuid,

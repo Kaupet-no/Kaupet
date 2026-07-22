@@ -66,6 +66,7 @@ import { getCurrentPosition, requestLocationPermission, isNative } from "@/lib/n
 
 import { PublishActions } from "@/features/listing-creation/field-groups/review-publish";
 import type { WizardSharedProps } from "@/features/listing-creation/field-groups/types";
+import { setPreviewDraft } from "@/features/listing-creation/preview-draft-store";
 
 const listingSchema = z.object({
   title: z.string().trim().min(5, "Tittelen må være minst 5 tegn").max(120, "Maks 120 tegn"),
@@ -307,10 +308,13 @@ function NewListingPage() {
   const [hasDraftData, setHasDraftData] = useState<Record<string, unknown> | null>(null);
   const [draftId, setDraftId] = useState<string | null>(null);
   const draftSaveInProgress = useRef(false);
+  const pendingSubmitValuesRef = useRef<ListingForm | null>(null);
   const [showNoImageDialog, setShowNoImageDialog] = useState(false);
   const [showNoPriceDialog, setShowNoPriceDialog] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
+  const [hasPreviewed, setHasPreviewed] = useState(false);
+  const [previewNudgeOpen, setPreviewNudgeOpen] = useState(false);
   const [attributes, setAttributes] = useState<AttributeMap>({});
   const [attributesTouched, setAttributesTouched] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
@@ -921,6 +925,11 @@ function NewListingPage() {
         sleeping_places: number;
         max_total_weight_kg: number;
         length_m: number;
+        imported_used: boolean;
+        first_registration_date: string;
+        cylinders: number;
+        engine_displacement_cc: number;
+        engine_code: string;
       }>;
     },
   ) {
@@ -961,13 +970,16 @@ function NewListingPage() {
     if (lengthM != null) next.length_m = lengthM;
     const seats = spec?.seats ?? lookup.seats;
     if (seats != null) next.seats = seats;
-    if (lookup.imported_used != null) next.imported_used = lookup.imported_used;
-    if (lookup.first_registration_date)
-      next.first_registration_date = lookup.first_registration_date;
-    if (lookup.cylinders != null) next.cylinders = lookup.cylinders;
-    if (lookup.engine_displacement_cc != null)
-      next.engine_displacement_cc = lookup.engine_displacement_cc;
-    if (lookup.engine_code) next.engine_code = lookup.engine_code;
+    const importedUsed = spec?.imported_used ?? lookup.imported_used;
+    if (importedUsed != null) next.imported_used = importedUsed;
+    const firstRegistrationDate = spec?.first_registration_date ?? lookup.first_registration_date;
+    if (firstRegistrationDate) next.first_registration_date = firstRegistrationDate;
+    const cylinders = spec?.cylinders ?? lookup.cylinders;
+    if (cylinders != null) next.cylinders = cylinders;
+    const engineDisplacementCc = spec?.engine_displacement_cc ?? lookup.engine_displacement_cc;
+    if (engineDisplacementCc != null) next.engine_displacement_cc = engineDisplacementCc;
+    const engineCode = spec?.engine_code ?? lookup.engine_code;
+    if (engineCode) next.engine_code = engineCode;
     const sleepingPlaces = spec?.sleeping_places ?? lookup.sleeping_places;
     if (sleepingPlaces != null) next.sleeping_places = sleepingPlaces;
     if (resolved?.brandName) next.brand = resolved.brandName;
@@ -1167,9 +1179,10 @@ function NewListingPage() {
           city: values.city || null,
           lat: finalCoords?.lat ?? null,
           lng: finalCoords?.lng ?? null,
-          can_ship: fieldGroupKeys.includes("delivery-location")
-            ? values.can_ship !== "pickup"
-            : null,
+          can_ship:
+            fieldGroupKeys.includes("delivery-location") && !isVehicle
+              ? values.can_ship !== "pickup"
+              : null,
           known_issues: isVehicle ? values.known_issues || null : null,
           no_known_issues: isVehicle ? !!values.no_known_issues : null,
           maintenance_history: isVehicle ? values.maintenance_history || null : null,
@@ -1242,6 +1255,34 @@ function NewListingPage() {
 
   // Derived label for the category picker button
   const categoryLabel = categoryId ? categoryBreadcrumb(categoryId, categoriesById) || null : null;
+
+  function openPreview() {
+    const categoryNode = categoryId ? categoriesById.get(categoryId) : undefined;
+    setPreviewDraft({
+      title,
+      subtitle: subtitle || null,
+      description,
+      priceNok: isFree ? null : typeof priceNok === "number" ? priceNok : null,
+      isFree,
+      condition: fieldGroupKeys.includes("condition") ? (condition ?? null) : null,
+      city: city || null,
+      postalCode: postalCode || null,
+      displayLat: coords?.lat ?? null,
+      displayLng: coords?.lng ?? null,
+      knownIssues: isVehicle ? knownIssues || null : null,
+      noKnownIssues: isVehicle ? !!noKnownIssues : null,
+      maintenanceHistory: isVehicle ? maintenanceHistory || null : null,
+      category: categoryNode
+        ? { name_nb: categoryNode.name_nb, slug: categoryNode.slug ?? null }
+        : null,
+      images: images.map((img, i) => ({ storage_path: String(i), sort_order: i })),
+      imgUrls: Object.fromEntries(images.map((img, i) => [String(i), img.previewUrl])),
+      attributes,
+    });
+    setHasPreviewed(true);
+    setPreviewNudgeOpen(false);
+    void navigate({ to: "/ny-annonse/forhandsvisning" });
+  }
 
   // Redirect to home if no type selected and no draft — entry should go through the picker dialog
   useEffect(() => {
@@ -1399,6 +1440,11 @@ function NewListingPage() {
             showErrorToast("Fyll inn alle obligatoriske egenskaper før du publiserer.");
             return;
           }
+          if (!hasPreviewed) {
+            pendingSubmitValuesRef.current = v;
+            setPreviewNudgeOpen(true);
+            return;
+          }
           mutation.mutate(v);
         })}
         className={`mt-8 ${native ? (isLast ? "overflow-hidden" : "pb-[calc(var(--app-bottom-nav-h)+1.5rem)]") : "pb-24"}`}
@@ -1461,6 +1507,7 @@ function NewListingPage() {
                     setTurnstileToken={setTurnstileToken}
                     mutationIsPending={mutation.isPending}
                     onCancel={() => navigate({ to: "/" })}
+                    onPreview={openPreview}
                   />
                 )}
               </div>
@@ -1468,6 +1515,30 @@ function NewListingPage() {
           );
         })()}
       </form>
+
+      <AlertDialog open={previewNudgeOpen} onOpenChange={setPreviewNudgeOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Vil du forhåndsvise annonsen før du publiserer?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Du har ikke sett hvordan annonsen din vil se ut ennå. Du kan forhåndsvise den nå,
+              eller publisere direkte.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction
+              onClick={() => {
+                setPreviewNudgeOpen(false);
+                if (pendingSubmitValuesRef.current) mutation.mutate(pendingSubmitValuesRef.current);
+              }}
+              className="bg-secondary text-secondary-foreground hover:bg-secondary/80"
+            >
+              Publiser likevel
+            </AlertDialogAction>
+            <AlertDialogAction onClick={openPreview}>Forhåndsvis annonse</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Category picker bottom sheet */}
       <CategoryPicker

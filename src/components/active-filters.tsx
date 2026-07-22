@@ -121,6 +121,15 @@ export function ActiveFilters({ search, terms, onUpdate }: Props) {
           +{hiddenCount}
         </button>
       )}
+      {itemCount > 1 && (
+        <button
+          type="button"
+          onClick={() => onUpdate({ q: "", extraGroups: [] })}
+          className="ml-auto text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+        >
+          Nullstill alle
+        </button>
+      )}
     </div>
   );
 }

@@ -4,8 +4,15 @@ import { MessageCircle, Share2, ShieldCheck, User as UserIcon } from "lucide-rea
 import { Button } from "@/components/ui/button";
 import { FavoriteButton } from "@/components/favorite-button";
 import { ShareListingDialog } from "@/components/share-listing-dialog";
+import { StarRating } from "@/components/star-rating";
 
-type Seller = { display_name: string | null; avatar_url: string | null; created_at: string } | null;
+type Seller = {
+  display_name: string | null;
+  avatar_url: string | null;
+  created_at: string;
+  avg_rating?: number;
+  review_count?: number;
+} | null;
 
 export function SellerContactPanel({
   isLoggedIn,
@@ -48,6 +55,15 @@ export function SellerContactPanel({
               <div className="flex flex-wrap items-center gap-1.5">
                 <p className="font-medium">{seller?.display_name ?? "Selger"}</p>
               </div>
+              {!!seller?.review_count && (
+                <div
+                  className="mt-0.5 flex items-center gap-1.5"
+                  aria-label={`${seller.avg_rating?.toFixed(1)} av 5 stjerner, basert på ${seller.review_count} vurderinger`}
+                >
+                  <StarRating value={seller.avg_rating ?? 0} readOnly size={13} />
+                  <span className="text-xs text-muted-foreground">({seller.review_count})</span>
+                </div>
+              )}
               {seller?.created_at && (
                 <p className="text-xs text-muted-foreground">
                   Medlem siden{" "}

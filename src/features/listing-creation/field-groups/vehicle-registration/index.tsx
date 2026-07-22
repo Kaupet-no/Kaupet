@@ -1,5 +1,7 @@
 import { Label } from "@/components/ui/label";
 import { CategoryPicker } from "@/components/category-picker";
+import { AttributeFields } from "@/components/attribute-fields";
+import { VEHICLE_WIZARD_MANAGED_KEYS } from "@/lib/vehicle-lookup.server";
 
 import type { WizardSharedProps } from "../types";
 import { RequiredMark } from "../required-mark";
@@ -26,6 +28,9 @@ export function VehicleRegistration(props: WizardSharedProps) {
     vehicleRegNrInput,
     setVehicleRegNrInput,
     onCategorySelect,
+    attributes,
+    onAttributesChange,
+    attributesTouched,
   } = props;
 
   const isManualLeafChosen = !!categoryId && categoryId !== bilOgMcCategoryId;
@@ -109,9 +114,28 @@ export function VehicleRegistration(props: WizardSharedProps) {
                 c.id === bilOgMcCategoryId ||
                 isDescendantOfBilOgMc(c, categories, bilOgMcCategoryId),
             )}
+            initialParentId={bilOgMcCategoryId ?? undefined}
             selectedId={isManualLeafChosen ? categoryId : ""}
             onSelect={onCategorySelect}
           />
+
+          {isManualLeafChosen && (
+            <div className="space-y-2 border-t pt-3">
+              <p className="text-sm text-muted-foreground">
+                Fyll inn kjøretøyets tekniske opplysninger manuelt.
+              </p>
+              <AttributeFields
+                categoryId={categoryId}
+                categories={categories ?? []}
+                value={attributes}
+                onChange={onAttributesChange}
+                showErrors={attributesTouched}
+                hiddenKeys={VEHICLE_WIZARD_MANAGED_KEYS}
+                required
+              />
+            </div>
+          )}
+
           <button
             type="button"
             onClick={() => setVehicleRegistered(true)}

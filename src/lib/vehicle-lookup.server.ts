@@ -123,6 +123,12 @@ export const VEHICLE_LOOKUP_FILTER_KEYS = [
   "sleeping_places",
 ] as const;
 
+/** Registration status/number are set by the wizard itself (SVV lookup, or
+ * the manual "kjøretøyet er ikke registrert" flow) rather than filled in by
+ * the user as a generic attribute, so they're always hidden from the
+ * category-attributes step regardless of which vehicle path was taken. */
+export const VEHICLE_WIZARD_MANAGED_KEYS = ["is_registered", "registration_number"] as const;
+
 const SVV_BASE_URL = "https://akfell-datautlevering.atlas.vegvesen.no/enkeltoppslag/kjoretoydata";
 
 /** SVV returns "-" (or blank) for fields that don't apply to a given vehicle

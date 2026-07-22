@@ -57,9 +57,15 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
     fieldsToValidate: ["category_id"],
     validateExtra: (ctx) => {
       // Either a lookup succeeded (proceed to vehicle-confirm) or the user
-      // manually picked a real leaf category (opted out of registered path).
+      // manually picked a real leaf category (opted out of registered path)
+      // and filled in the same required technical fields by hand.
       if (ctx.vehicleLookupResult) return null;
-      if (ctx.categoryId && ctx.categoryId !== ctx.bilOgMcCategoryId) return null;
+      if (ctx.categoryId && ctx.categoryId !== ctx.bilOgMcCategoryId) {
+        if (ctx.missingFilters.length > 0) {
+          return `Fyll inn ${ctx.missingFilters.map((f) => f.label_nb).join(", ")} før du går videre.`;
+        }
+        return null;
+      }
       return "Slå opp registreringsnummer, eller velg kjøretøytype manuelt.";
     },
   },

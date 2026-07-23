@@ -11,9 +11,16 @@ const PopoverAnchor = PopoverPrimitive.Anchor;
 
 const PopoverContent = React.forwardRef<
   React.ElementRef<typeof PopoverPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
->(({ className, align = "center", sideOffset = 4, ...props }, ref) => (
-  <PopoverPrimitive.Portal>
+  React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content> & {
+    /** Portal container override. Pass a Dialog's own content node when the
+     * popover is nested inside a modal Dialog — otherwise the popover
+     * portals to document.body outside the dialog's DOM subtree, and the
+     * dialog's focus trap keeps yanking focus back to the trigger instead
+     * of letting the popover's content (e.g. a search input) receive it. */
+    container?: HTMLElement | null;
+  }
+>(({ className, align = "center", sideOffset = 4, container, ...props }, ref) => (
+  <PopoverPrimitive.Portal container={container}>
     <PopoverPrimitive.Content
       ref={ref}
       align={align}

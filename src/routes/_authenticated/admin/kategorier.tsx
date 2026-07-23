@@ -813,10 +813,11 @@ function CategoryDialog({
 }) {
   const [savedCategory, setSavedCategory] = useState<Category | null>(category);
   const [activeTab, setActiveTab] = useState<"details" | "filters" | "flow">(initialTab);
+  const [dialogEl, setDialogEl] = useState<HTMLDivElement | null>(null);
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto">
+      <DialogContent ref={setDialogEl} className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{savedCategory ? savedCategory.name_nb : "Ny kategori"}</DialogTitle>
         </DialogHeader>
@@ -835,6 +836,7 @@ function CategoryDialog({
               category={savedCategory}
               parentId={parentId}
               categories={categories}
+              dialogEl={dialogEl}
               onClose={onClose}
               onSaved={(saved) => {
                 const isNewCategory = !savedCategory;
@@ -860,12 +862,14 @@ function CategoryDetailsPanel({
   category,
   parentId,
   categories,
+  dialogEl,
   onClose,
   onSaved,
 }: {
   category: Category | null;
   parentId: string | null;
   categories: Category[];
+  dialogEl: HTMLDivElement | null;
   onClose: () => void;
   onSaved: (saved: Category) => void;
 }) {
@@ -1002,7 +1006,6 @@ function CategoryDetailsPanel({
         <div className="space-y-2">
           <Label>Ikon</Label>
           <Popover
-            modal
             open={iconPickerOpen}
             onOpenChange={(open) => {
               setIconPickerOpen(open);
@@ -1027,7 +1030,7 @@ function CategoryDetailsPanel({
                 <ChevronsUpDown className="size-4 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-(--radix-popover-trigger-width) p-0">
+            <PopoverContent container={dialogEl} className="w-(--radix-popover-trigger-width) p-0">
               <Command shouldFilter={false}>
                 <CommandInput
                   placeholder="Søk eller skriv inn ikon-navn…"

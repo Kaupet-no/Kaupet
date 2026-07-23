@@ -1002,6 +1002,7 @@ function CategoryDetailsPanel({
         <div className="space-y-2">
           <Label>Ikon</Label>
           <Popover
+            modal
             open={iconPickerOpen}
             onOpenChange={(open) => {
               setIconPickerOpen(open);

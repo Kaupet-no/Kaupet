@@ -84,7 +84,7 @@ import {
 import { formatErrorMessage } from "@/lib/errors";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CATEGORY_ICON_OPTIONS, getCategoryIcon } from "@/lib/category-icons";
+import { ALL_ICON_OPTIONS, getCategoryIcon } from "@/lib/category-icons";
 import {
   FILTER_TYPE_LABELS,
   normalizeFilter,
@@ -875,6 +875,7 @@ function CategoryDetailsPanel({
   const [slugTouched, setSlugTouched] = useState(!!category);
   const [icon, setIcon] = useState<string | null>(category?.icon ?? null);
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
+  const [iconSearch, setIconSearch] = useState("");
   const [parentPickerOpen, setParentPickerOpen] = useState(false);
   const [color, setColor] = useState<string>(category?.color ?? "");
   const [headingFont, setHeadingFont] = useState<string>(
@@ -1016,11 +1017,30 @@ function CategoryDetailsPanel({
             </PopoverTrigger>
             <PopoverContent className="w-(--radix-popover-trigger-width) p-0">
               <Command>
-                <CommandInput placeholder="Søk etter ikon…" />
+                <CommandInput
+                  placeholder="Søk eller skriv inn ikon-navn…"
+                  value={iconSearch}
+                  onValueChange={setIconSearch}
+                />
                 <CommandList>
-                  <CommandEmpty>Ingen ikoner funnet</CommandEmpty>
+                  <CommandEmpty>
+                    {iconSearch.trim() ? (
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-accent"
+                        onClick={() => {
+                          setIcon(iconSearch.trim());
+                          setIconPickerOpen(false);
+                        }}
+                      >
+                        Bruk «{iconSearch.trim()}» som ikon-navn
+                      </button>
+                    ) : (
+                      "Ingen ikoner funnet"
+                    )}
+                  </CommandEmpty>
                   <CommandGroup>
-                    {CATEGORY_ICON_OPTIONS.map(({ name: iconName, icon: IconComponent }) => (
+                    {ALL_ICON_OPTIONS.map(({ name: iconName, icon: IconComponent }) => (
                       <CommandItem
                         key={iconName}
                         value={iconName}

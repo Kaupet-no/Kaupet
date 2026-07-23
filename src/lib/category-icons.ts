@@ -80,6 +80,7 @@ import {
   Zap,
   Cog,
   createLucideIcon,
+  icons as LUCIDE_ICONS,
 } from "lucide-react";
 
 // Lucide har verken en dressjakke eller en kjole, så disse to er bygget for
@@ -236,7 +237,22 @@ const CATEGORY_ICON_MAP: Record<string, LucideIcon> = Object.fromEntries(
   CATEGORY_ICON_OPTIONS.map(({ name, icon }) => [name, icon]),
 );
 
+// Alle ikonene lucide-react leverer, i tillegg til de håndbygde egendefinerte
+// ikonene over. Brukes av ikonvelgeren i admin slik at man kan søke blant og
+// velge ethvert lucide-ikon, ikke bare det kuraterte utvalget i
+// CATEGORY_ICON_OPTIONS (som fortsatt styrer hvilke ikoner som faktisk brukes
+// på kategoriene i dag).
+export const ALL_ICON_OPTIONS: { name: string; icon: LucideIcon }[] = (() => {
+  const seen = new Set(CATEGORY_ICON_OPTIONS.map((o) => o.name));
+  const extra = Object.entries(LUCIDE_ICONS)
+    .filter(([name]) => !seen.has(name))
+    .map(([name, icon]) => ({ name, icon: icon as LucideIcon }));
+  return [...CATEGORY_ICON_OPTIONS, ...extra].sort((a, b) => a.name.localeCompare(b.name));
+})();
+
 export function getCategoryIcon(iconName: string | null | undefined): LucideIcon {
   if (!iconName) return Package;
-  return CATEGORY_ICON_MAP[iconName] ?? Package;
+  return (
+    CATEGORY_ICON_MAP[iconName] ?? (LUCIDE_ICONS as Record<string, LucideIcon>)[iconName] ?? Package
+  );
 }

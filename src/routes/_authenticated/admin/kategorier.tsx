@@ -876,6 +876,11 @@ function CategoryDetailsPanel({
   const [icon, setIcon] = useState<string | null>(category?.icon ?? null);
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
   const [iconSearch, setIconSearch] = useState("");
+  const filteredIconOptions = useMemo(() => {
+    const q = iconSearch.trim().toLowerCase();
+    if (!q) return ALL_ICON_OPTIONS.slice(0, 100);
+    return ALL_ICON_OPTIONS.filter((o) => o.name.toLowerCase().includes(q)).slice(0, 100);
+  }, [iconSearch]);
   const [parentPickerOpen, setParentPickerOpen] = useState(false);
   const [color, setColor] = useState<string>(category?.color ?? "");
   const [headingFont, setHeadingFont] = useState<string>(
@@ -996,7 +1001,13 @@ function CategoryDetailsPanel({
         </div>
         <div className="space-y-2">
           <Label>Ikon</Label>
-          <Popover open={iconPickerOpen} onOpenChange={setIconPickerOpen}>
+          <Popover
+            open={iconPickerOpen}
+            onOpenChange={(open) => {
+              setIconPickerOpen(open);
+              if (!open) setIconSearch("");
+            }}
+          >
             <PopoverTrigger asChild>
               <Button
                 type="button"
@@ -1016,7 +1027,7 @@ function CategoryDetailsPanel({
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-(--radix-popover-trigger-width) p-0">
-              <Command>
+              <Command shouldFilter={false}>
                 <CommandInput
                   placeholder="Søk eller skriv inn ikon-navn…"
                   value={iconSearch}
@@ -1040,7 +1051,7 @@ function CategoryDetailsPanel({
                     )}
                   </CommandEmpty>
                   <CommandGroup>
-                    {ALL_ICON_OPTIONS.map(({ name: iconName, icon: IconComponent }) => (
+                    {filteredIconOptions.map(({ name: iconName, icon: IconComponent }) => (
                       <CommandItem
                         key={iconName}
                         value={iconName}

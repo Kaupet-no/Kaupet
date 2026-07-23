@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/location-filter";
 import { CONDITIONS } from "@/components/advanced-search-value";
+import { AttributeFilterPanel } from "@/components/attribute-filter-panel";
 import { SORT_OPTIONS, type SortValue, type Category } from "@/lib/categories";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { hapticImpact } from "@/lib/haptics";
@@ -24,6 +25,7 @@ import {
   getConditionChipState,
 } from "@/lib/filter-chip-labels";
 import { usePriceDraft } from "@/hooks/use-price-draft";
+import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
 
 type Props = {
   sort: SortValue;
@@ -42,9 +44,12 @@ type Props = {
   resultCount: number;
   onOpenAdvanced: () => void;
   advancedFilterCount?: number;
+  attrFilters?: CategoryFilter[];
+  attrValues?: Record<string, AttributeFilterValue>;
+  onAttrValuesChange?: (key: string, value: AttributeFilterValue | undefined) => void;
 };
 
-type SheetId = "sort" | "category" | "price" | "condition" | "location" | null;
+type SheetId = "sort" | "category" | "price" | "condition" | "location" | "attrs" | null;
 
 export function NativeFilterChips({
   sort,
@@ -63,6 +68,9 @@ export function NativeFilterChips({
   resultCount,
   onOpenAdvanced,
   advancedFilterCount = 0,
+  attrFilters = [],
+  attrValues = {},
+  onAttrValuesChange,
 }: Props) {
   const [openSheet, setOpenSheet] = useState<SheetId>(null);
 
@@ -83,6 +91,7 @@ export function NativeFilterChips({
   const { label: condLabel, active: condActive } = getConditionChipState(conditions);
   const locActive = location.lat != null;
   const locLabel = locActive ? (location.label ? location.label.split(",")[0] : "Sted") : "Sted";
+  const attrValueCount = Object.keys(attrValues).length;
 
   const resultBtn = (
     <Button
@@ -130,6 +139,15 @@ export function NativeFilterChips({
           icon={<MapPin className="size-3.5" />}
           onPress={() => open("location")}
         />
+        {attrFilters.length > 0 && onAttrValuesChange && (
+          <Chip
+            label="Egenskaper"
+            active={attrValueCount > 0}
+            icon={<SlidersHorizontal className="size-3.5" />}
+            onPress={() => open("attrs")}
+            badge={attrValueCount > 0 ? attrValueCount : undefined}
+          />
+        )}
         <Chip
           label="Mer"
           active={advancedFilterCount > 0}
@@ -249,6 +267,25 @@ export function NativeFilterChips({
           {resultBtn}
         </SheetContent>
       </Sheet>
+
+      {/* Attribute (category-specific) filters sheet */}
+      {attrFilters.length > 0 && onAttrValuesChange && (
+        <Sheet open={openSheet === "attrs"} onOpenChange={(o) => !o && close()}>
+          <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto rounded-t-2xl">
+            <SheetHeader>
+              <SheetTitle>Egenskaper</SheetTitle>
+            </SheetHeader>
+            <div className="mt-4">
+              <AttributeFilterPanel
+                filters={attrFilters}
+                values={attrValues}
+                onChange={onAttrValuesChange}
+              />
+            </div>
+            {resultBtn}
+          </SheetContent>
+        </Sheet>
+      )}
     </>
   );
 }

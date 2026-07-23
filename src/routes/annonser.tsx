@@ -33,8 +33,20 @@ import { reverseGeocode } from "@/lib/geocode";
 import { saveLastSearchContext } from "@/lib/last-search-context";
 import { summarizeCriteria } from "@/lib/saved-searches";
 import { WtbListingCard } from "@/components/wtb-listing-card";
-import { searchSchema, conditionEnum } from "@/features/listing-search/search-schema";
+import {
+  searchSchema,
+  conditionEnum,
+  decodeAttrFilters,
+  encodeAttrFilters,
+} from "@/features/listing-search/search-schema";
 import { useListingsQuery } from "@/features/listing-search/use-listings-query";
+import { buildTree } from "@/lib/categories";
+import {
+  effectiveFiltersForCategories,
+  normalizeFilter,
+  setAttributeFilterValue,
+  type AttributeFilterValue,
+} from "@/lib/category-filters";
 import { useWtbListings } from "@/features/listing-search/use-wtb-listings";
 import { useAuth } from "@/hooks/use-auth";
 import { useIsNative } from "@/hooks/use-is-native";
@@ -164,6 +176,18 @@ function BrowsePage() {
     },
   });
 
+  const { data: allFilters } = useQuery({
+    queryKey: ["category-filters", "all"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("category_filters")
+        .select("id, category_id, key, label_nb, type, unit, options, sort_order, is_primary")
+        .order("sort_order");
+      if (error) throw error;
+      return (data ?? []).map(normalizeFilter);
+    },
+  });
+
   const { data: radiusIds } = useQuery({
     queryKey: ["listings-radius", search.lat, search.lng, search.radius],
     enabled: search.lat != null && search.lng != null,
@@ -184,6 +208,24 @@ function BrowsePage() {
     if (search.category && !arr.includes(search.category)) return [...arr, search.category];
     return arr;
   }, [search.categories, search.category]);
+
+  const categoryTree = useMemo(() => buildTree(categories ?? []), [categories]);
+
+  const attrFilters = useMemo(() => {
+    const ids = effectiveCategories
+      .map((slug: string) => categoryTree.bySlug.get(slug)?.id)
+      .filter((id): id is string => !!id);
+    return effectiveFiltersForCategories(ids, allFilters ?? [], categoryTree.byId);
+  }, [effectiveCategories, categoryTree, allFilters]);
+
+  const attrValues = useMemo(() => decodeAttrFilters(search.attrs), [search.attrs]);
+
+  const handleAttrValueChange = (key: string, value: AttributeFilterValue | undefined) => {
+    const next = setAttributeFilterValue(attrValues, key, value);
+    navigate({
+      search: (prev: z.infer<typeof searchSchema>) => ({ ...prev, attrs: encodeAttrFilters(next) }),
+    });
+  };
 
   // Build terms list from `q` (space-separated)
   const terms = useMemo<string[]>(() => {
@@ -543,6 +585,9 @@ function BrowsePage() {
             advancedFilterCount={
               (search.extraGroups?.length ?? 0) + (search.qMode === "any" ? 1 : 0)
             }
+            attrFilters={attrFilters}
+            attrValues={attrValues}
+            onAttrValuesChange={handleAttrValueChange}
           />
         ) : (
           <DesktopFilterChips
@@ -565,6 +610,9 @@ function BrowsePage() {
             onQModeChange={(m) => updateSearch({ qMode: m })}
             extraGroups={search.extraGroups ?? []}
             onExtraGroupsChange={(extraGroups) => updateSearch({ extraGroups })}
+            attrFilters={attrFilters}
+            attrValues={attrValues}
+            onAttrValuesChange={handleAttrValueChange}
           />
         )}
       </div>

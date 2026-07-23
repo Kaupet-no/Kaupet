@@ -32,7 +32,7 @@ function VilkarPage() {
           <h1 className="mt-2 font-display text-4xl leading-tight tracking-tight">
             Brukervilkår for Kaupet.no
           </h1>
-          <p className="mt-3 text-sm text-muted-foreground">Sist oppdatert 20. juni 2026</p>
+          <p className="mt-3 text-sm text-muted-foreground">Sist oppdatert 23. juli 2026</p>
         </header>
       )}
 
@@ -75,8 +75,11 @@ function VilkarPage() {
           <ul className="mt-3 space-y-2 list-disc pl-5">
             <li>
               Salg av ulovlige varer eller tjenester, herunder våpen, narkotika, kopivarer, stjålne
-              gjenstander, levende dyr i strid med dyrevelferdsloven, eller aldersbegrensede varer
-              til mindreårige.
+              gjenstander eller aldersbegrensede varer til mindreårige.
+            </li>
+            <li>
+              Salg eller formidling av levende dyr. Dette gjelder uavhengig av dyreart. Utstyr,
+              tilbehør og fôr til kjæledyr er tillatt.
             </li>
             <li>Svindel, falske annonser, villedende prising eller "lokketilbud".</li>
             <li>

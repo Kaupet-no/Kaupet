@@ -11,7 +11,11 @@ export function useLandingCategories() {
     isError: categoriesIsError,
     refetch: refetchCategories,
   } = useQuery({
-    queryKey: ["categories"],
+    // Distinct key from useCategories()/annonser.tsx's slimmer `categories`
+    // query — this one selects extra columns (icon/color/etc.), and sharing
+    // a key would let whichever query wins the race cache incomplete rows
+    // for up to the global staleTime, silently emptying the landing chips.
+    queryKey: ["categories", "landing"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")

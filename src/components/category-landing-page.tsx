@@ -10,6 +10,7 @@ import { buildTree, descendants, pathFromAncestor, type Category } from "@/lib/c
 import {
   applyAttributeFilters,
   effectiveFiltersForCategory,
+  effectiveFiltersForCategories,
   normalizeFilter,
   setAttributeFilterValue,
   splitPrimaryFilters,
@@ -145,10 +146,26 @@ export function CategoryLandingPage({
     () => [selected.id, ...descendants(selected, tree).map((c) => c.id)],
     [selected, tree],
   );
-  const filters = useMemo(
-    () => effectiveFiltersForCategory(selected.id, allFilters ?? [], tree.byId),
-    [selected, allFilters, tree],
-  );
+  // While viewing a hub category (one with subcategories) without having
+  // drilled into a specific leaf, show the fields common to *every* leaf
+  // subcategory underneath it — e.g. "MC og moped" shows what's shared by
+  // Motorsykkel/Moped/ATV — rather than just fields defined on the hub
+  // itself. Drilling into a specific leaf then falls back to that leaf's own
+  // effective filters (which already includes everything inherited from
+  // here), so the field list only grows as you go deeper.
+  const filters = useMemo(() => {
+    const leaves = descendants(selected, tree).filter(
+      (d) => (tree.childrenByParent.get(d.id) ?? []).length === 0,
+    );
+    if (leaves.length > 0) {
+      return effectiveFiltersForCategories(
+        leaves.map((l) => l.id),
+        allFilters ?? [],
+        tree.byId,
+      );
+    }
+    return effectiveFiltersForCategory(selected.id, allFilters ?? [], tree.byId);
+  }, [selected, allFilters, tree]);
   const { primary: primaryFilters, secondary: secondaryFilters } = useMemo(
     () => splitPrimaryFilters(filters),
     [filters],

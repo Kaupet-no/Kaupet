@@ -3,7 +3,9 @@ import { z } from "zod";
 
 import { supabase } from "@/integrations/supabase/client";
 import type { Category } from "@/lib/categories";
+import { applyAttributeFilters } from "@/lib/category-filters";
 import {
+  decodeAttrFilters,
   rowContainsTerm,
   searchSchema,
   type ListingsPage,
@@ -121,6 +123,10 @@ export function useListingsQuery({
       if (search.conditions && search.conditions.length > 0) {
         qb = qb.in("condition", search.conditions);
       }
+
+      // Category-specific attribute filters (e.g. Bil's "hestekrefter")
+      const attrFilters = decodeAttrFilters(search.attrs);
+      qb = applyAttributeFilters(qb, attrFilters);
 
       // Price
       const includeFree = search.includeFree ?? true;

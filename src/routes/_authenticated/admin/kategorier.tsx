@@ -84,7 +84,7 @@ import {
 import { formatErrorMessage } from "@/lib/errors";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CATEGORY_ICON_OPTIONS, getCategoryIcon } from "@/lib/category-icons";
+import { ALL_ICON_OPTIONS, getCategoryIcon } from "@/lib/category-icons";
 import {
   FILTER_TYPE_LABELS,
   normalizeFilter,
@@ -813,10 +813,11 @@ function CategoryDialog({
 }) {
   const [savedCategory, setSavedCategory] = useState<Category | null>(category);
   const [activeTab, setActiveTab] = useState<"details" | "filters" | "flow">(initialTab);
+  const [dialogEl, setDialogEl] = useState<HTMLDivElement | null>(null);
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto">
+      <DialogContent ref={setDialogEl} className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{savedCategory ? savedCategory.name_nb : "Ny kategori"}</DialogTitle>
         </DialogHeader>
@@ -835,6 +836,7 @@ function CategoryDialog({
               category={savedCategory}
               parentId={parentId}
               categories={categories}
+              dialogEl={dialogEl}
               onClose={onClose}
               onSaved={(saved) => {
                 const isNewCategory = !savedCategory;
@@ -860,12 +862,14 @@ function CategoryDetailsPanel({
   category,
   parentId,
   categories,
+  dialogEl,
   onClose,
   onSaved,
 }: {
   category: Category | null;
   parentId: string | null;
   categories: Category[];
+  dialogEl: HTMLDivElement | null;
   onClose: () => void;
   onSaved: (saved: Category) => void;
 }) {
@@ -875,6 +879,12 @@ function CategoryDetailsPanel({
   const [slugTouched, setSlugTouched] = useState(!!category);
   const [icon, setIcon] = useState<string | null>(category?.icon ?? null);
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
+  const [iconSearch, setIconSearch] = useState("");
+  const filteredIconOptions = useMemo(() => {
+    const q = iconSearch.trim().toLowerCase();
+    if (!q) return ALL_ICON_OPTIONS.slice(0, 100);
+    return ALL_ICON_OPTIONS.filter((o) => o.name.toLowerCase().includes(q)).slice(0, 100);
+  }, [iconSearch]);
   const [parentPickerOpen, setParentPickerOpen] = useState(false);
   const [color, setColor] = useState<string>(category?.color ?? "");
   const [headingFont, setHeadingFont] = useState<string>(
@@ -995,7 +1005,13 @@ function CategoryDetailsPanel({
         </div>
         <div className="space-y-2">
           <Label>Ikon</Label>
-          <Popover open={iconPickerOpen} onOpenChange={setIconPickerOpen}>
+          <Popover
+            open={iconPickerOpen}
+            onOpenChange={(open) => {
+              setIconPickerOpen(open);
+              if (!open) setIconSearch("");
+            }}
+          >
             <PopoverTrigger asChild>
               <Button
                 type="button"
@@ -1014,13 +1030,32 @@ function CategoryDetailsPanel({
                 <ChevronsUpDown className="size-4 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-(--radix-popover-trigger-width) p-0">
-              <Command>
-                <CommandInput placeholder="Søk etter ikon…" />
+            <PopoverContent container={dialogEl} className="w-(--radix-popover-trigger-width) p-0">
+              <Command shouldFilter={false}>
+                <CommandInput
+                  placeholder="Søk eller skriv inn ikon-navn…"
+                  value={iconSearch}
+                  onValueChange={setIconSearch}
+                />
                 <CommandList>
-                  <CommandEmpty>Ingen ikoner funnet</CommandEmpty>
+                  <CommandEmpty>
+                    {iconSearch.trim() ? (
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-accent"
+                        onClick={() => {
+                          setIcon(iconSearch.trim());
+                          setIconPickerOpen(false);
+                        }}
+                      >
+                        Bruk «{iconSearch.trim()}» som ikon-navn
+                      </button>
+                    ) : (
+                      "Ingen ikoner funnet"
+                    )}
+                  </CommandEmpty>
                   <CommandGroup>
-                    {CATEGORY_ICON_OPTIONS.map(({ name: iconName, icon: IconComponent }) => (
+                    {filteredIconOptions.map(({ name: iconName, icon: IconComponent }) => (
                       <CommandItem
                         key={iconName}
                         value={iconName}

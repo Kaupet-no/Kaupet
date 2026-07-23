@@ -1,9 +1,8 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { MessageCircle, Search, FolderOpen } from "lucide-react";
+import { MessageCircle, FolderOpen } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { UserMenu } from "@/components/user-menu";
 import { NotificationsBell } from "@/components/notifications-bell";
 import { useUnreadConversationsCount } from "@/hooks/use-unread";
@@ -15,7 +14,6 @@ export function SiteHeader() {
   const navigate = useNavigate();
   const { data: categories } = useCategories();
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
-  const [q, setQ] = useState("");
 
   const rootCategories = useMemo(
     () => (categories ?? []).filter((c) => c.parent_id === null),
@@ -25,11 +23,6 @@ export function SiteHeader() {
     () => new Map((categories ?? []).map((c) => [c.id, c.slug])),
     [categories],
   );
-
-  const submitSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    navigate({ to: "/annonser", search: { q: q.trim(), category: "", sort: "new" } });
-  };
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur pt-safe">
@@ -65,19 +58,6 @@ export function SiteHeader() {
             navigate({ to: "/annonser", search: { q: "", category: slug, sort: "new" } });
           }}
         />
-
-        <form onSubmit={submitSearch} className="hidden max-w-sm flex-1 md:block">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Søk i annonser"
-              aria-label="Søk i annonser"
-              className="h-9 pl-9"
-            />
-          </div>
-        </form>
 
         <div className="ml-auto flex items-center gap-2">
           {user ? (

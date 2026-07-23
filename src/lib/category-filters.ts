@@ -170,6 +170,32 @@ export function getMissingRequiredFilters(
 }
 
 /**
+ * Effective filters for a multi-category selection (e.g. the /annonser
+ * category picker, which allows selecting several categories at once):
+ * returns only filters common to every selected category (by key), since a
+ * Bil-only field like "hestekrefter" doesn't make sense once "MC" is also
+ * selected. Returns [] when no category is selected — attribute filters
+ * only apply within a category context.
+ */
+export function effectiveFiltersForCategories(
+  categoryIds: string[],
+  allFilters: CategoryFilter[],
+  categoriesById: Map<string, CategoryNode>,
+): CategoryFilter[] {
+  if (categoryIds.length === 0) return [];
+  const perCategory = categoryIds.map((id) =>
+    effectiveFiltersForCategory(id, allFilters, categoriesById),
+  );
+  const [first, ...rest] = perCategory;
+  const commonKeys = new Set(first.map((f) => f.key));
+  for (const filters of rest) {
+    const keys = new Set(filters.map((f) => f.key));
+    for (const k of Array.from(commonKeys)) if (!keys.has(k)) commonKeys.delete(k);
+  }
+  return first.filter((f) => commonKeys.has(f.key)).sort((a, b) => a.sort_order - b.sort_order);
+}
+
+/**
  * Returns the vehicle_brands.category_group a category should look up
  * brands/models from, or null if the category has no `brand_select` filter
  * (i.e. isn't a vehicle category). Shared by the vehicle-lookup module and

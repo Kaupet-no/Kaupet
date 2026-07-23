@@ -25,6 +25,7 @@ import { categoryHeadingFontStack } from "@/lib/category-fonts";
 import { CategoryFilterFields, MoreFiltersToggle } from "@/components/category-filter-fields";
 import {
   effectiveFiltersForCategory,
+  effectiveFiltersForCategories,
   setAttributeFilterValue,
   splitPrimaryFilters,
   type AttributeFilterValue,
@@ -129,13 +130,32 @@ function WebLanding() {
   const [priceMax, setPriceMax] = useState<number | undefined>(undefined);
   const subcatRef = useRef<HTMLDivElement>(null);
 
-  // Filters configured for the deepest selected category (inherited up the
-  // chain), shown below its subcategories so the user can narrow the search
-  // before browsing — e.g. clothing size on "Bukse", screen size on "TV".
-  const activeFilters = useMemo(
-    () => effectiveFiltersForCategory(currentParent?.id ?? null, allFilters ?? [], categoriesById),
-    [currentParent, allFilters, categoriesById],
-  );
+  // Filters shown below the subcategory list, so the user can narrow the
+  // search before browsing — e.g. clothing size on "Bukse", screen size on
+  // "TV". While the selection is still a hub category (one with its own
+  // subcategories, e.g. "MC og moped"), show the fields common to *every*
+  // leaf subcategory underneath it rather than just fields defined on the
+  // hub itself — matching the same "complete as you drill deeper" behavior
+  // as the /{main} category landing pages.
+  const activeFilters = useMemo(() => {
+    if (!currentParent) return [];
+    const leaves: CategoryRow[] = [];
+    const stack = [...(childrenByParent.get(currentParent.id) ?? [])];
+    while (stack.length > 0) {
+      const next = stack.pop()!;
+      const children = childrenByParent.get(next.id) ?? [];
+      if (children.length === 0) leaves.push(next);
+      else stack.push(...children);
+    }
+    if (leaves.length > 0) {
+      return effectiveFiltersForCategories(
+        leaves.map((l) => l.id),
+        allFilters ?? [],
+        categoriesById,
+      );
+    }
+    return effectiveFiltersForCategory(currentParent.id, allFilters ?? [], categoriesById);
+  }, [currentParent, childrenByParent, allFilters, categoriesById]);
   const { primary: primaryFilters, secondary: secondaryFilters } = useMemo(
     () => splitPrimaryFilters(activeFilters),
     [activeFilters],
@@ -551,107 +571,169 @@ function WebLanding() {
                         )}
                       </div>
 
-                      <div
-                        key={currentParent.id}
-                        className={`grid gap-6 duration-700 animate-in fade-in md:grid-cols-[240px_1fr] ${
-                          navDirection === "forward"
-                            ? "slide-in-from-right-4"
-                            : "slide-in-from-left-4"
-                        }`}
-                      >
-                        {/* Venstre kolonne — underkategorier som en vertikal
-                            liste, så den leser som navigasjon, ikke som nok
-                            et sett filter-chips oppå breadcrumb-badgene. */}
-                        <div className="flex flex-col gap-1 md:border-r md:border-border md:pr-6">
-                          <button
-                            type="button"
-                            onClick={() => goToCategoryPage(selectedPath)}
-                            className="rounded-lg px-2.5 py-1.5 text-left text-sm font-medium text-primary transition hover:bg-primary/10"
-                          >
-                            Alt i {currentParent.name_nb}
-                          </button>
-                          {(childrenByParent.get(currentParent.id) ?? []).map((sub) => (
-                            <button
-                              key={sub.id}
-                              type="button"
-                              onClick={() => drillIntoSub(sub)}
-                              className="rounded-lg px-2.5 py-1.5 text-left text-sm text-foreground transition hover:bg-muted"
-                            >
-                              {sub.name_nb}
-                            </button>
-                          ))}
-                        </div>
-
-                        {/* Høyre kolonne — filtre gruppert i et rutenett i
-                            stedet for én lang vertikal stabel. */}
-                        <div className="min-w-0">
-                          <div className="grid gap-4 sm:grid-cols-2">
-                            <div className="space-y-2">
-                              <Label>Pris (kr)</Label>
-                              <div className="flex items-center gap-2">
-                                <Input
-                                  type="number"
-                                  placeholder="Fra"
-                                  value={priceMin ?? ""}
-                                  onChange={(e) =>
-                                    setPriceMin(
-                                      e.target.value === "" ? undefined : Number(e.target.value),
-                                    )
-                                  }
-                                />
-                                <Input
-                                  type="number"
-                                  placeholder="Til"
-                                  value={priceMax ?? ""}
-                                  onChange={(e) =>
-                                    setPriceMax(
-                                      e.target.value === "" ? undefined : Number(e.target.value),
-                                    )
-                                  }
-                                />
-                              </div>
-                            </div>
-                            <CategoryFilterFields
-                              filters={primaryFilters}
-                              values={filterValues}
-                              onChange={(key, v) =>
-                                setFilterValues((prev) => setAttributeFilterValue(prev, key, v))
-                              }
-                            />
+                      {/* Kun hovedkategori valgt (ingen underkategori
+                          drillet inn på ennå) — vi har ikke noe relevant
+                          søkeparameter å vise på dette nivået (de er
+                          konfigurert per underkategori), så nivå
+                          2-kategoriene vises som en ikonoversikt i stedet
+                          for filterpanelet. */}
+                      {selectedPath.length === 1 &&
+                      (childrenByParent.get(currentParent.id) ?? []).length > 0 ? (
+                        <div
+                          key={currentParent.id}
+                          className={`duration-700 animate-in fade-in ${
+                            navDirection === "forward"
+                              ? "slide-in-from-right-4"
+                              : "slide-in-from-left-4"
+                          }`}
+                        >
+                          <div className="flex flex-wrap justify-center gap-x-5 gap-y-4 sm:justify-start">
+                            {(childrenByParent.get(currentParent.id) ?? []).map((sub) => {
+                              const SubIcon = getCategoryIcon(sub.icon);
+                              return (
+                                <button
+                                  key={sub.id}
+                                  type="button"
+                                  onClick={() => drillIntoSub(sub)}
+                                  className="group flex w-20 flex-col items-center gap-1.5 text-center"
+                                >
+                                  <span
+                                    className="flex size-14 items-center justify-center rounded-full bg-muted text-muted-foreground transition group-hover:bg-[var(--cat-tint)] group-hover:text-primary-foreground"
+                                    style={
+                                      {
+                                        "--cat-tint": currentParent.color ?? "var(--primary)",
+                                      } as React.CSSProperties
+                                    }
+                                  >
+                                    <SubIcon className="size-6" />
+                                  </span>
+                                  <span className="line-clamp-2 text-pretty text-xs font-medium leading-tight text-foreground">
+                                    {sub.name_nb}
+                                  </span>
+                                </button>
+                              );
+                            })}
                           </div>
-                          {secondaryFilters.length > 0 && (
-                            <Collapsible
-                              open={moreFiltersOpen}
-                              onOpenChange={setMoreFiltersOpen}
-                              className="mt-4"
-                            >
-                              <MoreFiltersToggle
-                                open={moreFiltersOpen}
-                                count={secondaryFilters.length}
-                              />
-                              <CollapsibleContent className="grid gap-4 pt-4 data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:slide-in-from-top-2 data-[state=closed]:animate-out data-[state=closed]:fade-out sm:grid-cols-2">
-                                <CategoryFilterFields
-                                  filters={secondaryFilters}
-                                  values={filterValues}
-                                  onChange={(key, v) =>
-                                    setFilterValues((prev) => setAttributeFilterValue(prev, key, v))
-                                  }
-                                />
-                              </CollapsibleContent>
-                            </Collapsible>
-                          )}
                           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
                             <span className="text-sm text-muted-foreground">
                               {resultCount === undefined
                                 ? "Beregner antall treff …"
                                 : `${resultCount} ${resultCount === 1 ? "treff" : "treff"} akkurat nå`}
                             </span>
-                            <Button type="submit">
-                              {resultCount === undefined ? "Vis treff" : `Vis ${resultCount} treff`}
+                            <Button type="submit" variant="outline">
+                              {resultCount === undefined
+                                ? "Vis alt i " + currentParent.name_nb
+                                : `Vis ${resultCount} treff`}
                             </Button>
                           </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div
+                          key={currentParent.id}
+                          className={`grid gap-6 duration-700 animate-in fade-in md:grid-cols-[240px_1fr] ${
+                            navDirection === "forward"
+                              ? "slide-in-from-right-4"
+                              : "slide-in-from-left-4"
+                          }`}
+                        >
+                          {/* Venstre kolonne — underkategorier som en vertikal
+                              liste, så den leser som navigasjon, ikke som nok
+                              et sett filter-chips oppå breadcrumb-badgene. */}
+                          <div className="flex flex-col gap-1 md:border-r md:border-border md:pr-6">
+                            <button
+                              type="button"
+                              onClick={() => goToCategoryPage(selectedPath)}
+                              className="rounded-lg px-2.5 py-1.5 text-left text-sm font-medium text-primary transition hover:bg-primary/10"
+                            >
+                              Alt i {currentParent.name_nb}
+                            </button>
+                            {(childrenByParent.get(currentParent.id) ?? []).map((sub) => (
+                              <button
+                                key={sub.id}
+                                type="button"
+                                onClick={() => drillIntoSub(sub)}
+                                className="rounded-lg px-2.5 py-1.5 text-left text-sm text-foreground transition hover:bg-muted"
+                              >
+                                {sub.name_nb}
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Høyre kolonne — filtre gruppert i et rutenett i
+                              stedet for én lang vertikal stabel. */}
+                          <div className="min-w-0">
+                            <div className="grid gap-4 sm:grid-cols-2">
+                              <div className="space-y-2">
+                                <Label>Pris (kr)</Label>
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="number"
+                                    placeholder="Fra"
+                                    value={priceMin ?? ""}
+                                    onChange={(e) =>
+                                      setPriceMin(
+                                        e.target.value === "" ? undefined : Number(e.target.value),
+                                      )
+                                    }
+                                  />
+                                  <Input
+                                    type="number"
+                                    placeholder="Til"
+                                    value={priceMax ?? ""}
+                                    onChange={(e) =>
+                                      setPriceMax(
+                                        e.target.value === "" ? undefined : Number(e.target.value),
+                                      )
+                                    }
+                                  />
+                                </div>
+                              </div>
+                              <CategoryFilterFields
+                                filters={primaryFilters}
+                                values={filterValues}
+                                onChange={(key, v) =>
+                                  setFilterValues((prev) => setAttributeFilterValue(prev, key, v))
+                                }
+                              />
+                            </div>
+                            {secondaryFilters.length > 0 && (
+                              <Collapsible
+                                open={moreFiltersOpen}
+                                onOpenChange={setMoreFiltersOpen}
+                                className="mt-4"
+                              >
+                                <MoreFiltersToggle
+                                  open={moreFiltersOpen}
+                                  count={secondaryFilters.length}
+                                />
+                                <CollapsibleContent className="grid gap-4 pt-4 data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:slide-in-from-top-2 data-[state=closed]:animate-out data-[state=closed]:fade-out sm:grid-cols-2">
+                                  <CategoryFilterFields
+                                    filters={secondaryFilters}
+                                    values={filterValues}
+                                    onChange={(key, v) =>
+                                      setFilterValues((prev) =>
+                                        setAttributeFilterValue(prev, key, v),
+                                      )
+                                    }
+                                  />
+                                </CollapsibleContent>
+                              </Collapsible>
+                            )}
+                            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+                              <span className="text-sm text-muted-foreground">
+                                {resultCount === undefined
+                                  ? "Beregner antall treff …"
+                                  : `${resultCount} ${resultCount === 1 ? "treff" : "treff"} akkurat nå`}
+                              </span>
+                              <Button type="submit">
+                                {resultCount === undefined
+                                  ? "Vis treff"
+                                  : `Vis ${resultCount} treff`}
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </form>
                   </div>
                 </div>

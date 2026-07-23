@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { AttributeFilterValue } from "@/lib/category-filters";
 
 export const stringArray = z.preprocess((v) => {
   if (Array.isArray(v)) return v;
@@ -36,7 +37,26 @@ export const searchSchema = z.object({
   lng: z.coerce.number().optional(),
   radius: z.coerce.number().min(1).max(100).optional(),
   loc: z.string().optional(),
+  // JSON-encoded Record<string, AttributeFilterValue> — category-specific
+  // search parameters (e.g. Bil's "hestekrefter"), see category-filters.ts.
+  attrs: z.string().optional().default(""),
 });
+
+/** Encodes attribute filter values into the `attrs` URL search param. */
+export function encodeAttrFilters(values: Record<string, AttributeFilterValue>): string {
+  return Object.keys(values).length === 0 ? "" : JSON.stringify(values);
+}
+
+/** Decodes the `attrs` URL search param back into attribute filter values. */
+export function decodeAttrFilters(attrs: string | undefined): Record<string, AttributeFilterValue> {
+  if (!attrs) return {};
+  try {
+    const parsed = JSON.parse(attrs);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
 
 export type SearchListing = {
   id: string;

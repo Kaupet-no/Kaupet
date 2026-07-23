@@ -8,9 +8,11 @@ import { Label } from "@/components/ui/label";
 import { CategoryPicker } from "@/components/advanced-search-sheet";
 import { ModeToggle } from "@/components/search-term-mode-toggle";
 import { TermGroupEditor } from "@/components/term-group-editor";
+import { AttributeFilterPanel } from "@/components/attribute-filter-panel";
 import { CONDITIONS, type AdvancedSearchValue } from "@/components/advanced-search-value";
 import { SORT_OPTIONS, type SortValue, type Category } from "@/lib/categories";
 import type { TermGroup } from "@/lib/term-groups";
+import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
 import {
   getSortChipState,
   getCategoryChipState,
@@ -35,6 +37,11 @@ type Props = {
   onQModeChange: (v: AdvancedSearchValue["qMode"]) => void;
   extraGroups: TermGroup[];
   onExtraGroupsChange: (groups: TermGroup[]) => void;
+  /** Category-specific search parameters (empty when no category is selected,
+   * or the intersection of common fields when several are selected). */
+  attrFilters?: CategoryFilter[];
+  attrValues?: Record<string, AttributeFilterValue>;
+  onAttrValuesChange?: (key: string, value: AttributeFilterValue | undefined) => void;
 };
 
 /**
@@ -58,10 +65,15 @@ export function DesktopFilterChips({
   onQModeChange,
   extraGroups,
   onExtraGroupsChange,
+  attrFilters = [],
+  attrValues = {},
+  onAttrValuesChange,
 }: Props) {
-  const [openId, setOpenId] = useState<"sort" | "category" | "price" | "condition" | "more" | null>(
-    null,
-  );
+  const [openId, setOpenId] = useState<
+    "sort" | "category" | "price" | "condition" | "attrs" | "more" | null
+  >(null);
+
+  const attrValueCount = Object.keys(attrValues).length;
 
   const { label: sortLabel, active: sortActive } = getSortChipState(sort);
   const { label: catLabel, active: catActive } = getCategoryChipState(
@@ -168,6 +180,26 @@ export function DesktopFilterChips({
           </div>
         </PopoverContent>
       </Popover>
+
+      {attrFilters.length > 0 && onAttrValuesChange && (
+        <Popover open={openId === "attrs"} onOpenChange={(o) => setOpenId(o ? "attrs" : null)}>
+          <PopoverTrigger asChild>
+            <Chip
+              label="Egenskaper"
+              active={attrValueCount > 0}
+              icon={<SlidersHorizontal className="size-3.5" />}
+              badge={attrValueCount}
+            />
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-80 space-y-3 p-3">
+            <AttributeFilterPanel
+              filters={attrFilters}
+              values={attrValues}
+              onChange={onAttrValuesChange}
+            />
+          </PopoverContent>
+        </Popover>
+      )}
 
       <Popover open={openId === "more"} onOpenChange={(o) => setOpenId(o ? "more" : null)}>
         <PopoverTrigger asChild>

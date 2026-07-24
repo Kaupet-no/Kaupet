@@ -43,6 +43,11 @@ export type CategoryFilter = {
   options: FilterOption[] | null;
   sort_order: number;
   is_primary: boolean;
+  /** When set, this filter is only shown/required once the filter with key
+   * `depends_on_key` on the same category has the value `depends_on_value`
+   * (compared as a string). Null means always shown. */
+  depends_on_key: string | null;
+  depends_on_value: string | null;
 };
 
 export const FILTER_TYPE_LABELS: Record<FilterType, string> = {
@@ -67,6 +72,8 @@ export function normalizeFilter(row: {
   options: unknown;
   sort_order: number;
   is_primary: boolean;
+  depends_on_key?: string | null;
+  depends_on_value?: string | null;
 }): CategoryFilter {
   return {
     id: row.id,
@@ -78,7 +85,20 @@ export function normalizeFilter(row: {
     options: Array.isArray(row.options) ? (row.options as FilterOption[]) : null,
     sort_order: row.sort_order,
     is_primary: row.is_primary,
+    depends_on_key: row.depends_on_key ?? null,
+    depends_on_value: row.depends_on_value ?? null,
   };
+}
+
+/** Returns whether a filter's dependency (if any) is satisfied by the current
+ * attribute values — e.g. Bilsport's "Gren"/"Klasse" only apply once
+ * "Er bilen lisensiert?" is true. Filters without a dependency always apply. */
+export function filterDependencyMet(
+  filter: Pick<CategoryFilter, "depends_on_key" | "depends_on_value">,
+  attributes: Record<string, AttributeValue>,
+): boolean {
+  if (!filter.depends_on_key) return true;
+  return String(attributes[filter.depends_on_key]) === filter.depends_on_value;
 }
 
 /**
@@ -158,7 +178,11 @@ export function getMissingRequiredFilters(
     // false, and "registration_number" is set by the vehicle wizard itself
     // (SVV lookup, or left unset for a manually entered unregistered
     // vehicle) rather than filled in by the user as a generic attribute.
-    (f) => f.type !== "range" && f.type !== "boolean" && f.key !== "registration_number",
+    (f) =>
+      f.type !== "range" &&
+      f.type !== "boolean" &&
+      f.key !== "registration_number" &&
+      filterDependencyMet(f, attributes),
   );
   return filters.filter((f) => {
     const v = attributes[f.key];

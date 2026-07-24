@@ -2,16 +2,10 @@ import { Tag, Loader2 } from "lucide-react";
 
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { digitsOnlyClamped, formatThousands } from "@/lib/number-input";
 
 import type { WizardSharedProps } from "../types";
 import { FieldValid } from "../field-valid";
 import { RequiredMark } from "../required-mark";
-import { VehicleTitleFields } from "../title-photos";
-import { Condition } from "../condition";
-import { PriceGroup } from "../price";
 
 /**
  * Description textarea. Rendered with a fixed-height flex-fill wrapper on
@@ -31,7 +25,18 @@ export function DescriptionField({
   errors,
   touchedFields,
   description,
-}: Pick<WizardSharedProps, "native" | "register" | "errors" | "touchedFields" | "description">) {
+  isVehicle,
+}: Pick<
+  WizardSharedProps,
+  "native" | "register" | "errors" | "touchedFields" | "description" | "isVehicle"
+>) {
+  // Kjøretøy (Bil og MC) har egne felt for Tilstand og kjente feil/mangler
+  // (vehicle-condition), og kan aldri sendes/fraktes — den generiske
+  // placeholderen ("Beskriv tilstand, alder... og om henting/sending") passer
+  // derfor ikke og ble opplevd som misvisende for kjøretøyannonser.
+  const placeholder = isVehicle
+    ? "Forsøk å gi en så detaljert beskrivelse som mulig. Dette er annonsens hovedinnhold."
+    : "Beskriv tilstand, alder, hvorfor du selger, og om henting/sending.";
   const field = (
     <>
       <div className="flex items-center justify-between">
@@ -48,7 +53,7 @@ export function DescriptionField({
         id="description"
         rows={native ? undefined : 5}
         className={native ? "flex-1 resize-none min-h-0" : undefined}
-        placeholder="Beskriv tilstand, alder, hvorfor du selger, og om henting/sending."
+        placeholder={placeholder}
         aria-invalid={!!errors.description}
         aria-describedby={errors.description ? "description-error" : undefined}
         {...register("description")}
@@ -106,181 +111,20 @@ export function KeywordChips({
 }
 
 /**
- * Undertittel for kjøretøy (Bil og MC) — flyttet hit fra tittel-steget, siden
- * undertittel begrepsmessig hører sammen med beskrivelsen (utstyrsnivå o.l.),
- * ikke med den autogenererte kjøretøy-tittelen.
- */
-function SubtitleField({
-  register,
-  errors,
-  subtitle,
-}: Pick<WizardSharedProps, "register" | "errors" | "subtitle">) {
-  return (
-    <section className="space-y-2">
-      <div className="flex items-center justify-between">
-        <Label htmlFor="subtitle">
-          Undertittel <span className="font-normal text-muted-foreground">(valgfritt)</span>
-        </Label>
-        <span className="text-xs text-muted-foreground">{(subtitle ?? "").length} / 80</span>
-      </div>
-      <Input
-        id="subtitle"
-        placeholder="F.eks. Utstyrspakke, modellkode eller annen viktig info"
-        aria-invalid={!!errors.subtitle}
-        {...register("subtitle")}
-      />
-      {errors.subtitle && <p className="text-sm text-destructive">{errors.subtitle.message}</p>}
-    </section>
-  );
-}
-
-/** Highest mileage a vehicle can report — same cap as the price field, and
- * for the same reason: clamp in the input itself instead of letting the user
- * type past a limit and only finding out afterwards. */
-const MAX_MILEAGE_KM = 999_999_999;
-
-/**
- * Kilometerstand — kun for motoriserte kjøretøy (`showMileage`); skjules for
- * campingvogn og tilhenger, som ikke har kilometerteller. Lagres i
- * `attributes.mileage_km`, samme sted den publiserte annonsesiden allerede
- * leser den fra (se src/routes/$kaupetCode.tsx). Formateres som
- * mellomrom-gruppert tall med "km"-etikett, samme mønster som prisfeltet.
- */
-function MileageField({
-  attributes,
-  onAttributesChange,
-}: Pick<WizardSharedProps, "attributes" | "onAttributesChange">) {
-  const raw = attributes.mileage_km;
-  return (
-    <section className="space-y-2">
-      <Label htmlFor="mileage_km">
-        Kilometerstand
-        <RequiredMark />
-      </Label>
-      <div className="relative max-w-[200px]">
-        <Input
-          id="mileage_km"
-          type="text"
-          inputMode="numeric"
-          placeholder="0"
-          className="pr-10 text-right"
-          value={formatThousands(raw as string | number | undefined, MAX_MILEAGE_KM)}
-          onChange={(e) => {
-            const digits = digitsOnlyClamped(e.target.value, MAX_MILEAGE_KM);
-            const next = { ...attributes };
-            if (digits === "") delete next.mileage_km;
-            else next.mileage_km = Number(digits);
-            onAttributesChange(next);
-          }}
-        />
-        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-          km
-        </span>
-      </div>
-    </section>
-  );
-}
-
-/**
- * Kjente feil og mangler + vedlikeholdshistorikk — kun for kjøretøy (Bil og
- * MC). Kjente feil og mangler er obligatorisk med mindre "ingen kjente feil
- * eller mangler" er krysset av (håndhevet i registry.ts sin `validateExtra`
- * for denne field group-en).
- */
-function VehicleConditionDetails({
-  register,
-  setValue,
-  errors,
-  knownIssues,
-  noKnownIssues,
-  maintenanceHistory,
-}: Pick<
-  WizardSharedProps,
-  "register" | "setValue" | "errors" | "knownIssues" | "noKnownIssues" | "maintenanceHistory"
->) {
-  return (
-    <>
-      <section className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label htmlFor="known_issues">
-            Kjente feil og mangler
-            <RequiredMark />
-          </Label>
-          <span className="text-xs text-muted-foreground">{(knownIssues ?? "").length} / 2000</span>
-        </div>
-        <Textarea
-          id="known_issues"
-          rows={3}
-          disabled={noKnownIssues}
-          placeholder="Beskriv kjente feil eller mangler ved kjøretøyet."
-          aria-invalid={!!errors.known_issues}
-          {...register("known_issues")}
-        />
-        {errors.known_issues && (
-          <p className="text-sm text-destructive">{errors.known_issues.message}</p>
-        )}
-        <label className="flex items-center gap-2 text-sm">
-          <Checkbox
-            checked={!!noKnownIssues}
-            onCheckedChange={(v) => {
-              const checked = Boolean(v);
-              setValue("no_known_issues", checked, { shouldValidate: true });
-              if (checked) setValue("known_issues", "", { shouldValidate: true });
-            }}
-          />
-          Ingen kjente feil eller mangler
-        </label>
-      </section>
-
-      <section className="space-y-2">
-        <Label htmlFor="maintenance_history">
-          Vedlikeholdshistorikk{" "}
-          <span className="font-normal text-muted-foreground">(valgfritt)</span>
-        </Label>
-        <Textarea
-          id="maintenance_history"
-          rows={3}
-          placeholder="Hvilket vedlikehold er utført, og når?"
-          aria-invalid={!!errors.maintenance_history}
-          {...register("maintenance_history")}
-        />
-        {errors.maintenance_history && (
-          <p className="text-sm text-destructive">{errors.maintenance_history.message}</p>
-        )}
-      </section>
-    </>
-  );
-}
-
-/**
  * Registry-facing wrapper: DescriptionField + KeywordChips rendered
  * adjacently. Per the fase-2 field-group wiring decision, the generic
- * per-page rendering renders a field group's pieces together; this changes
- * where KeywordChips sits on web (previously further down, after Condition)
- * but keeps native's existing adjacent layout unchanged.
+ * per-page rendering renders a field group's pieces together.
  *
- * For kjøretøy (`isVehicle`), this step also carries Tittel, Tilstand,
- * Kilometerstand and Pris — moved here from their own steps/field-groups
- * (title-photos is images-only for vehicles; "condition"/"price" are removed
- * entirely from the Bil og MC category flow, see the
- * 20260721130000_bil_og_mc_flow_beskrivelse_step migration) so that step 3
- * of vehicle listing creation is images-only, and everything else about the
- * vehicle (beyond what Statens vegvesen-oppslaget already covers) lives on
- * one "Beskrivelse" step. Order: Tittel, Tilstand, Kilometerstand, Pris,
- * Undertittel, Beskrivelse, nøkkelord, feil/mangler, vedlikeholdshistorikk,
- * Tilstand (sistnevnte flyttet nederst, etter vedlikeholdshistorikk).
+ * For kjøretøy (`isVehicle`), Tittel/Tilstand/Kilometerstand/Pris/kjente
+ * feil-mangler/vedlikeholdshistorikk bor nå i egne field groups
+ * (`vehicle-facts` og `vehicle-condition`, se UX-audit) — dette steget er
+ * rent beskrivelse + nøkkelord for alle kategorier, kjøretøy inkludert.
  */
 export function DescriptionKeywordsGroup(props: WizardSharedProps) {
   return (
     <>
-      {props.isVehicle && <VehicleTitleFields {...props} />}
-      {props.isVehicle && props.showMileage && <MileageField {...props} />}
-      {props.isVehicle && <PriceGroup {...props} />}
-      {props.isVehicle && <SubtitleField {...props} />}
       <DescriptionField {...props} />
       <KeywordChips {...props} />
-      {props.isVehicle && <VehicleConditionDetails {...props} />}
-      {props.isVehicle && <Condition {...props} />}
     </>
   );
 }

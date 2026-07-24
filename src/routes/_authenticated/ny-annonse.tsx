@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
-import { AlertCircle, Check, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { AlertCircle, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { createListing, saveDraftListing } from "@/lib/listings.functions";
@@ -44,7 +44,11 @@ import {
   VEHICLE_WIZARD_MANAGED_KEYS,
 } from "@/lib/vehicle-lookup.server";
 import type { VehicleLookupResult } from "@/lib/vehicle-lookup.server";
-import type { VehicleClassification, VehicleLeafSlug } from "@/lib/vehicle-classification";
+import type {
+  AvgiftskodeGruppe,
+  VehicleClassification,
+  VehicleLeafSlug,
+} from "@/lib/vehicle-classification";
 
 import { useIsDemo } from "@/hooks/use-is-demo";
 import { useAuth } from "@/hooks/use-auth";
@@ -100,12 +104,23 @@ type ListingForm = z.infer<typeof listingSchema>;
 const DRAFT_KEY = "kaupet_draft_ny_annonse";
 const DRAFT_ID_KEY = "kaupet_draft_id";
 
-/** Forces the Bil og MC beskrivelse step (description-keywords, which also
- * carries Tittel/Tilstand/Kilometerstand/Pris for vehicles — see
- * description-keywords/index.tsx) onto its own page, separate from
- * title-photos (images only for vehicles) — see resolveWizardPages'
+/** Forces each of the Bil og MC vehicle-only steps onto its own page,
+ * separate from title-photos (images only for vehicles) and from each
+ * other: vehicle-facts (Tittel/Kilometerstand/Pris/Undertittel),
+ * vehicle-condition (Tilstand/kjente feil-mangler/vedlikeholdshistorikk) and
+ * description-keywords (ren beskrivelse+nøkkelord) — split up per the UX
+ * audit so the flow isn't one overloaded "Beskrivelse" step. Deliberately
+ * excludes "vehicle-equipment" (Utstyr): that one is meant to sit on the
+ * *same* page as description-keywords, directly under the Beskrivelse
+ * field — so as long as it's the very next key after description-keywords
+ * in field_groups (see the bil-og-mc migration), it joins that page's
+ * buffer instead of starting a new one. See resolveWizardPages'
  * `forceBreakBeforeKeys`. */
-const VEHICLE_FORCE_BREAK_BEFORE_KEYS = new Set(["description-keywords"]);
+const VEHICLE_FORCE_BREAK_BEFORE_KEYS = new Set([
+  "vehicle-facts",
+  "vehicle-condition",
+  "description-keywords",
+]);
 
 const SIMILAR_STOPWORDS = new Set([
   "og",
@@ -237,6 +252,14 @@ function buildDisplaySteps(pages: WizardPage[], native: boolean): DisplayStep[] 
   return steps;
 }
 
+/**
+ * Fast fremdriftslinje + "Steg X av Y" i stedet for én boks per steg — med
+ * så mange steg som kjøretøyflyten nå har (se UX-audit), gikk
+ * boks-per-steg-varianten over tilgjengelig sidebredde og virket enda
+ * verre på små skjermer. Viser alltid gjeldende stegs label ved siden av
+ * telleren, så brukeren fortsatt vet hvor i flyten de er uten å måtte lese
+ * en rekke med bokser.
+ */
 function StepIndicator({
   step,
   pages,
@@ -248,49 +271,32 @@ function StepIndicator({
 }) {
   const displaySteps = buildDisplaySteps(pages, native);
   const total = displaySteps.length;
-  const gapClass = native ? "gap-1.5" : "gap-2";
-  const circleClass = native ? "size-6" : "size-7";
-  const checkClass = native ? "size-3" : "size-3.5";
-  const labelBreakpoint = native ? "lg:inline" : "sm:inline";
-  const lineWidth = native ? "w-4" : "w-6";
+  const currentIndex = displaySteps.findIndex((ds) => step >= ds.startIndex && step <= ds.endIndex);
+  const current = currentIndex === -1 ? displaySteps[total - 1] : displaySteps[currentIndex];
+  const currentStepNumber = currentIndex === -1 ? total : currentIndex + 1;
+  const percent = total > 0 ? Math.round((currentStepNumber / total) * 100) : 0;
 
   return (
-    <nav aria-label="Fremdrift i skjema" className={`flex items-center ${gapClass}`}>
-      {displaySteps.map((ds, i) => {
-        const s = i + 1;
-        const isDone = step > ds.endIndex;
-        const isActive = step >= ds.startIndex && step <= ds.endIndex;
-        return (
-          <div key={ds.label + s} className={`flex items-center ${gapClass}`}>
-            <div
-              className={`flex ${circleClass} items-center justify-center rounded-full text-xs font-semibold transition-colors ${
-                isDone
-                  ? "bg-primary text-primary-foreground"
-                  : isActive
-                    ? "bg-primary text-primary-foreground ring-2 ring-primary/30"
-                    : "bg-muted text-muted-foreground"
-              }`}
-              aria-label={`Steg ${s}: ${ds.label}${isDone ? " (fullført)" : isActive ? " (pågår)" : ""}`}
-            >
-              {isDone ? <Check className={checkClass} /> : s}
-            </div>
-            <span
-              className={`text-xs ${
-                isActive
-                  ? "inline font-medium text-foreground"
-                  : `hidden ${labelBreakpoint} text-muted-foreground`
-              }`}
-            >
-              {ds.label}
-            </span>
-            {s < total && (
-              <div
-                className={`h-px ${lineWidth} shrink-0 ${isDone ? "bg-primary" : "bg-border"}`}
-              />
-            )}
-          </div>
-        );
-      })}
+    <nav aria-label="Fremdrift i skjema" className="space-y-1.5">
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <span className="font-medium text-foreground">
+          Steg {currentStepNumber} av {total}
+        </span>
+        <span className="truncate text-muted-foreground">{current?.label}</span>
+      </div>
+      <div
+        role="progressbar"
+        aria-valuenow={currentStepNumber}
+        aria-valuemin={1}
+        aria-valuemax={total}
+        aria-label={`Steg ${currentStepNumber} av ${total}: ${current?.label ?? ""}`}
+        className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
+      >
+        <div
+          className="h-full rounded-full bg-primary transition-[width] duration-300"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
     </nav>
   );
 }
@@ -456,6 +462,23 @@ function NewListingPage() {
     [categoryId, allFlows, categoriesById],
   );
 
+  // Whether the *flow* is vehicle-shaped — true as soon as the user has
+  // picked "Bil og MC" (or a descendant), regardless of whether a specific
+  // leaf category (and therefore `isVehicle`, which needs a resolved
+  // brand_select filter) has been determined yet. Used only to decide the
+  // wizard's page count/chunking up front: `isVehicle` briefly reads false
+  // while the user is still typing a registration number or hasn't picked a
+  // manual leaf category, which used to undercount the step total (5) until
+  // it jumped to the real count (7) once SVV/manual selection resolved a
+  // leaf — a step count that visibly *grows* mid-flow reads as a bad sign to
+  // most users, who are on the registered-vehicle path. Since every leaf
+  // under Bil og MC goes through the same vehicle-facts/vehicle-condition/
+  // description-keywords pages regardless of registered-or-not, the page
+  // count itself never actually needs to change — only `isVehicle` (which
+  // still gates vehicle-specific rendering choices like condition options or
+  // showMileage, evaluated later once a leaf is genuinely known) does.
+  const isVehicleFlow = baseFieldGroupKeys.includes("vehicle-registration");
+
   // Inject vehicle-confirm right after vehicle-registration once a lookup has
   // succeeded — it's never part of a category's stored field_groups (see
   // category-flows.ts), so it only ever appears in the live wizard state.
@@ -474,11 +497,11 @@ function NewListingPage() {
     () =>
       resolveWizardPages(fieldGroupKeys, {
         native,
-        forceBreakBeforeKeys: isVehicle ? VEHICLE_FORCE_BREAK_BEFORE_KEYS : undefined,
+        forceBreakBeforeKeys: isVehicleFlow ? VEHICLE_FORCE_BREAK_BEFORE_KEYS : undefined,
       }).map((keys) => ({
         groups: fieldGroupsForKeys(keys),
       })),
-    [fieldGroupKeys, native, isVehicle],
+    [fieldGroupKeys, native, isVehicleFlow],
   );
 
   const { step, setStep, currentPage, goNext, goBack, isFirst, isLast } = useListingSteps(pages);
@@ -936,6 +959,7 @@ function NewListingPage() {
         cylinders: number;
         engine_displacement_cc: number;
         engine_code: string;
+        avgiftskode_gruppe: AvgiftskodeGruppe;
       }>;
     },
   ) {
@@ -988,6 +1012,14 @@ function NewListingPage() {
     if (engineCode) next.engine_code = engineCode;
     const sleepingPlaces = spec?.sleeping_places ?? lookup.sleeping_places;
     if (sleepingPlaces != null) next.sleeping_places = sleepingPlaces;
+    // Personbil/Varebil-gruppen (utledet i vehicle-confirm fra avgiftsklasse-
+    // koden) manglet her tidligere — den ble beregnet og sendt med i
+    // specOverrides, men aldri faktisk skrevet til attributes, så
+    // omregistreringsavgiften kunne aldri beregnes for noen "bil"-annonse
+    // (alltid "Vi klarte ikke å beregne avgiften automatisk", uansett hvor
+    // komplett SVV-dataen var — se bug-rapport for DR50500, en Audi A3
+    // e-tron med fullstendige data).
+    if (spec?.avgiftskode_gruppe) next.avgiftskode_gruppe = spec.avgiftskode_gruppe;
     if (resolved?.brandName) next.brand = resolved.brandName;
     if (resolved?.modelName) next.model = resolved.modelName;
 
@@ -1442,9 +1474,13 @@ function NewListingPage() {
         </div>
       )}
 
-      {/* Sticky step indicator */}
+      {/* Sticky step indicator — hidden until a category is chosen: each
+          category can have a different flow length (see category_flows),
+          so showing a page-count/progress-fill before that's known would
+          either lie (wrong total) or force a flash-of-wrong-content once
+          the real per-category total resolves. */}
       <div className="sticky top-0 z-10 -mx-4 bg-background/95 px-4 py-3 backdrop-blur border-b border-border mt-4">
-        <StepIndicator step={step} pages={pages} native={native} />
+        {categoryId && <StepIndicator step={step} pages={pages} native={native} />}
         {draftSaveError ? (
           <p className="mt-1 text-right text-xs text-destructive">Utkast ble ikke lagret</p>
         ) : (

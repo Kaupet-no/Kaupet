@@ -1285,7 +1285,9 @@ function CategoryFiltersPanel({ category }: { category: Category }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("category_filters")
-        .select("id, category_id, key, label_nb, type, unit, options, sort_order, is_primary")
+        .select(
+          "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value",
+        )
         .eq("category_id", category.id)
         .order("sort_order");
       if (error) throw error;
@@ -1713,12 +1715,27 @@ function CategoryFlowPanel({ category }: { category: Category }) {
   // category already has it (seeded via migration), or the vehicle-first
   // flow silently breaks the next time someone touches this dialog.
   const hasVehicleRegistration = storedFieldGroups.includes("vehicle-registration");
+  // vehicle-facts/vehicle-condition/vehicle-equipment (Bil og MC's split-out
+  // Tittel/Pris/Kilometerstand, Tilstand/kjente feil-mangler/
+  // vedlikeholdshistorikk, and Utstyr sections, see UX audit) aren't part of
+  // MIDDLE_FIELD_GROUP_KEYS either — same reasoning and same fix as
+  // vehicle-registration above: they must survive a save if the category
+  // already has them, or the vehicle flow silently loses steps the next time
+  // someone touches this dialog. vehicle-equipment is placed right after
+  // middleOrder (which includes description-keywords) since it's meant to
+  // render on the same page, directly under the Beskrivelse field.
+  const hasVehicleFacts = storedFieldGroups.includes("vehicle-facts");
+  const hasVehicleCondition = storedFieldGroups.includes("vehicle-condition");
+  const hasVehicleEquipment = storedFieldGroups.includes("vehicle-equipment");
   const activeFieldGroups = [
     ...(hasVehicleRegistration ? ["vehicle-registration"] : []),
     "title-photos",
+    ...(hasVehicleFacts ? ["vehicle-facts"] : []),
+    ...(hasVehicleCondition ? ["vehicle-condition"] : []),
     ...middleOrder.filter(
       (k) => LOCKED_FIELD_GROUP_KEYS.includes(k) || storedFieldGroups.includes(k),
     ),
+    ...(hasVehicleEquipment ? ["vehicle-equipment"] : []),
     ...(deliveryActive ? ["delivery-location"] : []),
     "review-publish",
   ];
@@ -1793,10 +1810,14 @@ function CategoryFlowPanel({ category }: { category: Category }) {
     if (oldIndex === -1 || newIndex === -1) return;
     const reordered = arrayMove(middleOrder, oldIndex, newIndex);
     setFieldGroups([
+      ...(hasVehicleRegistration ? ["vehicle-registration"] : []),
       "title-photos",
+      ...(hasVehicleFacts ? ["vehicle-facts"] : []),
+      ...(hasVehicleCondition ? ["vehicle-condition"] : []),
       ...reordered.filter(
         (k) => LOCKED_FIELD_GROUP_KEYS.includes(k) || storedFieldGroups.includes(k),
       ),
+      ...(hasVehicleEquipment ? ["vehicle-equipment"] : []),
       ...(deliveryActive ? ["delivery-location"] : []),
       "review-publish",
     ]);
@@ -1851,6 +1872,22 @@ function CategoryFlowPanel({ category }: { category: Category }) {
                 {FIELD_GROUP_LABELS_NB["title-photos"]}
                 <span className="text-xs">(alltid først)</span>
               </li>
+              {hasVehicleFacts && (
+                <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm text-muted-foreground">
+                  <span className="inline-block size-4 shrink-0" aria-hidden />
+                  <Checkbox checked disabled />
+                  {FIELD_GROUP_LABELS_NB["vehicle-facts"]}
+                  <span className="text-xs">(kjøretøyflyt, kan ikke fjernes her)</span>
+                </li>
+              )}
+              {hasVehicleCondition && (
+                <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm text-muted-foreground">
+                  <span className="inline-block size-4 shrink-0" aria-hidden />
+                  <Checkbox checked disabled />
+                  {FIELD_GROUP_LABELS_NB["vehicle-condition"]}
+                  <span className="text-xs">(kjøretøyflyt, kan ikke fjernes her)</span>
+                </li>
+              )}
             </ul>
             <DndContext
               sensors={fieldGroupSensors}
@@ -1873,6 +1910,18 @@ function CategoryFlowPanel({ category }: { category: Category }) {
                 </ul>
               </SortableContext>
             </DndContext>
+            {hasVehicleEquipment && (
+              <ul>
+                <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm text-muted-foreground">
+                  <span className="inline-block size-4 shrink-0" aria-hidden />
+                  <Checkbox checked disabled />
+                  {FIELD_GROUP_LABELS_NB["vehicle-equipment"]}
+                  <span className="text-xs">
+                    (kjøretøyflyt, rett under Beskrivelse, kan ikke fjernes her)
+                  </span>
+                </li>
+              </ul>
+            )}
             <ul>
               <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm">
                 <span className="inline-block size-4 shrink-0" aria-hidden />

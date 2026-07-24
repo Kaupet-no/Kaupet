@@ -70,6 +70,33 @@ export function Price({
   const avgiftOverrideRaw = attributes.omregistreringsavgift_override_kr;
   const avgiftOverrideKr = typeof avgiftOverrideRaw === "number" ? avgiftOverrideRaw : null;
   const omregistreringsavgiftKr = avgiftOverrideKr ?? calculatedAvgiftKr;
+  const avgiftFritatt = attributes.omregistreringsavgift_fritatt === true;
+  const avgiftInkludert = attributes.omregistreringsavgift_inkludert === true;
+  const setAvgiftFritatt = (checked: boolean) => {
+    const next = { ...attributes };
+    if (checked) {
+      next.omregistreringsavgift_fritatt = true;
+      delete next.omregistreringsavgift_inkludert;
+    } else {
+      delete next.omregistreringsavgift_fritatt;
+    }
+    onAttributesChange(next);
+  };
+  const setAvgiftInkludert = (checked: boolean) => {
+    const next = { ...attributes };
+    if (checked) {
+      next.omregistreringsavgift_inkludert = true;
+      delete next.omregistreringsavgift_fritatt;
+    } else {
+      delete next.omregistreringsavgift_inkludert;
+    }
+    onAttributesChange(next);
+  };
+  // Avgiften kjøper faktisk betaler i tillegg til kjøpesummen — null når
+  // fritatt (ingen avgift) eller inkludert i kjøpesummen (allerede betalt av
+  // selger), selv om det beregnede/overstyrte beløpet fortsatt vises
+  // informativt i avgift-boksen under.
+  const avgiftAddedOnTopKr = avgiftFritatt || avgiftInkludert ? null : omregistreringsavgiftKr;
   // `priceNok` isn't reliably a clean `number` — react-hook-form's blur
   // handling (and other internal syncing) can end up re-reading it from a
   // DOM/string representation, which for this field is the space-formatted
@@ -84,18 +111,19 @@ export function Price({
     const digits = priceNok.replace(/[^\d]/g, "");
     return digits === "" ? null : Number(digits);
   })();
+  // "Pris synlig i annonse" stays visible whenever there's a price to show,
+  // even when fritatt/inkludert means nothing gets added on top — it's still
+  // useful confirmation of exactly what the buyer will see, not just a
+  // conditional add-on display.
   const totalprisKr =
-    !isFree && priceNumeric != null && omregistreringsavgiftKr != null
-      ? priceNumeric + omregistreringsavgiftKr
-      : null;
+    !isFree && priceNumeric != null ? priceNumeric + (avgiftAddedOnTopKr ?? 0) : null;
   // The *listing's displayed total* (price + avgift) must never exceed
   // MAX_PRICE_NOK, so the price input's own ceiling is lowered by whatever
   // fee is currently in play — otherwise a seller could type a price that,
   // once the fee is added, shows a "Pris synlig i annonse" above the cap.
+  // No reduction when fritatt/inkludert, since nothing gets added on top.
   const maxPriceInputKr =
-    omregistreringsavgiftKr != null
-      ? Math.max(0, MAX_PRICE_NOK - omregistreringsavgiftKr)
-      : MAX_PRICE_NOK;
+    avgiftAddedOnTopKr != null ? Math.max(0, MAX_PRICE_NOK - avgiftAddedOnTopKr) : MAX_PRICE_NOK;
   // Clamps down an already-typed price if the avgift only becomes known (or
   // grows) afterwards — e.g. a registration lookup resolving after the
   // seller already entered a price — so the total can never drift past
@@ -186,12 +214,14 @@ export function Price({
         </p>
       )}
       {isVehicle && (
-        <div className="space-y-1.5 rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-xs">
+        <div className="space-y-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-xs">
           <div className="flex items-center justify-between gap-2">
             <span className="text-muted-foreground">
               Omregistreringsavgift {avgiftOverrideKr != null && "(endret av deg)"}
             </span>
-            {editingAvgift ? (
+            {avgiftFritatt ? (
+              <span className="font-medium text-foreground">Fritatt</span>
+            ) : editingAvgift ? (
               <Input
                 type="number"
                 min={0}
@@ -220,13 +250,13 @@ export function Price({
               </button>
             )}
           </div>
-          {omregistreringsavgiftKr == null && (
+          {!avgiftFritatt && omregistreringsavgiftKr == null && (
             <p className="text-muted-foreground">
               Vi klarte ikke å beregne avgiften automatisk. Dette kan for eksempel skje dersom
               kjøretøyet ikke ble funnet hos Statens Vegvesen. Sett beløpet selv over.
             </p>
           )}
-          {avgiftOverrideKr != null && calculatedAvgiftKr != null && (
+          {!avgiftFritatt && avgiftOverrideKr != null && calculatedAvgiftKr != null && (
             <div className="flex items-center justify-between gap-2 text-muted-foreground">
               <span>Beregnet av Kaupet</span>
               <div className="flex items-center gap-2">
@@ -246,10 +276,49 @@ export function Price({
               </div>
             </div>
           )}
+
+          <div className="space-y-1.5 border-t border-border pt-2">
+            <label className="flex items-center gap-2">
+              <Checkbox
+                checked={avgiftFritatt}
+                onCheckedChange={(v) => setAvgiftFritatt(Boolean(v))}
+              />
+              Fritatt omregistreringsavgift
+            </label>
+            <label className="flex items-center gap-2">
+              <Checkbox
+                checked={avgiftInkludert}
+                onCheckedChange={(v) => setAvgiftInkludert(Boolean(v))}
+              />
+              Omregistreringsavgift er inkludert i kjøpesummen (selger er ansvarlig for
+              omregistrering)
+            </label>
+          </div>
+
+          {!avgiftFritatt && !avgiftInkludert && (
+            <p className="text-muted-foreground">
+              Betales av kjøper til staten ved eierskifte, og kommer i tillegg til kjøpesummen du
+              angir. Du kan endre beløpet dersom du mener det er feil. Du selv er ansvarlig for at
+              beløpet som oppgis er korrekt.
+            </p>
+          )}
+          {avgiftInkludert && (
+            <p className="text-muted-foreground">
+              Kjøper betaler da ikke noe ekstra ved eierskifte — du er selv ansvarlig for å
+              registrere eierskiftet og betale avgiften.
+            </p>
+          )}
           <p className="text-muted-foreground">
-            Betales av kjøper til staten ved eierskifte, og kommer i tillegg til kjøpesummen du
-            angir. Du kan endre beløpet dersom du mener det er feil. Du selv er ansvarlig for at
-            beløpet som oppgis er korrekt.
+            Du kan sjekke satsene selv hos{" "}
+            <a
+              href="https://www.skatteetaten.no/person/avgifter/bil/eierskifte/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 hover:text-foreground"
+            >
+              Skatteetaten
+            </a>
+            .
           </p>
         </div>
       )}

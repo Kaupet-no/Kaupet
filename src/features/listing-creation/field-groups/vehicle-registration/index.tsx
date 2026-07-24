@@ -6,6 +6,16 @@ import { VEHICLE_WIZARD_MANAGED_KEYS } from "@/lib/vehicle-lookup.server";
 import type { WizardSharedProps } from "../types";
 import { RequiredMark } from "../required-mark";
 import { VehicleLookupConfirmDialog } from "./vehicle-lookup-confirm-dialog";
+import { VEHICLE_EQUIPMENT_FILTER_KEYS } from "../vehicle-equipment";
+
+/** Manual "kjøretøy ikke registrert" path fills in technical specs with
+ * `required` on — but Utstyr (equipment) has its own dedicated, optional
+ * step (vehicle-equipment) later in the flow, so it must stay hidden (and
+ * therefore not counted as a missing required filter) here. */
+const HIDDEN_KEYS_FOR_MANUAL_LEAF = [
+  ...VEHICLE_WIZARD_MANAGED_KEYS,
+  ...VEHICLE_EQUIPMENT_FILTER_KEYS,
+];
 
 /**
  * First step of the vehicle-first "Bil og MC" path: the only question asked
@@ -46,7 +56,8 @@ export function VehicleRegistration(props: WizardSharedProps) {
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground">
             Trykk Neste for å hente kjøretøyopplysninger automatisk fra Statens vegvesen. Du får
-            sjekke og rette opplysningene før annonsen opprettes.
+            sjekke og rette opplysningene før annonsen opprettes. Deretter får du mulighet til å
+            fylle ut detaljer om pris, tilstand og bilder.
           </p>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -103,7 +114,8 @@ export function VehicleRegistration(props: WizardSharedProps) {
       ) : (
         <div className="space-y-2">
           <p className="text-sm text-muted-foreground">
-            Velg riktig kjøretøytype manuelt i stedet.
+            Ingen problem — velg riktig kjøretøytype manuelt i stedet, så fyller du inn de samme
+            opplysningene selv (f.eks. for et importert eller uregistrert kjøretøy).
           </p>
           <CategoryPicker
             inline
@@ -130,7 +142,7 @@ export function VehicleRegistration(props: WizardSharedProps) {
                 value={attributes}
                 onChange={onAttributesChange}
                 showErrors={attributesTouched}
-                hiddenKeys={VEHICLE_WIZARD_MANAGED_KEYS}
+                hiddenKeys={HIDDEN_KEYS_FOR_MANUAL_LEAF}
                 required
               />
             </div>

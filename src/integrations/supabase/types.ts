@@ -116,6 +116,8 @@ export type Database = {
         Row: {
           category_id: string
           created_at: string
+          depends_on_key: string | null
+          depends_on_value: string | null
           id: string
           is_primary: boolean
           key: string
@@ -128,6 +130,8 @@ export type Database = {
         Insert: {
           category_id: string
           created_at?: string
+          depends_on_key?: string | null
+          depends_on_value?: string | null
           id?: string
           is_primary?: boolean
           key: string
@@ -140,6 +144,8 @@ export type Database = {
         Update: {
           category_id?: string
           created_at?: string
+          depends_on_key?: string | null
+          depends_on_value?: string | null
           id?: string
           is_primary?: boolean
           key?: string

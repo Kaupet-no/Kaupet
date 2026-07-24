@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import {
   effectiveFiltersForCategory,
+  filterDependencyMet,
   getMissingRequiredFilters,
   normalizeFilter,
   type AttributeValue,
@@ -35,7 +36,9 @@ export function useAllCategoryFilters() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("category_filters")
-        .select("id, category_id, key, label_nb, type, unit, options, sort_order, is_primary")
+        .select(
+          "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value",
+        )
         .order("sort_order");
       if (error) throw error;
       return (data ?? []).map(normalizeFilter);
@@ -85,9 +88,9 @@ export function AttributeFields({
   const filters = useMemo(
     () =>
       effectiveFiltersForCategory(categoryId, allFilters ?? [], categoriesById).filter(
-        (f) => !hiddenKeySet.has(f.key),
+        (f) => !hiddenKeySet.has(f.key) && filterDependencyMet(f, value),
       ),
-    [categoryId, allFilters, categoriesById, hiddenKeySet],
+    [categoryId, allFilters, categoriesById, hiddenKeySet, value],
   );
 
   const missingKeys = useMemo(() => {

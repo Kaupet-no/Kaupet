@@ -100,12 +100,18 @@ type ListingForm = z.infer<typeof listingSchema>;
 const DRAFT_KEY = "kaupet_draft_ny_annonse";
 const DRAFT_ID_KEY = "kaupet_draft_id";
 
-/** Forces the Bil og MC beskrivelse step (description-keywords, which also
- * carries Tittel/Tilstand/Kilometerstand/Pris for vehicles — see
- * description-keywords/index.tsx) onto its own page, separate from
- * title-photos (images only for vehicles) — see resolveWizardPages'
- * `forceBreakBeforeKeys`. */
-const VEHICLE_FORCE_BREAK_BEFORE_KEYS = new Set(["description-keywords"]);
+/** Forces each of the Bil og MC vehicle-only steps onto its own page,
+ * separate from title-photos (images only for vehicles) and from each
+ * other: vehicle-facts (Tittel/Kilometerstand/Pris/Undertittel),
+ * vehicle-condition (Tilstand/kjente feil-mangler/vedlikeholdshistorikk) and
+ * description-keywords (ren beskrivelse+nøkkelord) — split up per the UX
+ * audit so the flow isn't one overloaded "Beskrivelse" step. See
+ * resolveWizardPages' `forceBreakBeforeKeys`. */
+const VEHICLE_FORCE_BREAK_BEFORE_KEYS = new Set([
+  "vehicle-facts",
+  "vehicle-condition",
+  "description-keywords",
+]);
 
 const SIMILAR_STOPWORDS = new Set([
   "og",

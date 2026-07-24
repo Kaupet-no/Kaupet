@@ -46,7 +46,8 @@ export function VehicleRegistration(props: WizardSharedProps) {
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground">
             Trykk Neste for å hente kjøretøyopplysninger automatisk fra Statens vegvesen. Du får
-            sjekke og rette opplysningene før annonsen opprettes.
+            sjekke og rette opplysningene før annonsen opprettes. Deretter fyller du ut noen få
+            detaljer om pris, tilstand og bilder — tar vanligvis bare et par minutter til.
           </p>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -103,7 +104,8 @@ export function VehicleRegistration(props: WizardSharedProps) {
       ) : (
         <div className="space-y-2">
           <p className="text-sm text-muted-foreground">
-            Velg riktig kjøretøytype manuelt i stedet.
+            Ingen problem — velg riktig kjøretøytype manuelt i stedet, så fyller du inn de samme
+            opplysningene selv (f.eks. for et importert eller uregistrert kjøretøy).
           </p>
           <CategoryPicker
             inline

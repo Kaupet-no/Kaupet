@@ -7,6 +7,8 @@ import { VehicleRegistration } from "./vehicle-registration";
 import { VehicleConfirm } from "./vehicle-confirm";
 import { Condition } from "./condition";
 import { PriceGroup } from "./price";
+import { VehicleFactsGroup } from "./vehicle-facts";
+import { VehicleConditionGroup } from "./vehicle-condition";
 import { DescriptionKeywordsGroup } from "./description-keywords";
 import { DeliveryLocation } from "./delivery-location";
 import { ReviewPublishGroup } from "./review-publish";
@@ -111,28 +113,43 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
         ? "SHOW_NO_PRICE_DIALOG"
         : null,
   },
-  "description-keywords": {
-    key: "description-keywords",
-    Component: DescriptionKeywordsGroup,
-    fieldsToValidate: ["description"],
+  "vehicle-facts": {
+    key: "vehicle-facts",
+    Component: VehicleFactsGroup,
+    fieldsToValidate: ["title", "price_nok"],
     validateExtra: (ctx) => {
-      // For Bil og MC, Tittel/Tilstand/Pris/Kilometerstand live on this same
-      // page (see DescriptionKeywordsGroup) rather than as separate
-      // "condition"/"price" field groups, so their validation moves here too.
-      if (ctx.isVehicle && !ctx.isFree && (ctx.priceNok === "" || ctx.priceNok === undefined)) {
+      // Kjøretøyets "harde fakta" — Tittel, Kilometerstand, Pris, Undertittel
+      // — samlet på ett eget steg (se UX-audit), atskilt fra
+      // vehicle-condition og description-keywords.
+      if (!ctx.isFree && (ctx.priceNok === "" || ctx.priceNok === undefined)) {
         return "SHOW_NO_PRICE_DIALOG";
       }
-      if (ctx.isVehicle && ctx.showMileage) {
+      if (ctx.showMileage) {
         const km = ctx.attributes.mileage_km;
         if (typeof km !== "number" || !Number.isFinite(km) || km < 0) {
           return "Fyll inn kilometerstand før du går videre.";
         }
       }
-      if (!ctx.isVehicle) return null;
+      return null;
+    },
+  },
+  "vehicle-condition": {
+    key: "vehicle-condition",
+    Component: VehicleConditionGroup,
+    fieldsToValidate: ["condition"],
+    validateExtra: (ctx) => {
+      // Tilstandsvurderingen — Tilstand, kjente feil/mangler og
+      // vedlikeholdshistorikk — samlet på ett eget steg (se UX-audit),
+      // atskilt fra vehicle-facts og description-keywords.
       if (ctx.noKnownIssues) return null;
       if ((ctx.knownIssues ?? "").trim().length > 0) return null;
       return "Beskriv kjente feil og mangler, eller kryss av for at kjøretøyet ikke har noen.";
     },
+  },
+  "description-keywords": {
+    key: "description-keywords",
+    Component: DescriptionKeywordsGroup,
+    fieldsToValidate: ["description"],
   },
   "delivery-location": {
     key: "delivery-location",
@@ -165,6 +182,8 @@ const FIELD_GROUP_LABEL_NATIVE_NB: Record<string, string> = {
   "category-attributes": "Detaljer",
   condition: "Detaljer",
   price: "Detaljer",
+  "vehicle-facts": "Detaljer",
+  "vehicle-condition": "Tilstand",
   "description-keywords": "Beskrivelse",
   "delivery-location": "Sted",
   "review-publish": "Publiser",
@@ -178,6 +197,8 @@ const FIELD_GROUP_LABEL_WEB_NB: Record<string, string> = {
   "category-attributes": "Detaljer",
   condition: "Detaljer",
   price: "Detaljer",
+  "vehicle-facts": "Pris & detaljer",
+  "vehicle-condition": "Tilstand",
   "description-keywords": "Beskrivelse",
   "delivery-location": "Lokasjon",
   "review-publish": "Publiser",
@@ -198,6 +219,8 @@ export const FIELD_GROUP_LABELS_NB: Record<string, string> = {
   "category-attributes": "Kategoriegenskaper",
   condition: "Tilstand",
   price: "Pris",
+  "vehicle-facts": "Kjøretøy: Tittel, pris & kilometerstand",
+  "vehicle-condition": "Kjøretøy: Tilstand & historikk",
   "description-keywords": "Beskrivelse & nøkkelord",
   "delivery-location": "Levering & sted",
   "review-publish": "Forhåndsvisning & publiser",

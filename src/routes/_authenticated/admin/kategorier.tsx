@@ -1285,7 +1285,9 @@ function CategoryFiltersPanel({ category }: { category: Category }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("category_filters")
-        .select("id, category_id, key, label_nb, type, unit, options, sort_order, is_primary")
+        .select(
+          "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value",
+        )
         .eq("category_id", category.id)
         .order("sort_order");
       if (error) throw error;

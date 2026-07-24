@@ -89,9 +89,9 @@ export function VehicleFactsGroup(props: WizardSharedProps) {
   return (
     <>
       <VehicleTitleFields {...props} />
+      <SubtitleField {...props} />
       {props.showMileage && <MileageField {...props} />}
       <PriceGroup {...props} />
-      <SubtitleField {...props} />
     </>
   );
 }

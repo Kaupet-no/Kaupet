@@ -1715,19 +1715,22 @@ function CategoryFlowPanel({ category }: { category: Category }) {
   // category already has it (seeded via migration), or the vehicle-first
   // flow silently breaks the next time someone touches this dialog.
   const hasVehicleRegistration = storedFieldGroups.includes("vehicle-registration");
-  // vehicle-facts/vehicle-condition (Bil og MC's split-out Tittel/Pris/
-  // Kilometerstand and Tilstand/kjente feil-mangler/vedlikeholdshistorikk
-  // steps, see UX audit) aren't part of MIDDLE_FIELD_GROUP_KEYS either — same
-  // reasoning and same fix as vehicle-registration above: they must survive
-  // a save if the category already has them, or the vehicle flow silently
-  // loses two steps the next time someone touches this dialog.
+  // vehicle-facts/vehicle-condition/vehicle-equipment (Bil og MC's split-out
+  // Tittel/Pris/Kilometerstand, Tilstand/kjente feil-mangler/
+  // vedlikeholdshistorikk, and Utstyr steps, see UX audit) aren't part of
+  // MIDDLE_FIELD_GROUP_KEYS either — same reasoning and same fix as
+  // vehicle-registration above: they must survive a save if the category
+  // already has them, or the vehicle flow silently loses steps the next time
+  // someone touches this dialog.
   const hasVehicleFacts = storedFieldGroups.includes("vehicle-facts");
   const hasVehicleCondition = storedFieldGroups.includes("vehicle-condition");
+  const hasVehicleEquipment = storedFieldGroups.includes("vehicle-equipment");
   const activeFieldGroups = [
     ...(hasVehicleRegistration ? ["vehicle-registration"] : []),
     "title-photos",
     ...(hasVehicleFacts ? ["vehicle-facts"] : []),
     ...(hasVehicleCondition ? ["vehicle-condition"] : []),
+    ...(hasVehicleEquipment ? ["vehicle-equipment"] : []),
     ...middleOrder.filter(
       (k) => LOCKED_FIELD_GROUP_KEYS.includes(k) || storedFieldGroups.includes(k),
     ),
@@ -1809,6 +1812,7 @@ function CategoryFlowPanel({ category }: { category: Category }) {
       "title-photos",
       ...(hasVehicleFacts ? ["vehicle-facts"] : []),
       ...(hasVehicleCondition ? ["vehicle-condition"] : []),
+      ...(hasVehicleEquipment ? ["vehicle-equipment"] : []),
       ...reordered.filter(
         (k) => LOCKED_FIELD_GROUP_KEYS.includes(k) || storedFieldGroups.includes(k),
       ),
@@ -1879,6 +1883,14 @@ function CategoryFlowPanel({ category }: { category: Category }) {
                   <span className="inline-block size-4 shrink-0" aria-hidden />
                   <Checkbox checked disabled />
                   {FIELD_GROUP_LABELS_NB["vehicle-condition"]}
+                  <span className="text-xs">(kjøretøyflyt, kan ikke fjernes her)</span>
+                </li>
+              )}
+              {hasVehicleEquipment && (
+                <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm text-muted-foreground">
+                  <span className="inline-block size-4 shrink-0" aria-hidden />
+                  <Checkbox checked disabled />
+                  {FIELD_GROUP_LABELS_NB["vehicle-equipment"]}
                   <span className="text-xs">(kjøretøyflyt, kan ikke fjernes her)</span>
                 </li>
               )}

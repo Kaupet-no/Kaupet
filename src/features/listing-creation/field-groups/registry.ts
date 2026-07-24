@@ -9,6 +9,7 @@ import { Condition } from "./condition";
 import { PriceGroup } from "./price";
 import { VehicleFactsGroup } from "./vehicle-facts";
 import { VehicleConditionGroup } from "./vehicle-condition";
+import { VehicleEquipmentGroup } from "./vehicle-equipment";
 import { DescriptionKeywordsGroup } from "./description-keywords";
 import { DeliveryLocation } from "./delivery-location";
 import { ReviewPublishGroup } from "./review-publish";
@@ -146,6 +147,11 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
       return "Beskriv kjente feil og mangler, eller kryss av for at kjøretøyet ikke har noen.";
     },
   },
+  "vehicle-equipment": {
+    key: "vehicle-equipment",
+    Component: VehicleEquipmentGroup,
+    // Ingen validering — utstyrsliste er valgfri, skal ikke blokkere publisering.
+  },
   "description-keywords": {
     key: "description-keywords",
     Component: DescriptionKeywordsGroup,
@@ -184,6 +190,7 @@ const FIELD_GROUP_LABEL_NATIVE_NB: Record<string, string> = {
   price: "Detaljer",
   "vehicle-facts": "Detaljer",
   "vehicle-condition": "Tilstand",
+  "vehicle-equipment": "Utstyr",
   "description-keywords": "Beskrivelse",
   "delivery-location": "Sted",
   "review-publish": "Publiser",
@@ -199,6 +206,7 @@ const FIELD_GROUP_LABEL_WEB_NB: Record<string, string> = {
   price: "Detaljer",
   "vehicle-facts": "Pris & detaljer",
   "vehicle-condition": "Tilstand",
+  "vehicle-equipment": "Utstyr",
   "description-keywords": "Beskrivelse",
   "delivery-location": "Lokasjon",
   "review-publish": "Publiser",
@@ -221,6 +229,7 @@ export const FIELD_GROUP_LABELS_NB: Record<string, string> = {
   price: "Pris",
   "vehicle-facts": "Kjøretøy: Tittel, pris & kilometerstand",
   "vehicle-condition": "Kjøretøy: Tilstand & historikk",
+  "vehicle-equipment": "Kjøretøy: Utstyr",
   "description-keywords": "Beskrivelse & nøkkelord",
   "delivery-location": "Levering & sted",
   "review-publish": "Forhåndsvisning & publiser",

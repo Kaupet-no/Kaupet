@@ -60,6 +60,8 @@ export function AttributeFields({
   required = false,
   showErrors = false,
   hiddenKeys,
+  onlyKeys,
+  title = "Egenskaper",
 }: {
   categoryId: string | null;
   categories: CategoryNode[];
@@ -74,6 +76,17 @@ export function AttributeFields({
    * asked to fill them in a second time here. Values already set for a
    * hidden key are left untouched in `value`/`onChange`. */
   hiddenKeys?: readonly string[];
+  /** When set, renders only these filter keys instead of every effective
+   * filter for the category — e.g. a dedicated "Utstyr" step that shows just
+   * the equipment multiselect filters, not the technical spec filters
+   * already covered elsewhere in the vehicle flow. Takes precedence over
+   * `hiddenKeys` for keys present in both (moot in practice, since a caller
+   * wouldn't pass a key in both lists). */
+  onlyKeys?: readonly string[];
+  /** Heading shown above the filter list — defaults to "Egenskaper", but a
+   * caller rendering only a subset of filters (via `onlyKeys`) may want a
+   * more specific heading, e.g. "Utstyr". */
+  title?: string;
 }) {
   const { data: allFilters } = useAllCategoryFilters();
 
@@ -84,13 +97,17 @@ export function AttributeFields({
   }, [categories]);
 
   const hiddenKeySet = useMemo(() => new Set(hiddenKeys ?? []), [hiddenKeys]);
+  const onlyKeySet = useMemo(() => (onlyKeys ? new Set(onlyKeys) : null), [onlyKeys]);
 
   const filters = useMemo(
     () =>
       effectiveFiltersForCategory(categoryId, allFilters ?? [], categoriesById).filter(
-        (f) => !hiddenKeySet.has(f.key) && filterDependencyMet(f, value),
+        (f) =>
+          !hiddenKeySet.has(f.key) &&
+          (!onlyKeySet || onlyKeySet.has(f.key)) &&
+          filterDependencyMet(f, value),
       ),
-    [categoryId, allFilters, categoriesById, hiddenKeySet, value],
+    [categoryId, allFilters, categoriesById, hiddenKeySet, onlyKeySet, value],
   );
 
   const missingKeys = useMemo(() => {
@@ -110,7 +127,7 @@ export function AttributeFields({
 
   return (
     <div className="space-y-4 rounded-xl border border-border p-4">
-      <p className="text-sm font-medium">Egenskaper</p>
+      <p className="text-sm font-medium">{title}</p>
       {filters.map((f) => {
         if (f.type === "brand_select") {
           return (

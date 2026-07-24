@@ -140,6 +140,8 @@ export function ListingDetailView({
   const euControlExempt =
     isVehicleCategory && typeof euControlExemptRaw === "boolean" ? euControlExemptRaw : null;
   const avgiftOverrideRaw = attributes.omregistreringsavgift_override_kr;
+  const avgiftFritatt = isVehicleCategory && attributes.omregistreringsavgift_fritatt === true;
+  const avgiftInkludert = isVehicleCategory && attributes.omregistreringsavgift_inkludert === true;
   const omregistreringsavgiftKr = isVehicleCategory
     ? typeof avgiftOverrideRaw === "number"
       ? avgiftOverrideRaw
@@ -229,7 +231,18 @@ export function ListingDetailView({
                 {sortedImages.length === 0 && (
                   <p className="mt-3 font-display text-xl text-primary">{priceLabel}</p>
                 )}
-                {isVehicleCategory && omregistreringsavgiftKr != null && (
+                {avgiftFritatt && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Fritatt for omregistreringsavgift
+                  </p>
+                )}
+                {avgiftInkludert && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Omregistreringsavgift er inkludert i kjøpesummen — selger er ansvarlig for
+                    omregistrering
+                  </p>
+                )}
+                {!avgiftFritatt && !avgiftInkludert && omregistreringsavgiftKr != null && (
                   <p className="mt-1 text-xs text-muted-foreground">
                     + {omregistreringsavgiftKr.toLocaleString("nb-NO")} kr i omregistreringsavgift
                     til staten (betales av kjøper ved eierskifte)

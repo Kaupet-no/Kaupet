@@ -25,7 +25,18 @@ export function DescriptionField({
   errors,
   touchedFields,
   description,
-}: Pick<WizardSharedProps, "native" | "register" | "errors" | "touchedFields" | "description">) {
+  isVehicle,
+}: Pick<
+  WizardSharedProps,
+  "native" | "register" | "errors" | "touchedFields" | "description" | "isVehicle"
+>) {
+  // Kjøretøy (Bil og MC) har egne felt for Tilstand og kjente feil/mangler
+  // (vehicle-condition), og kan aldri sendes/fraktes — den generiske
+  // placeholderen ("Beskriv tilstand, alder... og om henting/sending") passer
+  // derfor ikke og ble opplevd som misvisende for kjøretøyannonser.
+  const placeholder = isVehicle
+    ? "Forsøk å gi en så detaljert beskrivelse som mulig. Dette er annonsens hovedinnhold."
+    : "Beskriv tilstand, alder, hvorfor du selger, og om henting/sending.";
   const field = (
     <>
       <div className="flex items-center justify-between">
@@ -42,7 +53,7 @@ export function DescriptionField({
         id="description"
         rows={native ? undefined : 5}
         className={native ? "flex-1 resize-none min-h-0" : undefined}
-        placeholder="Beskriv tilstand, alder, hvorfor du selger, og om henting/sending."
+        placeholder={placeholder}
         aria-invalid={!!errors.description}
         aria-describedby={errors.description ? "description-error" : undefined}
         {...register("description")}

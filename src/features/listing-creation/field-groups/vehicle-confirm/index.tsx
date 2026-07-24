@@ -1038,8 +1038,7 @@ export function VehicleConfirm({
         <div className="space-y-1 rounded-md border border-border p-3">
           <Label htmlFor="vc-drive-type">Hjuldrift</Label>
           <p className="text-xs text-muted-foreground">
-            Statens vegvesen gir oss ikke nok informasjon til å avgjøre om kjøretøyet trekker på
-            for- eller bakaksel, så du må velge selv.
+            Vi klarer ikke å identifisere hjuldrift automatisk, så du må selv velge det som stemmer.
           </p>
           <Select value={spec.drive_type} onValueChange={(v) => setSpecField("drive_type", v)}>
             <SelectTrigger id="vc-drive-type" className="max-w-[220px]">

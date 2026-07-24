@@ -138,8 +138,10 @@ SELECT c.id, 'utstyr_annet', 'Annet', 'multiselect', NULL,
 FROM public.categories c
 WHERE c.slug = 'bil-og-mc' AND c.parent_id IS NULL;
 
--- Legger "vehicle-equipment" (Utstyr-steget) inn i flyten, mellom
--- vehicle-condition og description-keywords.
+-- Legger "vehicle-equipment" (Utstyr-seksjonen) inn i flyten, rett etter
+-- description-keywords — de to deler samme side (se ny-annonse.tsx' force-
+-- break-sett), slik at Utstyr vises rett under Beskrivelse-feltet i stedet
+-- for som et eget steg.
 UPDATE public.category_flows
-SET field_groups = '{vehicle-registration,category-attributes,title-photos,vehicle-facts,vehicle-condition,vehicle-equipment,description-keywords,delivery-location,review-publish}'
+SET field_groups = '{vehicle-registration,category-attributes,title-photos,vehicle-facts,vehicle-condition,description-keywords,vehicle-equipment,delivery-location,review-publish}'
 WHERE category_id IN (SELECT id FROM public.categories WHERE slug = 'bil-og-mc' AND parent_id IS NULL);

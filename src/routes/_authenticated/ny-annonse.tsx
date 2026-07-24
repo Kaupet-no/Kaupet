@@ -107,14 +107,18 @@ const DRAFT_ID_KEY = "kaupet_draft_id";
 /** Forces each of the Bil og MC vehicle-only steps onto its own page,
  * separate from title-photos (images only for vehicles) and from each
  * other: vehicle-facts (Tittel/Kilometerstand/Pris/Undertittel),
- * vehicle-condition (Tilstand/kjente feil-mangler/vedlikeholdshistorikk),
- * vehicle-equipment (Utstyr) and description-keywords (ren
- * beskrivelse+nøkkelord) — split up per the UX audit so the flow isn't one
- * overloaded "Beskrivelse" step. See resolveWizardPages' `forceBreakBeforeKeys`. */
+ * vehicle-condition (Tilstand/kjente feil-mangler/vedlikeholdshistorikk) and
+ * description-keywords (ren beskrivelse+nøkkelord) — split up per the UX
+ * audit so the flow isn't one overloaded "Beskrivelse" step. Deliberately
+ * excludes "vehicle-equipment" (Utstyr): that one is meant to sit on the
+ * *same* page as description-keywords, directly under the Beskrivelse
+ * field — so as long as it's the very next key after description-keywords
+ * in field_groups (see the bil-og-mc migration), it joins that page's
+ * buffer instead of starting a new one. See resolveWizardPages'
+ * `forceBreakBeforeKeys`. */
 const VEHICLE_FORCE_BREAK_BEFORE_KEYS = new Set([
   "vehicle-facts",
   "vehicle-condition",
-  "vehicle-equipment",
   "description-keywords",
 ]);
 

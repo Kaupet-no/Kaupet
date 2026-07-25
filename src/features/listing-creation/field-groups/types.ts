@@ -205,6 +205,15 @@ export type WizardSharedProps = {
   images: PendingImage[];
   setImages: (images: PendingImage[]) => void;
   uploadProgress: { done: number; total: number } | null;
+  /** Persisted draft listing id, if the draft has been saved to Supabase yet
+   * (requires a title of at least 5 characters — see `ensureDraftId`). Used
+   * by the vehicle 360° QR capture panel to know which listing to attach
+   * captured frames to. */
+  draftId: string | null;
+  /** Saves the draft to Supabase if it hasn't been saved yet (or `draftId` is
+   * still null), then resolves with the id — or null if the draft can't be
+   * saved yet (e.g. title too short). */
+  ensureDraftId: () => Promise<string | null>;
 
   // location
   locationMethod: "gps" | "postal" | null;

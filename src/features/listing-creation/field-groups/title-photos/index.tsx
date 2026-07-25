@@ -4,16 +4,11 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ImageUploader } from "@/components/image-uploader";
 import { Vehicle360QrPanel } from "@/components/vehicle-360-qr-panel";
+import { computeVehicleTitle } from "@/lib/vehicle-title";
 
 import type { WizardSharedProps } from "../types";
 import { FieldValid } from "../field-valid";
 import { RequiredMark } from "../required-mark";
-
-/** "bmw" / "BMW" / "iX3" -> "Bmw" / "Bmw" / "Ix3" — first letter upper, rest lower. */
-function capitalizeWord(value: unknown): string | null {
-  if (typeof value !== "string" || !value) return null;
-  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
-}
 
 /**
  * Tittel for kjøretøy-kategorier (de med en `brand_select`-filter, se
@@ -32,13 +27,7 @@ export function VehicleTitleFields({
   title,
   attributes,
 }: Pick<WizardSharedProps, "setValue" | "errors" | "title" | "attributes">) {
-  const computedTitle = [
-    attributes.year,
-    capitalizeWord(attributes.brand),
-    capitalizeWord(attributes.model),
-  ]
-    .filter((v) => v !== undefined && v !== null && v !== "")
-    .join(" ");
+  const computedTitle = computeVehicleTitle(attributes);
 
   useEffect(() => {
     if (computedTitle && computedTitle !== title) {

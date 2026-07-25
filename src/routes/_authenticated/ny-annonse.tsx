@@ -10,9 +10,8 @@ import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { AlertCircle, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
-import { createListing, saveDraftListing } from "@/lib/listings.functions";
+import { createListing } from "@/lib/listings.functions";
 import { uploadListingImage } from "@/lib/storage";
-import { computeVehicleTitle } from "@/lib/vehicle-title";
 import { geocodeNorwayAddress, lookupPostalCode, reverseGeocodeAddress } from "@/lib/geocode";
 import { type PendingImage } from "@/components/image-uploader";
 import { FullscreenLocationPicker } from "@/components/fullscreen-location-picker";
@@ -27,6 +26,7 @@ import {
 } from "@/features/listing-creation/category-flows";
 import { useAllCategoryFlows } from "@/features/listing-creation/use-all-category-flows";
 import { useListingSteps, type WizardPage } from "@/features/listing-creation/use-listing-steps";
+import { useDraftAutosave } from "@/features/listing-creation/use-draft-autosave";
 import { fieldGroupsForKeys, pageLabel } from "@/features/listing-creation/field-groups/registry";
 import {
   categoryBreadcrumb,
@@ -101,9 +101,6 @@ const listingSchema = z.object({
   maintenance_history: z.string().trim().max(2000).optional().or(z.literal("")),
 });
 type ListingForm = z.infer<typeof listingSchema>;
-
-const DRAFT_KEY = "kaupet_draft_ny_annonse";
-const DRAFT_ID_KEY = "kaupet_draft_id";
 
 /** Forces each of the Bil og MC vehicle-only steps onto its own page,
  * separate from title-photos (images only for vehicles) and from each
@@ -313,11 +310,6 @@ function NewListingPage() {
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(
     null,
   );
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [draftSaveError, setDraftSaveError] = useState(false);
-  const [hasDraftData, setHasDraftData] = useState<Record<string, unknown> | null>(null);
-  const [draftId, setDraftId] = useState<string | null>(null);
-  const draftSaveInProgress = useRef(false);
   const pendingSubmitValuesRef = useRef<ListingForm | null>(null);
   const [showNoImageDialog, setShowNoImageDialog] = useState(false);
   const [showNoPriceDialog, setShowNoPriceDialog] = useState(false);
@@ -575,25 +567,36 @@ function NewListingPage() {
   const lastEditedRef = useRef<"postal_code" | "city" | "map" | null>(null);
   const markerMovedRef = useRef(false);
 
-  // Load draft from localStorage on mount
-  useEffect(() => {
-    try {
-      const savedId = localStorage.getItem(DRAFT_ID_KEY);
-      if (savedId) setDraftId(savedId);
-      const saved = localStorage.getItem(DRAFT_KEY);
-      if (!saved) return;
-      const data = JSON.parse(saved) as Record<string, unknown>;
-      const savedAt = typeof data.saved_at === "number" ? data.saved_at : 0;
-      if (Date.now() - savedAt < 7 * 24 * 60 * 60 * 1000) {
-        if (data.title || data.description) setHasDraftData(data);
-      } else {
-        localStorage.removeItem(DRAFT_KEY);
-        localStorage.removeItem(DRAFT_ID_KEY);
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
+  const {
+    draftId,
+    lastSaved,
+    draftSaveError,
+    hasDraftData,
+    saveDraftToSupabase,
+    ensureDraftId,
+    restoreDraft: restoreDraftFields,
+    clearDraftStorage,
+    discardLocalDraftBanner,
+  } = useDraftAutosave({
+    title,
+    subtitle,
+    description,
+    selectedParentId,
+    categoryId,
+    condition,
+    isFree,
+    canShip,
+    priceNok,
+    postalCode,
+    city,
+    coords,
+    isVehicle,
+    attributes,
+  });
+
+  function restoreDraft() {
+    restoreDraftFields({ setValue, setSelectedParentId, setLocationMethod });
+  }
 
   // Pre-fill location from user's last listing (if no draft)
   useEffect(() => {
@@ -615,170 +618,6 @@ function NewListingPage() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
-
-  // Autosave to localStorage on field changes
-  useEffect(() => {
-    const t = window.setTimeout(() => {
-      try {
-        localStorage.setItem(
-          DRAFT_KEY,
-          JSON.stringify({
-            title,
-            subtitle,
-            description,
-            selectedParentId,
-            category_id: categoryId,
-            condition,
-            is_free: isFree,
-            can_ship: canShip,
-            price_nok: priceNok,
-            postal_code: postalCode,
-            city,
-            saved_at: Date.now(),
-          }),
-        );
-        setLastSaved(new Date());
-      } catch {
-        // ignore storage errors
-      }
-    }, 2000);
-    return () => window.clearTimeout(t);
-  }, [
-    title,
-    subtitle,
-    description,
-    selectedParentId,
-    categoryId,
-    condition,
-    isFree,
-    canShip,
-    priceNok,
-    postalCode,
-    city,
-  ]);
-
-  async function saveDraftToSupabase(): Promise<string | null> {
-    if (draftSaveInProgress.current) return draftId;
-    // For Bil/MC genereres tittelen fra kjøretøysoppslaget (Årsmodell/Merke/
-    // Modell) og fylles først inn i skjemaets `title`-felt når brukeren når
-    // beskrivelse-steget (se VehicleTitleFields) — som kommer *etter*
-    // bildeopplastningssteget i kjøretøyflyten. Uten dette fallbacket ville
-    // f.eks. 360°-QR-panelet aldri kunne lagre et utkast før det steget.
-    const currentTitle = (isVehicle ? computeVehicleTitle(attributes) : (title ?? "")).trim();
-    if (currentTitle.length < 5) return null;
-    draftSaveInProgress.current = true;
-    try {
-      const result = await saveDraftListing({
-        data: {
-          ...(draftId ? { id: draftId } : {}),
-          title: currentTitle,
-          subtitle: (subtitle ?? "").trim() || null,
-          description: (description ?? "").trim() || undefined,
-          category_id: categoryId || null,
-          condition: condition || undefined,
-          is_free: isFree,
-          price_nok: isFree ? null : typeof priceNok === "number" ? priceNok : null,
-          postal_code: postalCode || null,
-          city: city || null,
-          lat: coords?.lat ?? null,
-          lng: coords?.lng ?? null,
-          can_ship: canShip !== "pickup",
-        },
-      });
-      setDraftId(result.id);
-      setLastSaved(new Date());
-      setDraftSaveError(false);
-      try {
-        localStorage.setItem(DRAFT_ID_KEY, result.id);
-      } catch {
-        // ignore
-      }
-      return result.id;
-    } catch {
-      setDraftSaveError(true);
-      return null;
-    } finally {
-      draftSaveInProgress.current = false;
-    }
-  }
-
-  async function ensureDraftId(): Promise<string | null> {
-    if (draftId) return draftId;
-    return saveDraftToSupabase();
-  }
-
-  // Auto-save draft to Supabase every 30 seconds when form has enough data
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      void saveDraftToSupabase();
-    }, 30_000);
-    return () => window.clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    title,
-    description,
-    categoryId,
-    condition,
-    isFree,
-    priceNok,
-    postalCode,
-    city,
-    canShip,
-    coords,
-    draftId,
-  ]);
-
-  // Save draft when tab becomes hidden (user switches away or closes tab)
-  useEffect(() => {
-    function handleVisibilityChange() {
-      if (document.hidden) void saveDraftToSupabase();
-    }
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    title,
-    description,
-    categoryId,
-    condition,
-    isFree,
-    priceNok,
-    postalCode,
-    city,
-    canShip,
-    coords,
-    draftId,
-  ]);
-
-  function restoreDraft() {
-    if (!hasDraftData) return;
-    if (typeof hasDraftData.title === "string") setValue("title", hasDraftData.title);
-    if (typeof hasDraftData.subtitle === "string") setValue("subtitle", hasDraftData.subtitle);
-    if (typeof hasDraftData.description === "string")
-      setValue("description", hasDraftData.description);
-    if (typeof hasDraftData.condition === "string")
-      setValue("condition", hasDraftData.condition as ListingForm["condition"]);
-    if (typeof hasDraftData.is_free === "boolean") setValue("is_free", hasDraftData.is_free);
-    if (
-      hasDraftData.can_ship === "pickup" ||
-      hasDraftData.can_ship === "ship" ||
-      hasDraftData.can_ship === "both"
-    )
-      setValue("can_ship", hasDraftData.can_ship);
-    if (hasDraftData.price_nok !== undefined)
-      setValue("price_nok", hasDraftData.price_nok as ListingForm["price_nok"]);
-    if (typeof hasDraftData.postal_code === "string") {
-      setValue("postal_code", hasDraftData.postal_code);
-      if (hasDraftData.postal_code) setLocationMethod("postal");
-    }
-    if (typeof hasDraftData.city === "string") setValue("city", hasDraftData.city);
-    if (typeof hasDraftData.selectedParentId === "string")
-      setSelectedParentId(hasDraftData.selectedParentId);
-    if (typeof hasDraftData.category_id === "string")
-      setValue("category_id", hasDraftData.category_id);
-    setHasDraftData(null);
-    showSuccessToast("Utkast gjenopprettet!");
-  }
 
   // Auto-fill city from postal code
   useEffect(() => {
@@ -1273,8 +1112,7 @@ function NewListingPage() {
       return listing;
     },
     onSuccess: (result) => {
-      localStorage.removeItem(DRAFT_KEY);
-      localStorage.removeItem(DRAFT_ID_KEY);
+      clearDraftStorage();
       void import("@/lib/haptics").then((m) => m.hapticNotification("success"));
       showSuccessToast("Annonsen er publisert");
       setPublishedId(result.id);
@@ -1475,15 +1313,7 @@ function NewListingPage() {
           <Button type="button" size="sm" variant="secondary" onClick={restoreDraft}>
             Gjenopprett
           </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              localStorage.removeItem(DRAFT_KEY);
-              setHasDraftData(null);
-            }}
-          >
+          <Button type="button" size="sm" variant="ghost" onClick={discardLocalDraftBanner}>
             Forkast
           </Button>
         </div>
@@ -1705,8 +1535,7 @@ function NewListingPage() {
             <AlertDialogAction
               className="h-14 w-full bg-secondary text-destructive hover:bg-secondary/80"
               onClick={() => {
-                localStorage.removeItem(DRAFT_KEY);
-                localStorage.removeItem(DRAFT_ID_KEY);
+                clearDraftStorage();
                 blocker.proceed?.();
               }}
             >

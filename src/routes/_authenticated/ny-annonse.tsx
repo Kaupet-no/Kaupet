@@ -656,10 +656,10 @@ function NewListingPage() {
     city,
   ]);
 
-  async function saveDraftToSupabase() {
-    if (draftSaveInProgress.current) return;
+  async function saveDraftToSupabase(): Promise<string | null> {
+    if (draftSaveInProgress.current) return draftId;
     const currentTitle = (title ?? "").trim();
-    if (currentTitle.length < 5) return;
+    if (currentTitle.length < 5) return null;
     draftSaveInProgress.current = true;
     try {
       const result = await saveDraftListing({
@@ -687,11 +687,18 @@ function NewListingPage() {
       } catch {
         // ignore
       }
+      return result.id;
     } catch {
       setDraftSaveError(true);
+      return null;
     } finally {
       draftSaveInProgress.current = false;
     }
+  }
+
+  async function ensureDraftId(): Promise<string | null> {
+    if (draftId) return draftId;
+    return saveDraftToSupabase();
   }
 
   // Auto-save draft to Supabase every 30 seconds when form has enough data
@@ -1427,6 +1434,8 @@ function NewListingPage() {
     images,
     setImages,
     uploadProgress,
+    draftId,
+    ensureDraftId,
 
     locationMethod,
     setLocationMethod,

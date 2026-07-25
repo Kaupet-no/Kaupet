@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export const LISTING_BUCKET = "listing-images";
+export const VEHICLE_360_BUCKET = "listing-360-frames";
 export const AVATAR_BUCKET = "avatars";
 export const MAX_IMAGES = 8;
 export const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -129,6 +130,41 @@ export async function signListingImageUrls(
     for (const item of data ?? []) {
       if (item.signedUrl && item.path) {
         signedUrlCache.set(item.path, {
+          url: item.signedUrl,
+          expiresAt: now + expiresInSeconds * 1000,
+        });
+        result[item.path] = item.signedUrl;
+      }
+    }
+  }
+  return result;
+}
+
+const signed360UrlCache = new Map<string, { url: string; expiresAt: number }>();
+
+export async function signVehicle360FrameUrls(
+  paths: string[],
+  expiresInSeconds = 60 * 60,
+): Promise<Record<string, string>> {
+  const now = Date.now();
+  const result: Record<string, string> = {};
+  const need: string[] = [];
+  for (const p of paths) {
+    const cached = signed360UrlCache.get(p);
+    if (cached && cached.expiresAt > now + 60_000) {
+      result[p] = cached.url;
+    } else {
+      need.push(p);
+    }
+  }
+  if (need.length > 0) {
+    const { data, error } = await supabase.storage
+      .from(VEHICLE_360_BUCKET)
+      .createSignedUrls(need, expiresInSeconds);
+    if (error) throw error;
+    for (const item of data ?? []) {
+      if (item.signedUrl && item.path) {
+        signed360UrlCache.set(item.path, {
           url: item.signedUrl,
           expiresAt: now + expiresInSeconds * 1000,
         });

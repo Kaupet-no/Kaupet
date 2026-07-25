@@ -26,7 +26,7 @@ import { CategoryLandingPage } from "@/components/category-landing-page";
 import { type Category } from "@/lib/categories";
 import { normalizeSlugForMatch } from "@/lib/slug";
 
-import { signListingImageUrls } from "@/lib/storage";
+import { signListingImageUrls, signVehicle360FrameUrls } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { OwnerStatsPanel } from "@/components/listing-detail/owner-stats-panel";
 import { SellerContactPanel } from "@/components/listing-detail/seller-contact-panel";
@@ -285,6 +285,7 @@ function ListingDetailPage() {
   const { data: isAdmin } = useIsAdmin();
   const { data: isModerator } = useIsModerator();
   const [imgUrls, setImgUrls] = useState<Record<string, string>>({});
+  const [vehicle360ImgUrls, setVehicle360ImgUrls] = useState<Record<string, string>>({});
   const [statsInfoOpen, setStatsInfoOpen] = useState(false);
   const [promoteOpen, setPromoteOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -378,7 +379,7 @@ function ListingDetailPage() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, subtitle, description, price_nok, is_free, condition, city, postal_code, display_lat, display_lng, created_at, updated_at, published_at, status, seller_id, category_id, attributes, known_issues, no_known_issues, maintenance_history, listing_images(storage_path, sort_order), categories(name_nb, slug)",
+          "id, kaupet_code, title, subtitle, description, price_nok, is_free, condition, city, postal_code, display_lat, display_lng, created_at, updated_at, published_at, status, seller_id, category_id, attributes, known_issues, no_known_issues, maintenance_history, listing_images(storage_path, sort_order), listing_360_frames(storage_path, frame_order), categories(name_nb, slug)",
         )
         .eq("kaupet_code", kaupetCode)
         .maybeSingle();
@@ -498,6 +499,16 @@ function ListingDetailPage() {
     signListingImageUrls(images.map((i) => i.storage_path)).then(setImgUrls);
   }, [images]);
 
+  const vehicle360Frames = useMemo(
+    () => (data?.listing_360_frames ?? []).slice().sort((a, b) => a.frame_order - b.frame_order),
+    [data?.listing_360_frames],
+  );
+
+  useEffect(() => {
+    if (vehicle360Frames.length === 0) return;
+    signVehicle360FrameUrls(vehicle360Frames.map((f) => f.storage_path)).then(setVehicle360ImgUrls);
+  }, [vehicle360Frames]);
+
   // Logg visning (databasens unike constraint sørger for at samme besøkende
   // kun telles én gang per annonse)
   useEffect(() => {
@@ -587,6 +598,8 @@ function ListingDetailPage() {
       category={category ?? null}
       images={images}
       imgUrls={imgUrls}
+      vehicle360Frames={vehicle360Frames}
+      vehicle360ImgUrls={vehicle360ImgUrls}
       attributes={attributes}
       backSlot={<BackNavLink target={backTarget} onHistoryBack={() => router.history.back()} />}
       actionsMenuSlot={

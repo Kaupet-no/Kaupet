@@ -5,7 +5,11 @@ import { Loader2, MapPin } from "lucide-react";
 import { useIsNative } from "@/hooks/use-is-native";
 import { NativePageHeader } from "@/components/native-page-header";
 import { ImageGallery } from "@/components/listing-detail/image-gallery";
-import { VehicleSpecBar } from "@/components/listing-detail/vehicle/vehicle-spec-bar";
+import {
+  Vehicle360Viewer,
+  type Vehicle360Frame,
+} from "@/components/listing-detail/vehicle/vehicle-360-viewer";
+import { VehicleInfoGrid } from "@/components/listing-detail/vehicle/vehicle-info-grid";
 import { VehicleTechTable } from "@/components/listing-detail/vehicle/vehicle-tech-table";
 import { CONDITION_LABEL, VEHICLE_CONDITION_LABEL } from "@/lib/constants";
 import {
@@ -70,6 +74,10 @@ export type ListingDetailViewProps = {
   images: { storage_path: string; sort_order: number }[];
   imgUrls: Record<string, string>;
   attributes: Record<string, unknown>;
+  /** 360°-bildesekvens tatt via mobilappen (Bil/MC-kategorier). Tom/utelatt
+   * for annonser uten 360-opptak. */
+  vehicle360Frames?: Vehicle360Frame[];
+  vehicle360ImgUrls?: Record<string, string>;
   /** Rendered above the gallery on web only (hidden on native, same as today). */
   backSlot?: ReactNode;
   /** Edit/delete/report menu — real, non-owner viewers only. */
@@ -103,6 +111,8 @@ export function ListingDetailView({
   images,
   imgUrls,
   attributes,
+  vehicle360Frames,
+  vehicle360ImgUrls,
   backSlot,
   actionsMenuSlot,
   ownerStatsSlot,
@@ -114,11 +124,13 @@ export function ListingDetailView({
   const [mounted, setMounted] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [mapOverlayOpen, setMapOverlayOpen] = useState(false);
+  const [galleryTab, setGalleryTab] = useState<"images" | "360">("images");
   const closeLightbox = useCallback(() => setLightboxIndex(null), []);
   const closeMapOverlay = useCallback(() => setMapOverlayOpen(false), []);
   useEffect(() => setMounted(true), []);
 
   const sortedImages = images.slice().sort((a, b) => a.sort_order - b.sort_order);
+  const has360 = !!vehicle360Frames && vehicle360Frames.length > 0;
 
   const priceLabel = isFree
     ? "Gis bort"
@@ -164,14 +176,40 @@ export function ListingDetailView({
       <div className="mt-4 grid gap-8 md:grid-cols-[1.4fr_1fr]">
         <div>
           <div className="relative mb-6">
-            <ImageGallery
-              images={sortedImages}
-              imgUrls={imgUrls}
-              activeImage={activeImage}
-              onSelect={setActiveImage}
-              title={title}
-              onImageClick={sortedImages.length > 0 ? setLightboxIndex : undefined}
-            />
+            {has360 && (
+              <div className="mb-3 inline-flex rounded-full border border-border bg-muted/40 p-0.5 text-sm">
+                <button
+                  type="button"
+                  onClick={() => setGalleryTab("images")}
+                  className={`rounded-full px-3 py-1 transition ${galleryTab === "images" ? "bg-card font-medium shadow-sm" : "text-muted-foreground"}`}
+                >
+                  Bilder
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGalleryTab("360")}
+                  className={`rounded-full px-3 py-1 transition ${galleryTab === "360" ? "bg-card font-medium shadow-sm" : "text-muted-foreground"}`}
+                >
+                  360°
+                </button>
+              </div>
+            )}
+            {galleryTab === "360" && has360 ? (
+              <Vehicle360Viewer
+                frames={vehicle360Frames!}
+                imgUrls={vehicle360ImgUrls ?? {}}
+                title={title}
+              />
+            ) : (
+              <ImageGallery
+                images={sortedImages}
+                imgUrls={imgUrls}
+                activeImage={activeImage}
+                onSelect={setActiveImage}
+                title={title}
+                onImageClick={sortedImages.length > 0 ? setLightboxIndex : undefined}
+              />
+            )}
             {sortedImages.length > 0 && (
               <div className="absolute -bottom-4 left-4 rounded-xl border border-border bg-card px-4 py-2.5 shadow-lg">
                 <p className="font-display text-xl leading-none text-primary">{priceLabel}</p>
@@ -254,7 +292,7 @@ export function ListingDetailView({
           </div>
 
           {isVehicleCategory && (
-            <VehicleSpecBar vehicleLookup={vehicleLookup} mileageKm={mileageKm} />
+            <VehicleInfoGrid vehicleLookup={vehicleLookup} mileageKm={mileageKm} />
           )}
 
           {(() => {

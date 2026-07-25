@@ -1,23 +1,6 @@
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import type { VehicleLookupResult } from "@/lib/vehicle-lookup.server";
-
-const FUEL_LABEL_NB: Record<string, string> = {
-  bensin: "Bensin",
-  diesel: "Diesel",
-  el: "El",
-  hybrid: "Hybrid",
-};
-
-const TRANSMISSION_LABEL_NB: Record<string, string> = {
-  manuell: "Manuell",
-  automat: "Automat",
-};
-
-const DRIVE_TYPE_LABEL_NB: Record<string, string> = {
-  forhjul: "Forhjulsdrift",
-  bakhjul: "Bakhjulsdrift",
-  "4x4": "Firehjulsdrift",
-};
+import { DRIVE_TYPE_LABEL_NB, FUEL_LABEL_NB, TRANSMISSION_LABEL_NB } from "./vehicle-labels";
 
 type Row = { label: string; value: string };
 

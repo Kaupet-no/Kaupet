@@ -3,7 +3,6 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const SESSION_TTL_MS = 30 * 60 * 1000;
 export const MIN_360_FRAMES = 16;
 export const MAX_360_FRAMES = 36;
 export const TARGET_360_FRAMES = 24;
@@ -16,6 +15,10 @@ function randomToken(): string {
   );
 }
 
+// Én stabil QR-kode per annonseutkast — ikke en tidsbegrenset engangskode.
+// Idempotent: kalles denne flere ganger for samme utkast (f.eks. ved
+// sidelast på nytt) gjenbrukes samme token i stedet for å opprette en ny
+// rad, slik at koden brukeren evt. allerede har delt/lagret fortsatt virker.
 export const createVehicle360CaptureSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ listingId: z.string().uuid() }).parse(input))
@@ -32,18 +35,23 @@ export const createVehicle360CaptureSession = createServerFn({ method: "POST" })
     if (listingError) throw listingError;
     if (!listing) throw new Error("Fant ikke annonseutkastet");
 
-    const token = randomToken();
-    const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
+    const { data: existing, error: existingError } = await supabaseAdmin
+      .from("listing_360_capture_sessions")
+      .select("token")
+      .eq("listing_id", data.listingId)
+      .maybeSingle();
+    if (existingError) throw existingError;
+    if (existing) return { token: existing.token };
 
+    const token = randomToken();
     const { error } = await supabaseAdmin.from("listing_360_capture_sessions").insert({
       listing_id: data.listingId,
       token,
       created_by: userId,
-      expires_at: expiresAt,
     });
     if (error) throw error;
 
-    return { token, expiresAt };
+    return { token };
   });
 
 export const getVehicle360CaptureSession = createServerFn({ method: "GET" })
@@ -53,14 +61,11 @@ export const getVehicle360CaptureSession = createServerFn({ method: "GET" })
 
     const { data: session, error } = await supabaseAdmin
       .from("listing_360_capture_sessions")
-      .select("listing_id, expires_at, listings(title)")
+      .select("listing_id, listings(title)")
       .eq("token", data.token)
       .maybeSingle();
     if (error) throw error;
-    if (!session) throw new Error("Fant ikke opptaksøkten");
-    if (new Date(session.expires_at) <= new Date()) {
-      throw new Error("Denne økten er utløpt. Generer en ny QR-kode på annonsen.");
-    }
+    if (!session) throw new Error("Fant ikke QR-koden. Be selger vise en ny på annonsen.");
 
     const { data: existingFrames, error: framesError } = await supabaseAdmin
       .from("listing_360_frames")
@@ -110,14 +115,11 @@ export const uploadVehicle360Frame = createServerFn({ method: "POST" })
 
     const { data: session, error: sessionError } = await supabaseAdmin
       .from("listing_360_capture_sessions")
-      .select("listing_id, expires_at")
+      .select("listing_id")
       .eq("token", data.token)
       .maybeSingle();
     if (sessionError) throw sessionError;
-    if (!session) throw new Error("Fant ikke opptaksøkten");
-    if (new Date(session.expires_at) <= new Date()) {
-      throw new Error("Denne økten er utløpt. Generer en ny QR-kode på annonsen.");
-    }
+    if (!session) throw new Error("Fant ikke QR-koden. Be selger vise en ny på annonsen.");
 
     const bytes = Buffer.from(data.base64Data, "base64");
     if (bytes.byteLength > 2 * 1024 * 1024) {

@@ -12,7 +12,7 @@ import { AlertCircle, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { createListing } from "@/lib/listings.functions";
 import { uploadListingImage } from "@/lib/storage";
-import { geocodeNorwayAddress, lookupPostalCode, reverseGeocodeAddress } from "@/lib/geocode";
+import { geocodeNorwayAddress } from "@/lib/geocode";
 import { type PendingImage } from "@/components/image-uploader";
 import { FullscreenLocationPicker } from "@/components/fullscreen-location-picker";
 import { PromoteListingDialog } from "@/components/promote-listing-dialog";
@@ -28,6 +28,7 @@ import { useAllCategoryFlows } from "@/features/listing-creation/use-all-categor
 import { useListingSteps, type WizardPage } from "@/features/listing-creation/use-listing-steps";
 import { useDraftAutosave } from "@/features/listing-creation/use-draft-autosave";
 import { useVehicleLookupFlow } from "@/features/listing-creation/use-vehicle-lookup-flow";
+import { useLocationPicker } from "@/features/listing-creation/use-location-picker";
 import { fieldGroupsForKeys, pageLabel } from "@/features/listing-creation/field-groups/registry";
 import {
   categoryBreadcrumb,
@@ -61,7 +62,7 @@ import { CONDITIONS, VEHICLE_CONDITIONS } from "@/lib/constants";
 import { suggestCategoryForTitle } from "@/lib/category-suggestion.functions";
 import { suggestKeywordsForListing } from "@/lib/keyword-suggestion.functions";
 import { matchWtbListingsForListing } from "@/lib/wtb-listings.functions";
-import { getCurrentPosition, requestLocationPermission, isNative } from "@/lib/native";
+import { isNative } from "@/lib/native";
 
 import { PublishActions } from "@/features/listing-creation/field-groups/review-publish";
 import type { WizardSharedProps } from "@/features/listing-creation/field-groups/types";
@@ -310,9 +311,6 @@ function NewListingPage() {
   const [previewNudgeOpen, setPreviewNudgeOpen] = useState(false);
   const [attributes, setAttributes] = useState<AttributeMap>({});
   const [attributesTouched, setAttributesTouched] = useState(false);
-  const [locationLoading, setLocationLoading] = useState(false);
-  const [locationMethod, setLocationMethod] = useState<"gps" | "postal" | null>(null);
-  const [fullscreenMapOpen, setFullscreenMapOpen] = useState(false);
   const native = isNative();
   const { data: isDemo = false } = useIsDemo();
   const turnstileEnabled = !!import.meta.env.VITE_TURNSTILE_SITE_KEY;
@@ -568,9 +566,20 @@ function NewListingPage() {
     enableBeforeUnload: shouldBlockNav,
   });
 
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const lastEditedRef = useRef<"postal_code" | "city" | "map" | null>(null);
-  const markerMovedRef = useRef(false);
+  const {
+    locationLoading,
+    locationMethod,
+    setLocationMethod,
+    fullscreenMapOpen,
+    setFullscreenMapOpen,
+    coords,
+    setCoords,
+    lastEditedRef,
+    markerMovedRef,
+    switchToPostal,
+    switchToGps,
+    fetchMyLocation,
+  } = useLocationPicker({ postalCode, setValue });
 
   const {
     draftId,
@@ -623,33 +632,6 @@ function NewListingPage() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
-
-  // Auto-fill city from postal code
-  useEffect(() => {
-    if (lastEditedRef.current !== "postal_code") return;
-    const p = (postalCode ?? "").trim();
-    if (!/^\d{4}$/.test(p)) return;
-    const t = window.setTimeout(async () => {
-      const r = await lookupPostalCode(p);
-      if (!r) return;
-      if (r.city) setValue("city", r.city, { shouldValidate: false });
-      if (!markerMovedRef.current) setCoords({ lat: r.lat, lng: r.lng });
-    }, 500);
-    return () => window.clearTimeout(t);
-  }, [postalCode, setValue]);
-
-  // Reverse-geocode map position
-  useEffect(() => {
-    if (lastEditedRef.current !== "map" || !coords) return;
-    const t = window.setTimeout(async () => {
-      const r = await reverseGeocodeAddress(coords);
-      if (r.city) setValue("city", r.city, { shouldValidate: false });
-      if (r.postal_code && /^\d{4}$/.test(r.postal_code)) {
-        setValue("postal_code", r.postal_code, { shouldValidate: false });
-      }
-    }, 300);
-    return () => window.clearTimeout(t);
-  }, [coords, setValue]);
 
   // Category suggestion from title (categoryTouchedManually is declared
   // earlier — useVehicleLookupFlow needs it)
@@ -817,67 +799,6 @@ function NewListingPage() {
     }
     goNext();
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  function resetLocationMethod() {
-    setLocationMethod(null);
-    setCoords(null);
-    setValue("postal_code", "");
-    setValue("city", "");
-    markerMovedRef.current = false;
-    lastEditedRef.current = null;
-  }
-
-  function switchToPostal() {
-    setCoords(null);
-    setValue("postal_code", "");
-    setValue("city", "");
-    markerMovedRef.current = false;
-    lastEditedRef.current = null;
-    setLocationMethod("postal");
-  }
-
-  function switchToGps() {
-    setValue("postal_code", "");
-    setValue("city", "");
-    markerMovedRef.current = false;
-    lastEditedRef.current = null;
-    void fetchMyLocation();
-  }
-
-  async function fetchMyLocation() {
-    setLocationMethod("gps");
-    setLocationLoading(true);
-    try {
-      if (isNative()) {
-        const permission = await requestLocationPermission();
-        if (permission !== "granted") {
-          showErrorToast("Gi appen tilgang til posisjon i innstillingene.");
-          setLocationMethod(null);
-          return;
-        }
-      }
-      const pos = await getCurrentPosition();
-      if (!pos) {
-        showErrorToast("Kunne ikke hente posisjon.");
-        setLocationMethod(null);
-        return;
-      }
-      const { lat, lng } = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      setCoords({ lat, lng });
-      markerMovedRef.current = false;
-      lastEditedRef.current = null;
-      const geo = await reverseGeocodeAddress({ lat, lng });
-      if (geo.city) setValue("city", geo.city, { shouldValidate: false });
-      if (geo.postal_code && /^\d{4}$/.test(geo.postal_code)) {
-        setValue("postal_code", geo.postal_code, { shouldValidate: false });
-      }
-    } catch {
-      showErrorToast("Kunne ikke hente posisjon. Sjekk at du har gitt tilgang.");
-      setLocationMethod(null);
-    } finally {
-      setLocationLoading(false);
-    }
   }
 
   const mutation = useMutation({

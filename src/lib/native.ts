@@ -138,6 +138,28 @@ export async function shareContent(opts: {
   throw new Error("Deling støttes ikke i denne nettleseren");
 }
 
+/**
+ * Wires up Universal Links (iOS) / App Links (Android): when the OS opens
+ * the app because the user tapped a https://kaupet.no/... link (e.g. a
+ * scanned QR code, a shared link, a link in a message), Capacitor's App
+ * plugin fires `appUrlOpen` with the full URL — route it into the app's own
+ * router instead of leaving the WebView on its default page. Call once at
+ * app startup. Mirrors the push-notification navigation wiring in
+ * native-push.ts.
+ */
+export async function initUniversalLinkNavigation(navigate: (url: string) => void): Promise<void> {
+  if (!isNative()) return;
+  const { App } = await import("@capacitor/app");
+  await App.addListener("appUrlOpen", (data) => {
+    try {
+      const url = new URL(data.url);
+      navigate(url.pathname + url.search + url.hash);
+    } catch {
+      // Ugyldig URL — ignorer i stedet for å krasje appen.
+    }
+  });
+}
+
 /** Open a URL in an in-app browser on native; on web, opens a new tab. */
 export async function openExternal(url: string): Promise<void> {
   if (isNative()) {

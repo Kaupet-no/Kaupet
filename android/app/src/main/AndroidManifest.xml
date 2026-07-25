@@ -18,6 +18,16 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- App Links: kaupet.no-lenker åpner appen direkte når den er
+                 installert (autoVerify krever et gyldig assetlinks.json på
+                 https://kaupet.no/.well-known/assetlinks.json). -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="kaupet.no" />
+            </intent-filter>
         </activity>
 
         <provider

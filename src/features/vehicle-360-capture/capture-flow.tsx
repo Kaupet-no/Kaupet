@@ -23,7 +23,7 @@ type Frame = {
 // Intervallet vi sjekker for bevegelse i — faktisk bildefangst skjer kun når
 // nok bevegelse er registrert siden forrige bilde (se signature-sjekken
 // nedenfor), så dette er en øvre grense på fangstrate, ikke et fast tempo.
-const CAPTURE_INTERVAL_MS = 250;
+const CAPTURE_INTERVAL_MS = 500;
 // Nedskalert sammenligningsbilde brukt til bevegelsesdeteksjon — lite nok til
 // at differansen regnes ut momentant på hver tikk.
 const SIGNATURE_WIDTH = 32;
@@ -416,10 +416,23 @@ export function Vehicle360CaptureFlow({
       </p>
 
       {processing && (
-        <p className="flex items-center justify-center gap-1.5 text-sm font-medium text-primary">
-          <Loader2 className="size-4 animate-spin" /> Komprimerer og laster opp bilder (
-          {processedCount}/{totalCount})…
-        </p>
+        <div className="space-y-2 rounded-lg border bg-muted/40 p-4">
+          <p className="flex items-center justify-center gap-1.5 text-sm font-medium text-primary">
+            <Loader2 className="size-4 animate-spin" /> Laster opp bilder ({processedCount}/
+            {totalCount})…
+          </p>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-primary transition-all duration-300 ease-out"
+              style={{
+                width: `${totalCount > 0 ? (processedCount / totalCount) * 100 : 0}%`,
+              }}
+            />
+          </div>
+          <p className="text-center text-xs text-muted-foreground">
+            Ikke lukk siden — dette tar bare et øyeblikk.
+          </p>
+        </div>
       )}
 
       {frames.length > 0 && (
@@ -439,44 +452,45 @@ export function Vehicle360CaptureFlow({
         </ul>
       )}
 
-      {!recording ? (
-        <div className="space-y-2">
-          <Button
-            type="button"
-            className="w-full gap-2"
-            size="lg"
-            onClick={startRecording}
-            disabled={processing}
-          >
-            <CameraIcon className="size-5" />{" "}
-            {totalCount === 0 ? "Start opptak" : "Fortsett opptak"}
-          </Button>
-          {totalCount > 0 && (
+      {!processing &&
+        (!recording ? (
+          <div className="space-y-2">
             <Button
               type="button"
-              variant="outline"
-              className="w-full"
-              onClick={finish}
-              disabled={!hasEnough || finishing || processing}
+              className="w-full gap-2"
+              size="xl"
+              onClick={startRecording}
+              disabled={processing}
             >
-              {finishing && <Loader2 className="mr-2 size-4 animate-spin" />}
-              {hasEnough
-                ? "Fullfør"
-                : `Fullfør (${doneCount}/${MIN_360_FRAMES} minimum — fortsett opptaket)`}
+              <CameraIcon className="size-6" />{" "}
+              {totalCount === 0 ? "Start opptak" : "Fortsett opptak"}
             </Button>
-          )}
-        </div>
-      ) : (
-        <Button
-          type="button"
-          variant="destructive"
-          className="w-full gap-2"
-          size="lg"
-          onClick={stopRecording}
-        >
-          <Square className="size-4" /> Stopp
-        </Button>
-      )}
+            {totalCount > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={finish}
+                disabled={!hasEnough || finishing || processing}
+              >
+                {finishing && <Loader2 className="mr-2 size-4 animate-spin" />}
+                {hasEnough
+                  ? "Fullfør"
+                  : `Fullfør (${doneCount}/${MIN_360_FRAMES} minimum — fortsett opptaket)`}
+              </Button>
+            )}
+          </div>
+        ) : (
+          <Button
+            type="button"
+            variant="destructive"
+            className="w-full gap-2"
+            size="xl"
+            onClick={stopRecording}
+          >
+            <Square className="size-6" /> Stopp
+          </Button>
+        ))}
     </div>
   );
 }

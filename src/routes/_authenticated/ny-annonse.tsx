@@ -12,6 +12,7 @@ import { AlertCircle, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { createListing, saveDraftListing } from "@/lib/listings.functions";
 import { uploadListingImage } from "@/lib/storage";
+import { computeVehicleTitle } from "@/lib/vehicle-title";
 import { geocodeNorwayAddress, lookupPostalCode, reverseGeocodeAddress } from "@/lib/geocode";
 import { type PendingImage } from "@/components/image-uploader";
 import { FullscreenLocationPicker } from "@/components/fullscreen-location-picker";
@@ -658,7 +659,12 @@ function NewListingPage() {
 
   async function saveDraftToSupabase(): Promise<string | null> {
     if (draftSaveInProgress.current) return draftId;
-    const currentTitle = (title ?? "").trim();
+    // For Bil/MC genereres tittelen fra kjøretøysoppslaget (Årsmodell/Merke/
+    // Modell) og fylles først inn i skjemaets `title`-felt når brukeren når
+    // beskrivelse-steget (se VehicleTitleFields) — som kommer *etter*
+    // bildeopplastningssteget i kjøretøyflyten. Uten dette fallbacket ville
+    // f.eks. 360°-QR-panelet aldri kunne lagre et utkast før det steget.
+    const currentTitle = (isVehicle ? computeVehicleTitle(attributes) : (title ?? "")).trim();
     if (currentTitle.length < 5) return null;
     draftSaveInProgress.current = true;
     try {

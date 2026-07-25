@@ -22,6 +22,7 @@ import {
   initNativePushNavigation,
 } from "@/lib/native-push";
 import { setupNative } from "@/lib/native-setup";
+import { initUniversalLinkNavigation } from "@/lib/native";
 import { useIsNative } from "@/hooks/use-is-native";
 import { useKeyboardVisible } from "@/hooks/use-keyboard-visible";
 import { AppBottomNav } from "@/components/app-bottom-nav";
@@ -236,6 +237,7 @@ function RootComponent() {
     void autoRestoreNativePush();
     void initNativePushNavigation((url) => router.navigate({ href: url }));
     void initNativePushForeground((url) => router.navigate({ href: url }));
+    void initUniversalLinkNavigation((url) => router.navigate({ href: url }));
     return cleanup;
   }, [router]);
 

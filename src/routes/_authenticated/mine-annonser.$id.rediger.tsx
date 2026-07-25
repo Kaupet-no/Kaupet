@@ -1040,6 +1040,8 @@ function EditListingPage() {
             images: [],
             setImages: () => {},
             uploadProgress: null,
+            draftId: id,
+            ensureDraftId: async () => id,
 
             locationMethod,
             setLocationMethod,

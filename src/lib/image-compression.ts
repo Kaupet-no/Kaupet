@@ -6,7 +6,7 @@
 
 import imageCompression from "browser-image-compression";
 
-export type CompressPreset = "avatar" | "listing";
+export type CompressPreset = "avatar" | "listing" | "vehicle360";
 
 type PresetConfig = {
   maxWidthOrHeight: number;
@@ -16,9 +16,12 @@ type PresetConfig = {
 
 // Avatarer rendres lite (~80px) og kan komprimeres hardt. Annonsebilder trenger
 // høyere oppløsning, men kan fortsatt skaleres betraktelig ned fra originalen.
+// 360-frames vises kun små/animert i spin-visningen, aldri i full skjerm
+// enkeltvis — komprimeres derfor hardere enn galleribilder.
 const PRESETS: Record<CompressPreset, PresetConfig> = {
   avatar: { maxWidthOrHeight: 512, maxSizeMB: 0.15, initialQuality: 0.7 },
   listing: { maxWidthOrHeight: 1600, maxSizeMB: 0.6, initialQuality: 0.8 },
+  vehicle360: { maxWidthOrHeight: 1024, maxSizeMB: 0.3, initialQuality: 0.82 },
 };
 
 function toWebpName(name: string): string {

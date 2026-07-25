@@ -19,6 +19,7 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as TilbakestillPassordRouteImport } from './routes/tilbakestill-passord'
 import { Route as VilkarRouteImport } from './routes/vilkar'
 import { Route as KaupetCodeSubRouteImport } from './routes/$kaupetCode_.$sub'
+import { Route as R360OpptakTokenRouteImport } from './routes/360-opptak.$token'
 import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authenticated/admin/route'
 import { Route as AuthenticatedFavoritterRouteImport } from './routes/_authenticated/favoritter'
 import { Route as AuthenticatedMegRouteImport } from './routes/_authenticated/meg'
@@ -94,6 +95,11 @@ const VilkarRoute = VilkarRouteImport.update({
 const KaupetCodeSubRoute = KaupetCodeSubRouteImport.update({
   id: '/$kaupetCode_/$sub',
   path: '/$kaupetCode/$sub',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const R360OpptakTokenRoute = R360OpptakTokenRouteImport.update({
+  id: '/360-opptak/$token',
+  path: '/360-opptak/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAdminRouteRoute = AuthenticatedAdminRouteRouteImport.update({
@@ -258,6 +264,7 @@ export interface FileRoutesByFullPath {
   '/vilkar': typeof VilkarRoute
   '/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/$kaupetCode/$sub': typeof KaupetCodeSubRoute
+  '/360-opptak/$token': typeof R360OpptakTokenRoute
   '/favoritter': typeof AuthenticatedFavoritterRoute
   '/meg': typeof AuthenticatedMegRoute
   '/mine-sok': typeof AuthenticatedMineSokRoute
@@ -295,6 +302,7 @@ export interface FileRoutesByTo {
   '/tilbakestill-passord': typeof TilbakestillPassordRoute
   '/vilkar': typeof VilkarRoute
   '/$kaupetCode/$sub': typeof KaupetCodeSubRoute
+  '/360-opptak/$token': typeof R360OpptakTokenRoute
   '/favoritter': typeof AuthenticatedFavoritterRoute
   '/meg': typeof AuthenticatedMegRoute
   '/mine-sok': typeof AuthenticatedMineSokRoute
@@ -335,6 +343,7 @@ export interface FileRoutesById {
   '/vilkar': typeof VilkarRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/$kaupetCode_/$sub': typeof KaupetCodeSubRoute
+  '/360-opptak/$token': typeof R360OpptakTokenRoute
   '/_authenticated/favoritter': typeof AuthenticatedFavoritterRoute
   '/_authenticated/meg': typeof AuthenticatedMegRoute
   '/_authenticated/mine-sok': typeof AuthenticatedMineSokRoute
@@ -375,6 +384,7 @@ export interface FileRouteTypes {
     | '/vilkar'
     | '/admin'
     | '/$kaupetCode/$sub'
+    | '/360-opptak/$token'
     | '/favoritter'
     | '/meg'
     | '/mine-sok'
@@ -412,6 +422,7 @@ export interface FileRouteTypes {
     | '/tilbakestill-passord'
     | '/vilkar'
     | '/$kaupetCode/$sub'
+    | '/360-opptak/$token'
     | '/favoritter'
     | '/meg'
     | '/mine-sok'
@@ -451,6 +462,7 @@ export interface FileRouteTypes {
     | '/vilkar'
     | '/_authenticated/admin'
     | '/$kaupetCode_/$sub'
+    | '/360-opptak/$token'
     | '/_authenticated/favoritter'
     | '/_authenticated/meg'
     | '/_authenticated/mine-sok'
@@ -490,6 +502,7 @@ export interface RootRouteChildren {
   TilbakestillPassordRoute: typeof TilbakestillPassordRoute
   VilkarRoute: typeof VilkarRoute
   KaupetCodeSubRoute: typeof KaupetCodeSubRoute
+  R360OpptakTokenRoute: typeof R360OpptakTokenRoute
   AnnonseListingIdRoute: typeof AnnonseListingIdRoute
   BrukerIdRoute: typeof BrukerIdRoute
   ApiPublicPushDispatchRoute: typeof ApiPublicPushDispatchRoute
@@ -566,6 +579,13 @@ declare module '@tanstack/react-router' {
       path: '/$kaupetCode/$sub'
       fullPath: '/$kaupetCode/$sub'
       preLoaderRoute: typeof KaupetCodeSubRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/360-opptak/$token': {
+      id: '/360-opptak/$token'
+      path: '/360-opptak/$token'
+      fullPath: '/360-opptak/$token'
+      preLoaderRoute: typeof R360OpptakTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin': {
@@ -853,6 +873,7 @@ const rootRouteChildren: RootRouteChildren = {
   TilbakestillPassordRoute: TilbakestillPassordRoute,
   VilkarRoute: VilkarRoute,
   KaupetCodeSubRoute: KaupetCodeSubRoute,
+  R360OpptakTokenRoute: R360OpptakTokenRoute,
   AnnonseListingIdRoute: AnnonseListingIdRoute,
   BrukerIdRoute: BrukerIdRoute,
   ApiPublicPushDispatchRoute: ApiPublicPushDispatchRoute,

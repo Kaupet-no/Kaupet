@@ -589,6 +589,76 @@ export type Database = {
           },
         ]
       }
+      listing_360_frames: {
+        Row: {
+          created_at: string
+          frame_order: number
+          id: string
+          listing_id: string
+          storage_path: string
+        }
+        Insert: {
+          created_at?: string
+          frame_order: number
+          id?: string
+          listing_id: string
+          storage_path: string
+        }
+        Update: {
+          created_at?: string
+          frame_order?: number
+          id?: string
+          listing_id?: string
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_360_frames_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      listing_360_capture_sessions: {
+        Row: {
+          created_at: string
+          created_by: string
+          expires_at: string
+          id: string
+          listing_id: string
+          token: string
+          used_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          expires_at: string
+          id?: string
+          listing_id: string
+          token: string
+          used_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          expires_at?: string
+          id?: string
+          listing_id?: string
+          token?: string
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_360_capture_sessions_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       listing_promotions: {
         Row: {
           created_at: string

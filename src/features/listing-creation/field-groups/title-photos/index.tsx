@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ImageUploader } from "@/components/image-uploader";
+import { Vehicle360QrPanel } from "@/components/vehicle-360-qr-panel";
 
 import type { WizardSharedProps } from "../types";
 import { FieldValid } from "../field-valid";
@@ -138,6 +139,9 @@ export function TitlePhotos(props: WizardSharedProps) {
   return (
     <div className="space-y-6">
       <ImagesSection {...props} />
+      {props.isVehicle && (
+        <Vehicle360QrPanel draftId={props.draftId} ensureDraftId={props.ensureDraftId} />
+      )}
       {!props.isVehicle && <TitleSection {...props} />}
     </div>
   );

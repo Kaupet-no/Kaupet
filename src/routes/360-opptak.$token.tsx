@@ -34,7 +34,7 @@ function CaptureError({ error }: { error: Error }) {
       <h1 className="font-display text-xl">Kunne ikke starte opptaket</h1>
       <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
       <p className="mt-4 text-sm text-muted-foreground">
-        Gå tilbake til datamaskinen og generer en ny QR-kode på annonsen.
+        Be selgeren vise 360°-QR-koden på annonsen på nytt.
       </p>
       <Button className="mt-6" variant="outline" onClick={() => window.location.reload()}>
         Prøv på nytt

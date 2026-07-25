@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { NativePageHeader } from "@/components/native-page-header";
 import { createFileRoute, useNavigate, useBlocker, useRouter, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -29,6 +28,7 @@ import { useListingSteps, type WizardPage } from "@/features/listing-creation/us
 import { useDraftAutosave } from "@/features/listing-creation/use-draft-autosave";
 import { useVehicleLookupFlow } from "@/features/listing-creation/use-vehicle-lookup-flow";
 import { useLocationPicker } from "@/features/listing-creation/use-location-picker";
+import { useListingTitleHints } from "@/features/listing-creation/use-listing-title-hints";
 import { fieldGroupsForKeys, pageLabel } from "@/features/listing-creation/field-groups/registry";
 import {
   categoryBreadcrumb,
@@ -59,9 +59,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { formatErrorMessage } from "@/lib/errors";
 import { CONDITIONS, VEHICLE_CONDITIONS } from "@/lib/constants";
-import { suggestCategoryForTitle } from "@/lib/category-suggestion.functions";
-import { suggestKeywordsForListing } from "@/lib/keyword-suggestion.functions";
-import { matchWtbListingsForListing } from "@/lib/wtb-listings.functions";
 import { isNative } from "@/lib/native";
 
 import { PublishActions } from "@/features/listing-creation/field-groups/review-publish";
@@ -110,70 +107,6 @@ const VEHICLE_FORCE_BREAK_BEFORE_KEYS = new Set([
   "vehicle-facts",
   "vehicle-condition",
   "description-keywords",
-]);
-
-const SIMILAR_STOPWORDS = new Set([
-  "og",
-  "er",
-  "en",
-  "et",
-  "ei",
-  "i",
-  "på",
-  "med",
-  "til",
-  "av",
-  "for",
-  "som",
-  "fra",
-  "har",
-  "den",
-  "det",
-  "de",
-  "vi",
-  "du",
-  "kan",
-  "ikke",
-  "seg",
-  "han",
-  "hun",
-  "men",
-  "om",
-  "så",
-  "ut",
-  "enn",
-  "da",
-  "når",
-  "at",
-  "dem",
-  "sin",
-  "hva",
-  "ved",
-  "var",
-  "ny",
-  "nye",
-  "god",
-  "fin",
-  "fine",
-  "pen",
-  "pent",
-  "pene",
-  "lite",
-  "litt",
-  "stor",
-  "store",
-  "liten",
-  "billig",
-  "rimelig",
-  "rask",
-  "raskt",
-  "gammel",
-  "brukt",
-  "selger",
-  "selges",
-  "kjøper",
-  "kjøpes",
-  "pris",
 ]);
 
 export const Route = createFileRoute("/_authenticated/ny-annonse")({
@@ -633,97 +566,25 @@ function NewListingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  // Category suggestion from title (categoryTouchedManually is declared
-  // earlier — useVehicleLookupFlow needs it)
-  const [categorySuggestion, setCategorySuggestion] = useState<{
-    category_id: string;
-    parent_id: string | null;
-    name_nb: string;
-    parent_name_nb: string | null;
-  } | null>(null);
-  const [suggestionDismissed, setSuggestionDismissed] = useState(false);
-
-  useEffect(() => {
-    if (categoryTouchedManually || suggestionDismissed) return;
-    const t = (title ?? "").trim();
-    if (t.length < 5) {
-      setCategorySuggestion(null);
-      return;
-    }
-    const timer = window.setTimeout(async () => {
-      try {
-        const result = await suggestCategoryForTitle({ data: { title: t } });
-        setCategorySuggestion(result.suggestion);
-      } catch {
-        setCategorySuggestion(null);
-      }
-    }, 400);
-    return () => window.clearTimeout(timer);
-  }, [title, categoryTouchedManually, suggestionDismissed]);
-
-  function applyCategorySuggestion() {
-    if (!categorySuggestion) return;
-    setSelectedParentId(categorySuggestion.parent_id ?? categorySuggestion.category_id);
-    setValue("category_id", categorySuggestion.category_id, { shouldValidate: true });
-    setCategoryTouchedManually(true);
-    setCategorySuggestion(null);
-  }
-
-  // Debounced title for similar listings query
-  const [debouncedTitle, setDebouncedTitle] = useState("");
-  useEffect(() => {
-    const t = window.setTimeout(() => setDebouncedTitle(title ?? ""), 800);
-    return () => window.clearTimeout(t);
-  }, [title]);
-
-  const { data: similarListings } = useQuery({
-    queryKey: ["similar-listings", categoryId, debouncedTitle],
-    enabled: debouncedTitle.length >= 5 && !!categoryId,
-    staleTime: 60_000,
-    queryFn: async () => {
-      const significantWords = debouncedTitle
-        .toLowerCase()
-        .replace(/[^a-zæøå0-9\s]/g, "")
-        .split(/\s+/)
-        .filter((w) => w.length >= 2 && !SIMILAR_STOPWORDS.has(w));
-      if (significantWords.length === 0) return [];
-      const { data } = await supabase
-        .from("listings")
-        .select("id, title, price_nok, is_free, city")
-        .eq("category_id", categoryId)
-        .eq("status", "active")
-        .textSearch("search_vector", significantWords.join(" "), {
-          config: "norwegian",
-          type: "plain",
-        })
-        .limit(3);
-      return data ?? [];
-    },
+  const {
+    categorySuggestion,
+    setCategorySuggestion,
+    setSuggestionDismissed,
+    applyCategorySuggestion,
+    similarListings,
+    wtbMatch,
+    keywordSuggestions,
+    keywordsFetching,
+    appendTagToDescription,
+  } = useListingTitleHints({
+    title,
+    description,
+    categoryId,
+    categoryTouchedManually,
+    setSelectedParentId,
+    setCategoryTouchedManually,
+    setValue,
   });
-
-  // WTB price hint
-  const matchWtbFn = useServerFn(matchWtbListingsForListing);
-  const { data: wtbMatch } = useQuery({
-    queryKey: ["wtb-match", categoryId ?? null, debouncedTitle],
-    enabled: debouncedTitle.length >= 3,
-    staleTime: 120_000,
-    queryFn: () => matchWtbFn({ data: { title: debouncedTitle, category_id: categoryId || null } }),
-  });
-
-  // Keyword suggestions from other listings in the same category
-  const { data: keywordSuggestions, isFetching: keywordsFetching } = useQuery({
-    queryKey: ["keyword-suggestions", categoryId, debouncedTitle],
-    enabled: !!categoryId && debouncedTitle.length >= 3,
-    staleTime: 120_000,
-    queryFn: () =>
-      suggestKeywordsForListing({ data: { title: debouncedTitle, category_id: categoryId! } }),
-  });
-
-  function appendTagToDescription(tag: string) {
-    const current = (description ?? "").trimEnd();
-    const next = current ? `${current} ${tag}` : tag;
-    setValue("description", next, { shouldTouch: false });
-  }
 
   /** "Stemmer, fortsett" i bekreftelsesoverlayet: lukker overlayet og tar
    * brukeren rett videre til vehicle-confirm-steget (type-valg + detaljtabell),

@@ -8,6 +8,9 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+# Bun is the package manager of record (bun.lock is committed); don't let
+# npm-generated lockfiles sneak back in.
+package-lock.json
 dist
 dist-ssr
 .output

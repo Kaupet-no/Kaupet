@@ -51,6 +51,18 @@ export default defineConfig(({ command, mode }) => {
             nitro({
               preset: NITRO_PRESET,
               output: { dir: "dist", serverDir: "dist/server", publicDir: "dist/client" },
+              // Universal Links (iOS) / App Links (Android): Apple/Google
+              // fetch these extensionless files and expect JSON — Cloudflare's
+              // static asset serving would otherwise guess a generic content
+              // type from the missing file extension.
+              routeRules: {
+                "/.well-known/apple-app-site-association": {
+                  headers: { "content-type": "application/json" },
+                },
+                "/.well-known/assetlinks.json": {
+                  headers: { "content-type": "application/json" },
+                },
+              },
               cloudflare: {
                 nodeCompat: true,
                 deployConfig: true,

@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["KYQK4FCS7Y.no.kaupet.app"],
+        "components": [
+          {
+            "/": "/*",
+            "comment": "Match alle kaupet.no-lenker slik at de åpner appen direkte når den er installert, med automatisk fallback til nettleser ellers."
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -565,7 +565,7 @@ function NewListingPage() {
     publishedId === null &&
     (title.trim().length > 0 || images.length > 0 || vehicleLookupResult !== null);
   const blocker = useBlocker({
-    shouldBlockFn: () => shouldBlockNav,
+    shouldBlockFn: ({ next }) => shouldBlockNav && next.pathname !== "/ny-annonse/forhandsvisning",
     withResolver: true,
     enableBeforeUnload: shouldBlockNav,
   });

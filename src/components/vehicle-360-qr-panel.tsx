@@ -30,9 +30,12 @@ async function generateQrDataUrl(url: string): Promise<string> {
 /**
  * Desktop-only panel on the bildeopplastning-steget for Bil/MC-annonser:
  * viser en QR-kode brukeren kan skanne med mobilen for å ta opptak av en
- * 360°-bildesekvens av kjøretøyet. Krever en persistert draft (tittel ≥ 5
- * tegn) siden mobilopptaket knyttes til en ekte listing_id via en
- * tidsbegrenset token-sesjon (se vehicle-360.functions.ts).
+ * 360°-bildesekvens av kjøretøyet. Krever en persistert draft, siden
+ * mobilopptaket knyttes til en ekte listing_id via en tidsbegrenset
+ * token-sesjon (se vehicle-360.functions.ts). `ensureDraftId` løser dette
+ * automatisk for kjøretøy — tittelen genereres av kjøretøysoppslaget
+ * (Årsmodell/Merke/Modell), ikke skrevet inn av brukeren her (se
+ * computeVehicleTitle-fallbacket i saveDraftToSupabase).
  */
 export function Vehicle360QrPanel({
   draftId,
@@ -73,7 +76,9 @@ export function Vehicle360QrPanel({
     try {
       const id = draftId ?? (await ensureDraftId());
       if (!id) {
-        showErrorToast("Skriv inn en tittel (minst 5 tegn) før du starter 360°-opptak.");
+        showErrorToast(
+          "Fullfør kjøretøysoppslaget (Årsmodell/Merke/Modell) før du starter 360°-opptak.",
+        );
         return;
       }
       const myGeneration = ++generationRef.current;

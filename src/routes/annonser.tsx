@@ -19,10 +19,8 @@ import {
 } from "@/components/ui/dialog";
 import { SearchBar } from "@/components/search-bar";
 import { SaveSearchDialog } from "@/components/advanced-search-sheet";
-import { valueToCriteria, type AdvancedSearchValue } from "@/components/advanced-search-value";
 import { DesktopFilterChips } from "@/components/desktop-filter-chips";
 import { ActiveFilters } from "@/components/active-filters";
-import type { LocationValue } from "@/components/location-filter";
 import type { TermGroup } from "@/lib/term-groups";
 import type { MapListing } from "@/components/listings-map";
 import { FeaturedListingsSection } from "@/components/featured-listings-section";
@@ -33,27 +31,17 @@ import { reverseGeocode } from "@/lib/geocode";
 import { saveLastSearchContext } from "@/lib/last-search-context";
 import { summarizeCriteria } from "@/lib/saved-searches";
 import { WtbListingCard } from "@/components/wtb-listing-card";
-import {
-  searchSchema,
-  conditionEnum,
-  decodeAttrFilters,
-  encodeAttrFilters,
-} from "@/features/listing-search/search-schema";
+import { searchSchema, conditionEnum } from "@/features/listing-search/search-schema";
 import { useListingsQuery } from "@/features/listing-search/use-listings-query";
-import { buildTree } from "@/lib/categories";
-import {
-  effectiveFiltersForCategories,
-  normalizeFilter,
-  setAttributeFilterValue,
-  type AttributeFilterValue,
-} from "@/lib/category-filters";
+import { normalizeFilter } from "@/lib/category-filters";
 import { useWtbListings } from "@/features/listing-search/use-wtb-listings";
 import { useAuth } from "@/hooks/use-auth";
 import { useIsNative } from "@/hooks/use-is-native";
 import { NativePageHeader } from "@/components/native-page-header";
-import { hapticImpact, hapticNotification } from "@/lib/haptics";
+import { hapticImpact } from "@/lib/haptics";
 import { useScrollDirection } from "@/hooks/use-scroll-direction";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
+import { useAnnonserSearchState } from "@/features/listing-search/use-annonser-search-state";
 
 const ListingsMap = lazy(() =>
   import("@/components/listings-map").then((m) => ({ default: m.ListingsMap })),
@@ -153,16 +141,6 @@ function BrowsePage() {
   }, []);
   useEffect(() => setQDraft(search.q), [search.q]);
 
-  const location: LocationValue = useMemo(
-    () => ({
-      lat: search.lat ?? null,
-      lng: search.lng ?? null,
-      radius: search.radius ?? 10,
-      label: search.loc ?? "",
-    }),
-    [search.lat, search.lng, search.radius, search.loc],
-  );
-
   const { data: categories } = useQuery({
     queryKey: ["categories"],
     queryFn: async () => {
@@ -202,82 +180,21 @@ function BrowsePage() {
     },
   });
 
-  // Merge legacy single `category` into `categories`
-  const effectiveCategories = useMemo(() => {
-    const arr = Array.isArray(search.categories) ? search.categories : [];
-    if (search.category && !arr.includes(search.category)) return [...arr, search.category];
-    return arr;
-  }, [search.categories, search.category]);
-
-  const categoryTree = useMemo(() => buildTree(categories ?? []), [categories]);
-
-  const attrFilters = useMemo(() => {
-    const ids = effectiveCategories
-      .map((slug: string) => categoryTree.bySlug.get(slug)?.id)
-      .filter((id): id is string => !!id);
-    return effectiveFiltersForCategories(ids, allFilters ?? [], categoryTree.byId);
-  }, [effectiveCategories, categoryTree, allFilters]);
-
-  const attrValues = useMemo(() => decodeAttrFilters(search.attrs), [search.attrs]);
-
-  const handleAttrValueChange = (key: string, value: AttributeFilterValue | undefined) => {
-    const next = setAttributeFilterValue(attrValues, key, value);
-    navigate({
-      search: (prev: z.infer<typeof searchSchema>) => ({ ...prev, attrs: encodeAttrFilters(next) }),
-    });
-  };
-
-  // Build terms list from `q` (space-separated)
-  const terms = useMemo<string[]>(() => {
-    const q: string = search.q ?? "";
-    return q
-      .trim()
-      .split(/\s+/)
-      .map((t: string) => t.replace(/[%_,()]/g, " ").trim())
-      .filter(Boolean);
-  }, [search.q]);
-
-  const advancedInitial: AdvancedSearchValue = useMemo(
-    () => ({
-      terms,
-      qMode: search.qMode ?? "all",
-      extraGroups: search.extraGroups ?? [],
-      categories: effectiveCategories,
-      catMode: search.catMode ?? "any",
-      conditions: search.conditions ?? [],
-      min: typeof search.min === "number" ? search.min : null,
-      max: typeof search.max === "number" ? search.max : null,
-      includeFree: search.includeFree ?? true,
-      sort: search.sort,
-      location: {
-        lat: search.lat ?? null,
-        lng: search.lng ?? null,
-        radius: search.radius ?? 10,
-        label: search.loc ?? "",
-      },
-    }),
-    [
-      terms,
-      search.qMode,
-      search.extraGroups,
-      effectiveCategories,
-      search.catMode,
-      search.conditions,
-      search.min,
-      search.max,
-      search.includeFree,
-      search.sort,
-      search.lat,
-      search.lng,
-      search.radius,
-      search.loc,
-    ],
-  );
-
-  const currentCriteria = useMemo(
-    () => ({ ...valueToCriteria(advancedInitial), sort: search.sort }),
-    [advancedInitial, search.sort],
-  );
+  const {
+    location,
+    effectiveCategories,
+    categoryTree,
+    attrFilters,
+    attrValues,
+    handleAttrValueChange,
+    terms,
+    advancedInitial,
+    currentCriteria,
+    updateSearch,
+    handleApply,
+    handleLocationChange,
+    resetFilters,
+  } = useAnnonserSearchState({ search, navigate, categories, allFilters, setQDraft });
 
   useEffect(() => {
     if (!mounted) return;
@@ -317,44 +234,6 @@ function BrowsePage() {
   useEffect(() => {
     setActiveTab("listings");
   }, [search.q, search.category, search.categories]);
-
-  const updateSearch = (patch: Partial<z.infer<typeof searchSchema>>) => {
-    navigate({ search: (prev: z.infer<typeof searchSchema>) => ({ ...prev, ...patch }) });
-  };
-
-  // Applies only the fields owned by the advanced panel (category, price,
-  // condition, extra search lines). Query text, qMode, location and sort are
-  // owned by the search bar and already applied directly to the URL as the
-  // user edits them, so re-patching them here from the panel's draft would
-  // clobber any bar edits made while the panel was open.
-  const handleApply = (v: AdvancedSearchValue) => {
-    void hapticNotification("success");
-    const c = valueToCriteria(v);
-    updateSearch({
-      extraGroups: c.extraGroups,
-      categories: c.categories,
-      catMode: c.catMode,
-      conditions: c.conditions as z.infer<typeof conditionEnum>[] | undefined,
-      includeFree: c.includeFree,
-      min: c.min ?? undefined,
-      max: c.max ?? undefined,
-      category: "",
-    });
-  };
-
-  const handleLocationChange = (v: LocationValue) => {
-    updateSearch({
-      lat: v.lat ?? undefined,
-      lng: v.lng ?? undefined,
-      radius: v.lat != null ? v.radius : undefined,
-      loc: v.label || undefined,
-    });
-  };
-
-  const resetFilters = () => {
-    navigate({ search: () => ({ q: "", category: "", sort: "new" }) });
-    setQDraft("");
-  };
 
   const cards: ListingCardData[] = (listings ?? []).map((l) => ({
     id: l.id,

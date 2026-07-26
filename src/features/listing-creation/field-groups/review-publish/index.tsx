@@ -109,8 +109,8 @@ export function ReviewPublishGroup(props: WizardSharedProps) {
       />
       {props.attributes.vehicle_lookup && (
         <p className="text-xs text-muted-foreground">
-          Kjøretøyopplysningene i denne annonsen er hentet fra Statens vegvesen. Du er ansvarlig for
-          at de stemmer — gå tilbake for å rette dersom noe er feil.
+          Du er ansvarlig for at opplysningene i annonsen stemmer. Kontroller at opplysningene
+          stemmer før du publiserer annonsen.
         </p>
       )}
       <UploadProgress

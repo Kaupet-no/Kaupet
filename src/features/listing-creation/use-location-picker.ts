@@ -29,10 +29,18 @@ export function useLocationPicker(params: {
   useEffect(() => {
     if (lastEditedRef.current !== "postal_code") return;
     const p = (postalCode ?? "").trim();
+    // Clear the (possibly stale, e.g. carried over from a pre-filled draft or
+    // the user's previous listing) city immediately so it never keeps
+    // showing a place that doesn't match what's currently typed, even while
+    // the lookup below is still in flight or ends up failing.
+    setValue("city", "", { shouldValidate: false });
     if (!/^\d{4}$/.test(p)) return;
     const t = window.setTimeout(async () => {
       const r = await lookupPostalCode(p);
-      if (!r) return;
+      if (!r) {
+        showErrorToast("Fant ikke sted for dette postnummeret. Sjekk at det stemmer.");
+        return;
+      }
       if (r.city) setValue("city", r.city, { shouldValidate: false });
       if (!markerMovedRef.current) setCoords({ lat: r.lat, lng: r.lng });
     }, 500);

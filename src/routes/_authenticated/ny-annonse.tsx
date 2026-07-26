@@ -34,6 +34,7 @@ import {
   categoryBreadcrumb,
   getMissingRequiredFilters,
   vehicleCategoryGroupFor,
+  VEHICLE_EQUIPMENT_FILTER_KEYS,
   type CategoryNode,
 } from "@/lib/category-filters";
 import { VEHICLE_LEAF_SLUGS_WITHOUT_MILEAGE } from "@/lib/vehicle-classification";
@@ -62,7 +63,8 @@ import { isNative } from "@/lib/native";
 
 import { PublishActions } from "@/features/listing-creation/field-groups/review-publish";
 import type { WizardSharedProps } from "@/features/listing-creation/field-groups/types";
-import { setPreviewDraft } from "@/features/listing-creation/preview-draft-store";
+import type { PreviewDraft } from "@/features/listing-creation/preview-draft-store";
+import { PreviewDraftView } from "@/features/listing-creation/preview-draft-view";
 
 const listingSchema = z.object({
   title: z.string().trim().min(5, "Tittelen må være minst 5 tegn").max(120, "Maks 120 tegn"),
@@ -240,6 +242,8 @@ function NewListingPage() {
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const [hasPreviewed, setHasPreviewed] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewDraft, setPreviewDraft] = useState<PreviewDraft | null>(null);
   const [previewNudgeOpen, setPreviewNudgeOpen] = useState(false);
   const [attributes, setAttributes] = useState<AttributeMap>({});
   const [attributesTouched, setAttributesTouched] = useState(false);
@@ -320,7 +324,13 @@ function NewListingPage() {
 
   const missingFilters = useMemo(
     () =>
-      getMissingRequiredFilters(categoryId || null, allFilters ?? [], categoriesById, attributes),
+      getMissingRequiredFilters(
+        categoryId || null,
+        allFilters ?? [],
+        categoriesById,
+        attributes,
+        VEHICLE_EQUIPMENT_FILTER_KEYS,
+      ),
     [categoryId, allFilters, categoriesById, attributes],
   );
 
@@ -492,7 +502,7 @@ function NewListingPage() {
     publishedId === null &&
     (title.trim().length > 0 || images.length > 0 || vehicleLookupResult !== null);
   const blocker = useBlocker({
-    shouldBlockFn: ({ next }) => shouldBlockNav && next.pathname !== "/ny-annonse/forhandsvisning",
+    shouldBlockFn: () => shouldBlockNav,
     withResolver: true,
     enableBeforeUnload: shouldBlockNav,
   });
@@ -720,7 +730,7 @@ function NewListingPage() {
             });
             done += 1;
             setUploadProgress({ done, total: images.length });
-            return { storage_path: path, sort_order: i };
+            return { storage_path: path, sort_order: i, caption: img.caption?.trim() || null };
           }),
         );
         setUploadProgress(null);
@@ -729,6 +739,7 @@ function NewListingPage() {
             listing_id: listing.id,
             storage_path: u.storage_path,
             sort_order: u.sort_order,
+            caption: u.caption,
           })),
         );
         if (imgErr) throw imgErr;
@@ -789,13 +800,17 @@ function NewListingPage() {
       category: categoryNode
         ? { name_nb: categoryNode.name_nb, slug: categoryNode.slug ?? null }
         : null,
-      images: images.map((_, i) => ({ storage_path: String(i), sort_order: i })),
+      images: images.map((img, i) => ({
+        storage_path: String(i),
+        sort_order: i,
+        caption: img.caption?.trim() || null,
+      })),
       imgUrls: Object.fromEntries(images.map((img, i) => [String(i), img.previewUrl])),
       attributes,
     });
     setHasPreviewed(true);
     setPreviewNudgeOpen(false);
-    void navigate({ to: "/ny-annonse/forhandsvisning" });
+    setPreviewOpen(true);
   }
 
   // Redirect to home if no type selected and no draft — entry should go through the picker dialog
@@ -1143,6 +1158,10 @@ function NewListingPage() {
         />
       )}
 
+      {previewOpen && previewDraft && (
+        <PreviewDraftView draft={previewDraft} onClose={() => setPreviewOpen(false)} />
+      )}
+
       <AlertDialog
         open={blocker.status === "blocked"}
         onOpenChange={(open) => {
@@ -1150,41 +1169,69 @@ function NewListingPage() {
         }}
       >
         <AlertDialogContent onClickOutside={() => blocker.reset?.()}>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Avbryte annonsen?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Vil du lagre annonsen som kladd og fortsette senere, eller forkaste den?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="flex flex-col gap-3 px-6 pb-6 pt-2">
-            <AlertDialogAction
-              className="h-14 w-full bg-secondary text-destructive hover:bg-secondary/80"
-              onClick={() => {
-                clearDraftStorage();
-                blocker.proceed?.();
-              }}
-            >
-              Forkast annonse
-            </AlertDialogAction>
-            <AlertDialogAction
-              className="h-14 w-full bg-secondary text-secondary-foreground hover:bg-secondary/80"
-              disabled={isSavingDraft}
-              onClick={async () => {
-                setIsSavingDraft(true);
-                await saveDraftToSupabase();
-                setIsSavingDraft(false);
-                blocker.proceed?.();
-              }}
-            >
-              {isSavingDraft ? "Lagrer…" : "Lagre som kladd"}
-            </AlertDialogAction>
-            <AlertDialogCancel
-              className="h-14 w-full border-0 bg-secondary text-secondary-foreground hover:bg-secondary/80 !mt-0"
-              onClick={() => blocker.reset?.()}
-            >
-              Fortsett å redigere
-            </AlertDialogCancel>
-          </div>
+          {previewOpen ? (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Annonsen er ikke publisert ennå</AlertDialogTitle>
+                <AlertDialogDescription>Er du sikker på at du vil avslutte?</AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="flex flex-col gap-3 px-6 pb-6 pt-2">
+                <AlertDialogAction
+                  className="h-14 w-full bg-secondary text-destructive hover:bg-secondary/80"
+                  onClick={() => {
+                    setPreviewOpen(false);
+                    blocker.proceed?.();
+                  }}
+                >
+                  Avslutt uten å publisere
+                </AlertDialogAction>
+                <AlertDialogCancel
+                  className="h-14 w-full border-0 bg-secondary text-secondary-foreground hover:bg-secondary/80 !mt-0"
+                  onClick={() => blocker.reset?.()}
+                >
+                  Fortsett forhåndsvisning
+                </AlertDialogCancel>
+              </div>
+            </>
+          ) : (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Avbryte annonsen?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Vil du lagre annonsen som kladd og fortsette senere, eller forkaste den?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="flex flex-col gap-3 px-6 pb-6 pt-2">
+                <AlertDialogAction
+                  className="h-14 w-full bg-secondary text-destructive hover:bg-secondary/80"
+                  onClick={() => {
+                    clearDraftStorage();
+                    blocker.proceed?.();
+                  }}
+                >
+                  Forkast annonse
+                </AlertDialogAction>
+                <AlertDialogAction
+                  className="h-14 w-full bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                  disabled={isSavingDraft}
+                  onClick={async () => {
+                    setIsSavingDraft(true);
+                    await saveDraftToSupabase();
+                    setIsSavingDraft(false);
+                    blocker.proceed?.();
+                  }}
+                >
+                  {isSavingDraft ? "Lagrer…" : "Lagre som kladd"}
+                </AlertDialogAction>
+                <AlertDialogCancel
+                  className="h-14 w-full border-0 bg-secondary text-secondary-foreground hover:bg-secondary/80 !mt-0"
+                  onClick={() => blocker.reset?.()}
+                >
+                  Fortsett å redigere
+                </AlertDialogCancel>
+              </div>
+            </>
+          )}
         </AlertDialogContent>
       </AlertDialog>
 

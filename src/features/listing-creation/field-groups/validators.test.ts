@@ -43,4 +43,18 @@ describe("validateRequiredFieldGroups", () => {
     const flow = DEFAULT_FLOW.filter((k) => k !== "condition" && k !== "delivery-location");
     expect(validateRequiredFieldGroups(flow, { condition: null, can_ship: null })).toBeNull();
   });
+
+  it("allows can_ship: null for vehicle categories even when delivery-location is in the flow", () => {
+    // Bil og MC can't be shipped by post — its delivery-location step only
+    // asks for a location, not a shipping method, so can_ship is never set.
+    expect(
+      validateRequiredFieldGroups(DEFAULT_FLOW, { condition: "good", can_ship: null }, true),
+    ).toBeNull();
+  });
+
+  it("still requires condition for vehicle categories", () => {
+    expect(
+      validateRequiredFieldGroups(DEFAULT_FLOW, { condition: null, can_ship: null }, true),
+    ).toEqual(expect.any(String));
+  });
 });

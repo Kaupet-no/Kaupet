@@ -2,20 +2,15 @@ import { useMemo } from "react";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAllCategoryFilters, type AttributeMap } from "@/components/attribute-fields";
-import { effectiveFiltersForCategory, type CategoryFilter } from "@/lib/category-filters";
+import {
+  effectiveFiltersForCategory,
+  VEHICLE_EQUIPMENT_FILTER_KEYS,
+  type CategoryFilter,
+} from "@/lib/category-filters";
 
 import type { WizardSharedProps } from "../types";
 
-/** category_filters keys for the seks utstyr-gruppene (se
- * 20260724130000_bil_og_mc_utstyr_filters.sql). */
-export const VEHICLE_EQUIPMENT_FILTER_KEYS = [
-  "utstyr_teknisk",
-  "utstyr_forerstotte",
-  "utstyr_dekk",
-  "utstyr_lys",
-  "utstyr_interior",
-  "utstyr_annet",
-] as const;
+export { VEHICLE_EQUIPMENT_FILTER_KEYS };
 
 /** Én utstyrsgruppe (f.eks. "Teknisk"): liten uppercase-overskrift + et
  * rutenett med avkrysningsbokser — tettere og ryddigere enn en flat

@@ -63,7 +63,8 @@ import { isNative } from "@/lib/native";
 
 import { PublishActions } from "@/features/listing-creation/field-groups/review-publish";
 import type { WizardSharedProps } from "@/features/listing-creation/field-groups/types";
-import { setPreviewDraft } from "@/features/listing-creation/preview-draft-store";
+import type { PreviewDraft } from "@/features/listing-creation/preview-draft-store";
+import { PreviewDraftView } from "@/features/listing-creation/preview-draft-view";
 
 const listingSchema = z.object({
   title: z.string().trim().min(5, "Tittelen må være minst 5 tegn").max(120, "Maks 120 tegn"),
@@ -109,7 +110,7 @@ const VEHICLE_FORCE_BREAK_BEFORE_KEYS = new Set([
   "description-keywords",
 ]);
 
-export const Route = createFileRoute("/_authenticated/ny-annonse/")({
+export const Route = createFileRoute("/_authenticated/ny-annonse")({
   validateSearch: z
     .object({
       type: z.enum(["sell"]).optional(),
@@ -241,6 +242,8 @@ function NewListingPage() {
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const [hasPreviewed, setHasPreviewed] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewDraft, setPreviewDraft] = useState<PreviewDraft | null>(null);
   const [previewNudgeOpen, setPreviewNudgeOpen] = useState(false);
   const [attributes, setAttributes] = useState<AttributeMap>({});
   const [attributesTouched, setAttributesTouched] = useState(false);
@@ -499,7 +502,7 @@ function NewListingPage() {
     publishedId === null &&
     (title.trim().length > 0 || images.length > 0 || vehicleLookupResult !== null);
   const blocker = useBlocker({
-    shouldBlockFn: ({ next }) => shouldBlockNav && next.pathname !== "/ny-annonse/forhandsvisning",
+    shouldBlockFn: () => shouldBlockNav,
     withResolver: true,
     enableBeforeUnload: shouldBlockNav,
   });
@@ -807,20 +810,15 @@ function NewListingPage() {
     });
     setHasPreviewed(true);
     setPreviewNudgeOpen(false);
-    void navigate({ to: "/ny-annonse/forhandsvisning" });
+    setPreviewOpen(true);
   }
 
-  // Redirect to home if no type selected and no draft — entry should go through the picker dialog.
-  // Guarded with `hasPreviewed` because `listingType` (from Route.useSearch()) transiently reads
-  // as null while navigating away to /ny-annonse/forhandsvisning (the target route doesn't carry a
-  // "type" search param), which would otherwise fire this effect mid-navigation and trigger a
-  // second, blocked navigate({ to: "/" }) — surfacing the "Avbryte annonsen?" dialog right after
-  // clicking "Forhåndsvis annonse".
+  // Redirect to home if no type selected and no draft — entry should go through the picker dialog
   useEffect(() => {
-    if (listingType === null && !hasDraftData && !hasPreviewed) {
+    if (listingType === null && !hasDraftData) {
       void navigate({ to: "/" });
     }
-  }, [listingType, hasDraftData, hasPreviewed, navigate]);
+  }, [listingType, hasDraftData, navigate]);
 
   const sharedProps: WizardSharedProps = {
     native,
@@ -1158,6 +1156,10 @@ function NewListingPage() {
           }}
           onClose={() => setFullscreenMapOpen(false)}
         />
+      )}
+
+      {previewOpen && previewDraft && (
+        <PreviewDraftView draft={previewDraft} onClose={() => setPreviewOpen(false)} />
       )}
 
       <AlertDialog

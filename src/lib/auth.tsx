@@ -12,8 +12,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s);
-      setUser(s?.user ?? null);
+      // supabase-js can invoke this callback synchronously with the current
+      // session right as we subscribe (e.g. INITIAL_SESSION when a session
+      // is already persisted) — that lands inside this effect's own call
+      // stack, before React fully considers the component mounted, and logs
+      // "Can't perform a React state update on a component that hasn't
+      // mounted yet." Deferring to a microtask sidesteps that race.
+      queueMicrotask(() => {
+        setSession(s);
+        setUser(s?.user ?? null);
+      });
     });
 
     supabase.auth.getSession().then(({ data }) => {

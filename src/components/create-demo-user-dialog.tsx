@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
-import { showSuccessToast, showErrorToast } from "@/lib/toast";
+import { showSuccessToast } from "@/lib/toast";
 
 import { Button } from "@/components/ui/button";
 import {

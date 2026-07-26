@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 
-type ListingImage = { storage_path: string; sort_order: number };
+type ListingImage = { storage_path: string; sort_order: number; caption?: string | null };
 
 type Props = {
   images: ListingImage[];
@@ -97,6 +97,11 @@ export function ImageLightbox({ images, imgUrls, initialIndex, title, onClose }:
                 alt={i === 0 ? title : `${title} – bilde ${i + 1}`}
                 className="h-full w-full object-contain"
               />
+              {img.caption && (
+                <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-4 py-3 text-center text-sm text-white">
+                  {img.caption}
+                </p>
+              )}
             </div>
           ))}
         </div>

@@ -71,7 +71,7 @@ export type ListingDetailViewProps = {
   noKnownIssues: boolean | null;
   maintenanceHistory: string | null;
   category: ListingDetailViewCategory;
-  images: { storage_path: string; sort_order: number }[];
+  images: { storage_path: string; sort_order: number; caption?: string | null }[];
   imgUrls: Record<string, string>;
   attributes: Record<string, unknown>;
   /** 360°-bildesekvens tatt via mobilappen (Bil/MC-kategorier). Tom/utelatt

@@ -6,6 +6,7 @@ import {
   attributesSchema,
   getMissingRequiredFilters,
   normalizeFilter,
+  VEHICLE_EQUIPMENT_FILTER_KEYS,
   type CategoryNode,
 } from "@/lib/category-filters";
 import {
@@ -191,6 +192,7 @@ export const createListing = createServerFn({ method: "POST" })
       (filterRows ?? []).map(normalizeFilter),
       categoriesById,
       data.attributes ?? {},
+      VEHICLE_EQUIPMENT_FILTER_KEYS,
     );
     if (missing.length > 0) {
       throw new Error(`Fyll inn: ${missing.map((f) => f.label_nb).join(", ")}`);

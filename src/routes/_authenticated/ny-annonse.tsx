@@ -34,6 +34,7 @@ import {
   categoryBreadcrumb,
   getMissingRequiredFilters,
   vehicleCategoryGroupFor,
+  VEHICLE_EQUIPMENT_FILTER_KEYS,
   type CategoryNode,
 } from "@/lib/category-filters";
 import { VEHICLE_LEAF_SLUGS_WITHOUT_MILEAGE } from "@/lib/vehicle-classification";
@@ -320,7 +321,13 @@ function NewListingPage() {
 
   const missingFilters = useMemo(
     () =>
-      getMissingRequiredFilters(categoryId || null, allFilters ?? [], categoriesById, attributes),
+      getMissingRequiredFilters(
+        categoryId || null,
+        allFilters ?? [],
+        categoriesById,
+        attributes,
+        VEHICLE_EQUIPMENT_FILTER_KEYS,
+      ),
     [categoryId, allFilters, categoriesById, attributes],
   );
 
@@ -720,7 +727,7 @@ function NewListingPage() {
             });
             done += 1;
             setUploadProgress({ done, total: images.length });
-            return { storage_path: path, sort_order: i };
+            return { storage_path: path, sort_order: i, caption: img.caption?.trim() || null };
           }),
         );
         setUploadProgress(null);
@@ -729,6 +736,7 @@ function NewListingPage() {
             listing_id: listing.id,
             storage_path: u.storage_path,
             sort_order: u.sort_order,
+            caption: u.caption,
           })),
         );
         if (imgErr) throw imgErr;
@@ -789,7 +797,11 @@ function NewListingPage() {
       category: categoryNode
         ? { name_nb: categoryNode.name_nb, slug: categoryNode.slug ?? null }
         : null,
-      images: images.map((_, i) => ({ storage_path: String(i), sort_order: i })),
+      images: images.map((img, i) => ({
+        storage_path: String(i),
+        sort_order: i,
+        caption: img.caption?.trim() || null,
+      })),
       imgUrls: Object.fromEntries(images.map((img, i) => [String(i), img.previewUrl])),
       attributes,
     });

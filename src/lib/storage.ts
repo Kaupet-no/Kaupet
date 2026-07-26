@@ -3,19 +3,14 @@ import { supabase } from "@/integrations/supabase/client";
 export const LISTING_BUCKET = "listing-images";
 export const VEHICLE_360_BUCKET = "listing-360-frames";
 export const AVATAR_BUCKET = "avatars";
-export const MAX_IMAGES = 8;
 export const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB
 export const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp"] as const;
 
 export type ImageValidationError =
-  | { kind: "too-many"; allowed: number }
   | { kind: "too-large"; name: string; bytes: number }
   | { kind: "bad-type"; name: string; type: string };
 
-export function validateImages(files: File[], existingCount = 0): ImageValidationError | null {
-  if (files.length + existingCount > MAX_IMAGES) {
-    return { kind: "too-many", allowed: MAX_IMAGES };
-  }
+export function validateImages(files: File[]): ImageValidationError | null {
   for (const f of files) {
     if (!ALLOWED_MIME.includes(f.type as (typeof ALLOWED_MIME)[number])) {
       return { kind: "bad-type", name: f.name, type: f.type || "ukjent" };
@@ -29,8 +24,6 @@ export function validateImages(files: File[], existingCount = 0): ImageValidatio
 
 export function describeImageError(err: ImageValidationError): string {
   switch (err.kind) {
-    case "too-many":
-      return `Du kan laste opp maks ${err.allowed} bilder per annonse.`;
     case "too-large":
       return `"${err.name}" er for stor (maks ${Math.round(MAX_FILE_BYTES / 1024 / 1024)} MB).`;
     case "bad-type":

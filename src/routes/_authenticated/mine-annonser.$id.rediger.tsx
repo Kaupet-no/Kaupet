@@ -13,7 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { republishListing } from "@/lib/listings.functions";
 import { geocodeNorwayAddress } from "@/lib/geocode";
 import { FullscreenLocationPicker } from "@/components/fullscreen-location-picker";
-import { LISTING_BUCKET, MAX_IMAGES, uploadListingImage } from "@/lib/storage";
+import { LISTING_BUCKET, uploadListingImage } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,6 +33,7 @@ import {
   categoryBreadcrumb,
   getMissingRequiredFilters,
   vehicleCategoryGroupFor,
+  VEHICLE_EQUIPMENT_FILTER_KEYS,
   type CategoryNode,
 } from "@/lib/category-filters";
 import { CategoryPicker } from "@/components/category-picker";
@@ -136,7 +137,7 @@ function EditListingPage() {
         supabase
           .from("listings")
           .select(
-            "id, title, subtitle, description, category_id, condition, is_free, price_nok, can_ship, postal_code, city, status, attributes, known_issues, no_known_issues, maintenance_history, listing_images(id, storage_path, sort_order)",
+            "id, title, subtitle, description, category_id, condition, is_free, price_nok, can_ship, postal_code, city, status, attributes, known_issues, no_known_issues, maintenance_history, listing_images(id, storage_path, sort_order, caption)",
           )
           .eq("id", id)
           .single(),
@@ -236,7 +237,13 @@ function EditListingPage() {
   }, [categories]);
   const missingFilters = useMemo(
     () =>
-      getMissingRequiredFilters(categoryId || null, allFilters ?? [], categoriesById, attributes),
+      getMissingRequiredFilters(
+        categoryId || null,
+        allFilters ?? [],
+        categoriesById,
+        attributes,
+        VEHICLE_EQUIPMENT_FILTER_KEYS,
+      ),
     [categoryId, allFilters, categoriesById, attributes],
   );
   const categoryLabel = categoryId ? categoryBreadcrumb(categoryId, categoriesById) || null : null;
@@ -307,7 +314,7 @@ function EditListingPage() {
     appendTagToDescription,
   } = useEditListingHints({ title, description, categoryId, listingId: id, setValue });
 
-  const { items, removedPaths, fileInputRef, addFiles, removeItem, move, imagesDirty } =
+  const { items, removedPaths, fileInputRef, addFiles, removeItem, move, setCaption, imagesDirty } =
     useEditableListingImages(listing);
 
   // Unsaved-changes guard: form dirty, image list changed, or attributes touched.
@@ -397,6 +404,7 @@ function EditListingPage() {
         listing_id: id,
         storage_path: it.kind === "existing" ? it.storage_path : uploadedPaths[it.key],
         sort_order: idx,
+        caption: it.caption?.trim() || null,
       }));
       if (rows.length > 0) {
         const { error: insErr } = await supabase.from("listing_images").insert(rows);
@@ -546,8 +554,8 @@ function EditListingPage() {
           <section className="space-y-3">
             <Label>Bilder</Label>
             <p className="text-xs text-muted-foreground">
-              {items.length} av {MAX_IMAGES} bilder. Første bilde er hovedbildet. Bruk pilene for å
-              endre rekkefølge.
+              {items.length} {items.length === 1 ? "bilde" : "bilder"}. Første bilde er hovedbildet.
+              Bruk pilene for å endre rekkefølge.
             </p>
 
             {items.length > 0 && (
@@ -555,63 +563,70 @@ function EditListingPage() {
                 {items.map((it, idx) => {
                   const src = it.kind === "existing" ? it.url : it.previewUrl;
                   return (
-                    <li
-                      key={it.key}
-                      className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted"
-                    >
-                      {src ? (
-                        <img
-                          src={src}
-                          alt={
-                            idx === 0 ? "Hovedbilde av annonsen" : `Bilde ${idx + 1} av annonsen`
-                          }
-                          className="size-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex size-full items-center justify-center">
-                          <Loader2 className="size-4 animate-spin text-muted-foreground" />
-                        </div>
-                      )}
-                      {idx === 0 && (
-                        <span className="absolute left-2 top-2 rounded bg-primary/90 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary-foreground">
-                          Hoved
-                        </span>
-                      )}
-                      {it.kind === "new" && (
-                        <span className="absolute right-2 top-2 rounded bg-accent/90 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent-foreground">
-                          Ny
-                        </span>
-                      )}
-                      <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent p-1 opacity-0 transition group-hover:opacity-100">
-                        <div className="flex">
+                    <li key={it.key} className="space-y-1">
+                      <div className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted">
+                        {src ? (
+                          <img
+                            src={src}
+                            alt={
+                              idx === 0 ? "Hovedbilde av annonsen" : `Bilde ${idx + 1} av annonsen`
+                            }
+                            className="size-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex size-full items-center justify-center">
+                            <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                          </div>
+                        )}
+                        {idx === 0 && (
+                          <span className="absolute left-2 top-2 rounded bg-primary/90 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary-foreground">
+                            Hoved
+                          </span>
+                        )}
+                        {it.kind === "new" && (
+                          <span className="absolute right-2 top-2 rounded bg-accent/90 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent-foreground">
+                            Ny
+                          </span>
+                        )}
+                        <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent p-1 opacity-0 transition group-hover:opacity-100">
+                          <div className="flex">
+                            <button
+                              type="button"
+                              onClick={() => move(it.key, -1)}
+                              className="rounded p-1 text-white hover:bg-white/20 disabled:opacity-40"
+                              disabled={idx === 0}
+                              aria-label="Flytt venstre"
+                            >
+                              <ChevronLeft className="size-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => move(it.key, 1)}
+                              className="rounded p-1 text-white hover:bg-white/20 disabled:opacity-40"
+                              disabled={idx === items.length - 1}
+                              aria-label="Flytt høyre"
+                            >
+                              <ChevronRight className="size-3.5" />
+                            </button>
+                          </div>
                           <button
                             type="button"
-                            onClick={() => move(it.key, -1)}
-                            className="rounded p-1 text-white hover:bg-white/20 disabled:opacity-40"
-                            disabled={idx === 0}
-                            aria-label="Flytt venstre"
+                            onClick={() => removeItem(it.key)}
+                            className="rounded p-1 text-white hover:bg-destructive"
+                            aria-label="Fjern bilde"
                           >
-                            <ChevronLeft className="size-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => move(it.key, 1)}
-                            className="rounded p-1 text-white hover:bg-white/20 disabled:opacity-40"
-                            disabled={idx === items.length - 1}
-                            aria-label="Flytt høyre"
-                          >
-                            <ChevronRight className="size-3.5" />
+                            <X className="size-3.5" />
                           </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => removeItem(it.key)}
-                          className="rounded p-1 text-white hover:bg-destructive"
-                          aria-label="Fjern bilde"
-                        >
-                          <X className="size-3.5" />
-                        </button>
                       </div>
+                      <input
+                        type="text"
+                        value={it.caption ?? ""}
+                        onChange={(e) => setCaption(it.key, e.target.value)}
+                        placeholder="Bildetekst (valgfritt)"
+                        maxLength={140}
+                        className="w-full rounded border border-border bg-surface px-2 py-1 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
                     </li>
                   );
                 })}
@@ -636,7 +651,6 @@ function EditListingPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={items.length >= MAX_IMAGES}
               >
                 <ImagePlus className="size-4" />
                 Last opp bilder

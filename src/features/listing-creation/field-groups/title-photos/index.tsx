@@ -100,9 +100,7 @@ function ImagesSection({
 }: Pick<WizardSharedProps, "images" | "setImages" | "uploadProgress">) {
   return (
     <section className="space-y-2">
-      <Label>
-        Bilder <span className="font-normal text-muted-foreground">(anbefalt — maks 8)</span>
-      </Label>
+      <Label>Bilder</Label>
       <ImageUploader images={images} onChange={setImages} uploadProgress={uploadProgress} />
     </section>
   );

@@ -48,7 +48,8 @@ export type ListingDetailViewCategory = { name_nb: string; slug: string | null }
 /**
  * Presentational rendering of the listing detail page — extracted from
  * `$kaupetCode.tsx` so it can be reused unmodified for the pre-publish
- * preview (`ny-annonse.forhandsvisning`). Data-fetching, owner-only actions
+ * preview (see `PreviewDraftView`, rendered as an in-place overlay by the
+ * wizard). Data-fetching, owner-only actions
  * (stats, contact, edit/delete/report) and back-navigation stay in the
  * callers and are handed in as slots, so this component has no Supabase or
  * routing-history coupling of its own.
@@ -71,7 +72,7 @@ export type ListingDetailViewProps = {
   noKnownIssues: boolean | null;
   maintenanceHistory: string | null;
   category: ListingDetailViewCategory;
-  images: { storage_path: string; sort_order: number }[];
+  images: { storage_path: string; sort_order: number; caption?: string | null }[];
   imgUrls: Record<string, string>;
   attributes: Record<string, unknown>;
   /** 360°-bildesekvens tatt via mobilappen (Bil/MC-kategorier). Tom/utelatt

@@ -559,6 +559,7 @@ export type Database = {
       }
       listing_images: {
         Row: {
+          caption: string | null
           created_at: string
           id: string
           listing_id: string
@@ -566,6 +567,7 @@ export type Database = {
           storage_path: string
         }
         Insert: {
+          caption?: string | null
           created_at?: string
           id?: string
           listing_id: string
@@ -573,6 +575,7 @@ export type Database = {
           storage_path: string
         }
         Update: {
+          caption?: string | null
           created_at?: string
           id?: string
           listing_id?: string

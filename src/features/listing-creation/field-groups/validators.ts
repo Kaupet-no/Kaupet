@@ -9,11 +9,16 @@
 export function validateRequiredFieldGroups(
   fieldGroups: string[],
   values: { condition: string | null; can_ship: boolean | null },
+  // Vehicle categories (Bil og MC) can't be shipped by post — their
+  // "delivery-location" step only asks for a location, not a shipping
+  // method (see DeliveryLocation's `!isVehicle` guard around the "Levering"
+  // section), so `can_ship` is never set for them and shouldn't be required.
+  isVehicle = false,
 ): string | null {
   if (fieldGroups.includes("condition") && values.condition == null) {
     return "Velg en tilstand for annonsen.";
   }
-  if (fieldGroups.includes("delivery-location") && values.can_ship == null) {
+  if (fieldGroups.includes("delivery-location") && !isVehicle && values.can_ship == null) {
     return "Velg en leveringsmetode for annonsen.";
   }
   return null;

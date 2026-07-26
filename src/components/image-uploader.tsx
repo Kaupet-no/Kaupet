@@ -12,7 +12,7 @@ import {
 import { SortableContext, arrayMove, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { showErrorToast } from "@/lib/toast";
-import { MAX_IMAGES, describeImageError, validateImages } from "@/lib/storage";
+import { describeImageError, validateImages } from "@/lib/storage";
 import { compressImage } from "@/lib/image-compression";
 import { Button } from "@/components/ui/button";
 import { isNative, pickNativePhoto } from "@/lib/native";
@@ -22,6 +22,7 @@ export type PendingImage = {
   id: string;
   file: File;
   previewUrl: string;
+  caption?: string;
 };
 
 const GUIDE_KEY = "kaupet_photo_guide_seen";
@@ -32,12 +33,14 @@ function SortableImageItem({
   count,
   onMove,
   onRemove,
+  onCaptionChange,
 }: {
   img: PendingImage;
   idx: number;
   count: number;
   onMove: (id: string, dir: -1 | 1) => void;
   onRemove: (id: string) => void;
+  onCaptionChange: (id: string, caption: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: img.id,
@@ -46,57 +49,69 @@ function SortableImageItem({
     <li
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`group relative aspect-square touch-manipulation overflow-hidden rounded-lg border border-border bg-muted ${
-        isDragging ? "z-10 cursor-grabbing opacity-80 shadow-lg" : "cursor-grab"
-      }`}
-      {...attributes}
-      {...listeners}
+      className={`space-y-1 ${isDragging ? "z-10" : ""}`}
     >
-      <img
-        src={img.previewUrl}
-        alt={
-          idx === 0
-            ? `Hovedbilde av annonsen (${img.file.name})`
-            : `Bilde ${idx + 1} av annonsen (${img.file.name})`
-        }
-        className="size-full object-cover"
-        draggable={false}
-      />
-      {idx === 0 && (
-        <span className="absolute left-2 top-2 rounded bg-primary/90 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary-foreground">
-          Hoved
-        </span>
-      )}
-      <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent p-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100">
-        <div className="flex">
+      <div
+        className={`group relative aspect-square touch-manipulation overflow-hidden rounded-lg border border-border bg-muted ${
+          isDragging ? "cursor-grabbing opacity-80 shadow-lg" : "cursor-grab"
+        }`}
+        {...attributes}
+        {...listeners}
+      >
+        <img
+          src={img.previewUrl}
+          alt={
+            idx === 0
+              ? `Hovedbilde av annonsen (${img.file.name})`
+              : `Bilde ${idx + 1} av annonsen (${img.file.name})`
+          }
+          className="size-full object-cover"
+          draggable={false}
+        />
+        {idx === 0 && (
+          <span className="absolute left-2 top-2 rounded bg-primary/90 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary-foreground">
+            Hoved
+          </span>
+        )}
+        <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent p-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100">
+          <div className="flex">
+            <button
+              type="button"
+              onClick={() => onMove(img.id, -1)}
+              className="rounded p-1 text-white hover:bg-white/20 disabled:opacity-40"
+              disabled={idx === 0}
+              aria-label="Flytt bakover"
+            >
+              <ChevronLeft className="size-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onMove(img.id, 1)}
+              className="rounded p-1 text-white hover:bg-white/20 disabled:opacity-40"
+              disabled={idx === count - 1}
+              aria-label="Flytt fremover"
+            >
+              <ChevronRight className="size-3.5" />
+            </button>
+          </div>
           <button
             type="button"
-            onClick={() => onMove(img.id, -1)}
-            className="rounded p-1 text-white hover:bg-white/20 disabled:opacity-40"
-            disabled={idx === 0}
-            aria-label="Flytt bakover"
+            onClick={() => onRemove(img.id)}
+            className="rounded p-1 text-white hover:bg-destructive"
+            aria-label="Fjern bilde"
           >
-            <ChevronLeft className="size-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => onMove(img.id, 1)}
-            className="rounded p-1 text-white hover:bg-white/20 disabled:opacity-40"
-            disabled={idx === count - 1}
-            aria-label="Flytt fremover"
-          >
-            <ChevronRight className="size-3.5" />
+            <X className="size-3.5" />
           </button>
         </div>
-        <button
-          type="button"
-          onClick={() => onRemove(img.id)}
-          className="rounded p-1 text-white hover:bg-destructive"
-          aria-label="Fjern bilde"
-        >
-          <X className="size-3.5" />
-        </button>
       </div>
+      <input
+        type="text"
+        value={img.caption ?? ""}
+        onChange={(e) => onCaptionChange(img.id, e.target.value)}
+        placeholder="Bildetekst (valgfritt)"
+        maxLength={140}
+        className="w-full rounded border border-border bg-surface px-2 py-1 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+      />
     </li>
   );
 }
@@ -154,14 +169,10 @@ export function ImageUploader({
 
   const addFiles = useCallback(
     async (files: File[]) => {
-      if (files.length + images.length > MAX_IMAGES) {
-        showErrorToast(describeImageError({ kind: "too-many", allowed: MAX_IMAGES }));
-        return;
-      }
       setProcessing(true);
       try {
         const compressed = await Promise.all(files.map((file) => compressImage(file, "listing")));
-        const err = validateImages(compressed, images.length);
+        const err = validateImages(compressed);
         if (err) {
           showErrorToast(describeImageError(err));
           return;
@@ -209,7 +220,9 @@ export function ImageUploader({
     onChange(copy);
   };
 
-  const atLimit = images.length >= MAX_IMAGES;
+  const setCaption = (id: string, caption: string) => {
+    onChange(images.map((i) => (i.id === id ? { ...i, caption } : i)));
+  };
 
   // Aktiveringsterskler gjør at vanlige klikk/tapp på knappene i flisene
   // ikke starter en dra-operasjon.
@@ -273,7 +286,7 @@ export function ImageUploader({
                   showErrorToast(formatErrorMessage(e, "Kunne ikke åpne kameraet"));
                 }
               }}
-              disabled={atLimit || processing}
+              disabled={processing}
             >
               <Camera className="size-4" /> Ta bilde / velg fra galleri
             </Button>
@@ -282,7 +295,7 @@ export function ImageUploader({
               variant="outline"
               size="sm"
               onClick={() => inputRef.current?.click()}
-              disabled={atLimit || processing}
+              disabled={processing}
             >
               Velg fra filer
             </Button>
@@ -294,7 +307,7 @@ export function ImageUploader({
             size="sm"
             className="mt-4"
             onClick={() => inputRef.current?.click()}
-            disabled={atLimit || processing}
+            disabled={processing}
           >
             Velg bilder
           </Button>
@@ -316,7 +329,7 @@ export function ImageUploader({
       {images.length > 0 && (
         <>
           <p className="text-xs text-muted-foreground">
-            {images.length} av {MAX_IMAGES} bilder
+            {images.length} {images.length === 1 ? "bilde" : "bilder"}
           </p>
           <DndContext
             sensors={sensors}
@@ -333,6 +346,7 @@ export function ImageUploader({
                     count={images.length}
                     onMove={move}
                     onRemove={remove}
+                    onCaptionChange={setCaption}
                   />
                 ))}
               </ul>

@@ -3,12 +3,17 @@ import { showErrorToast } from "@/lib/toast";
 import { describeImageError, signListingImageUrls, validateImages } from "@/lib/storage";
 
 export type EditorItem =
-  | { kind: "existing"; key: string; storage_path: string; url?: string }
-  | { kind: "new"; key: string; file: File; previewUrl: string };
+  | { kind: "existing"; key: string; storage_path: string; url?: string; caption?: string }
+  | { kind: "new"; key: string; file: File; previewUrl: string; caption?: string };
 
 type EditableListing = {
   id: string;
-  listing_images: { id: string; storage_path: string; sort_order: number }[];
+  listing_images: {
+    id: string;
+    storage_path: string;
+    sort_order: number;
+    caption?: string | null;
+  }[];
 };
 
 /**
@@ -32,6 +37,7 @@ export function useEditableListingImages(listing: EditableListing | undefined) {
       kind: "existing",
       key: img.storage_path,
       storage_path: img.storage_path,
+      caption: img.caption ?? undefined,
     }));
     setItems(initial);
     hydratedFor.current = listing.id;
@@ -55,7 +61,7 @@ export function useEditableListingImages(listing: EditableListing | undefined) {
   }, []);
 
   const addFiles = (files: File[]) => {
-    const err = validateImages(files, items.length);
+    const err = validateImages(files);
     if (err) {
       showErrorToast(describeImageError(err));
       return;
@@ -67,6 +73,10 @@ export function useEditableListingImages(listing: EditableListing | undefined) {
       previewUrl: URL.createObjectURL(file),
     }));
     setItems((curr) => [...curr, ...next]);
+  };
+
+  const setCaption = (key: string, caption: string) => {
+    setItems((curr) => curr.map((it) => (it.key === key ? { ...it, caption } : it)));
   };
 
   const removeItem = (key: string) => {
@@ -104,6 +114,7 @@ export function useEditableListingImages(listing: EditableListing | undefined) {
     addFiles,
     removeItem,
     move,
+    setCaption,
     imagesDirty,
   };
 }

@@ -42,7 +42,6 @@ import { Route as AuthenticatedKvitteringPromoIdRouteImport } from './routes/_au
 import { Route as AuthenticatedMeldingerIndexRouteImport } from './routes/_authenticated/meldinger.index'
 import { Route as AuthenticatedMeldingerIdRouteImport } from './routes/_authenticated/meldinger.$id'
 import { Route as AuthenticatedMineAnnonserIndexRouteImport } from './routes/_authenticated/mine-annonser.index'
-import { Route as AuthenticatedNyAnnonseForhandsvisningRouteImport } from './routes/_authenticated/ny-annonse.forhandsvisning'
 import { Route as AuthenticatedMineAnnonserIdRedigerRouteImport } from './routes/_authenticated/mine-annonser.$id.rediger'
 import { Route as ApiPublicPushDispatchRouteImport } from './routes/api/public/push/dispatch'
 import { Route as ApiPublicVippsWebhookRouteImport } from './routes/api/public/vipps/webhook'
@@ -224,12 +223,6 @@ const AuthenticatedMineAnnonserIndexRoute =
     path: '/mine-annonser/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedNyAnnonseForhandsvisningRoute =
-  AuthenticatedNyAnnonseForhandsvisningRouteImport.update({
-    id: '/forhandsvisning',
-    path: '/forhandsvisning',
-    getParentRoute: () => AuthenticatedNyAnnonseRoute,
-  } as any)
 const AuthenticatedMineAnnonserIdRedigerRoute =
   AuthenticatedMineAnnonserIdRedigerRouteImport.update({
     id: '/mine-annonser/$id/rediger',
@@ -268,7 +261,7 @@ export interface FileRoutesByFullPath {
   '/favoritter': typeof AuthenticatedFavoritterRoute
   '/meg': typeof AuthenticatedMegRoute
   '/mine-sok': typeof AuthenticatedMineSokRoute
-  '/ny-annonse': typeof AuthenticatedNyAnnonseRouteWithChildren
+  '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/ny-ok-annonse': typeof AuthenticatedNyOkAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
   '/varsler': typeof AuthenticatedVarslerRoute
@@ -283,7 +276,6 @@ export interface FileRoutesByFullPath {
   '/bekrefter/$promoId': typeof AuthenticatedBekrefterPromoIdRoute
   '/kvittering/$promoId': typeof AuthenticatedKvitteringPromoIdRoute
   '/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
-  '/ny-annonse/forhandsvisning': typeof AuthenticatedNyAnnonseForhandsvisningRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/meldinger/': typeof AuthenticatedMeldingerIndexRoute
   '/mine-annonser/': typeof AuthenticatedMineAnnonserIndexRoute
@@ -306,7 +298,7 @@ export interface FileRoutesByTo {
   '/favoritter': typeof AuthenticatedFavoritterRoute
   '/meg': typeof AuthenticatedMegRoute
   '/mine-sok': typeof AuthenticatedMineSokRoute
-  '/ny-annonse': typeof AuthenticatedNyAnnonseRouteWithChildren
+  '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/ny-ok-annonse': typeof AuthenticatedNyOkAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
   '/varsler': typeof AuthenticatedVarslerRoute
@@ -321,7 +313,6 @@ export interface FileRoutesByTo {
   '/bekrefter/$promoId': typeof AuthenticatedBekrefterPromoIdRoute
   '/kvittering/$promoId': typeof AuthenticatedKvitteringPromoIdRoute
   '/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
-  '/ny-annonse/forhandsvisning': typeof AuthenticatedNyAnnonseForhandsvisningRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/meldinger': typeof AuthenticatedMeldingerIndexRoute
   '/mine-annonser': typeof AuthenticatedMineAnnonserIndexRoute
@@ -347,7 +338,7 @@ export interface FileRoutesById {
   '/_authenticated/favoritter': typeof AuthenticatedFavoritterRoute
   '/_authenticated/meg': typeof AuthenticatedMegRoute
   '/_authenticated/mine-sok': typeof AuthenticatedMineSokRoute
-  '/_authenticated/ny-annonse': typeof AuthenticatedNyAnnonseRouteWithChildren
+  '/_authenticated/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/_authenticated/ny-ok-annonse': typeof AuthenticatedNyOkAnnonseRoute
   '/_authenticated/profil': typeof AuthenticatedProfilRoute
   '/_authenticated/varsler': typeof AuthenticatedVarslerRoute
@@ -362,7 +353,6 @@ export interface FileRoutesById {
   '/_authenticated/bekrefter/$promoId': typeof AuthenticatedBekrefterPromoIdRoute
   '/_authenticated/kvittering/$promoId': typeof AuthenticatedKvitteringPromoIdRoute
   '/_authenticated/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
-  '/_authenticated/ny-annonse/forhandsvisning': typeof AuthenticatedNyAnnonseForhandsvisningRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/meldinger/': typeof AuthenticatedMeldingerIndexRoute
   '/_authenticated/mine-annonser/': typeof AuthenticatedMineAnnonserIndexRoute
@@ -403,7 +393,6 @@ export interface FileRouteTypes {
     | '/bekrefter/$promoId'
     | '/kvittering/$promoId'
     | '/meldinger/$id'
-    | '/ny-annonse/forhandsvisning'
     | '/admin/'
     | '/meldinger/'
     | '/mine-annonser/'
@@ -441,7 +430,6 @@ export interface FileRouteTypes {
     | '/bekrefter/$promoId'
     | '/kvittering/$promoId'
     | '/meldinger/$id'
-    | '/ny-annonse/forhandsvisning'
     | '/admin'
     | '/meldinger'
     | '/mine-annonser'
@@ -481,7 +469,6 @@ export interface FileRouteTypes {
     | '/_authenticated/bekrefter/$promoId'
     | '/_authenticated/kvittering/$promoId'
     | '/_authenticated/meldinger/$id'
-    | '/_authenticated/ny-annonse/forhandsvisning'
     | '/_authenticated/admin/'
     | '/_authenticated/meldinger/'
     | '/_authenticated/mine-annonser/'
@@ -742,13 +729,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMineAnnonserIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/ny-annonse/forhandsvisning': {
-      id: '/_authenticated/ny-annonse/forhandsvisning'
-      path: '/forhandsvisning'
-      fullPath: '/ny-annonse/forhandsvisning'
-      preLoaderRoute: typeof AuthenticatedNyAnnonseForhandsvisningRouteImport
-      parentRoute: typeof AuthenticatedNyAnnonseRoute
-    }
     '/_authenticated/mine-annonser/$id/rediger': {
       id: '/_authenticated/mine-annonser/$id/rediger'
       path: '/mine-annonser/$id/rediger'
@@ -806,27 +786,12 @@ const AuthenticatedAdminRouteRouteWithChildren =
     AuthenticatedAdminRouteRouteChildren,
   )
 
-interface AuthenticatedNyAnnonseRouteChildren {
-  AuthenticatedNyAnnonseForhandsvisningRoute: typeof AuthenticatedNyAnnonseForhandsvisningRoute
-}
-
-const AuthenticatedNyAnnonseRouteChildren: AuthenticatedNyAnnonseRouteChildren =
-  {
-    AuthenticatedNyAnnonseForhandsvisningRoute:
-      AuthenticatedNyAnnonseForhandsvisningRoute,
-  }
-
-const AuthenticatedNyAnnonseRouteWithChildren =
-  AuthenticatedNyAnnonseRoute._addFileChildren(
-    AuthenticatedNyAnnonseRouteChildren,
-  )
-
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRouteRoute: typeof AuthenticatedAdminRouteRouteWithChildren
   AuthenticatedFavoritterRoute: typeof AuthenticatedFavoritterRoute
   AuthenticatedMegRoute: typeof AuthenticatedMegRoute
   AuthenticatedMineSokRoute: typeof AuthenticatedMineSokRoute
-  AuthenticatedNyAnnonseRoute: typeof AuthenticatedNyAnnonseRouteWithChildren
+  AuthenticatedNyAnnonseRoute: typeof AuthenticatedNyAnnonseRoute
   AuthenticatedNyOkAnnonseRoute: typeof AuthenticatedNyOkAnnonseRoute
   AuthenticatedProfilRoute: typeof AuthenticatedProfilRoute
   AuthenticatedVarslerRoute: typeof AuthenticatedVarslerRoute
@@ -844,7 +809,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFavoritterRoute: AuthenticatedFavoritterRoute,
   AuthenticatedMegRoute: AuthenticatedMegRoute,
   AuthenticatedMineSokRoute: AuthenticatedMineSokRoute,
-  AuthenticatedNyAnnonseRoute: AuthenticatedNyAnnonseRouteWithChildren,
+  AuthenticatedNyAnnonseRoute: AuthenticatedNyAnnonseRoute,
   AuthenticatedNyOkAnnonseRoute: AuthenticatedNyOkAnnonseRoute,
   AuthenticatedProfilRoute: AuthenticatedProfilRoute,
   AuthenticatedVarslerRoute: AuthenticatedVarslerRoute,

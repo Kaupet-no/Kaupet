@@ -1,13 +1,10 @@
-import { useSyncExternalStore } from "react";
-
 import type { ListingDetailViewCategory } from "@/components/listing-detail/listing-detail-view";
 
 /**
- * In-memory (not persisted, not serialized) handoff of the current wizard
- * draft to the `/ny-annonse/forhandsvisning` route. Images only exist as
- * local blob URLs before publish, so the draft can't round-trip through
- * Supabase or localStorage — it only has to survive a same-tab client-side
- * navigation, which a module-scoped store does trivially.
+ * Shape of the wizard draft handed to `PreviewDraftView`. Images only exist
+ * as local blob URLs before publish, so this can't round-trip through
+ * Supabase or localStorage — it's just local component state in
+ * ny-annonse.tsx, passed straight down as a prop.
  */
 export type PreviewDraft = {
   title: string;
@@ -24,33 +21,7 @@ export type PreviewDraft = {
   noKnownIssues: boolean | null;
   maintenanceHistory: string | null;
   category: ListingDetailViewCategory;
-  images: { storage_path: string; sort_order: number }[];
+  images: { storage_path: string; sort_order: number; caption?: string | null }[];
   imgUrls: Record<string, string>;
   attributes: Record<string, unknown>;
 };
-
-let currentDraft: PreviewDraft | null = null;
-const listeners = new Set<() => void>();
-
-export function setPreviewDraft(draft: PreviewDraft) {
-  currentDraft = draft;
-  listeners.forEach((l) => l());
-}
-
-export function clearPreviewDraft() {
-  currentDraft = null;
-  listeners.forEach((l) => l());
-}
-
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
-
-function getSnapshot() {
-  return currentDraft;
-}
-
-export function usePreviewDraft(): PreviewDraft | null {
-  return useSyncExternalStore(subscribe, getSnapshot);
-}

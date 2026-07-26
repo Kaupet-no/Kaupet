@@ -24,7 +24,7 @@ import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authentic
 import { Route as AuthenticatedFavoritterRouteImport } from './routes/_authenticated/favoritter'
 import { Route as AuthenticatedMegRouteImport } from './routes/_authenticated/meg'
 import { Route as AuthenticatedMineSokRouteImport } from './routes/_authenticated/mine-sok'
-import { Route as AuthenticatedNyAnnonseRouteRouteImport } from './routes/_authenticated/ny-annonse/route'
+import { Route as AuthenticatedNyAnnonseRouteImport } from './routes/_authenticated/ny-annonse'
 import { Route as AuthenticatedNyOkAnnonseRouteImport } from './routes/_authenticated/ny-ok-annonse'
 import { Route as AuthenticatedProfilRouteImport } from './routes/_authenticated/profil'
 import { Route as AuthenticatedVarslerRouteImport } from './routes/_authenticated/varsler'
@@ -42,8 +42,6 @@ import { Route as AuthenticatedKvitteringPromoIdRouteImport } from './routes/_au
 import { Route as AuthenticatedMeldingerIndexRouteImport } from './routes/_authenticated/meldinger.index'
 import { Route as AuthenticatedMeldingerIdRouteImport } from './routes/_authenticated/meldinger.$id'
 import { Route as AuthenticatedMineAnnonserIndexRouteImport } from './routes/_authenticated/mine-annonser.index'
-import { Route as AuthenticatedNyAnnonseIndexRouteImport } from './routes/_authenticated/ny-annonse/index'
-import { Route as AuthenticatedNyAnnonseForhandsvisningRouteImport } from './routes/_authenticated/ny-annonse/forhandsvisning'
 import { Route as AuthenticatedMineAnnonserIdRedigerRouteImport } from './routes/_authenticated/mine-annonser.$id.rediger'
 import { Route as ApiPublicPushDispatchRouteImport } from './routes/api/public/push/dispatch'
 import { Route as ApiPublicVippsWebhookRouteImport } from './routes/api/public/vipps/webhook'
@@ -123,12 +121,11 @@ const AuthenticatedMineSokRoute = AuthenticatedMineSokRouteImport.update({
   path: '/mine-sok',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedNyAnnonseRouteRoute =
-  AuthenticatedNyAnnonseRouteRouteImport.update({
-    id: '/ny-annonse',
-    path: '/ny-annonse',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
+const AuthenticatedNyAnnonseRoute = AuthenticatedNyAnnonseRouteImport.update({
+  id: '/ny-annonse',
+  path: '/ny-annonse',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedNyOkAnnonseRoute =
   AuthenticatedNyOkAnnonseRouteImport.update({
     id: '/ny-ok-annonse',
@@ -226,18 +223,6 @@ const AuthenticatedMineAnnonserIndexRoute =
     path: '/mine-annonser/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedNyAnnonseIndexRoute =
-  AuthenticatedNyAnnonseIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => AuthenticatedNyAnnonseRouteRoute,
-  } as any)
-const AuthenticatedNyAnnonseForhandsvisningRoute =
-  AuthenticatedNyAnnonseForhandsvisningRouteImport.update({
-    id: '/forhandsvisning',
-    path: '/forhandsvisning',
-    getParentRoute: () => AuthenticatedNyAnnonseRouteRoute,
-  } as any)
 const AuthenticatedMineAnnonserIdRedigerRoute =
   AuthenticatedMineAnnonserIdRedigerRouteImport.update({
     id: '/mine-annonser/$id/rediger',
@@ -271,12 +256,12 @@ export interface FileRoutesByFullPath {
   '/tilbakestill-passord': typeof TilbakestillPassordRoute
   '/vilkar': typeof VilkarRoute
   '/admin': typeof AuthenticatedAdminRouteRouteWithChildren
-  '/ny-annonse': typeof AuthenticatedNyAnnonseRouteRouteWithChildren
   '/$kaupetCode/$sub': typeof KaupetCodeSubRoute
   '/360-opptak/$token': typeof R360OpptakTokenRoute
   '/favoritter': typeof AuthenticatedFavoritterRoute
   '/meg': typeof AuthenticatedMegRoute
   '/mine-sok': typeof AuthenticatedMineSokRoute
+  '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/ny-ok-annonse': typeof AuthenticatedNyOkAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
   '/varsler': typeof AuthenticatedVarslerRoute
@@ -291,11 +276,9 @@ export interface FileRoutesByFullPath {
   '/bekrefter/$promoId': typeof AuthenticatedBekrefterPromoIdRoute
   '/kvittering/$promoId': typeof AuthenticatedKvitteringPromoIdRoute
   '/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
-  '/ny-annonse/forhandsvisning': typeof AuthenticatedNyAnnonseForhandsvisningRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/meldinger/': typeof AuthenticatedMeldingerIndexRoute
   '/mine-annonser/': typeof AuthenticatedMineAnnonserIndexRoute
-  '/ny-annonse/': typeof AuthenticatedNyAnnonseIndexRoute
   '/mine-annonser/$id/rediger': typeof AuthenticatedMineAnnonserIdRedigerRoute
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
   '/api/public/vipps/webhook': typeof ApiPublicVippsWebhookRoute
@@ -315,6 +298,7 @@ export interface FileRoutesByTo {
   '/favoritter': typeof AuthenticatedFavoritterRoute
   '/meg': typeof AuthenticatedMegRoute
   '/mine-sok': typeof AuthenticatedMineSokRoute
+  '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/ny-ok-annonse': typeof AuthenticatedNyOkAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
   '/varsler': typeof AuthenticatedVarslerRoute
@@ -329,11 +313,9 @@ export interface FileRoutesByTo {
   '/bekrefter/$promoId': typeof AuthenticatedBekrefterPromoIdRoute
   '/kvittering/$promoId': typeof AuthenticatedKvitteringPromoIdRoute
   '/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
-  '/ny-annonse/forhandsvisning': typeof AuthenticatedNyAnnonseForhandsvisningRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/meldinger': typeof AuthenticatedMeldingerIndexRoute
   '/mine-annonser': typeof AuthenticatedMineAnnonserIndexRoute
-  '/ny-annonse': typeof AuthenticatedNyAnnonseIndexRoute
   '/mine-annonser/$id/rediger': typeof AuthenticatedMineAnnonserIdRedigerRoute
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
   '/api/public/vipps/webhook': typeof ApiPublicVippsWebhookRoute
@@ -351,12 +333,12 @@ export interface FileRoutesById {
   '/tilbakestill-passord': typeof TilbakestillPassordRoute
   '/vilkar': typeof VilkarRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteRouteWithChildren
-  '/_authenticated/ny-annonse': typeof AuthenticatedNyAnnonseRouteRouteWithChildren
   '/$kaupetCode_/$sub': typeof KaupetCodeSubRoute
   '/360-opptak/$token': typeof R360OpptakTokenRoute
   '/_authenticated/favoritter': typeof AuthenticatedFavoritterRoute
   '/_authenticated/meg': typeof AuthenticatedMegRoute
   '/_authenticated/mine-sok': typeof AuthenticatedMineSokRoute
+  '/_authenticated/ny-annonse': typeof AuthenticatedNyAnnonseRoute
   '/_authenticated/ny-ok-annonse': typeof AuthenticatedNyOkAnnonseRoute
   '/_authenticated/profil': typeof AuthenticatedProfilRoute
   '/_authenticated/varsler': typeof AuthenticatedVarslerRoute
@@ -371,11 +353,9 @@ export interface FileRoutesById {
   '/_authenticated/bekrefter/$promoId': typeof AuthenticatedBekrefterPromoIdRoute
   '/_authenticated/kvittering/$promoId': typeof AuthenticatedKvitteringPromoIdRoute
   '/_authenticated/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
-  '/_authenticated/ny-annonse/forhandsvisning': typeof AuthenticatedNyAnnonseForhandsvisningRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/meldinger/': typeof AuthenticatedMeldingerIndexRoute
   '/_authenticated/mine-annonser/': typeof AuthenticatedMineAnnonserIndexRoute
-  '/_authenticated/ny-annonse/': typeof AuthenticatedNyAnnonseIndexRoute
   '/_authenticated/mine-annonser/$id/rediger': typeof AuthenticatedMineAnnonserIdRedigerRoute
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
   '/api/public/vipps/webhook': typeof ApiPublicVippsWebhookRoute
@@ -393,12 +373,12 @@ export interface FileRouteTypes {
     | '/tilbakestill-passord'
     | '/vilkar'
     | '/admin'
-    | '/ny-annonse'
     | '/$kaupetCode/$sub'
     | '/360-opptak/$token'
     | '/favoritter'
     | '/meg'
     | '/mine-sok'
+    | '/ny-annonse'
     | '/ny-ok-annonse'
     | '/profil'
     | '/varsler'
@@ -413,11 +393,9 @@ export interface FileRouteTypes {
     | '/bekrefter/$promoId'
     | '/kvittering/$promoId'
     | '/meldinger/$id'
-    | '/ny-annonse/forhandsvisning'
     | '/admin/'
     | '/meldinger/'
     | '/mine-annonser/'
-    | '/ny-annonse/'
     | '/mine-annonser/$id/rediger'
     | '/api/public/push/dispatch'
     | '/api/public/vipps/webhook'
@@ -437,6 +415,7 @@ export interface FileRouteTypes {
     | '/favoritter'
     | '/meg'
     | '/mine-sok'
+    | '/ny-annonse'
     | '/ny-ok-annonse'
     | '/profil'
     | '/varsler'
@@ -451,11 +430,9 @@ export interface FileRouteTypes {
     | '/bekrefter/$promoId'
     | '/kvittering/$promoId'
     | '/meldinger/$id'
-    | '/ny-annonse/forhandsvisning'
     | '/admin'
     | '/meldinger'
     | '/mine-annonser'
-    | '/ny-annonse'
     | '/mine-annonser/$id/rediger'
     | '/api/public/push/dispatch'
     | '/api/public/vipps/webhook'
@@ -472,12 +449,12 @@ export interface FileRouteTypes {
     | '/tilbakestill-passord'
     | '/vilkar'
     | '/_authenticated/admin'
-    | '/_authenticated/ny-annonse'
     | '/$kaupetCode_/$sub'
     | '/360-opptak/$token'
     | '/_authenticated/favoritter'
     | '/_authenticated/meg'
     | '/_authenticated/mine-sok'
+    | '/_authenticated/ny-annonse'
     | '/_authenticated/ny-ok-annonse'
     | '/_authenticated/profil'
     | '/_authenticated/varsler'
@@ -492,11 +469,9 @@ export interface FileRouteTypes {
     | '/_authenticated/bekrefter/$promoId'
     | '/_authenticated/kvittering/$promoId'
     | '/_authenticated/meldinger/$id'
-    | '/_authenticated/ny-annonse/forhandsvisning'
     | '/_authenticated/admin/'
     | '/_authenticated/meldinger/'
     | '/_authenticated/mine-annonser/'
-    | '/_authenticated/ny-annonse/'
     | '/_authenticated/mine-annonser/$id/rediger'
     | '/api/public/push/dispatch'
     | '/api/public/vipps/webhook'
@@ -632,7 +607,7 @@ declare module '@tanstack/react-router' {
       id: '/_authenticated/ny-annonse'
       path: '/ny-annonse'
       fullPath: '/ny-annonse'
-      preLoaderRoute: typeof AuthenticatedNyAnnonseRouteRouteImport
+      preLoaderRoute: typeof AuthenticatedNyAnnonseRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/ny-ok-annonse': {
@@ -754,20 +729,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMineAnnonserIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/ny-annonse/': {
-      id: '/_authenticated/ny-annonse/'
-      path: '/'
-      fullPath: '/ny-annonse/'
-      preLoaderRoute: typeof AuthenticatedNyAnnonseIndexRouteImport
-      parentRoute: typeof AuthenticatedNyAnnonseRouteRoute
-    }
-    '/_authenticated/ny-annonse/forhandsvisning': {
-      id: '/_authenticated/ny-annonse/forhandsvisning'
-      path: '/forhandsvisning'
-      fullPath: '/ny-annonse/forhandsvisning'
-      preLoaderRoute: typeof AuthenticatedNyAnnonseForhandsvisningRouteImport
-      parentRoute: typeof AuthenticatedNyAnnonseRouteRoute
-    }
     '/_authenticated/mine-annonser/$id/rediger': {
       id: '/_authenticated/mine-annonser/$id/rediger'
       path: '/mine-annonser/$id/rediger'
@@ -825,29 +786,12 @@ const AuthenticatedAdminRouteRouteWithChildren =
     AuthenticatedAdminRouteRouteChildren,
   )
 
-interface AuthenticatedNyAnnonseRouteRouteChildren {
-  AuthenticatedNyAnnonseForhandsvisningRoute: typeof AuthenticatedNyAnnonseForhandsvisningRoute
-  AuthenticatedNyAnnonseIndexRoute: typeof AuthenticatedNyAnnonseIndexRoute
-}
-
-const AuthenticatedNyAnnonseRouteRouteChildren: AuthenticatedNyAnnonseRouteRouteChildren =
-  {
-    AuthenticatedNyAnnonseForhandsvisningRoute:
-      AuthenticatedNyAnnonseForhandsvisningRoute,
-    AuthenticatedNyAnnonseIndexRoute: AuthenticatedNyAnnonseIndexRoute,
-  }
-
-const AuthenticatedNyAnnonseRouteRouteWithChildren =
-  AuthenticatedNyAnnonseRouteRoute._addFileChildren(
-    AuthenticatedNyAnnonseRouteRouteChildren,
-  )
-
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRouteRoute: typeof AuthenticatedAdminRouteRouteWithChildren
-  AuthenticatedNyAnnonseRouteRoute: typeof AuthenticatedNyAnnonseRouteRouteWithChildren
   AuthenticatedFavoritterRoute: typeof AuthenticatedFavoritterRoute
   AuthenticatedMegRoute: typeof AuthenticatedMegRoute
   AuthenticatedMineSokRoute: typeof AuthenticatedMineSokRoute
+  AuthenticatedNyAnnonseRoute: typeof AuthenticatedNyAnnonseRoute
   AuthenticatedNyOkAnnonseRoute: typeof AuthenticatedNyOkAnnonseRoute
   AuthenticatedProfilRoute: typeof AuthenticatedProfilRoute
   AuthenticatedVarslerRoute: typeof AuthenticatedVarslerRoute
@@ -862,11 +806,10 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRouteRoute: AuthenticatedAdminRouteRouteWithChildren,
-  AuthenticatedNyAnnonseRouteRoute:
-    AuthenticatedNyAnnonseRouteRouteWithChildren,
   AuthenticatedFavoritterRoute: AuthenticatedFavoritterRoute,
   AuthenticatedMegRoute: AuthenticatedMegRoute,
   AuthenticatedMineSokRoute: AuthenticatedMineSokRoute,
+  AuthenticatedNyAnnonseRoute: AuthenticatedNyAnnonseRoute,
   AuthenticatedNyOkAnnonseRoute: AuthenticatedNyOkAnnonseRoute,
   AuthenticatedProfilRoute: AuthenticatedProfilRoute,
   AuthenticatedVarslerRoute: AuthenticatedVarslerRoute,

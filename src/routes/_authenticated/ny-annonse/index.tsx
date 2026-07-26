@@ -109,7 +109,7 @@ const VEHICLE_FORCE_BREAK_BEFORE_KEYS = new Set([
   "description-keywords",
 ]);
 
-export const Route = createFileRoute("/_authenticated/ny-annonse")({
+export const Route = createFileRoute("/_authenticated/ny-annonse/")({
   validateSearch: z
     .object({
       type: z.enum(["sell"]).optional(),
@@ -810,12 +810,17 @@ function NewListingPage() {
     void navigate({ to: "/ny-annonse/forhandsvisning" });
   }
 
-  // Redirect to home if no type selected and no draft — entry should go through the picker dialog
+  // Redirect to home if no type selected and no draft — entry should go through the picker dialog.
+  // Guarded with `hasPreviewed` because `listingType` (from Route.useSearch()) transiently reads
+  // as null while navigating away to /ny-annonse/forhandsvisning (the target route doesn't carry a
+  // "type" search param), which would otherwise fire this effect mid-navigation and trigger a
+  // second, blocked navigate({ to: "/" }) — surfacing the "Avbryte annonsen?" dialog right after
+  // clicking "Forhåndsvis annonse".
   useEffect(() => {
-    if (listingType === null && !hasDraftData) {
+    if (listingType === null && !hasDraftData && !hasPreviewed) {
       void navigate({ to: "/" });
     }
-  }, [listingType, hasDraftData, navigate]);
+  }, [listingType, hasDraftData, hasPreviewed, navigate]);
 
   const sharedProps: WizardSharedProps = {
     native,

@@ -18,27 +18,28 @@ Se full plan i samtalehistorikken / `iterative-strolling-minsky.md`-planfilen fo
 
 **Fase 2 — alle fire gud-komponenter ferdig oppdelt:**
 
-- `ny-annonse.tsx`: 1770 → 1226 linjer (commits `817ebb6`..`3044c49`) — `useDraftAutosave`, `useVehicleLookupFlow`, `useLocationPicker`, `useListingTitleHints`
-- `admin/kategorier.tsx`: 2003 → 496 linjer (commit `f40b812`) — splittet i 8 filer under `src/components/admin/categories/`
-- `mine-annonser.$id.rediger.tsx`: 1145 → 835 linjer (commits `d6dd755`, `7494e1c`) — `useEditableListingImages`, `useEditLocationPicker`, `useEditListingHints`
-- `annonser.tsx`: 943 → 822 linjer (commit `7b92f9b`) — `useAnnonserSearchState`
-- `index.tsx`: 901 → 765 linjer (commit `0549c3e`) — `useCategoryDrilldown`
+- `ny-annonse.tsx`: 1770 → 1226 linjer — `useDraftAutosave`, `useVehicleLookupFlow`, `useLocationPicker`, `useListingTitleHints`
+- `admin/kategorier.tsx`: 2003 → 496 linjer — splittet i 8 filer under `src/components/admin/categories/`
+- `mine-annonser.$id.rediger.tsx`: 1145 → 835 linjer — `useEditableListingImages`, `useEditLocationPicker`, `useEditListingHints`
+- `annonser.tsx`: 943 → 822 linjer — `useAnnonserSearchState`
+- `index.tsx`: 901 → 765 linjer — `useCategoryDrilldown`
 
-Alt verifisert med typecheck, lint, 98 tester, full bygg, og manuell nettleser-test for hvert steg (inkl. faktisk søk/filter/drilldown-interaksjon der ruta ikke krevde autentisering).
+**Fase 3 — testdekning ferdig** (commits `52bdf16`, `8edf1ab`)
+
+- Satte opp React Testing Library + jsdom (devDependencies, per-fil `@vitest-environment jsdom`-pragma slik at de opprinnelige node-miljø-testene ikke påvirkes)
+- Alle ni hooks fra fase 2 har nå egen testdekning: `useDraftAutosave`, `useVehicleLookupFlow`, `useLocationPicker`, `useListingTitleHints`, `useEditableListingImages`, `useEditLocationPicker`, `useEditListingHints`, `useAnnonserSearchState`, `useCategoryDrilldown`
+- Full suite: **165 tester** (98 opprinnelige + 67 nye), alle grønne
+
+Alt verifisert med typecheck, lint, full test-suite, full bygg, og manuell nettleser-test for hvert steg i fase 1/2.
 
 ## Gjenstår
-
-### Fase 3 — Testdekning
-
-- Komponent-/enhetstester for alle de nye hookene under `src/features/listing-creation/`, `src/features/listing-search/` og `src/features/landing/` — ingen har egne tester ennå, kun manuelt verifisert i nettleser
-- Vurder Vitest + React Testing Library hvis ikke allerede satt opp for komponenttester
-- Flere Playwright E2E-specs utover `publish-listing.spec.ts`
 
 ### Fase 4 — Mindre opprydding
 
 - Slå på `noUnusedLocals`/`noUnusedParameters` i `tsconfig.json` gradvis
-- Duplisert lignende-annonser-søk/`SIMILAR_STOPWORDS`: finnes nå i tre varianter (`useListingTitleHints`, `useEditListingHints`, og opprinnelig i `mine-annonser.$id.rediger.tsx` — nå konsolidert til `useEditListingHints`). Vurder om `useListingTitleHints` og `useEditListingHints` kan slås sammen til én parameterisert hook (med/uten kategoriforslag, med/uten selv-ekskludering).
+- Vurder å slå sammen `useListingTitleHints` og `useEditListingHints` til én parameterisert hook (med/uten kategoriforslag, med/uten selv-ekskludering) — nesten identisk logikk i to filer
 - Verifiser ingen andre steder har samme fail-open- eller "synkron callback i useEffect"-mønster som Turnstile- og auth-bugene som ble funnet og fikset underveis
+- Flere Playwright E2E-specs utover `publish-listing.spec.ts`
 
 ## Praktisk oppstart neste gang
 
@@ -46,4 +47,4 @@ Alt verifisert med typecheck, lint, 98 tester, full bygg, og manuell nettleser-t
 git pull origin staging
 ```
 
-Fase 2 (komponentoppdeling) er ferdig. Neste steg er Fase 3 (testdekning) — start med å sette opp React Testing Library hvis det ikke finnes, deretter skriv tester for hookene i prioritert rekkefølge: `use-draft-autosave.ts` og `use-vehicle-lookup-flow.ts` (høyest risiko, betaling/kjøretøy-oppslag involvert) først.
+Fase 2 og 3 er ferdig. Det som gjenstår (Fase 4) er lavthengende frukt — kan gjøres i vilkårlig rekkefølge, ingen avhengigheter mellom punktene.

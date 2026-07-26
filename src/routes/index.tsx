@@ -123,7 +123,6 @@ function WebLanding() {
     priceMax,
     setPriceMax,
     subcatRef,
-    activeFilters,
     primaryFilters,
     secondaryFilters,
     moreFiltersOpen,

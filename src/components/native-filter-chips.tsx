@@ -210,7 +210,6 @@ export function NativeFilterChips({
               onPriceChange(mn, mx, free);
               close();
             }}
-            resultBtn={resultBtn}
           />
         </SheetContent>
       </Sheet>
@@ -476,13 +475,11 @@ function PriceSheetContent({
   max,
   includeFree,
   onApply,
-  resultBtn,
 }: {
   min?: number;
   max?: number;
   includeFree: boolean;
   onApply: (min: number | undefined, max: number | undefined, includeFree: boolean) => void;
-  resultBtn: React.ReactNode;
 }) {
   const { minDraft, setMinDraft, maxDraft, setMaxDraft, freeDraft, setFreeDraft, apply } =
     usePriceDraft(min, max, includeFree, onApply);

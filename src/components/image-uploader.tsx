@@ -11,7 +11,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, arrayMove, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { showSuccessToast, showErrorToast } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast";
 import { MAX_IMAGES, describeImageError, validateImages } from "@/lib/storage";
 import { compressImage } from "@/lib/image-compression";
 import { Button } from "@/components/ui/button";

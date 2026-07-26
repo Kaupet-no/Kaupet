@@ -21,7 +21,6 @@ import { SearchBar } from "@/components/search-bar";
 import { SaveSearchDialog } from "@/components/advanced-search-sheet";
 import { DesktopFilterChips } from "@/components/desktop-filter-chips";
 import { ActiveFilters } from "@/components/active-filters";
-import type { TermGroup } from "@/lib/term-groups";
 import type { MapListing } from "@/components/listings-map";
 import { FeaturedListingsSection } from "@/components/featured-listings-section";
 import { NativeFilterChips } from "@/components/native-filter-chips";
@@ -111,7 +110,6 @@ function BrowsePage() {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
-  const PAGE_SIZE = 20;
   const sentinelRef = useRef<HTMLDivElement>(null);
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
   const [advancedOverlayOpen, setAdvancedOverlayOpen] = useState(false);
@@ -183,7 +181,6 @@ function BrowsePage() {
   const {
     location,
     effectiveCategories,
-    categoryTree,
     attrFilters,
     attrValues,
     handleAttrValueChange,

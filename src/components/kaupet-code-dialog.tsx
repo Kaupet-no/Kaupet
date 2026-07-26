@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Hash } from "lucide-react";
-import { showSuccessToast, showErrorToast } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

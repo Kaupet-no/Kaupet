@@ -16,7 +16,7 @@ import { ListingCard, type ListingCardData } from "@/components/listing-card";
 import { KaupetCodeDialog } from "@/components/kaupet-code-dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/location-filter";
+import { LocationPicker, RadiusPicker } from "@/components/location-filter";
 import { AnimatedSearchPlaceholder } from "@/components/animated-search-placeholder";
 import { useSavedLocation } from "@/hooks/use-saved-location";
 import { getCategoryIcon } from "@/lib/category-icons";

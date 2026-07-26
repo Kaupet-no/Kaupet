@@ -7,7 +7,16 @@ import {
   type CarouselApi,
 } from "@/components/ui/carousel";
 
-type ListingImage = { storage_path: string; sort_order: number };
+type ListingImage = { storage_path: string; sort_order: number; caption?: string | null };
+
+function ImageCaption({ caption }: { caption?: string | null }) {
+  if (!caption) return null;
+  return (
+    <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-3 py-2 text-xs text-white">
+      {caption}
+    </p>
+  );
+}
 
 export function ImageGallery({
   images,
@@ -76,7 +85,7 @@ export function ImageGallery({
           <CarouselContent className="ml-0">
             {images.map((img, i) => (
               <CarouselItem key={img.storage_path} className="pl-0">
-                <div className="aspect-[4/3] overflow-hidden rounded-xl border border-border bg-muted">
+                <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-border bg-muted">
                   {onImageClick ? (
                     <button
                       type="button"
@@ -97,6 +106,7 @@ export function ImageGallery({
                       className="size-full object-contain"
                     />
                   )}
+                  <ImageCaption caption={img.caption} />
                 </div>
               </CarouselItem>
             ))}
@@ -109,7 +119,7 @@ export function ImageGallery({
 
   return (
     <>
-      <div className="aspect-[4/3] overflow-hidden rounded-xl border border-border bg-muted">
+      <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-border bg-muted">
         {images.length > 0 ? (
           onImageClick ? (
             <button
@@ -136,6 +146,7 @@ export function ImageGallery({
             Ingen bilder
           </div>
         )}
+        {images.length > 0 && <ImageCaption caption={images[activeImage].caption} />}
       </div>
       {thumbnailStrip}
     </>

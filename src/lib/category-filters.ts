@@ -9,6 +9,20 @@ export const attributesSchema = z.record(
   z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]),
 );
 
+/** category_filters keys for the seks utstyr-gruppene (se
+ * 20260724130000_bil_og_mc_utstyr_filters.sql). Lives here (rather than in
+ * field-groups/vehicle-equipment, a React component module) so server code
+ * — e.g. listings.functions.ts's createListing — can reference it without
+ * pulling UI components into the server bundle. */
+export const VEHICLE_EQUIPMENT_FILTER_KEYS = [
+  "utstyr_teknisk",
+  "utstyr_forerstotte",
+  "utstyr_dekk",
+  "utstyr_lys",
+  "utstyr_interior",
+  "utstyr_annet",
+] as const;
+
 export type FilterType =
   | "select"
   | "multiselect"
@@ -172,7 +186,9 @@ export function getMissingRequiredFilters(
   allFilters: CategoryFilter[],
   categoriesById: Map<string, CategoryNode>,
   attributes: Record<string, AttributeValue>,
+  excludeKeys?: readonly string[],
 ): CategoryFilter[] {
+  const excluded = excludeKeys ? new Set(excludeKeys) : null;
   const filters = effectiveFiltersForCategory(categoryId, allFilters, categoriesById).filter(
     // "range" is search-only, "boolean" can't distinguish unanswered from
     // false, and "registration_number" is set by the vehicle wizard itself
@@ -182,6 +198,7 @@ export function getMissingRequiredFilters(
       f.type !== "range" &&
       f.type !== "boolean" &&
       f.key !== "registration_number" &&
+      !excluded?.has(f.key) &&
       filterDependencyMet(f, attributes),
   );
   return filters.filter((f) => {

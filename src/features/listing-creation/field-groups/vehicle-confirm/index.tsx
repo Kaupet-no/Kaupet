@@ -571,7 +571,7 @@ export function VehicleConfirm({
         </div>
         {(spec.year || lookup.brand || lookup.model) && (
           <p className="mt-1 text-muted-foreground">
-            Tittel blir:{" "}
+            Annonsens tittel blir:{" "}
             <span className="font-medium text-foreground">
               {[
                 spec.year,

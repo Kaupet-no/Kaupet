@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { ArrowLeft, Eye } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -9,9 +9,20 @@ export const Route = createFileRoute("/_authenticated/ny-annonse/forhandsvisning
   component: NyAnnonseForhandsvisning,
 });
 
+/**
+ * Real browser back-navigation (not `navigate({ to: "/ny-annonse" })`) — the
+ * wizard is only ever reached with a "type" search param (?type=sell), and a
+ * bare `navigate` here would drop it, tripping the wizard's own
+ * redirect-to-home guard for "arrived with no type and no draft" and
+ * bouncing the user to "/" instead of back to their in-progress listing. Same
+ * pattern already used by the image lightbox (see image-lightbox.tsx).
+ */
+function goBackToWizard() {
+  history.back();
+}
+
 function NyAnnonseForhandsvisning() {
   const draft = usePreviewDraft();
-  const navigate = useNavigate();
 
   if (!draft) {
     return (
@@ -20,7 +31,7 @@ function NyAnnonseForhandsvisning() {
         <p className="mt-2 text-sm text-muted-foreground">
           Gå tilbake til annonseveiviseren og trykk «Forhåndsvis annonse».
         </p>
-        <Button className="mt-6" onClick={() => navigate({ to: "/ny-annonse" })}>
+        <Button className="mt-6" onClick={goBackToWizard}>
           Tilbake til veiviseren
         </Button>
       </div>
@@ -55,12 +66,7 @@ function NyAnnonseForhandsvisning() {
             <Eye className="size-4" />
             Dette er en forhåndsvisning — annonsen er ikke publisert ennå
           </span>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={() => navigate({ to: "/ny-annonse" })}
-          >
+          <Button type="button" size="sm" variant="ghost" onClick={goBackToWizard}>
             <ArrowLeft className="size-4" /> Tilbake til annonsen
           </Button>
         </div>

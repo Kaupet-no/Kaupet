@@ -11,21 +11,9 @@ import { Loader2, ImagePlus, X, ChevronLeft, ChevronRight, Send } from "lucide-r
 
 import { supabase } from "@/integrations/supabase/client";
 import { republishListing } from "@/lib/listings.functions";
-import {
-  geocodeNorwayAddress,
-  lookupPostalCode,
-  lookupCity,
-  reverseGeocodeAddress,
-} from "@/lib/geocode";
+import { geocodeNorwayAddress } from "@/lib/geocode";
 import { FullscreenLocationPicker } from "@/components/fullscreen-location-picker";
-import {
-  LISTING_BUCKET,
-  MAX_IMAGES,
-  describeImageError,
-  signListingImageUrls,
-  uploadListingImage,
-  validateImages,
-} from "@/lib/storage";
+import { LISTING_BUCKET, MAX_IMAGES, uploadListingImage } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -64,7 +52,8 @@ import {
 } from "@/lib/vehicle-classification";
 import { suggestKeywordsForListing } from "@/lib/keyword-suggestion.functions";
 import { matchWtbListingsForListing } from "@/lib/wtb-listings.functions";
-import { getCurrentPosition, requestLocationPermission, isNative } from "@/lib/native";
+import { useEditableListingImages } from "@/features/listing-creation/use-editable-listing-images";
+import { useEditLocationPicker } from "@/features/listing-creation/use-edit-location-picker";
 
 const SIMILAR_STOPWORDS = new Set([
   "og",
@@ -151,10 +140,6 @@ const schema = z.object({
   maintenance_history: z.string().trim().max(2000).optional().or(z.literal("")),
 });
 type FormValues = z.infer<typeof schema>;
-
-type EditorItem =
-  | { kind: "existing"; key: string; storage_path: string; url?: string }
-  | { kind: "new"; key: string; file: File; previewUrl: string };
 
 /**
  * Groups the edit form into numbered sections mirroring the create-wizard's
@@ -288,76 +273,20 @@ function EditListingPage() {
   const maintenanceHistory = watch("maintenance_history");
 
   const [showPublishWarning, setShowPublishWarning] = useState(false);
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const lastEditedRef = useRef<"postal_code" | "city" | "map" | null>(null);
-  const markerMovedRef = useRef(false);
-  const coordsHydratedFor = useRef<string | null>(null);
-  const [locationMethod, setLocationMethod] = useState<"gps" | "postal" | null>(null);
-  const [locationLoading, setLocationLoading] = useState(false);
-  const [fullscreenMapOpen, setFullscreenMapOpen] = useState(false);
-  const locationMethodHydratedFor = useRef<string | null>(null);
-
-  // Initialize coords from existing listing
-  useEffect(() => {
-    if (!listing || coordsHydratedFor.current === listing.id) return;
-    coordsHydratedFor.current = listing.id;
-    if (typeof listing.lat === "number" && typeof listing.lng === "number") {
-      setCoords({ lat: listing.lat, lng: listing.lng });
-    }
-  }, [listing]);
-
-  // Default the location method to "postal" for existing listings that already
-  // have a postal code/city, so editing doesn't hide the already-filled-in
-  // location fields behind the create-wizard's pick-a-method screen.
-  useEffect(() => {
-    if (!listing || locationMethodHydratedFor.current === listing.id) return;
-    locationMethodHydratedFor.current = listing.id;
-    if (listing.postal_code || listing.city) setLocationMethod("postal");
-  }, [listing]);
-
-  // Auto-fill city from postal code
-  useEffect(() => {
-    if (lastEditedRef.current !== "postal_code") return;
-    const p = (postalCode ?? "").trim();
-    if (!/^\d{4}$/.test(p)) return;
-    const t = window.setTimeout(async () => {
-      const r = await lookupPostalCode(p);
-      if (!r) return;
-      if (r.city) setValue("city", r.city, { shouldValidate: false });
-      if (!markerMovedRef.current) setCoords({ lat: r.lat, lng: r.lng });
-    }, 500);
-    return () => window.clearTimeout(t);
-  }, [postalCode, setValue]);
-
-  // Auto-fill postal from city
-  useEffect(() => {
-    if (lastEditedRef.current !== "city") return;
-    const c = (city ?? "").trim();
-    if (c.length < 2) return;
-    const t = window.setTimeout(async () => {
-      const r = await lookupCity(c);
-      if (!r) return;
-      if (r.postal_code && !(postalCode ?? "").trim()) {
-        setValue("postal_code", r.postal_code, { shouldValidate: false });
-      }
-      if (!markerMovedRef.current) setCoords({ lat: r.lat, lng: r.lng });
-    }, 500);
-    return () => window.clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [city, setValue]);
-
-  // Reverse-geocode map position back to city/postal
-  useEffect(() => {
-    if (lastEditedRef.current !== "map" || !coords) return;
-    const t = window.setTimeout(async () => {
-      const r = await reverseGeocodeAddress(coords);
-      if (r.city) setValue("city", r.city, { shouldValidate: false });
-      if (r.postal_code && /^\d{4}$/.test(r.postal_code)) {
-        setValue("postal_code", r.postal_code, { shouldValidate: false });
-      }
-    }, 300);
-    return () => window.clearTimeout(t);
-  }, [coords, setValue]);
+  const {
+    coords,
+    setCoords,
+    lastEditedRef,
+    markerMovedRef,
+    locationMethod,
+    setLocationMethod,
+    locationLoading,
+    fullscreenMapOpen,
+    setFullscreenMapOpen,
+    switchToPostal,
+    switchToGps,
+    fetchMyLocation,
+  } = useEditLocationPicker({ listing, postalCode, city, setValue });
 
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const categoryHydratedFor = useRef<string | null>(null);
@@ -490,137 +419,10 @@ function EditListingPage() {
     setValue("description", next, { shouldTouch: false });
   }
 
-  function switchToPostal() {
-    setCoords(null);
-    setValue("postal_code", "");
-    setValue("city", "");
-    markerMovedRef.current = false;
-    lastEditedRef.current = null;
-    setLocationMethod("postal");
-  }
-
-  function switchToGps() {
-    setValue("postal_code", "");
-    setValue("city", "");
-    markerMovedRef.current = false;
-    lastEditedRef.current = null;
-    void fetchMyLocation();
-  }
-
-  async function fetchMyLocation() {
-    setLocationMethod("gps");
-    setLocationLoading(true);
-    try {
-      if (isNative()) {
-        const permission = await requestLocationPermission();
-        if (permission !== "granted") {
-          showErrorToast("Gi appen tilgang til posisjon i innstillingene.");
-          setLocationMethod(null);
-          return;
-        }
-      }
-      const pos = await getCurrentPosition();
-      if (!pos) {
-        showErrorToast("Kunne ikke hente posisjon.");
-        setLocationMethod(null);
-        return;
-      }
-      const { lat, lng } = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      setCoords({ lat, lng });
-      markerMovedRef.current = false;
-      lastEditedRef.current = null;
-      const geo = await reverseGeocodeAddress({ lat, lng });
-      if (geo.city) setValue("city", geo.city, { shouldValidate: false });
-      if (geo.postal_code && /^\d{4}$/.test(geo.postal_code)) {
-        setValue("postal_code", geo.postal_code, { shouldValidate: false });
-      }
-    } catch {
-      showErrorToast("Kunne ikke hente posisjon. Sjekk at du har gitt tilgang.");
-      setLocationMethod(null);
-    } finally {
-      setLocationLoading(false);
-    }
-  }
-
-  // Image editor state
-  const [items, setItems] = useState<EditorItem[]>([]);
-  const [removedPaths, setRemovedPaths] = useState<string[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const hydratedFor = useRef<string | null>(null);
-  const originalImageKeysRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!listing || hydratedFor.current === listing.id) return;
-    const sorted = [...(listing.listing_images ?? [])].sort((a, b) => a.sort_order - b.sort_order);
-    const initial: EditorItem[] = sorted.map((img) => ({
-      kind: "existing",
-      key: img.storage_path,
-      storage_path: img.storage_path,
-    }));
-    setItems(initial);
-    hydratedFor.current = listing.id;
-    originalImageKeysRef.current = initial.map((i) => i.key).join("|");
-    if (sorted.length > 0) {
-      signListingImageUrls(sorted.map((i) => i.storage_path)).then((map) => {
-        setItems((curr) =>
-          curr.map((it) => (it.kind === "existing" ? { ...it, url: map[it.storage_path] } : it)),
-        );
-      });
-    }
-  }, [listing]);
-
-  useEffect(() => {
-    return () => {
-      items.forEach((it) => {
-        if (it.kind === "new") URL.revokeObjectURL(it.previewUrl);
-      });
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const addFiles = (files: File[]) => {
-    const err = validateImages(files, items.length);
-    if (err) {
-      showErrorToast(describeImageError(err));
-      return;
-    }
-    const next: EditorItem[] = files.map((file) => ({
-      kind: "new",
-      key: crypto.randomUUID(),
-      file,
-      previewUrl: URL.createObjectURL(file),
-    }));
-    setItems((curr) => [...curr, ...next]);
-  };
-
-  const removeItem = (key: string) => {
-    setItems((curr) => {
-      const target = curr.find((i) => i.key === key);
-      if (target?.kind === "new") URL.revokeObjectURL(target.previewUrl);
-      if (target?.kind === "existing") {
-        setRemovedPaths((paths) => [...paths, target.storage_path]);
-      }
-      return curr.filter((i) => i.key !== key);
-    });
-  };
-
-  const move = (key: string, dir: -1 | 1) => {
-    setItems((curr) => {
-      const idx = curr.findIndex((i) => i.key === key);
-      if (idx < 0) return curr;
-      const newIdx = idx + dir;
-      if (newIdx < 0 || newIdx >= curr.length) return curr;
-      const copy = [...curr];
-      const [it] = copy.splice(idx, 1);
-      copy.splice(newIdx, 0, it);
-      return copy;
-    });
-  };
+  const { items, removedPaths, fileInputRef, addFiles, removeItem, move, imagesDirty } =
+    useEditableListingImages(listing);
 
   // Unsaved-changes guard: form dirty, image list changed, or attributes touched.
-  const imagesDirty =
-    originalImageKeysRef.current !== null &&
-    items.map((i) => i.key).join("|") !== originalImageKeysRef.current;
   const skipGuardRef = useRef(false);
   const hasUnsavedChanges = (isDirty || imagesDirty || attributesTouched) && !skipGuardRef.current;
   const blocker = useBlocker({

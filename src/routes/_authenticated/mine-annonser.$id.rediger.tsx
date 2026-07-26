@@ -50,74 +50,9 @@ import {
   VEHICLE_LEAF_SLUGS_WITHOUT_MILEAGE,
   type VehicleLeafSlug,
 } from "@/lib/vehicle-classification";
-import { suggestKeywordsForListing } from "@/lib/keyword-suggestion.functions";
-import { matchWtbListingsForListing } from "@/lib/wtb-listings.functions";
 import { useEditableListingImages } from "@/features/listing-creation/use-editable-listing-images";
 import { useEditLocationPicker } from "@/features/listing-creation/use-edit-location-picker";
-
-const SIMILAR_STOPWORDS = new Set([
-  "og",
-  "er",
-  "en",
-  "et",
-  "ei",
-  "i",
-  "på",
-  "med",
-  "til",
-  "av",
-  "for",
-  "som",
-  "fra",
-  "har",
-  "den",
-  "det",
-  "de",
-  "vi",
-  "du",
-  "kan",
-  "ikke",
-  "seg",
-  "han",
-  "hun",
-  "men",
-  "om",
-  "så",
-  "ut",
-  "enn",
-  "da",
-  "når",
-  "at",
-  "dem",
-  "sin",
-  "hva",
-  "ved",
-  "var",
-  "ny",
-  "nye",
-  "god",
-  "fin",
-  "fine",
-  "pen",
-  "pent",
-  "pene",
-  "lite",
-  "litt",
-  "stor",
-  "store",
-  "liten",
-  "billig",
-  "rimelig",
-  "rask",
-  "raskt",
-  "gammel",
-  "brukt",
-  "selger",
-  "selges",
-  "kjøper",
-  "kjøpes",
-  "pris",
-]);
+import { useEditListingHints } from "@/features/listing-creation/use-edit-listing-hints";
 
 const schema = z.object({
   title: z.string().trim().min(5).max(120),
@@ -364,60 +299,13 @@ function EditListingPage() {
   function setSuggestionDismissed() {}
   function setCategorySuggestion() {}
 
-  // Debounced title for WTB/keyword/similar-listings queries
-  const [debouncedTitle, setDebouncedTitle] = useState("");
-  useEffect(() => {
-    const t = window.setTimeout(() => setDebouncedTitle(title ?? ""), 800);
-    return () => window.clearTimeout(t);
-  }, [title]);
-
-  const { data: similarListings } = useQuery({
-    queryKey: ["similar-listings", categoryId, debouncedTitle],
-    enabled: debouncedTitle.length >= 5 && !!categoryId,
-    staleTime: 60_000,
-    queryFn: async () => {
-      const significantWords = debouncedTitle
-        .toLowerCase()
-        .replace(/[^a-zæøå0-9\s]/g, "")
-        .split(/\s+/)
-        .filter((w) => w.length >= 2 && !SIMILAR_STOPWORDS.has(w));
-      if (significantWords.length === 0) return [];
-      const { data } = await supabase
-        .from("listings")
-        .select("id, title, price_nok, is_free, city")
-        .eq("category_id", categoryId)
-        .eq("status", "active")
-        .neq("id", id)
-        .textSearch("search_vector", significantWords.join(" "), {
-          config: "norwegian",
-          type: "plain",
-        })
-        .limit(3);
-      return data ?? [];
-    },
-  });
-
-  const matchWtbFn = useServerFn(matchWtbListingsForListing);
-  const { data: wtbMatch } = useQuery({
-    queryKey: ["wtb-match", categoryId ?? null, debouncedTitle],
-    enabled: debouncedTitle.length >= 3,
-    staleTime: 120_000,
-    queryFn: () => matchWtbFn({ data: { title: debouncedTitle, category_id: categoryId || null } }),
-  });
-
-  const { data: keywordSuggestions, isFetching: keywordsFetching } = useQuery({
-    queryKey: ["keyword-suggestions", categoryId, debouncedTitle],
-    enabled: !!categoryId && debouncedTitle.length >= 3,
-    staleTime: 120_000,
-    queryFn: () =>
-      suggestKeywordsForListing({ data: { title: debouncedTitle, category_id: categoryId! } }),
-  });
-
-  function appendTagToDescription(tag: string) {
-    const current = (description ?? "").trimEnd();
-    const next = current ? `${current} ${tag}` : tag;
-    setValue("description", next, { shouldTouch: false });
-  }
+  const {
+    similarListings,
+    wtbMatch,
+    keywordSuggestions,
+    keywordsFetching,
+    appendTagToDescription,
+  } = useEditListingHints({ title, description, categoryId, listingId: id, setValue });
 
   const { items, removedPaths, fileInputRef, addFiles, removeItem, move, imagesDirty } =
     useEditableListingImages(listing);

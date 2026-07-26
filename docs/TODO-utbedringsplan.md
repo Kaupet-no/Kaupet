@@ -1,8 +1,8 @@
-# Utbedringsplan — status og videre arbeid
+# Utbedringsplan — status
 
-Se full plan i samtalehistorikken / `iterative-strolling-minsky.md`-planfilen for bakgrunn. Dette dokumentet er en kort statusoppdatering for å plukke opp arbeidet igjen.
+Se full historikk i samtaleloggen / `iterative-strolling-minsky.md`-planfilen for bakgrunn og resonnement bak hvert steg.
 
-## Ferdig (committet og pushet til `staging`)
+## Alle fire faser er ferdig
 
 **Fase 1 — sikkerhet/konsistens** (commit `922ed59`)
 
@@ -16,36 +16,34 @@ Se full plan i samtalehistorikken / `iterative-strolling-minsky.md`-planfilen fo
 
 - `AuthProvider` kalte state-settere synkront fra `onAuthStateChange` idet man abonnerte, som trigget "Can't perform a React state update on a component that hasn't mounted yet" på _hver_ side i appen. Fikset med `queueMicrotask`.
 
-**Fase 2 — alle fire gud-komponenter ferdig oppdelt:**
+**Fase 2 — alle fire gud-komponenter oppdelt:**
 
-- `ny-annonse.tsx`: 1770 → 1226 linjer — `useDraftAutosave`, `useVehicleLookupFlow`, `useLocationPicker`, `useListingTitleHints`
-- `admin/kategorier.tsx`: 2003 → 496 linjer — splittet i 8 filer under `src/components/admin/categories/`
-- `mine-annonser.$id.rediger.tsx`: 1145 → 835 linjer — `useEditableListingImages`, `useEditLocationPicker`, `useEditListingHints`
-- `annonser.tsx`: 943 → 822 linjer — `useAnnonserSearchState`
-- `index.tsx`: 901 → 765 linjer — `useCategoryDrilldown`
+- `ny-annonse.tsx`: 1770 → 1226 linjer
+- `admin/kategorier.tsx`: 2003 → 496 linjer (splittet i 8 filer)
+- `mine-annonser.$id.rediger.tsx`: 1145 → 835 linjer
+- `annonser.tsx`: 943 → 822 linjer
+- `index.tsx`: 901 → 765 linjer
 
-**Fase 3 — testdekning ferdig** (commits `52bdf16`, `8edf1ab`)
+**Fase 3 — testdekning** (commits `52bdf16`, `8edf1ab`)
 
-- React Testing Library + jsdom satt opp (devDependencies, per-fil `@vitest-environment jsdom`-pragma)
-- Alle ni hooks fra fase 2 har egen testdekning
-- Full suite: **165 tester**, alle grønne
+- React Testing Library + jsdom satt opp
+- Alle hooks fra fase 2 har egen testdekning
 
-**Fase 4 — delvis ferdig** (commit `105c1e0`)
+**Fase 4 — opprydding** (commits `105c1e0`, `3b1ce18`, `8d62639`, `2b41910`)
 
-- Slått på `noUnusedLocals`/`noUnusedParameters` i `tsconfig.json` — fikset 22 avdekkede dødkode-tilfeller (ubrukte imports/variabler i 14 filer). Undersøkte hvert enkelt tilfelle for å utelukke reelle bugs (f.eks. `resultBtn`-propen i `native-filter-chips.tsx` viste seg å være genuint ubrukt, ikke en manglende "lukk ark"-knapp — bekreftet via kodelesning av `onApply→close()`-kjeden).
-- Verifisert: ingen andre fail-open-sikkerhetsmønstre som Turnstile-buggen. Gjennomgått alle tre `onAuthStateChange`-abonnement i kodebasen (`auth.tsx` — allerede fikset, `__root.tsx` og `tilbakestill-passord.tsx` — begge trygge by design). Gjennomgått `process.env.*`-guarder i server-filene — resten er best-effort-sideeffekter (e-post/push), ikke sikkerhetsbypasser.
+- `noUnusedLocals`/`noUnusedParameters` slått på i `tsconfig.json` — 22 dødkode-tilfeller fjernet, hvert undersøkt for å utelukke reelle bugs
+- Sikkerhetsgjennomgang: ingen andre fail-open-mønstre som Turnstile-buggen funnet (alle tre `onAuthStateChange`-abonnement og server-side `process.env`-guarder gjennomgått)
+- `useListingTitleHints` og `useEditListingHints` slått sammen til én delt kjerne (`useTitleBasedListingHints`) — fjernet duplisert lignende-annonser/WTB/nøkkelord-logikk
+- Ny E2E-spec for uinnlogget søk (`e2e/browse-search.spec.ts`) — **merk: ikke kjørt gjennom Playwright-testløperen**, siden denne sandkassen mangler `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY`. Bekreftet kun at den parses korrekt (`playwright test --list`). Kjør den én gang mot et konfigurert miljø før den stoles på i CI.
 
-Alt verifisert med typecheck, lint, full test-suite, full bygg, og manuell nettleser-test.
+Full test-suite: **168 enhetstester**, alle grønne. Typecheck, lint og full bygg verifisert grønt gjennom hele arbeidet.
 
-## Gjenstår (lavere prioritet)
+## Eneste gjenstående forbehold
 
-- **Vurdere** å slå sammen `useListingTitleHints` og `useEditListingHints` til én parameterisert hook (med/uten kategoriforslag, med/uten selv-ekskludering) — nesten identisk logikk i to filer. Ikke gjort ennå: risiko/gevinst-vurdering tilsier at dette er lavt prioritert siden begge hooks allerede har god testdekning og fungerer korrekt hver for seg; en sammenslåing er en ren DRY-forbedring, ikke en bug-fiks.
-- Flere Playwright E2E-specs utover `publish-listing.spec.ts` — krever en kjørende Supabase-stack (`supabase start`) eller staging-miljø, som ikke er tilgjengelig i denne økten.
+`e2e/browse-search.spec.ts` bør kjøres én gang mot en ekte Supabase-tilkobling (lokalt med `.env` konfigurert, eller i CI) for å bekrefte at selektorene faktisk stemmer — den er skrevet ut fra manuelt observerte selektorer, ikke kjørt end-to-end.
 
-## Praktisk oppstart neste gang
+## Ved oppstart av nytt arbeid
 
 ```bash
 git pull origin staging
 ```
-
-Fase 1–3 er ferdig, Fase 4 er i hovedsak ferdig. De to gjenstående punktene er valgfrie forbedringer uten avhengigheter til hverandre — ta dem når det passer, eller hopp over dem helt.

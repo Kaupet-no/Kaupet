@@ -5,6 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   attributesSchema,
   getMissingRequiredFilters,
+  isVehicleCategory,
   normalizeFilter,
   VEHICLE_EQUIPMENT_FILTER_KEYS,
   type CategoryNode,
@@ -187,9 +188,10 @@ export const createListing = createServerFn({ method: "POST" })
     const categoriesById = new Map<string, CategoryNode>(
       (categoryRows ?? []).map((c) => [c.id as string, c as CategoryNode]),
     );
+    const normalizedFilters = (filterRows ?? []).map(normalizeFilter);
     const missing = getMissingRequiredFilters(
       data.category_id,
-      (filterRows ?? []).map(normalizeFilter),
+      normalizedFilters,
       categoriesById,
       data.attributes ?? {},
       VEHICLE_EQUIPMENT_FILTER_KEYS,
@@ -207,10 +209,14 @@ export const createListing = createServerFn({ method: "POST" })
     );
     const moduleError = validateModules(modules, data.attributes ?? {});
     if (moduleError) throw new Error(moduleError);
-    const fieldGroupError = validateRequiredFieldGroups(fieldGroups, {
-      condition: data.condition,
-      can_ship: data.can_ship,
-    });
+    const fieldGroupError = validateRequiredFieldGroups(
+      fieldGroups,
+      {
+        condition: data.condition,
+        can_ship: data.can_ship,
+      },
+      isVehicleCategory(data.category_id, normalizedFilters, categoriesById),
+    );
     if (fieldGroupError) throw new Error(fieldGroupError);
 
     const listingFields = {

@@ -521,14 +521,18 @@ function EditListingPage() {
               return;
             }
           }
-          const fieldGroupError = validateRequiredFieldGroups(fieldGroupKeys, {
-            condition: v.condition ?? null,
-            can_ship: fieldGroupKeys.includes("delivery-location")
-              ? v.can_ship != null
-                ? v.can_ship !== "pickup"
-                : null
-              : null,
-          });
+          const fieldGroupError = validateRequiredFieldGroups(
+            fieldGroupKeys,
+            {
+              condition: v.condition ?? null,
+              can_ship: fieldGroupKeys.includes("delivery-location")
+                ? v.can_ship != null
+                  ? v.can_ship !== "pickup"
+                  : null
+                : null,
+            },
+            !!vehicleGroup,
+          );
           if (fieldGroupError) {
             showErrorToast(fieldGroupError);
             return;

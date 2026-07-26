@@ -34,13 +34,13 @@ Se full historikk i samtaleloggen / `iterative-strolling-minsky.md`-planfilen fo
 - `noUnusedLocals`/`noUnusedParameters` slått på i `tsconfig.json` — 22 dødkode-tilfeller fjernet, hvert undersøkt for å utelukke reelle bugs
 - Sikkerhetsgjennomgang: ingen andre fail-open-mønstre som Turnstile-buggen funnet (alle tre `onAuthStateChange`-abonnement og server-side `process.env`-guarder gjennomgått)
 - `useListingTitleHints` og `useEditListingHints` slått sammen til én delt kjerne (`useTitleBasedListingHints`) — fjernet duplisert lignende-annonser/WTB/nøkkelord-logikk
-- Ny E2E-spec for uinnlogget søk (`e2e/browse-search.spec.ts`) — **merk: ikke kjørt gjennom Playwright-testløperen**, siden denne sandkassen mangler `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY`. Bekreftet kun at den parses korrekt (`playwright test --list`). Kjør den én gang mot et konfigurert miljø før den stoles på i CI.
+- Ny E2E-spec for uinnlogget søk (`e2e/browse-search.spec.ts`) — **kjørt og bestått** mot staging sitt Supabase-prosjekt (dekryptert `secrets/staging.env` med SOPS, kjørte lokal dev-server pekt mot staging-databasen). 1 passed (26.7s). `global-teardown.ts` ryddet automatisk opp den midlertidige testbrukeren i staging etterpå.
 
 Full test-suite: **168 enhetstester**, alle grønne. Typecheck, lint og full bygg verifisert grønt gjennom hele arbeidet.
 
-## Eneste gjenstående forbehold
+## Ingen gjenstående forbehold
 
-`e2e/browse-search.spec.ts` bør kjøres én gang mot en ekte Supabase-tilkobling (lokalt med `.env` konfigurert, eller i CI) for å bekrefte at selektorene faktisk stemmer — den er skrevet ut fra manuelt observerte selektorer, ikke kjørt end-to-end.
+Alt i utbedringsplanen er nå fullført og verifisert, inkludert E2E-specen.
 
 ## Ved oppstart av nytt arbeid
 

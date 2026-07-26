@@ -18,11 +18,7 @@ function VehicleConditionDetails({
   errors,
   knownIssues,
   noKnownIssues,
-  maintenanceHistory,
-}: Pick<
-  WizardSharedProps,
-  "register" | "setValue" | "errors" | "knownIssues" | "noKnownIssues" | "maintenanceHistory"
->) {
+}: Pick<WizardSharedProps, "register" | "setValue" | "errors" | "knownIssues" | "noKnownIssues">) {
   return (
     <>
       <section className="space-y-2">

@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NativePageHeader } from "@/components/native-page-header";
 import { createFileRoute, useNavigate, useBlocker, useRouter, Link } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
-import { AlertCircle, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { createListing } from "@/lib/listings.functions";
@@ -46,7 +46,6 @@ import type { VehicleLeafSlug } from "@/lib/vehicle-classification";
 import { useIsDemo } from "@/hooks/use-is-demo";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -249,7 +248,7 @@ function NewListingPage() {
   const turnstileEnabled = !!import.meta.env.VITE_TURNSTILE_SITE_KEY;
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const { type: typeParam } = Route.useSearch();
-  const [listingType, setListingType] = useState<"sell" | null>(() => typeParam ?? null);
+  const listingType = typeParam ?? null;
 
   const { data: categories } = useQuery({
     queryKey: ["categories", "with-parent"],
@@ -268,7 +267,6 @@ function NewListingPage() {
     [categories],
   );
 
-  const parentCategories = (categories ?? []).filter((c) => !c.parent_id);
   const [selectedParentId, setSelectedParentId] = useState<string>("");
 
   const { data: allFilters } = useAllCategoryFilters();
@@ -791,7 +789,7 @@ function NewListingPage() {
       category: categoryNode
         ? { name_nb: categoryNode.name_nb, slug: categoryNode.slug ?? null }
         : null,
-      images: images.map((img, i) => ({ storage_path: String(i), sort_order: i })),
+      images: images.map((_, i) => ({ storage_path: String(i), sort_order: i })),
       imgUrls: Object.fromEntries(images.map((img, i) => [String(i), img.previewUrl])),
       attributes,
     });

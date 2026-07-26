@@ -1,83 +1,14 @@
-import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
-import { supabase } from "@/integrations/supabase/client";
-import { suggestKeywordsForListing } from "@/lib/keyword-suggestion.functions";
-import { matchWtbListingsForListing } from "@/lib/wtb-listings.functions";
-
-const SIMILAR_STOPWORDS = new Set([
-  "og",
-  "er",
-  "en",
-  "et",
-  "ei",
-  "i",
-  "på",
-  "med",
-  "til",
-  "av",
-  "for",
-  "som",
-  "fra",
-  "har",
-  "den",
-  "det",
-  "de",
-  "vi",
-  "du",
-  "kan",
-  "ikke",
-  "seg",
-  "han",
-  "hun",
-  "men",
-  "om",
-  "så",
-  "ut",
-  "enn",
-  "da",
-  "når",
-  "at",
-  "dem",
-  "sin",
-  "hva",
-  "ved",
-  "var",
-  "ny",
-  "nye",
-  "god",
-  "fin",
-  "fine",
-  "pen",
-  "pent",
-  "pene",
-  "lite",
-  "litt",
-  "stor",
-  "store",
-  "liten",
-  "billig",
-  "rimelig",
-  "rask",
-  "raskt",
-  "gammel",
-  "brukt",
-  "selger",
-  "selges",
-  "kjøper",
-  "kjøpes",
-  "pris",
-]);
+import { useTitleBasedListingHints } from "@/features/listing-creation/use-title-based-listing-hints";
 
 /**
  * Everything the listing-edit page derives from the title as the user
  * types: "similar listings already up" hints (excluding the listing being
  * edited itself), a WTB (want-to-buy) price match, and keyword suggestions
- * for the description. Nearly identical to ny-annonse.tsx's
- * useListingTitleHints, but without the category-suggestion piece (editing
- * an already-published listing shouldn't suggest a different category off
- * a title tweak) and with the `.neq("id", listingId)` exclusion. Pulled out
- * of mine-annonser.$id.rediger.tsx.
+ * for the description — via the shared useTitleBasedListingHints core.
+ * Unlike ny-annonse.tsx's useListingTitleHints, there's no category
+ * suggestion here (editing an already-published listing shouldn't suggest a
+ * different category off a title tweak). Pulled out of
+ * mine-annonser.$id.rediger.tsx.
  */
 export function useEditListingHints(params: {
   title: string;
@@ -89,65 +20,11 @@ export function useEditListingHints(params: {
 }) {
   const { title, description, categoryId, listingId, setValue } = params;
 
-  const [debouncedTitle, setDebouncedTitle] = useState("");
-  useEffect(() => {
-    const t = window.setTimeout(() => setDebouncedTitle(title ?? ""), 800);
-    return () => window.clearTimeout(t);
-  }, [title]);
-
-  const { data: similarListings } = useQuery({
-    queryKey: ["similar-listings", categoryId, debouncedTitle],
-    enabled: debouncedTitle.length >= 5 && !!categoryId,
-    staleTime: 60_000,
-    queryFn: async () => {
-      const significantWords = debouncedTitle
-        .toLowerCase()
-        .replace(/[^a-zæøå0-9\s]/g, "")
-        .split(/\s+/)
-        .filter((w) => w.length >= 2 && !SIMILAR_STOPWORDS.has(w));
-      if (significantWords.length === 0) return [];
-      const { data } = await supabase
-        .from("listings")
-        .select("id, title, price_nok, is_free, city")
-        .eq("category_id", categoryId)
-        .eq("status", "active")
-        .neq("id", listingId)
-        .textSearch("search_vector", significantWords.join(" "), {
-          config: "norwegian",
-          type: "plain",
-        })
-        .limit(3);
-      return data ?? [];
-    },
+  return useTitleBasedListingHints({
+    title,
+    description,
+    categoryId,
+    excludeListingId: listingId,
+    setValue,
   });
-
-  const matchWtbFn = useServerFn(matchWtbListingsForListing);
-  const { data: wtbMatch } = useQuery({
-    queryKey: ["wtb-match", categoryId ?? null, debouncedTitle],
-    enabled: debouncedTitle.length >= 3,
-    staleTime: 120_000,
-    queryFn: () => matchWtbFn({ data: { title: debouncedTitle, category_id: categoryId || null } }),
-  });
-
-  const { data: keywordSuggestions, isFetching: keywordsFetching } = useQuery({
-    queryKey: ["keyword-suggestions", categoryId, debouncedTitle],
-    enabled: !!categoryId && debouncedTitle.length >= 3,
-    staleTime: 120_000,
-    queryFn: () =>
-      suggestKeywordsForListing({ data: { title: debouncedTitle, category_id: categoryId! } }),
-  });
-
-  function appendTagToDescription(tag: string) {
-    const current = (description ?? "").trimEnd();
-    const next = current ? `${current} ${tag}` : tag;
-    setValue("description", next, { shouldTouch: false });
-  }
-
-  return {
-    similarListings,
-    wtbMatch,
-    keywordSuggestions,
-    keywordsFetching,
-    appendTagToDescription,
-  };
 }

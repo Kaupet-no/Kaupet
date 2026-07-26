@@ -14,6 +14,25 @@ import {
 } from "@/features/listing-creation/category-flows";
 import { validateModules } from "@/features/listing-creation/modules/validators";
 import { validateRequiredFieldGroups } from "@/features/listing-creation/field-groups/validators";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+const MAX_LISTINGS_PER_HOUR = 5;
+
+async function assertUnderHourlyListingLimit(
+  supabaseAdmin: SupabaseClient,
+  userId: string,
+  errorMessage: string,
+) {
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { count } = await supabaseAdmin
+    .from("listings")
+    .select("id", { count: "exact", head: true })
+    .eq("seller_id", userId)
+    .gte("created_at", oneHourAgo);
+  if ((count ?? 0) >= MAX_LISTINGS_PER_HOUR) {
+    throw new Error(errorMessage);
+  }
+}
 
 export const saveDraftListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -85,15 +104,11 @@ export const saveDraftListing = createServerFn({ method: "POST" })
       return { id: updated.id as string, kaupet_code: updated.kaupet_code as string };
     }
 
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { count } = await supabaseAdmin
-      .from("listings")
-      .select("id", { count: "exact", head: true })
-      .eq("seller_id", userId)
-      .gte("created_at", oneHourAgo);
-    if ((count ?? 0) >= 5) {
-      throw new Error("Du har opprettet for mange annonser den siste timen. Prøv igjen senere.");
-    }
+    await assertUnderHourlyListingLimit(
+      supabaseAdmin,
+      userId,
+      "Du har opprettet for mange annonser den siste timen. Prøv igjen senere.",
+    );
 
     const { data: listing, error } = await supabaseAdmin
       .from("listings")
@@ -137,12 +152,21 @@ export const createListing = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { userId } = context;
 
-    if (process.env.TURNSTILE_SECRET_KEY) {
+    const turnstileSecret = process.env.TURNSTILE_SECRET_KEY;
+    if (!turnstileSecret) {
+      // Bot protection must be configured in production/staging; only skip it
+      // when running locally without the secret set. This fails closed rather
+      // than silently letting listings through unverified in a misconfigured
+      // deployed environment.
+      if (process.env.NODE_ENV === "production") {
+        throw new Error("Serverfeil: bot-beskyttelse er ikke konfigurert.");
+      }
+    } else {
       if (!data.turnstileToken) throw new Error("Turnstile-validering feilet. Prøv igjen.");
       const cfRes = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
         method: "POST",
         body: new URLSearchParams({
-          secret: process.env.TURNSTILE_SECRET_KEY,
+          secret: turnstileSecret,
           response: data.turnstileToken,
         }),
       });
@@ -221,15 +245,11 @@ export const createListing = createServerFn({ method: "POST" })
       return { id: listing.id as string, kaupet_code: listing.kaupet_code as string };
     }
 
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { count } = await supabaseAdmin
-      .from("listings")
-      .select("id", { count: "exact", head: true })
-      .eq("seller_id", userId)
-      .gte("created_at", oneHourAgo);
-    if ((count ?? 0) >= 5) {
-      throw new Error("Du har publisert for mange annonser den siste timen. Prøv igjen senere.");
-    }
+    await assertUnderHourlyListingLimit(
+      supabaseAdmin,
+      userId,
+      "Du har publisert for mange annonser den siste timen. Prøv igjen senere.",
+    );
 
     const { data: listing, error } = await supabaseAdmin
       .from("listings")

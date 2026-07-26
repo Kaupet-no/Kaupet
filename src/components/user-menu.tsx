@@ -1,5 +1,5 @@
-import { Link, useNavigate, useRouter } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import {
@@ -42,8 +42,6 @@ function initials(name: string | null | undefined, fallback: string) {
 
 export function UserMenu({ userId, email }: { userId: string; email: string | null }) {
   const navigate = useNavigate();
-  const router = useRouter();
-  const queryClient = useQueryClient();
   const { data: isAdmin } = useIsAdmin();
   const { data: isDemo } = useIsDemo();
   const canToggleTest = !!(isAdmin || isDemo);

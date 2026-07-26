@@ -1,7 +1,7 @@
 import * as React from "react";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
-import { showSuccessToast, showErrorToast } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";

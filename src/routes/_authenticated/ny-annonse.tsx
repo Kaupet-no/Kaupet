@@ -1,19 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NativePageHeader } from "@/components/native-page-header";
 import { createFileRoute, useNavigate, useBlocker, useRouter, Link } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
-import { AlertCircle, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
-import { createListing, saveDraftListing } from "@/lib/listings.functions";
+import { createListing } from "@/lib/listings.functions";
 import { uploadListingImage } from "@/lib/storage";
-import { computeVehicleTitle } from "@/lib/vehicle-title";
-import { geocodeNorwayAddress, lookupPostalCode, reverseGeocodeAddress } from "@/lib/geocode";
+import { geocodeNorwayAddress } from "@/lib/geocode";
 import { type PendingImage } from "@/components/image-uploader";
 import { FullscreenLocationPicker } from "@/components/fullscreen-location-picker";
 import { PromoteListingDialog } from "@/components/promote-listing-dialog";
@@ -27,6 +25,10 @@ import {
 } from "@/features/listing-creation/category-flows";
 import { useAllCategoryFlows } from "@/features/listing-creation/use-all-category-flows";
 import { useListingSteps, type WizardPage } from "@/features/listing-creation/use-listing-steps";
+import { useDraftAutosave } from "@/features/listing-creation/use-draft-autosave";
+import { useVehicleLookupFlow } from "@/features/listing-creation/use-vehicle-lookup-flow";
+import { useLocationPicker } from "@/features/listing-creation/use-location-picker";
+import { useListingTitleHints } from "@/features/listing-creation/use-listing-title-hints";
 import { fieldGroupsForKeys, pageLabel } from "@/features/listing-creation/field-groups/registry";
 import {
   categoryBreadcrumb,
@@ -34,27 +36,16 @@ import {
   vehicleCategoryGroupFor,
   type CategoryNode,
 } from "@/lib/category-filters";
-import { lookupVehicleByRegNumber } from "@/lib/vehicle-lookup.functions";
-import { matchVehicleBrandModel } from "@/lib/vehicle-brand-match.functions";
-import {
-  classifyVehicleCategory,
-  VEHICLE_LEAF_SLUGS_WITHOUT_MILEAGE,
-} from "@/lib/vehicle-classification";
+import { VEHICLE_LEAF_SLUGS_WITHOUT_MILEAGE } from "@/lib/vehicle-classification";
 import {
   VEHICLE_LOOKUP_FILTER_KEYS,
   VEHICLE_WIZARD_MANAGED_KEYS,
 } from "@/lib/vehicle-lookup.server";
-import type { VehicleLookupResult } from "@/lib/vehicle-lookup.server";
-import type {
-  AvgiftskodeGruppe,
-  VehicleClassification,
-  VehicleLeafSlug,
-} from "@/lib/vehicle-classification";
+import type { VehicleLeafSlug } from "@/lib/vehicle-classification";
 
 import { useIsDemo } from "@/hooks/use-is-demo";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -67,10 +58,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { formatErrorMessage } from "@/lib/errors";
 import { CONDITIONS, VEHICLE_CONDITIONS } from "@/lib/constants";
-import { suggestCategoryForTitle } from "@/lib/category-suggestion.functions";
-import { suggestKeywordsForListing } from "@/lib/keyword-suggestion.functions";
-import { matchWtbListingsForListing } from "@/lib/wtb-listings.functions";
-import { getCurrentPosition, requestLocationPermission, isNative } from "@/lib/native";
+import { isNative } from "@/lib/native";
 
 import { PublishActions } from "@/features/listing-creation/field-groups/review-publish";
 import type { WizardSharedProps } from "@/features/listing-creation/field-groups/types";
@@ -102,9 +90,6 @@ const listingSchema = z.object({
 });
 type ListingForm = z.infer<typeof listingSchema>;
 
-const DRAFT_KEY = "kaupet_draft_ny_annonse";
-const DRAFT_ID_KEY = "kaupet_draft_id";
-
 /** Forces each of the Bil og MC vehicle-only steps onto its own page,
  * separate from title-photos (images only for vehicles) and from each
  * other: vehicle-facts (Tittel/Kilometerstand/Pris/Undertittel),
@@ -121,70 +106,6 @@ const VEHICLE_FORCE_BREAK_BEFORE_KEYS = new Set([
   "vehicle-facts",
   "vehicle-condition",
   "description-keywords",
-]);
-
-const SIMILAR_STOPWORDS = new Set([
-  "og",
-  "er",
-  "en",
-  "et",
-  "ei",
-  "i",
-  "på",
-  "med",
-  "til",
-  "av",
-  "for",
-  "som",
-  "fra",
-  "har",
-  "den",
-  "det",
-  "de",
-  "vi",
-  "du",
-  "kan",
-  "ikke",
-  "seg",
-  "han",
-  "hun",
-  "men",
-  "om",
-  "så",
-  "ut",
-  "enn",
-  "da",
-  "når",
-  "at",
-  "dem",
-  "sin",
-  "hva",
-  "ved",
-  "var",
-  "ny",
-  "nye",
-  "god",
-  "fin",
-  "fine",
-  "pen",
-  "pent",
-  "pene",
-  "lite",
-  "litt",
-  "stor",
-  "store",
-  "liten",
-  "billig",
-  "rimelig",
-  "rask",
-  "raskt",
-  "gammel",
-  "brukt",
-  "selger",
-  "selges",
-  "kjøper",
-  "kjøpes",
-  "pris",
 ]);
 
 export const Route = createFileRoute("/_authenticated/ny-annonse")({
@@ -313,11 +234,6 @@ function NewListingPage() {
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(
     null,
   );
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [draftSaveError, setDraftSaveError] = useState(false);
-  const [hasDraftData, setHasDraftData] = useState<Record<string, unknown> | null>(null);
-  const [draftId, setDraftId] = useState<string | null>(null);
-  const draftSaveInProgress = useRef(false);
   const pendingSubmitValuesRef = useRef<ListingForm | null>(null);
   const [showNoImageDialog, setShowNoImageDialog] = useState(false);
   const [showNoPriceDialog, setShowNoPriceDialog] = useState(false);
@@ -327,15 +243,12 @@ function NewListingPage() {
   const [previewNudgeOpen, setPreviewNudgeOpen] = useState(false);
   const [attributes, setAttributes] = useState<AttributeMap>({});
   const [attributesTouched, setAttributesTouched] = useState(false);
-  const [locationLoading, setLocationLoading] = useState(false);
-  const [locationMethod, setLocationMethod] = useState<"gps" | "postal" | null>(null);
-  const [fullscreenMapOpen, setFullscreenMapOpen] = useState(false);
   const native = isNative();
   const { data: isDemo = false } = useIsDemo();
   const turnstileEnabled = !!import.meta.env.VITE_TURNSTILE_SITE_KEY;
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const { type: typeParam } = Route.useSearch();
-  const [listingType, setListingType] = useState<"sell" | null>(() => typeParam ?? null);
+  const listingType = typeParam ?? null;
 
   const { data: categories } = useQuery({
     queryKey: ["categories", "with-parent"],
@@ -354,29 +267,6 @@ function NewListingPage() {
     [categories],
   );
 
-  // Vehicle-first flow state (vehicle-registration / vehicle-confirm field groups)
-  const [vehicleRegistered, setVehicleRegistered] = useState(true);
-  const [vehicleLookupLoading, setVehicleLookupLoading] = useState(false);
-  const [vehicleLookupError, setVehicleLookupError] = useState<string | null>(null);
-  const [vehicleLookupResult, setVehicleLookupResult] = useState<VehicleLookupResult | null>(null);
-  const [vehicleClassification, setVehicleClassification] = useState<VehicleClassification | null>(
-    null,
-  );
-  const [vehiclePreviousClassificationMismatch, setVehiclePreviousClassificationMismatch] =
-    useState<{ slug: string | null; lookedUpAt: string } | null>(null);
-  const [vehicleLookupConfirmOpen, setVehicleLookupConfirmOpen] = useState(false);
-  /** DOM node for the shared step footer's primary-action slot, on the
-   * vehicle-confirm page — lets VehicleConfirm portal its "Bekreft og
-   * fortsett" button there instead of rendering it inline, so it sits on the
-   * same row as "Tilbake" like every other step's primary action. */
-  const [vehicleConfirmFooterSlot, setVehicleConfirmFooterSlot] = useState<HTMLDivElement | null>(
-    null,
-  );
-  const [vehicleRegNrInput, setVehicleRegNrInput] = useState("");
-  const lookupVehicleFn = useServerFn(lookupVehicleByRegNumber);
-  const matchBrandModelFn = useServerFn(matchVehicleBrandModel);
-
-  const parentCategories = (categories ?? []).filter((c) => !c.parent_id);
   const [selectedParentId, setSelectedParentId] = useState<string>("");
 
   const { data: allFilters } = useAllCategoryFilters();
@@ -453,6 +343,44 @@ function NewListingPage() {
     [categoryId, allFlows, categoriesById],
   );
 
+  // Hoisted above its natural spot (near the other category-suggestion state)
+  // because useVehicleLookupFlow's confirmVehicleData needs it, and that hook
+  // is called here — before `pages`/`goNext` exist, since `pages` itself
+  // depends on the hook's vehicleLookupResult. See goNextRef below for how
+  // the (real) circular part of that is resolved.
+  const [categoryTouchedManually, setCategoryTouchedManually] = useState(false);
+  const goNextRef = useRef<() => void>(() => {});
+
+  const {
+    vehicleRegistered,
+    setVehicleRegistered,
+    vehicleLookupLoading,
+    vehicleLookupError,
+    vehicleLookupResult,
+    vehicleClassification,
+    vehiclePreviousClassificationMismatch,
+    vehicleLookupConfirmOpen,
+    setVehicleLookupConfirmOpen,
+    vehicleConfirmFooterSlot,
+    setVehicleConfirmFooterSlot,
+    vehicleRegNrInput,
+    setVehicleRegNrInput,
+    runVehicleLookup,
+    matchVehicleBrandForLeaf,
+    confirmVehicleData,
+    adjustVehicleRegistrationNumber,
+    resetLookupOnReturnToRegistration,
+  } = useVehicleLookupFlow({
+    allFilters,
+    categoriesById,
+    attributes,
+    setAttributes,
+    setCategoryTouchedManually,
+    setSelectedParentId,
+    setValue,
+    goNext: () => goNextRef.current(),
+  });
+
   const vehicleAttributeHiddenKeys = [
     ...(vehicleLookupResult ? VEHICLE_LOOKUP_FILTER_KEYS : []),
     ...VEHICLE_WIZARD_MANAGED_KEYS,
@@ -506,6 +434,7 @@ function NewListingPage() {
   );
 
   const { step, setStep, currentPage, goNext, goBack, isFirst, isLast } = useListingSteps(pages);
+  goNextRef.current = goNext;
 
   /** The in-page "Tilbake" button calls `goBack()` directly (see the footer
    * button below) — it steps the wizard's own `pages` array backward and is
@@ -549,13 +478,10 @@ function NewListingPage() {
   useEffect(() => {
     const key = currentPage?.groups?.[0]?.key;
     if (key === "vehicle-registration" && prevPageKeyRef.current === "vehicle-confirm") {
-      setVehicleLookupResult(null);
-      setVehicleClassification(null);
-      setVehicleLookupError(null);
-      setVehiclePreviousClassificationMismatch(null);
-      setVehicleLookupConfirmOpen(false);
+      resetLookupOnReturnToRegistration();
     }
     prevPageKeyRef.current = key;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage]);
 
   const categoryAttributesPageIndex = pages.findIndex((p) =>
@@ -571,29 +497,51 @@ function NewListingPage() {
     enableBeforeUnload: shouldBlockNav,
   });
 
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const lastEditedRef = useRef<"postal_code" | "city" | "map" | null>(null);
-  const markerMovedRef = useRef(false);
+  const {
+    locationLoading,
+    locationMethod,
+    setLocationMethod,
+    fullscreenMapOpen,
+    setFullscreenMapOpen,
+    coords,
+    setCoords,
+    lastEditedRef,
+    markerMovedRef,
+    switchToPostal,
+    switchToGps,
+    fetchMyLocation,
+  } = useLocationPicker({ postalCode, setValue });
 
-  // Load draft from localStorage on mount
-  useEffect(() => {
-    try {
-      const savedId = localStorage.getItem(DRAFT_ID_KEY);
-      if (savedId) setDraftId(savedId);
-      const saved = localStorage.getItem(DRAFT_KEY);
-      if (!saved) return;
-      const data = JSON.parse(saved) as Record<string, unknown>;
-      const savedAt = typeof data.saved_at === "number" ? data.saved_at : 0;
-      if (Date.now() - savedAt < 7 * 24 * 60 * 60 * 1000) {
-        if (data.title || data.description) setHasDraftData(data);
-      } else {
-        localStorage.removeItem(DRAFT_KEY);
-        localStorage.removeItem(DRAFT_ID_KEY);
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
+  const {
+    draftId,
+    lastSaved,
+    draftSaveError,
+    hasDraftData,
+    saveDraftToSupabase,
+    ensureDraftId,
+    restoreDraft: restoreDraftFields,
+    clearDraftStorage,
+    discardLocalDraftBanner,
+  } = useDraftAutosave({
+    title,
+    subtitle,
+    description,
+    selectedParentId,
+    categoryId,
+    condition,
+    isFree,
+    canShip,
+    priceNok,
+    postalCode,
+    city,
+    coords,
+    isVehicle,
+    attributes,
+  });
+
+  function restoreDraft() {
+    restoreDraftFields({ setValue, setSelectedParentId, setLocationMethod });
+  }
 
   // Pre-fill location from user's last listing (if no draft)
   useEffect(() => {
@@ -616,448 +564,25 @@ function NewListingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  // Autosave to localStorage on field changes
-  useEffect(() => {
-    const t = window.setTimeout(() => {
-      try {
-        localStorage.setItem(
-          DRAFT_KEY,
-          JSON.stringify({
-            title,
-            subtitle,
-            description,
-            selectedParentId,
-            category_id: categoryId,
-            condition,
-            is_free: isFree,
-            can_ship: canShip,
-            price_nok: priceNok,
-            postal_code: postalCode,
-            city,
-            saved_at: Date.now(),
-          }),
-        );
-        setLastSaved(new Date());
-      } catch {
-        // ignore storage errors
-      }
-    }, 2000);
-    return () => window.clearTimeout(t);
-  }, [
-    title,
-    subtitle,
-    description,
-    selectedParentId,
-    categoryId,
-    condition,
-    isFree,
-    canShip,
-    priceNok,
-    postalCode,
-    city,
-  ]);
-
-  async function saveDraftToSupabase(): Promise<string | null> {
-    if (draftSaveInProgress.current) return draftId;
-    // For Bil/MC genereres tittelen fra kjøretøysoppslaget (Årsmodell/Merke/
-    // Modell) og fylles først inn i skjemaets `title`-felt når brukeren når
-    // beskrivelse-steget (se VehicleTitleFields) — som kommer *etter*
-    // bildeopplastningssteget i kjøretøyflyten. Uten dette fallbacket ville
-    // f.eks. 360°-QR-panelet aldri kunne lagre et utkast før det steget.
-    const currentTitle = (isVehicle ? computeVehicleTitle(attributes) : (title ?? "")).trim();
-    if (currentTitle.length < 5) return null;
-    draftSaveInProgress.current = true;
-    try {
-      const result = await saveDraftListing({
-        data: {
-          ...(draftId ? { id: draftId } : {}),
-          title: currentTitle,
-          subtitle: (subtitle ?? "").trim() || null,
-          description: (description ?? "").trim() || undefined,
-          category_id: categoryId || null,
-          condition: condition || undefined,
-          is_free: isFree,
-          price_nok: isFree ? null : typeof priceNok === "number" ? priceNok : null,
-          postal_code: postalCode || null,
-          city: city || null,
-          lat: coords?.lat ?? null,
-          lng: coords?.lng ?? null,
-          can_ship: canShip !== "pickup",
-        },
-      });
-      setDraftId(result.id);
-      setLastSaved(new Date());
-      setDraftSaveError(false);
-      try {
-        localStorage.setItem(DRAFT_ID_KEY, result.id);
-      } catch {
-        // ignore
-      }
-      return result.id;
-    } catch {
-      setDraftSaveError(true);
-      return null;
-    } finally {
-      draftSaveInProgress.current = false;
-    }
-  }
-
-  async function ensureDraftId(): Promise<string | null> {
-    if (draftId) return draftId;
-    return saveDraftToSupabase();
-  }
-
-  // Auto-save draft to Supabase every 30 seconds when form has enough data
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      void saveDraftToSupabase();
-    }, 30_000);
-    return () => window.clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
+  const {
+    categorySuggestion,
+    setCategorySuggestion,
+    setSuggestionDismissed,
+    applyCategorySuggestion,
+    similarListings,
+    wtbMatch,
+    keywordSuggestions,
+    keywordsFetching,
+    appendTagToDescription,
+  } = useListingTitleHints({
     title,
     description,
     categoryId,
-    condition,
-    isFree,
-    priceNok,
-    postalCode,
-    city,
-    canShip,
-    coords,
-    draftId,
-  ]);
-
-  // Save draft when tab becomes hidden (user switches away or closes tab)
-  useEffect(() => {
-    function handleVisibilityChange() {
-      if (document.hidden) void saveDraftToSupabase();
-    }
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    title,
-    description,
-    categoryId,
-    condition,
-    isFree,
-    priceNok,
-    postalCode,
-    city,
-    canShip,
-    coords,
-    draftId,
-  ]);
-
-  function restoreDraft() {
-    if (!hasDraftData) return;
-    if (typeof hasDraftData.title === "string") setValue("title", hasDraftData.title);
-    if (typeof hasDraftData.subtitle === "string") setValue("subtitle", hasDraftData.subtitle);
-    if (typeof hasDraftData.description === "string")
-      setValue("description", hasDraftData.description);
-    if (typeof hasDraftData.condition === "string")
-      setValue("condition", hasDraftData.condition as ListingForm["condition"]);
-    if (typeof hasDraftData.is_free === "boolean") setValue("is_free", hasDraftData.is_free);
-    if (
-      hasDraftData.can_ship === "pickup" ||
-      hasDraftData.can_ship === "ship" ||
-      hasDraftData.can_ship === "both"
-    )
-      setValue("can_ship", hasDraftData.can_ship);
-    if (hasDraftData.price_nok !== undefined)
-      setValue("price_nok", hasDraftData.price_nok as ListingForm["price_nok"]);
-    if (typeof hasDraftData.postal_code === "string") {
-      setValue("postal_code", hasDraftData.postal_code);
-      if (hasDraftData.postal_code) setLocationMethod("postal");
-    }
-    if (typeof hasDraftData.city === "string") setValue("city", hasDraftData.city);
-    if (typeof hasDraftData.selectedParentId === "string")
-      setSelectedParentId(hasDraftData.selectedParentId);
-    if (typeof hasDraftData.category_id === "string")
-      setValue("category_id", hasDraftData.category_id);
-    setHasDraftData(null);
-    showSuccessToast("Utkast gjenopprettet!");
-  }
-
-  // Auto-fill city from postal code
-  useEffect(() => {
-    if (lastEditedRef.current !== "postal_code") return;
-    const p = (postalCode ?? "").trim();
-    if (!/^\d{4}$/.test(p)) return;
-    const t = window.setTimeout(async () => {
-      const r = await lookupPostalCode(p);
-      if (!r) return;
-      if (r.city) setValue("city", r.city, { shouldValidate: false });
-      if (!markerMovedRef.current) setCoords({ lat: r.lat, lng: r.lng });
-    }, 500);
-    return () => window.clearTimeout(t);
-  }, [postalCode, setValue]);
-
-  // Reverse-geocode map position
-  useEffect(() => {
-    if (lastEditedRef.current !== "map" || !coords) return;
-    const t = window.setTimeout(async () => {
-      const r = await reverseGeocodeAddress(coords);
-      if (r.city) setValue("city", r.city, { shouldValidate: false });
-      if (r.postal_code && /^\d{4}$/.test(r.postal_code)) {
-        setValue("postal_code", r.postal_code, { shouldValidate: false });
-      }
-    }, 300);
-    return () => window.clearTimeout(t);
-  }, [coords, setValue]);
-
-  // Category suggestion from title
-  const [categoryTouchedManually, setCategoryTouchedManually] = useState(false);
-  const [categorySuggestion, setCategorySuggestion] = useState<{
-    category_id: string;
-    parent_id: string | null;
-    name_nb: string;
-    parent_name_nb: string | null;
-  } | null>(null);
-  const [suggestionDismissed, setSuggestionDismissed] = useState(false);
-
-  useEffect(() => {
-    if (categoryTouchedManually || suggestionDismissed) return;
-    const t = (title ?? "").trim();
-    if (t.length < 5) {
-      setCategorySuggestion(null);
-      return;
-    }
-    const timer = window.setTimeout(async () => {
-      try {
-        const result = await suggestCategoryForTitle({ data: { title: t } });
-        setCategorySuggestion(result.suggestion);
-      } catch {
-        setCategorySuggestion(null);
-      }
-    }, 400);
-    return () => window.clearTimeout(timer);
-  }, [title, categoryTouchedManually, suggestionDismissed]);
-
-  function applyCategorySuggestion() {
-    if (!categorySuggestion) return;
-    setSelectedParentId(categorySuggestion.parent_id ?? categorySuggestion.category_id);
-    setValue("category_id", categorySuggestion.category_id, { shouldValidate: true });
-    setCategoryTouchedManually(true);
-    setCategorySuggestion(null);
-  }
-
-  // Debounced title for similar listings query
-  const [debouncedTitle, setDebouncedTitle] = useState("");
-  useEffect(() => {
-    const t = window.setTimeout(() => setDebouncedTitle(title ?? ""), 800);
-    return () => window.clearTimeout(t);
-  }, [title]);
-
-  const { data: similarListings } = useQuery({
-    queryKey: ["similar-listings", categoryId, debouncedTitle],
-    enabled: debouncedTitle.length >= 5 && !!categoryId,
-    staleTime: 60_000,
-    queryFn: async () => {
-      const significantWords = debouncedTitle
-        .toLowerCase()
-        .replace(/[^a-zæøå0-9\s]/g, "")
-        .split(/\s+/)
-        .filter((w) => w.length >= 2 && !SIMILAR_STOPWORDS.has(w));
-      if (significantWords.length === 0) return [];
-      const { data } = await supabase
-        .from("listings")
-        .select("id, title, price_nok, is_free, city")
-        .eq("category_id", categoryId)
-        .eq("status", "active")
-        .textSearch("search_vector", significantWords.join(" "), {
-          config: "norwegian",
-          type: "plain",
-        })
-        .limit(3);
-      return data ?? [];
-    },
+    categoryTouchedManually,
+    setSelectedParentId,
+    setCategoryTouchedManually,
+    setValue,
   });
-
-  // WTB price hint
-  const matchWtbFn = useServerFn(matchWtbListingsForListing);
-  const { data: wtbMatch } = useQuery({
-    queryKey: ["wtb-match", categoryId ?? null, debouncedTitle],
-    enabled: debouncedTitle.length >= 3,
-    staleTime: 120_000,
-    queryFn: () => matchWtbFn({ data: { title: debouncedTitle, category_id: categoryId || null } }),
-  });
-
-  // Keyword suggestions from other listings in the same category
-  const { data: keywordSuggestions, isFetching: keywordsFetching } = useQuery({
-    queryKey: ["keyword-suggestions", categoryId, debouncedTitle],
-    enabled: !!categoryId && debouncedTitle.length >= 3,
-    staleTime: 120_000,
-    queryFn: () =>
-      suggestKeywordsForListing({ data: { title: debouncedTitle, category_id: categoryId! } }),
-  });
-
-  function appendTagToDescription(tag: string) {
-    const current = (description ?? "").trimEnd();
-    const next = current ? `${current} ${tag}` : tag;
-    setValue("description", next, { shouldTouch: false });
-  }
-
-  async function runVehicleLookup(registrationNumber: string): Promise<boolean> {
-    setVehicleLookupLoading(true);
-    setVehicleLookupError(null);
-    try {
-      const { lookup, previousClassificationMismatch } = await lookupVehicleFn({
-        data: { registrationNumber },
-      });
-      setVehicleLookupResult(lookup);
-      setVehicleClassification(
-        classifyVehicleCategory(
-          lookup.classification_code,
-          lookup.avgiftsklasse_code,
-          lookup.body_type_hint,
-          lookup.sleeping_places,
-        ),
-      );
-      setVehiclePreviousClassificationMismatch(previousClassificationMismatch);
-      setVehicleLookupConfirmOpen(true);
-      return true;
-    } catch (e) {
-      setVehicleLookupError(
-        formatErrorMessage(
-          e,
-          "Kjøretøyoppslag feilet. Kontroller at du har skrevet riktig og prøv igjen.",
-        ),
-      );
-      return false;
-    } finally {
-      setVehicleLookupLoading(false);
-    }
-  }
-
-  /** Runs the deferred brand/model match for a chosen leaf category, so
-   * vehicle-confirm can show/resolve an unmatched brand or model to the user
-   * *before* they commit — rather than confirmVehicleData silently leaving
-   * brand/model unset. */
-  async function matchVehicleBrandForLeaf(leafCategoryId: string) {
-    const lookup = vehicleLookupResult;
-    if (!lookup) return null;
-    const categoryGroup = vehicleCategoryGroupFor(leafCategoryId, allFilters ?? [], categoriesById);
-    if (!categoryGroup) return null;
-    const { brandMatch, modelMatch } = await matchBrandModelFn({
-      data: { brand: lookup.brand, model: lookup.model, categoryGroup },
-    });
-    return { categoryGroup, brandMatch, modelMatch };
-  }
-
-  function confirmVehicleData(
-    leafCategoryId: string,
-    resolved?: {
-      brandName?: string;
-      modelName?: string;
-      specOverrides?: Partial<{
-        year: number;
-        fuel_type: string;
-        transmission: string;
-        drive_type: string;
-        weight_kg: number;
-        power_hk: number;
-        tow_hitch: boolean;
-        max_tow_weight_kg: number;
-        seats: number;
-        color: string;
-        next_eu_control: string;
-        eu_control_exempt: boolean;
-        sleeping_places: number;
-        max_total_weight_kg: number;
-        length_m: number;
-        imported_used: boolean;
-        first_registration_date: string;
-        cylinders: number;
-        engine_displacement_cc: number;
-        engine_code: string;
-        avgiftskode_gruppe: AvgiftskodeGruppe;
-      }>;
-    },
-  ) {
-    const lookup = vehicleLookupResult;
-    if (!lookup) return;
-    const spec = resolved?.specOverrides;
-
-    const next: AttributeMap = {
-      ...attributes,
-      is_registered: true,
-      registration_number: lookup.registrationNumber,
-      vehicle_lookup: JSON.stringify(lookup),
-    };
-    const year = spec?.year ?? lookup.year;
-    if (year) next.year = year;
-    const fuelType = spec?.fuel_type ?? lookup.fuel_type;
-    if (fuelType) next.fuel_type = fuelType;
-    const weightKg = spec?.weight_kg ?? lookup.weight_kg;
-    if (weightKg != null) next.weight_kg = weightKg;
-    const transmission = spec?.transmission ?? lookup.transmission;
-    if (transmission) next.transmission = transmission;
-    const color = spec?.color ?? lookup.color;
-    if (color) next.color = color;
-    const nextEuControl = spec?.next_eu_control ?? lookup.next_eu_control;
-    if (nextEuControl) next.next_eu_control = nextEuControl;
-    if (spec?.eu_control_exempt != null) next.eu_control_exempt = spec.eu_control_exempt;
-    const powerHk = spec?.power_hk ?? lookup.power_hk;
-    if (powerHk != null) next.power_hk = powerHk;
-    const driveType = spec?.drive_type ?? lookup.drive_type;
-    if (driveType) next.drive_type = driveType;
-    const towHitch = spec?.tow_hitch ?? lookup.tow_hitch;
-    if (towHitch != null) next.tow_hitch = towHitch;
-    const maxTowWeightKg = spec?.max_tow_weight_kg ?? lookup.max_tow_weight_kg;
-    if (maxTowWeightKg != null) next.max_tow_weight_kg = maxTowWeightKg;
-    const maxTotalWeightKg = spec?.max_total_weight_kg ?? lookup.max_total_weight_kg;
-    if (maxTotalWeightKg != null) next.max_total_weight_kg = maxTotalWeightKg;
-    const lengthM = spec?.length_m ?? lookup.length_m;
-    if (lengthM != null) next.length_m = lengthM;
-    const seats = spec?.seats ?? lookup.seats;
-    if (seats != null) next.seats = seats;
-    const importedUsed = spec?.imported_used ?? lookup.imported_used;
-    if (importedUsed != null) next.imported_used = importedUsed;
-    const firstRegistrationDate = spec?.first_registration_date ?? lookup.first_registration_date;
-    if (firstRegistrationDate) next.first_registration_date = firstRegistrationDate;
-    const cylinders = spec?.cylinders ?? lookup.cylinders;
-    if (cylinders != null) next.cylinders = cylinders;
-    const engineDisplacementCc = spec?.engine_displacement_cc ?? lookup.engine_displacement_cc;
-    if (engineDisplacementCc != null) next.engine_displacement_cc = engineDisplacementCc;
-    const engineCode = spec?.engine_code ?? lookup.engine_code;
-    if (engineCode) next.engine_code = engineCode;
-    const sleepingPlaces = spec?.sleeping_places ?? lookup.sleeping_places;
-    if (sleepingPlaces != null) next.sleeping_places = sleepingPlaces;
-    // Personbil/Varebil-gruppen (utledet i vehicle-confirm fra avgiftsklasse-
-    // koden) manglet her tidligere — den ble beregnet og sendt med i
-    // specOverrides, men aldri faktisk skrevet til attributes, så
-    // omregistreringsavgiften kunne aldri beregnes for noen "bil"-annonse
-    // (alltid "Vi klarte ikke å beregne avgiften automatisk", uansett hvor
-    // komplett SVV-dataen var — se bug-rapport for DR50500, en Audi A3
-    // e-tron med fullstendige data).
-    if (spec?.avgiftskode_gruppe) next.avgiftskode_gruppe = spec.avgiftskode_gruppe;
-    if (resolved?.brandName) next.brand = resolved.brandName;
-    if (resolved?.modelName) next.model = resolved.modelName;
-
-    setAttributes(next);
-    setCategoryTouchedManually(true);
-    setSelectedParentId(categoriesById.get(leafCategoryId)?.parent_id ?? leafCategoryId);
-    setValue("category_id", leafCategoryId, { shouldValidate: true });
-    // Går rett til neste steg i stedet for å kalle goToNextPage(), siden den
-    // ville revalidert vehicle-confirm-steget med en categoryId som ennå ikke
-    // har rukket å oppdateres i state — og dermed feilaktig blokkert
-    // fremgangen på første klikk (måtte klikkes to ganger for å virke).
-    goNext();
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  /** Called from the post-lookup confirm overlay's "Juster registreringsnummer"
-   * action: clears the lookup so the user can retype and re-search, without
-   * touching vehicleRegistered or navigating away from the current step. */
-  function adjustVehicleRegistrationNumber() {
-    setVehicleLookupConfirmOpen(false);
-    setVehicleLookupResult(null);
-    setVehicleClassification(null);
-    setVehicleLookupError(null);
-    setVehiclePreviousClassificationMismatch(null);
-  }
 
   /** "Stemmer, fortsett" i bekreftelsesoverlayet: lukker overlayet og tar
    * brukeren rett videre til vehicle-confirm-steget (type-valg + detaljtabell),
@@ -1133,67 +658,6 @@ function NewListingPage() {
     }
     goNext();
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  function resetLocationMethod() {
-    setLocationMethod(null);
-    setCoords(null);
-    setValue("postal_code", "");
-    setValue("city", "");
-    markerMovedRef.current = false;
-    lastEditedRef.current = null;
-  }
-
-  function switchToPostal() {
-    setCoords(null);
-    setValue("postal_code", "");
-    setValue("city", "");
-    markerMovedRef.current = false;
-    lastEditedRef.current = null;
-    setLocationMethod("postal");
-  }
-
-  function switchToGps() {
-    setValue("postal_code", "");
-    setValue("city", "");
-    markerMovedRef.current = false;
-    lastEditedRef.current = null;
-    void fetchMyLocation();
-  }
-
-  async function fetchMyLocation() {
-    setLocationMethod("gps");
-    setLocationLoading(true);
-    try {
-      if (isNative()) {
-        const permission = await requestLocationPermission();
-        if (permission !== "granted") {
-          showErrorToast("Gi appen tilgang til posisjon i innstillingene.");
-          setLocationMethod(null);
-          return;
-        }
-      }
-      const pos = await getCurrentPosition();
-      if (!pos) {
-        showErrorToast("Kunne ikke hente posisjon.");
-        setLocationMethod(null);
-        return;
-      }
-      const { lat, lng } = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      setCoords({ lat, lng });
-      markerMovedRef.current = false;
-      lastEditedRef.current = null;
-      const geo = await reverseGeocodeAddress({ lat, lng });
-      if (geo.city) setValue("city", geo.city, { shouldValidate: false });
-      if (geo.postal_code && /^\d{4}$/.test(geo.postal_code)) {
-        setValue("postal_code", geo.postal_code, { shouldValidate: false });
-      }
-    } catch {
-      showErrorToast("Kunne ikke hente posisjon. Sjekk at du har gitt tilgang.");
-      setLocationMethod(null);
-    } finally {
-      setLocationLoading(false);
-    }
   }
 
   const mutation = useMutation({
@@ -1273,8 +737,7 @@ function NewListingPage() {
       return listing;
     },
     onSuccess: (result) => {
-      localStorage.removeItem(DRAFT_KEY);
-      localStorage.removeItem(DRAFT_ID_KEY);
+      clearDraftStorage();
       void import("@/lib/haptics").then((m) => m.hapticNotification("success"));
       showSuccessToast("Annonsen er publisert");
       setPublishedId(result.id);
@@ -1326,7 +789,7 @@ function NewListingPage() {
       category: categoryNode
         ? { name_nb: categoryNode.name_nb, slug: categoryNode.slug ?? null }
         : null,
-      images: images.map((img, i) => ({ storage_path: String(i), sort_order: i })),
+      images: images.map((_, i) => ({ storage_path: String(i), sort_order: i })),
       imgUrls: Object.fromEntries(images.map((img, i) => [String(i), img.previewUrl])),
       attributes,
     });
@@ -1475,15 +938,7 @@ function NewListingPage() {
           <Button type="button" size="sm" variant="secondary" onClick={restoreDraft}>
             Gjenopprett
           </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              localStorage.removeItem(DRAFT_KEY);
-              setHasDraftData(null);
-            }}
-          >
+          <Button type="button" size="sm" variant="ghost" onClick={discardLocalDraftBanner}>
             Forkast
           </Button>
         </div>
@@ -1705,8 +1160,7 @@ function NewListingPage() {
             <AlertDialogAction
               className="h-14 w-full bg-secondary text-destructive hover:bg-secondary/80"
               onClick={() => {
-                localStorage.removeItem(DRAFT_KEY);
-                localStorage.removeItem(DRAFT_ID_KEY);
+                clearDraftStorage();
                 blocker.proceed?.();
               }}
             >

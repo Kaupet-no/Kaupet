@@ -10,7 +10,7 @@ import { RequiredMark } from "../required-mark";
 /** Delivery-method buttons + location section (GPS/postal/map). Identical on web and native. */
 export function DeliveryLocation({
   native,
-  isVehicle,
+  behavior,
   canShip,
   setValue,
   locationMethod,
@@ -31,7 +31,7 @@ export function DeliveryLocation({
 }: WizardSharedProps) {
   return (
     <>
-      {!isVehicle && (
+      {behavior.requiresDeliveryMethod && (
         <section className="space-y-3">
           <Label>
             Levering

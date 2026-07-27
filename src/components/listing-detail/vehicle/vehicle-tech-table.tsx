@@ -1,5 +1,5 @@
-import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
-import type { VehicleLookupResult } from "@/lib/vehicle-lookup.server";
+﻿import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.server";
 import { DRIVE_TYPE_LABEL_NB, FUEL_LABEL_NB, TRANSMISSION_LABEL_NB } from "./vehicle-labels";
 
 type Row = { label: string; value: string };

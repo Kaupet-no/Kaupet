@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, RefreshCw, Smartphone, Trash2 } from "lucide-react";
@@ -11,7 +11,7 @@ import {
   createVehicle360CaptureSession,
   deleteVehicle360Frames,
   getVehicle360Frames,
-} from "@/lib/vehicle-360.functions";
+} from "@/lib/vehicle/vehicle-360.functions";
 
 /**
  * Desktop-only panel on the bildeopplastning-steget for Bil/MC-annonser:

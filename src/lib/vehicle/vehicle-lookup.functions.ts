@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { classifyVehicleCategory } from "@/lib/vehicle-classification";
+import { classifyVehicleCategory } from "@/lib/vehicle/vehicle-classification";
 
 const MAX_LOOKUPS_PER_HOUR = 20;
 
@@ -24,8 +24,10 @@ export const lookupVehicleByRegNumber = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { lookupVehicle, formatRetryClockNorway } = await import("@/lib/vehicle-lookup.server");
-    const { matchVehicleBrandAndModel } = await import("@/lib/vehicle-brand-match.functions");
+    const { lookupVehicle, formatRetryClockNorway } =
+      await import("@/lib/vehicle/vehicle-lookup.server");
+    const { matchVehicleBrandAndModel } =
+      await import("@/lib/vehicle/vehicle-brand-match.functions");
     const { userId } = context;
 
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();

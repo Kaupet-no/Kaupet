@@ -52,5 +52,37 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": "off",
     },
   },
+  {
+    // Files that are meant to stay vertical-agnostic (no direct knowledge of
+    // any single category vertical like vehicles). Category-specific
+    // behavior should be expressed through `CategoryBehavior`
+    // (src/lib/category-behavior.ts), not by importing vehicle-only code
+    // here — that's the isVehicle-boolean-in-generic-code drift this rule
+    // exists to prevent (see commit 71fa7bd for what that drift caused).
+    files: [
+      "src/lib/category-filters.ts",
+      "src/lib/category-behavior.ts",
+      "src/lib/listings.functions.ts",
+      "src/features/listing-creation/category-flows.ts",
+      "src/features/listing-creation/modules/registry.ts",
+      "src/features/listing-creation/field-groups/validators.ts",
+      "src/features/listing-creation/field-groups/delivery-location/**",
+      "src/features/listing-creation/field-groups/category-attributes/**",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/lib/vehicle/*", "@/lib/vehicle/**"],
+              message:
+                "This file is meant to stay vertical-agnostic. Add/read a flag on CategoryBehavior (src/lib/category-behavior.ts) instead of importing vehicle-specific code directly.",
+            },
+          ],
+        },
+      ],
+    },
+  },
   eslintPluginPrettier,
 );

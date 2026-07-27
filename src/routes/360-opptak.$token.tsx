@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+﻿import { createFileRoute } from "@tanstack/react-router";
 
-import { getVehicle360CaptureSession } from "@/lib/vehicle-360.functions";
+import { getVehicle360CaptureSession } from "@/lib/vehicle/vehicle-360.functions";
 import { Vehicle360CaptureFlow } from "@/features/vehicle-360-capture/capture-flow";
 import { Button } from "@/components/ui/button";
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { Pencil, Search } from "lucide-react";
 
 import { Label } from "@/components/ui/label";
@@ -10,7 +10,7 @@ import {
   computeOmregistreringsavgift,
   type AvgiftskodeGruppe,
   type VehicleLeafSlug,
-} from "@/lib/vehicle-classification";
+} from "@/lib/vehicle/vehicle-classification";
 import { digitsOnlyClamped, formatThousands } from "@/lib/number-input";
 
 import type { WizardSharedProps } from "../types";

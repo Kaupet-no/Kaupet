@@ -9,10 +9,11 @@ import { RequiredMark } from "../required-mark";
 
 /**
  * Category picker + suggestion banner + activeModules (vehicle-lookup/
- * generic-attributes). For Bil og MC (`isVehicle`), category and Egenskaper
- * are already locked in via vehicle-registration/vehicle-confirm earlier in
- * the flow, so this group renders nothing — it stays in the flow (it's a
- * `LOCKED_FIELD_GROUP_KEYS` entry) but is a no-op page for vehicle listings.
+ * generic-attributes). For Bil og MC (`!behavior.showGenericAttributes`),
+ * category and Egenskaper are already locked in via vehicle-registration/
+ * vehicle-confirm earlier in the flow, so this group renders nothing — it
+ * stays in the flow (it's a `LOCKED_FIELD_GROUP_KEYS` entry) but is a no-op
+ * page for vehicle listings.
  */
 export function CategoryAttributes({
   errors,
@@ -31,9 +32,9 @@ export function CategoryAttributes({
   onAttributesChange,
   attributesTouched,
   vehicleAttributeHiddenKeys,
-  isVehicle,
+  behavior,
 }: WizardSharedProps) {
-  if (isVehicle) return null;
+  if (!behavior.showGenericAttributes) return null;
 
   return (
     <section className="space-y-2">

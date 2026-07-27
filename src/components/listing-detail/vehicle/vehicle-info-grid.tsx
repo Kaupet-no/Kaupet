@@ -1,6 +1,6 @@
-import { Car, Fuel, Gauge, Cog, MoveHorizontal, IdCard, Zap, Users, Palette } from "lucide-react";
+﻿import { Car, Fuel, Gauge, Cog, MoveHorizontal, IdCard, Zap, Users, Palette } from "lucide-react";
 
-import type { VehicleLookupResult } from "@/lib/vehicle-lookup.server";
+import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.server";
 import { DRIVE_TYPE_LABEL_NB, FUEL_LABEL_NB, TRANSMISSION_LABEL_NB } from "./vehicle-labels";
 
 function formatMileage(mileageKm: number): string {

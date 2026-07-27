@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Check, ClipboardCheck, Loader2, X } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
@@ -19,7 +19,7 @@ import {
   adminRejectVehicleBrand,
   adminApproveVehicleModel,
   adminRejectVehicleModel,
-} from "@/lib/admin-vehicle-brands.functions";
+} from "@/lib/vehicle/admin-vehicle-brands.functions";
 import { formatErrorMessage } from "@/lib/errors";
 import { EmptyState } from "@/components/ui/empty-state";
 

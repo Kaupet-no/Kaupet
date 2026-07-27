@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { showErrorToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
@@ -7,11 +7,14 @@ import {
   type CategoryFilter,
   type CategoryNode,
 } from "@/lib/category-filters";
-import { lookupVehicleByRegNumber } from "@/lib/vehicle-lookup.functions";
-import { matchVehicleBrandModel } from "@/lib/vehicle-brand-match.functions";
-import { classifyVehicleCategory } from "@/lib/vehicle-classification";
-import type { AvgiftskodeGruppe, VehicleClassification } from "@/lib/vehicle-classification";
-import type { VehicleLookupResult } from "@/lib/vehicle-lookup.server";
+import { lookupVehicleByRegNumber } from "@/lib/vehicle/vehicle-lookup.functions";
+import { matchVehicleBrandModel } from "@/lib/vehicle/vehicle-brand-match.functions";
+import { classifyVehicleCategory } from "@/lib/vehicle/vehicle-classification";
+import type {
+  AvgiftskodeGruppe,
+  VehicleClassification,
+} from "@/lib/vehicle/vehicle-classification";
+import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.server";
 import type { AttributeMap } from "@/components/attribute-fields";
 
 type VehicleSpecOverrides = Partial<{

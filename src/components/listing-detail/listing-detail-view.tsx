@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
+﻿import { lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { Loader2, MapPin } from "lucide-react";
 
@@ -17,8 +17,8 @@ import {
   computeOmregistreringsavgift,
   type AvgiftskodeGruppe,
   type VehicleLeafSlug,
-} from "@/lib/vehicle-classification";
-import type { VehicleLookupResult } from "@/lib/vehicle-lookup.server";
+} from "@/lib/vehicle/vehicle-classification";
+import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.server";
 
 const ListingDetailMap = lazy(() =>
   import("@/components/listing-detail-map").then((m) => ({ default: m.ListingDetailMap })),
@@ -139,23 +139,28 @@ export function ListingDetailView({
       ? `${priceNok.toLocaleString("nb-NO")} kr`
       : "Pris ved henvendelse";
 
-  const isVehicleCategory =
+  // Slug-based, not the canonical filter-based `isVehicleCategory`
+  // (category-filters.ts) — this view only receives `category.slug`, not the
+  // category_filters rows needed to walk the ancestor chain for a
+  // brand_select filter. Named distinctly from that function to avoid
+  // implying they're the same check.
+  const isVehicleListing =
     !!category?.slug && VEHICLE_LEAF_SLUGS.includes(category.slug as VehicleLeafSlug);
-  const vehicleLookup = isVehicleCategory
+  const vehicleLookup = isVehicleListing
     ? ((attributes.vehicle_lookup as VehicleLookupResult | undefined) ?? null)
     : null;
   const mileageKmRaw = attributes.mileage_km;
   const mileageKm =
-    isVehicleCategory && typeof mileageKmRaw === "number" && Number.isFinite(mileageKmRaw)
+    isVehicleListing && typeof mileageKmRaw === "number" && Number.isFinite(mileageKmRaw)
       ? mileageKmRaw
       : null;
   const euControlExemptRaw = attributes.eu_control_exempt;
   const euControlExempt =
-    isVehicleCategory && typeof euControlExemptRaw === "boolean" ? euControlExemptRaw : null;
+    isVehicleListing && typeof euControlExemptRaw === "boolean" ? euControlExemptRaw : null;
   const avgiftOverrideRaw = attributes.omregistreringsavgift_override_kr;
-  const avgiftFritatt = isVehicleCategory && attributes.omregistreringsavgift_fritatt === true;
-  const avgiftInkludert = isVehicleCategory && attributes.omregistreringsavgift_inkludert === true;
-  const omregistreringsavgiftKr = isVehicleCategory
+  const avgiftFritatt = isVehicleListing && attributes.omregistreringsavgift_fritatt === true;
+  const avgiftInkludert = isVehicleListing && attributes.omregistreringsavgift_inkludert === true;
+  const omregistreringsavgiftKr = isVehicleListing
     ? typeof avgiftOverrideRaw === "number"
       ? avgiftOverrideRaw
       : computeOmregistreringsavgift(
@@ -217,7 +222,7 @@ export function ListingDetailView({
               </div>
             )}
           </div>
-          {isVehicleCategory && (
+          {isVehicleListing && (
             <VehicleTechTable
               vehicleLookup={vehicleLookup}
               mileageKm={mileageKm}
@@ -231,7 +236,7 @@ export function ListingDetailView({
             </p>
           </section>
 
-          {isVehicleCategory && (
+          {isVehicleListing && (
             <section className="mt-8">
               <h2 className="font-display text-xl">Kjente feil og mangler</h2>
               <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
@@ -240,7 +245,7 @@ export function ListingDetailView({
             </section>
           )}
 
-          {isVehicleCategory && maintenanceHistory && (
+          {isVehicleListing && maintenanceHistory && (
             <section className="mt-8">
               <h2 className="font-display text-xl">Vedlikeholdshistorikk</h2>
               <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
@@ -292,7 +297,7 @@ export function ListingDetailView({
             </div>
           </div>
 
-          {isVehicleCategory && (
+          {isVehicleListing && (
             <VehicleInfoGrid vehicleLookup={vehicleLookup} mileageKm={mileageKm} />
           )}
 
@@ -322,7 +327,7 @@ export function ListingDetailView({
                   <div>
                     <dt className="text-muted-foreground">Tilstand</dt>
                     <dd className="font-medium">
-                      {(isVehicleCategory ? VEHICLE_CONDITION_LABEL : CONDITION_LABEL)[
+                      {(isVehicleListing ? VEHICLE_CONDITION_LABEL : CONDITION_LABEL)[
                         condition as keyof typeof CONDITION_LABEL
                       ] ?? condition}
                     </dd>

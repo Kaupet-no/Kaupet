@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Camera as CameraIcon, Check, Loader2, RotateCw, Square } from "lucide-react";
 
@@ -11,7 +11,7 @@ import {
   MAX_360_FRAMES,
   completeVehicle360CaptureSession,
   uploadVehicle360Frame,
-} from "@/lib/vehicle-360.functions";
+} from "@/lib/vehicle/vehicle-360.functions";
 
 type Frame = {
   order: number;

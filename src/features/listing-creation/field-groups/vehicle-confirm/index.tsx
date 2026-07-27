@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { format, isValid, parse } from "date-fns";
 import { CalendarIcon } from "lucide-react";
@@ -27,19 +27,19 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { createVehicleBrand, createVehicleModel } from "@/lib/vehicle-brands.functions";
+import { createVehicleBrand, createVehicleModel } from "@/lib/vehicle/vehicle-brands.functions";
 import {
   VEHICLE_LEAF_SLUGS,
   avgiftskodeGruppeFromCode,
   type AvgiftskodeGruppe,
   type VehicleLeafSlug,
-} from "@/lib/vehicle-classification";
+} from "@/lib/vehicle/vehicle-classification";
 import {
   VehicleBrandField,
   VehicleModelField,
 } from "@/features/listing-creation/modules/generic-attributes/vehicle-brand-model-fields";
 import type { VehicleBrandGroup } from "@/lib/category-filters";
-import type { VehicleLookupResult } from "@/lib/vehicle-lookup.server";
+import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.server";
 
 import type { WizardSharedProps } from "../types";
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { NativePageHeader } from "@/components/native-page-header";
 import { createFileRoute, useNavigate, useBlocker, useRouter, Link } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -30,6 +30,7 @@ import { useVehicleLookupFlow } from "@/features/listing-creation/use-vehicle-lo
 import { useLocationPicker } from "@/features/listing-creation/use-location-picker";
 import { useListingTitleHints } from "@/features/listing-creation/use-listing-title-hints";
 import { fieldGroupsForKeys, pageLabel } from "@/features/listing-creation/field-groups/registry";
+import { getCategoryBehavior } from "@/lib/category-behavior";
 import {
   categoryBreadcrumb,
   getMissingRequiredFilters,
@@ -37,12 +38,12 @@ import {
   VEHICLE_EQUIPMENT_FILTER_KEYS,
   type CategoryNode,
 } from "@/lib/category-filters";
-import { VEHICLE_LEAF_SLUGS_WITHOUT_MILEAGE } from "@/lib/vehicle-classification";
+import { VEHICLE_LEAF_SLUGS_WITHOUT_MILEAGE } from "@/lib/vehicle/vehicle-classification";
 import {
   VEHICLE_LOOKUP_FILTER_KEYS,
   VEHICLE_WIZARD_MANAGED_KEYS,
-} from "@/lib/vehicle-lookup.server";
-import type { VehicleLeafSlug } from "@/lib/vehicle-classification";
+} from "@/lib/vehicle/vehicle-lookup.server";
+import type { VehicleLeafSlug } from "@/lib/vehicle/vehicle-classification";
 
 import { useIsDemo } from "@/hooks/use-is-demo";
 import { useAuth } from "@/hooks/use-auth";
@@ -334,10 +335,12 @@ function NewListingPage() {
     [categoryId, allFilters, categoriesById, attributes],
   );
 
-  const isVehicle = useMemo(
-    () => vehicleCategoryGroupFor(categoryId || null, allFilters ?? [], categoriesById) !== null,
+  const vehicleGroup = useMemo(
+    () => vehicleCategoryGroupFor(categoryId || null, allFilters ?? [], categoriesById),
     [categoryId, allFilters, categoriesById],
   );
+  const isVehicle = vehicleGroup !== null;
+  const behavior = useMemo(() => getCategoryBehavior(vehicleGroup), [vehicleGroup]);
 
   const showMileage = useMemo(() => {
     if (!isVehicle) return false;
@@ -643,7 +646,7 @@ function NewListingPage() {
       categoryId,
       bilOgMcCategoryId,
       vehicleLookupResult,
-      isVehicle,
+      behavior,
       knownIssues,
       noKnownIssues: !!noKnownIssues,
       showMileage,
@@ -823,6 +826,7 @@ function NewListingPage() {
   const sharedProps: WizardSharedProps = {
     native,
     isVehicle,
+    behavior,
     showMileage,
 
     register,

@@ -1,6 +1,6 @@
-﻿import { lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
+import { Fragment, lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { Loader2, MapPin } from "lucide-react";
+import { Loader2, MapPin, Maximize2 } from "lucide-react";
 
 import { useIsNative } from "@/hooks/use-is-native";
 import { NativePageHeader } from "@/components/native-page-header";
@@ -9,8 +9,17 @@ import {
   Vehicle360Viewer,
   type Vehicle360Frame,
 } from "@/components/listing-detail/vehicle/vehicle-360-viewer";
+import { VehicleEquipmentList } from "@/components/listing-detail/vehicle/vehicle-equipment-list";
 import { VehicleInfoGrid } from "@/components/listing-detail/vehicle/vehicle-info-grid";
 import { VehicleTechTable } from "@/components/listing-detail/vehicle/vehicle-tech-table";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { CONDITION_LABEL, VEHICLE_CONDITION_LABEL } from "@/lib/constants";
 import {
   VEHICLE_LEAF_SLUGS,
@@ -18,7 +27,7 @@ import {
   type AvgiftskodeGruppe,
   type VehicleLeafSlug,
 } from "@/lib/vehicle/vehicle-classification";
-import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.server";
+import { parseVehicleLookup } from "@/lib/vehicle/parse-vehicle-lookup";
 
 const ListingDetailMap = lazy(() =>
   import("@/components/listing-detail-map").then((m) => ({ default: m.ListingDetailMap })),
@@ -44,6 +53,10 @@ function LightboxLoadingFallback() {
 }
 
 export type ListingDetailViewCategory = { name_nb: string; slug: string | null } | null;
+
+/** A single crumb in the ancestor chain from a root category down to the
+ * listing's own leaf category, e.g. [Bil og MC, Personbil, Stasjonsvogn]. */
+export type ListingDetailBreadcrumbItem = { name_nb: string; slug: string };
 
 /**
  * Presentational rendering of the listing detail page — extracted from
@@ -72,6 +85,10 @@ export type ListingDetailViewProps = {
   noKnownIssues: boolean | null;
   maintenanceHistory: string | null;
   category: ListingDetailViewCategory;
+  /** Full ancestor chain for the category breadcrumb, root first. Falls back
+   * to a single plain category link (using `category` above) when omitted —
+   * the pre-publish preview doesn't have the category tree on hand. */
+  breadcrumb?: ListingDetailBreadcrumbItem[];
   images: { storage_path: string; sort_order: number; caption?: string | null }[];
   imgUrls: Record<string, string>;
   attributes: Record<string, unknown>;
@@ -87,6 +104,10 @@ export type ListingDetailViewProps = {
   ownerStatsSlot?: ReactNode;
   /** Contact-seller panel. */
   sellerContactSlot?: ReactNode;
+  /** Compact "Send melding"-button shown in the fixed mobile contact bar.
+   * Omitted (e.g. for the owner's own listing, or the pre-publish preview)
+   * hides the bar entirely. Web only — native has its own bottom nav. */
+  stickyContactSlot?: ReactNode;
   /** Sticky banner shown instead of the above when this is a pre-publish preview. */
   previewBanner?: ReactNode;
 };
@@ -109,6 +130,7 @@ export function ListingDetailView({
   noKnownIssues,
   maintenanceHistory,
   category,
+  breadcrumb,
   images,
   imgUrls,
   attributes,
@@ -118,6 +140,7 @@ export function ListingDetailView({
   actionsMenuSlot,
   ownerStatsSlot,
   sellerContactSlot,
+  stickyContactSlot,
   previewBanner,
 }: ListingDetailViewProps) {
   const isNative = useIsNative();
@@ -132,6 +155,7 @@ export function ListingDetailView({
 
   const sortedImages = images.slice().sort((a, b) => a.sort_order - b.sort_order);
   const has360 = !!vehicle360Frames && vehicle360Frames.length > 0;
+  const showStickyContact = !isNative && !!stickyContactSlot;
 
   const priceLabel = isFree
     ? "Gis bort"
@@ -146,9 +170,8 @@ export function ListingDetailView({
   // implying they're the same check.
   const isVehicleListing =
     !!category?.slug && VEHICLE_LEAF_SLUGS.includes(category.slug as VehicleLeafSlug);
-  const vehicleLookup = isVehicleListing
-    ? ((attributes.vehicle_lookup as VehicleLookupResult | undefined) ?? null)
-    : null;
+  const vehicleLookupRaw = attributes.vehicle_lookup;
+  const vehicleLookup = isVehicleListing ? (parseVehicleLookup(vehicleLookupRaw) ?? null) : null;
   const mileageKmRaw = attributes.mileage_km;
   const mileageKm =
     isVehicleListing && typeof mileageKmRaw === "number" && Number.isFinite(mileageKmRaw)
@@ -157,6 +180,15 @@ export function ListingDetailView({
   const euControlExemptRaw = attributes.eu_control_exempt;
   const euControlExempt =
     isVehicleListing && typeof euControlExemptRaw === "boolean" ? euControlExemptRaw : null;
+  // Seller-confirmed override (see `vehicle-confirm/index.tsx`), stored
+  // top-level like `mileage_km` — takes precedence over the SVV snapshot's
+  // `vehicle_lookup.drive_type`, which is often `null` when SVV doesn't
+  // expose axle data for the vehicle.
+  const driveTypeRaw = attributes.drive_type;
+  const driveType =
+    isVehicleListing && typeof driveTypeRaw === "string"
+      ? driveTypeRaw
+      : (vehicleLookup?.drive_type ?? null);
   const avgiftOverrideRaw = attributes.omregistreringsavgift_override_kr;
   const avgiftFritatt = isVehicleListing && attributes.omregistreringsavgift_fritatt === true;
   const avgiftInkludert = isVehicleListing && attributes.omregistreringsavgift_inkludert === true;
@@ -173,15 +205,71 @@ export function ListingDetailView({
         )
     : null;
 
+  const avgiftNote = avgiftFritatt
+    ? "Fritatt for omregistreringsavgift"
+    : avgiftInkludert
+      ? "omregistreringsavgift inkludert i kjøpesummen (dekkes av selger)"
+      : omregistreringsavgiftKr != null
+        ? `+ ${omregistreringsavgiftKr.toLocaleString("nb-NO")} kr i omregistreringsavgift ved eierskifte (betales av kjøper)`
+        : null;
+
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
+    <div className={`mx-auto max-w-6xl px-4 py-8 ${showStickyContact ? "pb-28 md:pb-8" : ""}`}>
       <NativePageHeader title={title} />
       {previewBanner}
       {!isNative && backSlot}
 
-      <div className="mt-4 grid gap-8 md:grid-cols-[1.4fr_1fr]">
+      <header className="mt-4">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            {breadcrumb && breadcrumb.length > 0 ? (
+              <Breadcrumb>
+                <BreadcrumbList className="gap-1 text-xs uppercase tracking-wide sm:gap-1">
+                  {breadcrumb.map((c, i) => (
+                    <Fragment key={c.slug}>
+                      {i > 0 && <BreadcrumbSeparator />}
+                      <BreadcrumbItem>
+                        {i === breadcrumb.length - 1 ? (
+                          <BreadcrumbPage className="uppercase tracking-wide">
+                            {c.name_nb}
+                          </BreadcrumbPage>
+                        ) : (
+                          <BreadcrumbLink asChild>
+                            <Link
+                              to="/annonser"
+                              search={{ q: "", category: c.slug, sort: "new" }}
+                              className="hover:text-foreground"
+                            >
+                              {c.name_nb}
+                            </Link>
+                          </BreadcrumbLink>
+                        )}
+                      </BreadcrumbItem>
+                    </Fragment>
+                  ))}
+                </BreadcrumbList>
+              </Breadcrumb>
+            ) : (
+              category?.slug && (
+                <Link
+                  to="/annonser"
+                  search={{ q: "", category: category.slug, sort: "new" }}
+                  className="text-xs uppercase tracking-wide text-muted-foreground hover:text-foreground"
+                >
+                  {category.name_nb}
+                </Link>
+              )
+            )}
+            <h1 className="mt-1 font-display text-3xl leading-tight tracking-tight">{title}</h1>
+            {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
+          </div>
+          {actionsMenuSlot && <div className="shrink-0 pt-0.5">{actionsMenuSlot}</div>}
+        </div>
+      </header>
+
+      <div className="mt-6 grid gap-8 md:grid-cols-[1.4fr_1fr]">
         <div>
-          <div className="relative mb-6">
+          <div className="mb-8">
             {has360 && (
               <div className="mb-3 inline-flex rounded-full border border-border bg-muted/40 p-0.5 text-sm">
                 <button
@@ -214,21 +302,38 @@ export function ListingDetailView({
                 onSelect={setActiveImage}
                 title={title}
                 onImageClick={sortedImages.length > 0 ? setLightboxIndex : undefined}
+                overlaySlot={
+                  sortedImages.length > 0 && (
+                    <div className="absolute -bottom-8 left-4 max-w-[calc(100%-2rem)] rounded-xl border border-border bg-card px-4 py-2.5 shadow-lg">
+                      <p className="font-display text-xl leading-none text-primary">{priceLabel}</p>
+                      {avgiftNote && (
+                        <p className="mt-1 text-xs leading-snug text-muted-foreground">
+                          {avgiftNote}
+                        </p>
+                      )}
+                    </div>
+                  )
+                }
               />
             )}
-            {sortedImages.length > 0 && (
-              <div className="absolute -bottom-4 left-4 rounded-xl border border-border bg-card px-4 py-2.5 shadow-lg">
-                <p className="font-display text-xl leading-none text-primary">{priceLabel}</p>
-              </div>
-            )}
           </div>
+
+          {sortedImages.length === 0 && (
+            <div>
+              <p className="font-display text-xl text-primary">{priceLabel}</p>
+              {avgiftNote && <p className="mt-1 text-xs text-muted-foreground">{avgiftNote}</p>}
+            </div>
+          )}
+
           {isVehicleListing && (
-            <VehicleTechTable
+            <VehicleInfoGrid
               vehicleLookup={vehicleLookup}
               mileageKm={mileageKm}
               euControlExempt={euControlExempt}
+              driveType={driveType}
             />
           )}
+
           <section className="mt-8">
             <h2 className="font-display text-xl">Beskrivelse</h2>
             <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
@@ -253,54 +358,22 @@ export function ListingDetailView({
               </p>
             </section>
           )}
-        </div>
-
-        <aside className="space-y-5">
-          <div>
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                {category?.slug && (
-                  <Link
-                    to="/annonser"
-                    search={{ q: "", category: category.slug, sort: "new" }}
-                    className="text-xs uppercase tracking-wide text-muted-foreground hover:text-foreground"
-                  >
-                    {category.name_nb}
-                  </Link>
-                )}
-                <h1 className="mt-1 font-display text-3xl leading-tight tracking-tight">{title}</h1>
-                {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
-                {/* Prisen vises flytende over bildekanten når det finnes bilder
-                    (se galleriseksjonen) — her kun som fallback uten bilder. */}
-                {sortedImages.length === 0 && (
-                  <p className="mt-3 font-display text-xl text-primary">{priceLabel}</p>
-                )}
-                {avgiftFritatt && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Fritatt for omregistreringsavgift
-                  </p>
-                )}
-                {avgiftInkludert && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Omregistreringsavgift er inkludert i kjøpesummen — selger er ansvarlig for
-                    omregistrering
-                  </p>
-                )}
-                {!avgiftFritatt && !avgiftInkludert && omregistreringsavgiftKr != null && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    + {omregistreringsavgiftKr.toLocaleString("nb-NO")} kr i omregistreringsavgift
-                    til staten (betales av kjøper ved eierskifte)
-                  </p>
-                )}
-              </div>
-              {actionsMenuSlot && <div className="shrink-0 pt-0.5">{actionsMenuSlot}</div>}
-            </div>
-          </div>
 
           {isVehicleListing && (
-            <VehicleInfoGrid vehicleLookup={vehicleLookup} mileageKm={mileageKm} />
+            <section className="mt-8">
+              <h2 className="font-display text-xl">Utstyr</h2>
+              <VehicleEquipmentList attributes={attributes} />
+              <VehicleTechTable
+                vehicleLookup={vehicleLookup}
+                mileageKm={mileageKm}
+                euControlExempt={euControlExempt}
+                driveType={driveType}
+              />
+            </section>
           )}
+        </div>
 
+        <aside className="@container space-y-5">
           {(() => {
             const fmt = (s: string) =>
               new Date(s).toLocaleDateString("nb-NO", {
@@ -322,7 +395,7 @@ export function ListingDetailView({
               isEditedLater && updatedAt ? fmt(updatedAt) : fmt(publishedAt ?? createdAt);
 
             return (
-              <dl className="grid grid-cols-2 gap-3 rounded-xl border border-border bg-card p-4 text-sm sm:grid-cols-3">
+              <dl className="grid grid-cols-2 gap-3 rounded-xl border border-border bg-card p-4 text-sm @sm:grid-cols-3">
                 {condition && (
                   <div>
                     <dt className="text-muted-foreground">Tilstand</dt>
@@ -359,7 +432,7 @@ export function ListingDetailView({
             type="button"
             onClick={() => setMapOverlayOpen(true)}
             aria-label="Se kart i fullskjerm"
-            className="block h-80 w-full cursor-pointer overflow-hidden rounded-2xl border border-border"
+            className="relative block h-80 w-full cursor-pointer overflow-hidden rounded-2xl border border-border"
           >
             {mounted ? (
               <Suspense fallback={<div className="h-full w-full animate-pulse bg-muted" />}>
@@ -368,6 +441,10 @@ export function ListingDetailView({
             ) : (
               <div className="h-full w-full animate-pulse bg-muted" />
             )}
+            <span className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium shadow-lg">
+              <Maximize2 className="size-3.5" />
+              Se i fullskjerm
+            </span>
           </button>
           <p className="mt-2 text-xs text-muted-foreground">
             Lokasjonen er omtrentlig. Gjenstanden befinner seg ikke nødvendigvis innenfor det
@@ -392,6 +469,18 @@ export function ListingDetailView({
         <Suspense fallback={<LightboxLoadingFallback />}>
           <MapOverlay lat={displayLat} lng={displayLng} onClose={closeMapOverlay} />
         </Suspense>
+      )}
+
+      {showStickyContact && (
+        <div
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 py-3 backdrop-blur md:hidden"
+          style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}
+        >
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
+            <p className="font-display text-lg leading-none text-primary">{priceLabel}</p>
+            {stickyContactSlot}
+          </div>
+        </div>
       )}
     </div>
   );

@@ -1,17 +1,24 @@
-﻿import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+﻿import { useState } from "react";
+import { ChevronDown } from "lucide-react";
+
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.server";
 import { DRIVE_TYPE_LABEL_NB, FUEL_LABEL_NB, TRANSMISSION_LABEL_NB } from "./vehicle-labels";
 
 type Row = { label: string; value: string };
 
 /**
- * Full teknisk-data-tabell for kjøretøy-annonser. Rendrer kun rader det
- * faktisk finnes data for — ingen tomme "—"-rader.
+ * Full teknisk-data-tabell for kjøretøy-annonser, skjult bak en
+ * "Vis teknisk informasjon"-dropdown under Utstyr-seksjonen — de viktigste
+ * nøkkeltallene vises allerede sentralt i `VehicleInfoGrid`. Rendrer kun
+ * rader det faktisk finnes data for — ingen tomme "—"-rader.
  */
 export function VehicleTechTable({
   vehicleLookup,
   mileageKm,
   euControlExempt,
+  driveType,
 }: {
   vehicleLookup: VehicleLookupResult | null;
   mileageKm: number | null;
@@ -19,7 +26,11 @@ export function VehicleTechTable({
    * fritatt for periodisk kjøretøykontroll, lagret som en vanlig attributt
    * (ikke i `vehicle_lookup`-snapshoten). */
   euControlExempt?: boolean | null;
+  /** Selgerens bekreftede verdi (`attributes.drive_type`), som har forrang
+   * over `vehicleLookup.drive_type` — se `vehicle-info-grid.tsx`. */
+  driveType?: string | null;
 }) {
+  const [open, setOpen] = useState(false);
   const rows: Row[] = [];
 
   if (mileageKm != null)
@@ -39,11 +50,8 @@ export function VehicleTechTable({
     });
   if (vehicleLookup?.power_hk)
     rows.push({ label: "Effekt", value: `${vehicleLookup.power_hk} hk` });
-  if (vehicleLookup?.drive_type)
-    rows.push({
-      label: "Hjuldrift",
-      value: DRIVE_TYPE_LABEL_NB[vehicleLookup.drive_type] ?? vehicleLookup.drive_type,
-    });
+  if (driveType)
+    rows.push({ label: "Hjuldrift", value: DRIVE_TYPE_LABEL_NB[driveType] ?? driveType });
   if (vehicleLookup?.weight_kg)
     rows.push({ label: "Vekt", value: `${vehicleLookup.weight_kg} kg` });
   if (vehicleLookup?.max_total_weight_kg)
@@ -84,20 +92,29 @@ export function VehicleTechTable({
   if (rows.length === 0) return null;
 
   return (
-    <section className="mt-8">
-      <h2 className="font-display text-xl">Tekniske data</h2>
-      <div className="mt-3 rounded-xl border border-border">
-        <Table>
-          <TableBody>
-            {rows.map((row) => (
-              <TableRow key={row.label}>
-                <TableCell className="w-1/2 text-muted-foreground">{row.label}</TableCell>
-                <TableCell className="font-medium">{row.value}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-    </section>
+    <Collapsible open={open} onOpenChange={setOpen} className="mt-4">
+      <CollapsibleTrigger asChild>
+        <button className="flex items-center gap-1.5 text-sm font-medium text-primary hover:underline">
+          Vis teknisk informasjon
+          <ChevronDown
+            className={`size-3.5 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+          />
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="mt-3 rounded-xl border border-border">
+          <Table>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.label}>
+                  <TableCell className="w-1/2 text-muted-foreground">{row.label}</TableCell>
+                  <TableCell className="font-medium">{row.value}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

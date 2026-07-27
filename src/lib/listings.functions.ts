@@ -5,11 +5,12 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   attributesSchema,
   getMissingRequiredFilters,
-  isVehicleCategory,
   normalizeFilter,
+  vehicleCategoryGroupFor,
   VEHICLE_EQUIPMENT_FILTER_KEYS,
   type CategoryNode,
 } from "@/lib/category-filters";
+import { getCategoryBehavior } from "@/lib/category-behavior";
 import {
   effectiveFlowForCategory,
   type CategoryFlowRow,
@@ -215,7 +216,9 @@ export const createListing = createServerFn({ method: "POST" })
         condition: data.condition,
         can_ship: data.can_ship,
       },
-      isVehicleCategory(data.category_id, normalizedFilters, categoriesById),
+      getCategoryBehavior(
+        vehicleCategoryGroupFor(data.category_id, normalizedFilters, categoriesById),
+      ),
     );
     if (fieldGroupError) throw new Error(fieldGroupError);
 

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import { validateRequiredFieldGroups } from "./validators";
+import { getCategoryBehavior } from "@/lib/category-behavior";
+
+const VEHICLE_BEHAVIOR = getCategoryBehavior("bil");
 
 describe("validateRequiredFieldGroups", () => {
   const DEFAULT_FLOW = [
@@ -48,13 +51,21 @@ describe("validateRequiredFieldGroups", () => {
     // Bil og MC can't be shipped by post — its delivery-location step only
     // asks for a location, not a shipping method, so can_ship is never set.
     expect(
-      validateRequiredFieldGroups(DEFAULT_FLOW, { condition: "good", can_ship: null }, true),
+      validateRequiredFieldGroups(
+        DEFAULT_FLOW,
+        { condition: "good", can_ship: null },
+        VEHICLE_BEHAVIOR,
+      ),
     ).toBeNull();
   });
 
   it("still requires condition for vehicle categories", () => {
     expect(
-      validateRequiredFieldGroups(DEFAULT_FLOW, { condition: null, can_ship: null }, true),
+      validateRequiredFieldGroups(
+        DEFAULT_FLOW,
+        { condition: null, can_ship: null },
+        VEHICLE_BEHAVIOR,
+      ),
     ).toEqual(expect.any(String));
   });
 });

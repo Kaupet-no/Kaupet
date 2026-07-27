@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, useBlocker } from "@tanstack/react-router";
+﻿import { createFileRoute, useNavigate, useBlocker } from "@tanstack/react-router";
 import { NativePageHeader } from "@/components/native-page-header";
 import { useIsNative } from "@/hooks/use-is-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -37,6 +37,7 @@ import {
   type CategoryNode,
 } from "@/lib/category-filters";
 import { CategoryPicker } from "@/components/category-picker";
+import { getCategoryBehavior } from "@/lib/category-behavior";
 import { modulesForKeys } from "@/features/listing-creation/modules/registry";
 import { effectiveFlowForCategory } from "@/features/listing-creation/category-flows";
 import { useAllCategoryFlows } from "@/features/listing-creation/use-all-category-flows";
@@ -50,7 +51,7 @@ import { CONDITIONS } from "@/lib/constants";
 import {
   VEHICLE_LEAF_SLUGS_WITHOUT_MILEAGE,
   type VehicleLeafSlug,
-} from "@/lib/vehicle-classification";
+} from "@/lib/vehicle/vehicle-classification";
 import { useEditableListingImages } from "@/features/listing-creation/use-editable-listing-images";
 import { useEditLocationPicker } from "@/features/listing-creation/use-edit-location-picker";
 import { useEditListingHints } from "@/features/listing-creation/use-edit-listing-hints";
@@ -531,7 +532,7 @@ function EditListingPage() {
                   : null
                 : null,
             },
-            !!vehicleGroup,
+            getCategoryBehavior(vehicleGroup),
           );
           if (fieldGroupError) {
             showErrorToast(fieldGroupError);
@@ -675,6 +676,7 @@ function EditListingPage() {
           const sharedProps: WizardSharedProps = {
             native,
             isVehicle: !!vehicleGroup,
+            behavior: getCategoryBehavior(vehicleGroup),
             showMileage,
 
             register,

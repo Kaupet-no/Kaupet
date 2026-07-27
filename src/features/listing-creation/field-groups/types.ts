@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   UseFormRegister,
   UseFormSetValue,
   UseFormWatch,
@@ -10,8 +10,9 @@ import type { AttributeMap } from "@/components/attribute-fields";
 import type { CategoryNode } from "@/lib/category-filters";
 import type { CategoryModule } from "@/features/listing-creation/modules/registry";
 import type { PendingImage } from "@/components/image-uploader";
-import type { VehicleLookupResult } from "@/lib/vehicle-lookup.server";
-import type { VehicleClassification } from "@/lib/vehicle-classification";
+import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.server";
+import type { VehicleClassification } from "@/lib/vehicle/vehicle-classification";
+import type { CategoryBehavior } from "@/lib/category-behavior";
 
 /** Minimal shape of ny-annonse.tsx's ListingForm — kept local to avoid a circular import. */
 export type ListingFormShape = {
@@ -48,6 +49,11 @@ export type WizardSharedProps = {
    * step — true for motorized vehicle leaves, false for `tilhenger-leaf` and
    * `campingvogn` (no odometer). Meaningless when `isVehicle` is false. */
   showMileage: boolean;
+  /** Flags derived from `isVehicle` that generic (non-vehicle-labelled) field
+   * groups branch on — delivery-location and category-attributes — so those
+   * branches live in one place (`getCategoryBehavior`) instead of each
+   * re-deriving their own vehicle check. */
+  behavior: CategoryBehavior;
 
   register: UseFormRegister<ListingFormShape>;
   watch: UseFormWatch<ListingFormShape>;

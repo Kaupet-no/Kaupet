@@ -14,6 +14,7 @@ import { DescriptionKeywordsGroup } from "./description-keywords";
 import { DeliveryLocation } from "./delivery-location";
 import { ReviewPublishGroup } from "./review-publish";
 import type { ListingFormShape, WizardSharedProps } from "./types";
+import type { CategoryBehavior } from "@/lib/category-behavior";
 
 /** Context passed to a field-group's `validateExtra`, mirroring what
  * `goToStep2/3` used to close over directly in ny-annonse.tsx. */
@@ -27,7 +28,7 @@ export type ValidateCtx = {
   categoryId: string;
   bilOgMcCategoryId: string | null;
   vehicleLookupResult: WizardSharedProps["vehicleLookupResult"];
-  isVehicle: boolean;
+  behavior: CategoryBehavior;
   knownIssues: WizardSharedProps["knownIssues"];
   noKnownIssues: WizardSharedProps["noKnownIssues"];
   showMileage: WizardSharedProps["showMileage"];
@@ -89,7 +90,7 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
       // vehicle-confirm — denne field group-en rendrer ingenting for
       // kjøretøy (se CategoryAttributes), så den skal heller ikke validere
       // noe her.
-      if (ctx.isVehicle) return null;
+      if (!ctx.behavior.showGenericAttributes) return null;
       if (ctx.missingFilters.length > 0) {
         return `Fyll inn ${ctx.missingFilters.map((f) => f.label_nb).join(", ")} før du går videre.`;
       }

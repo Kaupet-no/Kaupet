@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+﻿// @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useVehicleLookupFlow } from "./use-vehicle-lookup-flow";
@@ -11,12 +11,12 @@ vi.mock("@tanstack/react-start", () => ({
 }));
 
 const lookupVehicleByRegNumberMock = vi.fn();
-vi.mock("@/lib/vehicle-lookup.functions", () => ({
+vi.mock("@/lib/vehicle/vehicle-lookup.functions", () => ({
   lookupVehicleByRegNumber: (...args: unknown[]) => lookupVehicleByRegNumberMock(...args),
 }));
 
 const matchVehicleBrandModelMock = vi.fn();
-vi.mock("@/lib/vehicle-brand-match.functions", () => ({
+vi.mock("@/lib/vehicle/vehicle-brand-match.functions", () => ({
   matchVehicleBrandModel: (...args: unknown[]) => matchVehicleBrandModelMock(...args),
 }));
 

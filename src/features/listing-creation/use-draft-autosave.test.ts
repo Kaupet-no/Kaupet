@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+﻿// @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useDraftAutosave } from "./use-draft-autosave";
@@ -12,7 +12,7 @@ vi.mock("@/lib/listings.functions", () => ({
   saveDraftListing: (...args: unknown[]) => saveDraftListingMock(...args),
 }));
 
-vi.mock("@/lib/vehicle-title", () => ({
+vi.mock("@/lib/vehicle/vehicle-title", () => ({
   computeVehicleTitle: () => "",
 }));
 

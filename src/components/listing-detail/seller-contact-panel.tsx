@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { MessageCircle, Share2, ShieldCheck, User as UserIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { FavoriteButton } from "@/components/favorite-button";
 import { ShareListingDialog } from "@/components/share-listing-dialog";
 import { StarRating } from "@/components/star-rating";
@@ -54,6 +55,12 @@ export function SellerContactPanel({
             <>
               <div className="flex flex-wrap items-center gap-1.5">
                 <p className="font-medium">{seller?.display_name ?? "Selger"}</p>
+                {/* Statisk "Privatperson" inntil vi har forhandlerkontoer —
+                    da avgjøres denne av kontotype i stedet for å alltid vise
+                    privatperson. */}
+                <Badge variant="secondary" className="text-[10px] font-normal">
+                  Privatperson
+                </Badge>
               </div>
               {!!seller?.review_count && (
                 <div
@@ -95,15 +102,18 @@ export function SellerContactPanel({
           {contacting ? "Åpner samtale…" : "Send melding til selger"}
         </Button>
       )}
-      <FavoriteButton listingId={listingId} variant="full" size="lg" className="mt-2" />
-      <Button
-        type="button"
-        variant="outline"
-        className="mt-2 w-full gap-2"
-        onClick={() => onShareOpenChange(true)}
-      >
-        <Share2 className="size-4" /> Del annonse
-      </Button>
+      <div className="mt-2 flex flex-col gap-2">
+        <FavoriteButton listingId={listingId} variant="full" size="lg" className="w-full" />
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full gap-2"
+          onClick={() => onShareOpenChange(true)}
+        >
+          <Share2 className="size-4" /> Del annonse
+        </Button>
+      </div>
+
       <ShareListingDialog
         open={shareOpen}
         onOpenChange={onShareOpenChange}

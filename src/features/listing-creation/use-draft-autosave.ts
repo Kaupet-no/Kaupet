@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { showSuccessToast } from "@/lib/toast";
 import { saveDraftListing } from "@/lib/listings.functions";
-import { computeVehicleTitle } from "@/lib/vehicle-title";
+import { computeVehicleTitle } from "@/lib/vehicle/vehicle-title";
 import type { AttributeMap } from "@/components/attribute-fields";
 
 const DRAFT_KEY = "kaupet_draft_ny_annonse";

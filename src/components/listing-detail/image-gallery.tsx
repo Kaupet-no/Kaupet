@@ -1,9 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { useIsNative } from "@/hooks/use-is-native";
 import {
   Carousel,
   CarouselContent,
   CarouselItem,
+  CarouselPrevious,
+  CarouselNext,
   type CarouselApi,
 } from "@/components/ui/carousel";
 
@@ -18,6 +20,21 @@ function ImageCaption({ caption }: { caption?: string | null }) {
   );
 }
 
+/** Blurred, scaled echo of the image filling the frame behind an
+ * `object-contain` image, so letterbox bars read as a soft glow instead of a
+ * flat grey/muted bar when the photo's aspect ratio doesn't match 4:3. */
+function BlurredBackdrop({ src }: { src?: string }) {
+  if (!src) return null;
+  return (
+    <img
+      src={src}
+      alt=""
+      aria-hidden="true"
+      className="absolute inset-0 size-full scale-110 object-cover opacity-40 blur-2xl"
+    />
+  );
+}
+
 export function ImageGallery({
   images,
   imgUrls,
@@ -25,6 +42,7 @@ export function ImageGallery({
   onSelect,
   title,
   onImageClick,
+  overlaySlot,
 }: {
   images: ListingImage[];
   imgUrls: Record<string, string>;
@@ -32,6 +50,10 @@ export function ImageGallery({
   onSelect: (index: number) => void;
   title: string;
   onImageClick?: (index: number) => void;
+  /** Rendered absolutely-positioned over just the main image (e.g. the price
+   * badge) — scoped to a wrapper around the carousel alone, not the
+   * thumbnail strip below it, so it can't hang down into the thumbnails. */
+  overlaySlot?: ReactNode;
 }) {
   const isNative = useIsNative();
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
@@ -54,7 +76,7 @@ export function ImageGallery({
 
   const thumbnailStrip =
     images.length > 1 ? (
-      <div className="mt-3 flex gap-2 overflow-x-auto" role="list">
+      <div className="mt-10 flex gap-2 overflow-x-auto" role="list">
         {images.map((img, i) => (
           <button
             key={img.storage_path}
@@ -74,81 +96,64 @@ export function ImageGallery({
       </div>
     ) : null;
 
-  if (isNative && images.length > 0) {
+  if (images.length > 0) {
     return (
       <>
-        <Carousel
-          opts={{ align: "center", loop: false, startIndex: activeImage }}
-          setApi={setCarouselApi}
-          className="w-full"
-        >
-          <CarouselContent className="ml-0">
-            {images.map((img, i) => (
-              <CarouselItem key={img.storage_path} className="pl-0">
-                <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-border bg-muted">
-                  {onImageClick ? (
-                    <button
-                      type="button"
-                      onClick={() => onImageClick(i)}
-                      aria-label="Se bilde i fullskjerm"
-                      className="size-full"
-                    >
+        <div className="relative">
+          <Carousel
+            opts={{ align: "center", loop: false, startIndex: activeImage }}
+            setApi={setCarouselApi}
+            className="w-full"
+          >
+            <CarouselContent className="ml-0">
+              {images.map((img, i) => (
+                <CarouselItem key={img.storage_path} className="pl-0">
+                  <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-border bg-muted">
+                    <BlurredBackdrop src={imgUrls[img.storage_path]} />
+                    {onImageClick ? (
+                      <button
+                        type="button"
+                        onClick={() => onImageClick(i)}
+                        aria-label="Se bilde i fullskjerm"
+                        className="relative size-full"
+                      >
+                        <img
+                          src={imgUrls[img.storage_path]}
+                          alt={title}
+                          className="relative size-full object-contain"
+                        />
+                      </button>
+                    ) : (
                       <img
                         src={imgUrls[img.storage_path]}
                         alt={title}
-                        className="size-full object-contain"
+                        className="relative size-full object-contain"
                       />
-                    </button>
-                  ) : (
-                    <img
-                      src={imgUrls[img.storage_path]}
-                      alt={title}
-                      className="size-full object-contain"
-                    />
-                  )}
-                  <ImageCaption caption={img.caption} />
-                </div>
-              </CarouselItem>
-            ))}
-          </CarouselContent>
-        </Carousel>
+                    )}
+                    <ImageCaption caption={img.caption} />
+                  </div>
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+            {!isNative && images.length > 1 && (
+              <>
+                <CarouselPrevious className="left-3 border-border bg-card/90 backdrop-blur" />
+                <CarouselNext className="right-3 border-border bg-card/90 backdrop-blur" />
+              </>
+            )}
+          </Carousel>
+          {overlaySlot}
+        </div>
         {thumbnailStrip}
       </>
     );
   }
 
   return (
-    <>
-      <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-border bg-muted">
-        {images.length > 0 ? (
-          onImageClick ? (
-            <button
-              type="button"
-              onClick={() => onImageClick(activeImage)}
-              aria-label="Se bilde i fullskjerm"
-              className="size-full cursor-zoom-in"
-            >
-              <img
-                src={imgUrls[images[activeImage].storage_path]}
-                alt={title}
-                className="size-full object-contain"
-              />
-            </button>
-          ) : (
-            <img
-              src={imgUrls[images[activeImage].storage_path]}
-              alt={title}
-              className="size-full object-contain"
-            />
-          )
-        ) : (
-          <div className="flex size-full items-center justify-center text-sm text-muted-foreground">
-            Ingen bilder
-          </div>
-        )}
-        {images.length > 0 && <ImageCaption caption={images[activeImage].caption} />}
+    <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-border bg-muted">
+      <div className="flex size-full items-center justify-center text-sm text-muted-foreground">
+        Ingen bilder
       </div>
-      {thumbnailStrip}
-    </>
+    </div>
   );
 }

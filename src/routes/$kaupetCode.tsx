@@ -10,7 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { reconcilePromotionPayment } from "@/lib/promotions.functions";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { z } from "zod";
@@ -23,7 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { readLastSearchContext, type LastSearchContext } from "@/lib/last-search-context";
 import { CategoryLandingPage } from "@/components/category-landing-page";
-import { type Category } from "@/lib/categories";
+import { breadcrumbPath, buildTree, type Category } from "@/lib/categories";
 import { normalizeSlugForMatch } from "@/lib/slug";
 
 import { signListingImageUrls, signVehicle360FrameUrls } from "@/lib/storage";
@@ -379,7 +379,7 @@ function ListingDetailPage() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, subtitle, description, price_nok, is_free, condition, city, postal_code, display_lat, display_lng, created_at, updated_at, published_at, status, seller_id, category_id, attributes, known_issues, no_known_issues, maintenance_history, listing_images(storage_path, sort_order, caption), listing_360_frames(storage_path, frame_order), categories(name_nb, slug)",
+          "id, kaupet_code, title, subtitle, description, price_nok, is_free, condition, city, postal_code, display_lat, display_lng, created_at, updated_at, published_at, status, seller_id, category_id, attributes, known_issues, no_known_issues, maintenance_history, listing_images(storage_path, sort_order, caption), listing_360_frames(storage_path, frame_order), categories(id, name_nb, slug, parent_id)",
         )
         .eq("kaupet_code", kaupetCode)
         .maybeSingle();
@@ -406,6 +406,20 @@ function ListingDetailPage() {
             }
           : null,
       };
+    },
+  });
+
+  // Full category tree, only for building the listing's breadcrumb — shares
+  // the ["categories"] queryKey with annonser.tsx so React Query serves it
+  // from cache on normal in-app navigation instead of refetching.
+  const { data: allCategories } = useQuery({
+    queryKey: ["categories"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("categories")
+        .select("id, slug, name_nb, parent_id");
+      if (error) throw error;
+      return data as Category[];
     },
   });
 
@@ -576,6 +590,13 @@ function ListingDetailPage() {
   const seller = data.seller;
   const category = Array.isArray(data.categories) ? data.categories[0] : data.categories;
   const attributes = (data.attributes ?? {}) as Record<string, unknown>;
+  const breadcrumb =
+    category && allCategories
+      ? breadcrumbPath(category as Category, buildTree(allCategories)).map((c) => ({
+          name_nb: c.name_nb,
+          slug: c.slug,
+        }))
+      : undefined;
 
   return (
     <ListingDetailView
@@ -596,6 +617,7 @@ function ListingDetailPage() {
       noKnownIssues={data.no_known_issues}
       maintenanceHistory={data.maintenance_history}
       category={category ?? null}
+      breadcrumb={breadcrumb}
       images={images}
       imgUrls={imgUrls}
       vehicle360Frames={vehicle360Frames}
@@ -640,6 +662,19 @@ function ListingDetailPage() {
           onShareOpenChange={handleShareOpenChange}
           isNative={isNative}
         />
+      }
+      stickyContactSlot={
+        !isOwner ? (
+          <Button
+            size="sm"
+            className="gap-2"
+            onClick={() => contactMutation.mutate()}
+            disabled={contactMutation.isPending}
+          >
+            <MessageCircle className="size-4" />
+            {contactMutation.isPending ? "Åpner…" : "Send melding"}
+          </Button>
+        ) : undefined
       }
     />
   );

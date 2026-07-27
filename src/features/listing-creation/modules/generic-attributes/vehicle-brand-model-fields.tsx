@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+﻿import { useMemo } from "react";
 
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAllVehicleBrands, useAllVehicleModels } from "@/lib/vehicle-brands";
+import { useAllVehicleBrands, useAllVehicleModels } from "@/lib/vehicle/vehicle-brands";
 import type { VehicleBrandGroup } from "@/lib/category-filters";
 
 /**

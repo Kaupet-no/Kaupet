@@ -75,7 +75,7 @@ const TRANSMISSION_OPTIONS = [
   { value: "automat", label: "Automat" },
 ];
 
-const DRIVE_TYPE_OPTIONS = [
+export const DRIVE_TYPE_OPTIONS = [
   { value: "4x4", label: "Firehjulsdrift" },
   { value: "bakhjul", label: "Bakhjulsdrift" },
   { value: "forhjul", label: "Forhjulsdrift" },

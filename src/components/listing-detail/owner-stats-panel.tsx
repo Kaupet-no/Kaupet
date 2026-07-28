@@ -1,9 +1,35 @@
-import { Link } from "@tanstack/react-router";
-import { Check, ChevronDown, Eye, Heart, Info, Pencil, Sparkles, Users } from "lucide-react";
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import {
+  Check,
+  ChevronDown,
+  Eye,
+  Heart,
+  Info,
+  Loader2,
+  Pencil,
+  Send,
+  Sparkles,
+  Users,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { PromoteListingDialog } from "@/components/promote-listing-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { republishListing } from "@/lib/listings.functions";
+import { showSuccessToast, showErrorToast } from "@/lib/toast";
+import { formatErrorMessage } from "@/lib/errors";
 
 type Stats = { total_views: number; unique_visitors: number; favorite_count: number } | undefined;
 type ActivePromotion = { id: string; status: string; expires_at: string | null } | null | undefined;
@@ -17,6 +43,11 @@ export function OwnerStatsPanel({
   onPromoteOpenChange,
   statsInfoOpen,
   onStatsInfoOpenChange,
+  editMode,
+  onToggleEditMode,
+  hasImages,
+  isFree,
+  hasPrice,
 }: {
   listingId: string;
   status: string;
@@ -26,17 +57,98 @@ export function OwnerStatsPanel({
   onPromoteOpenChange: (open: boolean) => void;
   statsInfoOpen: boolean;
   onStatsInfoOpenChange: (open: boolean) => void;
+  /** Whether inline editing is currently on for this listing. */
+  editMode: boolean;
+  onToggleEditMode: () => void;
+  /** Used only to warn before publishing a draft that's missing images/price. */
+  hasImages: boolean;
+  isFree: boolean;
+  hasPrice: boolean;
 }) {
+  const queryClient = useQueryClient();
+  const [showPublishWarning, setShowPublishWarning] = useState(false);
+  const doRepublish = useServerFn(republishListing);
+  const publishDraft = useMutation({
+    mutationFn: () => doRepublish({ data: { id: listingId } }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-listings"] });
+      queryClient.invalidateQueries({ queryKey: ["listing"] });
+      showSuccessToast("Annonsen er publisert!");
+    },
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke publisere annonsen")),
+  });
+
   return (
     <div className="rounded-xl border border-primary/40 bg-primary/5 p-4">
       <p className="text-xs font-medium uppercase tracking-wide text-primary">
         Dette er din annonse
       </p>
-      <Link to="/mine-annonser/$id/rediger" params={{ id: listingId }} className="mt-3 block">
-        <Button className="w-full gap-2" variant="default">
-          <Pencil className="size-4" /> Rediger annonse
-        </Button>
-      </Link>
+      <Button
+        className="mt-3 w-full gap-2"
+        variant={editMode ? "secondary" : "default"}
+        onClick={onToggleEditMode}
+      >
+        <Pencil className="size-4" /> {editMode ? "Ferdig redigert" : "Rediger annonse"}
+      </Button>
+
+      {status === "draft" && (
+        <div className="mt-3 flex items-center gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-sm">
+          <span className="flex-1 text-amber-800 dark:text-amber-300">
+            Dette er et utkast — bare du kan se den.
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => {
+              const missingPrice = !isFree && !hasPrice;
+              const missingImages = !hasImages;
+              if (missingPrice || missingImages) {
+                setShowPublishWarning(true);
+              } else {
+                publishDraft.mutate();
+              }
+            }}
+            disabled={publishDraft.isPending}
+          >
+            {publishDraft.isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Send className="size-4" />
+            )}
+            Publiser
+          </Button>
+        </div>
+      )}
+
+      <AlertDialog open={showPublishWarning} onOpenChange={setShowPublishWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Annonsen mangler informasjon</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>
+                <p className="mb-2">Følgende felter er ikke utfylt:</p>
+                <ul className="list-disc pl-5 space-y-1">
+                  {!hasImages && <li>Ingen bilder lagt til</li>}
+                  {!isFree && !hasPrice && <li>Ingen pris satt</li>}
+                </ul>
+                <p className="mt-3">Vil du publisere likevel, eller gå tilbake og fylle inn?</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Gå tilbake</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowPublishWarning(false);
+                publishDraft.mutate();
+              }}
+            >
+              Publiser likevel
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {status === "active" &&
         (activePromotion ? (
           <Button

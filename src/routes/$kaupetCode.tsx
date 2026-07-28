@@ -31,6 +31,13 @@ import { Button } from "@/components/ui/button";
 import { OwnerStatsPanel } from "@/components/listing-detail/owner-stats-panel";
 import { SellerContactPanel } from "@/components/listing-detail/seller-contact-panel";
 import { ListingDetailView } from "@/components/listing-detail/listing-detail-view";
+import { getCategoryBehavior } from "@/lib/category-behavior";
+import { vehicleCategoryGroupFor } from "@/lib/category-filters";
+import { useAllCategoryFilters } from "@/components/attribute-fields";
+import { useListingEditMutations } from "@/features/listing-edit/use-listing-edit-mutations";
+import { VehiclePlateEditDialog } from "@/features/listing-edit/vehicle-plate-edit-dialog";
+import { CategoryChangeDialog } from "@/features/listing-edit/category-change-dialog";
+import type { ListingEditContextValue } from "@/features/listing-edit/edit-mode-context";
 
 // crypto.randomUUID() requires a secure context and isn't available in every
 // WebView — fall back to a non-crypto random ID so anonymous view-count
@@ -54,6 +61,9 @@ export const Route = createFileRoute("/$kaupetCode")({
     // Slug of a descendant category to scope the page to, without leaving
     // this URL — e.g. Interiør > Møbler > Sofa still lands on /interiør.
     sub: z.string().optional(),
+    // Owner inline-editing toggle — a search param (not local state) so it
+    // survives a reload while editing.
+    edit: z.coerce.boolean().optional(),
   }),
   loader: async ({ params }) => {
     // A single dynamic root segment serves two purposes: an 8-digit code is
@@ -379,7 +389,7 @@ function ListingDetailPage() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, subtitle, description, price_nok, is_free, condition, city, postal_code, display_lat, display_lng, created_at, updated_at, published_at, status, seller_id, category_id, attributes, known_issues, no_known_issues, maintenance_history, listing_images(storage_path, sort_order, caption), listing_360_frames(storage_path, frame_order), categories(id, name_nb, slug, parent_id)",
+          "id, kaupet_code, title, subtitle, description, price_nok, is_free, condition, can_ship, city, postal_code, display_lat, display_lng, created_at, updated_at, published_at, status, seller_id, category_id, attributes, known_issues, no_known_issues, maintenance_history, listing_images(storage_path, sort_order, caption), listing_360_frames(storage_path, frame_order), categories(id, name_nb, slug, parent_id)",
         )
         .eq("kaupet_code", kaupetCode)
         .maybeSingle();
@@ -425,6 +435,45 @@ function ListingDetailPage() {
 
   const listingId = data?.id;
   const isOwner = !!user && !!data && user.id === data.seller_id;
+
+  const editModeOn = isOwner && !!search.edit;
+  const [plateModalOpen, setPlateModalOpen] = useState(false);
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+  const { data: allFilters } = useAllCategoryFilters();
+  const categoriesByIdForBehavior = useMemo(() => {
+    const m = new Map<string, { id: string; parent_id: string | null }>();
+    for (const c of allCategories ?? []) m.set(c.id, c);
+    return m;
+  }, [allCategories]);
+  const vehicleGroup = data?.category_id
+    ? vehicleCategoryGroupFor(data.category_id, allFilters ?? [], categoriesByIdForBehavior)
+    : null;
+  const behavior = getCategoryBehavior(vehicleGroup);
+  const { saveField, fieldStatus } = useListingEditMutations({
+    listingId: listingId ?? "",
+    kaupetCode,
+    behavior,
+  });
+  const editContext: ListingEditContextValue | undefined = listingId
+    ? {
+        editMode: editModeOn,
+        listingId,
+        behavior,
+        saveField,
+        fieldStatus,
+        openVehicleLookupModal: () => setPlateModalOpen(true),
+        openCategoryModal: () => setCategoryModalOpen(true),
+      }
+    : undefined;
+
+  function toggleEditMode() {
+    navigate({
+      to: "/$kaupetCode",
+      params: { kaupetCode },
+      search: (prev) => ({ ...prev, edit: !editModeOn || undefined }),
+      replace: true,
+    });
+  }
 
   const { data: stats } = useQuery({
     queryKey: ["listing-stats", listingId],
@@ -617,12 +666,15 @@ function ListingDetailPage() {
       noKnownIssues={data.no_known_issues}
       maintenanceHistory={data.maintenance_history}
       category={category ?? null}
+      categoryId={data.category_id}
+      canShip={data.can_ship}
       breadcrumb={breadcrumb}
       images={images}
       imgUrls={imgUrls}
       vehicle360Frames={vehicle360Frames}
       vehicle360ImgUrls={vehicle360ImgUrls}
       attributes={attributes}
+      editMode={isOwner && editContext ? { context: editContext } : undefined}
       backSlot={<BackNavLink target={backTarget} onHistoryBack={() => router.history.back()} />}
       actionsMenuSlot={
         user && !isOwner ? (
@@ -645,6 +697,11 @@ function ListingDetailPage() {
             onPromoteOpenChange={setPromoteOpen}
             statsInfoOpen={statsInfoOpen}
             onStatsInfoOpenChange={setStatsInfoOpen}
+            editMode={editModeOn}
+            onToggleEditMode={toggleEditMode}
+            hasImages={images.length > 0}
+            isFree={data.is_free}
+            hasPrice={data.price_nok != null}
           />
         ) : undefined
       }
@@ -676,6 +733,26 @@ function ListingDetailPage() {
           </Button>
         ) : undefined
       }
-    />
+    >
+      {isOwner && listingId && (
+        <>
+          <VehiclePlateEditDialog
+            open={plateModalOpen}
+            onOpenChange={setPlateModalOpen}
+            listingId={listingId}
+            kaupetCode={kaupetCode}
+            currentCategoryId={data.category_id}
+            attributes={attributes}
+          />
+          <CategoryChangeDialog
+            open={categoryModalOpen}
+            onOpenChange={setCategoryModalOpen}
+            listingId={listingId}
+            kaupetCode={kaupetCode}
+            currentCategoryId={data.category_id}
+          />
+        </>
+      )}
+    </ListingDetailView>
   );
 }

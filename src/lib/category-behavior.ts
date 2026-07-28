@@ -1,4 +1,4 @@
-import { capitalizeWord } from "@/lib/vehicle/vehicle-title";
+import { capitalizeWord } from "@/lib/utils";
 import type {
   AttributeFilterValue,
   CategoryFilter,

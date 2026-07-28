@@ -97,6 +97,7 @@ function MyListingsPage() {
   const [tab, setTab] = useState<"all" | "active" | "sold" | "draft" | "wtb">("all");
   const [publishWarning, setPublishWarning] = useState<{
     id: string;
+    kaupetCode: string;
     missingTitle: boolean;
     missingCategory: boolean;
     missingDescription: boolean;
@@ -363,6 +364,7 @@ function MyListingsPage() {
                         ) {
                           setPublishWarning({
                             id: r.id,
+                            kaupetCode: r.kaupet_code,
                             missingTitle,
                             missingCategory,
                             missingDescription,
@@ -535,8 +537,9 @@ function MyListingsPage() {
                       className="bg-background text-foreground border border-input hover:bg-accent hover:text-accent-foreground"
                       onClick={() => {
                         void navigate({
-                          to: "/mine-annonser/$id/rediger",
-                          params: { id: publishWarning.id },
+                          to: "/$kaupetCode",
+                          params: { kaupetCode: publishWarning.kaupetCode },
+                          search: { edit: true },
                         });
                         setPublishWarning(null);
                       }}
@@ -713,8 +716,9 @@ function ListingRow({
           <DropdownMenuContent align="end" className="w-52">
             <DropdownMenuItem asChild>
               <Link
-                to="/mine-annonser/$id/rediger"
-                params={{ id: row.id }}
+                to="/$kaupetCode"
+                params={{ kaupetCode: row.kaupet_code }}
+                search={{ edit: true }}
                 className="flex items-center gap-2"
               >
                 <Pencil className="size-4" /> Rediger
@@ -803,7 +807,7 @@ function ListingRow({
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Link to="/mine-annonser/$id/rediger" params={{ id: row.id }}>
+        <Link to="/$kaupetCode" params={{ kaupetCode: row.kaupet_code }} search={{ edit: true }}>
           <Button size="sm" variant="outline" disabled={busy}>
             <Pencil className="size-4" /> Rediger
           </Button>

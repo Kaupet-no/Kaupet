@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
-import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, RotateCw } from "lucide-react";
+import {
+  Vehicle360Viewer,
+  type Vehicle360Frame,
+} from "@/components/listing-detail/vehicle/vehicle-360-viewer";
 
 type ListingImage = { storage_path: string; sort_order: number; caption?: string | null };
 
@@ -10,12 +14,26 @@ type Props = {
   initialIndex: number;
   title: string;
   onClose: () => void;
+  /** Samme kombinerte indeksrom som `ImageGallery` — 360°-visningen (om den
+   * finnes) er slide 0, og de vanlige bildene er forskjøvet én opp. */
+  vehicle360?: { frames: Vehicle360Frame[]; imgUrls: Record<string, string> };
 };
 
-export function ImageLightbox({ images, imgUrls, initialIndex, title, onClose }: Props) {
+export function ImageLightbox({
+  images,
+  imgUrls,
+  initialIndex,
+  title,
+  onClose,
+  vehicle360,
+}: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
-  const [emblaRef, emblaApi] = useEmblaCarousel({ startIndex: initialIndex });
+  const [emblaRef, emblaApi] = useEmblaCarousel({ startIndex: initialIndex, loop: true });
+
+  const has360 = !!vehicle360 && vehicle360.frames.length > 0;
+  const offset = has360 ? 1 : 0;
+  const totalSlides = images.length + offset;
 
   useEffect(() => {
     closeRef.current?.focus();
@@ -26,6 +44,8 @@ export function ImageLightbox({ images, imgUrls, initialIndex, title, onClose }:
     const onPop = () => onClose();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") history.back();
+      else if (e.key === "ArrowLeft") emblaApi?.scrollPrev();
+      else if (e.key === "ArrowRight") emblaApi?.scrollNext();
     };
     window.addEventListener("popstate", onPop);
     window.addEventListener("keydown", onKey);
@@ -33,7 +53,7 @@ export function ImageLightbox({ images, imgUrls, initialIndex, title, onClose }:
       window.removeEventListener("popstate", onPop);
       window.removeEventListener("keydown", onKey);
     };
-  }, [onClose]);
+  }, [onClose, emblaApi]);
 
   useEffect(() => {
     if (!emblaApi) return;
@@ -74,7 +94,7 @@ export function ImageLightbox({ images, imgUrls, initialIndex, title, onClose }:
         className="flex items-center justify-between px-4 py-3"
       >
         <span className="text-sm text-white/60">
-          {images.length > 1 ? `${currentIndex + 1} / ${images.length}` : ""}
+          {totalSlides > 1 ? `${currentIndex + 1} / ${totalSlides}` : ""}
         </span>
         <button
           ref={closeRef}
@@ -90,11 +110,22 @@ export function ImageLightbox({ images, imgUrls, initialIndex, title, onClose }:
       {/* Carousel — clicks bubble up to the backdrop and close the lightbox */}
       <div className="relative min-h-0 flex-1 overflow-hidden" ref={emblaRef}>
         <div className="flex h-full">
+          {has360 && (
+            <div className="relative flex h-full min-w-0 flex-[0_0_100%] items-center justify-center">
+              <div className="w-full max-w-full" onClick={(e) => e.stopPropagation()}>
+                <Vehicle360Viewer
+                  frames={vehicle360.frames}
+                  imgUrls={vehicle360.imgUrls}
+                  title={title}
+                />
+              </div>
+            </div>
+          )}
           {images.map((img, i) => (
             <div key={img.storage_path} className="relative h-full min-w-0 flex-[0_0_100%]">
               <img
                 src={imgUrls[img.storage_path]}
-                alt={i === 0 ? title : `${title} – bilde ${i + 1}`}
+                alt={i === 0 && !has360 ? title : `${title} – bilde ${i + 1}`}
                 className="h-full w-full object-contain"
               />
               {img.caption && (
@@ -106,7 +137,7 @@ export function ImageLightbox({ images, imgUrls, initialIndex, title, onClose }:
           ))}
         </div>
 
-        {images.length > 1 && (
+        {totalSlides > 1 && (
           <>
             <button
               type="button"
@@ -129,25 +160,41 @@ export function ImageLightbox({ images, imgUrls, initialIndex, title, onClose }:
       </div>
 
       {/* Thumbnail bar */}
-      {images.length > 1 && (
+      {totalSlides > 1 && (
         <div
           onClick={(e) => e.stopPropagation()}
           className="flex justify-center gap-2 overflow-x-auto px-4 py-3"
         >
-          {images.map((img, i) => (
+          {has360 && (
             <button
-              key={img.storage_path}
               type="button"
-              onClick={() => emblaApi?.scrollTo(i)}
-              aria-label={`Gå til bilde ${i + 1}`}
-              aria-pressed={i === currentIndex}
-              className={`size-14 shrink-0 overflow-hidden rounded-md border-2 transition-colors ${
-                i === currentIndex ? "border-white" : "border-transparent opacity-50"
+              onClick={() => emblaApi?.scrollTo(0)}
+              aria-label="Gå til 360°-visning"
+              aria-pressed={currentIndex === 0}
+              className={`flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-md border-2 bg-white/10 transition-colors ${
+                currentIndex === 0 ? "border-white" : "border-transparent opacity-50"
               }`}
             >
-              <img src={imgUrls[img.storage_path]} alt="" className="size-full object-cover" />
+              <RotateCw className="size-5 text-white" />
             </button>
-          ))}
+          )}
+          {images.map((img, i) => {
+            const absoluteIndex = i + offset;
+            return (
+              <button
+                key={img.storage_path}
+                type="button"
+                onClick={() => emblaApi?.scrollTo(absoluteIndex)}
+                aria-label={`Gå til bilde ${i + 1}`}
+                aria-pressed={absoluteIndex === currentIndex}
+                className={`size-14 shrink-0 overflow-hidden rounded-md border-2 transition-colors ${
+                  absoluteIndex === currentIndex ? "border-white" : "border-transparent opacity-50"
+                }`}
+              >
+                <img src={imgUrls[img.storage_path]} alt="" className="size-full object-cover" />
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

@@ -1,16 +1,9 @@
-import {
-  createFileRoute,
-  Link,
-  notFound,
-  useNavigate,
-  useRouter,
-  useRouterState,
-} from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, useNavigate, useRouter } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { reconcilePromotionPayment } from "@/lib/promotions.functions";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, MessageCircle } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { z } from "zod";
@@ -21,9 +14,9 @@ import { ListingActionsMenu } from "@/components/listing-detail/listing-actions-
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { readLastSearchContext, type LastSearchContext } from "@/lib/last-search-context";
 import { CategoryLandingPage } from "@/components/category-landing-page";
 import { breadcrumbPath, buildTree, type Category } from "@/lib/categories";
+import { encodeAttrFilters } from "@/features/listing-search/search-schema";
 import { normalizeSlugForMatch } from "@/lib/slug";
 
 import { signListingImageUrls, signVehicle360FrameUrls } from "@/lib/storage";
@@ -32,7 +25,7 @@ import { OwnerStatsPanel } from "@/components/listing-detail/owner-stats-panel";
 import { SellerContactPanel } from "@/components/listing-detail/seller-contact-panel";
 import { ListingDetailView } from "@/components/listing-detail/listing-detail-view";
 import { getCategoryBehavior } from "@/lib/category-behavior";
-import { vehicleCategoryGroupFor } from "@/lib/category-filters";
+import { genericBrandFilterFor, vehicleCategoryGroupFor } from "@/lib/category-filters";
 import { useAllCategoryFilters } from "@/components/attribute-fields";
 import { useListingEditMutations } from "@/features/listing-edit/use-listing-edit-mutations";
 import { VehiclePlateEditDialog } from "@/features/listing-edit/vehicle-plate-edit-dialog";
@@ -254,42 +247,11 @@ function ListingErrorBoundary({ error, reset }: { error: Error; reset: () => voi
   );
 }
 
-type BackTarget =
-  | { mode: "history"; label: string }
-  | { mode: "search"; label: string; search: LastSearchContext["search"] }
-  | { mode: "default" };
-
-const backLinkClass =
-  "inline-flex items-center gap-1 py-2 pr-2 text-sm text-muted-foreground hover:text-foreground";
-
-function BackNavLink({ target, onHistoryBack }: { target: BackTarget; onHistoryBack: () => void }) {
-  if (target.mode === "history") {
-    return (
-      <button type="button" onClick={onHistoryBack} className={backLinkClass}>
-        <ArrowLeft className="size-4" /> Tilbake til {target.label}
-      </button>
-    );
-  }
-  if (target.mode === "search") {
-    return (
-      <Link to="/annonser" search={target.search as never} className={backLinkClass}>
-        <ArrowLeft className="size-4" /> Tilbake til {target.label}
-      </Link>
-    );
-  }
-  return (
-    <Link to="/annonser" search={{ q: "", category: "", sort: "new" }} className={backLinkClass}>
-      <ArrowLeft className="size-4" /> Tilbake til annonser
-    </Link>
-  );
-}
-
 function ListingDetailPage() {
   const { kaupetCode } = Route.useParams();
   const search = Route.useSearch();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const router = useRouter();
   const queryClient = useQueryClient();
   const isNative = useIsNative();
   const { data: isAdmin } = useIsAdmin();
@@ -299,21 +261,6 @@ function ListingDetailPage() {
   const [statsInfoOpen, setStatsInfoOpen] = useState(false);
   const [promoteOpen, setPromoteOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
-  const [backTarget, setBackTarget] = useState<BackTarget>({ mode: "default" });
-  const fromSearch = useRouterState({
-    select: (s) => (s.location.state as { fromSearch?: boolean } | null)?.fromSearch === true,
-  });
-
-  useEffect(() => {
-    const last = readLastSearchContext();
-    if (router.history.canGoBack() && last && fromSearch) {
-      setBackTarget({ mode: "history", label: last.label });
-    } else if (last) {
-      setBackTarget({ mode: "search", label: last.label, search: last.search });
-    } else {
-      setBackTarget({ mode: "default" });
-    }
-  }, [router, fromSearch]);
 
   const reconcilePromotion = useServerFn(reconcilePromotionPayment);
   useEffect(() => {
@@ -447,6 +394,9 @@ function ListingDetailPage() {
   }, [allCategories]);
   const vehicleGroup = data?.category_id
     ? vehicleCategoryGroupFor(data.category_id, allFilters ?? [], categoriesByIdForBehavior)
+    : null;
+  const genericBrandFilter = data?.category_id
+    ? genericBrandFilterFor(data.category_id, allFilters ?? [], categoriesByIdForBehavior)
     : null;
   const behavior = getCategoryBehavior(vehicleGroup);
   const { saveField, fieldStatus } = useListingEditMutations({
@@ -639,13 +589,24 @@ function ListingDetailPage() {
   const seller = data.seller;
   const category = Array.isArray(data.categories) ? data.categories[0] : data.categories;
   const attributes = (data.attributes ?? {}) as Record<string, unknown>;
-  const breadcrumb =
-    category && allCategories
-      ? breadcrumbPath(category as Category, buildTree(allCategories)).map((c) => ({
-          name_nb: c.name_nb,
-          slug: c.slug,
-        }))
-      : undefined;
+  const breadcrumb = (() => {
+    if (!category || !allCategories) return undefined;
+    const categoryChain = breadcrumbPath(category as Category, buildTree(allCategories));
+    const rootCategorySlug = categoryChain[0]?.slug ?? null;
+    return [
+      ...categoryChain.map((c) => ({
+        name_nb: c.name_nb,
+        slug: c.slug as string | null,
+      })),
+      ...behavior
+        .extraBreadcrumbSegments(attributes, { rootCategorySlug, genericBrandFilter })
+        .map((s) => ({
+          name_nb: s.name_nb,
+          slug: s.slug,
+          attrs: s.attrs ? encodeAttrFilters(s.attrs) : undefined,
+        })),
+    ];
+  })();
 
   return (
     <ListingDetailView
@@ -675,14 +636,15 @@ function ListingDetailPage() {
       vehicle360ImgUrls={vehicle360ImgUrls}
       attributes={attributes}
       editMode={isOwner && editContext ? { context: editContext } : undefined}
-      backSlot={<BackNavLink target={backTarget} onHistoryBack={() => router.history.back()} />}
       actionsMenuSlot={
-        user && !isOwner ? (
+        user ? (
           <ListingActionsMenu
             listingId={data.id}
             listingTitle={data.title}
             sellerId={data.seller_id}
             isAdminOrModerator={!!(isAdmin || isModerator)}
+            isOwner={isOwner}
+            listingStatus={data.status}
           />
         ) : undefined
       }

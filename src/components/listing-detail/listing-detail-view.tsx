@@ -10,6 +10,7 @@ import { VehicleEquipmentList } from "@/components/listing-detail/vehicle/vehicl
 import { VehicleInfoGrid } from "@/components/listing-detail/vehicle/vehicle-info-grid";
 import { RegistrationPlate } from "@/components/listing-detail/vehicle/registration-plate";
 import { VehicleTechTable } from "@/components/listing-detail/vehicle/vehicle-tech-table";
+import { LoanCalculator } from "@/components/listing-detail/vehicle/loan-calculator";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -88,16 +89,20 @@ export type ListingDetailViewCategory = { name_nb: string; slug: string | null }
 
 /** A single crumb in the ancestor chain from a root category down to the
  * listing's own leaf category, e.g. [Bil og MC, Personbil, Stasjonsvogn]. */
-export type ListingDetailBreadcrumbItem = { name_nb: string; slug: string };
+export type ListingDetailBreadcrumbItem = {
+  name_nb: string;
+  slug: string | null;
+  /** JSON-encoded attribute filters (see `encodeAttrFilters`), applied as the `/annonser` `attrs` search param. */
+  attrs?: string;
+};
 
 /**
  * Presentational rendering of the listing detail page — extracted from
  * `$kaupetCode.tsx` so it can be reused unmodified for the pre-publish
  * preview (see `PreviewDraftView`, rendered as an in-place overlay by the
- * wizard). Data-fetching, owner-only actions
- * (stats, contact, edit/delete/report) and back-navigation stay in the
- * callers and are handed in as slots, so this component has no Supabase or
- * routing-history coupling of its own.
+ * wizard). Data-fetching and owner-only actions (stats, contact,
+ * edit/delete/report) stay in the callers and are handed in as slots, so
+ * this component has no Supabase or routing-history coupling of its own.
  */
 export type ListingDetailViewProps = {
   title: string;
@@ -139,8 +144,6 @@ export type ListingDetailViewProps = {
    * for annonser uten 360-opptak. */
   vehicle360Frames?: Vehicle360Frame[];
   vehicle360ImgUrls?: Record<string, string>;
-  /** Rendered above the gallery on web only (hidden on native, same as today). */
-  backSlot?: ReactNode;
   /** Edit/delete/report menu — real, non-owner viewers only. */
   actionsMenuSlot?: ReactNode;
   /** Views/favorites/promote panel — owner only. */
@@ -186,7 +189,6 @@ export function ListingDetailView({
   canShip,
   vehicle360Frames,
   vehicle360ImgUrls,
-  backSlot,
   actionsMenuSlot,
   ownerStatsSlot,
   sellerContactSlot,
@@ -264,6 +266,11 @@ export function ListingDetailView({
         ? `+ ${omregistreringsavgiftKr.toLocaleString("nb-NO")} kr i omregistreringsavgift ved eierskifte (betales av kjøper)`
         : null;
 
+  const totalPriceKr =
+    isVehicleListing && priceNok != null
+      ? priceNok + (avgiftFritatt || avgiftInkludert ? 0 : (omregistreringsavgiftKr ?? 0))
+      : null;
+
   const priceBlock = (
     <EditableField
       fieldKey="price"
@@ -338,13 +345,11 @@ export function ListingDetailView({
       canShip={canShip ?? null}
       vehicle360Frames={vehicle360Frames}
       vehicle360ImgUrls={vehicle360ImgUrls}
-      backSlot={backSlot}
       actionsMenuSlot={actionsMenuSlot}
       ownerStatsSlot={ownerStatsSlot}
       sellerContactSlot={sellerContactSlot}
       stickyContactSlot={stickyContactSlot}
       previewBanner={previewBanner}
-      isNative={isNative}
       activeImage={activeImage}
       setActiveImage={setActiveImage}
       mounted={mounted}
@@ -365,6 +370,7 @@ export function ListingDetailView({
       euControlExempt={euControlExempt}
       driveType={driveType}
       avgiftNote={avgiftNote}
+      totalPriceKr={totalPriceKr}
     >
       {children}
     </ListingDetailViewBody>
@@ -410,13 +416,11 @@ function ListingDetailViewBody({
   canShip,
   vehicle360Frames,
   vehicle360ImgUrls,
-  backSlot,
   actionsMenuSlot,
   ownerStatsSlot,
   sellerContactSlot,
   stickyContactSlot,
   previewBanner,
-  isNative,
   activeImage,
   setActiveImage,
   mounted,
@@ -437,6 +441,7 @@ function ListingDetailViewBody({
   euControlExempt,
   driveType,
   avgiftNote,
+  totalPriceKr,
   children,
 }: {
   title: string;
@@ -461,13 +466,11 @@ function ListingDetailViewBody({
   canShip: boolean | null;
   vehicle360Frames?: Vehicle360Frame[];
   vehicle360ImgUrls?: Record<string, string>;
-  backSlot?: ReactNode;
   actionsMenuSlot?: ReactNode;
   ownerStatsSlot?: ReactNode;
   sellerContactSlot?: ReactNode;
   stickyContactSlot?: ReactNode;
   previewBanner?: ReactNode;
-  isNative: boolean;
   activeImage: number;
   setActiveImage: (i: number) => void;
   mounted: boolean;
@@ -488,6 +491,7 @@ function ListingDetailViewBody({
   euControlExempt: boolean | null;
   driveType: string | null;
   avgiftNote: string | null;
+  totalPriceKr: number | null;
   children?: ReactNode;
 }) {
   const editCtx = useListingEdit();
@@ -498,7 +502,6 @@ function ListingDetailViewBody({
     <div className={`mx-auto max-w-6xl px-4 py-8 ${showStickyContact ? "pb-28 md:pb-8" : ""}`}>
       <NativePageHeader title={title} />
       {previewBanner}
-      {!isNative && backSlot}
 
       <header className="mt-4">
         <div className="flex items-start justify-between gap-2">
@@ -509,10 +512,10 @@ function ListingDetailViewBody({
                   <Breadcrumb>
                     <BreadcrumbList className="gap-1 text-xs uppercase tracking-wide sm:gap-1">
                       {breadcrumb.map((c, i) => (
-                        <Fragment key={c.slug}>
+                        <Fragment key={c.slug ?? `extra-${i}`}>
                           {i > 0 && <BreadcrumbSeparator />}
                           <BreadcrumbItem>
-                            {i === breadcrumb.length - 1 ? (
+                            {c.slug == null ? (
                               <BreadcrumbPage className="uppercase tracking-wide">
                                 {c.name_nb}
                               </BreadcrumbPage>
@@ -520,7 +523,12 @@ function ListingDetailViewBody({
                               <BreadcrumbLink asChild>
                                 <Link
                                   to="/annonser"
-                                  search={{ q: "", category: c.slug, sort: "new" }}
+                                  search={{
+                                    q: "",
+                                    category: c.slug,
+                                    sort: "new",
+                                    attrs: c.attrs ?? "",
+                                  }}
                                   className="hover:text-foreground"
                                 >
                                   {c.name_nb}
@@ -771,6 +779,7 @@ function ListingDetailViewBody({
                     euControlExempt={euControlExempt}
                     driveType={driveType}
                   />
+                  <LoanCalculator totalPriceKr={totalPriceKr} />
                 </section>
               )}
               className="mt-8"

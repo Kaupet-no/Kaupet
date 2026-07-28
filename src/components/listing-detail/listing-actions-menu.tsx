@@ -5,6 +5,8 @@ import { MoreVertical, Loader2 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
+import { supabase } from "@/integrations/supabase/client";
+import { MarkSoldDialog } from "@/components/listing-detail/mark-sold-dialog";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -43,15 +45,19 @@ type Props = {
   listingTitle: string;
   sellerId: string;
   isAdminOrModerator: boolean;
+  isOwner: boolean;
+  listingStatus: string;
 };
 
-type ConfirmAction = "disable" | "delete";
+type ConfirmAction = "disable" | "delete" | "owner-archive" | "owner-delete";
 
 export function ListingActionsMenu({
   listingId,
   listingTitle,
   sellerId,
   isAdminOrModerator,
+  isOwner,
+  listingStatus,
 }: Props) {
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -144,7 +150,44 @@ export function ListingActionsMenu({
     onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke slette annonsen")),
   });
 
-  const isPending = disableMut.isPending || deleteMut.isPending;
+  const [markSoldOpen, setMarkSoldOpen] = useState(false);
+
+  const ownerArchiveMut = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("listings")
+        .update({ status: "archived" })
+        .eq("id", listingId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      showSuccessToast("Annonsen er avpublisert");
+      setConfirmAction(null);
+      qc.invalidateQueries({ queryKey: ["listing"] });
+      qc.invalidateQueries({ queryKey: ["my-listings"] });
+    },
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke avpublisere annonsen")),
+  });
+
+  const ownerDeleteMut = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("listings").delete().eq("id", listingId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      showSuccessToast("Annonsen er slettet");
+      setConfirmAction(null);
+      qc.invalidateQueries({ queryKey: ["my-listings"] });
+      navigate({ to: "/mine-annonser" });
+    },
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke slette annonsen")),
+  });
+
+  const isPending =
+    disableMut.isPending ||
+    deleteMut.isPending ||
+    ownerArchiveMut.isPending ||
+    ownerDeleteMut.isPending;
 
   return (
     <>
@@ -155,12 +198,34 @@ export function ListingActionsMenu({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52">
-          <DropdownMenuItem onSelect={() => setReportOpen(true)}>
-            Rapporter annonse
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setUserReportOpen(true)}>
-            Rapporter bruker
-          </DropdownMenuItem>
+          {isOwner ? (
+            <>
+              {listingStatus !== "sold" && (
+                <DropdownMenuItem onSelect={() => setMarkSoldOpen(true)}>
+                  Merk som solgt
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onSelect={() => setConfirmAction("owner-archive")}>
+                Avpubliser annonse
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
+                onSelect={() => setConfirmAction("owner-delete")}
+              >
+                Slett annonse
+              </DropdownMenuItem>
+            </>
+          ) : (
+            <>
+              <DropdownMenuItem onSelect={() => setReportOpen(true)}>
+                Rapporter annonse
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setUserReportOpen(true)}>
+                Rapporter bruker
+              </DropdownMenuItem>
+            </>
+          )}
           {isAdminOrModerator && (
             <>
               <DropdownMenuSeparator />
@@ -172,7 +237,7 @@ export function ListingActionsMenu({
                   setConfirmAction("disable");
                 }}
               >
-                Avpubliser annonse
+                Avpubliser annonse (admin)
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
@@ -181,7 +246,7 @@ export function ListingActionsMenu({
                   setConfirmAction("delete");
                 }}
               >
-                Slett annonse
+                Slett annonse (admin)
               </DropdownMenuItem>
             </>
           )}
@@ -312,6 +377,67 @@ export function ListingActionsMenu({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Owner: archive confirmation */}
+      <AlertDialog
+        open={confirmAction === "owner-archive"}
+        onOpenChange={(o) => !isPending && !o && setConfirmAction(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Avpubliser annonse?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Er du sikker på at du vil avpublisere annonsen «{listingTitle}»? Den vil bli skjult
+              for alle andre brukere. Du kan publisere den på nytt senere fra Mine annonser.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isPending}>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                ownerArchiveMut.mutate();
+              }}
+            >
+              {ownerArchiveMut.isPending && <Loader2 className="size-4 animate-spin" />}
+              Avpubliser
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Owner: delete confirmation */}
+      <AlertDialog
+        open={confirmAction === "owner-delete"}
+        onOpenChange={(o) => !isPending && !o && setConfirmAction(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Slett annonse?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Er du sikker på at du vil slette annonsen «{listingTitle}»? Denne handlingen kan ikke
+              angres.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isPending}>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                ownerDeleteMut.mutate();
+              }}
+            >
+              {ownerDeleteMut.isPending && <Loader2 className="size-4 animate-spin" />}
+              Slett permanent
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <MarkSoldDialog open={markSoldOpen} onOpenChange={setMarkSoldOpen} listingId={listingId} />
     </>
   );
 }

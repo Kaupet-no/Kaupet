@@ -254,6 +254,23 @@ export function vehicleCategoryGroupFor(
   return (brandFilter?.unit as VehicleBrandGroup | undefined) ?? null;
 }
 
+/**
+ * Returns the category's generic (non-vehicle) "brand" filter — a plain
+ * text/select attribute keyed "brand" — or null if the category has none.
+ * Distinct from `vehicleCategoryGroupFor`'s `brand_select`, which is a
+ * structured, reference-table-backed filter type used only by vehicles.
+ */
+export function genericBrandFilterFor(
+  categoryId: string | null,
+  allFilters: CategoryFilter[],
+  categoriesById: Map<string, CategoryNode>,
+): CategoryFilter | null {
+  const filters = effectiveFiltersForCategory(categoryId, allFilters, categoriesById);
+  return (
+    filters.find((f) => f.key === "brand" && (f.type === "text" || f.type === "select")) ?? null
+  );
+}
+
 /** Convenience boolean wrapper around `vehicleCategoryGroupFor`, for call
  * sites that only need to know "is this a vehicle category?" without caring
  * which brand group. */

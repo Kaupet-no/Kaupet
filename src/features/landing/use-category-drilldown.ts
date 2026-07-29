@@ -6,6 +6,7 @@ import {
   type AttributeFilterValue,
   type CategoryFilter,
 } from "@/lib/category-filters";
+import { encodeAttrFilters } from "@/features/listing-search/search-schema";
 import type { CategoryRow } from "@/features/landing/landing-types";
 
 /**
@@ -86,7 +87,17 @@ export function useCategoryDrilldown(params: {
   }, [currentParent, childrenByParent]);
 
   function goToCategory(cat: CategoryRow) {
-    navigate({ to: "/annonser", search: { q: "", category: cat.slug, sort: "new" } });
+    navigate({
+      to: "/annonser",
+      search: {
+        q: "",
+        category: cat.slug,
+        sort: "new",
+        ...(Object.keys(filterValues).length > 0 && { attrs: encodeAttrFilters(filterValues) }),
+        ...(priceMin !== undefined && { min: priceMin }),
+        ...(priceMax !== undefined && { max: priceMax }),
+      },
+    });
   }
 
   // Any depth of category selection lands on the root main category's own
@@ -106,7 +117,12 @@ export function useCategoryDrilldown(params: {
     navigate({
       to: "/$kaupetCode",
       params: { kaupetCode: root.slug },
-      search: deepest.id === root.id ? {} : { sub: deepest.slug },
+      search: {
+        ...(deepest.id !== root.id && { sub: deepest.slug }),
+        ...(Object.keys(filterValues).length > 0 && { attrs: encodeAttrFilters(filterValues) }),
+        ...(priceMin !== undefined && { min: priceMin }),
+        ...(priceMax !== undefined && { max: priceMax }),
+      },
     });
   };
 

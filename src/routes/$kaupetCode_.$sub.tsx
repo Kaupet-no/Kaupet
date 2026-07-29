@@ -1,18 +1,14 @@
-import { createFileRoute, Link, notFound, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, useNavigate, useRouter } from "@tanstack/react-router";
 import { z } from "zod";
 import { CategoryLandingPage } from "@/components/category-landing-page";
 import { supabase } from "@/integrations/supabase/client";
 import { type Category } from "@/lib/categories";
 import { normalizeSlugForMatch } from "@/lib/slug";
+import { searchSchema } from "@/features/listing-search/search-schema";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/$kaupetCode_/$sub")({
-  validateSearch: z.object({
-    // Only used to deep-link preselected filter values, e.g. from the
-    // homepage's category picker.
-    f: z.record(z.string(), z.any()).optional(),
-    priceMin: z.coerce.number().int().min(0).optional(),
-    priceMax: z.coerce.number().int().min(0).optional(),
+  validateSearch: searchSchema.extend({
     // Slug of a descendant of `sub` to scope the page to, without leaving
     // this URL.
     sub2: z.string().optional(),
@@ -105,16 +101,16 @@ export const Route = createFileRoute("/$kaupetCode_/$sub")({
 
 function SubcategoryPage() {
   const { main, sub } = Route.useLoaderData();
-  const { f, priceMin, priceMax, sub2 } = Route.useSearch();
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: "/$kaupetCode/$sub" });
   return (
     <CategoryLandingPage
       category={sub}
       breadcrumb={[main, sub]}
-      subSlug={sub2}
+      subSlug={search.sub2}
       subSlugParam="sub2"
-      initialFilters={f}
-      initialPriceMin={priceMin}
-      initialPriceMax={priceMax}
+      search={search}
+      navigate={navigate}
     />
   );
 }

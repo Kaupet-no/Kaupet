@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { Save } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
 import type { ListingCardData } from "@/components/listing-card";
@@ -22,7 +22,12 @@ import { summarizeCriteria } from "@/lib/saved-searches";
 import { WtbListingCard } from "@/components/wtb-listing-card";
 import { searchSchema, conditionEnum } from "@/features/listing-search/search-schema";
 import { useListingsQuery } from "@/features/listing-search/use-listings-query";
-import { normalizeFilter } from "@/lib/category-filters";
+import {
+  normalizeFilter,
+  vehicleCategoryGroupFor,
+  genericBrandFilterFor,
+} from "@/lib/category-filters";
+import { getCategoryBehavior } from "@/lib/category-behavior";
 import { useWtbListings } from "@/features/listing-search/use-wtb-listings";
 import { useAuth } from "@/hooks/use-auth";
 import { useIsNative } from "@/hooks/use-is-native";
@@ -31,6 +36,13 @@ import { hapticImpact } from "@/lib/haptics";
 import { useScrollDirection } from "@/hooks/use-scroll-direction";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { useAnnonserSearchState } from "@/features/listing-search/use-annonser-search-state";
+import { CategoryHero } from "@/components/category-hero";
+import {
+  breadcrumbPath,
+  resolveHeroCategory,
+  selectAllForParent,
+  type Category,
+} from "@/lib/categories";
 
 export const Route = createFileRoute("/annonser")({
   validateSearch: searchSchema,
@@ -110,16 +122,18 @@ function BrowsePage() {
   }, []);
   useEffect(() => setQDraft(search.q), [search.q]);
 
+  // Same key/shape as the category landing pages so the two share one cache —
+  // `color`/`icon`/`heading_font` are what the category hero presents with.
   const { data: categories } = useQuery({
-    queryKey: ["categories"],
+    queryKey: ["categories", "with-color"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
-        .select("id, slug, name_nb, parent_id")
+        .select("id, slug, name_nb, parent_id, icon, color, heading_font")
         .order("sort_order")
         .order("name_nb");
       if (error) throw error;
-      return data;
+      return (data ?? []) as Category[];
     },
   });
 
@@ -152,6 +166,7 @@ function BrowsePage() {
   const {
     location,
     effectiveCategories,
+    categoryTree,
     attrFilters,
     attrValues,
     handleAttrValueChange,
@@ -163,6 +178,74 @@ function BrowsePage() {
     handleLocationChange,
     resetFilters,
   } = useAnnonserSearchState({ search, navigate, categories, allFilters, setQDraft });
+
+  // When the category filter narrows the results down to a single main-category
+  // branch, the page presents itself like that category's own landing page —
+  // "/Kategori" over the category's color, with its subcategories to drill
+  // into — so a search that started out category-less still shows which
+  // category the user ended up in.
+  const hero = useMemo(
+    () => resolveHeroCategory(effectiveCategories, categoryTree),
+    [effectiveCategories, categoryTree],
+  );
+  const heroBreadcrumb = useMemo(
+    () => (hero ? breadcrumbPath(hero.selected, categoryTree) : []),
+    [hero, categoryTree],
+  );
+  const heroSubcategories = hero ? (categoryTree.childrenByParent.get(hero.selected.id) ?? []) : [];
+
+  // Merke/Modell selected in the attribute filters get appended as extra
+  // brødsmuler after the category chain, matching the ad-detail page's
+  // breadcrumb so the two page types read as one continuous path.
+  const heroExtraSegments = useMemo(() => {
+    if (!hero) return [];
+    const attributes: Record<string, unknown> = {};
+    for (const [key, v] of Object.entries(attrValues)) {
+      if (v.kind === "text" || v.kind === "select") attributes[key] = v.value;
+    }
+    const vehicleGroup = vehicleCategoryGroupFor(
+      hero.selected.id,
+      allFilters ?? [],
+      categoryTree.byId,
+    );
+    const genericBrandFilter = genericBrandFilterFor(
+      hero.selected.id,
+      allFilters ?? [],
+      categoryTree.byId,
+    );
+    const rootCategorySlug = hero.main?.slug ?? hero.selected.slug;
+    return getCategoryBehavior(vehicleGroup).extraBreadcrumbSegments(attributes, {
+      rootCategorySlug,
+      genericBrandFilter,
+    });
+  }, [hero, attrValues, allFilters, categoryTree]);
+
+  // Only animate the hero in when it appears in response to the user picking a
+  // category — arriving with one already in the URL (deep link, or the
+  // homepage's category picker) should paint it as part of the page.
+  const [animateHero, setAnimateHero] = useState(false);
+  const heroSelectedId = hero?.selected.id ?? null;
+  // `undefined` = the state the page was first rendered in, which is whatever
+  // the URL asked for and therefore never animates.
+  const prevHeroId = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (!mounted || !categories) return;
+    const prev = prevHeroId.current;
+    prevHeroId.current = heroSelectedId;
+    if (prev === undefined) return;
+    setAnimateHero(heroSelectedId != null && heroSelectedId !== prev);
+  }, [mounted, categories, heroSelectedId]);
+
+  // Selecting a category inside the hero keeps the user on /annonser, so the
+  // query text and every other filter in the URL survive. Descendants are
+  // listed explicitly because the listings query only expands *root*
+  // categories one level (see use-listings-query.ts).
+  const selectHeroCategory = (target: Category) =>
+    updateSearch({
+      category: "",
+      categories: selectAllForParent(target, categoryTree),
+      catMode: "any",
+    });
 
   useEffect(() => {
     if (!mounted) return;
@@ -256,7 +339,7 @@ function BrowsePage() {
   }
 
   return (
-    <div className={`mx-auto max-w-7xl px-4 ${isNative ? "pt-2 pb-8" : "py-8 md:py-10"}`}>
+    <div>
       {isNative && (pullDistance > 0 || refreshing) && (
         <div
           className="flex items-center justify-center overflow-hidden transition-all duration-150"
@@ -269,18 +352,74 @@ function BrowsePage() {
         </div>
       )}
       <NativePageHeader title="Annonser" hideBack />
-      {!isNative && <h1 className="font-display text-3xl tracking-tight">Annonser</h1>}
 
+      {/* The wrapper stays mounted so its row height can transition — the
+          results below slide down instead of jumping when the hero appears. */}
       <div
-        className={
-          isNative
-            ? `sticky top-0 z-40 -mx-4 space-y-2 px-4 pb-2 pt-safe transition-all duration-200 bg-background/95 backdrop-blur ${scrollDir === "down" ? "shadow-sm" : ""}`
-            : "mt-6 space-y-2"
-        }
+        className={`grid transition-[grid-template-rows] duration-500 ease-out motion-reduce:transition-none ${
+          hero ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+        }`}
       >
-        {/* On native: tap on the search bar opens the full-screen search overlay */}
-        {isNative && (
-          <div className="relative">
+        <div className="overflow-hidden">
+          {hero && (
+            <CategoryHero
+              selected={hero.selected}
+              main={hero.main}
+              breadcrumbEntries={heroBreadcrumb}
+              extraSegments={heroExtraSegments}
+              subcategories={heroSubcategories}
+              onSelectCategory={selectHeroCategory}
+              compact={isNative}
+              headingAs={isNative ? "p" : "h1"}
+              animateIn={animateHero}
+            />
+          )}
+        </div>
+      </div>
+
+      <div className={`mx-auto max-w-7xl px-4 ${isNative ? "pt-2 pb-8" : "py-8 md:py-10"}`}>
+        {!isNative && !hero && <h1 className="font-display text-3xl tracking-tight">Annonser</h1>}
+
+        <div
+          className={
+            isNative
+              ? `sticky top-0 z-40 -mx-4 space-y-2 px-4 pb-2 pt-safe transition-all duration-200 bg-background/95 backdrop-blur ${scrollDir === "down" ? "shadow-sm" : ""}`
+              : "mt-6 space-y-2"
+          }
+        >
+          {/* On native: tap on the search bar opens the full-screen search overlay */}
+          {isNative && (
+            <div className="relative">
+              <SearchBar
+                q={qDraft}
+                onQChange={setQDraft}
+                onSubmitQ={() => {
+                  void hapticImpact("medium");
+                  updateSearch({ q: qDraft });
+                }}
+                location={location}
+                onLocationChange={handleLocationChange}
+                selectedSlugs={[]}
+                onSelectedChange={() => {}}
+                categories={categories ?? []}
+                hideCategory
+                hideLocation
+                qMode={search.qMode}
+                onQModeChange={(m) => updateSearch({ qMode: m })}
+                showQMode={false}
+              />
+              <button
+                type="button"
+                className="absolute inset-0 z-10"
+                onClick={() => {
+                  void hapticImpact("light");
+                  setSearchOverlayOpen(true);
+                }}
+                aria-label="Åpne søk"
+              />
+            </div>
+          )}
+          {!isNative && (
             <SearchBar
               q={qDraft}
               onQChange={setQDraft}
@@ -290,260 +429,245 @@ function BrowsePage() {
               }}
               location={location}
               onLocationChange={handleLocationChange}
-              selectedSlugs={[]}
-              onSelectedChange={() => {}}
+              selectedSlugs={
+                search.category
+                  ? [
+                      search.category,
+                      ...search.categories.filter((s: string) => s !== search.category),
+                    ]
+                  : search.categories
+              }
+              onSelectedChange={(slugs) =>
+                updateSearch({ category: "", categories: slugs, catMode: "any" })
+              }
               categories={categories ?? []}
               hideCategory
-              hideLocation
               qMode={search.qMode}
               onQModeChange={(m) => updateSearch({ qMode: m })}
               showQMode={false}
             />
+          )}
+          {isNative ? (
+            <NativeFilterChips
+              sort={search.sort}
+              onSortChange={(s) => updateSearch({ sort: s })}
+              categories={categories ?? []}
+              selectedCategories={effectiveCategories}
+              onCategoriesChange={(slugs) =>
+                updateSearch({ category: "", categories: slugs, catMode: "any" })
+              }
+              min={search.min}
+              max={search.max}
+              includeFree={search.includeFree ?? true}
+              onPriceChange={(mn, mx, free) =>
+                updateSearch({ min: mn, max: mx, includeFree: free })
+              }
+              conditions={search.conditions ?? []}
+              onConditionsChange={(c) =>
+                updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
+              }
+              location={location}
+              onLocationChange={handleLocationChange}
+              resultCount={totalCount ?? cards.length}
+              onOpenAdvanced={() => setAdvancedOverlayOpen(true)}
+              advancedFilterCount={
+                (search.extraGroups?.length ?? 0) + (search.qMode === "any" ? 1 : 0)
+              }
+            />
+          ) : (
+            <DesktopFilterChips
+              sort={search.sort}
+              onSortChange={(s) => updateSearch({ sort: s })}
+              categories={categories ?? []}
+              selectedCategories={effectiveCategories}
+              onCategoriesChange={(slugs) =>
+                updateSearch({ category: "", categories: slugs, catMode: "any" })
+              }
+              min={search.min}
+              max={search.max}
+              includeFree={search.includeFree ?? true}
+              onPriceChange={(mn, mx, free) =>
+                updateSearch({ min: mn, max: mx, includeFree: free })
+              }
+              conditions={search.conditions ?? []}
+              onConditionsChange={(c) =>
+                updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
+              }
+              qMode={search.qMode}
+              onQModeChange={(m) => updateSearch({ qMode: m })}
+              extraGroups={search.extraGroups ?? []}
+              onExtraGroupsChange={(extraGroups) => updateSearch({ extraGroups })}
+            />
+          )}
+
+          {/* Category-dependent filter row: the selected category's primary
+            fields stay visible, the rest sit behind "Se flere filter". */}
+          <AttributeFilterChips
+            filters={attrFilters}
+            values={attrValues}
+            onChange={handleAttrValueChange}
+            isNative={isNative}
+            resultCount={totalCount ?? cards.length}
+          />
+        </div>
+
+        <ActiveFilters
+          search={search}
+          terms={terms}
+          onUpdate={(patch) => updateSearch(patch)}
+          attrFilters={attrFilters}
+          attrValues={attrValues}
+          onRemoveAttr={(key, value) => {
+            const current = attrValues[key];
+            if (value !== undefined && current?.kind === "multiselect") {
+              const next = current.values.filter((v) => v !== value);
+              handleAttrValueChange(
+                key,
+                next.length > 0 ? { kind: "multiselect", values: next } : undefined,
+              );
+              return;
+            }
+            handleAttrValueChange(key, undefined);
+          }}
+        />
+
+        {user && (
+          <SaveSearchDialog
+            open={saveSearchOpen}
+            onOpenChange={setSaveSearchOpen}
+            defaultName={summarizeCriteria(currentCriteria)}
+            criteria={currentCriteria}
+            onSaved={() => setSaveSearchOpen(false)}
+          />
+        )}
+
+        {/* ØK-tab — vises kun når søkkriterier gir treff */}
+        {hasSearchCriteria && wtbCount > 0 && (
+          <div className="mt-4 flex gap-2" role="tablist" aria-label="Annonsetype">
             <button
               type="button"
-              className="absolute inset-0 z-10"
-              onClick={() => {
-                void hapticImpact("light");
-                setSearchOverlayOpen(true);
-              }}
-              aria-label="Åpne søk"
-            />
+              role="tab"
+              aria-selected={activeTab === "listings"}
+              onClick={() => setActiveTab("listings")}
+              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                activeTab === "listings"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              }`}
+            >
+              Til salgs
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "wtb"}
+              onClick={() => setActiveTab("wtb")}
+              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                activeTab === "wtb"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              }`}
+            >
+              Ønskes kjøpt ({wtbCount})
+            </button>
           </div>
         )}
-        {!isNative && (
-          <SearchBar
-            q={qDraft}
-            onQChange={setQDraft}
-            onSubmitQ={() => {
-              void hapticImpact("medium");
-              updateSearch({ q: qDraft });
-            }}
-            location={location}
-            onLocationChange={handleLocationChange}
-            selectedSlugs={
-              search.category
-                ? [
-                    search.category,
-                    ...search.categories.filter((s: string) => s !== search.category),
-                  ]
-                : search.categories
-            }
-            onSelectedChange={(slugs) =>
-              updateSearch({ category: "", categories: slugs, catMode: "any" })
-            }
-            categories={categories ?? []}
-            hideCategory
-            qMode={search.qMode}
-            onQModeChange={(m) => updateSearch({ qMode: m })}
-            showQMode={false}
-          />
-        )}
-        {isNative ? (
-          <NativeFilterChips
-            sort={search.sort}
-            onSortChange={(s) => updateSearch({ sort: s })}
-            categories={categories ?? []}
-            selectedCategories={effectiveCategories}
-            onCategoriesChange={(slugs) =>
-              updateSearch({ category: "", categories: slugs, catMode: "any" })
-            }
-            min={search.min}
-            max={search.max}
-            includeFree={search.includeFree ?? true}
-            onPriceChange={(mn, mx, free) => updateSearch({ min: mn, max: mx, includeFree: free })}
-            conditions={search.conditions ?? []}
-            onConditionsChange={(c) =>
-              updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
-            }
-            location={location}
-            onLocationChange={handleLocationChange}
-            resultCount={totalCount ?? cards.length}
-            onOpenAdvanced={() => setAdvancedOverlayOpen(true)}
-            advancedFilterCount={
-              (search.extraGroups?.length ?? 0) + (search.qMode === "any" ? 1 : 0)
-            }
-          />
+
+        {activeTab === "wtb" ? (
+          <div className="mt-4">
+            {wtbLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              </div>
+            ) : wtbListings.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border bg-surface p-12 text-center">
+                <p className="text-lg font-medium">Ingen ønskes kjøpt-annonser funnet</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Ingen etterspør dette akkurat nå. Prøv et bredere søk.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {wtbListings.map((w) => (
+                  <WtbListingCard key={w.id} listing={w} />
+                ))}
+              </div>
+            )}
+          </div>
         ) : (
-          <DesktopFilterChips
-            sort={search.sort}
-            onSortChange={(s) => updateSearch({ sort: s })}
-            categories={categories ?? []}
-            selectedCategories={effectiveCategories}
-            onCategoriesChange={(slugs) =>
-              updateSearch({ category: "", categories: slugs, catMode: "any" })
+          <ResultList
+            isNative={isNative}
+            isDesktop={isDesktop}
+            q={search.q}
+            effectiveCategories={effectiveCategories}
+            cards={cards}
+            totalCount={totalCount}
+            isLoading={isLoading}
+            hasNextPage={!!hasNextPage}
+            isFetchingNextPage={isFetchingNextPage}
+            fetchNextPage={() => void fetchNextPage()}
+            resetFilters={resetFilters}
+            onClearCategoryFilter={
+              effectiveCategories.length > 0
+                ? () => updateSearch({ category: "", categories: [] })
+                : undefined
             }
-            min={search.min}
-            max={search.max}
-            includeFree={search.includeFree ?? true}
-            onPriceChange={(mn, mx, free) => updateSearch({ min: mn, max: mx, includeFree: free })}
-            conditions={search.conditions ?? []}
-            onConditionsChange={(c) =>
-              updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
+            mapListings={mapListings}
+            mapCenter={mapCenter}
+            radiusKm={search.radius ?? 10}
+            onMapCenterChange={(c, label) =>
+              updateSearch({
+                lat: c.lat,
+                lng: c.lng,
+                radius: search.radius ?? 10,
+                loc: label ?? "",
+              })
             }
-            qMode={search.qMode}
-            onQModeChange={(m) => updateSearch({ qMode: m })}
-            extraGroups={search.extraGroups ?? []}
-            onExtraGroupsChange={(extraGroups) => updateSearch({ extraGroups })}
+            onMapAreaSearch={(c, label) =>
+              updateSearch({
+                lat: c.lat,
+                lng: c.lng,
+                radius: search.radius ?? 10,
+                loc: label ?? "",
+              })
+            }
+            toolbarExtra={
+              user ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSaveSearchOpen(true)}
+                  className="gap-1.5"
+                >
+                  <Save className="size-4" /> Lagre søk
+                </Button>
+              ) : undefined
+            }
           />
         )}
 
-        {/* Category-dependent filter row: the selected category's primary
-            fields stay visible, the rest sit behind "Se flere filter". */}
-        <AttributeFilterChips
-          filters={attrFilters}
-          values={attrValues}
-          onChange={handleAttrValueChange}
-          isNative={isNative}
-          resultCount={totalCount ?? cards.length}
-        />
+        {/* Native full-screen search overlay */}
+        {isNative && (
+          <NativeSearchOverlay
+            open={searchOverlayOpen}
+            onClose={() => setSearchOverlayOpen(false)}
+            initialQ={qDraft}
+            categories={categories ?? []}
+          />
+        )}
+
+        {/* Native full-screen advanced search */}
+        {isNative && (
+          <NativeAdvancedSearch
+            open={advancedOverlayOpen}
+            onClose={() => setAdvancedOverlayOpen(false)}
+            initial={advancedInitial}
+            categories={categories ?? []}
+            onApply={handleApply}
+          />
+        )}
       </div>
-
-      <ActiveFilters
-        search={search}
-        terms={terms}
-        onUpdate={(patch) => updateSearch(patch)}
-        attrFilters={attrFilters}
-        attrValues={attrValues}
-        onRemoveAttr={(key, value) => {
-          const current = attrValues[key];
-          if (value !== undefined && current?.kind === "multiselect") {
-            const next = current.values.filter((v) => v !== value);
-            handleAttrValueChange(
-              key,
-              next.length > 0 ? { kind: "multiselect", values: next } : undefined,
-            );
-            return;
-          }
-          handleAttrValueChange(key, undefined);
-        }}
-      />
-
-      {user && (
-        <SaveSearchDialog
-          open={saveSearchOpen}
-          onOpenChange={setSaveSearchOpen}
-          defaultName={summarizeCriteria(currentCriteria)}
-          criteria={currentCriteria}
-          onSaved={() => setSaveSearchOpen(false)}
-        />
-      )}
-
-      {/* ØK-tab — vises kun når søkkriterier gir treff */}
-      {hasSearchCriteria && wtbCount > 0 && (
-        <div className="mt-4 flex gap-2" role="tablist" aria-label="Annonsetype">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "listings"}
-            onClick={() => setActiveTab("listings")}
-            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-              activeTab === "listings"
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground hover:bg-muted/80"
-            }`}
-          >
-            Til salgs
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "wtb"}
-            onClick={() => setActiveTab("wtb")}
-            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-              activeTab === "wtb"
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground hover:bg-muted/80"
-            }`}
-          >
-            Ønskes kjøpt ({wtbCount})
-          </button>
-        </div>
-      )}
-
-      {activeTab === "wtb" ? (
-        <div className="mt-4">
-          {wtbLoading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            </div>
-          ) : wtbListings.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border bg-surface p-12 text-center">
-              <p className="text-lg font-medium">Ingen ønskes kjøpt-annonser funnet</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Ingen etterspør dette akkurat nå. Prøv et bredere søk.
-              </p>
-            </div>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {wtbListings.map((w) => (
-                <WtbListingCard key={w.id} listing={w} />
-              ))}
-            </div>
-          )}
-        </div>
-      ) : (
-        <ResultList
-          isNative={isNative}
-          isDesktop={isDesktop}
-          q={search.q}
-          effectiveCategories={effectiveCategories}
-          cards={cards}
-          totalCount={totalCount}
-          isLoading={isLoading}
-          hasNextPage={!!hasNextPage}
-          isFetchingNextPage={isFetchingNextPage}
-          fetchNextPage={() => void fetchNextPage()}
-          resetFilters={resetFilters}
-          onClearCategoryFilter={
-            effectiveCategories.length > 0
-              ? () => updateSearch({ category: "", categories: [] })
-              : undefined
-          }
-          mapListings={mapListings}
-          mapCenter={mapCenter}
-          radiusKm={search.radius ?? 10}
-          onMapCenterChange={(c, label) =>
-            updateSearch({ lat: c.lat, lng: c.lng, radius: search.radius ?? 10, loc: label ?? "" })
-          }
-          onMapAreaSearch={(c, label) =>
-            updateSearch({ lat: c.lat, lng: c.lng, radius: search.radius ?? 10, loc: label ?? "" })
-          }
-          toolbarExtra={
-            user ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setSaveSearchOpen(true)}
-                className="gap-1.5"
-              >
-                <Save className="size-4" /> Lagre søk
-              </Button>
-            ) : undefined
-          }
-        />
-      )}
-
-      {/* Native full-screen search overlay */}
-      {isNative && (
-        <NativeSearchOverlay
-          open={searchOverlayOpen}
-          onClose={() => setSearchOverlayOpen(false)}
-          initialQ={qDraft}
-          categories={categories ?? []}
-        />
-      )}
-
-      {/* Native full-screen advanced search */}
-      {isNative && (
-        <NativeAdvancedSearch
-          open={advancedOverlayOpen}
-          onClose={() => setAdvancedOverlayOpen(false)}
-          initial={advancedInitial}
-          categories={categories ?? []}
-          onApply={handleApply}
-        />
-      )}
     </div>
   );
 }

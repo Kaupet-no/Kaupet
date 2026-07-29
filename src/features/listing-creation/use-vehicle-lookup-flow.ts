@@ -10,6 +10,7 @@ import {
 import { lookupVehicleByRegNumber } from "@/lib/vehicle/vehicle-lookup.functions";
 import { matchVehicleBrandModel } from "@/lib/vehicle/vehicle-brand-match.functions";
 import { classifyVehicleCategory } from "@/lib/vehicle/vehicle-classification";
+import { firstRegistrationYear } from "@/lib/vehicle/first-registration";
 import type {
   AvgiftskodeGruppe,
   VehicleClassification,
@@ -184,7 +185,14 @@ export function useVehicleLookupFlow(params: {
     const importedUsed = spec?.imported_used ?? lookup.imported_used;
     if (importedUsed != null) next.imported_used = importedUsed;
     const firstRegistrationDate = spec?.first_registration_date ?? lookup.first_registration_date;
-    if (firstRegistrationDate) next.first_registration_date = firstRegistrationDate;
+    if (firstRegistrationDate) {
+      next.first_registration_date = firstRegistrationDate;
+      // Den eksakte datoen vises på annonsesiden, men søkes på som år — så
+      // året lagres avledet ved siden av (se
+      // 20260729130000_first_registration_year_numeric.sql).
+      const year = firstRegistrationYear(firstRegistrationDate);
+      if (year != null) next.first_registration_year = year;
+    }
     const cylinders = spec?.cylinders ?? lookup.cylinders;
     if (cylinders != null) next.cylinders = cylinders;
     const engineDisplacementCc = spec?.engine_displacement_cc ?? lookup.engine_displacement_cc;

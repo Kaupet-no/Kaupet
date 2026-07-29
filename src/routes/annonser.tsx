@@ -14,6 +14,7 @@ import { ActiveFilters } from "@/components/active-filters";
 import type { MapListing } from "@/components/listings-map";
 import { ResultList } from "@/components/result-list";
 import { NativeFilterChips } from "@/components/native-filter-chips";
+import { AttributeFilterChips } from "@/components/attribute-filter-chips";
 import { NativeSearchOverlay } from "@/components/native-search-overlay";
 import { NativeAdvancedSearch } from "@/components/native-advanced-search";
 import { saveLastSearchContext } from "@/lib/last-search-context";
@@ -361,9 +362,6 @@ function BrowsePage() {
             advancedFilterCount={
               (search.extraGroups?.length ?? 0) + (search.qMode === "any" ? 1 : 0)
             }
-            attrFilters={attrFilters}
-            attrValues={attrValues}
-            onAttrValuesChange={handleAttrValueChange}
           />
         ) : (
           <DesktopFilterChips
@@ -386,11 +384,18 @@ function BrowsePage() {
             onQModeChange={(m) => updateSearch({ qMode: m })}
             extraGroups={search.extraGroups ?? []}
             onExtraGroupsChange={(extraGroups) => updateSearch({ extraGroups })}
-            attrFilters={attrFilters}
-            attrValues={attrValues}
-            onAttrValuesChange={handleAttrValueChange}
           />
         )}
+
+        {/* Category-dependent filter row: the selected category's primary
+            fields stay visible, the rest sit behind "Se flere filter". */}
+        <AttributeFilterChips
+          filters={attrFilters}
+          values={attrValues}
+          onChange={handleAttrValueChange}
+          isNative={isNative}
+          resultCount={totalCount ?? cards.length}
+        />
       </div>
 
       <ActiveFilters

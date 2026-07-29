@@ -11,6 +11,7 @@ import {
   type AvgiftskodeGruppe,
   type VehicleLeafSlug,
 } from "@/lib/vehicle/vehicle-classification";
+import { firstRegistrationYear } from "@/lib/vehicle/first-registration";
 import { digitsOnlyClamped, formatThousands } from "@/lib/number-input";
 
 import type { WizardSharedProps } from "../types";
@@ -61,9 +62,7 @@ export function Price({
     ? computeOmregistreringsavgift(
         (vehicleClassification?.slug as VehicleLeafSlug) ?? null,
         vehicleLookupResult?.weight_kg ?? null,
-        vehicleLookupResult?.first_registration_date
-          ? Number(vehicleLookupResult.first_registration_date.slice(0, 4))
-          : null,
+        firstRegistrationYear(vehicleLookupResult?.first_registration_date),
         (attributes.avgiftskode_gruppe as AvgiftskodeGruppe | undefined) ?? null,
       )
     : null;

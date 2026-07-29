@@ -1,4 +1,5 @@
 import { SORT_OPTIONS, type SortValue, type Category } from "@/lib/categories";
+import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
 
 /**
  * Shared label/active-state derivation used by both NativeFilterChips and
@@ -43,4 +44,50 @@ export function getPriceChipState(
 export function getConditionChipState(conditions: string[]) {
   const active = conditions.length > 0;
   return { label: active ? `${conditions.length} tilstand` : "Tilstand", active };
+}
+
+/**
+ * Label/active state for a single category-attribute chip (Merke, Modell,
+ * Drivstoff, Årsmodell …) — the chip shows the chosen value rather than the
+ * field name once the filter is set, matching how the generic chips behave.
+ */
+export function getAttributeChipState(
+  filter: Pick<CategoryFilter, "label_nb" | "unit" | "options">,
+  value: AttributeFilterValue | undefined,
+) {
+  const fallback = { label: filter.label_nb, active: false };
+  if (!value) return fallback;
+  switch (value.kind) {
+    case "select": {
+      const option = filter.options?.find((o) => o.value === value.value);
+      return { label: option?.label_nb ?? value.value, active: true };
+    }
+    case "multiselect":
+      if (value.values.length === 0) return fallback;
+      return {
+        label:
+          value.values.length === 1
+            ? (filter.options?.find((o) => o.value === value.values[0])?.label_nb ??
+              value.values[0])
+            : `${filter.label_nb} (${value.values.length})`,
+        active: true,
+      };
+    case "boolean":
+      return value.value ? { label: filter.label_nb, active: true } : fallback;
+    case "text":
+      return value.value ? { label: value.value, active: true } : fallback;
+    case "range": {
+      if (value.min == null && value.max == null) return fallback;
+      const unit = filter.unit ? ` ${filter.unit}` : "";
+      const fmt = (n: number) => n.toLocaleString("nb-NO");
+      const label =
+        value.min != null && value.max != null
+          ? `${fmt(value.min)}–${fmt(value.max)}${unit}`
+          : value.min != null
+            ? `Fra ${fmt(value.min)}${unit}`
+            : `Til ${fmt(value.max!)}${unit}`;
+      return { label, active: true };
+    }
+  }
+  return fallback;
 }

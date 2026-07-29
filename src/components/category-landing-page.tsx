@@ -10,6 +10,7 @@ import type { MapListing } from "@/components/listings-map";
 import { ResultList } from "@/components/result-list";
 import { DesktopFilterChips } from "@/components/desktop-filter-chips";
 import { NativeFilterChips } from "@/components/native-filter-chips";
+import { AttributeFilterChips } from "@/components/attribute-filter-chips";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { buildTree, descendants, pathFromAncestor, type Category } from "@/lib/categories";
 import { normalizeFilter } from "@/lib/category-filters";
@@ -346,9 +347,6 @@ export function CategoryLandingPage({
               resultCount={totalCount ?? cards.length}
               onOpenAdvanced={() => {}}
               advancedFilterCount={0}
-              attrFilters={attrFilters}
-              attrValues={attrValues}
-              onAttrValuesChange={handleAttrValueChange}
             />
           ) : (
             <DesktopFilterChips
@@ -371,11 +369,18 @@ export function CategoryLandingPage({
               onQModeChange={(m) => updateSearch({ qMode: m })}
               extraGroups={search.extraGroups ?? []}
               onExtraGroupsChange={(extraGroups) => updateSearch({ extraGroups })}
-              attrFilters={attrFilters}
-              attrValues={attrValues}
-              onAttrValuesChange={handleAttrValueChange}
             />
           )}
+
+          {/* Category-dependent filter row: primary fields stay visible, the
+              rest sit behind "Se flere filter". */}
+          <AttributeFilterChips
+            filters={attrFilters}
+            values={attrValues}
+            onChange={handleAttrValueChange}
+            isNative={isNative}
+            resultCount={totalCount ?? cards.length}
+          />
         </div>
 
         <ActiveFilters

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useNavigate } from "@tanstack/react-router";
-import { ChevronRight } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { ActiveFilters } from "@/components/active-filters";
@@ -11,9 +10,14 @@ import { ResultList } from "@/components/result-list";
 import { DesktopFilterChips } from "@/components/desktop-filter-chips";
 import { NativeFilterChips } from "@/components/native-filter-chips";
 import { AttributeFilterChips } from "@/components/attribute-filter-chips";
-import { getCategoryIcon } from "@/lib/category-icons";
+import { CategoryHero } from "@/components/category-hero";
 import { buildTree, descendants, pathFromAncestor, type Category } from "@/lib/categories";
-import { normalizeFilter } from "@/lib/category-filters";
+import {
+  normalizeFilter,
+  vehicleCategoryGroupFor,
+  genericBrandFilterFor,
+} from "@/lib/category-filters";
+import { getCategoryBehavior } from "@/lib/category-behavior";
 import { SearchBar } from "@/components/search-bar";
 import { searchSchema, conditionEnum } from "@/features/listing-search/search-schema";
 import { useAnnonserSearchState } from "@/features/listing-search/use-annonser-search-state";
@@ -79,7 +83,7 @@ export function CategoryLandingPage({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
-        .select("id, slug, name_nb, parent_id, icon, color")
+        .select("id, slug, name_nb, parent_id, icon, color, heading_font")
         .order("sort_order")
         .order("name_nb");
       if (error) throw error;
@@ -161,6 +165,23 @@ export function CategoryLandingPage({
     setQDraft,
   });
 
+  // Merke/Modell selected in the attribute filters get appended as extra
+  // brødsmuler after the category chain, matching the ad-detail page's
+  // breadcrumb so the two page types read as one continuous path.
+  const extraSegments = useMemo(() => {
+    const attributes: Record<string, unknown> = {};
+    for (const [key, v] of Object.entries(attrValues)) {
+      if (v.kind === "text" || v.kind === "select") attributes[key] = v.value;
+    }
+    const vehicleGroup = vehicleCategoryGroupFor(selected.id, allFilters ?? [], tree.byId);
+    const genericBrandFilter = genericBrandFilterFor(selected.id, allFilters ?? [], tree.byId);
+    const rootCategorySlug = breadcrumb[0]?.slug ?? category.slug;
+    return getCategoryBehavior(vehicleGroup).extraBreadcrumbSegments(attributes, {
+      rootCategorySlug,
+      genericBrandFilter,
+    });
+  }, [attrValues, allFilters, tree, selected, breadcrumb, category]);
+
   const { data: radiusIds } = useQuery({
     queryKey: ["listings-radius", search.lat, search.lng, search.radius],
     enabled: search.lat != null && search.lng != null,
@@ -220,11 +241,6 @@ export function CategoryLandingPage({
   const mapCenter =
     search.lat != null && search.lng != null ? { lat: search.lat, lng: search.lng } : null;
 
-  const Icon = getCategoryIcon(selected.icon ?? null);
-  // Only "hub" main categories carry a presentation color — always the first
-  // breadcrumb entry — so the page's tint stays put while drilling deeper.
-  const accent = breadcrumb[0]?.color ?? undefined;
-
   // Picking a different top-level category than this page's own leaves this
   // page's SEO URL behind and lands on the canonical /annonser listing —
   // same rule the homepage's category picker follows.
@@ -237,77 +253,18 @@ export function CategoryLandingPage({
 
   return (
     <div>
-      <section
-        className="relative overflow-hidden"
-        style={accent ? { background: accent } : undefined}
-      >
-        <div className="absolute inset-0 bg-background/80" aria-hidden />
-        <div className="relative z-10 mx-auto max-w-7xl px-4 py-12">
-          <nav aria-label="Brødsmulesti" className="mb-4 flex flex-wrap items-center gap-1 text-sm">
-            <Link
-              to="/annonser"
-              search={{ q: "", category: "", sort: "new" }}
-              className="text-muted-foreground hover:text-foreground hover:underline"
-            >
-              Alle kategorier
-            </Link>
-            {breadcrumbEntries.map((c, i) => {
-              const isLast = i === breadcrumbEntries.length - 1;
-              // Entries before this page's own category are real ancestor
-              // pages with their own URL; the page's own category and any
-              // deeper `sub` selection just update the search param.
-              const isAboveOwnCategory = i < breadcrumb.length - 1;
-              return (
-                <span key={c.id} className="flex items-center gap-1">
-                  <ChevronRight className="size-3.5 text-muted-foreground" aria-hidden />
-                  {isLast ? (
-                    <span className="font-medium">{c.name_nb}</span>
-                  ) : isAboveOwnCategory ? (
-                    <Link
-                      to="/$kaupetCode"
-                      params={{ kaupetCode: c.slug }}
-                      className="text-muted-foreground hover:text-foreground hover:underline"
-                    >
-                      {c.name_nb}
-                    </Link>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => selectCategory(c)}
-                      className="text-muted-foreground hover:text-foreground hover:underline"
-                    >
-                      {c.name_nb}
-                    </button>
-                  )}
-                </span>
-              );
-            })}
-          </nav>
-          <div className="flex items-center gap-3">
-            <span
-              className="flex size-12 items-center justify-center rounded-full text-white"
-              style={{ background: accent ?? "var(--primary)" }}
-            >
-              <Icon className="size-6" />
-            </span>
-            <h1 className="font-display text-4xl tracking-tight">/{selected.name_nb}</h1>
-          </div>
-          {children.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-2">
-              {children.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => selectCategory(c)}
-                  className="rounded-full border border-border bg-card px-3 py-1.5 text-sm transition hover:border-primary hover:text-primary"
-                >
-                  {c.name_nb}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
+      {/* Entries before this page's own category are real ancestor pages with
+          their own URL; the page's own category and any deeper `sub`
+          selection just update the search param. */}
+      <CategoryHero
+        selected={selected}
+        main={breadcrumb[0]}
+        breadcrumbEntries={breadcrumbEntries}
+        extraSegments={extraSegments}
+        subcategories={children}
+        onSelectCategory={selectCategory}
+        linkUntilIndex={breadcrumb.length - 1}
+      />
 
       <div className="mx-auto max-w-7xl px-4 py-8">
         <div className="space-y-2">

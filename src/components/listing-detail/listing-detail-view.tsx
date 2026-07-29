@@ -92,7 +92,7 @@ export type ListingDetailViewCategory = { name_nb: string; slug: string | null }
 export type ListingDetailBreadcrumbItem = {
   name_nb: string;
   slug: string | null;
-  /** JSON-encoded attribute filters (see `encodeAttrFilters`), applied as the `/annonser` `attrs` search param. */
+  /** Compact-encoded attribute filters (see `encodeAttrFilters`), applied as the `/annonser` `attrs` search param. */
   attrs?: string;
 };
 

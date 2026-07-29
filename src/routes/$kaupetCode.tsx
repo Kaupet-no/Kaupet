@@ -19,6 +19,7 @@ import { breadcrumbPath, buildTree, type Category } from "@/lib/categories";
 import { encodeAttrFilters } from "@/features/listing-search/search-schema";
 import { normalizeSlugForMatch } from "@/lib/slug";
 
+import { searchSchema } from "@/features/listing-search/search-schema";
 import { signListingImageUrls, signVehicle360FrameUrls } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { OwnerStatsPanel } from "@/components/listing-detail/owner-stats-panel";
@@ -43,14 +44,9 @@ function randomVisitorId(): string {
 }
 
 export const Route = createFileRoute("/$kaupetCode")({
-  validateSearch: z.object({
+  validateSearch: searchSchema.extend({
     promotion: z.string().optional(),
     promo_id: z.string().optional(),
-    // Only used by the category-landing branch, to deep-link preselected
-    // filter values (e.g. from the homepage's category picker).
-    f: z.record(z.string(), z.any()).optional(),
-    priceMin: z.coerce.number().int().min(0).optional(),
-    priceMax: z.coerce.number().int().min(0).optional(),
     // Slug of a descendant category to scope the page to, without leaving
     // this URL — e.g. Interiør > Møbler > Sofa still lands on /interiør.
     sub: z.string().optional(),
@@ -212,17 +208,17 @@ export const Route = createFileRoute("/$kaupetCode")({
 
 function RootSlugPage() {
   const loaderData = Route.useLoaderData();
-  const { f, priceMin, priceMax, sub } = Route.useSearch();
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: "/$kaupetCode" });
   if (loaderData.kind === "category")
     return (
       <CategoryLandingPage
         category={loaderData.category}
         breadcrumb={[loaderData.category]}
-        subSlug={sub}
+        subSlug={search.sub}
         subSlugParam="sub"
-        initialFilters={f}
-        initialPriceMin={priceMin}
-        initialPriceMax={priceMax}
+        search={search}
+        navigate={navigate}
       />
     );
   return <ListingDetailPage />;

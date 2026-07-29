@@ -1,32 +1,21 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-import { Expand, LayoutList, LayoutGrid, Map as MapIcon, Save, SearchX } from "lucide-react";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Save } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
-import { ListingCard, type ListingCardData } from "@/components/listing-card";
+import type { ListingCardData } from "@/components/listing-card";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { SearchBar } from "@/components/search-bar";
 import { SaveSearchDialog } from "@/components/advanced-search-sheet";
 import { DesktopFilterChips } from "@/components/desktop-filter-chips";
 import { ActiveFilters } from "@/components/active-filters";
 import type { MapListing } from "@/components/listings-map";
-import { FeaturedListingsSection } from "@/components/featured-listings-section";
+import { ResultList } from "@/components/result-list";
 import { NativeFilterChips } from "@/components/native-filter-chips";
 import { NativeSearchOverlay } from "@/components/native-search-overlay";
 import { NativeAdvancedSearch } from "@/components/native-advanced-search";
-import { reverseGeocode } from "@/lib/geocode";
 import { saveLastSearchContext } from "@/lib/last-search-context";
 import { summarizeCriteria } from "@/lib/saved-searches";
 import { WtbListingCard } from "@/components/wtb-listing-card";
@@ -41,10 +30,6 @@ import { hapticImpact } from "@/lib/haptics";
 import { useScrollDirection } from "@/hooks/use-scroll-direction";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { useAnnonserSearchState } from "@/features/listing-search/use-annonser-search-state";
-
-const ListingsMap = lazy(() =>
-  import("@/components/listings-map").then((m) => ({ default: m.ListingsMap })),
-);
 
 export const Route = createFileRoute("/annonser")({
   validateSearch: searchSchema,
@@ -101,16 +86,8 @@ function BrowsePage() {
   const { user } = useAuth();
   const [qDraft, setQDraft] = useState(search.q);
   const [mounted, setMounted] = useState(false);
-  const [mobileMapOpen, setMobileMapOpen] = useState(false);
-  const [bigMapOpen, setBigMapOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
-  // Kartet er på som standard på desktop, men kan skjules for å gi
-  // annonselisten full bredde — spesielt nyttig ved få treff.
-  const [desktopMapVisible, setDesktopMapVisible] = useState(true);
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [activeId, setActiveId] = useState<string | null>(null);
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
-  const sentinelRef = useRef<HTMLDivElement>(null);
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
   const [advancedOverlayOpen, setAdvancedOverlayOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"listings" | "wtb">("listings");
@@ -120,13 +97,6 @@ function BrowsePage() {
     onRefresh: async () => {
       await queryClient.resetQueries({ queryKey: ["listings"] });
     },
-  });
-  const [viewMode, setViewMode] = useState<"grid" | "list">(() => {
-    try {
-      return (localStorage.getItem("kaupet_view_mode") as "grid" | "list") ?? "grid";
-    } catch {
-      return "grid";
-    }
   });
 
   useEffect(() => setMounted(true), []);
@@ -259,76 +229,6 @@ function BrowsePage() {
 
   const mapCenter =
     search.lat != null && search.lng != null ? { lat: search.lat, lng: search.lng } : null;
-
-  // Native infinite scroll — load next page when sentinel enters viewport
-  useEffect(() => {
-    if (!isNative || !sentinelRef.current) return;
-    const el = sentinelRef.current;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
-          void fetchNextPage();
-        }
-      },
-      { rootMargin: "200px" },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [isNative, hasNextPage, isFetchingNextPage, fetchNextPage]);
-
-  const renderMap = (withAreaSearch: boolean) =>
-    mounted ? (
-      <Suspense fallback={<div className="h-full w-full animate-pulse rounded-2xl bg-muted" />}>
-        <ListingsMap
-          center={mapCenter}
-          radiusKm={search.radius ?? 10}
-          listings={mapListings}
-          hoveredId={hoveredId}
-          activeId={activeId}
-          onMarkerHover={setHoveredId}
-          onMarkerSelect={setActiveId}
-          onCenterChange={(c) => {
-            updateSearch({
-              lat: c.lat,
-              lng: c.lng,
-              radius: search.radius ?? 10,
-              loc: "Henter sted…",
-            });
-            void reverseGeocode(c).then((name) => {
-              updateSearch({
-                lat: c.lat,
-                lng: c.lng,
-                radius: search.radius ?? 10,
-                loc: name ?? "Valgt punkt",
-              });
-            });
-          }}
-          onAreaSearch={
-            withAreaSearch
-              ? (c) => {
-                  updateSearch({
-                    lat: c.lat,
-                    lng: c.lng,
-                    radius: search.radius ?? 10,
-                    loc: "Henter sted…",
-                  });
-                  void reverseGeocode(c).then((name) => {
-                    updateSearch({
-                      lat: c.lat,
-                      lng: c.lng,
-                      radius: search.radius ?? 10,
-                      loc: name ?? "Valgt punkt",
-                    });
-                  });
-                }
-              : undefined
-          }
-          className="h-full w-full"
-        />
-      </Suspense>
-    ) : (
-      <div className="h-full w-full animate-pulse rounded-2xl bg-muted" />
-    );
 
   if (!mounted) {
     return (
@@ -493,84 +393,25 @@ function BrowsePage() {
         )}
       </div>
 
-      <ActiveFilters search={search} terms={terms} onUpdate={(patch) => updateSearch(patch)} />
-
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <span>
-            {isLoading
-              ? "Søker…"
-              : `${(totalCount ?? cards.length).toLocaleString("nb-NO")} annonse${(totalCount ?? cards.length) === 1 ? "" : "r"}`}
-          </span>
-          {isNative && (
-            <button
-              type="button"
-              onClick={() => {
-                void hapticImpact("light");
-                const next = viewMode === "grid" ? "list" : "grid";
-                setViewMode(next);
-                try {
-                  localStorage.setItem("kaupet_view_mode", next);
-                } catch {
-                  /* ignore */
-                }
-              }}
-              className="rounded-lg border border-border bg-card p-1.5 text-muted-foreground hover:text-foreground"
-              aria-label={
-                viewMode === "grid" ? "Bytt til listevisning" : "Bytt til rutenettvisning"
-              }
-            >
-              {viewMode === "grid" ? (
-                <LayoutList className="size-4" />
-              ) : (
-                <LayoutGrid className="size-4" />
-              )}
-            </button>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {!isDesktop && !isNative && (
-            <Sheet open={mobileMapOpen} onOpenChange={setMobileMapOpen}>
-              <SheetTrigger asChild>
-                <Button type="button" variant="outline" size="sm" className="gap-1.5">
-                  <MapIcon className="size-4" /> Kart
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="bottom" className="h-[88vh] p-4">
-                <SheetHeader>
-                  <SheetTitle>Kart</SheetTitle>
-                </SheetHeader>
-                <div className="mt-3 h-[calc(100%-3rem)]">
-                  {mobileMapOpen ? renderMap(true) : null}
-                </div>
-              </SheetContent>
-            </Sheet>
-          )}
-          {isDesktop && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => setDesktopMapVisible((v) => !v)}
-              aria-pressed={desktopMapVisible}
-            >
-              <MapIcon className="size-4" /> {desktopMapVisible ? "Skjul kart" : "Vis kart"}
-            </Button>
-          )}
-          {user && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setSaveSearchOpen(true)}
-              className="gap-1.5"
-            >
-              <Save className="size-4" /> Lagre søk
-            </Button>
-          )}
-        </div>
-      </div>
+      <ActiveFilters
+        search={search}
+        terms={terms}
+        onUpdate={(patch) => updateSearch(patch)}
+        attrFilters={attrFilters}
+        attrValues={attrValues}
+        onRemoveAttr={(key, value) => {
+          const current = attrValues[key];
+          if (value !== undefined && current?.kind === "multiselect") {
+            const next = current.values.filter((v) => v !== value);
+            handleAttrValueChange(
+              key,
+              next.length > 0 ? { kind: "multiselect", values: next } : undefined,
+            );
+            return;
+          }
+          handleAttrValueChange(key, undefined);
+        }}
+      />
 
       {user && (
         <SaveSearchDialog
@@ -636,162 +477,46 @@ function BrowsePage() {
           )}
         </div>
       ) : (
-        <div
-          className={`mt-4 grid gap-6 ${isDesktop && desktopMapVisible ? "lg:grid-cols-[1fr_420px]" : ""}`}
-        >
-          <div>
-            {!isLoading && (
-              <FeaturedListingsSection
-                categorySlug={effectiveCategories.length === 1 ? effectiveCategories[0] : undefined}
-                allowedIds={new Set((listings ?? []).map((l) => l.id))}
-                limit={3}
-              />
-            )}
-            {isLoading ? (
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className="overflow-hidden rounded-xl border border-border bg-card">
-                    <Skeleton className="aspect-[4/3] rounded-none" />
-                    <div className="space-y-2 p-3">
-                      <Skeleton className="h-4 w-4/5" />
-                      <Skeleton className="h-4 w-1/3" />
-                      <Skeleton className="h-3 w-1/2" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : cards.length === 0 ? (
-              <EmptyState
-                icon={SearchX}
-                title="Ingen annonser funnet"
-                description={
-                  search.q && effectiveCategories.length > 0
-                    ? `Ingen treff for «${search.q}» i valgt kategori. Prøv å søke i alle kategorier eller bruk andre søkeord.`
-                    : search.q
-                      ? `Ingen treff for «${search.q}». Prøv andre søkeord eller fjern filtre.`
-                      : effectiveCategories.length > 0
-                        ? "Ingen annonser i valgt kategori. Prøv å velge en bredere kategori."
-                        : "Prøv et bredere søk eller øk radiusen."
-                }
-                action={
-                  <>
-                    {effectiveCategories.length > 0 && (
-                      <Button
-                        variant="outline"
-                        onClick={() => updateSearch({ category: "", categories: [] })}
-                      >
-                        Fjern kategorifilter
-                      </Button>
-                    )}
-                    <Button variant="outline" onClick={resetFilters}>
-                      Nullstill alle filtre
-                    </Button>
-                  </>
-                }
-              />
-            ) : (
-              <div
-                className={
-                  isNative && viewMode === "list"
-                    ? "flex flex-col gap-3"
-                    : `grid grid-cols-2 gap-4 sm:grid-cols-3 ${isDesktop && !desktopMapVisible ? "lg:grid-cols-4" : ""}`
-                }
+        <ResultList
+          isNative={isNative}
+          isDesktop={isDesktop}
+          q={search.q}
+          effectiveCategories={effectiveCategories}
+          cards={cards}
+          totalCount={totalCount}
+          isLoading={isLoading}
+          hasNextPage={!!hasNextPage}
+          isFetchingNextPage={isFetchingNextPage}
+          fetchNextPage={() => void fetchNextPage()}
+          resetFilters={resetFilters}
+          onClearCategoryFilter={
+            effectiveCategories.length > 0
+              ? () => updateSearch({ category: "", categories: [] })
+              : undefined
+          }
+          mapListings={mapListings}
+          mapCenter={mapCenter}
+          radiusKm={search.radius ?? 10}
+          onMapCenterChange={(c, label) =>
+            updateSearch({ lat: c.lat, lng: c.lng, radius: search.radius ?? 10, loc: label ?? "" })
+          }
+          onMapAreaSearch={(c, label) =>
+            updateSearch({ lat: c.lat, lng: c.lng, radius: search.radius ?? 10, loc: label ?? "" })
+          }
+          toolbarExtra={
+            user ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setSaveSearchOpen(true)}
+                className="gap-1.5"
               >
-                {cards.map((l) => (
-                  <ListingCard
-                    key={l.id}
-                    listing={l}
-                    highlighted={hoveredId === l.id || activeId === l.id}
-                    onHoverChange={setHoveredId}
-                    compact={isNative && viewMode === "list"}
-                    linkState={{ fromSearch: true }}
-                  />
-                ))}
-              </div>
-            )}
-            {/* Last inn flere (web) / Infinite scroll sentinel (native) */}
-            {!isLoading &&
-              hasNextPage &&
-              (isNative ? (
-                <div ref={sentinelRef} className="h-4" />
-              ) : (
-                !isFetchingNextPage && (
-                  <div className="mt-6 flex justify-center">
-                    <Button variant="outline" onClick={() => void fetchNextPage()}>
-                      Last inn flere annonser
-                    </Button>
-                  </div>
-                )
-              ))}
-            {isFetchingNextPage && (
-              <div className="mt-6 flex justify-center">
-                <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              </div>
-            )}
-          </div>
-
-          {isDesktop && desktopMapVisible && (
-            <aside>
-              <div className="sticky top-20 h-[calc(100vh-6rem)]">
-                <div className="relative h-full overflow-hidden rounded-2xl border border-border shadow-sm">
-                  {renderMap(true)}
-                  <Dialog open={bigMapOpen} onOpenChange={setBigMapOpen}>
-                    <DialogTrigger asChild>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        className="absolute right-3 top-3 z-[450] rounded-full shadow-md"
-                      >
-                        <Expand className="size-4" /> Utvid
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-[95vw] p-0 sm:max-w-[95vw]">
-                      <DialogHeader className="px-4 pt-4">
-                        <DialogTitle>Kart</DialogTitle>
-                      </DialogHeader>
-                      <div className="h-[85vh] w-full p-4 pt-2">
-                        {bigMapOpen ? renderMap(true) : null}
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              </div>
-            </aside>
-          )}
-        </div>
-      )}
-
-      {/* Native kart-FAB + Sheet */}
-      {isNative && (
-        <>
-          <Sheet open={mobileMapOpen} onOpenChange={setMobileMapOpen}>
-            <SheetContent side="bottom" className="h-[88vh] p-4">
-              <SheetHeader>
-                <SheetTitle>Kart</SheetTitle>
-              </SheetHeader>
-              <div className="mt-3 h-[calc(100%-3rem)]">
-                {mobileMapOpen ? renderMap(true) : null}
-              </div>
-            </SheetContent>
-          </Sheet>
-          <button
-            type="button"
-            onClick={() => {
-              void hapticImpact("medium");
-              setMobileMapOpen(true);
-            }}
-            className="fixed bottom-[calc(var(--app-bottom-nav-h)+1rem)] right-4 z-50 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg active:scale-95 transition"
-            aria-label="Vis kart"
-          >
-            <MapIcon className="size-6" />
-            {mapListings.length > 0 && (
-              <span className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white">
-                {mapListings.length > 99 ? "99+" : mapListings.length}
-              </span>
-            )}
-          </button>
-        </>
+                <Save className="size-4" /> Lagre søk
+              </Button>
+            ) : undefined
+          }
+        />
       )}
 
       {/* Native full-screen search overlay */}

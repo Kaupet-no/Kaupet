@@ -126,8 +126,19 @@ export const VEHICLE_LOOKUP_FILTER_KEYS = [
 /** Registration status/number are set by the wizard itself (SVV lookup, or
  * the manual "kjøretøyet er ikke registrert" flow) rather than filled in by
  * the user as a generic attribute, so they're always hidden from the
- * category-attributes step regardless of which vehicle path was taken. */
-export const VEHICLE_WIZARD_MANAGED_KEYS = ["is_registered", "registration_number"] as const;
+ * category-attributes step regardless of which vehicle path was taken.
+ *
+ * `first_registration_year` belongs here for the same reason: it's derived
+ * from the exact date SVV returned (see confirmVehicleData) purely so the year
+ * is searchable as a range, never typed in. For an unregistered vehicle it
+ * stays unset — a vehicle that has never been registered shouldn't turn up in
+ * a "registrert mellom 2015 og 2020" search. Årsmodell (`year`) is the year
+ * the seller fills in there, and being a `number` filter it's required. */
+export const VEHICLE_WIZARD_MANAGED_KEYS = [
+  "is_registered",
+  "registration_number",
+  "first_registration_year",
+] as const;
 
 const SVV_BASE_URL = "https://akfell-datautlevering.atlas.vegvesen.no/enkeltoppslag/kjoretoydata";
 

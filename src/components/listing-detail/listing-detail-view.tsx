@@ -31,6 +31,7 @@ import {
   type AvgiftskodeGruppe,
   type VehicleLeafSlug,
 } from "@/lib/vehicle/vehicle-classification";
+import { firstRegistrationYear } from "@/lib/vehicle/first-registration";
 import { parseVehicleLookup } from "@/lib/vehicle/parse-vehicle-lookup";
 import { DRIVE_TYPE_OPTIONS } from "@/features/listing-creation/field-groups/vehicle-confirm";
 import { Input } from "@/components/ui/input";
@@ -251,9 +252,7 @@ export function ListingDetailView({
       : computeOmregistreringsavgift(
           (category?.slug as VehicleLeafSlug) ?? null,
           vehicleLookup?.weight_kg ?? null,
-          vehicleLookup?.first_registration_date
-            ? Number(vehicleLookup.first_registration_date.slice(0, 4))
-            : null,
+          firstRegistrationYear(vehicleLookup?.first_registration_date),
           (attributes.avgiftskode_gruppe as AvgiftskodeGruppe | undefined) ?? null,
         )
     : null;

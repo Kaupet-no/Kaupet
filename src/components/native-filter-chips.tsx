@@ -9,12 +9,12 @@ import {
 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/location-filter";
 import { CONDITIONS } from "@/components/advanced-search-value";
-import { AttributeFilterPanel } from "@/components/attribute-filter-panel";
+import { RangeFilterField } from "@/components/range-filter-field";
+import { PRICE_BOUNDS } from "@/lib/filter-range-bounds";
 import { SORT_OPTIONS, type SortValue, type Category } from "@/lib/categories";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { hapticImpact } from "@/lib/haptics";
@@ -24,8 +24,6 @@ import {
   getPriceChipState,
   getConditionChipState,
 } from "@/lib/filter-chip-labels";
-import { usePriceDraft } from "@/hooks/use-price-draft";
-import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
 
 type Props = {
   sort: SortValue;
@@ -44,12 +42,9 @@ type Props = {
   resultCount: number;
   onOpenAdvanced: () => void;
   advancedFilterCount?: number;
-  attrFilters?: CategoryFilter[];
-  attrValues?: Record<string, AttributeFilterValue>;
-  onAttrValuesChange?: (key: string, value: AttributeFilterValue | undefined) => void;
 };
 
-type SheetId = "sort" | "category" | "price" | "condition" | "location" | "attrs" | null;
+type SheetId = "sort" | "category" | "price" | "condition" | "location" | null;
 
 export function NativeFilterChips({
   sort,
@@ -68,9 +63,6 @@ export function NativeFilterChips({
   resultCount,
   onOpenAdvanced,
   advancedFilterCount = 0,
-  attrFilters = [],
-  attrValues = {},
-  onAttrValuesChange,
 }: Props) {
   const [openSheet, setOpenSheet] = useState<SheetId>(null);
 
@@ -91,7 +83,6 @@ export function NativeFilterChips({
   const { label: condLabel, active: condActive } = getConditionChipState(conditions);
   const locActive = location.lat != null;
   const locLabel = locActive ? (location.label ? location.label.split(",")[0] : "Sted") : "Sted";
-  const attrValueCount = Object.keys(attrValues).length;
 
   const resultBtn = (
     <Button
@@ -139,15 +130,6 @@ export function NativeFilterChips({
           icon={<MapPin className="size-3.5" />}
           onPress={() => open("location")}
         />
-        {attrFilters.length > 0 && onAttrValuesChange && (
-          <Chip
-            label="Egenskaper"
-            active={attrValueCount > 0}
-            icon={<SlidersHorizontal className="size-3.5" />}
-            onPress={() => open("attrs")}
-            badge={attrValueCount > 0 ? attrValueCount : undefined}
-          />
-        )}
         <Chip
           label="Mer"
           active={advancedFilterCount > 0}
@@ -266,25 +248,6 @@ export function NativeFilterChips({
           {resultBtn}
         </SheetContent>
       </Sheet>
-
-      {/* Attribute (category-specific) filters sheet */}
-      {attrFilters.length > 0 && onAttrValuesChange && (
-        <Sheet open={openSheet === "attrs"} onOpenChange={(o) => !o && close()}>
-          <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto rounded-t-2xl">
-            <SheetHeader>
-              <SheetTitle>Egenskaper</SheetTitle>
-            </SheetHeader>
-            <div className="mt-4">
-              <AttributeFilterPanel
-                filters={attrFilters}
-                values={attrValues}
-                onChange={onAttrValuesChange}
-              />
-            </div>
-            {resultBtn}
-          </SheetContent>
-        </Sheet>
-      )}
     </>
   );
 }
@@ -481,8 +444,8 @@ function PriceSheetContent({
   includeFree: boolean;
   onApply: (min: number | undefined, max: number | undefined, includeFree: boolean) => void;
 }) {
-  const { minDraft, setMinDraft, maxDraft, setMaxDraft, freeDraft, setFreeDraft, apply } =
-    usePriceDraft(min, max, includeFree, onApply);
+  const [draft, setDraft] = useState<{ min?: number; max?: number }>({ min, max });
+  const [freeDraft, setFreeDraft] = useState(includeFree);
 
   return (
     <>
@@ -490,36 +453,7 @@ function PriceSheetContent({
         <SheetTitle>Pris</SheetTitle>
       </SheetHeader>
       <div className="mt-4 space-y-4">
-        <div className="flex gap-3">
-          <div className="flex-1 space-y-1">
-            <Label htmlFor="price-min" className="text-sm text-muted-foreground">
-              Min (kr)
-            </Label>
-            <Input
-              id="price-min"
-              type="number"
-              inputMode="numeric"
-              value={minDraft}
-              onChange={(e) => setMinDraft(e.target.value)}
-              placeholder="0"
-              className="h-11"
-            />
-          </div>
-          <div className="flex-1 space-y-1">
-            <Label htmlFor="price-max" className="text-sm text-muted-foreground">
-              Maks (kr)
-            </Label>
-            <Input
-              id="price-max"
-              type="number"
-              inputMode="numeric"
-              value={maxDraft}
-              onChange={(e) => setMaxDraft(e.target.value)}
-              placeholder="–"
-              className="h-11"
-            />
-          </div>
-        </div>
+        <RangeFilterField label="Pris" bounds={PRICE_BOUNDS} value={draft} onChange={setDraft} />
         <label className="flex cursor-pointer items-center gap-3">
           <Checkbox
             checked={freeDraft}
@@ -539,7 +473,7 @@ function PriceSheetContent({
         className="mt-4 w-full"
         onClick={() => {
           void hapticImpact("medium");
-          apply();
+          onApply(draft.min, draft.max, freeDraft);
         }}
       >
         Bruk prisfilter

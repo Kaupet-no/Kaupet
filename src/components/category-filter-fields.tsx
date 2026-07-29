@@ -20,6 +20,8 @@ import {
   VehicleBrandField,
   VehicleModelField,
 } from "@/features/listing-creation/modules/generic-attributes/vehicle-brand-model-fields";
+import { RangeFilterField } from "@/components/range-filter-field";
+import { boundsForFilter } from "@/lib/filter-range-bounds";
 
 /**
  * Trigger button for the "Se flere valg" `Collapsible` wrapping a category's
@@ -52,11 +54,18 @@ export function CategoryFilterFields({
   filters,
   values,
   onChange,
+  brandLookupFilters,
 }: {
   filters: CategoryFilter[];
   values: Record<string, AttributeFilterValue>;
   onChange: (key: string, value: AttributeFilterValue | undefined) => void;
+  /** Where to look for the `brand_select` filter a `model_select` depends on.
+   * Defaults to `filters`; pass the category's full filter list when rendering
+   * a model field in isolation (e.g. its own chip popover on the search page),
+   * so the models offered still follow the selected brand. */
+  brandLookupFilters?: CategoryFilter[];
 }) {
+  const brandScope = brandLookupFilters ?? filters;
   return (
     <>
       {filters.map((f) => {
@@ -73,7 +82,7 @@ export function CategoryFilterFields({
           );
         }
         if (f.type === "model_select") {
-          const brandFilter = filters.find((bf) => bf.type === "brand_select");
+          const brandFilter = brandScope.find((bf) => bf.type === "brand_select");
           const brandName =
             brandFilter && values[brandFilter.key]?.kind === "select"
               ? (values[brandFilter.key] as { kind: "select"; value: string }).value
@@ -182,39 +191,21 @@ export function CategoryFilterFields({
           );
         }
         const range = current?.kind === "range" ? current : { min: undefined, max: undefined };
-        const updateRange = (patch: { min?: number; max?: number }) => {
-          const merged = { min: range.min, max: range.max, ...patch };
-          if (merged.min === undefined && merged.max === undefined) {
-            onChange(f.key, undefined);
-            return;
-          }
-          onChange(f.key, { kind: "range", min: merged.min, max: merged.max });
-        };
         return (
-          <div key={f.id} className="space-y-2">
-            <Label>
-              {f.label_nb}
-              {f.unit ? ` (${f.unit})` : ""}
-            </Label>
-            <div className="flex items-center gap-2">
-              <Input
-                type="number"
-                placeholder="Fra"
-                value={range.min ?? ""}
-                onChange={(e) =>
-                  updateRange({ min: e.target.value === "" ? undefined : Number(e.target.value) })
-                }
-              />
-              <Input
-                type="number"
-                placeholder="Til"
-                value={range.max ?? ""}
-                onChange={(e) =>
-                  updateRange({ max: e.target.value === "" ? undefined : Number(e.target.value) })
-                }
-              />
-            </div>
-          </div>
+          <RangeFilterField
+            key={f.id}
+            label={f.label_nb}
+            bounds={boundsForFilter(f)}
+            value={{ min: range.min, max: range.max }}
+            onChange={(next) =>
+              onChange(
+                f.key,
+                next.min === undefined && next.max === undefined
+                  ? undefined
+                  : { kind: "range", min: next.min, max: next.max },
+              )
+            }
+          />
         );
       })}
     </>

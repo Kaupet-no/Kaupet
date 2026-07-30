@@ -12,6 +12,11 @@ const SelectGroup = SelectPrimitive.Group;
 
 const SelectValue = SelectPrimitive.Value;
 
+/** Unstyled trigger for callers that supply their own trigger element via
+ * `asChild` — `SelectTrigger` can't be used that way because it appends its own
+ * chevron, leaving Radix's Slot with two children. */
+const SelectTriggerBare = SelectPrimitive.Trigger;
+
 const SelectTrigger = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>
@@ -143,6 +148,7 @@ export {
   SelectGroup,
   SelectValue,
   SelectTrigger,
+  SelectTriggerBare,
   SelectContent,
   SelectLabel,
   SelectItem,

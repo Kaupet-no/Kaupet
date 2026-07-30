@@ -1,38 +1,24 @@
 import { useState } from "react";
-import {
-  ArrowRight,
-  ChevronLeft,
-  LayoutGrid,
-  MapPin,
-  MoreHorizontal,
-  SlidersHorizontal,
-} from "lucide-react";
+import { MapPin, MoreHorizontal, SlidersHorizontal } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/location-filter";
 import { CONDITIONS } from "@/components/advanced-search-value";
-import { AttributeFilterPanel } from "@/components/attribute-filter-panel";
-import { SORT_OPTIONS, type SortValue, type Category } from "@/lib/categories";
-import { getCategoryIcon } from "@/lib/category-icons";
+import { RangeFilterField } from "@/components/range-filter-field";
+import { PRICE_BOUNDS } from "@/lib/filter-range-bounds";
+import { SORT_OPTIONS, type SortValue } from "@/lib/categories";
 import { hapticImpact } from "@/lib/haptics";
 import {
   getSortChipState,
-  getCategoryChipState,
   getPriceChipState,
   getConditionChipState,
 } from "@/lib/filter-chip-labels";
-import { usePriceDraft } from "@/hooks/use-price-draft";
-import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
 
 type Props = {
   sort: SortValue;
   onSortChange: (v: SortValue) => void;
-  categories: Category[];
-  selectedCategories: string[];
-  onCategoriesChange: (slugs: string[]) => void;
   min?: number;
   max?: number;
   includeFree: boolean;
@@ -44,19 +30,13 @@ type Props = {
   resultCount: number;
   onOpenAdvanced: () => void;
   advancedFilterCount?: number;
-  attrFilters?: CategoryFilter[];
-  attrValues?: Record<string, AttributeFilterValue>;
-  onAttrValuesChange?: (key: string, value: AttributeFilterValue | undefined) => void;
 };
 
-type SheetId = "sort" | "category" | "price" | "condition" | "location" | "attrs" | null;
+type SheetId = "sort" | "price" | "condition" | "location" | null;
 
 export function NativeFilterChips({
   sort,
   onSortChange,
-  categories,
-  selectedCategories,
-  onCategoriesChange,
   min,
   max,
   includeFree,
@@ -68,9 +48,6 @@ export function NativeFilterChips({
   resultCount,
   onOpenAdvanced,
   advancedFilterCount = 0,
-  attrFilters = [],
-  attrValues = {},
-  onAttrValuesChange,
 }: Props) {
   const [openSheet, setOpenSheet] = useState<SheetId>(null);
 
@@ -83,15 +60,10 @@ export function NativeFilterChips({
 
   // Labels for active filters
   const { label: sortLabel, active: sortActive } = getSortChipState(sort);
-  const { label: catLabel, active: catActive } = getCategoryChipState(
-    categories,
-    selectedCategories,
-  );
   const { label: priceLabel, active: priceActive } = getPriceChipState(min, max, includeFree);
   const { label: condLabel, active: condActive } = getConditionChipState(conditions);
   const locActive = location.lat != null;
   const locLabel = locActive ? (location.label ? location.label.split(",")[0] : "Sted") : "Sted";
-  const attrValueCount = Object.keys(attrValues).length;
 
   const resultBtn = (
     <Button
@@ -116,12 +88,6 @@ export function NativeFilterChips({
           onPress={() => open("sort")}
         />
         <Chip
-          label={catLabel}
-          active={catActive}
-          icon={<LayoutGrid className="size-3.5" />}
-          onPress={() => open("category")}
-        />
-        <Chip
           label={priceLabel}
           active={priceActive}
           icon={<span className="text-[11px] font-bold">kr</span>}
@@ -139,15 +105,6 @@ export function NativeFilterChips({
           icon={<MapPin className="size-3.5" />}
           onPress={() => open("location")}
         />
-        {attrFilters.length > 0 && onAttrValuesChange && (
-          <Chip
-            label="Egenskaper"
-            active={attrValueCount > 0}
-            icon={<SlidersHorizontal className="size-3.5" />}
-            onPress={() => open("attrs")}
-            badge={attrValueCount > 0 ? attrValueCount : undefined}
-          />
-        )}
         <Chip
           label="Mer"
           active={advancedFilterCount > 0}
@@ -188,16 +145,6 @@ export function NativeFilterChips({
           </div>
         </SheetContent>
       </Sheet>
-
-      {/* Category sheet */}
-      <CategorySheet
-        open={openSheet === "category"}
-        onClose={close}
-        categories={categories}
-        selected={selectedCategories}
-        onSelect={onCategoriesChange}
-        resultCount={resultCount}
-      />
 
       {/* Price sheet */}
       <Sheet open={openSheet === "price"} onOpenChange={(o) => !o && close()}>
@@ -266,25 +213,6 @@ export function NativeFilterChips({
           {resultBtn}
         </SheetContent>
       </Sheet>
-
-      {/* Attribute (category-specific) filters sheet */}
-      {attrFilters.length > 0 && onAttrValuesChange && (
-        <Sheet open={openSheet === "attrs"} onOpenChange={(o) => !o && close()}>
-          <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto rounded-t-2xl">
-            <SheetHeader>
-              <SheetTitle>Egenskaper</SheetTitle>
-            </SheetHeader>
-            <div className="mt-4">
-              <AttributeFilterPanel
-                filters={attrFilters}
-                values={attrValues}
-                onChange={onAttrValuesChange}
-              />
-            </div>
-            {resultBtn}
-          </SheetContent>
-        </Sheet>
-      )}
     </>
   );
 }
@@ -323,153 +251,6 @@ function Chip({
   );
 }
 
-function CategorySheet({
-  open,
-  onClose,
-  categories,
-  selected,
-  onSelect,
-  resultCount,
-}: {
-  open: boolean;
-  onClose: () => void;
-  categories: Category[];
-  selected: string[];
-  onSelect: (slugs: string[]) => void;
-  resultCount: number;
-}) {
-  const [activeParent, setActiveParent] = useState<Category | null>(null);
-
-  const rootCategories = categories.filter((c) => c.parent_id === null);
-  const childrenOf = (id: string) => categories.filter((c) => c.parent_id === id);
-
-  const toggleSlug = (slug: string) => {
-    void hapticImpact("light");
-    onSelect(selected.includes(slug) ? selected.filter((s) => s !== slug) : [...selected, slug]);
-  };
-
-  const selectAll = (parent: Category) => {
-    void hapticImpact("medium");
-    const subs = childrenOf(parent.id).map((c) => c.slug);
-    const allSlugs = [parent.slug, ...subs];
-    // If all already selected — deselect all
-    const allSelected = allSlugs.every((s) => selected.includes(s));
-    onSelect(
-      allSelected
-        ? selected.filter((s) => !allSlugs.includes(s))
-        : [...new Set([...selected, ...allSlugs])],
-    );
-    onClose();
-  };
-
-  return (
-    <Sheet
-      open={open}
-      onOpenChange={(o) => {
-        if (!o) {
-          onClose();
-          setActiveParent(null);
-        }
-      }}
-    >
-      <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto rounded-t-2xl">
-        <SheetHeader className="text-left">
-          <SheetTitle className="flex items-center gap-3">
-            {activeParent ? activeParent.name_nb : "Kategori"}
-            {activeParent && (
-              <button
-                type="button"
-                onClick={() => setActiveParent(null)}
-                className="flex shrink-0 items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium transition hover:border-primary hover:text-primary"
-              >
-                <ChevronLeft className="size-3.5" />
-                Tilbake
-              </button>
-            )}
-          </SheetTitle>
-        </SheetHeader>
-
-        <div className="mt-4 flex flex-col gap-2">
-          {!activeParent ? (
-            rootCategories.map((cat) => {
-              const Icon = getCategoryIcon(undefined);
-              const hasSubs = childrenOf(cat.id).length > 0;
-              const isActive = selected.includes(cat.slug);
-              return (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => (hasSubs ? setActiveParent(cat) : toggleSlug(cat.slug))}
-                  className={`group flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition active:scale-[0.98] ${
-                    isActive ? "border-primary bg-primary/5" : "border-border bg-card"
-                  }`}
-                >
-                  <span
-                    className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${isActive ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary"}`}
-                  >
-                    <Icon className="size-5" />
-                  </span>
-                  <span className={`truncate font-medium ${isActive ? "text-primary" : ""}`}>
-                    {cat.name_nb}
-                  </span>
-                  {hasSubs && (
-                    <ArrowRight className="ml-auto size-4 shrink-0 text-muted-foreground" />
-                  )}
-                </button>
-              );
-            })
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={() => selectAll(activeParent)}
-                className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left font-medium transition active:scale-[0.98]"
-              >
-                Alt i {activeParent.name_nb}
-              </button>
-              {childrenOf(activeParent.id).map((sub) => {
-                const Icon = getCategoryIcon(undefined);
-                const isActive = selected.includes(sub.slug);
-                return (
-                  <button
-                    key={sub.id}
-                    type="button"
-                    onClick={() => toggleSlug(sub.slug)}
-                    className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition active:scale-[0.98] ${
-                      isActive ? "border-primary bg-primary/5" : "border-border bg-card"
-                    }`}
-                  >
-                    <span
-                      className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${isActive ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary"}`}
-                    >
-                      <Icon className="size-5" />
-                    </span>
-                    <span className={`truncate font-medium ${isActive ? "text-primary" : ""}`}>
-                      {sub.name_nb}
-                    </span>
-                  </button>
-                );
-              })}
-            </>
-          )}
-        </div>
-
-        <Button
-          size="sm"
-          className="mt-4 w-full"
-          onClick={() => {
-            void hapticImpact("medium");
-            onClose();
-            setActiveParent(null);
-          }}
-        >
-          Vis {resultCount} annonse{resultCount === 1 ? "" : "r"}
-        </Button>
-      </SheetContent>
-    </Sheet>
-  );
-}
-
 function PriceSheetContent({
   min,
   max,
@@ -481,8 +262,8 @@ function PriceSheetContent({
   includeFree: boolean;
   onApply: (min: number | undefined, max: number | undefined, includeFree: boolean) => void;
 }) {
-  const { minDraft, setMinDraft, maxDraft, setMaxDraft, freeDraft, setFreeDraft, apply } =
-    usePriceDraft(min, max, includeFree, onApply);
+  const [draft, setDraft] = useState<{ min?: number; max?: number }>({ min, max });
+  const [freeDraft, setFreeDraft] = useState(includeFree);
 
   return (
     <>
@@ -490,36 +271,7 @@ function PriceSheetContent({
         <SheetTitle>Pris</SheetTitle>
       </SheetHeader>
       <div className="mt-4 space-y-4">
-        <div className="flex gap-3">
-          <div className="flex-1 space-y-1">
-            <Label htmlFor="price-min" className="text-sm text-muted-foreground">
-              Min (kr)
-            </Label>
-            <Input
-              id="price-min"
-              type="number"
-              inputMode="numeric"
-              value={minDraft}
-              onChange={(e) => setMinDraft(e.target.value)}
-              placeholder="0"
-              className="h-11"
-            />
-          </div>
-          <div className="flex-1 space-y-1">
-            <Label htmlFor="price-max" className="text-sm text-muted-foreground">
-              Maks (kr)
-            </Label>
-            <Input
-              id="price-max"
-              type="number"
-              inputMode="numeric"
-              value={maxDraft}
-              onChange={(e) => setMaxDraft(e.target.value)}
-              placeholder="–"
-              className="h-11"
-            />
-          </div>
-        </div>
+        <RangeFilterField label="Pris" bounds={PRICE_BOUNDS} value={draft} onChange={setDraft} />
         <label className="flex cursor-pointer items-center gap-3">
           <Checkbox
             checked={freeDraft}
@@ -539,7 +291,7 @@ function PriceSheetContent({
         className="mt-4 w-full"
         onClick={() => {
           void hapticImpact("medium");
-          apply();
+          onApply(draft.min, draft.max, freeDraft);
         }}
       >
         Bruk prisfilter

@@ -1,0 +1,64 @@
+import type { CategoryFilter } from "@/lib/category-filters";
+
+/** Slider geometry for a from–to numeric filter. */
+export type RangeBounds = {
+  min: number;
+  max: number;
+  step: number;
+  /** Unit suffix shown next to the thumb values, e.g. "kr" or "km". */
+  unit?: string;
+};
+
+/** Price is not a category_filter — it's a first-class listing column — so its
+ * slider scale lives here next to the attribute scales rather than being
+ * derived from filter metadata. */
+export const PRICE_BOUNDS: RangeBounds = { min: 0, max: 1_000_000, step: 1000, unit: "kr" };
+
+/** Per-key scales for the numeric attribute filters where a generic 0–100k
+ * ramp would be useless (a year slider starting at 0, a mileage slider
+ * stepping by 1 km). Keys match category_filters.key. */
+const BOUNDS_BY_KEY: Record<string, Omit<RangeBounds, "unit">> = {
+  year: { min: 1950, max: currentYear(), step: 1 },
+  first_registration_year: { min: 1950, max: currentYear(), step: 1 },
+  mileage_km: { min: 0, max: 500_000, step: 1000 },
+  hestekrefter: { min: 0, max: 1000, step: 5 },
+  effekt_hk: { min: 0, max: 1000, step: 5 },
+  engine_size_ccm: { min: 0, max: 3000, step: 50 },
+  vekt_kg: { min: 0, max: 5000, step: 50 },
+};
+
+/** Bounds for keys we have no explicit scale for, picked from the unit so a
+ * "kr"-denominated attribute doesn't get a 0–1000 ramp. */
+const BOUNDS_BY_UNIT: Record<string, Omit<RangeBounds, "unit">> = {
+  km: { min: 0, max: 500_000, step: 1000 },
+  kr: { min: 0, max: 1_000_000, step: 1000 },
+  kg: { min: 0, max: 5000, step: 50 },
+};
+
+const DEFAULT_BOUNDS: Omit<RangeBounds, "unit"> = { min: 0, max: 10_000, step: 10 };
+
+function currentYear() {
+  return new Date().getFullYear();
+}
+
+/** Resolves the slider scale for a numeric (`number`/`range`) category filter. */
+export function boundsForFilter(filter: Pick<CategoryFilter, "key" | "unit">): RangeBounds {
+  const base =
+    BOUNDS_BY_KEY[filter.key] ??
+    (filter.unit ? BOUNDS_BY_UNIT[filter.unit] : undefined) ??
+    DEFAULT_BOUNDS;
+  return { ...base, unit: filter.unit ?? undefined };
+}
+
+/** Snaps a manually typed value into the slider's range, so a number typed
+ * past the scale (e.g. a 900 000 km oldtimer) still moves the thumb to the end
+ * instead of throwing Radix off with an out-of-range value. */
+export function clampToBounds(value: number, bounds: RangeBounds): number {
+  return Math.min(Math.max(value, bounds.min), bounds.max);
+}
+
+/** "120 000 km" / "2018" — space-grouped nb-NO digits plus the unit. */
+export function formatRangeValue(value: number, unit?: string): string {
+  const digits = value.toLocaleString("nb-NO");
+  return unit ? `${digits} ${unit}` : digits;
+}

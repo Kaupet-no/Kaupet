@@ -1,32 +1,26 @@
 import { useState } from "react";
-import { ChevronDown, LayoutGrid, MoreHorizontal, SlidersHorizontal } from "lucide-react";
+import { MoreHorizontal, SlidersHorizontal } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { CategoryPicker } from "@/components/advanced-search-sheet";
 import { ModeToggle } from "@/components/search-term-mode-toggle";
 import { TermGroupEditor } from "@/components/term-group-editor";
-import { AttributeFilterPanel } from "@/components/attribute-filter-panel";
+import { FilterChip as Chip } from "@/components/filter-chip";
+import { RangeFilterField } from "@/components/range-filter-field";
 import { CONDITIONS, type AdvancedSearchValue } from "@/components/advanced-search-value";
-import { SORT_OPTIONS, type SortValue, type Category } from "@/lib/categories";
+import { SORT_OPTIONS, type SortValue } from "@/lib/categories";
 import type { TermGroup } from "@/lib/term-groups";
-import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
+import { PRICE_BOUNDS } from "@/lib/filter-range-bounds";
 import {
   getSortChipState,
-  getCategoryChipState,
   getPriceChipState,
   getConditionChipState,
 } from "@/lib/filter-chip-labels";
-import { usePriceDraft } from "@/hooks/use-price-draft";
 
 type Props = {
   sort: SortValue;
   onSortChange: (v: SortValue) => void;
-  categories: Category[];
-  selectedCategories: string[];
-  onCategoriesChange: (slugs: string[]) => void;
   min?: number;
   max?: number;
   includeFree: boolean;
@@ -37,24 +31,18 @@ type Props = {
   onQModeChange: (v: AdvancedSearchValue["qMode"]) => void;
   extraGroups: TermGroup[];
   onExtraGroupsChange: (groups: TermGroup[]) => void;
-  /** Category-specific search parameters (empty when no category is selected,
-   * or the intersection of common fields when several are selected). */
-  attrFilters?: CategoryFilter[];
-  attrValues?: Record<string, AttributeFilterValue>;
-  onAttrValuesChange?: (key: string, value: AttributeFilterValue | undefined) => void;
 };
 
 /**
  * Desktop equivalent of NativeFilterChips: a row of filter pills, each
  * showing its own active state, instead of a separate collapsible
  * "advanced search" section that duplicated what ActiveFilters showed below.
+ * Category-specific fields live in their own row below this one — see
+ * `AttributeFilterChips`.
  */
 export function DesktopFilterChips({
   sort,
   onSortChange,
-  categories,
-  selectedCategories,
-  onCategoriesChange,
   min,
   max,
   includeFree,
@@ -65,21 +53,10 @@ export function DesktopFilterChips({
   onQModeChange,
   extraGroups,
   onExtraGroupsChange,
-  attrFilters = [],
-  attrValues = {},
-  onAttrValuesChange,
 }: Props) {
-  const [openId, setOpenId] = useState<
-    "sort" | "category" | "price" | "condition" | "attrs" | "more" | null
-  >(null);
-
-  const attrValueCount = Object.keys(attrValues).length;
+  const [openId, setOpenId] = useState<"sort" | "price" | "condition" | "more" | null>(null);
 
   const { label: sortLabel, active: sortActive } = getSortChipState(sort);
-  const { label: catLabel, active: catActive } = getCategoryChipState(
-    categories,
-    selectedCategories,
-  );
   const { label: priceLabel, active: priceActive } = getPriceChipState(min, max, includeFree);
   const { label: condLabel, active: condActive } = getConditionChipState(conditions);
 
@@ -111,19 +88,6 @@ export function DesktopFilterChips({
               {s.label}
             </button>
           ))}
-        </PopoverContent>
-      </Popover>
-
-      <Popover open={openId === "category"} onOpenChange={(o) => setOpenId(o ? "category" : null)}>
-        <PopoverTrigger asChild>
-          <Chip label={catLabel} active={catActive} icon={<LayoutGrid className="size-3.5" />} />
-        </PopoverTrigger>
-        <PopoverContent align="start" className="w-80 p-3">
-          <CategoryPicker
-            categories={categories}
-            selected={selectedCategories}
-            onChange={onCategoriesChange}
-          />
         </PopoverContent>
       </Popover>
 
@@ -181,26 +145,6 @@ export function DesktopFilterChips({
         </PopoverContent>
       </Popover>
 
-      {attrFilters.length > 0 && onAttrValuesChange && (
-        <Popover open={openId === "attrs"} onOpenChange={(o) => setOpenId(o ? "attrs" : null)}>
-          <PopoverTrigger asChild>
-            <Chip
-              label="Egenskaper"
-              active={attrValueCount > 0}
-              icon={<SlidersHorizontal className="size-3.5" />}
-              badge={attrValueCount}
-            />
-          </PopoverTrigger>
-          <PopoverContent align="start" className="w-80 space-y-3 p-3">
-            <AttributeFilterPanel
-              filters={attrFilters}
-              values={attrValues}
-              onChange={onAttrValuesChange}
-            />
-          </PopoverContent>
-        </Popover>
-      )}
-
       <Popover open={openId === "more"} onOpenChange={(o) => setOpenId(o ? "more" : null)}>
         <PopoverTrigger asChild>
           <Chip
@@ -225,41 +169,6 @@ export function DesktopFilterChips({
   );
 }
 
-function Chip({
-  label,
-  active,
-  icon,
-  badge,
-  ...rest
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  label: string;
-  active: boolean;
-  icon: React.ReactNode;
-  badge?: number;
-}) {
-  return (
-    <button
-      type="button"
-      {...rest}
-      className={`relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm transition ${
-        active
-          ? "border-primary bg-primary font-medium text-primary-foreground"
-          : "border-border bg-card text-foreground hover:bg-muted"
-      }`}
-    >
-      {active && <span className="size-1.5 shrink-0 rounded-full bg-primary-foreground" />}
-      {icon}
-      <span className="max-w-[160px] truncate">{label}</span>
-      <ChevronDown className="size-3.5 opacity-60" />
-      {badge != null && badge > 0 && (
-        <span className="absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white">
-          {badge}
-        </span>
-      )}
-    </button>
-  );
-}
-
 function PricePopoverContent({
   min,
   max,
@@ -271,33 +180,22 @@ function PricePopoverContent({
   includeFree: boolean;
   onApply: (min: number | undefined, max: number | undefined, includeFree: boolean) => void;
 }) {
-  const { minDraft, setMinDraft, maxDraft, setMaxDraft, freeDraft, setFreeDraft, apply } =
-    usePriceDraft(min, max, includeFree, onApply);
+  const [draft, setDraft] = useState<{ min?: number; max?: number }>({ min, max });
+  const [freeDraft, setFreeDraft] = useState(includeFree);
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <Input
-          type="number"
-          min={0}
-          placeholder="Fra"
-          value={minDraft}
-          onChange={(e) => setMinDraft(e.target.value)}
-        />
-        <span className="text-muted-foreground">–</span>
-        <Input
-          type="number"
-          min={0}
-          placeholder="Til"
-          value={maxDraft}
-          onChange={(e) => setMaxDraft(e.target.value)}
-        />
-      </div>
+      <RangeFilterField label="Pris" bounds={PRICE_BOUNDS} value={draft} onChange={setDraft} />
       <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
         <Checkbox checked={freeDraft} onCheckedChange={(c) => setFreeDraft(c === true)} />
         Inkluder gratis-annonser
       </label>
-      <Button type="button" size="sm" className="w-full" onClick={apply}>
+      <Button
+        type="button"
+        size="sm"
+        className="w-full"
+        onClick={() => onApply(draft.min, draft.max, freeDraft)}
+      >
         Bruk prisfilter
       </Button>
     </div>

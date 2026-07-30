@@ -393,17 +393,7 @@ function WebLanding() {
                       className="rounded-2xl border border-border bg-card p-4 shadow-sm md:p-6"
                       onSubmit={(e) => {
                         e.preventDefault();
-                        const root = selectedPath[0];
-                        navigate({
-                          to: "/$kaupetCode",
-                          params: { kaupetCode: root.slug },
-                          search: {
-                            f: filterValues,
-                            priceMin,
-                            priceMax,
-                            sub: currentParent.id === root.id ? undefined : currentParent.slug,
-                          },
-                        });
+                        goToCategoryPage(selectedPath);
                       }}
                     >
                       <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1.5">

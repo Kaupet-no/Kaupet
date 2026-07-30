@@ -86,6 +86,52 @@ export function pathFromAncestor(
   return full.slice(idx + 1);
 }
 
+/**
+ * Resolves the category header (hero) a result set should be presented under,
+ * given whichever category slugs the search is currently filtered by.
+ *
+ * A hero only makes sense when the selection sits inside a single main
+ * category's branch — one colored root, everything else below it (which is
+ * exactly what the category picker produces via `selectAllForParent`). A
+ * colorless root or an unknown slug returns null and the page falls back to
+ * its generic heading.
+ *
+ * `selected` is the category shown in the title and whose children become the
+ * subcategory chips; `main` carries the presentation color, so the tint stays
+ * put while the user drills deeper. When the selection narrows to one
+ * category (or its full subtree), `selected` drills down to it so the title
+ * gets specific. If the selection instead spans multiple sibling branches
+ * without their shared parent also selected, there is no single category to
+ * name the title after, so this returns null.
+ */
+export function resolveHeroCategory(
+  selectedSlugs: string[],
+  tree: CatTree,
+): { selected: Category; main: Category } | null {
+  if (selectedSlugs.length === 0) return null;
+
+  const paths: Category[][] = [];
+  for (const slug of selectedSlugs) {
+    const cat = tree.bySlug.get(slug);
+    if (!cat) return null;
+    paths.push(breadcrumbPath(cat, tree));
+  }
+
+  const main = paths[0][0];
+  if (main.parent_id != null || !main.color) return null;
+  if (paths.some((p) => p[0].id !== main.id)) return null;
+
+  // The shallowest selected category — every other selection has to be it or
+  // one of its descendants for the branch to be unambiguous.
+  const shallowest = paths.reduce((a, b) => (b.length < a.length ? b : a));
+  const candidate = shallowest[shallowest.length - 1];
+  const allowed = new Set([candidate.id, ...descendants(candidate, tree).map((d) => d.id)]);
+  const fitsCandidate = paths.every((p) => allowed.has(p[p.length - 1].id));
+
+  if (!fitsCandidate) return null;
+  return { selected: candidate, main };
+}
+
 export function categoryLabel(selectedSlugs: string[], tree: CatTree): string {
   if (selectedSlugs.length === 0) return "Alle kategorier";
   const set = new Set(selectedSlugs);

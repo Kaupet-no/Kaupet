@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Select,
   SelectContent,
@@ -20,6 +20,8 @@ import {
   VehicleBrandField,
   VehicleModelField,
 } from "@/features/listing-creation/modules/generic-attributes/vehicle-brand-model-fields";
+import { RangeFilterField } from "@/components/range-filter-field";
+import { boundsForFilter } from "@/lib/filter-range-bounds";
 
 /**
  * Trigger button for the "Se flere valg" `Collapsible` wrapping a category's
@@ -52,11 +54,18 @@ export function CategoryFilterFields({
   filters,
   values,
   onChange,
+  brandLookupFilters,
 }: {
   filters: CategoryFilter[];
   values: Record<string, AttributeFilterValue>;
   onChange: (key: string, value: AttributeFilterValue | undefined) => void;
+  /** Where to look for the `brand_select` filter a `model_select` depends on.
+   * Defaults to `filters`; pass the category's full filter list when rendering
+   * a model field in isolation (e.g. its own chip popover on the search page),
+   * so the models offered still follow the selected brand. */
+  brandLookupFilters?: CategoryFilter[];
 }) {
+  const brandScope = brandLookupFilters ?? filters;
   return (
     <>
       {filters.map((f) => {
@@ -73,7 +82,7 @@ export function CategoryFilterFields({
           );
         }
         if (f.type === "model_select") {
-          const brandFilter = filters.find((bf) => bf.type === "brand_select");
+          const brandFilter = brandScope.find((bf) => bf.type === "brand_select");
           const brandName =
             brandFilter && values[brandFilter.key]?.kind === "select"
               ? (values[brandFilter.key] as { kind: "select"; value: string }).value
@@ -101,8 +110,7 @@ export function CategoryFilterFields({
             </label>
           );
         }
-        if (f.type === "select" || f.type === "multiselect") {
-          // Both rendered as single-select dropdowns here for simplicity.
+        if (f.type === "select") {
           return (
             <div key={f.id} className="space-y-2">
               <Label>{f.label_nb}</Label>
@@ -127,6 +135,44 @@ export function CategoryFilterFields({
             </div>
           );
         }
+        if (f.type === "multiselect") {
+          const selected = current?.kind === "multiselect" ? current.values : [];
+          const toggle = (optionValue: string) => {
+            const next = selected.includes(optionValue)
+              ? selected.filter((v) => v !== optionValue)
+              : [...selected, optionValue];
+            onChange(f.key, next.length > 0 ? { kind: "multiselect", values: next } : undefined);
+          };
+          return (
+            <Collapsible key={f.id} className="space-y-2">
+              <CollapsibleTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-between"
+                >
+                  <span>
+                    {f.label_nb}
+                    {selected.length > 0 ? ` (${selected.length})` : ""}
+                  </span>
+                  <ChevronDown className="size-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="grid grid-cols-1 gap-x-4 gap-y-1.5 rounded-md border border-border p-3 sm:grid-cols-2 lg:grid-cols-3">
+                {(f.options ?? []).map((o) => (
+                  <label key={o.value} className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={selected.includes(o.value)}
+                      onCheckedChange={() => toggle(o.value)}
+                    />
+                    {o.label_nb}
+                  </label>
+                ))}
+              </CollapsibleContent>
+            </Collapsible>
+          );
+        }
         // number / range / text → min/max for numeric, single field for text
         if (f.type === "text") {
           return (
@@ -145,39 +191,21 @@ export function CategoryFilterFields({
           );
         }
         const range = current?.kind === "range" ? current : { min: undefined, max: undefined };
-        const updateRange = (patch: { min?: number; max?: number }) => {
-          const merged = { min: range.min, max: range.max, ...patch };
-          if (merged.min === undefined && merged.max === undefined) {
-            onChange(f.key, undefined);
-            return;
-          }
-          onChange(f.key, { kind: "range", min: merged.min, max: merged.max });
-        };
         return (
-          <div key={f.id} className="space-y-2">
-            <Label>
-              {f.label_nb}
-              {f.unit ? ` (${f.unit})` : ""}
-            </Label>
-            <div className="flex items-center gap-2">
-              <Input
-                type="number"
-                placeholder="Fra"
-                value={range.min ?? ""}
-                onChange={(e) =>
-                  updateRange({ min: e.target.value === "" ? undefined : Number(e.target.value) })
-                }
-              />
-              <Input
-                type="number"
-                placeholder="Til"
-                value={range.max ?? ""}
-                onChange={(e) =>
-                  updateRange({ max: e.target.value === "" ? undefined : Number(e.target.value) })
-                }
-              />
-            </div>
-          </div>
+          <RangeFilterField
+            key={f.id}
+            label={f.label_nb}
+            bounds={boundsForFilter(f)}
+            value={{ min: range.min, max: range.max }}
+            onChange={(next) =>
+              onChange(
+                f.key,
+                next.min === undefined && next.max === undefined
+                  ? undefined
+                  : { kind: "range", min: next.min, max: next.max },
+              )
+            }
+          />
         );
       })}
     </>

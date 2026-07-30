@@ -1,28 +1,29 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useNavigate } from "@tanstack/react-router";
-import { ChevronRight, PackageSearch } from "lucide-react";
+import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
-import { CategoryFilterFields, MoreFiltersToggle } from "@/components/category-filter-fields";
-import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
-import { getCategoryIcon } from "@/lib/category-icons";
+import { ActiveFilters } from "@/components/active-filters";
+import type { ListingCardData } from "@/components/listing-card";
+import type { MapListing } from "@/components/listings-map";
+import { ResultList } from "@/components/result-list";
+import { DesktopFilterChips } from "@/components/desktop-filter-chips";
+import { NativeFilterChips } from "@/components/native-filter-chips";
+import { AttributeFilterChips } from "@/components/attribute-filter-chips";
+import { CategoryHero } from "@/components/category-hero";
 import { buildTree, descendants, pathFromAncestor, type Category } from "@/lib/categories";
 import {
-  applyAttributeFilters,
-  effectiveFiltersForCategory,
-  effectiveFiltersForCategories,
   normalizeFilter,
-  setAttributeFilterValue,
-  splitPrimaryFilters,
-  type AttributeFilterValue,
+  vehicleCategoryGroupFor,
+  genericBrandFilterFor,
 } from "@/lib/category-filters";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { ListingCard, type ListingCardData } from "@/components/listing-card";
-import { EmptyState } from "@/components/ui/empty-state";
+import { getCategoryBehavior } from "@/lib/category-behavior";
 import { SearchBar } from "@/components/search-bar";
-import type { LocationValue } from "@/components/location-filter";
+import { searchSchema, conditionEnum } from "@/features/listing-search/search-schema";
+import { useAnnonserSearchState } from "@/features/listing-search/use-annonser-search-state";
+import { useListingsQuery } from "@/features/listing-search/use-listings-query";
+import { useIsNative } from "@/hooks/use-is-native";
+
+type Search = z.infer<typeof searchSchema>;
 
 type Props = {
   /** This page's own URL-level category — a main category for /{slug}, or a
@@ -41,41 +42,46 @@ type Props = {
    * /{main}, but that name is already a path param on /{main}/{sub}, so that
    * route uses "sub2" instead. */
   subSlugParam: "sub" | "sub2";
-  /** Deep-linked filter values, e.g. from the homepage's category picker. */
-  initialFilters?: Record<string, AttributeFilterValue>;
-  initialPriceMin?: number;
-  initialPriceMax?: number;
+  /** Full /annonser-shaped search state for this route — the page shares the
+   * same schema and query logic as /annonser, only forcing the category. */
+  search: Search;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  navigate: (opts: { search: any }) => void;
 };
 
+/**
+ * Category landing page — renders the exact same filter row, active-filter
+ * chips and result list as /annonser (via useAnnonserSearchState/
+ * useListingsQuery/ResultList), scoped to this page's category, with a hero
+ * banner on top for quick sub-category drilldown and SEO copy.
+ */
 export function CategoryLandingPage({
   category,
   breadcrumb,
   subSlug,
   subSlugParam,
-  initialFilters,
-  initialPriceMin,
-  initialPriceMax,
+  search,
+  navigate,
 }: Props) {
-  const navigate = useNavigate();
-  const [q, setQ] = useState("");
-  const [location, setLocation] = useState<LocationValue>({
-    lat: null,
-    lng: null,
-    radius: 50,
-    label: "",
-  });
-  const [filterValues, setFilterValues] = useState<Record<string, AttributeFilterValue>>(
-    () => initialFilters ?? {},
-  );
-  const [priceMin, setPriceMin] = useState<number | undefined>(initialPriceMin);
-  const [priceMax, setPriceMax] = useState<number | undefined>(initialPriceMax);
+  const isNative = useIsNative();
+  const [qDraft, setQDraft] = useState(search.q);
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => setQDraft(search.q), [search.q]);
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 1024px)");
+    const update = () => setIsDesktop(mql.matches);
+    update();
+    mql.addEventListener("change", update);
+    return () => mql.removeEventListener("change", update);
+  }, []);
 
   const { data: categories } = useQuery({
     queryKey: ["categories", "with-color"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
-        .select("id, slug, name_nb, parent_id, icon, color")
+        .select("id, slug, name_nb, parent_id, icon, color, heading_font")
         .order("sort_order")
         .order("name_nb");
       if (error) throw error;
@@ -118,277 +124,249 @@ export function CategoryLandingPage({
   // away from this page's own URL — it only updates the search param.
   const selectCategory = (target: Category) => {
     navigate({
-      to: ".",
       search: (prev: Record<string, unknown>) => ({
         ...prev,
         [subSlugParam]: target.id === category.id ? undefined : target.slug,
       }),
-    } as never);
+    });
   };
 
-  // Reset filters when the scoped category changes (drilling in/out) — a
-  // filter configured for "Sofa" rarely makes sense once you're back on
-  // "Møbler" — but not on first mount, so a deep-linked `f`/`priceMin` still
-  // applies to the initial selection.
-  const isFirstRender = useRef(true);
-  useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
-    setFilterValues({});
-    setPriceMin(undefined);
-    setPriceMax(undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected.id]);
-
-  const categoryIds = useMemo(
-    () => [selected.id, ...descendants(selected, tree).map((c) => c.id)],
+  // The set of category slugs this page is scoped to — `selected` plus every
+  // descendant at any depth, so a hub category (e.g. "Møbler") still covers
+  // all its leaves ("Sofa", "Stol", ...), matching what this page showed
+  // before it shared /annonser's single-level-expansion query logic.
+  const scopedSlugs = useMemo(
+    () => [selected.slug, ...descendants(selected, tree).map((d) => d.slug)],
     [selected, tree],
   );
-  // While viewing a hub category (one with subcategories) without having
-  // drilled into a specific leaf, show the fields common to *every* leaf
-  // subcategory underneath it — e.g. "MC og moped" shows what's shared by
-  // Motorsykkel/Moped/ATV — rather than just fields defined on the hub
-  // itself. Drilling into a specific leaf then falls back to that leaf's own
-  // effective filters (which already includes everything inherited from
-  // here), so the field list only grows as you go deeper.
-  const filters = useMemo(() => {
-    const leaves = descendants(selected, tree).filter(
-      (d) => (tree.childrenByParent.get(d.id) ?? []).length === 0,
-    );
-    if (leaves.length > 0) {
-      return effectiveFiltersForCategories(
-        leaves.map((l) => l.id),
-        allFilters ?? [],
-        tree.byId,
-      );
-    }
-    return effectiveFiltersForCategory(selected.id, allFilters ?? [], tree.byId);
-  }, [selected, allFilters, tree]);
-  const { primary: primaryFilters, secondary: secondaryFilters } = useMemo(
-    () => splitPrimaryFilters(filters),
-    [filters],
-  );
-  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
 
-  const { data: listings, isLoading } = useQuery({
-    queryKey: ["category-listings", selected.id, filterValues, priceMin, priceMax],
+  const effectiveSearch: Search = useMemo(
+    () => ({ ...search, category: "", categories: scopedSlugs, catMode: "any" }),
+    [search, scopedSlugs],
+  );
+
+  const {
+    location,
+    effectiveCategories,
+    attrFilters,
+    attrValues,
+    handleAttrValueChange,
+    terms,
+    updateSearch,
+    handleLocationChange,
+    resetFilters,
+  } = useAnnonserSearchState({
+    search: effectiveSearch,
+    navigate,
+    categories: categories ?? undefined,
+    allFilters,
+    setQDraft,
+  });
+
+  // Merke/Modell selected in the attribute filters get appended as extra
+  // brødsmuler after the category chain, matching the ad-detail page's
+  // breadcrumb so the two page types read as one continuous path.
+  const extraSegments = useMemo(() => {
+    const attributes: Record<string, unknown> = {};
+    for (const [key, v] of Object.entries(attrValues)) {
+      if (v.kind === "text" || v.kind === "select") attributes[key] = v.value;
+    }
+    const vehicleGroup = vehicleCategoryGroupFor(selected.id, allFilters ?? [], tree.byId);
+    const genericBrandFilter = genericBrandFilterFor(selected.id, allFilters ?? [], tree.byId);
+    const rootCategorySlug = breadcrumb[0]?.slug ?? category.slug;
+    return getCategoryBehavior(vehicleGroup).extraBreadcrumbSegments(attributes, {
+      rootCategorySlug,
+      genericBrandFilter,
+    });
+  }, [attrValues, allFilters, tree, selected, breadcrumb, category]);
+
+  const { data: radiusIds } = useQuery({
+    queryKey: ["listings-radius", search.lat, search.lng, search.radius],
+    enabled: search.lat != null && search.lng != null,
     queryFn: async () => {
-      let qb = supabase
-        .from("listings")
-        .select(
-          "id, kaupet_code, title, subtitle, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order)",
-        )
-        .eq("status", "active")
-        .in("category_id", categoryIds);
-      qb = applyAttributeFilters(qb, filterValues);
-      if (typeof priceMin === "number") qb = qb.gte("price_nok", priceMin);
-      if (typeof priceMax === "number") qb = qb.lte("price_nok", priceMax);
-      const { data, error } = await qb.order("created_at", { ascending: false }).limit(48);
-      if (error) throw error;
-      return (data ?? []).map<ListingCardData>((l) => {
-        const imgs = (l.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
-        return {
-          id: l.id,
-          kaupet_code: l.kaupet_code,
-          title: l.title,
-          subtitle: l.subtitle,
-          price_nok: l.price_nok,
-          is_free: l.is_free,
-          city: l.city,
-          created_at: l.created_at,
-          cover_path: imgs[0]?.storage_path ?? null,
-        };
+      const { data, error } = await supabase.rpc("listings_within_radius", {
+        center_lat: search.lat!,
+        center_lng: search.lng!,
+        radius_km: search.radius ?? 10,
       });
+      if (error) throw error;
+      return (data ?? []).map((r: { id: string }) => r.id);
     },
   });
 
-  const Icon = getCategoryIcon(selected.icon ?? null);
-  // Only "hub" main categories carry a presentation color — always the first
-  // breadcrumb entry — so the page's tint stays put while drilling deeper.
-  const accent = breadcrumb[0]?.color ?? undefined;
+  const {
+    data: listingsData,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useListingsQuery({
+    search: effectiveSearch,
+    categories: categories ?? undefined,
+    effectiveCategories,
+    terms,
+    radiusIds,
+  });
 
-  const submitSearch = () => {
-    navigate({ to: "/annonser", search: { q, category: selected.slug, sort: "new" } });
-  };
+  const listings = useMemo(() => listingsData?.pages.flatMap((p) => p.rows), [listingsData]);
+  const totalCount = listingsData?.pages[0]?.totalCount ?? null;
+
+  const cards: ListingCardData[] = (listings ?? []).map((l) => ({
+    id: l.id,
+    kaupet_code: l.kaupet_code,
+    title: l.title,
+    subtitle: l.subtitle,
+    price_nok: l.price_nok,
+    is_free: l.is_free,
+    city: l.city,
+    created_at: l.created_at,
+    cover_path: l.cover_path,
+  }));
+
+  const mapListings: MapListing[] = (listings ?? [])
+    .filter((l): l is typeof l & { lat: number; lng: number } => l.lat != null && l.lng != null)
+    .map((l) => ({
+      id: l.id,
+      kaupet_code: l.kaupet_code,
+      title: l.title,
+      price_nok: l.price_nok,
+      is_free: l.is_free,
+      lat: l.lat,
+      lng: l.lng,
+      cover_path: l.cover_path,
+    }));
+
+  const mapCenter =
+    search.lat != null && search.lng != null ? { lat: search.lat, lng: search.lng } : null;
 
   return (
     <div>
-      <section
-        className="relative overflow-hidden"
-        style={accent ? { background: accent } : undefined}
-      >
-        <div className="absolute inset-0 bg-background/80" aria-hidden />
-        <div className="relative z-10 mx-auto max-w-6xl px-4 py-12">
-          <nav aria-label="Brødsmulesti" className="mb-4 flex flex-wrap items-center gap-1 text-sm">
-            <Link
-              to="/annonser"
-              search={{ q: "", category: "", sort: "new" }}
-              className="text-muted-foreground hover:text-foreground hover:underline"
-            >
-              Alle kategorier
-            </Link>
-            {breadcrumbEntries.map((c, i) => {
-              const isLast = i === breadcrumbEntries.length - 1;
-              // Entries before this page's own category are real ancestor
-              // pages with their own URL; the page's own category and any
-              // deeper `sub` selection just update the search param.
-              const isAboveOwnCategory = i < breadcrumb.length - 1;
-              return (
-                <span key={c.id} className="flex items-center gap-1">
-                  <ChevronRight className="size-3.5 text-muted-foreground" aria-hidden />
-                  {isLast ? (
-                    <span className="font-medium">{c.name_nb}</span>
-                  ) : isAboveOwnCategory ? (
-                    <Link
-                      to="/$kaupetCode"
-                      params={{ kaupetCode: c.slug }}
-                      className="text-muted-foreground hover:text-foreground hover:underline"
-                    >
-                      {c.name_nb}
-                    </Link>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => selectCategory(c)}
-                      className="text-muted-foreground hover:text-foreground hover:underline"
-                    >
-                      {c.name_nb}
-                    </button>
-                  )}
-                </span>
-              );
-            })}
-          </nav>
-          <div className="flex items-center gap-3">
-            <span
-              className="flex size-12 items-center justify-center rounded-full text-white"
-              style={{ background: accent ?? "var(--primary)" }}
-            >
-              <Icon className="size-6" />
-            </span>
-            <h1 className="font-display text-4xl tracking-tight">/{selected.name_nb}</h1>
-          </div>
-          {children.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-2">
-              {children.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => selectCategory(c)}
-                  className="rounded-full border border-border bg-card px-3 py-1.5 text-sm transition hover:border-primary hover:text-primary"
-                >
-                  {c.name_nb}
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="mt-5 max-w-2xl">
-            <SearchBar
-              q={q}
-              onQChange={setQ}
-              onSubmitQ={submitSearch}
+      {/* Entries before this page's own category are real ancestor pages with
+          their own URL; the page's own category and any deeper `sub`
+          selection just update the search param. */}
+      <CategoryHero
+        selected={selected}
+        main={breadcrumb[0]}
+        breadcrumbEntries={breadcrumbEntries}
+        extraSegments={extraSegments}
+        subcategories={children}
+        onSelectCategory={selectCategory}
+        linkUntilIndex={breadcrumb.length - 1}
+      />
+
+      <div className="mx-auto max-w-7xl px-4 py-8">
+        <div className="space-y-2">
+          <SearchBar
+            q={qDraft}
+            onQChange={setQDraft}
+            onSubmitQ={() => updateSearch({ q: qDraft })}
+            selectedSlugs={[]}
+            onSelectedChange={() => {}}
+            categories={categories ?? []}
+            hideCategory
+            qMode={search.qMode}
+            onQModeChange={(m) => updateSearch({ qMode: m })}
+            showQMode={false}
+          />
+          {isNative ? (
+            <NativeFilterChips
+              sort={search.sort}
+              onSortChange={(s) => updateSearch({ sort: s })}
+              min={search.min}
+              max={search.max}
+              includeFree={search.includeFree ?? true}
+              onPriceChange={(mn, mx, free) =>
+                updateSearch({ min: mn, max: mx, includeFree: free })
+              }
+              conditions={search.conditions ?? []}
+              onConditionsChange={(c) =>
+                updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
+              }
               location={location}
-              onLocationChange={setLocation}
-              selectedSlugs={[]}
-              onSelectedChange={() => {}}
-              categories={categories ?? []}
-              hideCategory
-              qMode="all"
-              onQModeChange={() => {}}
-            />
-          </div>
-        </div>
-      </section>
-
-      <div className="mx-auto max-w-6xl gap-8 px-4 py-8 md:grid md:grid-cols-[240px_1fr]">
-        <aside className="mb-6 space-y-5 md:mb-0">
-          <p className="text-sm font-medium">Filtrer</p>
-          <div className="space-y-2">
-            <Label>Pris (kr)</Label>
-            <div className="flex items-center gap-2">
-              <Input
-                type="number"
-                placeholder="Fra"
-                value={priceMin ?? ""}
-                onChange={(e) =>
-                  setPriceMin(e.target.value === "" ? undefined : Number(e.target.value))
-                }
-              />
-              <Input
-                type="number"
-                placeholder="Til"
-                value={priceMax ?? ""}
-                onChange={(e) =>
-                  setPriceMax(e.target.value === "" ? undefined : Number(e.target.value))
-                }
-              />
-            </div>
-          </div>
-          {filters.length > 0 && (
-            <>
-              <CategoryFilterFields
-                filters={primaryFilters}
-                values={filterValues}
-                onChange={(key, v) =>
-                  setFilterValues((prev) => setAttributeFilterValue(prev, key, v))
-                }
-              />
-              {secondaryFilters.length > 0 && (
-                <Collapsible open={moreFiltersOpen} onOpenChange={setMoreFiltersOpen}>
-                  <MoreFiltersToggle open={moreFiltersOpen} />
-                  <CollapsibleContent className="space-y-4 pt-4 data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:slide-in-from-top-2 data-[state=closed]:animate-out data-[state=closed]:fade-out">
-                    <CategoryFilterFields
-                      filters={secondaryFilters}
-                      values={filterValues}
-                      onChange={(key, v) =>
-                        setFilterValues((prev) => setAttributeFilterValue(prev, key, v))
-                      }
-                    />
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
-            </>
-          )}
-          {(Object.keys(filterValues).length > 0 ||
-            priceMin !== undefined ||
-            priceMax !== undefined) && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setFilterValues({});
-                setPriceMin(undefined);
-                setPriceMax(undefined);
-              }}
-            >
-              Nullstill filtre
-            </Button>
-          )}
-        </aside>
-
-        <div>
-          {isLoading ? (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-muted" />
-              ))}
-            </div>
-          ) : (listings ?? []).length === 0 ? (
-            <EmptyState
-              icon={PackageSearch}
-              title="Ingen annonser i denne kategorien ennå"
-              description="Prøv å justere filtrene, eller kom tilbake senere."
+              onLocationChange={handleLocationChange}
+              resultCount={totalCount ?? cards.length}
+              onOpenAdvanced={() => {}}
+              advancedFilterCount={0}
             />
           ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {(listings ?? []).map((l) => (
-                <ListingCard key={l.id} listing={l} />
-              ))}
-            </div>
+            <DesktopFilterChips
+              sort={search.sort}
+              onSortChange={(s) => updateSearch({ sort: s })}
+              min={search.min}
+              max={search.max}
+              includeFree={search.includeFree ?? true}
+              onPriceChange={(mn, mx, free) =>
+                updateSearch({ min: mn, max: mx, includeFree: free })
+              }
+              conditions={search.conditions ?? []}
+              onConditionsChange={(c) =>
+                updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
+              }
+              qMode={search.qMode}
+              onQModeChange={(m) => updateSearch({ qMode: m })}
+              extraGroups={search.extraGroups ?? []}
+              onExtraGroupsChange={(extraGroups) => updateSearch({ extraGroups })}
+            />
           )}
+
+          {/* Category-dependent filter row: primary fields stay visible, the
+              rest sit behind "Se flere filter". */}
+          <AttributeFilterChips
+            filters={attrFilters}
+            values={attrValues}
+            onChange={handleAttrValueChange}
+            isNative={isNative}
+            resultCount={totalCount ?? cards.length}
+          />
         </div>
+
+        <ActiveFilters
+          search={search}
+          terms={terms}
+          onUpdate={(patch) => updateSearch(patch)}
+          attrFilters={attrFilters}
+          attrValues={attrValues}
+          location={location}
+          onRemoveLocation={() =>
+            updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
+          }
+          onRemoveAttr={(key, value) => {
+            const current = attrValues[key];
+            if (value !== undefined && current?.kind === "multiselect") {
+              const next = current.values.filter((v) => v !== value);
+              handleAttrValueChange(
+                key,
+                next.length > 0 ? { kind: "multiselect", values: next } : undefined,
+              );
+              return;
+            }
+            handleAttrValueChange(key, undefined);
+          }}
+        />
+
+        <ResultList
+          isNative={isNative}
+          isDesktop={isDesktop}
+          q={search.q}
+          effectiveCategories={[selected.slug]}
+          cards={cards}
+          totalCount={totalCount}
+          isLoading={isLoading}
+          hasNextPage={!!hasNextPage}
+          isFetchingNextPage={isFetchingNextPage}
+          fetchNextPage={() => void fetchNextPage()}
+          resetFilters={resetFilters}
+          mapListings={mapListings}
+          mapCenter={mapCenter}
+          radiusKm={search.radius ?? 10}
+          onMapCenterChange={(c, label) =>
+            updateSearch({ lat: c.lat, lng: c.lng, loc: label ?? "" })
+          }
+          onMapRadiusChange={(km) => updateSearch({ radius: km })}
+          onMapClearLocation={() =>
+            updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
+          }
+        />
       </div>
     </div>
   );

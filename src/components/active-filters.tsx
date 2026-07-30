@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "re
 import { X } from "lucide-react";
 
 import { TermGroupChips } from "@/components/term-group-editor";
+import type { LocationValue } from "@/components/location-filter";
 import type { TermGroup } from "@/lib/term-groups";
 import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
 
@@ -20,6 +21,11 @@ type Props = {
   attrFilters?: CategoryFilter[];
   attrValues?: Record<string, AttributeFilterValue>;
   onRemoveAttr?: (key: string, value?: string) => void;
+  /** Location/radius filter set via the map — shown as its own removable
+   * label since it has no always-visible pill of its own (it lives inside
+   * the map section, not the filter-chip row). */
+  location?: LocationValue;
+  onRemoveLocation?: () => void;
 };
 
 function describeAttrValue(filter: CategoryFilter, value: AttributeFilterValue): string {
@@ -58,10 +64,14 @@ export function ActiveFilters({
   attrFilters = [],
   attrValues = {},
   onRemoveAttr,
+  location,
+  onRemoveLocation,
 }: Props) {
   const hasLine1 = terms.length > 0;
   const attrEntries = Object.entries(attrValues);
-  const hasAnyFilter = hasLine1 || search.extraGroups.length > 0 || attrEntries.length > 0;
+  const hasLocation = location?.lat != null && location?.lng != null;
+  const hasAnyFilter =
+    hasLine1 || search.extraGroups.length > 0 || attrEntries.length > 0 || hasLocation;
 
   const [collapsed, setCollapsed] = useState(true);
   const [overflowStart, setOverflowStart] = useState<number | null>(null);
@@ -81,6 +91,18 @@ export function ActiveFilters({
 
   const allItems: { key: string; node: ReactNode }[] = [];
 
+  if (hasLocation && location) {
+    allItems.push({
+      key: "__location__",
+      node: (
+        <AttrChip
+          key="__location__"
+          label={`${location.label || "Valgt sted"} · ${location.radius} km`}
+          onRemove={() => onRemoveLocation?.()}
+        />
+      ),
+    });
+  }
   if (hasLine1) {
     allItems.push({
       key: "__q__",
@@ -200,6 +222,7 @@ export function ActiveFilters({
           onClick={() => {
             onUpdate({ q: "", extraGroups: [] });
             for (const key of Object.keys(attrValues)) onRemoveAttr?.(key);
+            if (hasLocation) onRemoveLocation?.();
           }}
           className="ml-auto text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
         >

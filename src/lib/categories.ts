@@ -98,11 +98,12 @@ export function pathFromAncestor(
  *
  * `selected` is the category shown in the title and whose children become the
  * subcategory chips; `main` carries the presentation color, so the tint stays
- * put while the user drills deeper. When the selection narrows to one
- * category (or its full subtree), `selected` drills down to it so the title
- * gets specific. If the selection instead spans multiple sibling branches
- * without their shared parent also selected, there is no single category to
- * name the title after, so this returns null.
+ * put while the user drills deeper. `selected` is the deepest category that is
+ * an ancestor of (or equal to) every selected category — i.e. their lowest
+ * common ancestor — so narrowing to one category (or its full subtree) drills
+ * the title down to it, while selecting several sibling branches at once
+ * (e.g. multi-selecting subcategory chips under the same main category) falls
+ * back to the closest shared ancestor instead of returning null.
  */
 export function resolveHeroCategory(
   selectedSlugs: string[],
@@ -121,14 +122,18 @@ export function resolveHeroCategory(
   if (main.parent_id != null || !main.color) return null;
   if (paths.some((p) => p[0].id !== main.id)) return null;
 
-  // The shallowest selected category — every other selection has to be it or
-  // one of its descendants for the branch to be unambiguous.
-  const shallowest = paths.reduce((a, b) => (b.length < a.length ? b : a));
-  const candidate = shallowest[shallowest.length - 1];
-  const allowed = new Set([candidate.id, ...descendants(candidate, tree).map((d) => d.id)]);
-  const fitsCandidate = paths.every((p) => allowed.has(p[p.length - 1].id));
+  // Longest common prefix across every selected category's breadcrumb path —
+  // its last entry is their lowest common ancestor, which is always at least
+  // `main` since every path starts there.
+  let common = paths[0];
+  for (const p of paths.slice(1)) {
+    const len = Math.min(common.length, p.length);
+    let i = 0;
+    while (i < len && common[i].id === p[i].id) i++;
+    common = common.slice(0, i);
+  }
+  const candidate = common[common.length - 1];
 
-  if (!fitsCandidate) return null;
   return { selected: candidate, main };
 }
 

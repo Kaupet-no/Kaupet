@@ -11,8 +11,14 @@ import {
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Link } from "@tanstack/react-router";
-import { Button } from "@/components/ui/button";
+import { MapPin, Search as SearchIcon, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
 import { signListingImageUrls } from "@/lib/storage";
+
+const EARTH_RADIUS_KM = 6371;
+
+type GeocodeResult = { place_id: number; display_name: string; lat: string; lon: string };
 
 const centerIcon = L.divIcon({
   className: "",
@@ -20,6 +26,40 @@ const centerIcon = L.divIcon({
   iconSize: [18, 18],
   iconAnchor: [9, 9],
 });
+
+// Kryss for å fjerne radius-filteret, plassert rett utenfor sirkelkanten
+// (se clearIconPosition) slik at det ikke havner oppå senter-markøren eller
+// annonse-merkene som kan ligge midt i sirkelen. Skjult til brukeren hovrer
+// over kartet (ren CSS via den omkringliggende ".group"-diven — Leaflets lag
+// havner i DOM-treet under den, så group-hover fungerer selv om ikonet er
+// statisk HTML), men alltid synlig på touch-enheter siden de ikke har hover.
+function makeClearIcon(alwaysVisible: boolean) {
+  return L.divIcon({
+    className: "",
+    html: `<div class="${
+      alwaysVisible ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+    } transition-opacity" style="width:22px;height:22px;border-radius:9999px;background:white;border:1.5px solid var(--primary);box-shadow:0 2px 8px hsl(0 0% 0% / 0.28);display:flex;align-items:center;justify-content:center;cursor:pointer;">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+    </div>`,
+    iconSize: [22, 22],
+    // Bunn-midt anker: ikonet tegnes rett over det geografiske punktet
+    // (toppen av sirkelen), med litt luft ut over kanten.
+    iconAnchor: [11, 28],
+  });
+}
+
+// Punktet rett nord for senter, på selve sirkelkanten (radiusKm unna) — der
+// kryss-ikonet plasseres slik at det ikke overlapper senter-markøren eller
+// annonser inni sirkelen.
+function clearIconPosition(
+  center: { lat: number; lng: number },
+  radiusKm: number,
+): { lat: number; lng: number } {
+  return {
+    lat: center.lat + (radiusKm / EARTH_RADIUS_KM) * (180 / Math.PI),
+    lng: center.lng,
+  };
+}
 
 export type MapListing = {
   id: string;
@@ -41,7 +81,8 @@ type Props = {
   onMarkerHover?: (id: string | null) => void;
   onMarkerSelect?: (id: string | null) => void;
   onCenterChange?: (c: { lat: number; lng: number }) => void;
-  onAreaSearch?: (c: { lat: number; lng: number }) => void;
+  onRadiusChange?: (km: number) => void;
+  onClearLocation?: () => void;
   className?: string;
 };
 
@@ -88,20 +129,58 @@ function CenterUpdater({
     const key = `${center.lat.toFixed(5)},${center.lng.toFixed(5)},${radiusKm}`;
     if (key === last.current) return;
     last.current = key;
-    // Tilpass kartet slik at hele radius-sirkelen synes med litt luft rundt.
+    // Tilpass kartet slik at hele radius-sirkelen synes med litt luft rundt,
+    // men bare hvis sirkelen faktisk faller utenfor gjeldende synsfelt — unngår
+    // at kartet hopper rundt for hver tick mens brukeren drar radius-slideren.
     const bounds = L.latLng(center.lat, center.lng).toBounds(radiusKm * 1000 * 2.2);
+    if (map.getBounds().contains(bounds)) return;
     map.fitBounds(bounds, { animate: true, padding: [20, 20] });
   }, [center, radiusKm, map]);
   return null;
 }
 
-function ClickHandler({ onClick }: { onClick?: (c: { lat: number; lng: number }) => void }) {
+function ClickHandler({
+  onClick,
+  disabled,
+}: {
+  onClick?: (c: { lat: number; lng: number }) => void;
+  disabled?: boolean;
+}) {
   useMapEvents({
     click(e) {
+      if (disabled) return;
       onClick?.({ lat: e.latlng.lat, lng: e.latlng.lng });
     },
   });
   return null;
+}
+
+function HoverRadiusPreview({ radiusKm }: { radiusKm: number }) {
+  const [pos, setPos] = useState<{ lat: number; lng: number } | null>(null);
+  useMapEvents({
+    mousemove(e) {
+      setPos({ lat: e.latlng.lat, lng: e.latlng.lng });
+    },
+    mouseout() {
+      setPos(null);
+    },
+  });
+  if (!pos) return null;
+  return (
+    <Circle
+      center={[pos.lat, pos.lng]}
+      radius={radiusKm * 1000}
+      pathOptions={{
+        color: "hsl(var(--primary))",
+        fillColor: "hsl(var(--primary))",
+        fillOpacity: 0.04,
+        weight: 1.5,
+        opacity: 0.4,
+        dashArray: "4 4",
+      }}
+      interactive={false}
+    />
+  );
 }
 
 function distanceMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
@@ -115,25 +194,31 @@ function distanceMeters(a: { lat: number; lng: number }, b: { lat: number; lng: 
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-function AreaSearchTracker({
-  center,
-  onShow,
+function ZoomRadiusSync({
+  active,
+  onDefaultRadius,
 }: {
-  center: { lat: number; lng: number } | null;
-  onShow: (c: { lat: number; lng: number } | null) => void;
+  active: boolean;
+  onDefaultRadius: (km: number) => void;
 }) {
+  const sync = (m: L.Map) => {
+    const bounds = m.getBounds();
+    const center = m.getCenter();
+    const widthMeters = distanceMeters(
+      { lat: center.lat, lng: bounds.getWest() },
+      { lat: center.lat, lng: bounds.getEast() },
+    );
+    const km = Math.round(widthMeters / 1000 / 4);
+    onDefaultRadius(Math.min(100, Math.max(1, km)));
+  };
   const map = useMapEvents({
-    moveend: () => {
-      const c = map.getCenter();
-      if (!center) {
-        onShow({ lat: c.lat, lng: c.lng });
-        return;
-      }
-      const d = distanceMeters({ lat: c.lat, lng: c.lng }, center);
-      if (d > 500) onShow({ lat: c.lat, lng: c.lng });
-      else onShow(null);
-    },
+    zoomend: () => active && sync(map),
+    moveend: () => active && sync(map),
   });
+  useEffect(() => {
+    if (active) sync(map);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
   return null;
 }
 
@@ -148,15 +233,79 @@ export function ListingsMap({
   onMarkerHover,
   onMarkerSelect,
   onCenterChange,
-  onAreaSearch,
+  onRadiusChange,
+  onClearLocation,
   className,
 }: Props) {
   const initial = center ?? NORWAY_CENTER;
   const zoom = center ? 11 : 5;
-  const [areaCenter, setAreaCenter] = useState<{ lat: number; lng: number } | null>(null);
+  const [previewRadiusKm, setPreviewRadiusKm] = useState(radiusKm);
+  const [radiusManuallySet, setRadiusManuallySet] = useState(false);
+  const [isSliderInteracting, setIsSliderInteracting] = useState(false);
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+  const [locQuery, setLocQuery] = useState("");
+  const [locResults, setLocResults] = useState<GeocodeResult[]>([]);
+  const [locLoading, setLocLoading] = useState(false);
+  const locDebounce = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    // Når et filter allerede er aktivt (eller brukeren har justert slideren
+    // selv), er radiusKm-propen fasit. Før noe filter er satt følger radiusen
+    // i stedet dynamisk kartets zoom (se ZoomRadiusSync), så vi skal ikke
+    // overskrive den med en statisk standardverdi her.
+    if (center || radiusManuallySet) setPreviewRadiusKm(radiusKm);
+  }, [radiusKm, center, radiusManuallySet]);
+
+  useEffect(() => {
+    setIsTouchDevice(window.matchMedia("(hover: none)").matches);
+  }, []);
+
+  const clearIcon = useMemo(() => makeClearIcon(isTouchDevice), [isTouchDevice]);
+
+  const handleClear = () => {
+    onClearLocation?.();
+    setRadiusManuallySet(false);
+  };
+
+  const commitCenter = (c: { lat: number; lng: number }) => {
+    onCenterChange?.(c);
+    if (previewRadiusKm !== radiusKm) onRadiusChange?.(previewRadiusKm);
+  };
+
+  useEffect(() => {
+    if (locQuery.trim().length < 2) {
+      setLocResults([]);
+      return;
+    }
+    window.clearTimeout(locDebounce.current);
+    locDebounce.current = window.setTimeout(async () => {
+      setLocLoading(true);
+      try {
+        const url = new URL("https://nominatim.openstreetmap.org/search");
+        url.searchParams.set("q", locQuery);
+        url.searchParams.set("format", "json");
+        url.searchParams.set("countrycodes", "no");
+        url.searchParams.set("limit", "6");
+        url.searchParams.set("addressdetails", "0");
+        const res = await fetch(url.toString(), { headers: { "Accept-Language": "nb" } });
+        if (res.ok) setLocResults(await res.json());
+      } catch {
+        // ignore
+      } finally {
+        setLocLoading(false);
+      }
+    }, 350);
+    return () => window.clearTimeout(locDebounce.current);
+  }, [locQuery]);
+
+  const pickLocResult = (r: GeocodeResult) => {
+    commitCenter({ lat: parseFloat(r.lat), lng: parseFloat(r.lon) });
+    setLocQuery("");
+    setLocResults([]);
+  };
 
   return (
-    <div className={`relative ${className ?? ""}`}>
+    <div className={`group relative ${className ?? ""}`}>
       <MapContainer
         center={[initial.lat, initial.lng]}
         zoom={zoom}
@@ -170,8 +319,12 @@ export function ListingsMap({
           subdomains="abcd"
         />
         <CenterUpdater center={center} radiusKm={radiusKm} />
-        <ClickHandler onClick={onCenterChange} />
-        {onAreaSearch && <AreaSearchTracker center={center} onShow={setAreaCenter} />}
+        <ClickHandler onClick={commitCenter} />
+        <ZoomRadiusSync
+          active={!center && !radiusManuallySet}
+          onDefaultRadius={setPreviewRadiusKm}
+        />
+        {!center && <HoverRadiusPreview radiusKm={previewRadiusKm} />}
         {center && (
           <>
             <Circle
@@ -197,6 +350,21 @@ export function ListingsMap({
                 },
               }}
             />
+            {onClearLocation && (
+              <Marker
+                position={[
+                  clearIconPosition(center, radiusKm).lat,
+                  clearIconPosition(center, radiusKm).lng,
+                ]}
+                icon={clearIcon}
+                eventHandlers={{
+                  click: (e) => {
+                    L.DomEvent.stop(e);
+                    handleClear();
+                  },
+                }}
+              />
+            )}
           </>
         )}
         {listings.map((l) => (
@@ -210,19 +378,96 @@ export function ListingsMap({
           />
         ))}
       </MapContainer>
-      {onAreaSearch && areaCenter && (
-        <div className="pointer-events-none absolute inset-x-0 top-3 z-[400] flex justify-center">
-          <Button
-            type="button"
-            size="sm"
-            className="pointer-events-auto rounded-full shadow-lg"
-            onClick={() => {
-              onAreaSearch(areaCenter);
-              setAreaCenter(null);
-            }}
+      {onRadiusChange && (
+        <div className="absolute left-3 top-3 z-[400]">
+          <div
+            className={`rounded-2xl border border-border bg-card/95 shadow-lg backdrop-blur transition-all ${
+              isTouchDevice || isSliderInteracting
+                ? "w-56 p-3"
+                : "w-9 p-2 group-hover:w-56 group-hover:p-3"
+            } overflow-hidden`}
           >
-            Søk i dette området
-          </Button>
+            <div
+              className={`flex items-center gap-2 ${
+                isTouchDevice || isSliderInteracting ? "" : "group-hover:hidden"
+              }`}
+            >
+              <MapPin className="size-5 shrink-0 text-muted-foreground" />
+            </div>
+            <div
+              className={`space-y-2 ${
+                isTouchDevice || isSliderInteracting ? "" : "hidden group-hover:block"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-muted-foreground">Radius</span>
+                <div className="flex items-center gap-1">
+                  <span className="font-display text-sm">{previewRadiusKm} km</span>
+                  {center && onClearLocation && (
+                    <button
+                      type="button"
+                      onClick={handleClear}
+                      className="rounded-full p-0.5 text-muted-foreground hover:bg-muted"
+                      aria-label="Fjern radius-filter"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <Slider
+                value={[previewRadiusKm]}
+                min={1}
+                max={100}
+                step={1}
+                onValueChange={([v]) => {
+                  setPreviewRadiusKm(v);
+                  setRadiusManuallySet(true);
+                }}
+                onPointerDown={() => setIsSliderInteracting(true)}
+                onValueCommit={([v]) => {
+                  setIsSliderInteracting(false);
+                  setPreviewRadiusKm(v);
+                  setRadiusManuallySet(true);
+                  if (center) onRadiusChange(v);
+                }}
+                aria-label="Søkeradius i kilometer"
+              />
+              <div className="relative">
+                <SearchIcon className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={locQuery}
+                  onChange={(e) => setLocQuery(e.target.value)}
+                  placeholder="Stedsnavn eller postnummer"
+                  className="h-8 pl-7 text-xs"
+                  aria-label="Søk etter sted eller postnummer"
+                />
+              </div>
+            </div>
+          </div>
+          {(isTouchDevice || isSliderInteracting || locQuery.length >= 2) && (
+            <div
+              className={`absolute left-0 top-full mt-1 w-56 overflow-hidden rounded-xl border border-border bg-card shadow-lg ${
+                isTouchDevice || isSliderInteracting ? "" : "hidden group-hover:block"
+              }`}
+            >
+              {locLoading && <div className="px-2 py-2 text-xs text-muted-foreground">Søker…</div>}
+              {!locLoading && locResults.length === 0 && locQuery.trim().length >= 2 && (
+                <div className="px-2 py-2 text-xs text-muted-foreground">Ingen treff</div>
+              )}
+              {locResults.map((r) => (
+                <button
+                  key={r.place_id}
+                  type="button"
+                  onClick={() => pickLocResult(r)}
+                  className="flex w-full items-start gap-2 px-2 py-2 text-left text-xs hover:bg-muted"
+                >
+                  <MapPin className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+                  <span className="line-clamp-2">{r.display_name}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

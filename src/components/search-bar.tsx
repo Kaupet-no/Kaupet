@@ -4,15 +4,11 @@ import {
   ChevronLeft,
   ChevronRight,
   FolderOpen,
-  MapPin,
   Search as SearchIcon,
-  SlidersHorizontal,
-  X,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/location-filter";
 import { ModeToggle } from "@/components/search-term-mode-toggle";
 import {
   buildTree,
@@ -29,8 +25,6 @@ type Props = {
   q: string;
   onQChange: (v: string) => void;
   onSubmitQ: () => void;
-  location: LocationValue;
-  onLocationChange: (v: LocationValue) => void;
   selectedSlugs: string[];
   onSelectedChange: (slugs: string[]) => void;
   categories: Category[];
@@ -38,7 +32,6 @@ type Props = {
    * has its own, more capable category picker) is open, to avoid showing
    * two different category UIs at once. */
   hideCategory?: boolean;
-  hideLocation?: boolean;
   qMode: "all" | "any";
   onQModeChange: (v: "all" | "any") => void;
   /** Show the "Alle ord"/"Minst ett"-toggle for the "Hva" field — only
@@ -51,26 +44,20 @@ export function SearchBar({
   q,
   onQChange,
   onSubmitQ,
-  location,
-  onLocationChange,
   selectedSlugs,
   onSelectedChange,
   categories,
   hideCategory = false,
-  hideLocation = false,
   qMode,
   onQModeChange,
   showQMode = false,
 }: Props) {
-  const [locOpen, setLocOpen] = useState(false);
-  const [radiusOpen, setRadiusOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
   const [drillParentId, setDrillParentId] = useState<string | null>(null);
   const [qFocused, setQFocused] = useState(false);
   const suggestionRef = useRef<HTMLButtonElement>(null);
 
   const tree = useMemo(() => buildTree(categories), [categories]);
-  const hasLocation = location.lat != null && location.lng != null;
   const label = categoryLabel(selectedSlugs, tree);
   const hasCategory = selectedSlugs.length > 0;
 
@@ -159,66 +146,6 @@ export function SearchBar({
                 labels={["Alle ord", "Minst ett"]}
               />
             </div>
-          )}
-
-          {!hideLocation && (
-            <>
-              <Divider />
-
-              {/* Hvor */}
-              <Popover open={locOpen} onOpenChange={setLocOpen}>
-                <PopoverTrigger asChild>
-                  <BarButton active={hasLocation}>
-                    <MapPin className="size-4" />
-                    <span className="truncate">{location.label || "Hvor som helst"}</span>
-                    {hasLocation && (
-                      <span
-                        role="button"
-                        tabIndex={0}
-                        className="ml-1 rounded-full p-0.5 hover:bg-muted"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onLocationChange({
-                            lat: null,
-                            lng: null,
-                            radius: location.radius,
-                            label: "",
-                          });
-                        }}
-                        aria-label="Fjern lokasjon"
-                      >
-                        <X className="size-3.5" />
-                      </span>
-                    )}
-                  </BarButton>
-                </PopoverTrigger>
-                <PopoverContent align="start" className="p-2">
-                  <LocationPicker
-                    value={location}
-                    onChange={onLocationChange}
-                    onDone={() => setLocOpen(false)}
-                  />
-                </PopoverContent>
-              </Popover>
-
-              <Divider />
-
-              {/* Radius */}
-              <Popover open={radiusOpen} onOpenChange={setRadiusOpen}>
-                <PopoverTrigger asChild>
-                  <BarButton disabled={!hasLocation} active={hasLocation}>
-                    <SlidersHorizontal className="size-4" />
-                    <span>{hasLocation ? `${location.radius} km` : "Radius"}</span>
-                  </BarButton>
-                </PopoverTrigger>
-                <PopoverContent align="start" className="p-1">
-                  <RadiusPicker
-                    value={location.radius}
-                    onChange={(r) => onLocationChange({ ...location, radius: r })}
-                  />
-                </PopoverContent>
-              </Popover>
-            </>
           )}
 
           {!hideCategory && (

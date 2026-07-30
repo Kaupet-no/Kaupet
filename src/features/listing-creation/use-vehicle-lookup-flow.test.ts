@@ -239,6 +239,50 @@ describe("useVehicleLookupFlow", () => {
     expect(goNext).toHaveBeenCalled();
   });
 
+  it("confirmVehicleData stores both the exact first-registration date and the searchable year", async () => {
+    window.scrollTo = vi.fn();
+    lookupVehicleByRegNumberMock.mockResolvedValue({
+      lookup: { ...lookupResult, first_registration_date: "2018-05-14" },
+      previousClassificationMismatch: null,
+    });
+    const setAttributes = vi.fn();
+    const { result } = renderHook(() => useVehicleLookupFlow(makeParams({ setAttributes })));
+    await act(() => result.current.runVehicleLookup("EK12345"));
+
+    act(() => result.current.confirmVehicleData(CAR_CATEGORY_ID));
+
+    expect(setAttributes).toHaveBeenCalledWith(
+      expect.objectContaining({
+        first_registration_date: "2018-05-14",
+        first_registration_year: 2018,
+      }),
+    );
+  });
+
+  it("confirmVehicleData derives the year from an edited first-registration date", async () => {
+    window.scrollTo = vi.fn();
+    lookupVehicleByRegNumberMock.mockResolvedValue({
+      lookup: { ...lookupResult, first_registration_date: "2018-05-14" },
+      previousClassificationMismatch: null,
+    });
+    const setAttributes = vi.fn();
+    const { result } = renderHook(() => useVehicleLookupFlow(makeParams({ setAttributes })));
+    await act(() => result.current.runVehicleLookup("EK12345"));
+
+    act(() =>
+      result.current.confirmVehicleData(CAR_CATEGORY_ID, {
+        specOverrides: { first_registration_date: "2021-01-02" },
+      }),
+    );
+
+    expect(setAttributes).toHaveBeenCalledWith(
+      expect.objectContaining({
+        first_registration_date: "2021-01-02",
+        first_registration_year: 2021,
+      }),
+    );
+  });
+
   it("adjustVehicleRegistrationNumber and resetLookupOnReturnToRegistration both clear the lookup state", async () => {
     lookupVehicleByRegNumberMock.mockResolvedValue({
       lookup: lookupResult,

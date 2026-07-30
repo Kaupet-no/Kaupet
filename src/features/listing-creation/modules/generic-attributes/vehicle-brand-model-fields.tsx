@@ -12,6 +12,59 @@ import {
 import { useAllVehicleBrands, useAllVehicleModels } from "@/lib/vehicle/vehicle-brands";
 import type { VehicleBrandGroup } from "@/lib/category-filters";
 
+/** One option in a brand/model dropdown. `label` differs from `value` only for
+ * a not-yet-approved value, which is suffixed "(venter godkjenning)". */
+export type VehicleOption = { value: string; label: string };
+
+/**
+ * The brand options for a category group. A brand added via the Statens
+ * vegvesen import isn't approved yet and so is missing from the reference
+ * table — without re-adding it the selected value would vanish from the
+ * control instead of showing what the user just confirmed.
+ */
+export function useVehicleBrandOptions(
+  categoryGroup: VehicleBrandGroup,
+  value: string | undefined,
+): VehicleOption[] {
+  const { data: allBrands } = useAllVehicleBrands();
+  return useMemo(() => {
+    const brands = (allBrands ?? []).filter((b) => b.category_group === categoryGroup);
+    const options = brands.map((b) => ({ value: b.name, label: b.name }));
+    if (value && !brands.some((b) => b.name === value)) {
+      options.unshift({ value, label: `${value} (venter godkjenning)` });
+    }
+    return options;
+  }, [allBrands, categoryGroup, value]);
+}
+
+/** The model options for a brand. `brandKnown` is false until a brand the
+ * reference table recognizes is picked, which is when a model can be chosen. */
+export function useVehicleModelOptions(
+  categoryGroup: VehicleBrandGroup,
+  brandName: string | undefined,
+  value: string | undefined,
+): { options: VehicleOption[]; brandKnown: boolean } {
+  const { data: allBrands } = useAllVehicleBrands();
+  const { data: allModels } = useAllVehicleModels();
+
+  const brandId = useMemo(
+    () => allBrands?.find((b) => b.category_group === categoryGroup && b.name === brandName)?.id,
+    [allBrands, categoryGroup, brandName],
+  );
+
+  const options = useMemo(() => {
+    const models = (allModels ?? []).filter((m) => m.brand_id === brandId);
+    const opts = models.map((m) => ({ value: m.name, label: m.name }));
+    // Same reasoning as for brands: a just-imported model isn't approved yet.
+    if (value && !models.some((m) => m.name === value)) {
+      opts.unshift({ value, label: `${value} (venter godkjenning)` });
+    }
+    return opts;
+  }, [allModels, brandId, value]);
+
+  return { options, brandKnown: !!brandId };
+}
+
 /**
  * Koblede merke/modell-nedtrekksmenyer: et merke har mange modeller, en
  * modell har ett merke. Ingen fritekst — bruker kan kun velge fra
@@ -31,15 +84,7 @@ export function VehicleBrandField({
   required?: boolean;
   error?: string;
 }) {
-  const { data: allBrands } = useAllVehicleBrands();
-  const brands = useMemo(
-    () => (allBrands ?? []).filter((b) => b.category_group === categoryGroup),
-    [allBrands, categoryGroup],
-  );
-  // Et nylig lagt til merke er ikke godkjent ennå og finnes derfor ikke i
-  // `brands` — uten dette forsvinner valgt verdi sporløst fra den synlige
-  // kontrollen (viser tom boks i stedet for merket brukeren nettopp bekreftet).
-  const hasPendingValue = !!value && !brands.some((b) => b.name === value);
+  const options = useVehicleBrandOptions(categoryGroup, value);
 
   return (
     <div className="space-y-2">
@@ -49,10 +94,9 @@ export function VehicleBrandField({
           <SelectValue placeholder="Velg merke…" />
         </SelectTrigger>
         <SelectContent>
-          {hasPendingValue && <SelectItem value={value!}>{value} (venter godkjenning)</SelectItem>}
-          {brands.map((b) => (
-            <SelectItem key={b.id} value={b.name}>
-              {b.name}
+          {options.map((o) => (
+            <SelectItem key={o.value} value={o.value}>
+              {o.label}
             </SelectItem>
           ))}
         </SelectContent>
@@ -80,20 +124,7 @@ export function VehicleModelField({
   /** Henger-kategorien: Vegvesenet har ofte kun produsent, ikke modell. */
   freeText?: boolean;
 }) {
-  const { data: allBrands } = useAllVehicleBrands();
-  const { data: allModels } = useAllVehicleModels();
-
-  const brandId = useMemo(
-    () => allBrands?.find((b) => b.category_group === categoryGroup && b.name === brandName)?.id,
-    [allBrands, categoryGroup, brandName],
-  );
-  const models = useMemo(
-    () => (allModels ?? []).filter((m) => m.brand_id === brandId),
-    [allModels, brandId],
-  );
-  // Samme resonnement som for merke: en nylig lagt til modell er ikke
-  // godkjent ennå og finnes derfor ikke i `models`.
-  const hasPendingValue = !!value && !models.some((m) => m.name === value);
+  const { options, brandKnown } = useVehicleModelOptions(categoryGroup, brandName, value);
 
   if (freeText) {
     return (
@@ -115,16 +146,15 @@ export function VehicleModelField({
       <Select
         value={value ?? ""}
         onValueChange={(v) => onChange(v || undefined)}
-        disabled={!brandId}
+        disabled={!brandKnown}
       >
         <SelectTrigger aria-invalid={!!error}>
-          <SelectValue placeholder={brandId ? "Velg modell…" : "Velg merke først"} />
+          <SelectValue placeholder={brandKnown ? "Velg modell…" : "Velg merke først"} />
         </SelectTrigger>
         <SelectContent>
-          {hasPendingValue && <SelectItem value={value!}>{value} (venter godkjenning)</SelectItem>}
-          {models.map((m) => (
-            <SelectItem key={m.id} value={m.name}>
-              {m.name}
+          {options.map((o) => (
+            <SelectItem key={o.value} value={o.value}>
+              {o.label}
             </SelectItem>
           ))}
         </SelectContent>

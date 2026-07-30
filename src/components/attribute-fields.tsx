@@ -241,10 +241,14 @@ function AttributeField({
 
   // number / range (single value in input context) / text
   const isNumber = filter.type === "number" || filter.type === "range";
+  // `range` filters are search-only and so excluded from
+  // getMissingRequiredFilters — marking them "*" here promised a validation
+  // that never fires.
+  const showRequiredMark = required && filter.type !== "range";
   return (
     <div className="space-y-2">
       <Label>
-        {label} <span className="text-destructive">*</span>
+        {label} {showRequiredMark && <span className="text-destructive">*</span>}
       </Label>
       <Input
         type={isNumber ? "number" : "text"}

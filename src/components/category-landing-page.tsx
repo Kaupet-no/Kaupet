@@ -260,8 +260,6 @@ export function CategoryLandingPage({
             q={qDraft}
             onQChange={setQDraft}
             onSubmitQ={() => updateSearch({ q: qDraft })}
-            location={location}
-            onLocationChange={handleLocationChange}
             selectedSlugs={[]}
             onSelectedChange={() => {}}
             categories={categories ?? []}
@@ -328,6 +326,10 @@ export function CategoryLandingPage({
           onUpdate={(patch) => updateSearch(patch)}
           attrFilters={attrFilters}
           attrValues={attrValues}
+          location={location}
+          onRemoveLocation={() =>
+            updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
+          }
           onRemoveAttr={(key, value) => {
             const current = attrValues[key];
             if (value !== undefined && current?.kind === "multiselect") {
@@ -358,10 +360,11 @@ export function CategoryLandingPage({
           mapCenter={mapCenter}
           radiusKm={search.radius ?? 10}
           onMapCenterChange={(c, label) =>
-            updateSearch({ lat: c.lat, lng: c.lng, radius: search.radius ?? 10, loc: label ?? "" })
+            updateSearch({ lat: c.lat, lng: c.lng, loc: label ?? "" })
           }
-          onMapAreaSearch={(c, label) =>
-            updateSearch({ lat: c.lat, lng: c.lng, radius: search.radius ?? 10, loc: label ?? "" })
+          onMapRadiusChange={(km) => updateSearch({ radius: km })}
+          onMapClearLocation={() =>
+            updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
           }
         />
       </div>

@@ -39,7 +39,8 @@ type Props = {
   mapCenter: { lat: number; lng: number } | null;
   radiusKm: number;
   onMapCenterChange: (c: { lat: number; lng: number }, label: string | null) => void;
-  onMapAreaSearch?: (c: { lat: number; lng: number }, label: string | null) => void;
+  onMapRadiusChange?: (km: number) => void;
+  onMapClearLocation?: () => void;
   /** Extra toolbar actions (e.g. "Lagre søk") — annonser-specific, so left to the caller. */
   toolbarExtra?: ReactNode;
 };
@@ -66,7 +67,8 @@ export function ResultList({
   mapCenter,
   radiusKm,
   onMapCenterChange,
-  onMapAreaSearch,
+  onMapRadiusChange,
+  onMapClearLocation,
   toolbarExtra,
 }: Props) {
   const [mounted, setMounted] = useState(false);
@@ -101,7 +103,7 @@ export function ResultList({
     return () => observer.disconnect();
   }, [isNative, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const renderMap = (withAreaSearch: boolean) =>
+  const renderMap = () =>
     mounted ? (
       <Suspense fallback={<div className="h-full w-full animate-pulse rounded-2xl bg-muted" />}>
         <ListingsMap
@@ -116,14 +118,8 @@ export function ResultList({
             onMapCenterChange(c, "Henter sted…");
             void reverseGeocode(c).then((name) => onMapCenterChange(c, name ?? "Valgt punkt"));
           }}
-          onAreaSearch={
-            withAreaSearch && onMapAreaSearch
-              ? (c) => {
-                  onMapAreaSearch(c, "Henter sted…");
-                  void reverseGeocode(c).then((name) => onMapAreaSearch(c, name ?? "Valgt punkt"));
-                }
-              : undefined
-          }
+          onRadiusChange={onMapRadiusChange}
+          onClearLocation={onMapClearLocation}
           className="h-full w-full"
         />
       </Suspense>
@@ -178,9 +174,7 @@ export function ResultList({
                 <SheetHeader>
                   <SheetTitle>Kart</SheetTitle>
                 </SheetHeader>
-                <div className="mt-3 h-[calc(100%-3rem)]">
-                  {mobileMapOpen ? renderMap(true) : null}
-                </div>
+                <div className="mt-3 h-[calc(100%-3rem)]">{mobileMapOpen ? renderMap() : null}</div>
               </SheetContent>
             </Sheet>
           )}
@@ -295,7 +289,7 @@ export function ResultList({
           <aside>
             <div className="sticky top-20 h-[calc(100vh-6rem)]">
               <div className="relative h-full overflow-hidden rounded-2xl border border-border shadow-sm">
-                {renderMap(true)}
+                {renderMap()}
                 <Dialog open={bigMapOpen} onOpenChange={setBigMapOpen}>
                   <DialogTrigger asChild>
                     <Button
@@ -312,7 +306,7 @@ export function ResultList({
                       <DialogTitle>Kart</DialogTitle>
                     </DialogHeader>
                     <div className="h-[85vh] w-full p-4 pt-2">
-                      {bigMapOpen ? renderMap(true) : null}
+                      {bigMapOpen ? renderMap() : null}
                     </div>
                   </DialogContent>
                 </Dialog>
@@ -330,9 +324,7 @@ export function ResultList({
               <SheetHeader>
                 <SheetTitle>Kart</SheetTitle>
               </SheetHeader>
-              <div className="mt-3 h-[calc(100%-3rem)]">
-                {mobileMapOpen ? renderMap(true) : null}
-              </div>
+              <div className="mt-3 h-[calc(100%-3rem)]">{mobileMapOpen ? renderMap() : null}</div>
             </SheetContent>
           </Sheet>
           <button

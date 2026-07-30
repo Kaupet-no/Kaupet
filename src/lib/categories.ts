@@ -100,10 +100,9 @@ export function pathFromAncestor(
  * subcategory chips; `main` carries the presentation color, so the tint stays
  * put while the user drills deeper. When the selection narrows to one
  * category (or its full subtree), `selected` drills down to it so the title
- * gets specific; when it spans several sibling subcategories at once (a
- * multi-select within one main category), `selected` falls back to `main`
- * itself rather than hiding the hero — there is no single deepest category
- * left to name the title after.
+ * gets specific. If the selection instead spans multiple sibling branches
+ * without their shared parent also selected, there is no single category to
+ * name the title after, so this returns null.
  */
 export function resolveHeroCategory(
   selectedSlugs: string[],
@@ -129,7 +128,8 @@ export function resolveHeroCategory(
   const allowed = new Set([candidate.id, ...descendants(candidate, tree).map((d) => d.id)]);
   const fitsCandidate = paths.every((p) => allowed.has(p[p.length - 1].id));
 
-  return { selected: fitsCandidate ? candidate : main, main };
+  if (!fitsCandidate) return null;
+  return { selected: candidate, main };
 }
 
 export function categoryLabel(selectedSlugs: string[], tree: CatTree): string {

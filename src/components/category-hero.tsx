@@ -6,6 +6,7 @@ import { categoryHeadingFontStack } from "@/lib/category-fonts";
 import type { Category } from "@/lib/categories";
 import type { BreadcrumbSegment } from "@/lib/category-behavior";
 import { encodeAttrFilters } from "@/features/listing-search/search-schema";
+import { ScrollArrowRow } from "@/components/scroll-arrow-row";
 
 type Props = {
   /** The category the result set is scoped to — its name is the heading. */
@@ -25,6 +26,15 @@ type Props = {
   /** Subcategories offered as chips below the heading. */
   subcategories: Category[];
   onSelectCategory: (c: Category) => void;
+  /** When set, the subcategory chips become multi-select toggles (active
+   * state + styling driven by `isActive`/`onToggle`) instead of the default
+   * single-select drill via `onSelectCategory` — used on /annonser, where
+   * several subcategories can be narrowed to at once. Leaving this unset
+   * keeps the original drill-down behavior (category landing pages). */
+  subcategorySelection?: {
+    isActive: (c: Category) => boolean;
+    onToggle: (c: Category) => void;
+  };
   /** Breadcrumb entries with an index below this are real category pages with
    * their own URL and render as links; the rest just re-scope the current
    * page. Defaults to 0 (nothing links out). */
@@ -53,6 +63,7 @@ export function CategoryHero({
   extraSegments = [],
   subcategories,
   onSelectCategory,
+  subcategorySelection,
   linkUntilIndex = 0,
   compact = false,
   headingAs: Heading = "h1",
@@ -156,20 +167,31 @@ export function CategoryHero({
         {subcategories.length > 0 && (
           <div
             key={`${selected.id}-subs`}
-            className={`mt-4 flex flex-wrap gap-2 motion-reduce:animate-none ${
+            className={`mt-4 motion-reduce:animate-none ${
               animateIn ? "duration-500 animate-in fade-in slide-in-from-bottom-4" : ""
             }`}
           >
-            {subcategories.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => onSelectCategory(c)}
-                className="rounded-full border border-border bg-card px-3 py-1.5 text-sm transition hover:border-primary hover:text-primary"
-              >
-                {c.name_nb}
-              </button>
-            ))}
+            <ScrollArrowRow>
+              {subcategories.map((c) => {
+                const active = subcategorySelection?.isActive(c) ?? false;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() =>
+                      subcategorySelection ? subcategorySelection.onToggle(c) : onSelectCategory(c)
+                    }
+                    className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                      active
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-card hover:border-primary hover:text-primary"
+                    }`}
+                  >
+                    {c.name_nb}
+                  </button>
+                );
+              })}
+            </ScrollArrowRow>
           </div>
         )}
       </div>

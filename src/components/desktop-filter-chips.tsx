@@ -1,21 +1,19 @@
 import { useState } from "react";
-import { LayoutGrid, MoreHorizontal, SlidersHorizontal } from "lucide-react";
+import { MoreHorizontal, SlidersHorizontal } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { CategoryPicker } from "@/components/advanced-search-sheet";
 import { ModeToggle } from "@/components/search-term-mode-toggle";
 import { TermGroupEditor } from "@/components/term-group-editor";
 import { FilterChip as Chip } from "@/components/filter-chip";
 import { RangeFilterField } from "@/components/range-filter-field";
 import { CONDITIONS, type AdvancedSearchValue } from "@/components/advanced-search-value";
-import { SORT_OPTIONS, type SortValue, type Category } from "@/lib/categories";
+import { SORT_OPTIONS, type SortValue } from "@/lib/categories";
 import type { TermGroup } from "@/lib/term-groups";
 import { PRICE_BOUNDS } from "@/lib/filter-range-bounds";
 import {
   getSortChipState,
-  getCategoryChipState,
   getPriceChipState,
   getConditionChipState,
 } from "@/lib/filter-chip-labels";
@@ -23,9 +21,6 @@ import {
 type Props = {
   sort: SortValue;
   onSortChange: (v: SortValue) => void;
-  categories: Category[];
-  selectedCategories: string[];
-  onCategoriesChange: (slugs: string[]) => void;
   min?: number;
   max?: number;
   includeFree: boolean;
@@ -48,9 +43,6 @@ type Props = {
 export function DesktopFilterChips({
   sort,
   onSortChange,
-  categories,
-  selectedCategories,
-  onCategoriesChange,
   min,
   max,
   includeFree,
@@ -62,15 +54,9 @@ export function DesktopFilterChips({
   extraGroups,
   onExtraGroupsChange,
 }: Props) {
-  const [openId, setOpenId] = useState<"sort" | "category" | "price" | "condition" | "more" | null>(
-    null,
-  );
+  const [openId, setOpenId] = useState<"sort" | "price" | "condition" | "more" | null>(null);
 
   const { label: sortLabel, active: sortActive } = getSortChipState(sort);
-  const { label: catLabel, active: catActive } = getCategoryChipState(
-    categories,
-    selectedCategories,
-  );
   const { label: priceLabel, active: priceActive } = getPriceChipState(min, max, includeFree);
   const { label: condLabel, active: condActive } = getConditionChipState(conditions);
 
@@ -102,19 +88,6 @@ export function DesktopFilterChips({
               {s.label}
             </button>
           ))}
-        </PopoverContent>
-      </Popover>
-
-      <Popover open={openId === "category"} onOpenChange={(o) => setOpenId(o ? "category" : null)}>
-        <PopoverTrigger asChild>
-          <Chip label={catLabel} active={catActive} icon={<LayoutGrid className="size-3.5" />} />
-        </PopoverTrigger>
-        <PopoverContent align="start" className="w-80 p-3">
-          <CategoryPicker
-            categories={categories}
-            selected={selectedCategories}
-            onChange={onCategoriesChange}
-          />
         </PopoverContent>
       </Popover>
 

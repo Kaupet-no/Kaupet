@@ -91,14 +91,19 @@ export function pathFromAncestor(
  * given whichever category slugs the search is currently filtered by.
  *
  * A hero only makes sense when the selection sits inside a single main
- * category's branch — one colored root, one shallowest category, everything
- * else below it (which is exactly what the category picker produces via
- * `selectAllForParent`). Anything mixed (two branches, a colorless root, an
- * unknown slug) returns null and the page falls back to its generic heading.
+ * category's branch — one colored root, everything else below it (which is
+ * exactly what the category picker produces via `selectAllForParent`). A
+ * colorless root or an unknown slug returns null and the page falls back to
+ * its generic heading.
  *
  * `selected` is the category shown in the title and whose children become the
  * subcategory chips; `main` carries the presentation color, so the tint stays
- * put while the user drills deeper.
+ * put while the user drills deeper. When the selection narrows to one
+ * category (or its full subtree), `selected` drills down to it so the title
+ * gets specific; when it spans several sibling subcategories at once (a
+ * multi-select within one main category), `selected` falls back to `main`
+ * itself rather than hiding the hero — there is no single deepest category
+ * left to name the title after.
  */
 export function resolveHeroCategory(
   selectedSlugs: string[],
@@ -120,11 +125,11 @@ export function resolveHeroCategory(
   // The shallowest selected category — every other selection has to be it or
   // one of its descendants for the branch to be unambiguous.
   const shallowest = paths.reduce((a, b) => (b.length < a.length ? b : a));
-  const selected = shallowest[shallowest.length - 1];
-  const allowed = new Set([selected.id, ...descendants(selected, tree).map((d) => d.id)]);
-  if (paths.some((p) => !allowed.has(p[p.length - 1].id))) return null;
+  const candidate = shallowest[shallowest.length - 1];
+  const allowed = new Set([candidate.id, ...descendants(candidate, tree).map((d) => d.id)]);
+  const fitsCandidate = paths.every((p) => allowed.has(p[p.length - 1].id));
 
-  return { selected, main };
+  return { selected: fitsCandidate ? candidate : main, main };
 }
 
 export function categoryLabel(selectedSlugs: string[], tree: CatTree): string {

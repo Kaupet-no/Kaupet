@@ -37,6 +37,7 @@ import { useScrollDirection } from "@/hooks/use-scroll-direction";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { useAnnonserSearchState } from "@/features/listing-search/use-annonser-search-state";
 import { CategoryHero } from "@/components/category-hero";
+import { CategoryChipRow } from "@/components/category-chip-row";
 import {
   breadcrumbPath,
   resolveHeroCategory,
@@ -188,11 +189,22 @@ function BrowsePage() {
     () => resolveHeroCategory(effectiveCategories, categoryTree),
     [effectiveCategories, categoryTree],
   );
+  // Always just the main category — not `hero.selected`, which can drill
+  // deeper as subcategories narrow the selection. With multi-select
+  // subcategories, `selected` is whichever one happened to be picked most
+  // recently, so a title that followed it would flip around confusingly;
+  // the main category's own name stays stable no matter how many (or which)
+  // subcategories are toggled.
   const heroBreadcrumb = useMemo(
-    () => (hero ? breadcrumbPath(hero.selected, categoryTree) : []),
+    () => (hero ? breadcrumbPath(hero.main, categoryTree) : []),
     [hero, categoryTree],
   );
-  const heroSubcategories = hero ? (categoryTree.childrenByParent.get(hero.selected.id) ?? []) : [];
+  // Always the main category's own direct children — not `hero.selected`'s,
+  // which can drill deeper than the root once a single subcategory narrows
+  // the selection. Keeping this anchored to the root is what makes selecting
+  // several sibling subcategories at once possible (see
+  // isHeroChildActive/toggleChildCategory below).
+  const heroSubcategories = hero ? (categoryTree.childrenByParent.get(hero.main.id) ?? []) : [];
 
   // Merke/Modell selected in the attribute filters get appended as extra
   // brødsmuler after the category chain, matching the ad-detail page's
@@ -224,7 +236,10 @@ function BrowsePage() {
   // category — arriving with one already in the URL (deep link, or the
   // homepage's category picker) should paint it as part of the page.
   const [animateHero, setAnimateHero] = useState(false);
-  const heroSelectedId = hero?.selected.id ?? null;
+  // Keyed on the main category, not `hero.selected` — the hero's own title no
+  // longer follows the narrower category, so re-animating on every
+  // subcategory toggle would be pointless motion.
+  const heroSelectedId = hero?.main.id ?? null;
   // `undefined` = the state the page was first rendered in, which is whatever
   // the URL asked for and therefore never animates.
   const prevHeroId = useRef<string | null | undefined>(undefined);
@@ -246,6 +261,54 @@ function BrowsePage() {
       categories: selectAllForParent(target, categoryTree),
       catMode: "any",
     });
+
+  // Always-visible category row above the search bar: tapping a main
+  // category selects its whole branch immediately (same as selectHeroCategory
+  // above); tapping a subcategory narrows to just that branch, toggling it
+  // off again falls back to the whole main category.
+  const selectRootCategory = (root: Category) => {
+    const alreadyActive = effectiveCategories.some((slug) =>
+      selectAllForParent(root, categoryTree).includes(slug),
+    );
+    updateSearch({
+      category: "",
+      categories: alreadyActive ? [] : selectAllForParent(root, categoryTree),
+      catMode: "any",
+    });
+  };
+
+  const toggleChildCategory = (root: Category, child: Category) => {
+    const selected = new Set(effectiveCategories);
+    const wholeBranch = selectAllForParent(root, categoryTree);
+    const wholeBranchSelected = wholeBranch.every((slug) => selected.has(slug));
+    const childBranch = selectAllForParent(child, categoryTree);
+    const childActive = !wholeBranchSelected && childBranch.every((slug) => selected.has(slug));
+
+    let next: string[];
+    if (wholeBranchSelected) {
+      // Narrowing from "everything in this main category" to just this child.
+      next = childBranch;
+    } else if (childActive) {
+      // Deselecting this child — fall back to the whole branch if nothing
+      // else is explicitly selected.
+      const remaining = effectiveCategories.filter((slug) => !childBranch.includes(slug));
+      next = remaining.length === 0 ? wholeBranch : remaining;
+    } else {
+      next = [...new Set([...effectiveCategories, ...childBranch])];
+    }
+    updateSearch({ category: "", categories: next, catMode: "any" });
+  };
+
+  const isHeroChildActive = (child: Category) => {
+    if (!hero) return false;
+    const wholeBranchSelected = selectAllForParent(hero.main, categoryTree).every((slug) =>
+      effectiveCategories.includes(slug),
+    );
+    if (wholeBranchSelected) return false;
+    return selectAllForParent(child, categoryTree).every((slug) =>
+      effectiveCategories.includes(slug),
+    );
+  };
 
   useEffect(() => {
     if (!mounted) return;
@@ -353,31 +416,38 @@ function BrowsePage() {
       )}
       <NativePageHeader title="Annonser" hideBack />
 
-      {/* The wrapper stays mounted so its row height can transition — the
-          results below slide down instead of jumping when the hero appears. */}
-      <div
-        className={`grid transition-[grid-template-rows] duration-500 ease-out motion-reduce:transition-none ${
-          hero ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-        }`}
-      >
-        <div className="overflow-hidden">
-          {hero && (
-            <CategoryHero
-              selected={hero.selected}
-              main={hero.main}
-              breadcrumbEntries={heroBreadcrumb}
-              extraSegments={heroExtraSegments}
-              subcategories={heroSubcategories}
-              onSelectCategory={selectHeroCategory}
-              compact={isNative}
-              headingAs={isNative ? "p" : "h1"}
-              animateIn={animateHero}
-            />
-          )}
+      {/* Hero zone: before a category is picked this shows the always-visible
+          main-category chip row; picking one brings in CategoryHero in this
+          same spot (its own subcategory row takes over narrowing further). */}
+      {hero ? (
+        <CategoryHero
+          selected={hero.main}
+          main={hero.main}
+          breadcrumbEntries={heroBreadcrumb}
+          extraSegments={heroExtraSegments}
+          subcategories={heroSubcategories}
+          onSelectCategory={selectHeroCategory}
+          subcategorySelection={{
+            isActive: isHeroChildActive,
+            onToggle: (c) => toggleChildCategory(hero.main, c),
+          }}
+          compact={isNative}
+          headingAs={isNative ? "p" : "h1"}
+          animateIn={animateHero}
+        />
+      ) : (
+        <div className={isNative ? "px-4 pt-2" : "mx-auto max-w-7xl px-4 pt-6"}>
+          <CategoryChipRow
+            tree={categoryTree}
+            onSelectRoot={selectRootCategory}
+            isNative={isNative}
+          />
         </div>
-      </div>
+      )}
 
-      <div className={`mx-auto max-w-7xl px-4 ${isNative ? "pt-2 pb-8" : "py-8 md:py-10"}`}>
+      <div
+        className={`mx-auto max-w-7xl px-4 ${isNative ? "pt-2 pb-8" : "pb-8 pt-3 md:pb-10 md:pt-4"}`}
+      >
         {!isNative && !hero && <h1 className="font-display text-3xl tracking-tight">Annonser</h1>}
 
         <div
@@ -451,11 +521,6 @@ function BrowsePage() {
             <NativeFilterChips
               sort={search.sort}
               onSortChange={(s) => updateSearch({ sort: s })}
-              categories={categories ?? []}
-              selectedCategories={effectiveCategories}
-              onCategoriesChange={(slugs) =>
-                updateSearch({ category: "", categories: slugs, catMode: "any" })
-              }
               min={search.min}
               max={search.max}
               includeFree={search.includeFree ?? true}
@@ -478,11 +543,6 @@ function BrowsePage() {
             <DesktopFilterChips
               sort={search.sort}
               onSortChange={(s) => updateSearch({ sort: s })}
-              categories={categories ?? []}
-              selectedCategories={effectiveCategories}
-              onCategoriesChange={(slugs) =>
-                updateSearch({ category: "", categories: slugs, catMode: "any" })
-              }
               min={search.min}
               max={search.max}
               includeFree={search.includeFree ?? true}

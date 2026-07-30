@@ -55,9 +55,18 @@ describe("resolveHeroCategory", () => {
     expect(resolveHeroCategory(["interior", "biler"], tree)).toBeNull();
   });
 
-  it("returns nothing for siblings without their shared parent selected", () => {
+  it("falls back to the shared ancestor for siblings without their parent selected", () => {
     const withStol = buildTree([...categories, cat("7", "stol", "Stol", "2")]);
-    expect(resolveHeroCategory(["sofa", "stol"], withStol)).toBeNull();
+    const hero = resolveHeroCategory(["sofa", "stol"], withStol);
+    expect(hero?.selected.slug).toBe("mobler");
+    expect(hero?.main.slug).toBe("interior");
+  });
+
+  it("falls back to the main category for sibling subcategories directly under it", () => {
+    const withElektronikk = buildTree([...categories, cat("8", "elektronikk", "Elektronikk", "1")]);
+    const hero = resolveHeroCategory(["mobler", "elektronikk"], withElektronikk);
+    expect(hero?.selected.slug).toBe("interior");
+    expect(hero?.main.slug).toBe("interior");
   });
 
   it("returns nothing for a root category that isn't a main category", () => {

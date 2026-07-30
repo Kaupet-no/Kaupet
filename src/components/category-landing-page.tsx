@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { ActiveFilters } from "@/components/active-filters";
@@ -65,7 +64,6 @@ export function CategoryLandingPage({
   navigate,
 }: Props) {
   const isNative = useIsNative();
-  const routerNavigate = useNavigate();
   const [qDraft, setQDraft] = useState(search.q);
   const [isDesktop, setIsDesktop] = useState(false);
 
@@ -241,16 +239,6 @@ export function CategoryLandingPage({
   const mapCenter =
     search.lat != null && search.lng != null ? { lat: search.lat, lng: search.lng } : null;
 
-  // Picking a different top-level category than this page's own leaves this
-  // page's SEO URL behind and lands on the canonical /annonser listing —
-  // same rule the homepage's category picker follows.
-  const onCategoriesChange = (slugs: string[]) => {
-    routerNavigate({
-      to: "/annonser",
-      search: { q: search.q, category: "", categories: slugs, catMode: "any", sort: search.sort },
-    });
-  };
-
   return (
     <div>
       {/* Entries before this page's own category are real ancestor pages with
@@ -286,9 +274,6 @@ export function CategoryLandingPage({
             <NativeFilterChips
               sort={search.sort}
               onSortChange={(s) => updateSearch({ sort: s })}
-              categories={categories ?? []}
-              selectedCategories={effectiveCategories}
-              onCategoriesChange={onCategoriesChange}
               min={search.min}
               max={search.max}
               includeFree={search.includeFree ?? true}
@@ -309,9 +294,6 @@ export function CategoryLandingPage({
             <DesktopFilterChips
               sort={search.sort}
               onSortChange={(s) => updateSearch({ sort: s })}
-              categories={categories ?? []}
-              selectedCategories={effectiveCategories}
-              onCategoriesChange={onCategoriesChange}
               min={search.min}
               max={search.max}
               includeFree={search.includeFree ?? true}

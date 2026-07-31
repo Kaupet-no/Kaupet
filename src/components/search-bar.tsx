@@ -1,10 +1,12 @@
 import { useMemo, useRef, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { FolderOpen, Search as SearchIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ModeToggle } from "@/components/search-term-mode-toggle";
 import { findCategorySuggestion, type Category } from "@/lib/categories";
 import { describeTermGroup } from "@/lib/term-groups";
+import { useSearchSuggestions } from "@/features/listing-search/use-search-suggestions";
 
 export type { Category };
 
@@ -43,12 +45,14 @@ export function SearchBar({
   showQMode = false,
 }: Props) {
   const [qFocused, setQFocused] = useState(false);
-  const suggestionRef = useRef<HTMLButtonElement>(null);
+  const firstSuggestionRef = useRef<HTMLElement>(null);
 
   // Suggest a matching category while the user types in "Hva", so people who
   // type a category name (e.g. "sykkel") discover that browsing by category
   // is also possible from the same field, without needing a separate UI.
   const qSuggestion = useMemo(() => findCategorySuggestion(categories, q), [q, categories]);
+  const { data: listingSuggestions } = useSearchSuggestions(q);
+  const hasDropdown = qFocused && !!(qSuggestion || listingSuggestions?.length);
 
   return (
     <form
@@ -66,53 +70,75 @@ export function SearchBar({
             onFocus={() => setQFocused(true)}
             onBlur={() => setQFocused(false)}
             onKeyDown={(e) => {
-              if ((e.key === "ArrowDown" || e.key === "Tab") && qSuggestion && !e.shiftKey) {
-                if (suggestionRef.current) {
+              if ((e.key === "ArrowDown" || e.key === "Tab") && hasDropdown && !e.shiftKey) {
+                if (firstSuggestionRef.current) {
                   e.preventDefault();
-                  suggestionRef.current.focus();
+                  firstSuggestionRef.current.focus();
                 }
               }
             }}
             placeholder="Hva leter du etter?"
             className="h-8 border-0 bg-transparent p-0 shadow-none focus-visible:ring-0 focus-visible:outline-none"
             aria-autocomplete="list"
-            aria-expanded={!!(qFocused && qSuggestion)}
+            aria-expanded={hasDropdown}
             aria-haspopup="listbox"
           />
-          {qFocused && qSuggestion && (
+          {hasDropdown && (
             <div
               role="listbox"
-              aria-label="Kategorisøk"
-              className="absolute left-0 top-[calc(100%+0.5rem)] z-50 w-[min(320px,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-card p-1 shadow-md"
+              aria-label="Søkeforslag"
+              className="absolute left-0 top-[calc(100%+0.5rem)] z-50 w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-card p-1 shadow-md"
             >
-              <button
-                ref={suggestionRef}
-                type="button"
-                role="option"
-                aria-selected="false"
-                // Mouse-down fires before the input's blur, so the click
-                // registers instead of being lost when focus leaves the field.
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  onSelectedChange([qSuggestion.slug]);
-                  onQChange("");
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
+              {qSuggestion && (
+                <button
+                  ref={firstSuggestionRef as React.RefObject<HTMLButtonElement>}
+                  type="button"
+                  role="option"
+                  aria-selected="false"
+                  // Mouse-down fires before the input's blur, so the click
+                  // registers instead of being lost when focus leaves the field.
+                  onMouseDown={(e) => {
                     e.preventDefault();
                     onSelectedChange([qSuggestion.slug]);
                     onQChange("");
-                  } else if (e.key === "Escape") {
-                    setQFocused(false);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onSelectedChange([qSuggestion.slug]);
+                      onQChange("");
+                    } else if (e.key === "Escape") {
+                      setQFocused(false);
+                    }
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <FolderOpen className="size-4 shrink-0 text-muted-foreground" />
+                  <span>
+                    Gå til kategori: <span className="font-medium">{qSuggestion.name_nb}</span>
+                  </span>
+                </button>
+              )}
+              {listingSuggestions?.map((s, i) => (
+                <Link
+                  key={s.id}
+                  ref={
+                    !qSuggestion && i === 0
+                      ? (firstSuggestionRef as React.RefObject<HTMLAnchorElement>)
+                      : undefined
                   }
-                }}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <FolderOpen className="size-4 shrink-0 text-muted-foreground" />
-                <span>
-                  Gå til kategori: <span className="font-medium">{qSuggestion.name_nb}</span>
-                </span>
-              </button>
+                  to="/$kaupetCode"
+                  params={{ kaupetCode: s.kaupet_code }}
+                  role="option"
+                  aria-selected="false"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setQFocused(false)}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
+                  <span className="truncate">{s.title}</span>
+                </Link>
+              ))}
             </div>
           )}
         </div>

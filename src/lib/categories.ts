@@ -12,10 +12,11 @@ export type Category = {
 export function mainCategories(categories: Category[]): Category[] {
   return categories.filter((c) => c.parent_id == null && !!c.color);
 }
-export type SortValue = "new" | "price_asc" | "price_desc";
+export type SortValue = "new" | "relevance" | "price_asc" | "price_desc";
 
 export const SORT_OPTIONS: Array<{ value: SortValue; label: string }> = [
   { value: "new", label: "Nyeste først" },
+  { value: "relevance", label: "Mest relevant" },
   { value: "price_asc", label: "Pris: lav → høy" },
   { value: "price_desc", label: "Pris: høy → lav" },
 ];

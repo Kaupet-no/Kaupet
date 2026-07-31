@@ -27,6 +27,9 @@ export function buildAdvancedSearchCriteria(
   v: AdvancedSearchValue,
   sortOverride?: SearchCriteria["sort"],
 ) {
-  const criteria: SearchCriteria = { ...valueToCriteria(v), sort: sortOverride ?? v.sort };
+  const criteria: SearchCriteria = {
+    ...valueToCriteria(v),
+    sort: sortOverride ?? (v.sort === "relevance" ? "new" : v.sort),
+  };
   return { criteria, defaultName: summarizeCriteria(criteria) };
 }

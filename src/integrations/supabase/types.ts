@@ -203,6 +203,41 @@ export type Database = {
           },
         ]
       }
+      filter_synonyms: {
+        Row: {
+          category_filter_id: string
+          created_at: string
+          id: string
+          is_generated: boolean
+          option_value: string | null
+          phrase: string
+        }
+        Insert: {
+          category_filter_id: string
+          created_at?: string
+          id?: string
+          is_generated?: boolean
+          option_value?: string | null
+          phrase: string
+        }
+        Update: {
+          category_filter_id?: string
+          created_at?: string
+          id?: string
+          is_generated?: boolean
+          option_value?: string | null
+          phrase?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "filter_synonyms_category_filter_id_fkey"
+            columns: ["category_filter_id"]
+            isOneToOne: false
+            referencedRelation: "category_filters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vehicle_brands: {
         Row: {
           id: string
@@ -1853,6 +1888,19 @@ export type Database = {
         Returns: {
           saved_search_id: string
           unread_count: number
+        }[]
+      }
+      match_search_synonyms: {
+        Args: {
+          p_category_id: string
+          phrases: string[]
+        }
+        Returns: {
+          phrase: string
+          filter_key: string
+          filter_label: string
+          option_value: string | null
+          option_label: string | null
         }[]
       }
       search_listing_ids: {

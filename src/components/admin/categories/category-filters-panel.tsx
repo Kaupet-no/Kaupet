@@ -32,12 +32,14 @@ import {
   type FilterType,
 } from "@/lib/category-filters";
 import { SortableFilterRow } from "./sortable-filter-row";
+import { FilterSynonymsDialog } from "./filter-synonyms-dialog";
 import { FILTER_TYPES, filterKeyify, type Category, type EditableFilter } from "./shared";
 
 export function CategoryFiltersPanel({ category }: { category: Category }) {
   const qc = useQueryClient();
   const [draft, setDraft] = useState<EditableFilter | null>(null);
   const [keyTouched, setKeyTouched] = useState(false);
+  const [synonymsFilter, setSynonymsFilter] = useState<CategoryFilter | null>(null);
 
   const {
     data: filters,
@@ -207,6 +209,7 @@ export function CategoryFiltersPanel({ category }: { category: Category }) {
                       }
                       onEdit={() => startEdit(f)}
                       onDelete={() => remove.mutate(f.id)}
+                      onEditSynonyms={() => setSynonymsFilter(f)}
                     />
                   ))}
                 </ul>
@@ -371,6 +374,14 @@ export function CategoryFiltersPanel({ category }: { category: Category }) {
         <Button type="button" variant="outline" onClick={startNew}>
           <Plus className="size-4" /> Nytt filter
         </Button>
+      )}
+
+      {synonymsFilter && (
+        <FilterSynonymsDialog
+          filter={synonymsFilter}
+          open={!!synonymsFilter}
+          onOpenChange={(open) => !open && setSynonymsFilter(null)}
+        />
       )}
     </>
   );

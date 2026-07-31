@@ -17,6 +17,8 @@ import type { MapListing } from "@/components/listings-map";
 import { FeaturedListingsSection } from "@/components/featured-listings-section";
 import { reverseGeocode } from "@/lib/geocode";
 import { hapticImpact } from "@/lib/haptics";
+import { getAttributeChipState } from "@/lib/filter-chip-labels";
+import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
 
 const ListingsMap = lazy(() =>
   import("@/components/listings-map").then((m) => ({ default: m.ListingsMap })),
@@ -38,6 +40,13 @@ type Props = {
   /** Re-search with the last word of `q` dropped — offered on zero results
    * for a multi-word query, since the last word is often the culprit. */
   onDropLastWord?: (nextQ: string) => void;
+  /** Active category-attribute filters — used on zero results to suggest
+   * dropping the most restrictive one first (attribute/location filters are
+   * a more likely culprit than free-text terms, which already fall back to
+   * trigram matching). */
+  attrFilters?: CategoryFilter[];
+  attrValues?: Record<string, AttributeFilterValue>;
+  onRemoveAttr?: (key: string) => void;
   mapListings: MapListing[];
   mapCenter: { lat: number; lng: number } | null;
   radiusKm: number;
@@ -67,6 +76,9 @@ export function ResultList({
   resetFilters,
   onClearCategoryFilter,
   onDropLastWord,
+  attrFilters = [],
+  attrValues = {},
+  onRemoveAttr,
   mapListings,
   mapCenter,
   radiusKm,
@@ -77,6 +89,14 @@ export function ResultList({
 }: Props) {
   const qWords = q.trim().split(/\s+/).filter(Boolean);
   const lastWord = qWords.length > 1 ? qWords[qWords.length - 1] : null;
+  // Most restrictive active attribute filter, offered as the first recovery
+  // action on zero results — structured filters narrow the result set harder
+  // than a free-text term, which already tolerates typos via trigram fallback.
+  const [mostRestrictiveAttrKey] = Object.keys(attrValues);
+  const mostRestrictiveAttrFilter = attrFilters.find((f) => f.key === mostRestrictiveAttrKey);
+  const mostRestrictiveAttrLabel = mostRestrictiveAttrFilter
+    ? getAttributeChipState(mostRestrictiveAttrFilter, attrValues[mostRestrictiveAttrKey]).label
+    : null;
   const [mounted, setMounted] = useState(false);
   const [mobileMapOpen, setMobileMapOpen] = useState(false);
   const [bigMapOpen, setBigMapOpen] = useState(false);
@@ -239,6 +259,11 @@ export function ResultList({
               }
               action={
                 <>
+                  {mostRestrictiveAttrFilter && mostRestrictiveAttrLabel && onRemoveAttr && (
+                    <Button variant="outline" onClick={() => onRemoveAttr(mostRestrictiveAttrKey)}>
+                      Fjern «{mostRestrictiveAttrLabel}»
+                    </Button>
+                  )}
                   {effectiveCategories.length > 0 && onClearCategoryFilter && (
                     <Button variant="outline" onClick={onClearCategoryFilter}>
                       Fjern kategorifilter

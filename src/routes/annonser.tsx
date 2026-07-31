@@ -669,6 +669,10 @@ function BrowsePage() {
                 ? () => updateSearch({ category: "", categories: [] })
                 : undefined
             }
+            onDropLastWord={(nextQ) => {
+              setQDraft(nextQ);
+              updateSearch({ q: nextQ });
+            }}
             mapListings={mapListings}
             mapCenter={mapCenter}
             radiusKm={search.radius ?? 10}

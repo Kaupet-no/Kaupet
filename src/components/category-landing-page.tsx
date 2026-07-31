@@ -355,6 +355,10 @@ export function CategoryLandingPage({
           isFetchingNextPage={isFetchingNextPage}
           fetchNextPage={() => void fetchNextPage()}
           resetFilters={resetFilters}
+          onDropLastWord={(nextQ) => {
+            setQDraft(nextQ);
+            updateSearch({ q: nextQ });
+          }}
           mapListings={mapListings}
           mapCenter={mapCenter}
           radiusKm={search.radius ?? 10}

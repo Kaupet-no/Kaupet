@@ -1788,6 +1788,10 @@ export type Database = {
         Args: { _listing_id: string; _visitor_key: string }
         Returns: undefined
       }
+      log_search_query: {
+        Args: { _query: string; _result_count: number }
+        Returns: undefined
+      }
       match_listing_to_saved_searches: {
         Args: { _listing_id: string }
         Returns: undefined

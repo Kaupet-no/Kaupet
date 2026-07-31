@@ -51,7 +51,9 @@ export function valueToCriteria(v: AdvancedSearchValue): SearchCriteria {
     min: v.min,
     max: v.max,
     includeFree: v.includeFree,
-    sort: v.sort,
+    // Relevance sort has no meaning without a live query context, so a
+    // saved search persists "new" instead.
+    sort: v.sort === "relevance" ? "new" : v.sort,
     extraGroups: v.extraGroups,
     lat: v.location.lat,
     lng: v.location.lng,

@@ -122,7 +122,10 @@ export function useAnnonserSearchState(params: {
   );
 
   const currentCriteria = useMemo(
-    () => ({ ...valueToCriteria(advancedInitial), sort: search.sort }),
+    () => ({
+      ...valueToCriteria(advancedInitial),
+      sort: search.sort === "relevance" ? "new" : search.sort,
+    }),
     [advancedInitial, search.sort],
   );
 

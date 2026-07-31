@@ -1851,6 +1851,17 @@ export type Database = {
           unread_count: number
         }[]
       }
+      search_listing_ids: {
+        Args: {
+          include_groups?: Json
+          exclude_any_terms?: string[] | null
+          exclude_all_groups?: Json
+        }
+        Returns: {
+          id: string
+          rank: number
+        }[]
+      }
       suggest_category_for_title: {
         Args: { _title: string }
         Returns: {

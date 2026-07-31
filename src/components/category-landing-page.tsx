@@ -22,6 +22,10 @@ import { SearchBar } from "@/components/search-bar";
 import { searchSchema, conditionEnum } from "@/features/listing-search/search-schema";
 import { useAnnonserSearchState } from "@/features/listing-search/use-annonser-search-state";
 import { useListingsQuery } from "@/features/listing-search/use-listings-query";
+import {
+  useSearchSynonymMatches,
+  removeMatchedWords,
+} from "@/features/listing-search/use-search-synonym-matches";
 import { useIsNative } from "@/hooks/use-is-native";
 
 type Search = z.infer<typeof searchSchema>;
@@ -163,6 +167,39 @@ export function CategoryLandingPage({
     allFilters,
     setQDraft,
   });
+
+  // Recognizes category-attribute vocabulary (e.g. "ryggekamera") typed into
+  // the search box and converts it into a structured attribute filter — see
+  // use-search-synonym-matches.ts. This page always has a stable selected
+  // category, so matching can run unconditionally.
+  const { data: synonymMatches } = useSearchSynonymMatches(selected.id, qDraft);
+  useEffect(() => {
+    if (!synonymMatches || synonymMatches.length === 0) return;
+    for (const m of synonymMatches) {
+      const filter = attrFilters.find((f) => f.key === m.filterKey);
+      if (!filter) continue;
+      if (filter.type === "boolean") {
+        handleAttrValueChange(m.filterKey, { kind: "boolean", value: true });
+      } else if (filter.type === "select" && m.optionValue) {
+        handleAttrValueChange(m.filterKey, { kind: "select", value: m.optionValue });
+      } else if (filter.type === "multiselect" && m.optionValue) {
+        const current = attrValues[m.filterKey];
+        const values = current?.kind === "multiselect" ? current.values : [];
+        if (!values.includes(m.optionValue)) {
+          handleAttrValueChange(m.filterKey, {
+            kind: "multiselect",
+            values: [...values, m.optionValue],
+          });
+        }
+      }
+    }
+    const nextQ = removeMatchedWords(qDraft, synonymMatches);
+    if (nextQ !== qDraft) {
+      setQDraft(nextQ);
+      updateSearch({ q: nextQ });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [synonymMatches]);
 
   // Merke/Modell selected in the attribute filters get appended as extra
   // brødsmuler after the category chain, matching the ad-detail page's

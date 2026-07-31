@@ -24,6 +24,10 @@ import { WtbListingCard } from "@/components/wtb-listing-card";
 import { searchSchema, conditionEnum } from "@/features/listing-search/search-schema";
 import { useListingsQuery } from "@/features/listing-search/use-listings-query";
 import {
+  useSearchSynonymMatches,
+  removeMatchedWords,
+} from "@/features/listing-search/use-search-synonym-matches";
+import {
   normalizeFilter,
   vehicleCategoryGroupFor,
   genericBrandFilterFor,
@@ -200,6 +204,43 @@ function BrowsePage() {
     () => (hero ? breadcrumbPath(hero.main, categoryTree) : []),
     [hero, categoryTree],
   );
+
+  // Recognizes category-attribute vocabulary (e.g. "ryggekamera") typed into
+  // the search box and converts it into a structured attribute filter, so
+  // typing equipment terms works the same as clicking the matching filter
+  // chip. Only runs once a category is selected — see
+  // use-search-synonym-matches.ts for why the vocabulary is ambiguous
+  // without one.
+  const { data: synonymMatches } = useSearchSynonymMatches(hero?.selected.id ?? null, qDraft);
+  useEffect(() => {
+    if (!synonymMatches || synonymMatches.length === 0) return;
+    for (const m of synonymMatches) {
+      const filter = attrFilters.find((f) => f.key === m.filterKey);
+      if (!filter) continue;
+      if (filter.type === "boolean") {
+        handleAttrValueChange(m.filterKey, { kind: "boolean", value: true });
+      } else if (filter.type === "select" && m.optionValue) {
+        handleAttrValueChange(m.filterKey, { kind: "select", value: m.optionValue });
+      } else if (filter.type === "multiselect" && m.optionValue) {
+        const current = attrValues[m.filterKey];
+        const values = current?.kind === "multiselect" ? current.values : [];
+        if (!values.includes(m.optionValue)) {
+          handleAttrValueChange(m.filterKey, {
+            kind: "multiselect",
+            values: [...values, m.optionValue],
+          });
+        }
+      }
+    }
+    const nextQ = removeMatchedWords(qDraft, synonymMatches);
+    if (nextQ !== qDraft) {
+      setQDraft(nextQ);
+      updateSearch({ q: nextQ });
+    }
+    // Runs once per resolved match set; re-triggers naturally once qDraft
+    // changes again as a result of applying it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [synonymMatches]);
   // Always the main category's own direct children — not `hero.selected`'s,
   // which can drill deeper than the root once a single subcategory narrows
   // the selection. Keeping this anchored to the root is what makes selecting

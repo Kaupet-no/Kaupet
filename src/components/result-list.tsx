@@ -35,6 +35,9 @@ type Props = {
   fetchNextPage: () => void;
   resetFilters: () => void;
   onClearCategoryFilter?: () => void;
+  /** Re-search with the last word of `q` dropped — offered on zero results
+   * for a multi-word query, since the last word is often the culprit. */
+  onDropLastWord?: (nextQ: string) => void;
   mapListings: MapListing[];
   mapCenter: { lat: number; lng: number } | null;
   radiusKm: number;
@@ -63,6 +66,7 @@ export function ResultList({
   fetchNextPage,
   resetFilters,
   onClearCategoryFilter,
+  onDropLastWord,
   mapListings,
   mapCenter,
   radiusKm,
@@ -71,6 +75,8 @@ export function ResultList({
   onMapClearLocation,
   toolbarExtra,
 }: Props) {
+  const qWords = q.trim().split(/\s+/).filter(Boolean);
+  const lastWord = qWords.length > 1 ? qWords[qWords.length - 1] : null;
   const [mounted, setMounted] = useState(false);
   const [mobileMapOpen, setMobileMapOpen] = useState(false);
   const [bigMapOpen, setBigMapOpen] = useState(false);
@@ -236,6 +242,19 @@ export function ResultList({
                   {effectiveCategories.length > 0 && onClearCategoryFilter && (
                     <Button variant="outline" onClick={onClearCategoryFilter}>
                       Fjern kategorifilter
+                    </Button>
+                  )}
+                  {lastWord && onDropLastWord && (
+                    <Button
+                      variant="outline"
+                      onClick={() => onDropLastWord(qWords.slice(0, -1).join(" "))}
+                    >
+                      Prøv uten «{lastWord}»
+                    </Button>
+                  )}
+                  {mapCenter && onMapClearLocation && (
+                    <Button variant="outline" onClick={onMapClearLocation}>
+                      Vis resultater i hele Norge
                     </Button>
                   )}
                   <Button variant="outline" onClick={resetFilters}>

@@ -74,6 +74,16 @@ export function useListingsQuery({
         includeGroups.length > 0 || excludeAnyTerms.length > 0 || excludeAllGroups.length > 0;
       const emptyPage: ListingsPage = { rows: [], totalCount: 0, nextOffset: null };
 
+      // Aggregated, fire-and-forget logging of the free-text query and its
+      // result count — only for the first page of a real text search, so
+      // future tuning (trigram threshold, synonyms) has data to work from.
+      const rawQuery = (search.q ?? "").trim();
+      const logSearch = (resultCount: number) => {
+        if (pageParam === 0 && rawQuery) {
+          void supabase.rpc("log_search_query", { _query: rawQuery, _result_count: resultCount });
+        }
+      };
+
       // Rank of matching ids, keyed by id — used to sort by relevance and to
       // constrain the main query to matching rows. Resolved server-side via
       // the listings.search_vector GIN index instead of ILIKE scans.
@@ -85,7 +95,10 @@ export function useListingsQuery({
           exclude_all_groups: excludeAllGroups,
         });
         if (searchError) throw searchError;
-        if (!matches || matches.length === 0) return emptyPage;
+        if (!matches || matches.length === 0) {
+          logSearch(0);
+          return emptyPage;
+        }
         searchRank = new Map(matches.map((m) => [m.id, m.rank]));
       }
 
@@ -180,6 +193,7 @@ export function useListingsQuery({
           .map((id) => byId.get(id))
           .filter((l): l is NonNullable<typeof l> => l != null)
           .map(mapRow);
+        logSearch(rankedIds.length);
         return {
           rows,
           totalCount: rankedIds.length,
@@ -197,6 +211,7 @@ export function useListingsQuery({
       if (error) throw error;
 
       const raw = data ?? [];
+      logSearch(count ?? raw.length);
       return {
         rows: raw.map(mapRow),
         totalCount: count ?? null,

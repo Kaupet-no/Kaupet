@@ -89,7 +89,7 @@ export function ResultList({
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
-    if (!isNative || !sentinelRef.current) return;
+    if (!sentinelRef.current) return;
     const el = sentinelRef.current;
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -101,7 +101,7 @@ export function ResultList({
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [isNative, hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const renderMap = () =>
     mounted ? (
@@ -264,20 +264,8 @@ export function ResultList({
               ))}
             </div>
           )}
-          {/* Last inn flere (web) / Infinite scroll sentinel (native) */}
-          {!isLoading &&
-            hasNextPage &&
-            (isNative ? (
-              <div ref={sentinelRef} className="h-4" />
-            ) : (
-              !isFetchingNextPage && (
-                <div className="mt-6 flex justify-center">
-                  <Button variant="outline" onClick={() => void fetchNextPage()}>
-                    Last inn flere annonser
-                  </Button>
-                </div>
-              )
-            ))}
+          {/* Infinite scroll sentinel — same pattern on web and native. */}
+          {!isLoading && hasNextPage && <div ref={sentinelRef} className="h-4" />}
           {isFetchingNextPage && (
             <div className="mt-6 flex justify-center">
               <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />

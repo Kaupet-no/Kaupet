@@ -470,7 +470,6 @@ function BrowsePage() {
                 selectedSlugs={[]}
                 onSelectedChange={() => {}}
                 categories={categories ?? []}
-                hideCategory
                 qMode={search.qMode}
                 onQModeChange={(m) => updateSearch({ qMode: m })}
                 showQMode={false}
@@ -506,7 +505,6 @@ function BrowsePage() {
                 updateSearch({ category: "", categories: slugs, catMode: "any" })
               }
               categories={categories ?? []}
-              hideCategory
               qMode={search.qMode}
               onQModeChange={(m) => updateSearch({ qMode: m })}
               showQMode={false}

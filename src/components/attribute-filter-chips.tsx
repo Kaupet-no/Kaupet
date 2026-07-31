@@ -32,7 +32,29 @@ type Props = {
   /** Current result count, shown on the native sheets' dismiss button the same
    * way NativeFilterChips does. */
   resultCount?: number;
+  /** The active free-text search box content — used to bring secondary
+   * filters whose label or options match a typed word to the top of "Se
+   * flere filter", so e.g. typing "sykkel" surfaces "Hjulstørrelse" instead
+   * of leaving it buried in a long, fixed admin-sorted list. Purely a
+   * same-session text match, no historical query data required. */
+  queryText?: string;
 };
+
+/** How many of a filter's typed-word matches count toward its relevance —
+ * only used to rank secondary filters, never to hide or filter them out. */
+function relevanceScore(filter: CategoryFilter, words: string[]): number {
+  if (words.length === 0) return 0;
+  const haystacks = [
+    filter.label_nb.toLowerCase(),
+    ...(filter.options ?? []).map((o) => o.label_nb.toLowerCase()),
+  ];
+  let score = 0;
+  for (const word of words) {
+    if (word.length < 2) continue;
+    if (haystacks.some((h) => h.includes(word))) score++;
+  }
+  return score;
+}
 
 /**
  * The category-dependent filter row on the search results page: the category's
@@ -47,13 +69,27 @@ export function AttributeFilterChips({
   onChange,
   isNative = false,
   resultCount,
+  queryText,
 }: Props) {
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
 
   if (filters.length === 0) return null;
 
-  const { primary, secondary } = splitPrimaryFilters(filters);
+  const { primary, secondaryRaw } = (() => {
+    const split = splitPrimaryFilters(filters);
+    return { primary: split.primary, secondaryRaw: split.secondary };
+  })();
+  // Same-session relevance boost: filters matching a typed word float to the
+  // top, so a search-in-progress makes "Se flere filter" feel search-aware
+  // rather than a fixed, admin-only-curated list — see relevanceScore above.
+  const queryWords = (queryText ?? "").trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const secondary =
+    queryWords.length === 0
+      ? secondaryRaw
+      : [...secondaryRaw].sort(
+          (a, b) => relevanceScore(b, queryWords) - relevanceScore(a, queryWords),
+        );
   const secondaryCount = secondary.filter((f) => values[f.key] !== undefined).length;
 
   const openField = (key: string | null) => {

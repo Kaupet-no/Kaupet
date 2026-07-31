@@ -359,6 +359,7 @@ export function CategoryLandingPage({
             onChange={handleAttrValueChange}
             isNative={isNative}
             resultCount={totalCount ?? cards.length}
+            queryText={qDraft}
           />
 
           {/* Rendered inside the same space-y-2 group as the search bar and

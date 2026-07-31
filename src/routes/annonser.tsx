@@ -28,6 +28,7 @@ import {
   removeMatchedWords,
 } from "@/features/listing-search/use-search-synonym-matches";
 import { parseNumericFilters, removeNumericMatches } from "@/lib/search-number-parser";
+import { matchCategoryPhrase, removeCategoryMatch } from "@/lib/search-category-match";
 import {
   normalizeFilter,
   vehicleCategoryGroupFor,
@@ -266,6 +267,30 @@ function BrowsePage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [numericMatches]);
+
+  // Recognizes a category name typed as a whole phrase (e.g. "mobiltelefon")
+  // and applies it as the category filter — the same action as clicking the
+  // "Gå til kategori" suggestion in SearchBar, just without requiring the
+  // click. See search-category-match.ts. Only on /annonser: category
+  // landing pages are already scoped to one category, so auto-navigating
+  // away based on typed text there would be surprising rather than helpful.
+  const categoryMatch = useMemo(
+    () => matchCategoryPhrase(qDraft, categories ?? []),
+    [qDraft, categories],
+  );
+  useEffect(() => {
+    if (!categoryMatch) return;
+    const nextQ = removeCategoryMatch(qDraft, categoryMatch);
+    setQDraft(nextQ);
+    updateSearch({
+      category: "",
+      categories: [categoryMatch.categorySlug],
+      catMode: "any",
+      q: nextQ,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoryMatch]);
+
   // Always the main category's own direct children — not `hero.selected`'s,
   // which can drill deeper than the root once a single subcategory narrows
   // the selection. Keeping this anchored to the root is what makes selecting

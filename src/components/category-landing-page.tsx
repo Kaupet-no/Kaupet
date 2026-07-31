@@ -9,6 +9,7 @@ import { ResultList } from "@/components/result-list";
 import { DesktopFilterChips } from "@/components/desktop-filter-chips";
 import { NativeFilterChips } from "@/components/native-filter-chips";
 import { AttributeFilterChips } from "@/components/attribute-filter-chips";
+import { FilterHintBanner } from "@/components/filter-hint-banner";
 import { CategoryHero } from "@/components/category-hero";
 import { buildTree, descendants, pathFromAncestor, type Category } from "@/lib/categories";
 import {
@@ -267,6 +268,11 @@ export function CategoryLandingPage({
             onQModeChange={(m) => updateSearch({ qMode: m })}
             showQMode={false}
           />
+          <FilterHintBanner
+            hasActiveCriteria={
+              terms.length > 0 || Object.keys(attrValues).length > 0 || location?.lat != null
+            }
+          />
           {isNative ? (
             <NativeFilterChips
               sort={search.sort}
@@ -317,31 +323,35 @@ export function CategoryLandingPage({
             isNative={isNative}
             resultCount={totalCount ?? cards.length}
           />
-        </div>
 
-        <ActiveFilters
-          search={search}
-          terms={terms}
-          onUpdate={(patch) => updateSearch(patch)}
-          attrFilters={attrFilters}
-          attrValues={attrValues}
-          location={location}
-          onRemoveLocation={() =>
-            updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
-          }
-          onRemoveAttr={(key, value) => {
-            const current = attrValues[key];
-            if (value !== undefined && current?.kind === "multiselect") {
-              const next = current.values.filter((v) => v !== value);
-              handleAttrValueChange(
-                key,
-                next.length > 0 ? { kind: "multiselect", values: next } : undefined,
-              );
-              return;
+          {/* Rendered inside the same space-y-2 group as the search bar and
+              filter chips above, rather than as a separately-spaced sibling,
+              so the active-criteria row reads as part of one continuous
+              search-and-filter unit instead of a visually detached block. */}
+          <ActiveFilters
+            search={search}
+            terms={terms}
+            onUpdate={(patch) => updateSearch(patch)}
+            attrFilters={attrFilters}
+            attrValues={attrValues}
+            location={location}
+            onRemoveLocation={() =>
+              updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
             }
-            handleAttrValueChange(key, undefined);
-          }}
-        />
+            onRemoveAttr={(key, value) => {
+              const current = attrValues[key];
+              if (value !== undefined && current?.kind === "multiselect") {
+                const next = current.values.filter((v) => v !== value);
+                handleAttrValueChange(
+                  key,
+                  next.length > 0 ? { kind: "multiselect", values: next } : undefined,
+                );
+                return;
+              }
+              handleAttrValueChange(key, undefined);
+            }}
+          />
+        </div>
 
         <ResultList
           isNative={isNative}
@@ -359,6 +369,9 @@ export function CategoryLandingPage({
             setQDraft(nextQ);
             updateSearch({ q: nextQ });
           }}
+          attrFilters={attrFilters}
+          attrValues={attrValues}
+          onRemoveAttr={(key) => handleAttrValueChange(key, undefined)}
           mapListings={mapListings}
           mapCenter={mapCenter}
           radiusKm={search.radius ?? 10}

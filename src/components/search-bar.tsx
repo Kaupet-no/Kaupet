@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { FolderOpen, Search as SearchIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,17 @@ import { describeTermGroup } from "@/lib/term-groups";
 import { useSearchSuggestions } from "@/features/listing-search/use-search-suggestions";
 
 export type { Category };
+
+/** Rotates through the input's placeholder while it's empty and unfocused, to
+ * teach newcomers that the search box understands more than plain keywords
+ * (exclusion, price, condition) without needing a separate onboarding step. */
+const PLACEHOLDER_EXAMPLES = [
+  "Hva leter du etter?",
+  "Prøv: sykkel unntatt elsykkel",
+  "Prøv: iPhone under 3000",
+  "Prøv: sofa som ny",
+  "Prøv: bil automatgir",
+];
 
 type Props = {
   q: string;
@@ -45,7 +56,19 @@ export function SearchBar({
   showQMode = false,
 }: Props) {
   const [qFocused, setQFocused] = useState(false);
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const firstSuggestionRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (q || qFocused) {
+      setPlaceholderIndex(0);
+      return;
+    }
+    const id = setInterval(() => {
+      setPlaceholderIndex((i) => (i + 1) % PLACEHOLDER_EXAMPLES.length);
+    }, 4000);
+    return () => clearInterval(id);
+  }, [q, qFocused]);
 
   // Suggest a matching category while the user types in "Hva", so people who
   // type a category name (e.g. "sykkel") discover that browsing by category
@@ -77,7 +100,7 @@ export function SearchBar({
                 }
               }
             }}
-            placeholder="Hva leter du etter?"
+            placeholder={PLACEHOLDER_EXAMPLES[placeholderIndex]}
             className="h-8 border-0 bg-transparent p-0 shadow-none focus-visible:ring-0 focus-visible:outline-none"
             aria-autocomplete="list"
             aria-expanded={hasDropdown}

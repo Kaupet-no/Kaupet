@@ -15,6 +15,7 @@ import type { MapListing } from "@/components/listings-map";
 import { ResultList } from "@/components/result-list";
 import { NativeFilterChips } from "@/components/native-filter-chips";
 import { AttributeFilterChips } from "@/components/attribute-filter-chips";
+import { FilterHintBanner } from "@/components/filter-hint-banner";
 import { NativeSearchOverlay } from "@/components/native-search-overlay";
 import { NativeAdvancedSearch } from "@/components/native-advanced-search";
 import { saveLastSearchContext } from "@/lib/last-search-context";
@@ -510,6 +511,7 @@ function BrowsePage() {
               showQMode={false}
             />
           )}
+          <FilterHintBanner hasActiveCriteria={hasSearchCriteria} />
           {isNative ? (
             <NativeFilterChips
               sort={search.sort}
@@ -562,31 +564,35 @@ function BrowsePage() {
             isNative={isNative}
             resultCount={totalCount ?? cards.length}
           />
-        </div>
 
-        <ActiveFilters
-          search={search}
-          terms={terms}
-          onUpdate={(patch) => updateSearch(patch)}
-          attrFilters={attrFilters}
-          attrValues={attrValues}
-          location={location}
-          onRemoveLocation={() =>
-            updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
-          }
-          onRemoveAttr={(key, value) => {
-            const current = attrValues[key];
-            if (value !== undefined && current?.kind === "multiselect") {
-              const next = current.values.filter((v) => v !== value);
-              handleAttrValueChange(
-                key,
-                next.length > 0 ? { kind: "multiselect", values: next } : undefined,
-              );
-              return;
+          {/* Rendered inside the same space-y-2 group as the search bar and
+              filter chips above, rather than as a separately-spaced sibling,
+              so the active-criteria row reads as part of one continuous
+              search-and-filter unit instead of a visually detached block. */}
+          <ActiveFilters
+            search={search}
+            terms={terms}
+            onUpdate={(patch) => updateSearch(patch)}
+            attrFilters={attrFilters}
+            attrValues={attrValues}
+            location={location}
+            onRemoveLocation={() =>
+              updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
             }
-            handleAttrValueChange(key, undefined);
-          }}
-        />
+            onRemoveAttr={(key, value) => {
+              const current = attrValues[key];
+              if (value !== undefined && current?.kind === "multiselect") {
+                const next = current.values.filter((v) => v !== value);
+                handleAttrValueChange(
+                  key,
+                  next.length > 0 ? { kind: "multiselect", values: next } : undefined,
+                );
+                return;
+              }
+              handleAttrValueChange(key, undefined);
+            }}
+          />
+        </div>
 
         {user && (
           <SaveSearchDialog
@@ -673,6 +679,9 @@ function BrowsePage() {
               setQDraft(nextQ);
               updateSearch({ q: nextQ });
             }}
+            attrFilters={attrFilters}
+            attrValues={attrValues}
+            onRemoveAttr={(key) => handleAttrValueChange(key, undefined)}
             mapListings={mapListings}
             mapCenter={mapCenter}
             radiusKm={search.radius ?? 10}

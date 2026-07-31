@@ -204,7 +204,7 @@ export function ActiveFilters({
   const hiddenCount = showCollapsed ? allItems.length - overflowStart! : 0;
 
   return (
-    <div ref={containerRef} className="mt-3 flex flex-wrap items-center gap-2">
+    <div ref={containerRef} className="flex flex-wrap items-center gap-2">
       {visibleItems.map((item) => item.node)}
       {showCollapsed && hiddenCount > 0 && (
         <button

@@ -263,7 +263,6 @@ export function CategoryLandingPage({
             selectedSlugs={[]}
             onSelectedChange={() => {}}
             categories={categories ?? []}
-            hideCategory
             qMode={search.qMode}
             onQModeChange={(m) => updateSearch({ qMode: m })}
             showQMode={false}

@@ -1914,6 +1914,17 @@ export type Database = {
           rank: number
         }[]
       }
+      suggest_attribute_values: {
+        Args: {
+          p_category_id: string
+          p_key: string
+          p_limit?: number
+        }
+        Returns: {
+          value: string
+          listing_count: number
+        }[]
+      }
       suggest_category_for_title: {
         Args: { _title: string }
         Returns: {

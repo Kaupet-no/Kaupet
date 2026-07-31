@@ -129,6 +129,32 @@ export function AttributeFilterChips({
     const { label, active } = getAttributeChipState(f, values[f.key]);
     const current = values[f.key];
 
+    // Merke (brand) always opens into a surface (ComboboxField, via fieldFor)
+    // rather than the closed SelectChip dropdown below — see the matching
+    // special-case in category-filter-fields.tsx for why.
+    if (f.key === "brand" && (f.type === "text" || f.type === "select")) {
+      const chip = (
+        <FilterChip
+          label={label}
+          active={active}
+          onClick={isNative ? () => openField(f.key) : undefined}
+        />
+      );
+      if (isNative) return <span key={f.id}>{chip}</span>;
+      return (
+        <Popover
+          key={f.id}
+          open={openKey === f.key}
+          onOpenChange={(o) => openField(o ? f.key : null)}
+        >
+          <PopoverTrigger asChild>{chip}</PopoverTrigger>
+          <PopoverContent align="start" className="w-80 p-3">
+            {fieldFor(f)}
+          </PopoverContent>
+        </Popover>
+      );
+    }
+
     // Single-choice fields put their own menu/toggle on the chip: wrapping them
     // in a popover would cost a second tap to reach the only control inside it.
     if (f.type === "select") {
@@ -298,6 +324,9 @@ export function AttributeFilterChips({
 /** Filter types whose control doesn't fit on the chip itself and so need a
  * popover/sheet to open into. */
 function needsSurface(filter: CategoryFilter): boolean {
+  // Merke (brand) always needs a surface (ComboboxField) even when its type
+  // is "select" — see the matching special-case in the chips map above.
+  if (filter.key === "brand") return filter.type === "text" || filter.type === "select";
   return !["select", "brand_select", "model_select", "boolean"].includes(filter.type);
 }
 

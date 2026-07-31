@@ -22,6 +22,7 @@ import {
 } from "@/features/listing-creation/modules/generic-attributes/vehicle-brand-model-fields";
 import { RangeFilterField } from "@/components/range-filter-field";
 import { boundsForFilter } from "@/lib/filter-range-bounds";
+import { ComboboxField } from "@/components/combobox-field";
 
 /**
  * Trigger button for the "Se flere valg" `Collapsible` wrapping a category's
@@ -94,6 +95,34 @@ export function CategoryFilterFields({
               brandName={brandName}
               value={current?.kind === "select" ? current.value : undefined}
               onChange={(v) => onChange(f.key, v ? { kind: "select", value: v } : undefined)}
+            />
+          );
+        }
+        // Merke (brand) stays open-vocabulary even once an admin has promoted
+        // it to type "select" with suggested options (see suggest_attribute_values
+        // / Fase 2.6) — a curated list helps most buyers, but a plain <Select>
+        // would block sellers with an uncommon brand, so it gets a combobox
+        // instead of the closed dropdown other select filters use.
+        if (f.key === "brand" && (f.type === "text" || f.type === "select")) {
+          const brandValue =
+            current?.kind === "text" || current?.kind === "select" ? current.value : undefined;
+          return (
+            <ComboboxField
+              key={f.id}
+              label={f.label_nb}
+              value={brandValue}
+              options={f.options ?? []}
+              onChange={(v) =>
+                onChange(
+                  f.key,
+                  v
+                    ? f.type === "select"
+                      ? { kind: "select", value: v }
+                      : { kind: "text", value: v }
+                    : undefined,
+                )
+              }
+              placeholder={`Søk ${f.label_nb.toLowerCase()} eller skriv inn...`}
             />
           );
         }

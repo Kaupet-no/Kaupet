@@ -26,6 +26,7 @@ import {
   useSearchSynonymMatches,
   removeMatchedWords,
 } from "@/features/listing-search/use-search-synonym-matches";
+import { parseNumericFilters, removeNumericMatches } from "@/lib/search-number-parser";
 import { useIsNative } from "@/hooks/use-is-native";
 
 type Search = z.infer<typeof searchSchema>;
@@ -200,6 +201,29 @@ export function CategoryLandingPage({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [synonymMatches]);
+
+  // Recognizes number+unit facts (e.g. "under 100000 km", "235 hk", a bare
+  // "2021") typed into the search box — see search-number-parser.ts.
+  const numericMatches = useMemo(
+    () => parseNumericFilters(qDraft, attrFilters),
+    [qDraft, attrFilters],
+  );
+  useEffect(() => {
+    if (numericMatches.length === 0) return;
+    for (const m of numericMatches) {
+      const current = attrValues[m.filterKey];
+      const currentRange: { min?: number; max?: number } = current?.kind === "range" ? current : {};
+      const nextMin = m.min ?? currentRange.min;
+      const nextMax = m.max ?? currentRange.max;
+      handleAttrValueChange(m.filterKey, { kind: "range", min: nextMin, max: nextMax });
+    }
+    const nextQ = removeNumericMatches(qDraft, numericMatches);
+    if (nextQ !== qDraft) {
+      setQDraft(nextQ);
+      updateSearch({ q: nextQ });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [numericMatches]);
 
   // Merke/Modell selected in the attribute filters get appended as extra
   // brødsmuler after the category chain, matching the ad-detail page's

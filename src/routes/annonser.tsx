@@ -27,6 +27,7 @@ import {
   useSearchSynonymMatches,
   removeMatchedWords,
 } from "@/features/listing-search/use-search-synonym-matches";
+import { parseNumericFilters, removeNumericMatches } from "@/lib/search-number-parser";
 import {
   normalizeFilter,
   vehicleCategoryGroupFor,
@@ -241,6 +242,30 @@ function BrowsePage() {
     // changes again as a result of applying it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [synonymMatches]);
+
+  // Recognizes number+unit facts (e.g. "under 100000 km", "235 hk", a bare
+  // "2021") typed into the search box and converts them into range filters
+  // on the category's own number-type filters — see search-number-parser.ts.
+  const numericMatches = useMemo(
+    () => parseNumericFilters(qDraft, attrFilters),
+    [qDraft, attrFilters],
+  );
+  useEffect(() => {
+    if (numericMatches.length === 0) return;
+    for (const m of numericMatches) {
+      const current = attrValues[m.filterKey];
+      const currentRange: { min?: number; max?: number } = current?.kind === "range" ? current : {};
+      const nextMin = m.min ?? currentRange.min;
+      const nextMax = m.max ?? currentRange.max;
+      handleAttrValueChange(m.filterKey, { kind: "range", min: nextMin, max: nextMax });
+    }
+    const nextQ = removeNumericMatches(qDraft, numericMatches);
+    if (nextQ !== qDraft) {
+      setQDraft(nextQ);
+      updateSearch({ q: nextQ });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [numericMatches]);
   // Always the main category's own direct children — not `hero.selected`'s,
   // which can drill deeper than the root once a single subcategory narrows
   // the selection. Keeping this anchored to the root is what makes selecting

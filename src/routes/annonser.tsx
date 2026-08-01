@@ -30,6 +30,7 @@ import {
   removeCategoryMatch,
 } from "@/lib/search-category-match";
 import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
+import { stripFillerWords } from "@/lib/search-stopwords";
 import {
   normalizeFilter,
   vehicleCategoryGroupFor,
@@ -311,7 +312,9 @@ function BrowsePage() {
     // title-search term — unlike category-name matches, which are redundant
     // once the category filter itself exists.
     const nextQ =
-      categoryMatch.source === "category" ? removeCategoryMatch(qDraft, categoryMatch) : qDraft;
+      categoryMatch.source === "category"
+        ? stripFillerWords(removeCategoryMatch(qDraft, categoryMatch))
+        : qDraft;
     setQDraft(nextQ);
     updateSearch({
       category: "",

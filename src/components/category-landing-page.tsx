@@ -22,11 +22,7 @@ import { SearchBar } from "@/components/search-bar";
 import { searchSchema, conditionEnum } from "@/features/listing-search/search-schema";
 import { useAnnonserSearchState } from "@/features/listing-search/use-annonser-search-state";
 import { useListingsQuery } from "@/features/listing-search/use-listings-query";
-import {
-  useSearchSynonymMatches,
-  removeMatchedWords,
-} from "@/features/listing-search/use-search-synonym-matches";
-import { parseNumericFilters, removeNumericMatches } from "@/lib/search-number-parser";
+import { useTextToFilterPipeline } from "@/features/listing-search/use-text-to-filter-pipeline";
 import { useIsNative } from "@/hooks/use-is-native";
 
 type Search = z.infer<typeof searchSchema>;
@@ -72,6 +68,21 @@ export function CategoryLandingPage({
   const isNative = useIsNative();
   const [qDraft, setQDraft] = useState(search.q);
   const [isDesktop, setIsDesktop] = useState(false);
+  // See annonser.tsx's identical field for why this exists — keyed by
+  // "filterKey:optionValue" ("filterKey:" for single-value filters).
+  const [autoAppliedText, setAutoAppliedText] = useState<Record<string, string>>({});
+  const [justCreatedKeys, setJustCreatedKeys] = useState<Set<string>>(new Set());
+  const flashKeys = (keys: string[]) => {
+    if (keys.length === 0) return;
+    setJustCreatedKeys((prev) => new Set([...prev, ...keys]));
+    setTimeout(() => {
+      setJustCreatedKeys((prev) => {
+        const next = new Set(prev);
+        for (const k of keys) next.delete(k);
+        return next;
+      });
+    }, 1500);
+  };
 
   useEffect(() => setQDraft(search.q), [search.q]);
   useEffect(() => {
@@ -169,61 +180,48 @@ export function CategoryLandingPage({
     setQDraft,
   });
 
-  // Recognizes category-attribute vocabulary (e.g. "ryggekamera") typed into
-  // the search box and converts it into a structured attribute filter — see
-  // use-search-synonym-matches.ts. This page always has a stable selected
+  // Recognizes category-attribute vocabulary (e.g. "ryggekamera") and
+  // number+unit facts typed into the search box — see
+  // use-text-to-filter-pipeline.ts. This page always has a stable selected
   // category, so matching can run unconditionally.
-  const { data: synonymMatches } = useSearchSynonymMatches(selected.id, qDraft);
-  useEffect(() => {
-    if (!synonymMatches || synonymMatches.length === 0) return;
-    for (const m of synonymMatches) {
-      const filter = attrFilters.find((f) => f.key === m.filterKey);
-      if (!filter) continue;
-      if (filter.type === "boolean") {
-        handleAttrValueChange(m.filterKey, { kind: "boolean", value: true });
-      } else if (filter.type === "select" && m.optionValue) {
-        handleAttrValueChange(m.filterKey, { kind: "select", value: m.optionValue });
-      } else if (filter.type === "multiselect" && m.optionValue) {
-        const current = attrValues[m.filterKey];
-        const values = current?.kind === "multiselect" ? current.values : [];
-        if (!values.includes(m.optionValue)) {
-          handleAttrValueChange(m.filterKey, {
-            kind: "multiselect",
-            values: [...values, m.optionValue],
-          });
-        }
-      }
-    }
-    const nextQ = removeMatchedWords(qDraft, synonymMatches);
-    if (nextQ !== qDraft) {
-      setQDraft(nextQ);
-      updateSearch({ q: nextQ });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [synonymMatches]);
+  useTextToFilterPipeline({
+    qDraft,
+    setQDraft,
+    updateSearch,
+    attrFilters,
+    attrValues,
+    handleAttrValueChange,
+    categoryId: selected.id,
+    onApplied: (applied) => {
+      setAutoAppliedText((prev) => ({ ...prev, ...applied }));
+      flashKeys(Object.keys(applied));
+    },
+  });
 
-  // Recognizes number+unit facts (e.g. "under 100000 km", "235 hk", a bare
-  // "2021") typed into the search box — see search-number-parser.ts.
-  const numericMatches = useMemo(
-    () => parseNumericFilters(qDraft, attrFilters),
-    [qDraft, attrFilters],
-  );
-  useEffect(() => {
-    if (numericMatches.length === 0) return;
-    for (const m of numericMatches) {
-      const current = attrValues[m.filterKey];
-      const currentRange: { min?: number; max?: number } = current?.kind === "range" ? current : {};
-      const nextMin = m.min ?? currentRange.min;
-      const nextMax = m.max ?? currentRange.max;
-      handleAttrValueChange(m.filterKey, { kind: "range", min: nextMin, max: nextMax });
+  const removeAttrWithRestore = (key: string, value?: string) => {
+    const composite = `${key}:${value ?? ""}`;
+    const restoreText = autoAppliedText[composite];
+    const current = attrValues[key];
+    if (value !== undefined && current?.kind === "multiselect") {
+      const next = current.values.filter((v) => v !== value);
+      handleAttrValueChange(
+        key,
+        next.length > 0 ? { kind: "multiselect", values: next } : undefined,
+      );
+    } else {
+      handleAttrValueChange(key, undefined);
     }
-    const nextQ = removeNumericMatches(qDraft, numericMatches);
-    if (nextQ !== qDraft) {
+    if (restoreText) {
+      setAutoAppliedText((prev) => {
+        const next = { ...prev };
+        delete next[composite];
+        return next;
+      });
+      const nextQ = qDraft ? `${qDraft} ${restoreText}` : restoreText;
       setQDraft(nextQ);
       updateSearch({ q: nextQ });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [numericMatches]);
+  };
 
   // Merke/Modell selected in the attribute filters get appended as extra
   // brødsmuler after the category chain, matching the ad-detail page's
@@ -322,9 +320,6 @@ export function CategoryLandingPage({
             q={qDraft}
             onQChange={setQDraft}
             onSubmitQ={() => updateSearch({ q: qDraft })}
-            selectedSlugs={[]}
-            onSelectedChange={() => {}}
-            categories={categories ?? []}
             qMode={search.qMode}
             onQModeChange={(m) => updateSearch({ qMode: m })}
             showQMode={false}
@@ -400,18 +395,8 @@ export function CategoryLandingPage({
             onRemoveLocation={() =>
               updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
             }
-            onRemoveAttr={(key, value) => {
-              const current = attrValues[key];
-              if (value !== undefined && current?.kind === "multiselect") {
-                const next = current.values.filter((v) => v !== value);
-                handleAttrValueChange(
-                  key,
-                  next.length > 0 ? { kind: "multiselect", values: next } : undefined,
-                );
-                return;
-              }
-              handleAttrValueChange(key, undefined);
-            }}
+            onRemoveAttr={removeAttrWithRestore}
+            justCreatedKeys={justCreatedKeys}
           />
         </div>
 
@@ -433,7 +418,7 @@ export function CategoryLandingPage({
           }}
           attrFilters={attrFilters}
           attrValues={attrValues}
-          onRemoveAttr={(key) => handleAttrValueChange(key, undefined)}
+          onRemoveAttr={(key) => removeAttrWithRestore(key)}
           mapListings={mapListings}
           mapCenter={mapCenter}
           radiusKm={search.radius ?? 10}

@@ -55,15 +55,16 @@ const DEFAULT_BEHAVIOR: CategoryBehavior = {
     if (!genericBrandFilter) return [];
     const raw = attributes[genericBrandFilter.key];
     if (typeof raw !== "string" || !raw) return [];
+    // Multiselect (not a single "select"/"text" value), matching the
+    // vehicle Merke/Modell breadcrumb behavior — landing here shows every
+    // other brand as a checkable option too (see the "brand" key branch in
+    // category-filter-fields.tsx), not just this one fixed value.
     return [
       {
         name_nb: capitalizeWord(raw) ?? raw,
         slug: rootCategorySlug,
         attrs: {
-          [genericBrandFilter.key]: {
-            kind: genericBrandFilter.type === "select" ? "select" : "text",
-            value: raw,
-          },
+          [genericBrandFilter.key]: { kind: "multiselect", values: [raw] },
         },
       },
     ];

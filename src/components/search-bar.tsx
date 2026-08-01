@@ -1,14 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { FolderOpen, Search as SearchIcon } from "lucide-react";
+import { Search as SearchIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ModeToggle } from "@/components/search-term-mode-toggle";
-import { findCategorySuggestion, type Category } from "@/lib/categories";
 import { describeTermGroup } from "@/lib/term-groups";
 import { useSearchSuggestions } from "@/features/listing-search/use-search-suggestions";
-
-export type { Category };
 
 /** Rotates through the input's placeholder while it's empty and unfocused, to
  * teach newcomers that the search box understands more than plain keywords
@@ -19,15 +16,13 @@ const PLACEHOLDER_EXAMPLES = [
   "Prøv: iPhone under 3000",
   "Prøv: sofa som ny",
   "Prøv: bil automatgir",
+  "Prøv: mobiltelefon",
 ];
 
 type Props = {
   q: string;
   onQChange: (v: string) => void;
   onSubmitQ: () => void;
-  selectedSlugs: string[];
-  onSelectedChange: (slugs: string[]) => void;
-  categories: Category[];
   qMode: "all" | "any";
   onQModeChange: (v: "all" | "any") => void;
   /** Show the "Alle ord"/"Minst ett"-toggle for the "Hva" field — only
@@ -37,20 +32,18 @@ type Props = {
 };
 
 /**
- * Pure text-query search field. Category selection lives solely in
- * CategoryHero/CategoryChipRow on the page — this bar used to also own a
- * drill-down category popover, but having two independent category pickers
- * visible at once was confusing, so the only category-related thing left
- * here is the "gå til kategori" hint below, which is query-driven rather
- * than a picker UI of its own.
+ * Pure text-query search field. Category selection lives in
+ * CategoryHero/CategoryChipRow and in the automatic category-match effect
+ * (see search-category-match.ts) — this bar used to also show a "Gå til
+ * kategori" suggestion in its own dropdown, but that duplicated the
+ * automatic matcher and could fire out of step with it (the automatic one
+ * often applied before the suggestion was even clicked), so it was removed
+ * in favor of one single category-recognition path.
  */
 export function SearchBar({
   q,
   onQChange,
   onSubmitQ,
-  selectedSlugs: _selectedSlugs,
-  onSelectedChange,
-  categories,
   qMode,
   onQModeChange,
   showQMode = false,
@@ -70,12 +63,8 @@ export function SearchBar({
     return () => clearInterval(id);
   }, [q, qFocused]);
 
-  // Suggest a matching category while the user types in "Hva", so people who
-  // type a category name (e.g. "sykkel") discover that browsing by category
-  // is also possible from the same field, without needing a separate UI.
-  const qSuggestion = useMemo(() => findCategorySuggestion(categories, q), [q, categories]);
   const { data: listingSuggestions } = useSearchSuggestions(q);
-  const hasDropdown = qFocused && !!(qSuggestion || listingSuggestions?.length);
+  const hasDropdown = qFocused && !!listingSuggestions?.length;
 
   return (
     <form
@@ -112,43 +101,11 @@ export function SearchBar({
               aria-label="Søkeforslag"
               className="absolute left-0 top-[calc(100%+0.5rem)] z-50 w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-card p-1 shadow-md"
             >
-              {qSuggestion && (
-                <button
-                  ref={firstSuggestionRef as React.RefObject<HTMLButtonElement>}
-                  type="button"
-                  role="option"
-                  aria-selected="false"
-                  // Mouse-down fires before the input's blur, so the click
-                  // registers instead of being lost when focus leaves the field.
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    onSelectedChange([qSuggestion.slug]);
-                    onQChange("");
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      onSelectedChange([qSuggestion.slug]);
-                      onQChange("");
-                    } else if (e.key === "Escape") {
-                      setQFocused(false);
-                    }
-                  }}
-                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <FolderOpen className="size-4 shrink-0 text-muted-foreground" />
-                  <span>
-                    Gå til kategori: <span className="font-medium">{qSuggestion.name_nb}</span>
-                  </span>
-                </button>
-              )}
               {listingSuggestions?.map((s, i) => (
                 <Link
                   key={s.id}
                   ref={
-                    !qSuggestion && i === 0
-                      ? (firstSuggestionRef as React.RefObject<HTMLAnchorElement>)
-                      : undefined
+                    i === 0 ? (firstSuggestionRef as React.RefObject<HTMLAnchorElement>) : undefined
                   }
                   to="/$kaupetCode"
                   params={{ kaupetCode: s.kaupet_code }}

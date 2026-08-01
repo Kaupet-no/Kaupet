@@ -1719,6 +1719,15 @@ export type Database = {
           views_7d: number
         }[]
       }
+      admin_zero_result_searches: {
+        Args: { _limit?: number }
+        Returns: {
+          last_searched_at: string
+          query: string
+          search_count: number
+          zero_result_count: number
+        }[]
+      }
       admin_popular_categories: {
         Args: never
         Returns: {

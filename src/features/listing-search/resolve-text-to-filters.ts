@@ -71,7 +71,7 @@ export async function resolveTextToFilters(params: {
   }
   q = removeNumericMatches(q, numericMatches);
 
-  let synonymMatches: Awaited<ReturnType<typeof fetchSynonymMatches>> = [];
+  let synonymMatches: Awaited<ReturnType<typeof fetchSynonymMatches>>;
   try {
     synonymMatches = categoryId ? await fetchSynonymMatches(categoryId, q) : [];
   } catch {

@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Eye, ImageOff, MapPin } from "lucide-react";
+import { Eye, Gauge, ImageOff, MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 import { signListingImageUrls } from "@/lib/storage";
 import { formatPrice } from "@/lib/format";
@@ -18,7 +18,19 @@ export type ListingCardData = {
   cover_path: string | null;
   total_views?: number;
   views_last_week?: number;
+  mileage_km?: number | null;
 };
+
+function MileageLabel({ mileageKm, className }: { mileageKm: number; className?: string }) {
+  return (
+    <p
+      className={`flex shrink-0 items-center gap-1 text-xs text-muted-foreground ${className ?? ""}`}
+    >
+      <Gauge className="size-3" />
+      {mileageKm.toLocaleString("nb-NO")} km
+    </p>
+  );
+}
 
 type Props = {
   listing: ListingCardData;
@@ -104,7 +116,12 @@ export function ListingCard({
           {listing.subtitle && (
             <p className="line-clamp-1 text-xs text-muted-foreground">{listing.subtitle}</p>
           )}
-          <p className="font-display text-base font-semibold">{formatPrice(listing)}</p>
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="font-display text-base font-semibold">{formatPrice(listing)}</p>
+            {typeof listing.mileage_km === "number" && (
+              <MileageLabel mileageKm={listing.mileage_km} />
+            )}
+          </div>
           {listing.city && <p className="text-xs text-muted-foreground">{listing.city}</p>}
         </div>
         <FavoriteButton listingId={listing.id} size="sm" className="shrink-0 self-center" />
@@ -134,9 +151,14 @@ export function ListingCard({
         {listing.subtitle && (
           <p className="line-clamp-1 text-xs text-muted-foreground">{listing.subtitle}</p>
         )}
-        <p className={`font-display ${isNative ? "text-lg font-semibold" : "text-base"}`}>
-          {formatPrice(listing)}
-        </p>
+        <div className="flex items-baseline justify-between gap-2">
+          <p className={`font-display ${isNative ? "text-lg font-semibold" : "text-base"}`}>
+            {formatPrice(listing)}
+          </p>
+          {typeof listing.mileage_km === "number" && (
+            <MileageLabel mileageKm={listing.mileage_km} />
+          )}
+        </div>
         {listing.city && (
           <p
             className={`text-xs text-muted-foreground ${isNative ? "" : "flex items-center gap-1"}`}

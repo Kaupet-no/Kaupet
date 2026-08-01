@@ -1872,6 +1872,7 @@ export type Database = {
           subtitle: string | null
           total_views: number
           views_last_week: number
+          mileage_km: number | null
         }[]
       }
       popular_listings_last_week: {
@@ -1888,6 +1889,7 @@ export type Database = {
           subtitle: string | null
           total_views: number
           views_last_week: number
+          mileage_km: number | null
         }[]
       }
       purge_expired_accounts: { Args: never; Returns: number }

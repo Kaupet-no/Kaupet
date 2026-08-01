@@ -77,11 +77,16 @@ const VEHICLE_BEHAVIOR: CategoryBehavior = {
     const brand = typeof attributes.brand === "string" ? attributes.brand : null;
     const model = typeof attributes.model === "string" ? attributes.model : null;
     const segments: BreadcrumbSegment[] = [];
+    // Multiselect (not a single "select"/"text" value) so landing on this
+    // filtered search also shows the brand/model chips as checkbox lists the
+    // user can broaden — e.g. clicking "Volvo" shows every brand as a
+    // checkable option (Volvo pre-checked) and every Volvo model, not just
+    // the one this listing happens to be.
     if (brand) {
       segments.push({
         name_nb: capitalizeWord(brand) ?? brand,
         slug: rootCategorySlug,
-        attrs: { brand: { kind: "text", value: brand } },
+        attrs: { brand: { kind: "multiselect", values: [brand] } },
       });
     }
     if (model) {
@@ -89,8 +94,8 @@ const VEHICLE_BEHAVIOR: CategoryBehavior = {
         name_nb: capitalizeWord(model) ?? model,
         slug: rootCategorySlug,
         attrs: {
-          ...(brand ? { brand: { kind: "text", value: brand } } : {}),
-          model: { kind: "text", value: model },
+          ...(brand ? { brand: { kind: "multiselect", values: [brand] } } : {}),
+          model: { kind: "multiselect", values: [model] },
         },
       });
     }

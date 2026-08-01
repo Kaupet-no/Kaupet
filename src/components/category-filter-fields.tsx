@@ -22,7 +22,7 @@ import {
 } from "@/features/listing-creation/modules/generic-attributes/vehicle-brand-model-fields";
 import { RangeFilterField } from "@/components/range-filter-field";
 import { boundsForFilter } from "@/lib/filter-range-bounds";
-import { ComboboxField } from "@/components/combobox-field";
+import { ComboboxMultiContent } from "@/components/combobox-field";
 
 /**
  * Trigger button for the "Se flere valg" `Collapsible` wrapping a category's
@@ -102,28 +102,40 @@ export function CategoryFilterFields({
         // it to type "select" with suggested options (see suggest_attribute_values
         // / Fase 2.6) — a curated list helps most buyers, but a plain <Select>
         // would block sellers with an uncommon brand, so it gets a combobox
-        // instead of the closed dropdown other select filters use.
+        // instead of the closed dropdown other select filters use. Multiselect
+        // (not "text"/"select" single-value) for the same reason vehicle
+        // Merke/Modell are — this is search-side (CategoryFilterFields is
+        // only used here, not in the listing-creation wizard, which has its
+        // own single-value field group), so a buyer should be able to check
+        // several brands to broaden the search, not just pick one.
+        //
+        // Rendered as the checklist directly (not ComboboxMultiField's own
+        // label+trigger+popover) — every call site here already supplies its
+        // own chrome (the chip's own Popover, or the "Flere valg" sheet/
+        // dialog), so wrapping it in a second nested trigger button would
+        // force an extra tap just to reach the list inside it.
         if (f.key === "brand" && (f.type === "text" || f.type === "select")) {
-          const brandValue =
-            current?.kind === "text" || current?.kind === "select" ? current.value : undefined;
+          const brandValues = current?.kind === "multiselect" ? current.values : [];
           return (
-            <ComboboxField
-              key={f.id}
-              label={f.label_nb}
-              value={brandValue}
-              options={f.options ?? []}
-              onChange={(v) =>
-                onChange(
-                  f.key,
-                  v
-                    ? f.type === "select"
-                      ? { kind: "select", value: v }
-                      : { kind: "text", value: v }
-                    : undefined,
-                )
-              }
-              placeholder={`Søk ${f.label_nb.toLowerCase()} eller skriv inn...`}
-            />
+            <div key={f.id} className="space-y-2">
+              <Label>{f.label_nb}</Label>
+              <div className="rounded-md border border-border">
+                <ComboboxMultiContent
+                  values={brandValues}
+                  options={f.options ?? []}
+                  onToggle={(v) => {
+                    const next = brandValues.includes(v)
+                      ? brandValues.filter((x) => x !== v)
+                      : [...brandValues, v];
+                    onChange(
+                      f.key,
+                      next.length > 0 ? { kind: "multiselect", values: next } : undefined,
+                    );
+                  }}
+                  placeholder={`Søk ${f.label_nb.toLowerCase()} eller skriv inn...`}
+                />
+              </div>
+            </div>
           );
         }
         if (f.type === "boolean") {

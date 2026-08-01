@@ -50,8 +50,9 @@ export function FilterHintBanner({
   return (
     <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
       <span className="flex-1">
-        Trykk på et filter for å legge det til søket ditt — det dukker opp som en fjernbar
-        søkekriterie du kan endre eller slette når som helst.
+        Trykk på et filter, eller skriv rett i søkefeltet ("automatgir", "under 3000 kr",
+        "mobiltelefon") — det dukker opp som en fjernbar søkekriterie du kan endre eller slette når
+        som helst.
       </span>
       <button
         type="button"

@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-import { Save } from "lucide-react";
+import { FolderOpen, Save, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -23,11 +23,7 @@ import { summarizeCriteria } from "@/lib/saved-searches";
 import { WtbListingCard } from "@/components/wtb-listing-card";
 import { searchSchema, conditionEnum } from "@/features/listing-search/search-schema";
 import { useListingsQuery } from "@/features/listing-search/use-listings-query";
-import {
-  useSearchSynonymMatches,
-  removeMatchedWords,
-} from "@/features/listing-search/use-search-synonym-matches";
-import { parseNumericFilters, removeNumericMatches } from "@/lib/search-number-parser";
+import { useTextToFilterPipeline } from "@/features/listing-search/use-text-to-filter-pipeline";
 import { matchCategoryPhrase, removeCategoryMatch } from "@/lib/search-category-match";
 import {
   normalizeFilter,
@@ -112,6 +108,26 @@ function BrowsePage() {
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
   const [advancedOverlayOpen, setAdvancedOverlayOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"listings" | "wtb">("listings");
+  // The original typed phrase behind each auto-applied attribute value, keyed
+  // by "filterKey:optionValue" ("filterKey:" for single-value filters) — lets
+  // removing an auto-generated chip put the word back in the search box
+  // instead of deleting it outright, since the automation can guess wrong.
+  const [autoAppliedText, setAutoAppliedText] = useState<Record<string, string>>({});
+  // Composite keys of chips that were just auto-applied from typed text —
+  // flashed briefly in ActiveFilters so the transition from "word" to "chip"
+  // is visible instead of the word just disappearing.
+  const [justCreatedKeys, setJustCreatedKeys] = useState<Set<string>>(new Set());
+  const flashKeys = (keys: string[]) => {
+    if (keys.length === 0) return;
+    setJustCreatedKeys((prev) => new Set([...prev, ...keys]));
+    setTimeout(() => {
+      setJustCreatedKeys((prev) => {
+        const next = new Set(prev);
+        for (const k of keys) next.delete(k);
+        return next;
+      });
+    }, 1500);
+  };
 
   const { refreshing, pullDistance } = usePullToRefresh({
     enabled: isNative && mounted,
@@ -207,66 +223,56 @@ function BrowsePage() {
     [hero, categoryTree],
   );
 
-  // Recognizes category-attribute vocabulary (e.g. "ryggekamera") typed into
-  // the search box and converts it into a structured attribute filter, so
-  // typing equipment terms works the same as clicking the matching filter
-  // chip. Only runs once a category is selected — see
-  // use-search-synonym-matches.ts for why the vocabulary is ambiguous
-  // without one.
-  const { data: synonymMatches } = useSearchSynonymMatches(hero?.selected.id ?? null, qDraft);
-  useEffect(() => {
-    if (!synonymMatches || synonymMatches.length === 0) return;
-    for (const m of synonymMatches) {
-      const filter = attrFilters.find((f) => f.key === m.filterKey);
-      if (!filter) continue;
-      if (filter.type === "boolean") {
-        handleAttrValueChange(m.filterKey, { kind: "boolean", value: true });
-      } else if (filter.type === "select" && m.optionValue) {
-        handleAttrValueChange(m.filterKey, { kind: "select", value: m.optionValue });
-      } else if (filter.type === "multiselect" && m.optionValue) {
-        const current = attrValues[m.filterKey];
-        const values = current?.kind === "multiselect" ? current.values : [];
-        if (!values.includes(m.optionValue)) {
-          handleAttrValueChange(m.filterKey, {
-            kind: "multiselect",
-            values: [...values, m.optionValue],
-          });
-        }
-      }
-    }
-    const nextQ = removeMatchedWords(qDraft, synonymMatches);
-    if (nextQ !== qDraft) {
-      setQDraft(nextQ);
-      updateSearch({ q: nextQ });
-    }
-    // Runs once per resolved match set; re-triggers naturally once qDraft
-    // changes again as a result of applying it.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [synonymMatches]);
+  // Recognizes category-attribute vocabulary (e.g. "ryggekamera") and
+  // number+unit facts (e.g. "under 100000 km") typed into the search box
+  // and converts them into structured attribute filters — see
+  // use-text-to-filter-pipeline.ts, which coordinates both matchers in one
+  // atomic pass so they can't clobber each other. Synonym matching only
+  // runs once a category is selected — see use-search-synonym-matches.ts
+  // for why the vocabulary is ambiguous without one.
+  useTextToFilterPipeline({
+    qDraft,
+    setQDraft,
+    updateSearch,
+    attrFilters,
+    attrValues,
+    handleAttrValueChange,
+    categoryId: hero?.selected.id ?? null,
+    onApplied: (applied) => {
+      setAutoAppliedText((prev) => ({ ...prev, ...applied }));
+      flashKeys(Object.keys(applied));
+    },
+  });
 
-  // Recognizes number+unit facts (e.g. "under 100000 km", "235 hk", a bare
-  // "2021") typed into the search box and converts them into range filters
-  // on the category's own number-type filters — see search-number-parser.ts.
-  const numericMatches = useMemo(
-    () => parseNumericFilters(qDraft, attrFilters),
-    [qDraft, attrFilters],
-  );
-  useEffect(() => {
-    if (numericMatches.length === 0) return;
-    for (const m of numericMatches) {
-      const current = attrValues[m.filterKey];
-      const currentRange: { min?: number; max?: number } = current?.kind === "range" ? current : {};
-      const nextMin = m.min ?? currentRange.min;
-      const nextMax = m.max ?? currentRange.max;
-      handleAttrValueChange(m.filterKey, { kind: "range", min: nextMin, max: nextMax });
+  // Removes an attribute filter the same way onRemoveAttr always has, but
+  // first checks whether it was auto-applied from typed text (see
+  // autoAppliedText above) — if so, the original word goes back into the
+  // search box instead of vanishing, since the automation guessing wrong
+  // shouldn't cost the user what they typed.
+  const removeAttrWithRestore = (key: string, value?: string) => {
+    const composite = `${key}:${value ?? ""}`;
+    const restoreText = autoAppliedText[composite];
+    const current = attrValues[key];
+    if (value !== undefined && current?.kind === "multiselect") {
+      const next = current.values.filter((v) => v !== value);
+      handleAttrValueChange(
+        key,
+        next.length > 0 ? { kind: "multiselect", values: next } : undefined,
+      );
+    } else {
+      handleAttrValueChange(key, undefined);
     }
-    const nextQ = removeNumericMatches(qDraft, numericMatches);
-    if (nextQ !== qDraft) {
+    if (restoreText) {
+      setAutoAppliedText((prev) => {
+        const next = { ...prev };
+        delete next[composite];
+        return next;
+      });
+      const nextQ = qDraft ? `${qDraft} ${restoreText}` : restoreText;
       setQDraft(nextQ);
       updateSearch({ q: nextQ });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [numericMatches]);
+  };
 
   // Recognizes a category name typed as a whole phrase (e.g. "mobiltelefon")
   // and applies it as the category filter — the same action as clicking the
@@ -274,11 +280,19 @@ function BrowsePage() {
   // click. See search-category-match.ts. Only on /annonser: category
   // landing pages are already scoped to one category, so auto-navigating
   // away based on typed text there would be surprising rather than helpful.
-  const categoryMatch = useMemo(
-    () => matchCategoryPhrase(qDraft, categories ?? []),
-    [qDraft, categories],
-  );
-  useEffect(() => {
+  // A category match is confirmed (click or Enter) rather than applied the
+  // instant it's recognized — unlike the attribute/number matches above, it
+  // triggers a full page navigation (new hero, new breadcrumb), which is too
+  // disruptive to fire mid-sentence while the user is still typing. Tracking
+  // `dismissedMatchText` keeps a closed suggestion closed for that exact
+  // phrase instead of it reappearing on every keystroke.
+  const [dismissedMatchText, setDismissedMatchText] = useState<string | null>(null);
+  const categoryMatch = useMemo(() => {
+    const m = matchCategoryPhrase(qDraft, categories ?? []);
+    return m && m.matchedText !== dismissedMatchText ? m : null;
+  }, [qDraft, categories, dismissedMatchText]);
+
+  const applyCategoryMatch = () => {
     if (!categoryMatch) return;
     const nextQ = removeCategoryMatch(qDraft, categoryMatch);
     setQDraft(nextQ);
@@ -288,8 +302,8 @@ function BrowsePage() {
       catMode: "any",
       q: nextQ,
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categoryMatch]);
+    setDismissedMatchText(null);
+  };
 
   // Always the main category's own direct children — not `hero.selected`'s,
   // which can drill deeper than the root once a single subcategory narrows
@@ -559,9 +573,6 @@ function BrowsePage() {
                   void hapticImpact("medium");
                   updateSearch({ q: qDraft });
                 }}
-                selectedSlugs={[]}
-                onSelectedChange={() => {}}
-                categories={categories ?? []}
                 qMode={search.qMode}
                 onQModeChange={(m) => updateSearch({ qMode: m })}
                 showQMode={false}
@@ -583,24 +594,40 @@ function BrowsePage() {
               onQChange={setQDraft}
               onSubmitQ={() => {
                 void hapticImpact("medium");
-                updateSearch({ q: qDraft });
+                // Pressing Enter with a pending category match confirms it
+                // (same action as clicking the suggestion chip below)
+                // instead of running a plain text search for it.
+                if (categoryMatch) applyCategoryMatch();
+                else updateSearch({ q: qDraft });
               }}
-              selectedSlugs={
-                search.category
-                  ? [
-                      search.category,
-                      ...search.categories.filter((s: string) => s !== search.category),
-                    ]
-                  : search.categories
-              }
-              onSelectedChange={(slugs) =>
-                updateSearch({ category: "", categories: slugs, catMode: "any" })
-              }
-              categories={categories ?? []}
               qMode={search.qMode}
               onQModeChange={(m) => updateSearch({ qMode: m })}
               showQMode={false}
             />
+          )}
+          {categoryMatch && (
+            <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+              <FolderOpen className="size-4 shrink-0 text-primary" />
+              <span className="flex-1">
+                Mente du kategorien{" "}
+                <button
+                  type="button"
+                  onClick={applyCategoryMatch}
+                  className="font-medium text-primary underline-offset-2 hover:underline"
+                >
+                  {categoryMatch.categoryName}
+                </button>
+                ?
+              </span>
+              <button
+                type="button"
+                onClick={() => setDismissedMatchText(categoryMatch.matchedText)}
+                className="shrink-0 rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Ikke nå"
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
           )}
           <FilterHintBanner hasActiveCriteria={hasSearchCriteria} />
           {isNative ? (
@@ -671,18 +698,8 @@ function BrowsePage() {
             onRemoveLocation={() =>
               updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
             }
-            onRemoveAttr={(key, value) => {
-              const current = attrValues[key];
-              if (value !== undefined && current?.kind === "multiselect") {
-                const next = current.values.filter((v) => v !== value);
-                handleAttrValueChange(
-                  key,
-                  next.length > 0 ? { kind: "multiselect", values: next } : undefined,
-                );
-                return;
-              }
-              handleAttrValueChange(key, undefined);
-            }}
+            onRemoveAttr={removeAttrWithRestore}
+            justCreatedKeys={justCreatedKeys}
           />
         </div>
 
@@ -773,7 +790,7 @@ function BrowsePage() {
             }}
             attrFilters={attrFilters}
             attrValues={attrValues}
-            onRemoveAttr={(key) => handleAttrValueChange(key, undefined)}
+            onRemoveAttr={(key) => removeAttrWithRestore(key)}
             mapListings={mapListings}
             mapCenter={mapCenter}
             radiusKm={search.radius ?? 10}

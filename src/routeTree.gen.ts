@@ -36,6 +36,7 @@ import { Route as AuthenticatedAdminKategorierRouteImport } from './routes/_auth
 import { Route as AuthenticatedAdminKjoretoyRouteImport } from './routes/_authenticated/admin/kjoretoy'
 import { Route as AuthenticatedAdminModerasjonRouteImport } from './routes/_authenticated/admin/moderasjon'
 import { Route as AuthenticatedAdminPromoteringerRouteImport } from './routes/_authenticated/admin/promoteringer'
+import { Route as AuthenticatedAdminSokRouteImport } from './routes/_authenticated/admin/sok'
 import { Route as AuthenticatedAdminVippsWebhooksRouteImport } from './routes/_authenticated/admin/vipps-webhooks'
 import { Route as AuthenticatedBekrefterPromoIdRouteImport } from './routes/_authenticated/bekrefter.$promoId'
 import { Route as AuthenticatedKvitteringPromoIdRouteImport } from './routes/_authenticated/kvittering.$promoId'
@@ -186,6 +187,11 @@ const AuthenticatedAdminPromoteringerRoute =
     path: '/promoteringer',
     getParentRoute: () => AuthenticatedAdminRouteRoute,
   } as any)
+const AuthenticatedAdminSokRoute = AuthenticatedAdminSokRouteImport.update({
+  id: '/sok',
+  path: '/sok',
+  getParentRoute: () => AuthenticatedAdminRouteRoute,
+} as any)
 const AuthenticatedAdminVippsWebhooksRoute =
   AuthenticatedAdminVippsWebhooksRouteImport.update({
     id: '/vipps-webhooks',
@@ -265,6 +271,7 @@ export interface FileRoutesByFullPath {
   '/admin/kjoretoy': typeof AuthenticatedAdminKjoretoyRoute
   '/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
   '/admin/promoteringer': typeof AuthenticatedAdminPromoteringerRoute
+  '/admin/sok': typeof AuthenticatedAdminSokRoute
   '/admin/vipps-webhooks': typeof AuthenticatedAdminVippsWebhooksRoute
   '/bekrefter/$promoId': typeof AuthenticatedBekrefterPromoIdRoute
   '/kvittering/$promoId': typeof AuthenticatedKvitteringPromoIdRoute
@@ -301,6 +308,7 @@ export interface FileRoutesByTo {
   '/admin/kjoretoy': typeof AuthenticatedAdminKjoretoyRoute
   '/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
   '/admin/promoteringer': typeof AuthenticatedAdminPromoteringerRoute
+  '/admin/sok': typeof AuthenticatedAdminSokRoute
   '/admin/vipps-webhooks': typeof AuthenticatedAdminVippsWebhooksRoute
   '/bekrefter/$promoId': typeof AuthenticatedBekrefterPromoIdRoute
   '/kvittering/$promoId': typeof AuthenticatedKvitteringPromoIdRoute
@@ -340,6 +348,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/kjoretoy': typeof AuthenticatedAdminKjoretoyRoute
   '/_authenticated/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
   '/_authenticated/admin/promoteringer': typeof AuthenticatedAdminPromoteringerRoute
+  '/_authenticated/admin/sok': typeof AuthenticatedAdminSokRoute
   '/_authenticated/admin/vipps-webhooks': typeof AuthenticatedAdminVippsWebhooksRoute
   '/_authenticated/bekrefter/$promoId': typeof AuthenticatedBekrefterPromoIdRoute
   '/_authenticated/kvittering/$promoId': typeof AuthenticatedKvitteringPromoIdRoute
@@ -379,6 +388,7 @@ export interface FileRouteTypes {
     | '/admin/kjoretoy'
     | '/admin/moderasjon'
     | '/admin/promoteringer'
+    | '/admin/sok'
     | '/admin/vipps-webhooks'
     | '/bekrefter/$promoId'
     | '/kvittering/$promoId'
@@ -415,6 +425,7 @@ export interface FileRouteTypes {
     | '/admin/kjoretoy'
     | '/admin/moderasjon'
     | '/admin/promoteringer'
+    | '/admin/sok'
     | '/admin/vipps-webhooks'
     | '/bekrefter/$promoId'
     | '/kvittering/$promoId'
@@ -453,6 +464,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/kjoretoy'
     | '/_authenticated/admin/moderasjon'
     | '/_authenticated/admin/promoteringer'
+    | '/_authenticated/admin/sok'
     | '/_authenticated/admin/vipps-webhooks'
     | '/_authenticated/bekrefter/$promoId'
     | '/_authenticated/kvittering/$promoId'
@@ -674,6 +686,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminPromoteringerRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
+    '/_authenticated/admin/sok': {
+      id: '/_authenticated/admin/sok'
+      path: '/sok'
+      fullPath: '/admin/sok'
+      preLoaderRoute: typeof AuthenticatedAdminSokRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
     '/_authenticated/admin/vipps-webhooks': {
       id: '/_authenticated/admin/vipps-webhooks'
       path: '/vipps-webhooks'
@@ -746,6 +765,7 @@ interface AuthenticatedAdminRouteRouteChildren {
   AuthenticatedAdminKjoretoyRoute: typeof AuthenticatedAdminKjoretoyRoute
   AuthenticatedAdminModerasjonRoute: typeof AuthenticatedAdminModerasjonRoute
   AuthenticatedAdminPromoteringerRoute: typeof AuthenticatedAdminPromoteringerRoute
+  AuthenticatedAdminSokRoute: typeof AuthenticatedAdminSokRoute
   AuthenticatedAdminVippsWebhooksRoute: typeof AuthenticatedAdminVippsWebhooksRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
 }
@@ -757,6 +777,7 @@ const AuthenticatedAdminRouteRouteChildren: AuthenticatedAdminRouteRouteChildren
     AuthenticatedAdminKjoretoyRoute: AuthenticatedAdminKjoretoyRoute,
     AuthenticatedAdminModerasjonRoute: AuthenticatedAdminModerasjonRoute,
     AuthenticatedAdminPromoteringerRoute: AuthenticatedAdminPromoteringerRoute,
+    AuthenticatedAdminSokRoute: AuthenticatedAdminSokRoute,
     AuthenticatedAdminVippsWebhooksRoute: AuthenticatedAdminVippsWebhooksRoute,
     AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
   }

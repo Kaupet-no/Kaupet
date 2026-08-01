@@ -457,6 +457,9 @@ describe.skipIf(!canRun)(
 
     const userIds: string[] = [];
     let ownerId: string;
+    let searchId: string;
+    let listingId: string;
+    let secondListingId: string;
     let notificationId: string;
 
     async function signIn(email: string) {
@@ -481,12 +484,18 @@ describe.skipIf(!canRun)(
       const sellerId = await mkUser(emails.seller);
       await mkUser(emails.other);
 
+      // notify: false — otherwise inserting the active listing below fires
+      // listings_match_saved_searches, which matches this search's empty
+      // (unfiltered) criteria and auto-inserts the same notification row via
+      // the DB trigger, racing the manual insert further down and tripping
+      // the (saved_search_id, listing_id) unique constraint.
       const { data: search, error: searchErr } = await admin
         .from("saved_searches")
-        .insert({ user_id: ownerId, name: "RLS ssn test search", criteria: {} })
+        .insert({ user_id: ownerId, name: "RLS ssn test search", criteria: {}, notify: false })
         .select("id")
         .single();
       if (searchErr) throw searchErr;
+      searchId = search.id;
 
       const { data: listing, error: listingErr } = await admin
         .from("listings")
@@ -499,14 +508,32 @@ describe.skipIf(!canRun)(
         .select("id")
         .single();
       if (listingErr) throw listingErr;
+      listingId = listing.id;
 
       const { data: notif, error: notifErr } = await admin
         .from("saved_search_notifications")
-        .insert({ saved_search_id: search.id, user_id: ownerId, listing_id: listing.id })
+        .insert({ saved_search_id: searchId, user_id: ownerId, listing_id: listingId })
         .select("id")
         .single();
       if (notifErr) throw notifErr;
       notificationId = notif.id;
+
+      // Second listing so the insert-blocked test below uses a real,
+      // not-yet-notified (search, listing) pair — proving the insert is
+      // rejected for lacking an INSERT grant/policy, not because of a
+      // foreign-key or unique-constraint violation.
+      const { data: listing2, error: listing2Err } = await admin
+        .from("listings")
+        .insert({
+          seller_id: sellerId,
+          title: "RLS ssn test listing 2",
+          price_nok: 100,
+          status: "active",
+        })
+        .select("id")
+        .single();
+      if (listing2Err) throw listing2Err;
+      secondListingId = listing2.id;
     });
 
     afterAll(async () => {
@@ -537,9 +564,9 @@ describe.skipIf(!canRun)(
     it("blocks clients from inserting notifications directly (server-only via SECURITY DEFINER function)", async () => {
       const owner = await signIn(emails.owner);
       const { error } = await owner.from("saved_search_notifications").insert({
-        saved_search_id: notificationId,
+        saved_search_id: searchId,
         user_id: ownerId,
-        listing_id: notificationId,
+        listing_id: secondListingId,
       });
       expect(error).not.toBeNull();
     });

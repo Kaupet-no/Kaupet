@@ -67,7 +67,11 @@ const FUEL_TYPE_OPTIONS = [
   { value: "diesel", label: "Diesel" },
   { value: "bensin", label: "Bensin" },
   { value: "el", label: "Elektrisk" },
-  { value: "hybrid", label: "Hybrid" },
+  { value: "hybrid_bensin", label: "Hybrid (bensin + el)" },
+  { value: "hybrid_diesel", label: "Hybrid (diesel + el)" },
+  { value: "hydrogen", label: "Hydrogen" },
+  { value: "gass_cng", label: "Gass (CNG)" },
+  { value: "etanol_e85", label: "Etanol (E85)" },
 ];
 
 const TRANSMISSION_OPTIONS = [

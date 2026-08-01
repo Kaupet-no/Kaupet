@@ -35,6 +35,15 @@ export type FilterType =
 
 export type FilterOption = { value: string; label_nb: string };
 
+/** `category_filters` keys of type `"select"` where a listing carries one
+ * value (a car has one body style/color/fuel type) but a buyer searching
+ * should still be able to check several allowed values at once — rendered
+ * as a checkbox list in the search UI (attribute-filter-chips.tsx,
+ * category-filter-fields.tsx) while attribute-fields.tsx (listing creation)
+ * keeps rendering the same `type: "select"` row as a single-value dropdown,
+ * since that form is unaffected by this key list. */
+export const SEARCH_MULTISELECT_KEYS: readonly string[] = ["body_type", "color", "fuel_type"];
+
 /** For brand_select filters, `unit` stores which vehicle_brands.category_group to read from. */
 export type VehicleBrandGroup =
   "bil" | "motorsykkel" | "moped_atv" | "bobil_campingvogn" | "henger";

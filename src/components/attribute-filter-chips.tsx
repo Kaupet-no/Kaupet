@@ -23,10 +23,11 @@ import {
 } from "@/lib/filter-chip-labels";
 import { splitPrimaryFilters } from "@/lib/category-filters";
 import { hapticImpact } from "@/lib/haptics";
-import type {
-  AttributeFilterValue,
-  CategoryFilter,
-  VehicleBrandGroup,
+import {
+  SEARCH_MULTISELECT_KEYS,
+  type AttributeFilterValue,
+  type CategoryFilter,
+  type VehicleBrandGroup,
 } from "@/lib/category-filters";
 
 type Props = {
@@ -184,6 +185,25 @@ export function AttributeFilterChips({
             {fieldFor(f)}
           </PopoverContent>
         </Popover>
+      );
+    }
+
+    // Karosseri/Farge/Drivstoff: a listing has one value, but a buyer
+    // narrowing search should be able to check several allowed values —
+    // see SEARCH_MULTISELECT_KEYS.
+    if (f.type === "select" && SEARCH_MULTISELECT_KEYS.includes(f.key)) {
+      const selected = current?.kind === "multiselect" ? current.values : [];
+      return (
+        <AttributeMultiChip
+          key={f.id}
+          filter={f}
+          label={label}
+          active={active}
+          values={selected}
+          onChange={(vals) =>
+            onChange(f.key, vals.length > 0 ? { kind: "multiselect", values: vals } : undefined)
+          }
+        />
       );
     }
 
@@ -562,6 +582,39 @@ function MultiSelectPopoverBody({
         </label>
       ))}
     </div>
+  );
+}
+
+/** Karosseri/Farge/Drivstoff as a checkbox list rather than a single-pick
+ * dropdown — see SEARCH_MULTISELECT_KEYS for why these `type: "select"`
+ * filters get a multi-value chip in search despite each listing only
+ * carrying one value. */
+function AttributeMultiChip({
+  filter,
+  label,
+  active,
+  values,
+  onChange,
+}: {
+  filter: CategoryFilter;
+  label: string;
+  active: boolean;
+  values: string[];
+  onChange: (values: string[]) => void;
+}) {
+  const options = (filter.options ?? []).map((o) => ({ value: o.value, label: o.label_nb }));
+  const toggle = (v: string) => {
+    onChange(values.includes(v) ? values.filter((x) => x !== v) : [...values, v]);
+  };
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <FilterChip label={label} active={active} />
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64 p-2">
+        <MultiSelectPopoverBody options={options} values={values} onToggle={toggle} />
+      </PopoverContent>
+    </Popover>
   );
 }
 

@@ -70,7 +70,8 @@ export function RangeFilterField({
       <div className="flex items-baseline justify-between gap-2">
         <Label>{label}</Label>
         <span className="text-xs text-muted-foreground">
-          {formatRangeValue(sliderMin, bounds.unit)} – {formatRangeValue(sliderMax, bounds.unit)}
+          {formatRangeValue(sliderMin, bounds.unit, bounds.noGrouping)} –{" "}
+          {formatRangeValue(sliderMax, bounds.unit, bounds.noGrouping)}
           {sliderMax === bounds.max ? "+" : ""}
         </span>
       </div>
@@ -90,7 +91,7 @@ export function RangeFilterField({
           inputMode="numeric"
           aria-label={`Fra ${label.toLowerCase()}`}
           placeholder="Fra"
-          value={formatThousands(minDraft, bounds.max)}
+          value={formatThousands(minDraft, bounds.max, bounds.noGrouping)}
           onChange={(e) => setMinDraft(digitsOnlyClamped(e.target.value, bounds.max))}
           onBlur={() => commit(minDraft, maxDraft)}
           onKeyDown={(e) => e.key === "Enter" && commit(minDraft, maxDraft)}
@@ -100,7 +101,7 @@ export function RangeFilterField({
           inputMode="numeric"
           aria-label={`Til ${label.toLowerCase()}`}
           placeholder="Til"
-          value={formatThousands(maxDraft, bounds.max)}
+          value={formatThousands(maxDraft, bounds.max, bounds.noGrouping)}
           onChange={(e) => setMaxDraft(digitsOnlyClamped(e.target.value, bounds.max))}
           onBlur={() => commit(minDraft, maxDraft)}
           onKeyDown={(e) => e.key === "Enter" && commit(minDraft, maxDraft)}

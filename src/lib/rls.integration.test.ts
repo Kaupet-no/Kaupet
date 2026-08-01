@@ -341,13 +341,21 @@ describe.skipIf(!canRun)("RLS: favorites are private to their owner", () => {
 
   it("lets the owner see their own favorite", async () => {
     const owner = await signIn(emails.owner);
-    const { data } = await owner.from("favorites").select("id").eq("listing_id", listingId);
+    const { data, error } = await owner
+      .from("favorites")
+      .select("listing_id")
+      .eq("listing_id", listingId);
+    expect(error).toBeNull();
     expect(data).toHaveLength(1);
   });
 
   it("hides another user's favorites from an unrelated user", async () => {
     const other = await signIn(emails.other);
-    const { data } = await other.from("favorites").select("id").eq("listing_id", listingId);
+    const { data, error } = await other
+      .from("favorites")
+      .select("listing_id")
+      .eq("listing_id", listingId);
+    expect(error).toBeNull();
     expect(data).toHaveLength(0);
   });
 

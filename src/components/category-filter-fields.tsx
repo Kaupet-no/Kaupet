@@ -11,10 +11,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type {
-  AttributeFilterValue,
-  CategoryFilter,
-  VehicleBrandGroup,
+import {
+  SEARCH_MULTISELECT_KEYS,
+  type AttributeFilterValue,
+  type CategoryFilter,
+  type VehicleBrandGroup,
 } from "@/lib/category-filters";
 import {
   VehicleBrandField,
@@ -151,7 +152,7 @@ export function CategoryFilterFields({
             </label>
           );
         }
-        if (f.type === "select") {
+        if (f.type === "select" && !SEARCH_MULTISELECT_KEYS.includes(f.key)) {
           return (
             <div key={f.id} className="space-y-2">
               <Label>{f.label_nb}</Label>
@@ -176,7 +177,7 @@ export function CategoryFilterFields({
             </div>
           );
         }
-        if (f.type === "multiselect") {
+        if (f.type === "multiselect" || SEARCH_MULTISELECT_KEYS.includes(f.key)) {
           const selected = current?.kind === "multiselect" ? current.values : [];
           const toggle = (optionValue: string) => {
             const next = selected.includes(optionValue)

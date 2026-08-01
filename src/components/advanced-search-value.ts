@@ -1,13 +1,34 @@
 import type { LocationValue } from "@/components/location-filter";
-import type { SortValue } from "@/lib/categories";
+import type { Category, SortValue } from "@/lib/categories";
 import type { TermGroup } from "@/lib/term-groups";
 import type { SearchCriteria } from "@/lib/saved-searches";
+
+/** Root category slug for Bil og MC, which only lets a listing belong to one
+ * subcategory at a time — unlike other categories, where an ad can carry
+ * several sub-tags. The advanced search mirrors that by restricting
+ * subcategory selection to one at a time, and by hiding the "Tilstand"
+ * filter, since no Bil og MC listing has that attribute. */
+export const BIL_OG_MC_SLUG = "bil-og-mc";
+
+/** Walks a selected category slug up to its root ancestor and reports
+ * whether that root is Bil og MC. */
+export function isBilOgMcCategory(categories: Category[], selected: string[]): boolean {
+  const first = categories.find((c) => selected.includes(c.slug));
+  if (!first) return false;
+  let cur = first;
+  while (cur.parent_id) {
+    const parent = categories.find((c) => c.id === cur.parent_id);
+    if (!parent) break;
+    cur = parent;
+  }
+  return cur.slug === BIL_OG_MC_SLUG;
+}
 
 export const CONDITIONS: Array<{ value: string; label: string }> = [
   { value: "new", label: "Helt ny" },
   { value: "like_new", label: "Som ny" },
   { value: "good", label: "Pent brukt" },
-  { value: "worn", label: "Brukt med slitasje" },
+  { value: "acceptable", label: "Brukt med slitasje" },
   { value: "for_parts", label: "Må repareres" },
 ];
 

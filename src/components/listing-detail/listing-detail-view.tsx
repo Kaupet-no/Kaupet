@@ -506,7 +506,7 @@ function ListingDetailViewBody({
                   <Breadcrumb>
                     <BreadcrumbList className="gap-1 text-xs uppercase tracking-wide sm:gap-1">
                       {breadcrumb.map((c, i) => (
-                        <Fragment key={c.slug ?? `extra-${i}`}>
+                        <Fragment key={`${c.slug ?? "extra"}-${i}`}>
                           {i > 0 && <BreadcrumbSeparator />}
                           <BreadcrumbItem>
                             {c.slug == null ? (

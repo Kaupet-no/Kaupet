@@ -43,6 +43,53 @@ function buildNgrams(words: string[]): { text: string; start: number; end: numbe
  * should pass `categoryId: null` when no category is selected, which
  * disables matching entirely.
  */
+/**
+ * The actual RPC call + n-gram matching, factored out of the `useQuery`
+ * wrapper below so it can also be `await`-ed directly outside of React —
+ * see resolve-text-to-filters.ts, which reuses this for the native search
+ * overlay's one-shot submit (no live debounced hook there).
+ */
+export async function fetchSynonymMatches(
+  categoryId: string | null,
+  q: string,
+): Promise<SynonymMatch[]> {
+  const words = q.trim().length > 0 ? q.trim().split(/\s+/) : [];
+  const ngrams = buildNgrams(words);
+  if (ngrams.length === 0 || !categoryId) return [];
+
+  const { data, error } = await supabase.rpc("match_search_synonyms", {
+    p_category_id: categoryId,
+    phrases: ngrams.map((n) => n.text),
+  });
+  if (error) throw error;
+  if (!data || data.length === 0) return [];
+
+  const byPhrase = new Map(data.map((row) => [row.phrase.toLowerCase(), row]));
+
+  // Greedily accept the longest matched n-gram first, skipping any
+  // shorter match whose word range overlaps one already accepted (so
+  // "adaptiv cruisecontrol" wins over the "cruisecontrol" it contains).
+  const accepted: SynonymMatch[] = [];
+  const consumed = new Set<number>();
+  for (const ngram of ngrams) {
+    const row = byPhrase.get(ngram.text.toLowerCase());
+    if (!row) continue;
+    const range = Array.from({ length: ngram.end - ngram.start + 1 }, (_, i) => ngram.start + i);
+    if (range.some((i) => consumed.has(i))) continue;
+    for (const i of range) consumed.add(i);
+    accepted.push({
+      startWord: ngram.start,
+      endWord: ngram.end,
+      matchedText: ngram.text,
+      filterKey: row.filter_key,
+      filterLabel: row.filter_label,
+      optionValue: row.option_value,
+      optionLabel: row.option_label,
+    });
+  }
+  return accepted.sort((a, b) => a.startWord - b.startWord);
+}
+
 export function useSearchSynonymMatches(categoryId: string | null, q: string) {
   const [debouncedQ, setDebouncedQ] = useState(q.trim());
 
@@ -55,45 +102,7 @@ export function useSearchSynonymMatches(categoryId: string | null, q: string) {
 
   return useQuery({
     queryKey: ["search-synonym-matches", categoryId, debouncedQ],
-    queryFn: async (): Promise<SynonymMatch[]> => {
-      const ngrams = buildNgrams(words);
-      if (ngrams.length === 0 || !categoryId) return [];
-
-      const { data, error } = await supabase.rpc("match_search_synonyms", {
-        p_category_id: categoryId,
-        phrases: ngrams.map((n) => n.text),
-      });
-      if (error) throw error;
-      if (!data || data.length === 0) return [];
-
-      const byPhrase = new Map(data.map((row) => [row.phrase.toLowerCase(), row]));
-
-      // Greedily accept the longest matched n-gram first, skipping any
-      // shorter match whose word range overlaps one already accepted (so
-      // "adaptiv cruisecontrol" wins over the "cruisecontrol" it contains).
-      const accepted: SynonymMatch[] = [];
-      const consumed = new Set<number>();
-      for (const ngram of ngrams) {
-        const row = byPhrase.get(ngram.text.toLowerCase());
-        if (!row) continue;
-        const range = Array.from(
-          { length: ngram.end - ngram.start + 1 },
-          (_, i) => ngram.start + i,
-        );
-        if (range.some((i) => consumed.has(i))) continue;
-        for (const i of range) consumed.add(i);
-        accepted.push({
-          startWord: ngram.start,
-          endWord: ngram.end,
-          matchedText: ngram.text,
-          filterKey: row.filter_key,
-          filterLabel: row.filter_label,
-          optionValue: row.option_value,
-          optionLabel: row.option_label,
-        });
-      }
-      return accepted.sort((a, b) => a.startWord - b.startWord);
-    },
+    queryFn: () => fetchSynonymMatches(categoryId, debouncedQ),
     enabled: words.length > 0 && !!categoryId,
     staleTime: 30_000,
   });

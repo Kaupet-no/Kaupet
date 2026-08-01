@@ -83,8 +83,9 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
   e2e:
-    name: E2E (manual)
-    if: github.event_name == 'workflow_dispatch'
+    name: E2E
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
+    needs: verify
     runs-on: ubuntu-latest
     environment: staging
     steps:

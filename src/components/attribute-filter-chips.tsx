@@ -9,11 +9,18 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Select, SelectContent, SelectItem, SelectTriggerBare } from "@/components/ui/select";
 import { FilterChip } from "@/components/filter-chip";
 import { CategoryFilterFields } from "@/components/category-filter-fields";
+import { RangeFilterField } from "@/components/range-filter-field";
+import { CONDITIONS } from "@/components/advanced-search-value";
+import { PRICE_BOUNDS } from "@/lib/filter-range-bounds";
 import {
   useVehicleBrandOptions,
   useVehicleModelOptionsForBrands,
 } from "@/features/listing-creation/modules/generic-attributes/vehicle-brand-model-fields";
-import { getAttributeChipState } from "@/lib/filter-chip-labels";
+import {
+  getAttributeChipState,
+  getPriceChipState,
+  getConditionChipState,
+} from "@/lib/filter-chip-labels";
 import { splitPrimaryFilters } from "@/lib/category-filters";
 import { hapticImpact } from "@/lib/haptics";
 import type {
@@ -24,7 +31,8 @@ import type {
 
 type Props = {
   /** Effective filters for the selected category/categories. Empty when no
-   * category is selected — the row then renders nothing. */
+   * category is selected — the row then renders nothing, unless Pris/Tilstand
+   * (below) are supplied, in which case those still show. */
   filters: CategoryFilter[];
   values: Record<string, AttributeFilterValue>;
   onChange: (key: string, value: AttributeFilterValue | undefined) => void;
@@ -39,6 +47,17 @@ type Props = {
    * of leaving it buried in a long, fixed admin-sorted list. Purely a
    * same-session text match, no historical query data required. */
   queryText?: string;
+  /** Pris/Tilstand — generic (non-category) search criteria that share this
+   * row on desktop so all visible criteria live in one component/line. Only
+   * wired up by desktop callers; native keeps these in NativeFilterChips. */
+  min?: number;
+  max?: number;
+  includeFree?: boolean;
+  onPriceChange?: (min: number | undefined, max: number | undefined, includeFree: boolean) => void;
+  conditions?: string[];
+  onConditionsChange?: (c: string[]) => void;
+  /** Hides the "Tilstand" chip — no listing under Bil og MC has that attribute. */
+  hideCondition?: boolean;
 };
 
 /** How many of a filter's typed-word matches count toward its relevance —
@@ -71,11 +90,23 @@ export function AttributeFilterChips({
   isNative = false,
   resultCount,
   queryText,
+  min,
+  max,
+  includeFree,
+  onPriceChange,
+  conditions,
+  onConditionsChange,
+  hideCondition = false,
 }: Props) {
   const [openKey, setOpenKey] = useState<string | null>(null);
+  const [priceConditionOpen, setPriceConditionOpen] = useState<"price" | "condition" | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
 
-  if (filters.length === 0) return null;
+  // Desktop callers wire up Pris/Tilstand here so all visible search criteria
+  // live in one row/component; native keeps them in NativeFilterChips.
+  const showPriceCondition = !isNative && onPriceChange != null;
+
+  if (filters.length === 0 && !showPriceCondition) return null;
 
   const { primary, secondaryRaw } = (() => {
     const split = splitPrimaryFilters(filters);
@@ -247,6 +278,76 @@ export function AttributeFilterChips({
     );
   });
 
+  const { label: priceLabel, active: priceActive } = getPriceChipState(
+    min,
+    max,
+    includeFree ?? true,
+  );
+  const { label: condLabel, active: condActive } = getConditionChipState(conditions ?? []);
+
+  const priceChip = showPriceCondition && (
+    <Popover
+      open={priceConditionOpen === "price"}
+      onOpenChange={(o) => setPriceConditionOpen(o ? "price" : null)}
+    >
+      <PopoverTrigger asChild>
+        <FilterChip
+          label={priceLabel}
+          active={priceActive}
+          icon={<span className="text-[11px] font-bold">kr</span>}
+        />
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-72 p-3">
+        <PricePopoverContent
+          min={min}
+          max={max}
+          includeFree={includeFree ?? true}
+          onApply={(mn, mx, free) => {
+            onPriceChange?.(mn, mx, free);
+            setPriceConditionOpen(null);
+          }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+
+  const conditionChip = showPriceCondition && !hideCondition && (
+    <Popover
+      open={priceConditionOpen === "condition"}
+      onOpenChange={(o) => setPriceConditionOpen(o ? "condition" : null)}
+    >
+      <PopoverTrigger asChild>
+        <FilterChip
+          label={condLabel}
+          active={condActive}
+          icon={<span className="text-[11px]">✦</span>}
+        />
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64 p-2">
+        <div className="flex flex-col gap-1">
+          {CONDITIONS.map((c) => (
+            <label
+              key={c.value}
+              className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted"
+            >
+              <Checkbox
+                checked={(conditions ?? []).includes(c.value)}
+                onCheckedChange={(checked) =>
+                  onConditionsChange?.(
+                    checked
+                      ? [...(conditions ?? []), c.value]
+                      : (conditions ?? []).filter((v) => v !== c.value),
+                  )
+                }
+              />
+              <span>{c.label}</span>
+            </label>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+
   const moreButton = secondary.length > 0 && (
     <Button
       type="button"
@@ -280,14 +381,15 @@ export function AttributeFilterChips({
     </div>
   );
 
-  return (
-    <div
-      className={
-        isNative
-          ? "flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          : "flex flex-wrap items-center gap-2"
-      }
-    >
+  // Native keeps its own horizontally-scrolling row — merging it with
+  // NativeFilterChips' row would just make one wider scroll strip, with no
+  // benefit on the narrow viewports it targets. Desktop instead returns a
+  // fragment: the caller wraps it together with DesktopFilterChips in one
+  // shared flex-wrap row, so Pris/Tilstand and Merke/Modell can share a line.
+  const body = (
+    <>
+      {priceChip}
+      {conditionChip}
       {chips}
       {moreButton}
 
@@ -328,6 +430,48 @@ export function AttributeFilterChips({
             </DialogContent>
           </Dialog>
         ))}
+    </>
+  );
+
+  if (isNative) {
+    return (
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {body}
+      </div>
+    );
+  }
+  return body;
+}
+
+function PricePopoverContent({
+  min,
+  max,
+  includeFree,
+  onApply,
+}: {
+  min?: number;
+  max?: number;
+  includeFree: boolean;
+  onApply: (min: number | undefined, max: number | undefined, includeFree: boolean) => void;
+}) {
+  const [draft, setDraft] = useState<{ min?: number; max?: number }>({ min, max });
+  const [freeDraft, setFreeDraft] = useState(includeFree);
+
+  return (
+    <div className="space-y-3">
+      <RangeFilterField label="Pris" bounds={PRICE_BOUNDS} value={draft} onChange={setDraft} />
+      <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+        <Checkbox checked={freeDraft} onCheckedChange={(c) => setFreeDraft(c === true)} />
+        Inkluder gratis-annonser
+      </label>
+      <Button
+        type="button"
+        size="sm"
+        className="w-full"
+        onClick={() => onApply(draft.min, draft.max, freeDraft)}
+      >
+        Bruk prisfilter
+      </Button>
     </div>
   );
 }

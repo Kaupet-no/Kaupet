@@ -1,4 +1,4 @@
-import { Expand, LayoutList, LayoutGrid, Map as MapIcon, SearchX } from "lucide-react";
+import { ArrowUpDown, Expand, LayoutList, LayoutGrid, Map as MapIcon, SearchX } from "lucide-react";
 import { lazy, type ReactNode, Suspense, useEffect, useRef, useState } from "react";
 
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Dialog,
   DialogContent,
@@ -17,7 +18,8 @@ import type { MapListing } from "@/components/listings-map";
 import { FeaturedListingsSection } from "@/components/featured-listings-section";
 import { reverseGeocode } from "@/lib/geocode";
 import { hapticImpact } from "@/lib/haptics";
-import { getAttributeChipState } from "@/lib/filter-chip-labels";
+import { getAttributeChipState, getSortChipState } from "@/lib/filter-chip-labels";
+import { SORT_OPTIONS, type SortValue } from "@/lib/categories";
 import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
 
 const ListingsMap = lazy(() =>
@@ -53,6 +55,10 @@ type Props = {
   onMapCenterChange: (c: { lat: number; lng: number }, label: string | null) => void;
   onMapRadiusChange?: (km: number) => void;
   onMapClearLocation?: () => void;
+  /** Sorting is a view setting, not a search criterion, so it lives here next
+   * to "Skjul kart"/"Lagre søk" instead of in the filter-chip row. */
+  sort: SortValue;
+  onSortChange: (v: SortValue) => void;
   /** Extra toolbar actions (e.g. "Lagre søk") — annonser-specific, so left to the caller. */
   toolbarExtra?: ReactNode;
 };
@@ -85,8 +91,12 @@ export function ResultList({
   onMapCenterChange,
   onMapRadiusChange,
   onMapClearLocation,
+  sort,
+  onSortChange,
   toolbarExtra,
 }: Props) {
+  const [sortOpen, setSortOpen] = useState(false);
+  const { label: sortLabel } = getSortChipState(sort);
   const qWords = q.trim().split(/\s+/).filter(Boolean);
   const lastWord = qWords.length > 1 ? qWords[qWords.length - 1] : null;
   // Most restrictive active attribute filter, offered as the first recovery
@@ -189,6 +199,30 @@ export function ResultList({
           )}
         </div>
         <div className="flex items-center gap-2">
+          <Popover open={sortOpen} onOpenChange={setSortOpen}>
+            <PopoverTrigger asChild>
+              <Button type="button" variant="outline" size="sm" className="gap-1.5">
+                <ArrowUpDown className="size-4" /> {sortLabel}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-56 p-1">
+              {SORT_OPTIONS.map((s) => (
+                <button
+                  key={s.value}
+                  type="button"
+                  onClick={() => {
+                    onSortChange(s.value);
+                    setSortOpen(false);
+                  }}
+                  className={`block w-full rounded px-3 py-2 text-left text-sm hover:bg-muted ${
+                    sort === s.value ? "bg-muted font-medium" : ""
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </PopoverContent>
+          </Popover>
           {!isDesktop && !isNative && (
             <Sheet open={mobileMapOpen} onOpenChange={setMobileMapOpen}>
               <SheetTrigger asChild>

@@ -860,6 +860,7 @@ function BrowsePage() {
             onClose={() => setSearchOverlayOpen(false)}
             initialQ={qDraft}
             categories={categories ?? []}
+            allFilters={allFilters ?? []}
           />
         )}
 

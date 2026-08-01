@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { useSearchSynonymMatches, removeMatchedWords } from "./use-search-synonym-matches";
 import { parseNumericFilters, removeNumericMatches } from "@/lib/search-number-parser";
+import { stripFillerWords } from "@/lib/search-stopwords";
 import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
 
 /**
@@ -101,6 +102,7 @@ export function useTextToFilterPipeline({
     let nextQ = qDraft;
     if (hasSynonyms) nextQ = removeMatchedWords(nextQ, synonymMatches!);
     if (hasNumeric) nextQ = removeNumericMatches(nextQ, numericMatches);
+    nextQ = stripFillerWords(nextQ);
     if (nextQ !== qDraft) {
       setQDraft(nextQ);
       updateSearch({ q: nextQ });

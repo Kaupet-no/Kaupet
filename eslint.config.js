@@ -31,11 +31,14 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      "react-hooks/set-state-in-effect": "off",
-      "react-hooks/static-components": "off",
-      "react-hooks/incompatible-library": "off",
-      "react-hooks/refs": "off",
-      "no-useless-assignment": "off",
+      // Downgraded from "error" (not "off") pending an incremental cleanup —
+      // there are ~60 pre-existing violations across the codebase that need
+      // per-file review rather than a blind bulk fix. New violations still
+      // surface as lint warnings; tighten back to "error" as files are cleaned up.
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/static-components": "warn",
+      "react-hooks/incompatible-library": "warn",
+      "react-hooks/refs": "warn",
       "no-restricted-imports": [
         "error",
         {

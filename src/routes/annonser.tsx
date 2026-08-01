@@ -45,14 +45,11 @@ import { hapticImpact } from "@/lib/haptics";
 import { useScrollDirection } from "@/hooks/use-scroll-direction";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { useAnnonserSearchState } from "@/features/listing-search/use-annonser-search-state";
+import { useHeroCategoryActions } from "@/features/listing-search/use-hero-category-actions";
 import { CategoryHero } from "@/components/category-hero";
 import { CategoryChipRow } from "@/components/category-chip-row";
-import {
-  breadcrumbPath,
-  resolveHeroCategory,
-  selectAllForParent,
-  type Category,
-} from "@/lib/categories";
+import { BrowsePageSkeleton } from "@/components/browse-page-skeleton";
+import { breadcrumbPath, resolveHeroCategory, type Category } from "@/lib/categories";
 
 export const Route = createFileRoute("/annonser")({
   validateSearch: searchSchema,
@@ -381,64 +378,8 @@ function BrowsePage() {
     setAnimateHero(heroSelectedId != null && heroSelectedId !== prev);
   }, [mounted, categories, heroSelectedId]);
 
-  // Selecting a category inside the hero keeps the user on /annonser, so the
-  // query text and every other filter in the URL survive. Descendants are
-  // listed explicitly because the listings query only expands *root*
-  // categories one level (see use-listings-query.ts).
-  const selectHeroCategory = (target: Category) =>
-    updateSearch({
-      category: "",
-      categories: selectAllForParent(target, categoryTree),
-      catMode: "any",
-    });
-
-  // Always-visible category row above the search bar: tapping a main
-  // category selects its whole branch immediately (same as selectHeroCategory
-  // above); tapping a subcategory narrows to just that branch, toggling it
-  // off again falls back to the whole main category.
-  const selectRootCategory = (root: Category) => {
-    const alreadyActive = effectiveCategories.some((slug) =>
-      selectAllForParent(root, categoryTree).includes(slug),
-    );
-    updateSearch({
-      category: "",
-      categories: alreadyActive ? [] : selectAllForParent(root, categoryTree),
-      catMode: "any",
-    });
-  };
-
-  const toggleChildCategory = (root: Category, child: Category) => {
-    const selected = new Set(effectiveCategories);
-    const wholeBranch = selectAllForParent(root, categoryTree);
-    const wholeBranchSelected = wholeBranch.every((slug) => selected.has(slug));
-    const childBranch = selectAllForParent(child, categoryTree);
-    const childActive = !wholeBranchSelected && childBranch.every((slug) => selected.has(slug));
-
-    let next: string[];
-    if (wholeBranchSelected) {
-      // Narrowing from "everything in this main category" to just this child.
-      next = childBranch;
-    } else if (childActive) {
-      // Deselecting this child — fall back to the whole branch if nothing
-      // else is explicitly selected.
-      const remaining = effectiveCategories.filter((slug) => !childBranch.includes(slug));
-      next = remaining.length === 0 ? wholeBranch : remaining;
-    } else {
-      next = [...new Set([...effectiveCategories, ...childBranch])];
-    }
-    updateSearch({ category: "", categories: next, catMode: "any" });
-  };
-
-  const isHeroChildActive = (child: Category) => {
-    if (!hero) return false;
-    const wholeBranchSelected = selectAllForParent(hero.main, categoryTree).every((slug) =>
-      effectiveCategories.includes(slug),
-    );
-    if (wholeBranchSelected) return false;
-    return selectAllForParent(child, categoryTree).every((slug) =>
-      effectiveCategories.includes(slug),
-    );
-  };
+  const { selectHeroCategory, selectRootCategory, toggleChildCategory, isHeroChildActive } =
+    useHeroCategoryActions({ hero, categoryTree, effectiveCategories, updateSearch });
 
   useEffect(() => {
     if (!mounted) return;
@@ -508,27 +449,7 @@ function BrowsePage() {
     search.lat != null && search.lng != null ? { lat: search.lat, lng: search.lng } : null;
 
   if (!mounted) {
-    return (
-      <div className="mx-auto max-w-7xl px-4 py-10" aria-busy="true" aria-live="polite">
-        <h1 className="font-display text-3xl tracking-tight">Annonser</h1>
-        <span className="sr-only">Laster…</span>
-        <div className="mt-6 h-14 w-full animate-pulse rounded-full bg-muted" />
-        <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_420px]">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="space-y-3 rounded-xl border border-border p-3">
-                <div className="aspect-[4/3] w-full animate-pulse rounded-lg bg-muted" />
-                <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
-                <div className="h-4 w-1/3 animate-pulse rounded bg-muted" />
-              </div>
-            ))}
-          </div>
-          <div className="hidden lg:block">
-            <div className="sticky top-24 h-[calc(100vh-8rem)] w-full animate-pulse rounded-2xl bg-muted" />
-          </div>
-        </div>
-      </div>
-    );
+    return <BrowsePageSkeleton />;
   }
 
   return (

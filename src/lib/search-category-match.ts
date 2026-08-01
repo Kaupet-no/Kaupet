@@ -2,6 +2,12 @@ export type CategoryMatch = {
   matchedText: string;
   categorySlug: string;
   categoryName: string;
+  /** "category": the matched text *is* the category name and gets stripped
+   * from the query once applied (redundant once the filter exists).
+   * "brand": the matched text is a vehicle brand (e.g. "Volvo") that
+   * implies the category but should stay in the query, since it's still a
+   * useful title-search term and isn't itself a category name. */
+  source: "category" | "brand";
 };
 
 function escapeRegExp(s: string): string {
@@ -37,7 +43,49 @@ export function matchCategoryPhrase<T extends { slug: string; name_nb: string }>
     const m = q.match(re);
     if (!m) continue;
     if (!best || m[0].length > best.matchedText.length) {
-      best = { matchedText: m[0], categorySlug: c.slug, categoryName: name };
+      best = { matchedText: m[0], categorySlug: c.slug, categoryName: name, source: "category" };
+    }
+  }
+  return best;
+}
+
+/**
+ * Finds a known vehicle brand (e.g. "Volvo") typed as a whole word inside
+ * free-text search, and maps it to the "Bil og MC" root category — without
+ * this, a query like "Volvo med cruisecontrol" never gets a category
+ * assigned (since "Volvo" isn't a category name), so the equipment-synonym
+ * matcher in use-search-synonym-matches.ts never runs for "cruisecontrol"
+ * (it requires a category to scope its vocabulary lookup against), and the
+ * whole query falls through to a plain text search that finds nothing.
+ *
+ * Scoped to the "Bil og MC" root (not the specific "Bil"/"Motorsykkel"/...
+ * subcategory the brand's `category_group` implies) — the root already
+ * carries the shared equipment filters (utstyr_*) that this exists to
+ * unlock, and guessing the exact subcategory slug from `category_group`
+ * risks a wrong mapping; the root is always correct and sufficient.
+ */
+export function matchVehicleBrandPhrase(
+  query: string,
+  brands: { name: string }[],
+  vehicleRootSlug = "bil-og-mc",
+): CategoryMatch | null {
+  const q = query.trim();
+  if (!q) return null;
+
+  let best: CategoryMatch | null = null;
+  for (const b of brands) {
+    const name = b.name.trim();
+    if (!name) continue;
+    const re = new RegExp(`\\b${escapeRegExp(name)}\\b`, "i");
+    const m = q.match(re);
+    if (!m) continue;
+    if (!best || m[0].length > best.matchedText.length) {
+      best = {
+        matchedText: m[0],
+        categorySlug: vehicleRootSlug,
+        categoryName: "Bil og MC",
+        source: "brand",
+      };
     }
   }
   return best;

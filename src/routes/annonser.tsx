@@ -24,7 +24,12 @@ import { WtbListingCard } from "@/components/wtb-listing-card";
 import { searchSchema, conditionEnum } from "@/features/listing-search/search-schema";
 import { useListingsQuery } from "@/features/listing-search/use-listings-query";
 import { useTextToFilterPipeline } from "@/features/listing-search/use-text-to-filter-pipeline";
-import { matchCategoryPhrase, removeCategoryMatch } from "@/lib/search-category-match";
+import {
+  matchCategoryPhrase,
+  matchVehicleBrandPhrase,
+  removeCategoryMatch,
+} from "@/lib/search-category-match";
+import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
 import {
   normalizeFilter,
   vehicleCategoryGroupFor,
@@ -287,14 +292,26 @@ function BrowsePage() {
   // `dismissedMatchText` keeps a closed suggestion closed for that exact
   // phrase instead of it reappearing on every keystroke.
   const [dismissedMatchText, setDismissedMatchText] = useState<string | null>(null);
+  // Vehicle brand names ("Volvo") don't match any category name, so without
+  // this a query like "Volvo med cruisecontrol" never gets a category
+  // assigned — and the equipment-synonym matcher above requires one to scope
+  // its vocabulary lookup, so "cruisecontrol" would just fall through to a
+  // plain text search that finds nothing. See matchVehicleBrandPhrase.
+  const { data: vehicleBrands } = useAllVehicleBrands();
   const categoryMatch = useMemo(() => {
-    const m = matchCategoryPhrase(qDraft, categories ?? []);
+    const m =
+      matchCategoryPhrase(qDraft, categories ?? []) ??
+      matchVehicleBrandPhrase(qDraft, vehicleBrands ?? []);
     return m && m.matchedText !== dismissedMatchText ? m : null;
-  }, [qDraft, categories, dismissedMatchText]);
+  }, [qDraft, categories, vehicleBrands, dismissedMatchText]);
 
   const applyCategoryMatch = () => {
     if (!categoryMatch) return;
-    const nextQ = removeCategoryMatch(qDraft, categoryMatch);
+    // Brand matches ("Volvo") stay in the query — they're still a useful
+    // title-search term — unlike category-name matches, which are redundant
+    // once the category filter itself exists.
+    const nextQ =
+      categoryMatch.source === "category" ? removeCategoryMatch(qDraft, categoryMatch) : qDraft;
     setQDraft(nextQ);
     updateSearch({
       category: "",
@@ -609,15 +626,31 @@ function BrowsePage() {
             <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
               <FolderOpen className="size-4 shrink-0 text-primary" />
               <span className="flex-1">
-                Mente du kategorien{" "}
-                <button
-                  type="button"
-                  onClick={applyCategoryMatch}
-                  className="font-medium text-primary underline-offset-2 hover:underline"
-                >
-                  {categoryMatch.categoryName}
-                </button>
-                ?
+                {categoryMatch.source === "brand" ? (
+                  <>
+                    Fant «{categoryMatch.matchedText}» — søk i{" "}
+                    <button
+                      type="button"
+                      onClick={applyCategoryMatch}
+                      className="font-medium text-primary underline-offset-2 hover:underline"
+                    >
+                      {categoryMatch.categoryName}
+                    </button>
+                    ?
+                  </>
+                ) : (
+                  <>
+                    Mente du kategorien{" "}
+                    <button
+                      type="button"
+                      onClick={applyCategoryMatch}
+                      className="font-medium text-primary underline-offset-2 hover:underline"
+                    >
+                      {categoryMatch.categoryName}
+                    </button>
+                    ?
+                  </>
+                )}
               </span>
               <button
                 type="button"

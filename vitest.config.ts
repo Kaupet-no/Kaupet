@@ -11,7 +11,6 @@ export default defineConfig({
     exclude: ["**/node_modules/**", "src/**/*.integration.test.ts"],
     coverage: {
       provider: "v8",
-      all: true,
       include: ["src/**/*.{ts,tsx}"],
       exclude: [
         "src/**/*.test.{ts,tsx}",

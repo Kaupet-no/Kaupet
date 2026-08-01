@@ -9,7 +9,6 @@ import type { ListingCardData } from "@/components/listing-card";
 import { Button } from "@/components/ui/button";
 import { SearchBar } from "@/components/search-bar";
 import { SaveSearchDialog } from "@/components/advanced-search-sheet";
-import { DesktopFilterChips } from "@/components/desktop-filter-chips";
 import { ActiveFilters } from "@/components/active-filters";
 import type { MapListing } from "@/components/listings-map";
 import { ResultList } from "@/components/result-list";
@@ -37,6 +36,7 @@ import {
   genericBrandFilterFor,
 } from "@/lib/category-filters";
 import { getCategoryBehavior } from "@/lib/category-behavior";
+import { isBilOgMcCategory } from "@/components/advanced-search-value";
 import { useWtbListings } from "@/features/listing-search/use-wtb-listings";
 import { useAuth } from "@/hooks/use-auth";
 import { useIsNative } from "@/hooks/use-is-native";
@@ -208,6 +208,10 @@ function BrowsePage() {
     handleLocationChange,
     resetFilters,
   } = useAnnonserSearchState({ search, navigate, categories, allFilters, setQDraft });
+
+  // No Bil og MC listing has a "Tilstand" attribute, so the condition filter
+  // is meaningless (and hidden) once the search narrows to that category.
+  const isBilOgMc = isBilOgMcCategory(categories ?? [], effectiveCategories);
 
   // When the category filter narrows the results down to a single main-category
   // branch, the page presents itself like that category's own landing page —
@@ -623,6 +627,8 @@ function BrowsePage() {
               qMode={search.qMode}
               onQModeChange={(m) => updateSearch({ qMode: m })}
               showQMode={false}
+              extraGroups={search.extraGroups ?? []}
+              onExtraGroupsChange={(extraGroups) => updateSearch({ extraGroups })}
             />
           )}
           {categoryMatch && (
@@ -665,11 +671,9 @@ function BrowsePage() {
               </button>
             </div>
           )}
-          <FilterHintBanner hasActiveCriteria={hasSearchCriteria} />
+          {!categoryMatch && <FilterHintBanner hasActiveCriteria={hasSearchCriteria} />}
           {isNative ? (
             <NativeFilterChips
-              sort={search.sort}
-              onSortChange={(s) => updateSearch({ sort: s })}
               min={search.min}
               max={search.max}
               includeFree={search.includeFree ?? true}
@@ -687,38 +691,44 @@ function BrowsePage() {
               advancedFilterCount={
                 (search.extraGroups?.length ?? 0) + (search.qMode === "any" ? 1 : 0)
               }
+              hideCondition={isBilOgMc}
             />
           ) : (
-            <DesktopFilterChips
-              sort={search.sort}
-              onSortChange={(s) => updateSearch({ sort: s })}
-              min={search.min}
-              max={search.max}
-              includeFree={search.includeFree ?? true}
-              onPriceChange={(mn, mx, free) =>
-                updateSearch({ min: mn, max: mx, includeFree: free })
-              }
-              conditions={search.conditions ?? []}
-              onConditionsChange={(c) =>
-                updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
-              }
-              qMode={search.qMode}
-              onQModeChange={(m) => updateSearch({ qMode: m })}
-              extraGroups={search.extraGroups ?? []}
-              onExtraGroupsChange={(extraGroups) => updateSearch({ extraGroups })}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <AttributeFilterChips
+                filters={attrFilters}
+                values={attrValues}
+                onChange={handleAttrValueChange}
+                isNative={isNative}
+                resultCount={totalCount ?? cards.length}
+                queryText={qDraft}
+                min={search.min}
+                max={search.max}
+                includeFree={search.includeFree ?? true}
+                onPriceChange={(mn, mx, free) =>
+                  updateSearch({ min: mn, max: mx, includeFree: free })
+                }
+                conditions={search.conditions ?? []}
+                onConditionsChange={(c) =>
+                  updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
+                }
+                hideCondition={isBilOgMc}
+              />
+            </div>
           )}
 
           {/* Category-dependent filter row: the selected category's primary
             fields stay visible, the rest sit behind "Se flere filter". */}
-          <AttributeFilterChips
-            filters={attrFilters}
-            values={attrValues}
-            onChange={handleAttrValueChange}
-            isNative={isNative}
-            resultCount={totalCount ?? cards.length}
-            queryText={qDraft}
-          />
+          {isNative && (
+            <AttributeFilterChips
+              filters={attrFilters}
+              values={attrValues}
+              onChange={handleAttrValueChange}
+              isNative={isNative}
+              resultCount={totalCount ?? cards.length}
+              queryText={qDraft}
+            />
+          )}
 
           {/* Rendered inside the same space-y-2 group as the search bar and
               filter chips above, rather than as a separately-spaced sibling,
@@ -837,6 +847,8 @@ function BrowsePage() {
             onMapClearLocation={() =>
               updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
             }
+            sort={search.sort}
+            onSortChange={(s) => updateSearch({ sort: s })}
             toolbarExtra={
               user ? (
                 <Button

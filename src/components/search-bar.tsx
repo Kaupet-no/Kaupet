@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Search as SearchIcon } from "lucide-react";
+import { Search as SearchIcon, ListPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ModeToggle } from "@/components/search-term-mode-toggle";
-import { describeTermGroup } from "@/lib/term-groups";
+import { TermGroupEditor } from "@/components/term-group-editor";
+import { describeTermGroup, type TermGroup } from "@/lib/term-groups";
 import { useSearchSuggestions } from "@/features/listing-search/use-search-suggestions";
 
 /** Rotates through the input's placeholder while it's empty and unfocused, to
@@ -29,6 +32,12 @@ type Props = {
    * relevant once the advanced search panel is open, since that's where the
    * extra search lines that make the distinction matter live. */
   showQMode?: boolean;
+  /** Extra search lines ("Flere søkelinjer") — optional so callers that don't
+   * need them (none currently) aren't forced to wire up empty state. When
+   * provided, a settings button appears in the search bar for both this and
+   * `qMode`, replacing the old separate "Flere valg" filter chip. */
+  extraGroups?: TermGroup[];
+  onExtraGroupsChange?: (groups: TermGroup[]) => void;
 };
 
 /**
@@ -47,10 +56,15 @@ export function SearchBar({
   qMode,
   onQModeChange,
   showQMode = false,
+  extraGroups,
+  onExtraGroupsChange,
 }: Props) {
   const [qFocused, setQFocused] = useState(false);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  const [moreOpen, setMoreOpen] = useState(false);
   const firstSuggestionRef = useRef<HTMLElement>(null);
+  const showMoreButton = !showQMode && extraGroups != null && onExtraGroupsChange != null;
+  const moreCount = (extraGroups?.length ?? 0) + (qMode === "any" ? 1 : 0);
 
   useEffect(() => {
     if (q || qFocused) {
@@ -127,6 +141,43 @@ export function SearchBar({
           <div className="shrink-0">
             <ModeToggle value={qMode} onChange={onQModeChange} labels={["Alle ord", "Minst ett"]} />
           </div>
+        )}
+
+        {showMoreButton && (
+          <Popover open={moreOpen} onOpenChange={setMoreOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label="Flere søkevalg"
+                className={`relative flex size-9 shrink-0 items-center justify-center rounded-full transition ${
+                  moreCount > 0
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+              >
+                <ListPlus className="size-4" />
+                {moreCount > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white">
+                    {moreCount}
+                  </span>
+                )}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-96 space-y-4 p-4">
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-sm font-medium">Søkeordmodus</Label>
+                <ModeToggle
+                  value={qMode}
+                  onChange={onQModeChange}
+                  labels={["Alle ord", "Minst ett"]}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Flere søkelinjer</Label>
+                <TermGroupEditor groups={extraGroups ?? []} onChange={onExtraGroupsChange!} />
+              </div>
+            </PopoverContent>
+          </Popover>
         )}
 
         <Button

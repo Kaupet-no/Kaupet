@@ -6,7 +6,6 @@ import { ActiveFilters } from "@/components/active-filters";
 import type { ListingCardData } from "@/components/listing-card";
 import type { MapListing } from "@/components/listings-map";
 import { ResultList } from "@/components/result-list";
-import { DesktopFilterChips } from "@/components/desktop-filter-chips";
 import { NativeFilterChips } from "@/components/native-filter-chips";
 import { AttributeFilterChips } from "@/components/attribute-filter-chips";
 import { FilterHintBanner } from "@/components/filter-hint-banner";
@@ -18,6 +17,7 @@ import {
   genericBrandFilterFor,
 } from "@/lib/category-filters";
 import { getCategoryBehavior } from "@/lib/category-behavior";
+import { BIL_OG_MC_SLUG } from "@/components/advanced-search-value";
 import { SearchBar } from "@/components/search-bar";
 import { searchSchema, conditionEnum } from "@/features/listing-search/search-schema";
 import { useAnnonserSearchState } from "@/features/listing-search/use-annonser-search-state";
@@ -136,6 +136,10 @@ export function CategoryLandingPage({
   );
   const breadcrumbEntries = useMemo(() => [...breadcrumb, ...extraPath], [breadcrumb, extraPath]);
   const children = tree.childrenByParent.get(selected.id) ?? [];
+
+  // No Bil og MC listing has a "Tilstand" attribute, so the condition filter
+  // is meaningless (and hidden) anywhere under that root category.
+  const isBilOgMc = (breadcrumb[0]?.slug ?? category.slug) === BIL_OG_MC_SLUG;
 
   // Selecting a different (deeper/shallower/sibling) category never navigates
   // away from this page's own URL — it only updates the search param.
@@ -323,6 +327,8 @@ export function CategoryLandingPage({
             qMode={search.qMode}
             onQModeChange={(m) => updateSearch({ qMode: m })}
             showQMode={false}
+            extraGroups={search.extraGroups ?? []}
+            onExtraGroupsChange={(extraGroups) => updateSearch({ extraGroups })}
           />
           <FilterHintBanner
             hasActiveCriteria={
@@ -331,8 +337,6 @@ export function CategoryLandingPage({
           />
           {isNative ? (
             <NativeFilterChips
-              sort={search.sort}
-              onSortChange={(s) => updateSearch({ sort: s })}
               min={search.min}
               max={search.max}
               includeFree={search.includeFree ?? true}
@@ -348,38 +352,44 @@ export function CategoryLandingPage({
               resultCount={totalCount ?? cards.length}
               onOpenAdvanced={() => {}}
               advancedFilterCount={0}
+              hideCondition={isBilOgMc}
             />
           ) : (
-            <DesktopFilterChips
-              sort={search.sort}
-              onSortChange={(s) => updateSearch({ sort: s })}
-              min={search.min}
-              max={search.max}
-              includeFree={search.includeFree ?? true}
-              onPriceChange={(mn, mx, free) =>
-                updateSearch({ min: mn, max: mx, includeFree: free })
-              }
-              conditions={search.conditions ?? []}
-              onConditionsChange={(c) =>
-                updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
-              }
-              qMode={search.qMode}
-              onQModeChange={(m) => updateSearch({ qMode: m })}
-              extraGroups={search.extraGroups ?? []}
-              onExtraGroupsChange={(extraGroups) => updateSearch({ extraGroups })}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <AttributeFilterChips
+                filters={attrFilters}
+                values={attrValues}
+                onChange={handleAttrValueChange}
+                isNative={isNative}
+                resultCount={totalCount ?? cards.length}
+                queryText={qDraft}
+                min={search.min}
+                max={search.max}
+                includeFree={search.includeFree ?? true}
+                onPriceChange={(mn, mx, free) =>
+                  updateSearch({ min: mn, max: mx, includeFree: free })
+                }
+                conditions={search.conditions ?? []}
+                onConditionsChange={(c) =>
+                  updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
+                }
+                hideCondition={isBilOgMc}
+              />
+            </div>
           )}
 
           {/* Category-dependent filter row: primary fields stay visible, the
               rest sit behind "Se flere filter". */}
-          <AttributeFilterChips
-            filters={attrFilters}
-            values={attrValues}
-            onChange={handleAttrValueChange}
-            isNative={isNative}
-            resultCount={totalCount ?? cards.length}
-            queryText={qDraft}
-          />
+          {isNative && (
+            <AttributeFilterChips
+              filters={attrFilters}
+              values={attrValues}
+              onChange={handleAttrValueChange}
+              isNative={isNative}
+              resultCount={totalCount ?? cards.length}
+              queryText={qDraft}
+            />
+          )}
 
           {/* Rendered inside the same space-y-2 group as the search bar and
               filter chips above, rather than as a separately-spaced sibling,
@@ -429,6 +439,8 @@ export function CategoryLandingPage({
           onMapClearLocation={() =>
             updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
           }
+          sort={search.sort}
+          onSortChange={(s) => updateSearch({ sort: s })}
         />
       </div>
     </div>

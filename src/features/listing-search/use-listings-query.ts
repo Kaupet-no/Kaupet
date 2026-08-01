@@ -2,6 +2,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import type { Category } from "@/lib/categories";
 import { applyAttributeFilters } from "@/lib/category-filters";
 import {
@@ -24,6 +25,7 @@ type SelectedListingRow = {
   display_lng: number | null;
   created_at: string;
   listing_images: { storage_path: string; sort_order: number }[] | null;
+  attributes: Json;
 };
 
 type SearchParams = z.infer<typeof searchSchema>;
@@ -105,7 +107,7 @@ export function useListingsQuery({
       let qb = supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, subtitle, description, price_nok, is_free, city, display_lat, display_lng, created_at, listing_images(storage_path, sort_order)",
+          "id, kaupet_code, title, subtitle, description, price_nok, is_free, city, display_lat, display_lng, created_at, listing_images(storage_path, sort_order), attributes",
           { count: pageParam === 0 ? "exact" : undefined },
         )
         .eq("status", "active");
@@ -164,6 +166,8 @@ export function useListingsQuery({
 
       const mapRow = (l: SelectedListingRow) => {
         const imgs = (l.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
+        const attrs = l.attributes as Record<string, unknown> | null;
+        const mileageRaw = attrs?.mileage_km;
         return {
           id: l.id,
           kaupet_code: l.kaupet_code,
@@ -176,6 +180,7 @@ export function useListingsQuery({
           lng: l.display_lng as number | null,
           created_at: l.created_at,
           cover_path: imgs[0]?.storage_path ?? null,
+          mileage_km: typeof mileageRaw === "number" ? mileageRaw : null,
         };
       };
 

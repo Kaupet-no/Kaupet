@@ -6,6 +6,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { User as UserIcon } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { StarRating } from "@/components/star-rating";
@@ -82,7 +83,7 @@ function PublicProfilePage() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, subtitle, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order)",
+          "id, kaupet_code, title, subtitle, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order), attributes",
         )
         .eq("seller_id", id)
         .eq("status", "active")
@@ -100,11 +101,14 @@ function PublicProfilePage() {
         city: string | null;
         created_at: string;
         listing_images: ListingImage[] | null;
+        attributes: Json;
       };
       return (data ?? []).map((l: ListingRow) => {
         const imgs = (l.listing_images ?? [])
           .slice()
           .sort((a: ListingImage, b: ListingImage) => a.sort_order - b.sort_order);
+        const attrs = l.attributes as Record<string, unknown> | null;
+        const mileageRaw = attrs?.mileage_km;
         return {
           id: l.id,
           kaupet_code: l.kaupet_code,
@@ -115,6 +119,7 @@ function PublicProfilePage() {
           city: l.city,
           created_at: l.created_at,
           cover_path: imgs[0]?.storage_path ?? null,
+          mileage_km: typeof mileageRaw === "number" ? mileageRaw : null,
         };
       });
     },

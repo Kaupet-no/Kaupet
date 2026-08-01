@@ -24,6 +24,7 @@ export function usePopularListings() {
         cover_path: l.cover_path,
         total_views: Number(l.total_views ?? 0),
         views_last_week: Number(l.views_last_week ?? 0),
+        mileage_km: l.mileage_km != null ? Number(l.mileage_km) : null,
       }));
     },
   });

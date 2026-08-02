@@ -79,6 +79,7 @@ function TitleSection(
       </div>
       <Input
         id="title"
+        data-testid="listing-title-input"
         placeholder="F.eks. Trek Marlin 5 sykkel 2022 — sort, lite brukt"
         aria-invalid={!!props.errors.title}
         aria-describedby={props.errors.title ? "title-error" : undefined}

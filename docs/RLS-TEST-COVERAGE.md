@@ -22,7 +22,7 @@ backoff ved Supabase sin auth-rate-limit — bruk den (ikke en ny lokal
 `signInWithPassword`-kall) i alle nye testgrupper, siden en full kjøring nå
 gjør 70+ innlogginger i løpet av sekunder.
 
-## Dekket (21 tabeller, verifisert 65/65 grønt mot staging 2026-08-02)
+## Dekket (24 tabeller, verifisert 71/71 grønt mot staging 2026-08-02)
 
 - `conversations` / `messages` — kun deltakere ser samtalen
 - `listings` — eier ser egne draft/disabled, andre ser kun aktive; ikke-eier
@@ -58,6 +58,9 @@ gjør 70+ innlogginger i løpet av sekunder.
 - `favorite_price_drops` / `favorite_sold_notifications` — kun eier ser og
   kan markere som lest; ingen direkte klient-INSERT (kun via triggerne
   `listings_emit_price_drops`/`listings_emit_sold_notifications`)
+- `listing_images` — følger annonsens active-or-owner-synlighet
+- `listing_360_frames` — lesbar av alle uansett annonsestatus (se funn under)
+- `listing_360_capture_sessions` — fullstendig server-only, ingen klient-GRANT
 
 ## Funn fra testarbeidet (ikke bare testfiksinger)
 
@@ -80,7 +83,7 @@ gjør 70+ innlogginger i løpet av sekunder.
    flere testgrupper i samme fil vil trenge enda mer backoff-margin —
    vurder å dele filen i flere test-filer per tabellgruppe hvis kjøretiden
    blir et problem (hver fil kan kjøres separat med `vitest run <fil>`).
-   Ved 21 tabeller/65 tester tar en full kjøring nå ~66 sekunder.
+   Ved 24 tabeller/71 tester tar en full kjøring nå ~77 sekunder.
 4. **`user_reviews` fikk offentlig lesetilgang tilbake i en senere
    migrasjon.** Samme mønster som `profiles` (myk-sletting) — en
    mellomliggende innstramming (`20260605123044_*.sql`, til
@@ -97,6 +100,15 @@ gjør 70+ innlogginger i løpet av sekunder.
    (kun et forslått navn, ingen sensitiv data), men appen må filtrere
    `pending`-verdier bort klient-side (f.eks. `VehicleBrandField`) —
    verifiser dette hvis noen jobber med den komponenten videre.
+6. **`listing_360_frames` mangler samme active-or-owner-filter som
+   `listing_images` fikk.** `listing_images` sin SELECT-policy ble strammet
+   inn i `20260605075809_*.sql` til å kreve at annonsen er aktiv eller
+   eies av spørreren. `listing_360_frames` (opprettet senere, i
+   `20260725110000_vehicle_360_view.sql`) fikk aldri samme behandling —
+   policyen er fortsatt `USING (true)`. Kun `storage_path`-strengen lekker
+   for en draft-annonse (ikke selve bildet — storage-bucketens egen policy
+   sjekker korrekt), så alvorligheten er lav, men det er en reell
+   inkonsistens verdt å rette hvis 360-bilde-funksjonaliteten røres igjen.
 
 ## Gjenstående — prioritert rekkefølge
 
@@ -105,14 +117,13 @@ utelukkende lav prioritet (analytics/telemetri, offentlig kategoridata, og
 noen mindre systemtabeller) — ingen av disse forventes å inneholde
 sikkerhetskritiske funn, men bør dekkes for fullstendighet.
 
-1. `listing_images`, `listing_360_capture_sessions`, `listing_360_frames`
-2. `listing_view_events` / `listing_views` / `search_query_stats` /
+1. `listing_view_events` / `listing_views` / `search_query_stats` /
    `listing_keyword_stats` / `listing_category_word_stats` — stort sett
    analytics/telemetri, sjekk om de faktisk er lesbare av klienter
-3. `categories` / `category_filters` / `category_flows` / `filter_synonyms`
+2. `categories` / `category_filters` / `category_flows` / `filter_synonyms`
    / `site_settings` / `app_settings` — offentlig lesedata, lite risiko,
    men verifiser at skriving er admin/service-role-only
-4. `user_verifications`, `error_log`, `push_dispatch_failures`,
+3. `user_verifications`, `error_log`, `push_dispatch_failures`,
    `vipps_oauth_states`, `system_messages`
 
 ## Fremgangsmåte for neste økt

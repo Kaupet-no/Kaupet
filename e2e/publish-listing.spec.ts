@@ -90,5 +90,8 @@ test("logger inn og publiserer en annonse", async ({ page }) => {
   }
 
   await page.getByRole("button", { name: "Publiser annonse" }).click();
+  // Publishing without having opened the preview first prompts a "want to
+  // preview before publishing?" dialog rather than publishing immediately.
+  await page.getByRole("button", { name: "Publiser likevel" }).click();
   await expect(page.getByText("Annonsen er publisert")).toBeVisible({ timeout: 15_000 });
 });

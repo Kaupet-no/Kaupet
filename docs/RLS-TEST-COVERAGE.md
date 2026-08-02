@@ -1,9 +1,12 @@
-# RLS-testdekning — status og gjenstående arbeid
+# RLS-testdekning — status
 
-Del av den bredere code assessment-planen (2026-08-01/02). Alle andre punkter i
-planen er fullført og pushet til `staging`. Dette dokumentet sporer det ene
-gjenstående punktet: å utvide `src/lib/rls.integration.test.ts` til å dekke
-flere av de ~47 RLS-aktiverte tabellene i `supabase/migrations/`.
+Del av den bredere code assessment-planen (2026-08-01/02). Alle andre punkter
+i planen er fullført og pushet til `staging`. **Dette punktet (#10) er nå
+fullført**: `src/lib/rls.integration.test.ts` dekker alle tabeller fra den
+opprinnelige prioriterte listen — 37 tabeller, 94 tester, verifisert 100 %
+grønt mot staging 2026-08-02. To tabeller fra den opprinnelige listen
+(`user_verifications`, `vipps_oauth_states`) viste seg å være droppet fra
+skjemaet og er derfor ikke testet — se funn-punkt 9.
 
 ## Hvordan kjøre testene
 
@@ -22,7 +25,7 @@ backoff ved Supabase sin auth-rate-limit — bruk den (ikke en ny lokal
 `signInWithPassword`-kall) i alle nye testgrupper, siden en full kjøring nå
 gjør 70+ innlogginger i løpet av sekunder.
 
-## Dekket (34 tabeller, verifisert 88/88 grønt mot staging 2026-08-02)
+## Dekket (37 tabeller, verifisert 94/94 grønt mot staging 2026-08-02)
 
 - `conversations` / `messages` — kun deltakere ser samtalen
 - `listings` — eier ser egne draft/disabled, andre ser kun aktive; ikke-eier
@@ -73,6 +76,10 @@ gjør 70+ innlogginger i løpet av sekunder.
   bred tabell-GRANT til `authenticated`)
 - `site_settings` — offentlig lesbar singleton-rad, kun admin kan oppdatere
 - `app_settings` — fullstendig server-only (lagrer bl.a. `push_dispatch_secret`)
+- `error_log` / `push_dispatch_failures` — fullstendig server-only; admin
+  leser feillogg via `admin_list_error_log()`-RPC-en, ikke direkte
+- `system_messages` — kun mottaker ser og kan markere som lest; kun
+  admin/moderator kan sende (håndhevet av policy, ikke bare UI)
 
 ## Funn fra testarbeidet (ikke bare testfiksinger)
 
@@ -144,25 +151,39 @@ gjør 70+ innlogginger i løpet av sekunder.
    lese og lagre eksisterende verdi i `beforeAll` og sette den tilbake i
    `afterAll` når en test muterer en rad som ikke er opprettet av testen
    selv (i motsetning til brukere/annonser testen selv oppretter og sletter).
+9. **To tabeller fra den opprinnelige planen finnes ikke lenger.**
+   `user_verifications` og `vipps_oauth_states` ble opprettet i
+   `20260605131613_*.sql`, men droppet permanent kort tid etter i
+   `20260606220053_348f18b1-5264-4d62-a7eb-43aedd48e939.sql` — trolig en
+   tidlig Vipps-ID-verifiseringsfunksjon som ble forlatt før den nådde
+   produksjon. Oppdaget ved at `bun run test:rls` feilet med "Could not
+   find the table ... in the schema cache" (PostgREST kjenner ikke til
+   tabellen — et annet symptom enn en RLS/tilgangsfeil). Lærdom: sjekk
+   alltid for `DROP TABLE` i tillegg til `DROP POLICY` når du kartlegger en
+   tabells gjeldende tilstand.
 
-## Gjenstående — prioritert rekkefølge
+## Status: fullført
 
-Alle "høy" og "middels" prioritet-tabeller er nå dekket, samt kategoridata og
-site/app settings. Det som gjenstår er en håndfull mindre systemtabeller —
-ingen av disse forventes å inneholde sikkerhetskritiske funn, men bør dekkes
-for fullstendighet.
+Alle tabeller fra den opprinnelige prioriterte listen er nå dekket (eller
+bekreftet fjernet fra skjemaet, se funn 9). RLS-testdekningen har gått fra
+2 tabeller (kun `conversations`/`messages`) til 37, med 9 reelle funn
+underveis — de fleste lav alvorlighet, men verdifulle å ha dokumentert
+(spesielt at policyer/GRANT-er for samme tabell kan endres flere ganger på
+tvers av migrasjoner, og at "siste migrasjon vinner" ikke alltid er
+intuitivt ut fra tabellnavn alene).
 
-1. `user_verifications`, `error_log`, `push_dispatch_failures`,
-   `vipps_oauth_states`, `system_messages`
+## Hvis dekningen skal utvides videre
 
-## Fremgangsmåte for neste økt
+Fremgangsmåten under gjelder fortsatt for eventuelle nye tabeller som legges
+til senere, eller for å gå enda dypere på eksisterende tabeller (f.eks. flere
+kant-tilfeller per tabell):
 
-1. For hver tabell: `grep -n "CREATE POLICY\|DROP POLICY" supabase/migrations/*.sql | grep -i "on (public\.)?<tabell>"`
-   for å finne gjeldende policyer. **Viktig lærdom fra to runder nå:** ikke
-   bare se på første `CREATE POLICY` — sjekk om en senere migrasjon har
-   `DROP POLICY`/`CREATE POLICY` for samme navn (policyer kan endres flere
-   ganger på tvers av migrasjoner, siste vinner — skjedde med både
-   `listing_promotions` og `user_reviews`), og les selve
+1. For hver tabell: `grep -n "CREATE POLICY\|DROP POLICY\|DROP TABLE" supabase/migrations/*.sql | grep -i "<tabell>"`
+   for å finne gjeldende policyer — og bekrefte at tabellen faktisk fortsatt
+   finnes (se funn 9). **Viktig lærdom fra hele denne runden:** ikke bare se
+   på første `CREATE POLICY` — sjekk om en senere migrasjon har
+   `DROP POLICY`/`CREATE POLICY` for samme navn (siste vinner, skjedde med
+   både `listing_promotions` og `user_reviews`), og les selve
    policy-definisjonen nøye (`FOR ALL` vs. `FOR SELECT`, hvem den faktisk
    gjelder for) i stedet for å anta ut fra tabellnavn/kontekst alene.
 2. Skriv testgruppe(r) etter samme mønster som eksisterende (se
@@ -175,6 +196,5 @@ for fullstendighet.
    tilbake (Claude Code kan ikke selv koble til staging-Supabase i denne
    økten — miljøets sikkerhetsklassifiserer blokkerer det).
 6. Fiks eventuelle feil som dukker opp — vurder alltid om feilen er i testens
-   antakelse (som med `ip_bans`/`listing_promotions`/`user_reviews` denne
-   og forrige runde) eller et reelt RLS-hull, før du "fikser" ved å endre
+   antakelse eller et reelt RLS-hull, før du "fikser" ved å endre
    forventningen.

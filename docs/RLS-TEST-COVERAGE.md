@@ -48,18 +48,15 @@ gjør 70+ innlogginger i løpet av sekunder.
 
 ## Funn fra testarbeidet (ikke bare testfiksinger)
 
-1. **`listing_promotions` har mistet offentlig lesetilgang.** Migrasjonen
-   `20260608194322_32f4864e-8c38-4e30-9391-f950a86cc5f4.sql` dropper
-   policyen `"Anyone can read active promotions"` uten erstatning. Kun
-   eier/admin kan nå lese tabellen direkte — offentlig visning av
-   "fremhevet"-status må gå via `get_featured_listing_ids()`-RPC-en
-   (SECURITY DEFINER, bypasser RLS). **Oppfølging pågår:** en bakgrunnsøkt
-   (`task_6c53cb70`, startet 2026-08-02) undersøker om frontend-koden
-   faktisk bruker denne RPC-en overalt der fremhevet-status skal vises til
-   besøkende, eller om noe fortsatt spør tabellen direkte og dermed feiler
-   stille. Sjekk om den økten har landet et resultat før du fortsetter — hvis
-   den fant et brudd, bør det fikses før mer RLS-testarbeid, siden det er en
-   reell (ikke bare test-relatert) regresjon.
+1. **`listing_promotions` har mistet offentlig lesetilgang — bekreftet trygt.**
+   Migrasjonen `20260608194322_32f4864e-8c38-4e30-9391-f950a86cc5f4.sql`
+   dropper policyen `"Anyone can read active promotions"` uten erstatning.
+   Kun eier/admin kan nå lese tabellen direkte — offentlig visning av
+   "fremhevet"-status går via `get_featured_listing_ids()`-RPC-en (SECURITY
+   DEFINER, bypasser RLS). **Oppfølging avsluttet** (`task_6c53cb70`,
+   2026-08-02): frontend-koden bruker konsekvent denne RPC-en der
+   fremhevet-status vises til besøkende — ingen direkte tabellspørring
+   funnet som ville feilet stille. Ingen kodeendring nødvendig.
 2. **`ip_bans`-policyen er en `FOR ALL`-policy, ikke "ingen tilgang".**
    Første antakelse (kun service-role) var feil — admins kan og skal lese
    tabellen direkte via `has_role(auth.uid(), 'admin')`. Ikke-admin får tom

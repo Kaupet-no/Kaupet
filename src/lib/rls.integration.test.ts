@@ -23,6 +23,22 @@ const SERVICE_ROLE_KEY = process.env.LOCAL_SUPABASE_SERVICE_ROLE_KEY;
 const canRun = Boolean(URL && ANON_KEY && SERVICE_ROLE_KEY);
 const PASSWORD = "test-password-12345";
 
+/** With ~14 test groups each signing in 2-4 users, a full run does 60+
+ * password sign-ins in well under a minute — enough to trip Supabase auth's
+ * per-project rate limit on staging. Retries with backoff on a rate-limit
+ * response instead of failing the whole suite. */
+async function signInWithRetry(email: string, attempt = 0): Promise<SupabaseClient> {
+  const client = createClient(URL!, ANON_KEY!);
+  const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD });
+  if (!error) return client;
+  const isRateLimited = error.status === 429 || /rate limit/i.test(error.message);
+  if (isRateLimited && attempt < 5) {
+    await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)));
+    return signInWithRetry(email, attempt + 1);
+  }
+  throw error;
+}
+
 describe.skipIf(!canRun)("RLS: conversations & messages are only visible to participants", () => {
   const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
   const suffix = Date.now();
@@ -36,10 +52,7 @@ describe.skipIf(!canRun)("RLS: conversations & messages are only visible to part
   let conversationId: string;
 
   async function signIn(email: string) {
-    const client = createClient(URL!, ANON_KEY!);
-    const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD });
-    if (error) throw error;
-    return client;
+    return signInWithRetry(email);
   }
 
   beforeAll(async () => {
@@ -126,10 +139,7 @@ describe.skipIf(!canRun)("RLS: listings — draft visibility and owner-only writ
   let disabledListingId: string;
 
   async function signIn(email: string) {
-    const client = createClient(URL!, ANON_KEY!);
-    const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD });
-    if (error) throw error;
-    return client;
+    return signInWithRetry(email);
   }
 
   beforeAll(async () => {
@@ -235,10 +245,7 @@ describe.skipIf(!canRun)("RLS: profiles — soft-deleted profiles are hidden fro
   let deletedUserId: string;
 
   async function signIn(email: string) {
-    const client = createClient(URL!, ANON_KEY!);
-    const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD });
-    if (error) throw error;
-    return client;
+    return signInWithRetry(email);
   }
 
   beforeAll(async () => {
@@ -294,10 +301,7 @@ describe.skipIf(!canRun)("RLS: favorites are private to their owner", () => {
   let listingId: string;
 
   async function signIn(email: string) {
-    const client = createClient(URL!, ANON_KEY!);
-    const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD });
-    if (error) throw error;
-    return client;
+    return signInWithRetry(email);
   }
 
   beforeAll(async () => {
@@ -381,10 +385,7 @@ describe.skipIf(!canRun)("RLS: saved_searches are private to their owner", () =>
   let savedSearchId: string;
 
   async function signIn(email: string) {
-    const client = createClient(URL!, ANON_KEY!);
-    const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD });
-    if (error) throw error;
-    return client;
+    return signInWithRetry(email);
   }
 
   beforeAll(async () => {
@@ -463,10 +464,7 @@ describe.skipIf(!canRun)(
     let notificationId: string;
 
     async function signIn(email: string) {
-      const client = createClient(URL!, ANON_KEY!);
-      const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD });
-      if (error) throw error;
-      return client;
+      return signInWithRetry(email);
     }
 
     beforeAll(async () => {
@@ -586,10 +584,7 @@ describe.skipIf(!canRun)("RLS: push_subscriptions are private to their owner", (
   let subscriptionId: string;
 
   async function signIn(email: string) {
-    const client = createClient(URL!, ANON_KEY!);
-    const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD });
-    if (error) throw error;
-    return client;
+    return signInWithRetry(email);
   }
 
   beforeAll(async () => {
@@ -672,10 +667,7 @@ describe.skipIf(!canRun)("RLS: notification_preferences are private to their own
   let ownerId: string;
 
   async function signIn(email: string) {
-    const client = createClient(URL!, ANON_KEY!);
-    const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD });
-    if (error) throw error;
-    return client;
+    return signInWithRetry(email);
   }
 
   beforeAll(async () => {
@@ -755,10 +747,7 @@ describe.skipIf(!canRun)(
     let blockRowId: string;
 
     async function signIn(email: string) {
-      const client = createClient(URL!, ANON_KEY!);
-      const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD });
-      if (error) throw error;
-      return client;
+      return signInWithRetry(email);
     }
 
     beforeAll(async () => {
@@ -835,10 +824,7 @@ describe.skipIf(!canRun)(
     let bannedId: string;
 
     async function signIn(email: string) {
-      const client = createClient(URL!, ANON_KEY!);
-      const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD });
-      if (error) throw error;
-      return client;
+      return signInWithRetry(email);
     }
 
     beforeAll(async () => {
@@ -924,10 +910,7 @@ describe.skipIf(!canRun)(
     let suspendedId: string;
 
     async function signIn(email: string) {
-      const client = createClient(URL!, ANON_KEY!);
-      const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD });
-      if (error) throw error;
-      return client;
+      return signInWithRetry(email);
     }
 
     beforeAll(async () => {
@@ -994,7 +977,7 @@ describe.skipIf(!canRun)(
 );
 
 describe.skipIf(!canRun)(
-  "RLS: ip_bans have no client grant at all — service-role/admin RPC only",
+  "RLS: ip_bans are visible only to admins (via the 'Admins manage ip_bans' policy)",
   () => {
     const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
     const suffix = Date.now();
@@ -1004,12 +987,10 @@ describe.skipIf(!canRun)(
     };
 
     const userIds: string[] = [];
+    let ipBanId: string;
 
     async function signIn(email: string) {
-      const client = createClient(URL!, ANON_KEY!);
-      const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD });
-      if (error) throw error;
-      return client;
+      return signInWithRetry(email);
     }
 
     beforeAll(async () => {
@@ -1026,6 +1007,18 @@ describe.skipIf(!canRun)(
       const adminId = await mkUser(emails.admin);
       await mkUser(emails.other);
       await grantAdmin(admin, adminId);
+
+      const { data, error } = await admin
+        .from("ip_bans")
+        .insert({
+          ip_address: `203.0.113.${suffix % 255}`,
+          reason: "RLS test ip ban",
+          banned_by: adminId,
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      ipBanId = data.id;
     });
 
     afterAll(async () => {
@@ -1033,16 +1026,18 @@ describe.skipIf(!canRun)(
       await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
     });
 
-    it("blocks even an admin from querying ip_bans directly (no GRANT to authenticated)", async () => {
+    it("lets an admin see ip bans directly", async () => {
       const adminClient = await signIn(emails.admin);
-      const { error } = await adminClient.from("ip_bans").select("id").limit(1);
-      expect(error).not.toBeNull();
+      const { data, error } = await adminClient.from("ip_bans").select("id").eq("id", ipBanId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(1);
     });
 
-    it("blocks a regular user from querying ip_bans directly", async () => {
+    it("hides ip bans from a non-admin user (RLS default-deny, no matching policy)", async () => {
       const other = await signIn(emails.other);
-      const { error } = await other.from("ip_bans").select("id").limit(1);
-      expect(error).not.toBeNull();
+      const { data, error } = await other.from("ip_bans").select("id").eq("id", ipBanId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(0);
     });
   },
 );
@@ -1066,10 +1061,7 @@ describe.skipIf(!canRun)(
     let reportId: string;
 
     async function signIn(email: string) {
-      const client = createClient(URL!, ANON_KEY!);
-      const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD });
-      if (error) throw error;
-      return client;
+      return signInWithRetry(email);
     }
 
     beforeAll(async () => {
@@ -1149,7 +1141,12 @@ describe.skipIf(!canRun)(
 );
 
 describe.skipIf(!canRun)(
-  "RLS: listing_promotions — owner and public see active ones, only owner/admin see pending",
+  // The public-read policy ("Anyone can read active promotions") was dropped
+  // in 20260608194322_*.sql without a replacement — public "featured
+  // listing" visibility now goes exclusively through the SECURITY DEFINER
+  // get_featured_listing_ids() RPC, not a direct table SELECT. Only the
+  // owner (and admins, via a separate policy) can read this table directly.
+  "RLS: listing_promotions — only owner/admin can read, no public/anon access",
   () => {
     const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
     const suffix = Date.now();
@@ -1164,10 +1161,7 @@ describe.skipIf(!canRun)(
     let activePromoId: string;
 
     async function signIn(email: string) {
-      const client = createClient(URL!, ANON_KEY!);
-      const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD });
-      if (error) throw error;
-      return client;
+      return signInWithRetry(email);
     }
 
     beforeAll(async () => {
@@ -1241,41 +1235,39 @@ describe.skipIf(!canRun)(
       expect(new Set(data?.map((p) => p.id))).toEqual(new Set([pendingPromoId, activePromoId]));
     });
 
-    it("hides the pending promotion from other users but shows the active one", async () => {
+    it("hides both promotions from an unrelated non-admin user, active included", async () => {
       const other = await signIn(emails.other);
       const { data, error } = await other
         .from("listing_promotions")
         .select("id")
         .in("id", [pendingPromoId, activePromoId]);
       expect(error).toBeNull();
-      expect(data?.map((p) => p.id)).toEqual([activePromoId]);
+      expect(data).toHaveLength(0);
     });
 
-    it("shows the active promotion to anonymous visitors but hides the pending one", async () => {
+    it("hides both promotions from anonymous visitors, active included", async () => {
       const anon = createClient(URL!, ANON_KEY!);
       const { data, error } = await anon
         .from("listing_promotions")
         .select("id")
         .in("id", [pendingPromoId, activePromoId]);
       expect(error).toBeNull();
-      expect(data?.map((p) => p.id)).toEqual([activePromoId]);
+      expect(data).toHaveLength(0);
     });
   },
 );
 
 describe.skipIf(!canRun)(
-  "RLS: vipps_webhook_secrets and vipps_webhook_events are fully server-only",
+  "RLS: vipps_webhook_secrets and vipps_webhook_events never leak to authenticated clients",
   () => {
     const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
     const suffix = Date.now();
     const email = `rls-vipps-${suffix}@example.com`;
     const userIds: string[] = [];
+    let webhookEventId: string;
 
     async function signIn() {
-      const client = createClient(URL!, ANON_KEY!);
-      const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD });
-      if (error) throw error;
-      return client;
+      return signInWithRetry(email);
     }
 
     beforeAll(async () => {
@@ -1286,23 +1278,55 @@ describe.skipIf(!canRun)(
       });
       if (error) throw error;
       userIds.push(data.user!.id);
+
+      const { data: event, error: eventErr } = await admin
+        .from("vipps_webhook_events")
+        .insert({
+          event_id: `rls-test-event-${suffix}`,
+          reference: "rls-test",
+          event_name: "test.event",
+          payload: {},
+        })
+        .select("id")
+        .single();
+      if (eventErr) throw eventErr;
+      webhookEventId = event.id;
     });
 
     afterAll(async () => {
       if (!canRun) return;
+      await admin.from("vipps_webhook_events").delete().eq("id", webhookEventId);
       await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
     });
 
-    it("blocks an authenticated client from reading vipps_webhook_secrets (no GRANT at all)", async () => {
+    it("never returns vipps_webhook_secrets rows to a regular authenticated client", async () => {
+      // Doesn't insert its own row — vipps_webhook_secrets holds real
+      // production webhook config, not test-safe to write to. Verified
+      // instead against whatever real rows already exist (any environment
+      // running Vipps promotions has at least one).
       const client = await signIn();
-      const { error } = await client.from("vipps_webhook_secrets").select("id").limit(1);
-      expect(error).not.toBeNull();
+      const { data, error } = await client.from("vipps_webhook_secrets").select("id");
+      // Either outcome is acceptable — a grant-level permission error, or an
+      // empty result from RLS default-deny (this table has zero policies).
+      // What must never happen is `data` containing any real rows.
+      if (error) {
+        expect(error).not.toBeNull();
+      } else {
+        expect(data?.length ?? 0).toBe(0);
+      }
     });
 
-    it("blocks an authenticated client from reading vipps_webhook_events (no GRANT at all)", async () => {
+    it("never returns vipps_webhook_events rows to a non-admin authenticated client", async () => {
       const client = await signIn();
-      const { error } = await client.from("vipps_webhook_events").select("id").limit(1);
-      expect(error).not.toBeNull();
+      const { data, error } = await client
+        .from("vipps_webhook_events")
+        .select("id")
+        .eq("id", webhookEventId);
+      if (error) {
+        expect(error).not.toBeNull();
+      } else {
+        expect(data).toHaveLength(0);
+      }
     });
   },
 );

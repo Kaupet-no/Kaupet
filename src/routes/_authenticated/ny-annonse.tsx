@@ -939,6 +939,7 @@ function NewListingPage() {
                 ) : !isLast ? (
                   <Button
                     type="button"
+                    data-testid="wizard-next-button"
                     disabled={vehicleLookupLoading}
                     onClick={() => void goToNextPage()}
                   >
@@ -977,6 +978,7 @@ function NewListingPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogAction
+              data-testid="publish-anyway-button"
               onClick={() => {
                 setPreviewNudgeOpen(false);
                 if (pendingSubmitValuesRef.current) mutation.mutate(pendingSubmitValuesRef.current);
@@ -1017,6 +1019,7 @@ function NewListingPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Legg til bilder</AlertDialogCancel>
             <AlertDialogAction
+              data-testid="continue-without-image-button"
               onClick={() => {
                 setShowNoImageDialog(false);
                 void goToNextPage({ skipImageCheck: true });

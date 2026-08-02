@@ -33,19 +33,21 @@ test("logger inn og publiserer en annonse", async ({ page }) => {
   await page.goto("/ny-annonse?type=sell");
 
   // Category must be chosen first — it's always the wizard's first step,
-  // rendered as a drill-down grid (main category -> sub -> ... -> leaf),
-  // auto-advancing to the next step once a leaf is picked. Avoid "Bil og
+  // rendered as a drill-down grid (main category -> sub -> ... -> leaf) of
+  // tiles, each an icon plus a name in a `.leading-tight` span (see
+  // rowItem/grid rendering in category-picker.tsx) — that span is what
+  // distinguishes a pickable tile from the wizard's other buttons ("Neste",
+  // "Tilbake til kategorier", ...). Picking a leaf auto-advances to the next
+  // step, at which point no tiles remain and the loop stops. Avoid "Bil og
   // MC": it's selectable at the top level despite having children (so the
-  // loop below would treat it as a leaf), but branches into a
+  // loop would otherwise treat it as a leaf), but branches into a
   // vehicle-specific flow with different fields than this test fills in.
-  const categorySection = page.locator("section").filter({ hasText: "Kategori" });
   for (let depth = 0; depth < 6; depth++) {
-    if (!(await categorySection.isVisible().catch(() => false))) break;
-    const option = categorySection
-      .locator('button:not([aria-label="Tilbake til kategorier"])')
-      .filter({ hasNotText: "Bil og MC" })
-      .first();
-    await option.click();
+    const tiles = page
+      .locator("button:has(span.leading-tight)")
+      .filter({ hasNotText: "Bil og MC" });
+    if ((await tiles.count()) === 0) break;
+    await tiles.first().click();
     // Picker shows a checkmark confirmation for SELECTION_CONFIRM_MS before
     // firing onSelect and (for leaves) advancing to the next step.
     await page.waitForTimeout(500);

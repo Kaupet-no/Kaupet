@@ -2731,6 +2731,7 @@ describe.skipIf(!canRun)(
       other: `rls-sitesettings-other-${suffix}@example.com`,
     };
     const userIds: string[] = [];
+    let originalDefaultSearchExamples: string[];
 
     async function signIn(email: string) {
       return signInWithRetry(email);
@@ -2750,10 +2751,26 @@ describe.skipIf(!canRun)(
       const adminId = await mkUser(emails.admin);
       await mkUser(emails.other);
       await grantAdmin(admin, adminId);
+
+      // This is a real singleton row used in production/staging (rotating
+      // search-field examples on the landing page) — save its current
+      // value so the admin-update test below can restore it afterwards
+      // instead of leaving test data behind on a shared row.
+      const { data: current, error: currentErr } = await admin
+        .from("site_settings")
+        .select("default_search_examples")
+        .eq("id", true)
+        .single();
+      if (currentErr) throw currentErr;
+      originalDefaultSearchExamples = current.default_search_examples;
     });
 
     afterAll(async () => {
       if (!canRun) return;
+      await admin
+        .from("site_settings")
+        .update({ default_search_examples: originalDefaultSearchExamples })
+        .eq("id", true);
       await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
     });
 

@@ -74,8 +74,15 @@ test("logger inn og publiserer en kjøretøy-annonse (manuell registrering)", as
   await page.getByLabel("Merke").waitFor();
   await page.getByLabel("Merke").click();
   await page.getByRole("option", { name: TEST_BRAND }).click();
+  // Confirm the selection actually round-tripped into the controlled
+  // Select's displayed value before touching Modell (which only becomes
+  // enabled once a recognized brand is set) — the model list depends on an
+  // async lookup keyed off the brand, so this also gives that lookup a
+  // moment to resolve rather than racing it.
+  await expect(page.getByLabel("Merke")).toContainText(TEST_BRAND);
   await page.getByLabel("Modell").click();
   await page.getByRole("option", { name: TEST_MODEL }).click();
+  await expect(page.getByLabel("Modell")).toContainText(TEST_MODEL);
   await page.getByTestId("wizard-next-button").click();
 
   // Bilder-siden (bundled with the now-inert generic category-attributes

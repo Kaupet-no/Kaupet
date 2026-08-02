@@ -22,7 +22,7 @@ backoff ved Supabase sin auth-rate-limit — bruk den (ikke en ny lokal
 `signInWithPassword`-kall) i alle nye testgrupper, siden en full kjøring nå
 gjør 70+ innlogginger i løpet av sekunder.
 
-## Dekket (19 tabeller, verifisert 59/59 grønt mot staging 2026-08-02)
+## Dekket (21 tabeller, verifisert 65/65 grønt mot staging 2026-08-02)
 
 - `conversations` / `messages` — kun deltakere ser samtalen
 - `listings` — eier ser egne draft/disabled, andre ser kun aktive; ikke-eier
@@ -55,6 +55,9 @@ gjør 70+ innlogginger i løpet av sekunder.
   (se funn under); en bruker kan ikke godkjenne seg selv eller foreslå på
   andres vegne
 - `admin_moderation_log` — kun admin/moderator kan lese
+- `favorite_price_drops` / `favorite_sold_notifications` — kun eier ser og
+  kan markere som lest; ingen direkte klient-INSERT (kun via triggerne
+  `listings_emit_price_drops`/`listings_emit_sold_notifications`)
 
 ## Funn fra testarbeidet (ikke bare testfiksinger)
 
@@ -77,7 +80,7 @@ gjør 70+ innlogginger i løpet av sekunder.
    flere testgrupper i samme fil vil trenge enda mer backoff-margin —
    vurder å dele filen i flere test-filer per tabellgruppe hvis kjøretiden
    blir et problem (hver fil kan kjøres separat med `vitest run <fil>`).
-   Ved 19 tabeller/59 tester tar en full kjøring nå ~56 sekunder.
+   Ved 21 tabeller/65 tester tar en full kjøring nå ~66 sekunder.
 4. **`user_reviews` fikk offentlig lesetilgang tilbake i en senere
    migrasjon.** Samme mønster som `profiles` (myk-sletting) — en
    mellomliggende innstramming (`20260605123044_*.sql`, til
@@ -97,22 +100,19 @@ gjør 70+ innlogginger i løpet av sekunder.
 
 ## Gjenstående — prioritert rekkefølge
 
-### Middels prioritet
+Alle "høy" og "middels" prioritet-tabeller er nå dekket. Det som gjenstår er
+utelukkende lav prioritet (analytics/telemetri, offentlig kategoridata, og
+noen mindre systemtabeller) — ingen av disse forventes å inneholde
+sikkerhetskritiske funn, men bør dekkes for fullstendighet.
 
-1. **`favorite_price_drops` / `favorite_sold_notifications`** — samme
-   mønster som `saved_search_notifications` (varsler generert av triggere,
-   ingen direkte klient-INSERT).
-
-### Lav prioritet (mindre sikkerhetskritisk, men bør dekkes for fullstendighet)
-
-2. `listing_images`, `listing_360_capture_sessions`, `listing_360_frames`
-3. `listing_view_events` / `listing_views` / `search_query_stats` /
+1. `listing_images`, `listing_360_capture_sessions`, `listing_360_frames`
+2. `listing_view_events` / `listing_views` / `search_query_stats` /
    `listing_keyword_stats` / `listing_category_word_stats` — stort sett
    analytics/telemetri, sjekk om de faktisk er lesbare av klienter
-4. `categories` / `category_filters` / `category_flows` / `filter_synonyms`
+3. `categories` / `category_filters` / `category_flows` / `filter_synonyms`
    / `site_settings` / `app_settings` — offentlig lesedata, lite risiko,
    men verifiser at skriving er admin/service-role-only
-5. `user_verifications`, `error_log`, `push_dispatch_failures`,
+4. `user_verifications`, `error_log`, `push_dispatch_failures`,
    `vipps_oauth_states`, `system_messages`
 
 ## Fremgangsmåte for neste økt

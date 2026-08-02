@@ -17,9 +17,12 @@ Get-Content .env.staging.local | ForEach-Object { if ($_ -match '^([^=]+)=(.*)$'
 Testene oppretter ekte, midlertidige testbrukere (`rls-*-<timestamp>@example.com`)
 og rydder dem opp i `afterAll`. Se eksisterende testgrupper i filen for mønsteret:
 service-role-oppsett, to+ innloggede klienter, verifiser hvem som kan/ikke kan
-se og endre hva.
+se og endre hva. En delt `signInWithRetry`-hjelper (øverst i filen) legger på
+backoff ved Supabase sin auth-rate-limit — bruk den (ikke en ny lokal
+`signInWithPassword`-kall) i alle nye testgrupper, siden en full kjøring nå
+gjør 70+ innlogginger i løpet av sekunder.
 
-## Dekket (9 tabeller, verifisert grønt mot staging 2026-08-02)
+## Dekket (14 tabeller, verifisert 42/42 grønt mot staging 2026-08-02)
 
 - `conversations` / `messages` — kun deltakere ser samtalen
 - `listings` — eier ser egne draft/disabled, andre ser kun aktive; ikke-eier
@@ -33,65 +36,100 @@ se og endre hva.
 - `notification_preferences` — privat til eier
 - `user_blocks` — kun blokkerer ser blokkeringen; blokkert bruker skal ikke
   kunne oppdage den via direkte spørring
+- `user_bans` / `user_suspensions` — rammet bruker ser egen sperre, ikke
+  andres; kun admin kan sperre
+- `ip_bans` — kun admin ser (via `has_role`-policyen); ikke-admin får tom
+  liste (RLS-filtrert, ikke tilgangsfeil — se funn under)
+- `reports` — hvem som helst kan sende inn egen rapport, ikke på andres
+  vegne; ingen (heller ikke rapportøren) kan lese uten admin/moderator-rolle
+- `listing_promotions` — kun eier/admin kan lese direkte (se funn under)
+- `vipps_webhook_secrets` / `vipps_webhook_events` — bekreftet at ingen
+  klientrolle (heller ikke admin) har noen GRANT på disse tabellene
+
+## Funn fra testarbeidet (ikke bare testfiksinger)
+
+1. **`listing_promotions` har mistet offentlig lesetilgang.** Migrasjonen
+   `20260608194322_32f4864e-8c38-4e30-9391-f950a86cc5f4.sql` dropper
+   policyen `"Anyone can read active promotions"` uten erstatning. Kun
+   eier/admin kan nå lese tabellen direkte — offentlig visning av
+   "fremhevet"-status må gå via `get_featured_listing_ids()`-RPC-en
+   (SECURITY DEFINER, bypasser RLS). **Oppfølging pågår:** en bakgrunnsøkt
+   (`task_6c53cb70`, startet 2026-08-02) undersøker om frontend-koden
+   faktisk bruker denne RPC-en overalt der fremhevet-status skal vises til
+   besøkende, eller om noe fortsatt spør tabellen direkte og dermed feiler
+   stille. Sjekk om den økten har landet et resultat før du fortsetter — hvis
+   den fant et brudd, bør det fikses før mer RLS-testarbeid, siden det er en
+   reell (ikke bare test-relatert) regresjon.
+2. **`ip_bans`-policyen er en `FOR ALL`-policy, ikke "ingen tilgang".**
+   Første antakelse (kun service-role) var feil — admins kan og skal lese
+   tabellen direkte via `has_role(auth.uid(), 'admin')`. Ikke-admin får tom
+   liste, ikke en tilgangsfeil (RLS default-deny, ingen matchende policy).
+3. **Rate limiting er en reell begrensning for videre testarbeid.** Supabase
+   sin auth-rate-limit på staging trigges ved ~14+ testgrupper i samme kjøring.
+   `signInWithRetry`-hjelperen (backoff, 5 forsøk) løser dette for nå, men
+   flere testgrupper i samme fil vil trenge enda mer backoff-margin —
+   vurder å dele filen i flere test-filer per tabellgruppe hvis kjøretiden
+   blir et problem (hver fil kan kjøres separat med `vitest run <fil>`).
 
 ## Gjenstående — prioritert rekkefølge
 
-### Høy prioritet (betaling og moderasjon — høyest risiko)
+### Høy prioritet
 
-1. **`vipps_webhook_secrets` / `vipps_webhook_events`** — betalingsdata,
-   sannsynligvis service-role-only med ingen klienttilgang i det hele tatt;
-   verifiser at `authenticated`/`anon` ikke har noen grants.
-2. **`listing_promotions` / `listing_sales`** — betalingsrelatert
-   (fremhevede annonser, salgsbekreftelse). Sjekk `20260610102257_*.sql`
-   for `listing_sales`-policyen nevnt i eksisterende migrasjonsgjennomgang.
-3. **`user_bans` / `user_suspensions` / `ip_bans`** — moderasjon; bør
-   sannsynligvis kun være lesbare av admin/service-role, ikke av vanlige
-   brukere (heller ikke banned-brukeren selv).
-4. **`reports`** — brukerrapporter av annonser/brukere; sjekk
-   `20260628130000_listing_reports_moderator_policies.sql` for gjeldende
-   policyer (moderator-tilgang er allerede migrert inn, verifiser med test).
+1. **`listing_sales`** — salgsbekreftelse; sjekk policyen i
+   `20260610102257_*.sql` ("Seller can confirm sale") — verifiser at kun
+   selger i den aktuelle samtalen kan bekrefte salg, og at kjøper/andre ikke
+   kan lese eller endre andres salgsrader.
 
 ### Middels prioritet
 
-5. **`wtb_listings`** ("ønskes kjøpt"-annonser) — sannsynligvis lik
+2. **`wtb_listings`** ("ønskes kjøpt"-annonser) — sannsynligvis lik
    `listings`-mønsteret (eier ser egne, andre ser kun aktive).
-6. **`user_reviews`** — offentlig lesbar per migrasjon
+3. **`user_reviews`** — offentlig lesbar per migrasjon
    `20260610102257_*.sql` (`GRANT SELECT ... TO anon`), men verifiser at
    kun den faktiske kjøperen/selgeren i en fullført handel kan opprette en
    anmeldelse.
-7. **`vehicle_brands` / `vehicle_models`** — offentlig lesbare, men
+4. **`vehicle_brands` / `vehicle_models`** — offentlig lesbare, men
    pending-approval-verdier (opprettet via `createVehicleBrand`/
    `createVehicleModel` i `vehicle-confirm`-flyten) bør ikke være synlige/
    brukbare før godkjenning; verifiser denne statusovergangen.
-8. **`admin_moderation_log`** — bør være admin/service-role-only.
+5. **`admin_moderation_log`** — bør være admin/service-role-only (policy
+   finnes: `"Admins and moderators read moderation log"`).
+6. **`favorite_price_drops` / `favorite_sold_notifications`** — samme
+   mønster som `saved_search_notifications` (varsler generert av triggere,
+   ingen direkte klient-INSERT).
 
 ### Lav prioritet (mindre sikkerhetskritisk, men bør dekkes for fullstendighet)
 
-9. `listing_images`, `listing_360_capture_sessions`, `listing_360_frames`
-10. `listing_view_events` / `listing_views` / `search_query_stats` /
-    `listing_keyword_stats` / `listing_category_word_stats` — stort sett
-    analytics/telemetri, sjekk om de faktisk er lesbare av klienter
-11. `favorite_price_drops` / `favorite_sold_notifications` — samme mønster
-    som `saved_search_notifications`
-12. `categories` / `category_filters` / `category_flows` / `filter_synonyms`
-    / `site_settings` / `app_settings` — offentlig lesedata, lite risiko,
-    men verifiser at skriving er admin/service-role-only
-13. `user_verifications`, `error_log`, `push_dispatch_failures`,
+7. `listing_images`, `listing_360_capture_sessions`, `listing_360_frames`
+8. `listing_view_events` / `listing_views` / `search_query_stats` /
+   `listing_keyword_stats` / `listing_category_word_stats` — stort sett
+   analytics/telemetri, sjekk om de faktisk er lesbare av klienter
+9. `categories` / `category_filters` / `category_flows` / `filter_synonyms`
+   / `site_settings` / `app_settings` — offentlig lesedata, lite risiko,
+   men verifiser at skriving er admin/service-role-only
+10. `user_verifications`, `error_log`, `push_dispatch_failures`,
     `vipps_oauth_states`, `system_messages`
 
 ## Fremgangsmåte for neste økt
 
-1. For hver tabell: `grep -n "CREATE POLICY\|DROP POLICY" supabase/migrations/*.sql | grep -i "on (public\.)?<tabell>"`
-   for å finne gjeldende policyer (husk at policyer kan være endret i senere
-   migrasjoner — bruk siste `CREATE POLICY` for et gitt policy-navn, ikke
-   nødvendigvis den første).
-2. Skriv testgruppe(r) etter samme mønster som eksisterende (se
-   `src/lib/rls.integration.test.ts`).
-3. Kjør `bunx tsc --noEmit` og `bunx eslint src/lib/rls.integration.test.ts`
+1. Sjekk om `task_6c53cb70` (featured-listing-undersøkelsen) har landet —
+   følg opp eventuelt reelt funn før mer testarbeid.
+2. For hver tabell: `grep -n "CREATE POLICY\|DROP POLICY" supabase/migrations/*.sql | grep -i "on (public\.)?<tabell>"`
+   for å finne gjeldende policyer. **Viktig lærdom fra denne runden:** ikke
+   bare se på første `CREATE POLICY` — sjekk om en senere migrasjon har
+   `DROP POLICY` for samme navn uten erstatning (skjedde med
+   `listing_promotions`), og les selve policy-definisjonen nøye (`FOR ALL`
+   vs. `FOR SELECT`, hvem den faktisk gjelder for) i stedet for å anta ut fra
+   tabellnavn/kontekst alene.
+3. Skriv testgruppe(r) etter samme mønster som eksisterende (se
+   `src/lib/rls.integration.test.ts`), og bruk `signInWithRetry`, ikke en ny
+   lokal `signInWithPassword`.
+4. Kjør `bunx tsc --noEmit` og `bunx eslint src/lib/rls.integration.test.ts`
    lokalt — kan verifiseres uten Supabase-tilkobling.
-4. Commit + push til staging.
-5. Be brukeren kjøre PowerShell-kommandoen over og rapportere resultatet
+5. Commit + push til staging.
+6. Be brukeren kjøre PowerShell-kommandoen over og rapportere resultatet
    tilbake (Claude Code kan ikke selv koble til staging-Supabase i denne
    økten — miljøets sikkerhetsklassifiserer blokkerer det).
-6. Fiks eventuelle feil som dukker opp (som regel enten en feil i testen
-   selv, eller et reelt funn — begge er verdifulle).
+7. Fiks eventuelle feil som dukker opp — vurder alltid om feilen er i testens
+   antakelse (som med `ip_bans`/`listing_promotions` denne runden) eller et
+   reelt RLS-hull, før du "fikser" ved å endre forventningen.

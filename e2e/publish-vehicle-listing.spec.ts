@@ -131,7 +131,9 @@ test("logger inn og publiserer en kjøretøy-annonse (manuell registrering)", as
   // required.
   await page.getByTestId("wizard-step-vehicle-facts").waitFor();
   await page.getByLabel("Kilometerstand").fill("42000");
-  await page.getByLabel("Pris").fill("150000");
+  // getByLabel("Pris") is ambiguous — the step progressbar's aria-label
+  // ("Steg 4 av 7: Pris & detaljer") also matches as a substring.
+  await page.getByRole("textbox", { name: "Pris" }).fill("150000");
 
   // vehicle-condition: known-issues is required unless "no known issues" is
   // checked. Tilstand keeps its default value.

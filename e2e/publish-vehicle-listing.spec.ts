@@ -125,10 +125,13 @@ test("logger inn og publiserer en kjøretøy-annonse (manuell registrering)", as
 
   // vehicle-facts: title is computed from Merke/Modell (already filled) and
   // isn't directly editable for vehicles. Kilometerstand is required
-  // whenever showMileage applies, which it does for this leaf.
+  // whenever showMileage applies, which it does for this leaf. Unlike the
+  // generic flow, vehicles have no "Gis bort gratis" checkbox at all (see
+  // the `!isVehicle &&` guard in price/index.tsx) — a real price is
+  // required.
   await page.getByTestId("wizard-step-vehicle-facts").waitFor();
   await page.getByLabel("Kilometerstand").fill("42000");
-  await page.getByRole("checkbox", { name: "Gis bort gratis" }).click();
+  await page.getByLabel("Pris").fill("150000");
 
   // vehicle-condition: known-issues is required unless "no known issues" is
   // checked. Tilstand keeps its default value.

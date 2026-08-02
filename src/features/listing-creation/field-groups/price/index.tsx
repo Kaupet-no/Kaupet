@@ -138,7 +138,7 @@ export function Price({
   return (
     <section className="space-y-3">
       <div className="flex items-center gap-1.5">
-        <Label>
+        <Label htmlFor="price_nok">
           Pris
           <RequiredMark />
         </Label>
@@ -154,6 +154,7 @@ export function Price({
         <div className="space-y-1">
           <div className="relative max-w-[200px]">
             <Input
+              id="price_nok"
               type="text"
               inputMode="numeric"
               placeholder="0"

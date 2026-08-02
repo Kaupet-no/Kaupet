@@ -2350,23 +2350,37 @@ describe.skipIf(!canRun)(
       await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
     });
 
-    it("lets an anonymous visitor log a view (core feature — view counting)", async () => {
+    it("blocks direct table INSERT — logging a view only works via the log_listing_view RPC", async () => {
+      // 20260617123639_*.sql and 20260617142736_fix-listing-view-logging.sql
+      // both REVOKE INSERT (and SELECT) on listing_views from anon/
+      // authenticated entirely — PostgREST upserts need SELECT to check
+      // ON CONFLICT, which anon must never have (visitor_key shouldn't be
+      // publicly readable), so logging moved to a SECURITY DEFINER RPC
+      // that only needs EXECUTE. A raw client insert is expected to fail
+      // with a grant-level permission error now, not just an RLS filter.
       const anon = createClient(URL!, ANON_KEY!);
       const { error } = await anon
         .from("listing_views")
         .insert({ listing_id: listingId, visitor_key: `rls-anon-visitor-${suffix}` });
+      expect(error).not.toBeNull();
+    });
+
+    it("lets an anonymous visitor log a view via the log_listing_view RPC", async () => {
+      const anon = createClient(URL!, ANON_KEY!);
+      const { error } = await anon.rpc("log_listing_view", {
+        _listing_id: listingId,
+        _visitor_key: `rls-anon-rpc-visitor-${suffix}`,
+      });
       expect(error).toBeNull();
     });
 
-    it("blocks even the listing owner from reading raw view rows directly (no SELECT policy — use the listing_stats RPC instead)", async () => {
-      // The original "Owners can read views for their listings" SELECT
-      // policy was intentionally dropped in 20260605075809_*.sql — owners
-      // now get view counts via the listing_stats() RPC, not a raw table
-      // read, presumably to keep individual visitor_key rows non-queryable.
+    it("blocks even the listing owner from reading raw view rows directly (no GRANT at all — use the listing_stats RPC instead)", async () => {
+      // No SELECT grant remains for authenticated either (revoked in the
+      // same two migrations) — owners get view counts via listing_stats(),
+      // never a raw table read.
       const owner = await signIn();
-      const { data, error } = await owner.from("listing_views").select("id").eq("id", viewId);
-      expect(error).toBeNull();
-      expect(data).toHaveLength(0);
+      const { error } = await owner.from("listing_views").select("id").eq("id", viewId);
+      expect(error).not.toBeNull();
     });
   },
 );

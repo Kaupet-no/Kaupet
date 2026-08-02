@@ -203,6 +203,41 @@ export type Database = {
           },
         ]
       }
+      filter_synonyms: {
+        Row: {
+          category_filter_id: string
+          created_at: string
+          id: string
+          is_generated: boolean
+          option_value: string | null
+          phrase: string
+        }
+        Insert: {
+          category_filter_id: string
+          created_at?: string
+          id?: string
+          is_generated?: boolean
+          option_value?: string | null
+          phrase: string
+        }
+        Update: {
+          category_filter_id?: string
+          created_at?: string
+          id?: string
+          is_generated?: boolean
+          option_value?: string | null
+          phrase?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "filter_synonyms_category_filter_id_fkey"
+            columns: ["category_filter_id"]
+            isOneToOne: false
+            referencedRelation: "category_filters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vehicle_brands: {
         Row: {
           id: string
@@ -1684,6 +1719,15 @@ export type Database = {
           views_7d: number
         }[]
       }
+      admin_zero_result_searches: {
+        Args: { _limit?: number }
+        Returns: {
+          last_searched_at: string
+          query: string
+          search_count: number
+          zero_result_count: number
+        }[]
+      }
       admin_popular_categories: {
         Args: never
         Returns: {
@@ -1788,6 +1832,10 @@ export type Database = {
         Args: { _listing_id: string; _visitor_key: string }
         Returns: undefined
       }
+      log_search_query: {
+        Args: { _query: string; _result_count: number }
+        Returns: undefined
+      }
       match_listing_to_saved_searches: {
         Args: { _listing_id: string }
         Returns: undefined
@@ -1824,6 +1872,7 @@ export type Database = {
           subtitle: string | null
           total_views: number
           views_last_week: number
+          mileage_km: number | null
         }[]
       }
       popular_listings_last_week: {
@@ -1840,6 +1889,7 @@ export type Database = {
           subtitle: string | null
           total_views: number
           views_last_week: number
+          mileage_km: number | null
         }[]
       }
       purge_expired_accounts: { Args: never; Returns: number }
@@ -1849,6 +1899,41 @@ export type Database = {
         Returns: {
           saved_search_id: string
           unread_count: number
+        }[]
+      }
+      match_search_synonyms: {
+        Args: {
+          p_category_id: string
+          phrases: string[]
+        }
+        Returns: {
+          phrase: string
+          filter_key: string
+          filter_label: string
+          option_value: string | null
+          option_label: string | null
+        }[]
+      }
+      search_listing_ids: {
+        Args: {
+          include_groups?: Json
+          exclude_any_terms?: string[] | null
+          exclude_all_groups?: Json
+        }
+        Returns: {
+          id: string
+          rank: number
+        }[]
+      }
+      suggest_attribute_values: {
+        Args: {
+          p_category_id: string
+          p_key: string
+          p_limit?: number
+        }
+        Returns: {
+          value: string
+          listing_count: number
         }[]
       }
       suggest_category_for_title: {

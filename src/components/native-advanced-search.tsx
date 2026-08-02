@@ -18,7 +18,11 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { CategoryPicker, SaveSearchDialog } from "@/components/advanced-search-sheet";
-import { CONDITIONS, type AdvancedSearchValue } from "@/components/advanced-search-value";
+import {
+  CONDITIONS,
+  isBilOgMcCategory,
+  type AdvancedSearchValue,
+} from "@/components/advanced-search-value";
 import type { Category } from "@/lib/categories";
 import { emptyTermGroup, type TermGroup } from "@/lib/term-groups";
 import { useAuth } from "@/hooks/use-auth";
@@ -243,31 +247,36 @@ export function NativeAdvancedSearch({ open, onClose, initial, categories, onApp
               </section>
 
               {/* Condition */}
-              <section className="space-y-3">
-                <Label className="text-sm font-medium">Tilstand</Label>
-                <div className="flex flex-col gap-3">
-                  {CONDITIONS.map((c) => (
-                    <label key={c.value} className="flex cursor-pointer items-center gap-3 py-0.5">
-                      <Checkbox
-                        checked={v.conditions.includes(c.value)}
-                        onCheckedChange={() => {
-                          void hapticImpact("light");
-                          setV((prev) => ({
-                            ...prev,
-                            conditions: prev.conditions.includes(c.value)
-                              ? prev.conditions.filter((x) => x !== c.value)
-                              : [...prev.conditions, c.value],
-                          }));
-                        }}
-                        id={`adv-cond-${c.value}`}
-                      />
-                      <Label htmlFor={`adv-cond-${c.value}`} className="cursor-pointer text-base">
-                        {c.label}
-                      </Label>
-                    </label>
-                  ))}
-                </div>
-              </section>
+              {!isBilOgMcCategory(categories, v.categories) && (
+                <section className="space-y-3">
+                  <Label className="text-sm font-medium">Tilstand</Label>
+                  <div className="flex flex-col gap-3">
+                    {CONDITIONS.map((c) => (
+                      <label
+                        key={c.value}
+                        className="flex cursor-pointer items-center gap-3 py-0.5"
+                      >
+                        <Checkbox
+                          checked={v.conditions.includes(c.value)}
+                          onCheckedChange={() => {
+                            void hapticImpact("light");
+                            setV((prev) => ({
+                              ...prev,
+                              conditions: prev.conditions.includes(c.value)
+                                ? prev.conditions.filter((x) => x !== c.value)
+                                : [...prev.conditions, c.value],
+                            }));
+                          }}
+                          id={`adv-cond-${c.value}`}
+                        />
+                        <Label htmlFor={`adv-cond-${c.value}`} className="cursor-pointer text-base">
+                          {c.label}
+                        </Label>
+                      </label>
+                    ))}
+                  </div>
+                </section>
+              )}
             </div>
 
             {/* Sticky footer */}

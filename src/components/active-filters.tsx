@@ -21,6 +21,11 @@ type Props = {
   attrFilters?: CategoryFilter[];
   attrValues?: Record<string, AttributeFilterValue>;
   onRemoveAttr?: (key: string, value?: string) => void;
+  /** Composite keys ("filterKey" or "filterKey:optionValue", matching the
+   * ones built below) that were just auto-applied from typed text — briefly
+   * highlighted so the user sees *which* chip their word turned into,
+   * instead of the word just vanishing with no visible destination. */
+  justCreatedKeys?: Set<string>;
   /** Location/radius filter set via the map — shown as its own removable
    * label since it has no always-visible pill of its own (it lives inside
    * the map section, not the filter-chip row). */
@@ -66,6 +71,7 @@ export function ActiveFilters({
   onRemoveAttr,
   location,
   onRemoveLocation,
+  justCreatedKeys,
 }: Props) {
   const hasLine1 = terms.length > 0;
   const attrEntries = Object.entries(attrValues);
@@ -139,6 +145,7 @@ export function ActiveFilters({
               key={`${key}:${v}`}
               label={`${filter.label_nb}: ${opt?.label_nb ?? v}`}
               onRemove={() => onRemoveAttr?.(key, v)}
+              justCreated={justCreatedKeys?.has(`${key}:${v}`)}
             />
           ),
         });
@@ -156,6 +163,7 @@ export function ActiveFilters({
               : `${filter.label_nb}: ${describeAttrValue(filter, value)}`
           }
           onRemove={() => onRemoveAttr?.(key)}
+          justCreated={justCreatedKeys?.has(`${key}:`)}
         />
       ),
     });
@@ -204,7 +212,7 @@ export function ActiveFilters({
   const hiddenCount = showCollapsed ? allItems.length - overflowStart! : 0;
 
   return (
-    <div ref={containerRef} className="mt-3 flex flex-wrap items-center gap-2">
+    <div ref={containerRef} className="flex flex-wrap items-center gap-2">
       {visibleItems.map((item) => item.node)}
       {showCollapsed && hiddenCount > 0 && (
         <button
@@ -233,9 +241,21 @@ export function ActiveFilters({
   );
 }
 
-function AttrChip({ label, onRemove }: { label: string; onRemove: () => void }) {
+function AttrChip({
+  label,
+  onRemove,
+  justCreated,
+}: {
+  label: string;
+  onRemove: () => void;
+  justCreated?: boolean;
+}) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs">
+    <span
+      className={`inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs ${
+        justCreated ? "animate-in fade-in zoom-in-95 ring-2 ring-primary/50 duration-300" : ""
+      }`}
+    >
       {label}
       <button
         type="button"

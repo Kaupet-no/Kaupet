@@ -1,14 +1,11 @@
 ﻿import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { format, isValid, parse } from "date-fns";
-import { CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -28,273 +25,26 @@ import {
 } from "@/components/ui/alert-dialog";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { createVehicleBrand, createVehicleModel } from "@/lib/vehicle/vehicle-brands.functions";
-import {
-  VEHICLE_LEAF_SLUGS,
-  avgiftskodeGruppeFromCode,
-  type AvgiftskodeGruppe,
-  type VehicleLeafSlug,
-} from "@/lib/vehicle/vehicle-classification";
+import { VEHICLE_LEAF_SLUGS, type VehicleLeafSlug } from "@/lib/vehicle/vehicle-classification";
 import {
   VehicleBrandField,
   VehicleModelField,
 } from "@/features/listing-creation/modules/generic-attributes/vehicle-brand-model-fields";
 import type { VehicleBrandGroup } from "@/lib/category-filters";
-import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.server";
 
 import type { WizardSharedProps } from "../types";
+import {
+  LEAF_LABELS_NB,
+  AVGIFTSKODE_GRUPPE_LABELS_NB,
+  FUEL_TYPE_OPTIONS,
+  TRANSMISSION_OPTIONS,
+  DRIVE_TYPE_OPTIONS,
+  COLOR_OPTIONS,
+} from "./constants";
+import { parseIsoDate, specFromLookup, specOverridesFrom, type EditableSpec } from "./spec";
+import { EuControlDateField } from "./eu-control-date-field";
 
-const LEAF_LABELS_NB: Record<VehicleLeafSlug, string> = {
-  bil: "Bil",
-  bobil: "Bobil",
-  campingvogn: "Campingvogn",
-  motorsykkel: "Motorsykkel",
-  "moped-og-scooter": "Moped/scooter",
-  atv: "ATV",
-  snoscooter: "Snøscooter",
-  "tilhenger-leaf": "Tilhenger",
-  "lastebil-og-henger": "Lastebil/henger",
-  "buss-og-minibuss": "Buss/minibuss",
-  "traktor-og-redskap": "Traktor/redskap",
-  anleggsmaskiner: "Anleggsmaskin",
-};
-
-const AVGIFTSKODE_GRUPPE_LABELS_NB: Record<AvgiftskodeGruppe, string> = {
-  personbil: "Personbil",
-  varebil: "Varebil",
-};
-
-const FUEL_TYPE_OPTIONS = [
-  { value: "diesel", label: "Diesel" },
-  { value: "bensin", label: "Bensin" },
-  { value: "el", label: "Elektrisk" },
-  { value: "hybrid", label: "Hybrid" },
-];
-
-const TRANSMISSION_OPTIONS = [
-  { value: "manuell", label: "Manuell" },
-  { value: "automat", label: "Automat" },
-];
-
-export const DRIVE_TYPE_OPTIONS = [
-  { value: "4x4", label: "Firehjulsdrift" },
-  { value: "bakhjul", label: "Bakhjulsdrift" },
-  { value: "forhjul", label: "Forhjulsdrift" },
-];
-
-/** Mirrors the `color` category_filters options (see
- * supabase/migrations/20260722100000_vehicle_color_select_options.sql) so
- * registered and manually-entered vehicles store the same fixed values —
- * needed for the "uregistrert" search filter to work identically either way. */
-const COLOR_OPTIONS = [
-  { value: "black", label: "Svart" },
-  { value: "white", label: "Hvit" },
-  { value: "silver", label: "Sølv" },
-  { value: "gray", label: "Grå" },
-  { value: "red", label: "Rød" },
-  { value: "blue", label: "Blå" },
-  { value: "green", label: "Grønn" },
-  { value: "yellow", label: "Gul" },
-  { value: "orange", label: "Oransje" },
-  { value: "brown", label: "Brun" },
-  { value: "beige", label: "Beige" },
-  { value: "purple", label: "Lilla" },
-  { value: "other", label: "Annen farge" },
-];
-
-/** SVV returns color as free text (e.g. "SORT", "SØLV METALLIC") — best-effort
- * maps it onto the fixed color list as a preselected suggestion the user can
- * correct via the dropdown, rather than leaving the field empty or storing
- * raw text that wouldn't match the "manual entry" path's fixed values. */
-function guessColorOption(raw: string | null | undefined): string {
-  if (!raw) return "";
-  const s = raw.toLowerCase();
-  const matchers: [string, string[]][] = [
-    ["black", ["sort", "svart"]],
-    ["white", ["hvit"]],
-    ["silver", ["sølv", "solv"]],
-    ["gray", ["grå", "gra"]],
-    ["red", ["rød", "rod"]],
-    ["blue", ["blå", "bla"]],
-    ["green", ["grønn", "gronn"]],
-    ["yellow", ["gul"]],
-    ["orange", ["oransje"]],
-    ["brown", ["brun"]],
-    ["beige", ["beige"]],
-    ["purple", ["lilla", "fiolett"]],
-  ];
-  for (const [value, keywords] of matchers) {
-    if (keywords.some((k) => s.includes(k))) return value;
-  }
-  return "other";
-}
-
-/** `next_eu_control` is stored/submitted as an ISO date (`yyyy-MM-dd`) —
- * matching the format SVV's `kontrollfrist` already comes in as — but shown
- * to the user as a calendar-picked `dd.MM.yyyy`, same field used by every
- * vehicle leaf (not a trailer-specific control). */
-function parseIsoDate(value: string): Date | undefined {
-  if (!value) return undefined;
-  const parsed = parse(value, "yyyy-MM-dd", new Date());
-  return isValid(parsed) ? parsed : undefined;
-}
-
-function startOfToday(): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-/** `mode="future"` (default) is for dates like EU-kontroll that must lie
- * ahead of today; `mode="past"` is for dates like førstegangsregistrering
- * that must lie behind it. Both share the same ISO-in/dd.MM.yyyy-out
- * behavior — only which half of the calendar is selectable differs. */
-function EuControlDateField({
-  id,
-  value,
-  onChange,
-  mode = "future",
-}: {
-  id: string;
-  value: string;
-  onChange: (v: string) => void;
-  mode?: "future" | "past";
-}) {
-  const [open, setOpen] = useState(false);
-  const selectedDate = parseIsoDate(value);
-  const today = startOfToday();
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          id={id}
-          className="w-full justify-start font-normal"
-        >
-          <CalendarIcon className="mr-2 size-4 text-muted-foreground" />
-          {selectedDate ? format(selectedDate, "dd.MM.yyyy") : "Velg dato"}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
-        <Calendar
-          mode="single"
-          captionLayout="dropdown"
-          selected={selectedDate}
-          disabled={mode === "future" ? { before: today } : { after: today }}
-          startMonth={mode === "future" ? today : new Date(1970, 0)}
-          endMonth={mode === "future" ? new Date(new Date().getFullYear() + 4, 11) : today}
-          onSelect={(date) => {
-            if (date) onChange(format(date, "yyyy-MM-dd"));
-            setOpen(false);
-          }}
-        />
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-/** The subset of vehicle-confirm's fields that are also `category_filters`
- * for vehicle leaves — editable here so they're never asked again in the
- * later category-attributes step (see VEHICLE_LOOKUP_FILTER_KEYS). */
-type EditableSpec = {
-  year: string;
-  fuel_type: string;
-  transmission: string;
-  drive_type: string;
-  weight_kg: string;
-  /** Tillatt totalvekt — kun relevant for bil/bobil/campingvogn/tilhenger/de
-   * tyngre kjøretøykategoriene (se `showWeightAndLength` under). */
-  max_total_weight_kg: string;
-  /** Lengde i meter — samme kategorier som over. */
-  length_m: string;
-  power_hk: string;
-  tow_hitch: boolean;
-  max_tow_weight_kg: string;
-  seats: string;
-  color: string;
-  next_eu_control: string;
-  eu_control_exempt: boolean | null;
-  /** Antall soveplasser — kun relevant for bobil/campingvogn (se `isCamper`
-   * under). Statens vegvesens Enkeltoppslag-API har ikke dette feltet i det
-   * hele tatt (verifisert mot det reelle OpenAPI-skjemaet), så `lookup.
-   * sleeping_places` er alltid `null` — dette er derfor et rent manuelt felt,
-   * ikke en SVV-verdi brukeren kan korrigere. */
-  sleeping_places: string;
-  imported_used: boolean | null;
-  first_registration_date: string;
-  cylinders: string;
-  engine_displacement_cc: string;
-  engine_code: string;
-  /** Personbil/Varebil, utledet automatisk fra avgiftsklassekoden (se
-   * avgiftskodeGruppeFromCode) — kun relevant når kjøretøyet er klassifisert
-   * som "bil". Ikke et redigerbart felt (vises kun som informasjon), men
-   * lagres i attributes.avgiftskode_gruppe slik at det blir søkbart. */
-  avgiftskode_gruppe: AvgiftskodeGruppe | null;
-};
-
-function specFromLookup(lookup: VehicleLookupResult | null): EditableSpec {
-  return {
-    year: lookup?.year != null ? String(lookup.year) : "",
-    fuel_type: lookup?.fuel_type ?? "",
-    transmission: lookup?.transmission ?? "",
-    drive_type: lookup?.drive_type ?? "",
-    weight_kg: lookup?.weight_kg != null ? String(lookup.weight_kg) : "",
-    max_total_weight_kg:
-      lookup?.max_total_weight_kg != null ? String(lookup.max_total_weight_kg) : "",
-    length_m: lookup?.length_m != null ? String(lookup.length_m) : "",
-    power_hk: lookup?.power_hk != null ? String(lookup.power_hk) : "",
-    tow_hitch: lookup?.tow_hitch ?? false,
-    max_tow_weight_kg: lookup?.max_tow_weight_kg != null ? String(lookup.max_tow_weight_kg) : "",
-    seats: lookup?.seats != null ? String(lookup.seats) : "",
-    color: guessColorOption(lookup?.color),
-    next_eu_control: lookup?.next_eu_control ?? "",
-    // Statens vegvesen-oppslaget inneholder ikke pålitelig informasjon om
-    // Tempo 100-registrering, så dette kan aldri utledes automatisk — brukeren
-    // må alltid svare eksplisitt (se spørsmålet under datakortet i UI-en).
-    eu_control_exempt: null,
-    sleeping_places: lookup?.sleeping_places != null ? String(lookup.sleeping_places) : "",
-    imported_used: lookup?.imported_used ?? null,
-    first_registration_date: lookup?.first_registration_date ?? "",
-    cylinders: lookup?.cylinders != null ? String(lookup.cylinders) : "",
-    engine_displacement_cc:
-      lookup?.engine_displacement_cc != null ? String(lookup.engine_displacement_cc) : "",
-    engine_code: lookup?.engine_code ?? "",
-    avgiftskode_gruppe: avgiftskodeGruppeFromCode(
-      lookup?.avgiftsklasse_code ?? null,
-      lookup?.classification_code ?? null,
-    ),
-  };
-}
-
-function specOverridesFrom(spec: EditableSpec) {
-  return {
-    year: spec.year.trim() ? Number(spec.year) : undefined,
-    fuel_type: spec.fuel_type || undefined,
-    transmission: spec.transmission || undefined,
-    drive_type: spec.drive_type || undefined,
-    weight_kg: spec.weight_kg.trim() ? Number(spec.weight_kg) : undefined,
-    max_total_weight_kg: spec.max_total_weight_kg.trim()
-      ? Number(spec.max_total_weight_kg)
-      : undefined,
-    length_m: spec.length_m.trim() ? Number(spec.length_m) : undefined,
-    power_hk: spec.power_hk.trim() ? Number(spec.power_hk) : undefined,
-    tow_hitch: spec.tow_hitch,
-    max_tow_weight_kg: spec.max_tow_weight_kg.trim() ? Number(spec.max_tow_weight_kg) : undefined,
-    seats: spec.seats.trim() ? Number(spec.seats) : undefined,
-    color: spec.color || undefined,
-    next_eu_control: spec.next_eu_control || undefined,
-    eu_control_exempt: spec.eu_control_exempt ?? undefined,
-    sleeping_places: spec.sleeping_places.trim() ? Number(spec.sleeping_places) : undefined,
-    imported_used: spec.imported_used ?? undefined,
-    first_registration_date: spec.first_registration_date || undefined,
-    cylinders: spec.cylinders.trim() ? Number(spec.cylinders) : undefined,
-    engine_displacement_cc: spec.engine_displacement_cc.trim()
-      ? Number(spec.engine_displacement_cc)
-      : undefined,
-    engine_code: spec.engine_code || undefined,
-    avgiftskode_gruppe: spec.avgiftskode_gruppe ?? undefined,
-  };
-}
+export { DRIVE_TYPE_OPTIONS } from "./constants";
 
 /**
  * Dedicated confirmation step for the vehicle-first flow: shown only after a

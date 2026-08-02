@@ -5,6 +5,10 @@ import { useNavigate } from "@tanstack/react-router";
 import { Input } from "@/components/ui/input";
 import { findCategorySuggestion, type Category } from "@/lib/categories";
 import { hapticImpact } from "@/lib/haptics";
+import { resolveTextToFilters } from "@/features/listing-search/resolve-text-to-filters";
+import { encodeAttrFilters } from "@/features/listing-search/search-schema";
+import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
+import type { CategoryFilter } from "@/lib/category-filters";
 
 const HISTORY_KEY = "kaupet_recent_searches_v1";
 const MAX_HISTORY = 5;
@@ -32,13 +36,22 @@ type Props = {
   onClose: () => void;
   initialQ?: string;
   categories: Category[];
+  allFilters: CategoryFilter[];
 };
 
-export function NativeSearchOverlay({ open, onClose, initialQ = "", categories }: Props) {
+export function NativeSearchOverlay({
+  open,
+  onClose,
+  initialQ = "",
+  categories,
+  allFilters,
+}: Props) {
   const [q, setQ] = useState(initialQ);
   const [history, setHistory] = useState<string[]>([]);
+  const [submitting, setSubmitting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const { data: vehicleBrands } = useAllVehicleBrands();
 
   useEffect(() => {
     if (open) {
@@ -55,11 +68,35 @@ export function NativeSearchOverlay({ open, onClose, initialQ = "", categories }
     [q, categories],
   );
 
-  const submit = (value: string) => {
-    if (!value.trim()) return;
+  const submit = async (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed || submitting) return;
     void hapticImpact("medium");
-    saveToHistory(value.trim());
-    navigate({ to: "/annonser", search: { q: value.trim(), category: "", sort: "new" } });
+    saveToHistory(trimmed);
+
+    setSubmitting(true);
+    // Runs the same category/brand, equipment-synonym and number+unit
+    // recognition as the desktop search pipeline (see
+    // resolve-text-to-filters.ts) so a native search for e.g. "Volvo med
+    // cruisecontrol" lands with the same filters applied as on desktop,
+    // instead of a plain (and often empty) fritekst search.
+    const resolved = await resolveTextToFilters({
+      q: trimmed,
+      categories,
+      vehicleBrands: vehicleBrands ?? [],
+      allFilters,
+    }).catch(() => null);
+    setSubmitting(false);
+
+    navigate({
+      to: "/annonser",
+      search: {
+        q: resolved?.q ?? trimmed,
+        category: resolved?.categorySlug ?? "",
+        attrs: resolved ? encodeAttrFilters(resolved.attrPatch) : "",
+        sort: "new",
+      },
+    });
     onClose();
   };
 
@@ -93,7 +130,7 @@ export function NativeSearchOverlay({ open, onClose, initialQ = "", categories }
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") submit(q);
+              if (e.key === "Enter") void submit(q);
             }}
             placeholder="Hva leter du etter?"
             className="h-11 border-0 bg-muted pl-9 pr-8 text-base focus-visible:ring-0"
@@ -113,10 +150,11 @@ export function NativeSearchOverlay({ open, onClose, initialQ = "", categories }
         {q.trim() && (
           <button
             type="button"
-            onClick={() => submit(q)}
-            className="shrink-0 text-sm font-medium text-primary"
+            onClick={() => void submit(q)}
+            disabled={submitting}
+            className="shrink-0 text-sm font-medium text-primary disabled:opacity-50"
           >
-            Søk
+            {submitting ? "Søker…" : "Søk"}
           </button>
         )}
       </div>
@@ -164,7 +202,7 @@ export function NativeSearchOverlay({ open, onClose, initialQ = "", categories }
               <button
                 key={item}
                 type="button"
-                onClick={() => submit(item)}
+                onClick={() => void submit(item)}
                 className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left transition hover:bg-muted active:bg-muted"
               >
                 <Clock className="size-4 shrink-0 text-muted-foreground" />

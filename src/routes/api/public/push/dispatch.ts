@@ -181,10 +181,10 @@ export const Route = createFileRoute("/api/public/push/dispatch")({
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
         // Build notification content from authoritative DB rows only.
-        let userId: string | null = null;
-        let title = "Kaupet.no";
-        let body = "";
-        let url = "/";
+        let userId: string | null;
+        let title: string;
+        let body: string;
+        let url: string;
         let tag: string | undefined;
 
         if (payload.type === "message") {

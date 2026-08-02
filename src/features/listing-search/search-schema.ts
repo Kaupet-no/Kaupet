@@ -32,7 +32,7 @@ export const searchSchema = z.object({
   includeFree: z.coerce.boolean().optional().default(true),
   min: z.coerce.number().int().min(0).optional(),
   max: z.coerce.number().int().min(0).optional(),
-  sort: z.enum(["new", "price_asc", "price_desc"]).optional().default("new"),
+  sort: z.enum(["new", "relevance", "price_asc", "price_desc"]).optional().default("new"),
   lat: z.coerce.number().optional(),
   lng: z.coerce.number().optional(),
   radius: z.coerce.number().min(1).max(100).optional(),
@@ -142,15 +142,3 @@ export type ListingsPage = {
   totalCount: number | null;
   nextOffset: number | null;
 };
-
-export function rowContainsTerm(
-  l: { title: string | null; description: string | null; city: string | null },
-  term: string,
-): boolean {
-  const needle = term.toLowerCase();
-  return (
-    !!l.title?.toLowerCase().includes(needle) ||
-    !!l.description?.toLowerCase().includes(needle) ||
-    !!l.city?.toLowerCase().includes(needle)
-  );
-}

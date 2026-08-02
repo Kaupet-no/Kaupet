@@ -40,7 +40,7 @@ function FavoritesPage() {
       const { data, error } = await supabase
         .from("favorites")
         .select(
-          "listing_id, created_at, listings(id, kaupet_code, title, subtitle, price_nok, is_free, city, created_at, status, listing_images(storage_path, sort_order))",
+          "listing_id, created_at, listings(id, kaupet_code, title, subtitle, price_nok, is_free, city, created_at, status, listing_images(storage_path, sort_order), attributes)",
         )
         .eq("user_id", user!.id)
         .order("created_at", { ascending: false });
@@ -58,6 +58,7 @@ function FavoritesPage() {
           .sort(
             (a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order,
           );
+        const mileageRaw = (l.attributes as Record<string, unknown> | null)?.mileage_km;
         return {
           kind: "available",
           listing_id: row.listing_id,
@@ -71,6 +72,7 @@ function FavoritesPage() {
             city: l.city,
             created_at: l.created_at,
             cover_path: imgs[0]?.storage_path ?? null,
+            mileage_km: typeof mileageRaw === "number" ? mileageRaw : null,
           },
         };
       });

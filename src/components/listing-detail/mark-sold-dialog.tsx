@@ -129,7 +129,7 @@ export function MarkSoldDialog({ open, onOpenChange, listingId }: Props) {
           <AlertDialogTitle>Er du sikker på at du vil sette annonsen som solgt?</AlertDialogTitle>
           <AlertDialogDescription>
             {contacts && contacts.length > 0
-              ? "Velg hvem som kjøpte annonsen."
+              ? "Velg hvem du valgte å selge til."
               : "Ingen har tatt kontakt om denne annonsen ennå."}
           </AlertDialogDescription>
         </AlertDialogHeader>

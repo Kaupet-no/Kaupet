@@ -6,9 +6,9 @@ import { ActiveFilters } from "@/components/active-filters";
 import type { ListingCardData } from "@/components/listing-card";
 import type { MapListing } from "@/components/listings-map";
 import { ResultList } from "@/components/result-list";
-import { DesktopFilterChips } from "@/components/desktop-filter-chips";
 import { NativeFilterChips } from "@/components/native-filter-chips";
 import { AttributeFilterChips } from "@/components/attribute-filter-chips";
+import { FilterHintBanner } from "@/components/filter-hint-banner";
 import { CategoryHero } from "@/components/category-hero";
 import { buildTree, descendants, pathFromAncestor, type Category } from "@/lib/categories";
 import {
@@ -17,10 +17,12 @@ import {
   genericBrandFilterFor,
 } from "@/lib/category-filters";
 import { getCategoryBehavior } from "@/lib/category-behavior";
+import { BIL_OG_MC_SLUG } from "@/components/advanced-search-value";
 import { SearchBar } from "@/components/search-bar";
 import { searchSchema, conditionEnum } from "@/features/listing-search/search-schema";
 import { useAnnonserSearchState } from "@/features/listing-search/use-annonser-search-state";
 import { useListingsQuery } from "@/features/listing-search/use-listings-query";
+import { useTextToFilterPipeline } from "@/features/listing-search/use-text-to-filter-pipeline";
 import { useIsNative } from "@/hooks/use-is-native";
 
 type Search = z.infer<typeof searchSchema>;
@@ -66,6 +68,21 @@ export function CategoryLandingPage({
   const isNative = useIsNative();
   const [qDraft, setQDraft] = useState(search.q);
   const [isDesktop, setIsDesktop] = useState(false);
+  // See annonser.tsx's identical field for why this exists — keyed by
+  // "filterKey:optionValue" ("filterKey:" for single-value filters).
+  const [autoAppliedText, setAutoAppliedText] = useState<Record<string, string>>({});
+  const [justCreatedKeys, setJustCreatedKeys] = useState<Set<string>>(new Set());
+  const flashKeys = (keys: string[]) => {
+    if (keys.length === 0) return;
+    setJustCreatedKeys((prev) => new Set([...prev, ...keys]));
+    setTimeout(() => {
+      setJustCreatedKeys((prev) => {
+        const next = new Set(prev);
+        for (const k of keys) next.delete(k);
+        return next;
+      });
+    }, 1500);
+  };
 
   useEffect(() => setQDraft(search.q), [search.q]);
   useEffect(() => {
@@ -120,6 +137,10 @@ export function CategoryLandingPage({
   const breadcrumbEntries = useMemo(() => [...breadcrumb, ...extraPath], [breadcrumb, extraPath]);
   const children = tree.childrenByParent.get(selected.id) ?? [];
 
+  // No Bil og MC listing has a "Tilstand" attribute, so the condition filter
+  // is meaningless (and hidden) anywhere under that root category.
+  const isBilOgMc = (breadcrumb[0]?.slug ?? category.slug) === BIL_OG_MC_SLUG;
+
   // Selecting a different (deeper/shallower/sibling) category never navigates
   // away from this page's own URL — it only updates the search param.
   const selectCategory = (target: Category) => {
@@ -162,6 +183,49 @@ export function CategoryLandingPage({
     allFilters,
     setQDraft,
   });
+
+  // Recognizes category-attribute vocabulary (e.g. "ryggekamera") and
+  // number+unit facts typed into the search box — see
+  // use-text-to-filter-pipeline.ts. This page always has a stable selected
+  // category, so matching can run unconditionally.
+  useTextToFilterPipeline({
+    qDraft,
+    setQDraft,
+    updateSearch,
+    attrFilters,
+    attrValues,
+    handleAttrValueChange,
+    categoryId: selected.id,
+    onApplied: (applied) => {
+      setAutoAppliedText((prev) => ({ ...prev, ...applied }));
+      flashKeys(Object.keys(applied));
+    },
+  });
+
+  const removeAttrWithRestore = (key: string, value?: string) => {
+    const composite = `${key}:${value ?? ""}`;
+    const restoreText = autoAppliedText[composite];
+    const current = attrValues[key];
+    if (value !== undefined && current?.kind === "multiselect") {
+      const next = current.values.filter((v) => v !== value);
+      handleAttrValueChange(
+        key,
+        next.length > 0 ? { kind: "multiselect", values: next } : undefined,
+      );
+    } else {
+      handleAttrValueChange(key, undefined);
+    }
+    if (restoreText) {
+      setAutoAppliedText((prev) => {
+        const next = { ...prev };
+        delete next[composite];
+        return next;
+      });
+      const nextQ = qDraft ? `${qDraft} ${restoreText}` : restoreText;
+      setQDraft(nextQ);
+      updateSearch({ q: nextQ });
+    }
+  };
 
   // Merke/Modell selected in the attribute filters get appended as extra
   // brødsmuler after the category chain, matching the ad-detail page's
@@ -260,18 +324,19 @@ export function CategoryLandingPage({
             q={qDraft}
             onQChange={setQDraft}
             onSubmitQ={() => updateSearch({ q: qDraft })}
-            selectedSlugs={[]}
-            onSelectedChange={() => {}}
-            categories={categories ?? []}
-            hideCategory
             qMode={search.qMode}
             onQModeChange={(m) => updateSearch({ qMode: m })}
             showQMode={false}
+            extraGroups={search.extraGroups ?? []}
+            onExtraGroupsChange={(extraGroups) => updateSearch({ extraGroups })}
+          />
+          <FilterHintBanner
+            hasActiveCriteria={
+              terms.length > 0 || Object.keys(attrValues).length > 0 || location?.lat != null
+            }
           />
           {isNative ? (
             <NativeFilterChips
-              sort={search.sort}
-              onSortChange={(s) => updateSearch({ sort: s })}
               min={search.min}
               max={search.max}
               includeFree={search.includeFree ?? true}
@@ -287,62 +352,63 @@ export function CategoryLandingPage({
               resultCount={totalCount ?? cards.length}
               onOpenAdvanced={() => {}}
               advancedFilterCount={0}
+              hideCondition={isBilOgMc}
             />
           ) : (
-            <DesktopFilterChips
-              sort={search.sort}
-              onSortChange={(s) => updateSearch({ sort: s })}
-              min={search.min}
-              max={search.max}
-              includeFree={search.includeFree ?? true}
-              onPriceChange={(mn, mx, free) =>
-                updateSearch({ min: mn, max: mx, includeFree: free })
-              }
-              conditions={search.conditions ?? []}
-              onConditionsChange={(c) =>
-                updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
-              }
-              qMode={search.qMode}
-              onQModeChange={(m) => updateSearch({ qMode: m })}
-              extraGroups={search.extraGroups ?? []}
-              onExtraGroupsChange={(extraGroups) => updateSearch({ extraGroups })}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <AttributeFilterChips
+                filters={attrFilters}
+                values={attrValues}
+                onChange={handleAttrValueChange}
+                isNative={isNative}
+                resultCount={totalCount ?? cards.length}
+                queryText={qDraft}
+                min={search.min}
+                max={search.max}
+                includeFree={search.includeFree ?? true}
+                onPriceChange={(mn, mx, free) =>
+                  updateSearch({ min: mn, max: mx, includeFree: free })
+                }
+                conditions={search.conditions ?? []}
+                onConditionsChange={(c) =>
+                  updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
+                }
+                hideCondition={isBilOgMc}
+              />
+            </div>
           )}
 
           {/* Category-dependent filter row: primary fields stay visible, the
               rest sit behind "Se flere filter". */}
-          <AttributeFilterChips
-            filters={attrFilters}
-            values={attrValues}
-            onChange={handleAttrValueChange}
-            isNative={isNative}
-            resultCount={totalCount ?? cards.length}
+          {isNative && (
+            <AttributeFilterChips
+              filters={attrFilters}
+              values={attrValues}
+              onChange={handleAttrValueChange}
+              isNative={isNative}
+              resultCount={totalCount ?? cards.length}
+              queryText={qDraft}
+            />
+          )}
+
+          {/* Rendered inside the same space-y-2 group as the search bar and
+              filter chips above, rather than as a separately-spaced sibling,
+              so the active-criteria row reads as part of one continuous
+              search-and-filter unit instead of a visually detached block. */}
+          <ActiveFilters
+            search={search}
+            terms={terms}
+            onUpdate={(patch) => updateSearch(patch)}
+            attrFilters={attrFilters}
+            attrValues={attrValues}
+            location={location}
+            onRemoveLocation={() =>
+              updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
+            }
+            onRemoveAttr={removeAttrWithRestore}
+            justCreatedKeys={justCreatedKeys}
           />
         </div>
-
-        <ActiveFilters
-          search={search}
-          terms={terms}
-          onUpdate={(patch) => updateSearch(patch)}
-          attrFilters={attrFilters}
-          attrValues={attrValues}
-          location={location}
-          onRemoveLocation={() =>
-            updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
-          }
-          onRemoveAttr={(key, value) => {
-            const current = attrValues[key];
-            if (value !== undefined && current?.kind === "multiselect") {
-              const next = current.values.filter((v) => v !== value);
-              handleAttrValueChange(
-                key,
-                next.length > 0 ? { kind: "multiselect", values: next } : undefined,
-              );
-              return;
-            }
-            handleAttrValueChange(key, undefined);
-          }}
-        />
 
         <ResultList
           isNative={isNative}
@@ -356,6 +422,13 @@ export function CategoryLandingPage({
           isFetchingNextPage={isFetchingNextPage}
           fetchNextPage={() => void fetchNextPage()}
           resetFilters={resetFilters}
+          onDropLastWord={(nextQ) => {
+            setQDraft(nextQ);
+            updateSearch({ q: nextQ });
+          }}
+          attrFilters={attrFilters}
+          attrValues={attrValues}
+          onRemoveAttr={(key) => removeAttrWithRestore(key)}
           mapListings={mapListings}
           mapCenter={mapCenter}
           radiusKm={search.radius ?? 10}
@@ -366,6 +439,8 @@ export function CategoryLandingPage({
           onMapClearLocation={() =>
             updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
           }
+          sort={search.sort}
+          onSortChange={(s) => updateSearch({ sort: s })}
         />
       </div>
     </div>

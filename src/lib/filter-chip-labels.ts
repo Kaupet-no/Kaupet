@@ -1,5 +1,6 @@
 import { SORT_OPTIONS, type SortValue, type Category } from "@/lib/categories";
 import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
+import { boundsForFilter } from "@/lib/filter-range-bounds";
 
 /**
  * Shared label/active-state derivation used by both NativeFilterChips and
@@ -52,7 +53,7 @@ export function getConditionChipState(conditions: string[]) {
  * field name once the filter is set, matching how the generic chips behave.
  */
 export function getAttributeChipState(
-  filter: Pick<CategoryFilter, "label_nb" | "unit" | "options">,
+  filter: Pick<CategoryFilter, "key" | "label_nb" | "unit" | "options">,
   value: AttributeFilterValue | undefined,
 ) {
   const fallback = { label: filter.label_nb, active: false };
@@ -79,7 +80,8 @@ export function getAttributeChipState(
     case "range": {
       if (value.min == null && value.max == null) return fallback;
       const unit = filter.unit ? ` ${filter.unit}` : "";
-      const fmt = (n: number) => n.toLocaleString("nb-NO");
+      const noGrouping = boundsForFilter(filter).noGrouping;
+      const fmt = (n: number) => (noGrouping ? String(n) : n.toLocaleString("nb-NO"));
       const label =
         value.min != null && value.max != null
           ? `${fmt(value.min)}–${fmt(value.max)}${unit}`

@@ -23,4 +23,4 @@ Produksjon (`main`) er uberørt av dette — `deploy`-jobben der bruker fortsatt
   LOCAL_SUPABASE_SERVICE_ROLE_KEY=... \
   bun run test:rls
   ```
-  `src/lib/rls.integration.test.ts` er ett representativt eksempel (synlighet av samtaler/meldinger via RLS) — bruk samme mønster for å dekke flere policyer over tid.
+  `src/lib/rls.integration.test.ts` dekker 37 av ~47 RLS-aktiverte tabeller (94 tester) — bruk samme mønster (service-role-oppsett, flere innloggede klienter, verifiser hvem som kan/ikke kan se og endre hva) for å utvide dekningen videre.

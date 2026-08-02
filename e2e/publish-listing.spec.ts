@@ -27,22 +27,71 @@ test("logger inn og publiserer en annonse", async ({ page }) => {
   await page.getByRole("main").getByRole("button", { name: "Logg inn" }).click();
   await expect(page).toHaveURL("/", { timeout: 10_000 });
 
-  await page.goto("/ny-annonse");
-  await page.getByLabel("Tittel").fill("E2E testannonse — Stokke Tripp Trapp");
+  // type=sell is required — without it the route redirects to "/" (entry
+  // is meant to go through the "Opprett en annonse" picker dialog, which
+  // sets this param before navigating here).
+  await page.goto("/ny-annonse?type=sell");
+
+  // Category must be chosen first — it's always the wizard's first step.
+  // Search directly for a known leaf with no *required* extra attributes
+  // (only an optional "Merke" text field — see the category_attribute_
+  // definitions seed) rather than drilling blind: many leaves (e.g.
+  // Elektronikk > TV og lyd > TV) have several required attribute selects
+  // this test doesn't fill in, which blocks the wizard from advancing.
+  // Search matches across every level, so no drill-down is needed.
+  const categorySearch = page.getByPlaceholder("Søk i kategorier...");
+  await categorySearch.waitFor({ timeout: 10_000 });
+  await categorySearch.fill("Stellebord og oppbevaring");
+  await page.getByRole("button", { name: /Stellebord og oppbevaring/ }).click();
+  // Picker shows a checkmark confirmation for SELECTION_CONFIRM_MS before
+  // firing onSelect and advancing to the next step.
+  await page.waitForTimeout(500);
+
+  // Tittel, Kategori (already set), Tilstand and Pris all live on the same
+  // "Bilder & tittel" step. getByLabel is ambiguous here — the step
+  // indicator's progressbar has an aria-label like "Steg 2 av 4: Bilder &
+  // tittel", which also matches "Tittel" as a substring — so scope to the
+  // textbox role instead.
+  await page.getByRole("textbox", { name: "Tittel" }).fill("E2E testannonse — Stokke Tripp Trapp");
+  // "Stellebord og oppbevaring" has one category attribute, "Merke", which
+  // turns out to be required (marked "*", invalid until filled) despite
+  // being a free-text field. Its <Label> has no htmlFor/id pairing with the
+  // <Input> (see AttributeFields in attribute-fields.tsx), so it has no
+  // accessible name at all — getByRole/getByLabel can't find it. Locate the
+  // input as the label's sibling instead.
   await page
-    .getByLabel("Beskrivelse")
-    .fill("Automatisk opprettet av en e2e-test. Stol i god stand, lite brukt.");
-
-  await page.getByText("Velg hovedkategori").click();
-  await page.getByRole("option").first().click();
-  const subcategoryPlaceholder = page.getByText("Velg underkategori");
-  if (await subcategoryPlaceholder.isVisible().catch(() => false)) {
-    await subcategoryPlaceholder.click();
-    await page.getByRole("option").first().click();
-  }
-
+    .locator("label", { hasText: "Merke" })
+    .locator("xpath=following-sibling::input")
+    .fill("Stokke");
   await page.getByRole("checkbox", { name: "Gis bort gratis" }).click();
 
+  // Beskrivelse, delivery/location and the publish confirmation are each
+  // their own subsequent step. Walk forward generically: fill Beskrivelse
+  // when its step is showing, dismiss the "no images added" confirmation
+  // dialog the first "Neste" click triggers, and stop once "Publiser
+  // annonse" appears.
+  for (let i = 0; i < 5; i++) {
+    const publishButton = page.getByRole("button", { name: "Publiser annonse" });
+    if (await publishButton.isVisible().catch(() => false)) break;
+
+    const descriptionField = page.getByRole("textbox", { name: "Beskrivelse" });
+    if (await descriptionField.isVisible().catch(() => false)) {
+      await descriptionField.fill(
+        "Automatisk opprettet av en e2e-test. Stol i god stand, lite brukt.",
+      );
+    }
+
+    await page.getByRole("button", { name: /^Neste/ }).click();
+
+    const continueWithoutImage = page.getByRole("button", { name: "Fortsett uten bilde" });
+    if (await continueWithoutImage.isVisible().catch(() => false)) {
+      await continueWithoutImage.click();
+    }
+  }
+
   await page.getByRole("button", { name: "Publiser annonse" }).click();
+  // Publishing without having opened the preview first prompts a "want to
+  // preview before publishing?" dialog rather than publishing immediately.
+  await page.getByRole("button", { name: "Publiser likevel" }).click();
   await expect(page.getByText("Annonsen er publisert")).toBeVisible({ timeout: 15_000 });
 });

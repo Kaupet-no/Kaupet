@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MapPin, MoreHorizontal, SlidersHorizontal } from "lucide-react";
+import { MapPin, MoreHorizontal } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -8,17 +8,10 @@ import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/l
 import { CONDITIONS } from "@/components/advanced-search-value";
 import { RangeFilterField } from "@/components/range-filter-field";
 import { PRICE_BOUNDS } from "@/lib/filter-range-bounds";
-import { SORT_OPTIONS, type SortValue } from "@/lib/categories";
 import { hapticImpact } from "@/lib/haptics";
-import {
-  getSortChipState,
-  getPriceChipState,
-  getConditionChipState,
-} from "@/lib/filter-chip-labels";
+import { getPriceChipState, getConditionChipState } from "@/lib/filter-chip-labels";
 
 type Props = {
-  sort: SortValue;
-  onSortChange: (v: SortValue) => void;
   min?: number;
   max?: number;
   includeFree: boolean;
@@ -30,13 +23,13 @@ type Props = {
   resultCount: number;
   onOpenAdvanced: () => void;
   advancedFilterCount?: number;
+  /** Hides the "Tilstand" chip — no listing under Bil og MC has that attribute. */
+  hideCondition?: boolean;
 };
 
-type SheetId = "sort" | "price" | "condition" | "location" | null;
+type SheetId = "price" | "condition" | "location" | null;
 
 export function NativeFilterChips({
-  sort,
-  onSortChange,
   min,
   max,
   includeFree,
@@ -48,6 +41,7 @@ export function NativeFilterChips({
   resultCount,
   onOpenAdvanced,
   advancedFilterCount = 0,
+  hideCondition = false,
 }: Props) {
   const [openSheet, setOpenSheet] = useState<SheetId>(null);
 
@@ -59,7 +53,6 @@ export function NativeFilterChips({
   const close = () => setOpenSheet(null);
 
   // Labels for active filters
-  const { label: sortLabel, active: sortActive } = getSortChipState(sort);
   const { label: priceLabel, active: priceActive } = getPriceChipState(min, max, includeFree);
   const { label: condLabel, active: condActive } = getConditionChipState(conditions);
   const locActive = location.lat != null;
@@ -82,23 +75,19 @@ export function NativeFilterChips({
     <>
       <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <Chip
-          label={sortLabel}
-          active={sortActive}
-          icon={<SlidersHorizontal className="size-3.5" />}
-          onPress={() => open("sort")}
-        />
-        <Chip
           label={priceLabel}
           active={priceActive}
           icon={<span className="text-[11px] font-bold">kr</span>}
           onPress={() => open("price")}
         />
-        <Chip
-          label={condLabel}
-          active={condActive}
-          icon={<span className="text-[11px]">✦</span>}
-          onPress={() => open("condition")}
-        />
+        {!hideCondition && (
+          <Chip
+            label={condLabel}
+            active={condActive}
+            icon={<span className="text-[11px]">✦</span>}
+            onPress={() => open("condition")}
+          />
+        )}
         <Chip
           label={locLabel}
           active={locActive}
@@ -116,35 +105,6 @@ export function NativeFilterChips({
           badge={advancedFilterCount > 0 ? advancedFilterCount : undefined}
         />
       </div>
-
-      {/* Sort sheet */}
-      <Sheet open={openSheet === "sort"} onOpenChange={(o) => !o && close()}>
-        <SheetContent side="bottom" className="rounded-t-2xl">
-          <SheetHeader>
-            <SheetTitle>Sorter etter</SheetTitle>
-          </SheetHeader>
-          <div className="mt-4 flex flex-col gap-2">
-            {SORT_OPTIONS.map((s) => (
-              <button
-                key={s.value}
-                type="button"
-                onClick={() => {
-                  void hapticImpact("light");
-                  onSortChange(s.value);
-                  close();
-                }}
-                className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition active:scale-[0.98] ${
-                  sort === s.value
-                    ? "border-primary bg-primary/5 font-medium text-primary"
-                    : "border-border bg-card"
-                }`}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
-        </SheetContent>
-      </Sheet>
 
       {/* Price sheet */}
       <Sheet open={openSheet === "price"} onOpenChange={(o) => !o && close()}>

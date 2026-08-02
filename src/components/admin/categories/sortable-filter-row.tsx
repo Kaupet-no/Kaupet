@@ -1,20 +1,27 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Pencil, Trash2 } from "lucide-react";
+import { GripVertical, Languages, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FILTER_TYPE_LABELS, type CategoryFilter } from "@/lib/category-filters";
+
+/** Filter types whose values can be recognized as search-phrase synonyms —
+ * "range"/"number"/"text" values aren't a fixed vocabulary, so a synonym
+ * dictionary doesn't apply to them. */
+const SYNONYM_ELIGIBLE_TYPES: CategoryFilter["type"][] = ["select", "multiselect", "boolean"];
 
 export function SortableFilterRow({
   filter,
   onTogglePrimary,
   onEdit,
   onDelete,
+  onEditSynonyms,
 }: {
   filter: CategoryFilter;
   onTogglePrimary: (checked: boolean) => void;
   onEdit: () => void;
   onDelete: () => void;
+  onEditSynonyms: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: filter.id,
@@ -56,6 +63,17 @@ export function SortableFilterRow({
           />
           Vis alltid
         </label>
+        {SYNONYM_ELIGIBLE_TYPES.includes(filter.type) && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onEditSynonyms}
+            aria-label="Synonymer for søk"
+            title="Synonymer for søk"
+          >
+            <Languages className="size-4" />
+          </Button>
+        )}
         <Button variant="ghost" size="icon" onClick={onEdit} aria-label="Rediger">
           <Pencil className="size-4" />
         </Button>

@@ -1,12 +1,12 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { NativePageHeader } from "@/components/native-page-header";
-import { createFileRoute, useNavigate, useBlocker, useRouter, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useBlocker } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
-import { AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { createListing } from "@/lib/listings.functions";
@@ -66,6 +66,8 @@ import { PublishActions } from "@/features/listing-creation/field-groups/review-
 import type { WizardSharedProps } from "@/features/listing-creation/field-groups/types";
 import type { PreviewDraft } from "@/features/listing-creation/preview-draft-store";
 import { PreviewDraftView } from "@/features/listing-creation/preview-draft-view";
+import { NewListingError } from "@/features/listing-creation/new-listing-error";
+import { StepIndicator } from "@/features/listing-creation/step-indicator";
 
 const listingSchema = z.object({
   title: z.string().trim().min(5, "Tittelen må være minst 5 tegn").max(120, "Maks 120 tegn"),
@@ -126,105 +128,6 @@ export const Route = createFileRoute("/_authenticated/ny-annonse")({
   component: NewListingPage,
   errorComponent: NewListingError,
 });
-
-function NewListingError({ error, reset }: { error: Error; reset: () => void }) {
-  const router = useRouter();
-  return (
-    <div className="mx-auto max-w-md px-4 py-16 text-center">
-      <AlertCircle className="mx-auto size-10 text-destructive" />
-      <h1 className="mt-4 font-display text-2xl">Noe gikk galt</h1>
-      <p className="mt-2 text-muted-foreground">{formatErrorMessage(error, "Ukjent feil")}</p>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Utkastet ditt er lagret — du kan trygt prøve på nytt.
-      </p>
-      <div className="mt-6 flex justify-center gap-3">
-        <Button
-          variant="outline"
-          onClick={() => {
-            void router.invalidate();
-            reset();
-          }}
-        >
-          Prøv igjen
-        </Button>
-        <Button asChild>
-          <Link to="/mine-annonser">Mine annonser</Link>
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-/** A page (1-based index into `pages`) whose only group is `vehicle-confirm`
- * doesn't get its own dot in the step indicator — it's the same logical
- * "Registreringsnummer" step as the vehicle-registration page right before
- * it (SVV lookup + confirmation are one user-facing step, even though
- * they're two separate wizard pages internally). */
-type DisplayStep = { label: string; startIndex: number; endIndex: number };
-
-function buildDisplaySteps(pages: WizardPage[], native: boolean): DisplayStep[] {
-  const steps: DisplayStep[] = [];
-  pages.forEach((p, i) => {
-    const index = i + 1;
-    const isVehicleConfirmPage = p.groups.length === 1 && p.groups[0].key === "vehicle-confirm";
-    const prev = steps[steps.length - 1];
-    if (isVehicleConfirmPage && prev) {
-      prev.endIndex = index;
-      return;
-    }
-    steps.push({ label: pageLabel(p.groups, native), startIndex: index, endIndex: index });
-  });
-  return steps;
-}
-
-/**
- * Fast fremdriftslinje + "Steg X av Y" i stedet for én boks per steg — med
- * så mange steg som kjøretøyflyten nå har (se UX-audit), gikk
- * boks-per-steg-varianten over tilgjengelig sidebredde og virket enda
- * verre på små skjermer. Viser alltid gjeldende stegs label ved siden av
- * telleren, så brukeren fortsatt vet hvor i flyten de er uten å måtte lese
- * en rekke med bokser.
- */
-function StepIndicator({
-  step,
-  pages,
-  native,
-}: {
-  step: number;
-  pages: WizardPage[];
-  native: boolean;
-}) {
-  const displaySteps = buildDisplaySteps(pages, native);
-  const total = displaySteps.length;
-  const currentIndex = displaySteps.findIndex((ds) => step >= ds.startIndex && step <= ds.endIndex);
-  const current = currentIndex === -1 ? displaySteps[total - 1] : displaySteps[currentIndex];
-  const currentStepNumber = currentIndex === -1 ? total : currentIndex + 1;
-  const percent = total > 0 ? Math.round((currentStepNumber / total) * 100) : 0;
-
-  return (
-    <nav aria-label="Fremdrift i skjema" className="space-y-1.5">
-      <div className="flex items-center justify-between gap-2 text-xs">
-        <span className="font-medium text-foreground">
-          Steg {currentStepNumber} av {total}
-        </span>
-        <span className="truncate text-muted-foreground">{current?.label}</span>
-      </div>
-      <div
-        role="progressbar"
-        aria-valuenow={currentStepNumber}
-        aria-valuemin={1}
-        aria-valuemax={total}
-        aria-label={`Steg ${currentStepNumber} av ${total}: ${current?.label ?? ""}`}
-        className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
-      >
-        <div
-          className="h-full rounded-full bg-primary transition-[width] duration-300"
-          style={{ width: `${percent}%` }}
-        />
-      </div>
-    </nav>
-  );
-}
 
 function NewListingPage() {
   const navigate = useNavigate();

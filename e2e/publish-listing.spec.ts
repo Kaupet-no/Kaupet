@@ -53,6 +53,10 @@ test("logger inn og publiserer en annonse", async ({ page }) => {
   // tittel", which also matches "Tittel" as a substring — so scope to the
   // textbox role instead.
   await page.getByRole("textbox", { name: "Tittel" }).fill("E2E testannonse — Stokke Tripp Trapp");
+  // "Stellebord og oppbevaring" has one category attribute, "Merke", which
+  // turns out to be required (marked "*", invalid until filled) despite
+  // being a free-text field.
+  await page.getByRole("textbox", { name: "Merke" }).fill("Stokke");
   await page.getByRole("checkbox", { name: "Gis bort gratis" }).click();
 
   // Beskrivelse, delivery/location and the publish confirmation are each

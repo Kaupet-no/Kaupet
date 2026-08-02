@@ -2041,3 +2041,260 @@ describe.skipIf(!canRun)(
     });
   },
 );
+
+describe.skipIf(!canRun)(
+  "RLS: listing_images follow their parent listing's active-or-owner visibility",
+  () => {
+    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+    const suffix = Date.now();
+    const emails = {
+      seller: `rls-img-seller-${suffix}@example.com`,
+      other: `rls-img-other-${suffix}@example.com`,
+    };
+
+    const userIds: string[] = [];
+    let sellerId: string;
+    let draftListingId: string;
+    let draftImageId: string;
+
+    async function signIn(email: string) {
+      return signInWithRetry(email);
+    }
+
+    beforeAll(async () => {
+      const mkUser = async (email: string) => {
+        const { data, error } = await admin.auth.admin.createUser({
+          email,
+          password: PASSWORD,
+          email_confirm: true,
+        });
+        if (error) throw error;
+        userIds.push(data.user!.id);
+        return data.user!.id;
+      };
+      sellerId = await mkUser(emails.seller);
+      await mkUser(emails.other);
+
+      const { data: listing, error: listingErr } = await admin
+        .from("listings")
+        .insert({
+          seller_id: sellerId,
+          title: "RLS image test draft listing",
+          price_nok: 100,
+          status: "draft",
+        })
+        .select("id")
+        .single();
+      if (listingErr) throw listingErr;
+      draftListingId = listing.id;
+
+      const { data: image, error: imageErr } = await admin
+        .from("listing_images")
+        .insert({ listing_id: draftListingId, storage_path: `rls-test/${suffix}.jpg` })
+        .select("id")
+        .single();
+      if (imageErr) throw imageErr;
+      draftImageId = image.id;
+    });
+
+    afterAll(async () => {
+      if (!canRun) return;
+      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+    });
+
+    it("lets the owner see images on their own draft listing", async () => {
+      const seller = await signIn(emails.seller);
+      const { data, error } = await seller
+        .from("listing_images")
+        .select("id")
+        .eq("id", draftImageId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(1);
+    });
+
+    it("hides images on a draft listing from other users and anon", async () => {
+      const other = await signIn(emails.other);
+      const { data, error } = await other
+        .from("listing_images")
+        .select("id")
+        .eq("id", draftImageId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(0);
+
+      const anon = createClient(URL!, ANON_KEY!);
+      const { data: anonData, error: anonErr } = await anon
+        .from("listing_images")
+        .select("id")
+        .eq("id", draftImageId);
+      expect(anonErr).toBeNull();
+      expect(anonData).toHaveLength(0);
+    });
+
+    it("blocks a non-owner from adding images to someone else's listing", async () => {
+      const other = await signIn(emails.other);
+      const { error } = await other
+        .from("listing_images")
+        .insert({ listing_id: draftListingId, storage_path: `rls-hijack/${suffix}.jpg` });
+      expect(error).not.toBeNull();
+    });
+  },
+);
+
+describe.skipIf(!canRun)(
+  "RLS: listing_360_frames rows are readable by everyone regardless of listing status",
+  () => {
+    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+    const suffix = Date.now();
+    const emails = {
+      seller: `rls-360-seller-${suffix}@example.com`,
+      other: `rls-360-other-${suffix}@example.com`,
+    };
+
+    const userIds: string[] = [];
+    let sellerId: string;
+    let draftListingId: string;
+    let frameId: string;
+
+    async function signIn(email: string) {
+      return signInWithRetry(email);
+    }
+
+    beforeAll(async () => {
+      const mkUser = async (email: string) => {
+        const { data, error } = await admin.auth.admin.createUser({
+          email,
+          password: PASSWORD,
+          email_confirm: true,
+        });
+        if (error) throw error;
+        userIds.push(data.user!.id);
+        return data.user!.id;
+      };
+      sellerId = await mkUser(emails.seller);
+      await mkUser(emails.other);
+
+      const { data: listing, error: listingErr } = await admin
+        .from("listings")
+        .insert({
+          seller_id: sellerId,
+          title: "RLS 360 test draft listing",
+          price_nok: 100,
+          status: "draft",
+        })
+        .select("id")
+        .single();
+      if (listingErr) throw listingErr;
+      draftListingId = listing.id;
+
+      const { data: frame, error: frameErr } = await admin
+        .from("listing_360_frames")
+        .insert({
+          listing_id: draftListingId,
+          storage_path: `rls-test-360/${suffix}.jpg`,
+          frame_order: 0,
+        })
+        .select("id")
+        .single();
+      if (frameErr) throw frameErr;
+      frameId = frame.id;
+    });
+
+    afterAll(async () => {
+      if (!canRun) return;
+      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+    });
+
+    it("lets an anonymous visitor read a 360-frame row of a draft listing (no status filter on this policy, unlike listing_images)", async () => {
+      // Documents actual current behavior: "Listing 360 frames viewable by
+      // everyone" is USING (true) with no join back to the listing's status,
+      // unlike listing_images' "...for active or owner" policy. Only the
+      // storage_path (not the image bytes) leaks this way — the storage
+      // bucket's own SELECT policy does check active-or-owner — but it's an
+      // inconsistency worth tightening to match listing_images if this file
+      // is revisited.
+      const anon = createClient(URL!, ANON_KEY!);
+      const { data, error } = await anon.from("listing_360_frames").select("id").eq("id", frameId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(1);
+    });
+
+    it("blocks a non-owner from adding 360 frames to someone else's listing", async () => {
+      const other = await signIn(emails.other);
+      const { error } = await other.from("listing_360_frames").insert({
+        listing_id: draftListingId,
+        storage_path: `rls-hijack-360/${suffix}.jpg`,
+        frame_order: 1,
+      });
+      expect(error).not.toBeNull();
+    });
+  },
+);
+
+describe.skipIf(!canRun)(
+  "RLS: listing_360_capture_sessions never leak to authenticated clients",
+  () => {
+    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+    const suffix = Date.now();
+    const email = `rls-360session-${suffix}@example.com`;
+    const userIds: string[] = [];
+    let sessionId: string;
+
+    async function signIn() {
+      return signInWithRetry(email);
+    }
+
+    beforeAll(async () => {
+      const { data, error } = await admin.auth.admin.createUser({
+        email,
+        password: PASSWORD,
+        email_confirm: true,
+      });
+      if (error) throw error;
+      const userId = data.user!.id;
+      userIds.push(userId);
+
+      const { data: listing, error: listingErr } = await admin
+        .from("listings")
+        .insert({
+          seller_id: userId,
+          title: "RLS 360 session test listing",
+          price_nok: 100,
+          status: "draft",
+        })
+        .select("id")
+        .single();
+      if (listingErr) throw listingErr;
+
+      const { data: session, error: sessionErr } = await admin
+        .from("listing_360_capture_sessions")
+        .insert({
+          listing_id: listing.id,
+          token: `rls-test-token-${suffix}`,
+          created_by: userId,
+          expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        })
+        .select("id")
+        .single();
+      if (sessionErr) throw sessionErr;
+      sessionId = session.id;
+    });
+
+    afterAll(async () => {
+      if (!canRun) return;
+      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+    });
+
+    it("never returns capture-session rows to their own creator via the client (server/service-role only)", async () => {
+      const client = await signIn();
+      const { data, error } = await client
+        .from("listing_360_capture_sessions")
+        .select("id")
+        .eq("id", sessionId);
+      if (error) {
+        expect(error).not.toBeNull();
+      } else {
+        expect(data).toHaveLength(0);
+      }
+    });
+  },
+);

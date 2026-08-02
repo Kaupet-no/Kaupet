@@ -1,0 +1,99 @@
+/**
+ * Golden-path e2e test: log in and publish a Bil og MC listing via the
+ * manual "kjøretøy ikke registrert" path (no Statens vegvesen lookup — that
+ * external dependency would make CI runs depend on a third-party API being
+ * reachable and returning a known-good plate). Covers the vehicle-specific
+ * wizard steps (vehicle-registration, vehicle-facts, vehicle-condition)
+ * that publish-listing.spec.ts's generic flow never exercises.
+ *
+ * Requires a running dev server and a reachable Supabase project — see
+ * README.md → Testing for how to configure and run this.
+ */
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { expect, test } from "@playwright/test";
+
+const { email, password } = JSON.parse(
+  readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), ".auth", "user.json"),
+    "utf-8",
+  ),
+) as { email: string; password: string };
+
+// Dedicated e2e-only leaf under "Bil og MC" (see the
+// 20260803090000_e2e_test_vehicle_category.sql migration), with exactly the
+// two text attributes (Merke/Modell) the vehicle title computation needs
+// (see src/lib/vehicle/vehicle-title.ts) and nothing else — so filling in
+// the category's own attributes doesn't require guessing at real vehicle
+// data (fuel type, gearbox, ...). Never rename/delete its slug
+// ('e2e-test-vehicle') without updating this file.
+const TEST_VEHICLE_CATEGORY_NAME = "E2E-test kjøretøy (ikke bruk)";
+
+test("logger inn og publiserer en kjøretøy-annonse (manuell registrering)", async ({ page }) => {
+  await page.goto("/auth");
+  await page.waitForLoadState("networkidle");
+  await page.getByLabel("E-post").fill(email);
+  await page.getByLabel("Passord").fill(password);
+  await expect(page.getByLabel("E-post")).toHaveValue(email);
+  await page.getByRole("main").getByRole("button", { name: "Logg inn" }).click();
+  await expect(page).toHaveURL("/", { timeout: 10_000 });
+
+  await page.goto("/ny-annonse?type=sell");
+
+  // Top-level category-select step: "Bil og MC" is directly selectable
+  // despite having children (see category-select/index.tsx's
+  // `selectableGroups`) — clicking it doesn't drill down, it advances
+  // straight to vehicle-registration.
+  const bilOgMcTile = page.locator('[data-category-name="Bil og MC"]');
+  await bilOgMcTile.waitFor({ timeout: 10_000 });
+  await bilOgMcTile.click();
+  await bilOgMcTile.waitFor({ state: "detached" });
+
+  // vehicle-registration step: skip the Statens vegvesen lookup path and
+  // pick the test leaf manually instead. The embedded category picker here
+  // reuses the same tile markup as the top-level one.
+  await page.getByTestId("wizard-step-vehicle-registration").waitFor();
+  await page.getByRole("button", { name: "Kjøretøyet er ikke registrert" }).click();
+  await page.locator(`[data-category-name="${TEST_VEHICLE_CATEGORY_NAME}"]`).click();
+
+  // Selecting the leaf reveals its attribute fields (Merke/Modell) on this
+  // same page rather than advancing — wait for them instead of guessing at
+  // the picker's internal confirmation delay.
+  await page.getByLabel("Merke").waitFor();
+  await page.getByLabel("Merke").fill("Volvo");
+  await page.getByLabel("Modell").fill("V90");
+  await page.getByTestId("wizard-next-button").click();
+
+  // Bilder-siden (bundled with the now-inert generic category-attributes
+  // group) asks about images before advancing, same as the generic flow.
+  await page.getByTestId("continue-without-image-button").click();
+
+  // vehicle-facts: title is computed from Merke/Modell (already filled) and
+  // isn't directly editable for vehicles. Kilometerstand is required
+  // whenever showMileage applies, which it does for this leaf.
+  await page.getByTestId("wizard-step-vehicle-facts").waitFor();
+  await page.getByLabel("Kilometerstand").fill("42000");
+  await page.getByRole("checkbox", { name: "Gis bort gratis" }).click();
+  await page.getByTestId("wizard-next-button").click();
+
+  // vehicle-condition: known-issues is required unless "no known issues" is
+  // checked. Tilstand keeps its default value.
+  await page.getByTestId("wizard-step-vehicle-condition").waitFor();
+  await page.getByRole("checkbox", { name: "Ingen kjente feil eller mangler" }).click();
+  await page.getByTestId("wizard-next-button").click();
+
+  // Beskrivelse is its own step, identical to the generic flow.
+  await page.getByTestId("wizard-step-description-keywords").waitFor();
+  await page
+    .getByTestId("listing-description-textarea")
+    .fill("Automatisk opprettet av en e2e-test. Bil i god stand, lite brukt.");
+  await page.getByTestId("wizard-next-button").click();
+
+  // Final step: delivery/location (vehicles can't be shipped, so this step
+  // has nothing required to fill in) + publish confirmation share one page.
+  await page.getByTestId("wizard-step-delivery-location").waitFor();
+  await page.getByTestId("publish-listing-button").click();
+  await page.getByTestId("publish-anyway-button").click();
+  await expect(page.getByText("Annonsen er publisert")).toBeVisible({ timeout: 15_000 });
+});

@@ -146,7 +146,11 @@ export function PublishActions({
           options={{ size: "invisible" }}
         />
       )}
-      <Button type="submit" disabled={mutationIsPending || (turnstileEnabled && !turnstileToken)}>
+      <Button
+        type="submit"
+        data-testid="publish-listing-button"
+        disabled={mutationIsPending || (turnstileEnabled && !turnstileToken)}
+      >
         {mutationIsPending && <Loader2 className="size-4 animate-spin" />}
         Publiser annonse
       </Button>

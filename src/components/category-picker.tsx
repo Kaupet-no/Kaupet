@@ -205,6 +205,8 @@ export function CategoryPicker({
         type="button"
         onClick={() => handleItemClick(cat)}
         disabled={!!pendingSelection}
+        data-testid="category-tile"
+        data-category-name={cat.name_nb}
         className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
           isPending
             ? "bg-primary/15 text-primary font-medium ring-1 ring-primary/40"
@@ -234,6 +236,7 @@ export function CategoryPicker({
       <div className="relative p-3 border-b shrink-0">
         <Search className="absolute left-6 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
         <Input
+          data-testid="category-search-input"
           placeholder="Søk i kategorier..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -282,6 +285,8 @@ export function CategoryPicker({
                   type="button"
                   onClick={() => handleItemClick(cat)}
                   disabled={!!pendingSelection}
+                  data-testid="category-tile"
+                  data-category-name={cat.name_nb}
                   className={`flex flex-col items-center gap-2 rounded-xl border px-3 py-4 text-center transition-colors ${
                     isPending
                       ? "border-primary bg-primary/10 ring-1 ring-primary/40"

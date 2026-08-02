@@ -186,16 +186,17 @@ function AttributeField({
 
   if (filter.type === "select") {
     const options = filter.options ?? [];
+    const fieldId = `attr-${filter.key}`;
     return (
       <div className="space-y-2">
-        <Label>
+        <Label htmlFor={fieldId}>
           {label} {required && <span className="text-destructive">*</span>}
         </Label>
         <Select
           value={typeof value === "string" ? value : ""}
           onValueChange={(v) => onChange(v || undefined)}
         >
-          <SelectTrigger aria-invalid={!!error}>
+          <SelectTrigger id={fieldId} aria-invalid={!!error}>
             <SelectValue placeholder="Velg…" />
           </SelectTrigger>
           <SelectContent>
@@ -245,12 +246,14 @@ function AttributeField({
   // getMissingRequiredFilters — marking them "*" here promised a validation
   // that never fires.
   const showRequiredMark = required && filter.type !== "range";
+  const fieldId = `attr-${filter.key}`;
   return (
     <div className="space-y-2">
-      <Label>
+      <Label htmlFor={fieldId}>
         {label} {showRequiredMark && <span className="text-destructive">*</span>}
       </Label>
       <Input
+        id={fieldId}
         type={isNumber ? "number" : "text"}
         aria-invalid={!!error}
         value={value === undefined ? "" : String(value)}

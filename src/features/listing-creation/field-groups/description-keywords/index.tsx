@@ -51,6 +51,7 @@ export function DescriptionField({
       </div>
       <Textarea
         id="description"
+        data-testid="listing-description-textarea"
         rows={native ? undefined : 5}
         className={native ? "flex-1 resize-none min-h-0" : undefined}
         placeholder={placeholder}

@@ -22,7 +22,7 @@ backoff ved Supabase sin auth-rate-limit — bruk den (ikke en ny lokal
 `signInWithPassword`-kall) i alle nye testgrupper, siden en full kjøring nå
 gjør 70+ innlogginger i løpet av sekunder.
 
-## Dekket (24 tabeller, verifisert 71/71 grønt mot staging 2026-08-02)
+## Dekket (28 tabeller, verifisert 80/80 grønt mot staging 2026-08-02)
 
 - `conversations` / `messages` — kun deltakere ser samtalen
 - `listings` — eier ser egne draft/disabled, andre ser kun aktive; ikke-eier
@@ -61,6 +61,13 @@ gjør 70+ innlogginger i løpet av sekunder.
 - `listing_images` — følger annonsens active-or-owner-synlighet
 - `listing_360_frames` — lesbar av alle uansett annonsestatus (se funn under)
 - `listing_360_capture_sessions` — fullstendig server-only, ingen klient-GRANT
+- `listing_views` — ingen GRANT i det hele tatt (verken INSERT eller
+  SELECT) — logging går kun via `log_listing_view()`-RPC-en (se funn under)
+- `listing_view_events` — kun admin kan lese; ingen direkte klient-INSERT
+- `listing_category_word_stats` / `listing_keyword_stats` — offentlig
+  lesbare søkeforslag-data, ikke skrivbare fra klient
+- `search_query_stats` — ingen klientrolle (heller ikke admin) har noen
+  policy på tabellen; skriving kun via `log_search_query()`-RPC-en
 
 ## Funn fra testarbeidet (ikke bare testfiksinger)
 
@@ -83,7 +90,10 @@ gjør 70+ innlogginger i løpet av sekunder.
    flere testgrupper i samme fil vil trenge enda mer backoff-margin —
    vurder å dele filen i flere test-filer per tabellgruppe hvis kjøretiden
    blir et problem (hver fil kan kjøres separat med `vitest run <fil>`).
-   Ved 24 tabeller/71 tester tar en full kjøring nå ~77 sekunder.
+   Ved 28 tabeller/80 tester tar en full kjøring nå ~89 sekunder.
+   `testTimeout` i `vitest.integration.config.ts` er satt til 30s (opp fra
+   standard 5s) fordi en test med 2-3 sekvensielle innlogginger kan
+   legitimt overskride 5s når backoff trigges.
 4. **`user_reviews` fikk offentlig lesetilgang tilbake i en senere
    migrasjon.** Samme mønster som `profiles` (myk-sletting) — en
    mellomliggende innstramming (`20260605123044_*.sql`, til
@@ -109,21 +119,29 @@ gjør 70+ innlogginger i løpet av sekunder.
    for en draft-annonse (ikke selve bildet — storage-bucketens egen policy
    sjekker korrekt), så alvorligheten er lav, men det er en reell
    inkonsistens verdt å rette hvis 360-bilde-funksjonaliteten røres igjen.
+7. **`listing_views` har ingen klient-GRANT i det hele tatt — verken
+   INSERT eller SELECT.** To migrasjoner
+   (`20260617123639_*.sql` og `20260617142736_fix-listing-view-logging.sql`)
+   trekker begge tilbake alt: PostgREST-upserts (`ON CONFLICT`) krever
+   SELECT-rettighet for å sjekke konflikten, som `anon` aldri skal ha
+   (ville eksponert `visitor_key` for enhver besøkende) — løsningen var å
+   flytte all skriving til `log_listing_view()` (SECURITY DEFINER,
+   trenger kun EXECUTE). Direkte tabellspørring feiler nå med en ekte
+   `42501 permission denied`, ikke et RLS-tomt resultat — en annen feilmodus
+   enn f.eks. `ip_bans`/`search_query_stats`, verdt å huske når du skriver
+   assertions for tabeller uten GRANT.
 
 ## Gjenstående — prioritert rekkefølge
 
 Alle "høy" og "middels" prioritet-tabeller er nå dekket. Det som gjenstår er
-utelukkende lav prioritet (analytics/telemetri, offentlig kategoridata, og
-noen mindre systemtabeller) — ingen av disse forventes å inneholde
-sikkerhetskritiske funn, men bør dekkes for fullstendighet.
+utelukkende lav prioritet (offentlig kategoridata og noen mindre
+systemtabeller) — ingen av disse forventes å inneholde sikkerhetskritiske
+funn, men bør dekkes for fullstendighet.
 
-1. `listing_view_events` / `listing_views` / `search_query_stats` /
-   `listing_keyword_stats` / `listing_category_word_stats` — stort sett
-   analytics/telemetri, sjekk om de faktisk er lesbare av klienter
-2. `categories` / `category_filters` / `category_flows` / `filter_synonyms`
+1. `categories` / `category_filters` / `category_flows` / `filter_synonyms`
    / `site_settings` / `app_settings` — offentlig lesedata, lite risiko,
    men verifiser at skriving er admin/service-role-only
-3. `user_verifications`, `error_log`, `push_dispatch_failures`,
+2. `user_verifications`, `error_log`, `push_dispatch_failures`,
    `vipps_oauth_states`, `system_messages`
 
 ## Fremgangsmåte for neste økt

@@ -55,8 +55,14 @@ test("logger inn og publiserer en annonse", async ({ page }) => {
   await page.getByRole("textbox", { name: "Tittel" }).fill("E2E testannonse — Stokke Tripp Trapp");
   // "Stellebord og oppbevaring" has one category attribute, "Merke", which
   // turns out to be required (marked "*", invalid until filled) despite
-  // being a free-text field.
-  await page.getByRole("textbox", { name: "Merke" }).fill("Stokke");
+  // being a free-text field. Its <Label> has no htmlFor/id pairing with the
+  // <Input> (see AttributeFields in attribute-fields.tsx), so it has no
+  // accessible name at all — getByRole/getByLabel can't find it. Locate the
+  // input as the label's sibling instead.
+  await page
+    .locator("label", { hasText: "Merke" })
+    .locator("xpath=following-sibling::input")
+    .fill("Stokke");
   await page.getByRole("checkbox", { name: "Gis bort gratis" }).click();
 
   // Beskrivelse, delivery/location and the publish confirmation are each

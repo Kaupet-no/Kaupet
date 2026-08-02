@@ -23,4 +23,4 @@ Produksjon (`main`) er uberørt av dette — `deploy`-jobben der bruker fortsatt
   LOCAL_SUPABASE_SERVICE_ROLE_KEY=... \
   bun run test:rls
   ```
-  `src/lib/rls.integration.test.ts` dekker nå 9 av ~47 RLS-aktiverte tabeller — se [docs/RLS-TEST-COVERAGE.md](RLS-TEST-COVERAGE.md) for status og prioritert liste over gjenstående tabeller.
+  `src/lib/rls.integration.test.ts` dekker 37 av ~47 RLS-aktiverte tabeller (94 tester) — bruk samme mønster (service-role-oppsett, flere innloggede klienter, verifiser hvem som kan/ikke kan se og endre hva) for å utvide dekningen videre.

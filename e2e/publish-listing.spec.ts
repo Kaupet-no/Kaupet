@@ -32,42 +32,52 @@ test("logger inn og publiserer en annonse", async ({ page }) => {
   // sets this param before navigating here).
   await page.goto("/ny-annonse?type=sell");
 
-  // The category grid is populated by a client-side query, so it isn't
-  // there yet right after goto() resolves — wait for the first tile before
-  // starting to drill down, or the loop below sees 0 tiles on its very
-  // first check and exits immediately without ever clicking anything.
-  await page.locator("button:has(span.leading-tight)").first().waitFor({ timeout: 10_000 });
+  // Category must be chosen first — it's always the wizard's first step.
+  // Search directly for a known leaf with no *required* extra attributes
+  // (only an optional "Merke" text field — see the category_attribute_
+  // definitions seed) rather than drilling blind: many leaves (e.g.
+  // Elektronikk > TV og lyd > TV) have several required attribute selects
+  // this test doesn't fill in, which blocks the wizard from advancing.
+  // Search matches across every level, so no drill-down is needed.
+  const categorySearch = page.getByPlaceholder("Søk i kategorier...");
+  await categorySearch.waitFor({ timeout: 10_000 });
+  await categorySearch.fill("Stellebord og oppbevaring");
+  await page.getByRole("button", { name: /Stellebord og oppbevaring/ }).click();
+  // Picker shows a checkmark confirmation for SELECTION_CONFIRM_MS before
+  // firing onSelect and advancing to the next step.
+  await page.waitForTimeout(500);
 
-  // Category must be chosen first — it's always the wizard's first step,
-  // rendered as a drill-down grid (main category -> sub -> ... -> leaf) of
-  // tiles, each an icon plus a name in a `.leading-tight` span (see
-  // rowItem/grid rendering in category-picker.tsx) — that span is what
-  // distinguishes a pickable tile from the wizard's other buttons ("Neste",
-  // "Tilbake til kategorier", ...). Picking a leaf auto-advances to the next
-  // step, at which point no tiles remain and the loop stops. Avoid "Bil og
-  // MC": it's selectable at the top level despite having children (so the
-  // loop would otherwise treat it as a leaf), but branches into a
-  // vehicle-specific flow with different fields than this test fills in.
-  for (let depth = 0; depth < 6; depth++) {
-    const tiles = page
-      .locator("button:has(span.leading-tight)")
-      .filter({ hasNotText: "Bil og MC" });
-    if ((await tiles.count()) === 0) break;
-    await tiles.first().click();
-    // Picker shows a checkmark confirmation for SELECTION_CONFIRM_MS before
-    // firing onSelect and (for leaves) advancing to the next step.
-    await page.waitForTimeout(500);
-  }
-
-  // getByLabel is ambiguous here: the step indicator's progressbar carries
-  // an aria-label like "Steg 2 av 4: Bilder & tittel" / "... Beskrivelse",
-  // which also matches on substring. Scope to the actual textbox role.
+  // Tittel, Kategori (already set), Tilstand and Pris all live on the same
+  // "Bilder & tittel" step. getByLabel is ambiguous here — the step
+  // indicator's progressbar has an aria-label like "Steg 2 av 4: Bilder &
+  // tittel", which also matches "Tittel" as a substring — so scope to the
+  // textbox role instead.
   await page.getByRole("textbox", { name: "Tittel" }).fill("E2E testannonse — Stokke Tripp Trapp");
-  await page
-    .getByRole("textbox", { name: "Beskrivelse" })
-    .fill("Automatisk opprettet av en e2e-test. Stol i god stand, lite brukt.");
-
   await page.getByRole("checkbox", { name: "Gis bort gratis" }).click();
+
+  // Beskrivelse, delivery/location and the publish confirmation are each
+  // their own subsequent step. Walk forward generically: fill Beskrivelse
+  // when its step is showing, dismiss the "no images added" confirmation
+  // dialog the first "Neste" click triggers, and stop once "Publiser
+  // annonse" appears.
+  for (let i = 0; i < 5; i++) {
+    const publishButton = page.getByRole("button", { name: "Publiser annonse" });
+    if (await publishButton.isVisible().catch(() => false)) break;
+
+    const descriptionField = page.getByRole("textbox", { name: "Beskrivelse" });
+    if (await descriptionField.isVisible().catch(() => false)) {
+      await descriptionField.fill(
+        "Automatisk opprettet av en e2e-test. Stol i god stand, lite brukt.",
+      );
+    }
+
+    await page.getByRole("button", { name: /^Neste/ }).click();
+
+    const continueWithoutImage = page.getByRole("button", { name: "Fortsett uten bilde" });
+    if (await continueWithoutImage.isVisible().catch(() => false)) {
+      await continueWithoutImage.click();
+    }
+  }
 
   await page.getByRole("button", { name: "Publiser annonse" }).click();
   await expect(page.getByText("Annonsen er publisert")).toBeVisible({ timeout: 15_000 });

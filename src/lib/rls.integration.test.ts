@@ -2141,7 +2141,7 @@ describe.skipIf(!canRun)(
 );
 
 describe.skipIf(!canRun)(
-  "RLS: listing_360_frames rows are readable by everyone regardless of listing status",
+  "RLS: listing_360_frames follow their parent listing's active-or-owner visibility",
   () => {
     const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
     const suffix = Date.now();
@@ -2204,18 +2204,29 @@ describe.skipIf(!canRun)(
       await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
     });
 
-    it("lets an anonymous visitor read a 360-frame row of a draft listing (no status filter on this policy, unlike listing_images)", async () => {
-      // Documents actual current behavior: "Listing 360 frames viewable by
-      // everyone" is USING (true) with no join back to the listing's status,
-      // unlike listing_images' "...for active or owner" policy. Only the
-      // storage_path (not the image bytes) leaks this way — the storage
-      // bucket's own SELECT policy does check active-or-owner — but it's an
-      // inconsistency worth tightening to match listing_images if this file
-      // is revisited.
-      const anon = createClient(URL!, ANON_KEY!);
-      const { data, error } = await anon.from("listing_360_frames").select("id").eq("id", frameId);
+    it("lets the owner see 360 frames on their own draft listing", async () => {
+      const seller = await signIn(emails.seller);
+      const { data, error } = await seller
+        .from("listing_360_frames")
+        .select("id")
+        .eq("id", frameId);
       expect(error).toBeNull();
       expect(data).toHaveLength(1);
+    });
+
+    it("hides 360 frames on a draft listing from other users and anon (tightened in 20260802100000_*.sql to match listing_images)", async () => {
+      const other = await signIn(emails.other);
+      const { data, error } = await other.from("listing_360_frames").select("id").eq("id", frameId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(0);
+
+      const anon = createClient(URL!, ANON_KEY!);
+      const { data: anonData, error: anonErr } = await anon
+        .from("listing_360_frames")
+        .select("id")
+        .eq("id", frameId);
+      expect(anonErr).toBeNull();
+      expect(anonData).toHaveLength(0);
     });
 
     it("blocks a non-owner from adding 360 frames to someone else's listing", async () => {

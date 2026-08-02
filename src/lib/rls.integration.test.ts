@@ -1833,3 +1833,211 @@ describe.skipIf(!canRun)("RLS: admin_moderation_log is readable only by admins/m
     expect(data).toHaveLength(0);
   });
 });
+
+describe.skipIf(!canRun)(
+  "RLS: favorite_price_drops are visible only to their owner, never insertable by clients",
+  () => {
+    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+    const suffix = Date.now();
+    const emails = {
+      owner: `rls-pricedrop-owner-${suffix}@example.com`,
+      seller: `rls-pricedrop-seller-${suffix}@example.com`,
+      other: `rls-pricedrop-other-${suffix}@example.com`,
+    };
+
+    const userIds: string[] = [];
+    let ownerId: string;
+    let listingId: string;
+    let dropId: string;
+
+    async function signIn(email: string) {
+      return signInWithRetry(email);
+    }
+
+    beforeAll(async () => {
+      const mkUser = async (email: string) => {
+        const { data, error } = await admin.auth.admin.createUser({
+          email,
+          password: PASSWORD,
+          email_confirm: true,
+        });
+        if (error) throw error;
+        userIds.push(data.user!.id);
+        return data.user!.id;
+      };
+      ownerId = await mkUser(emails.owner);
+      const sellerId = await mkUser(emails.seller);
+      await mkUser(emails.other);
+
+      const { data: listing, error: listingErr } = await admin
+        .from("listings")
+        .insert({
+          seller_id: sellerId,
+          title: "RLS price drop test listing",
+          price_nok: 100,
+          status: "active",
+        })
+        .select("id")
+        .single();
+      if (listingErr) throw listingErr;
+      listingId = listing.id;
+
+      const { data: drop, error: dropErr } = await admin
+        .from("favorite_price_drops")
+        .insert({
+          user_id: ownerId,
+          listing_id: listingId,
+          old_price_nok: 200,
+          new_price_nok: 100,
+          drop_pct: 50,
+        })
+        .select("id")
+        .single();
+      if (dropErr) throw dropErr;
+      dropId = drop.id;
+    });
+
+    afterAll(async () => {
+      if (!canRun) return;
+      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+    });
+
+    it("lets the owner see and mark their own price-drop notification as read", async () => {
+      const owner = await signIn(emails.owner);
+      const { data, error } = await owner
+        .from("favorite_price_drops")
+        .select("id")
+        .eq("id", dropId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(1);
+
+      const { error: updateError, count } = await owner
+        .from("favorite_price_drops")
+        .update({ read_at: new Date().toISOString() }, { count: "exact" })
+        .eq("id", dropId);
+      expect(updateError).toBeNull();
+      expect(count).toBe(1);
+    });
+
+    it("hides the notification from an unrelated user", async () => {
+      const other = await signIn(emails.other);
+      const { data, error } = await other
+        .from("favorite_price_drops")
+        .select("id")
+        .eq("id", dropId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(0);
+    });
+
+    it("blocks clients from inserting price-drop rows directly (server-only via trigger)", async () => {
+      const owner = await signIn(emails.owner);
+      const { error } = await owner.from("favorite_price_drops").insert({
+        user_id: ownerId,
+        listing_id: listingId,
+        old_price_nok: 100,
+        new_price_nok: 1,
+        drop_pct: 99,
+      });
+      expect(error).not.toBeNull();
+    });
+  },
+);
+
+describe.skipIf(!canRun)(
+  "RLS: favorite_sold_notifications are visible only to their owner, never insertable by clients",
+  () => {
+    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+    const suffix = Date.now();
+    const emails = {
+      owner: `rls-sold-owner-${suffix}@example.com`,
+      seller: `rls-sold-seller-${suffix}@example.com`,
+      other: `rls-sold-other-${suffix}@example.com`,
+    };
+
+    const userIds: string[] = [];
+    let ownerId: string;
+    let listingId: string;
+    let notifId: string;
+
+    async function signIn(email: string) {
+      return signInWithRetry(email);
+    }
+
+    beforeAll(async () => {
+      const mkUser = async (email: string) => {
+        const { data, error } = await admin.auth.admin.createUser({
+          email,
+          password: PASSWORD,
+          email_confirm: true,
+        });
+        if (error) throw error;
+        userIds.push(data.user!.id);
+        return data.user!.id;
+      };
+      ownerId = await mkUser(emails.owner);
+      const sellerId = await mkUser(emails.seller);
+      await mkUser(emails.other);
+
+      const { data: listing, error: listingErr } = await admin
+        .from("listings")
+        .insert({
+          seller_id: sellerId,
+          title: "RLS sold notif test listing",
+          price_nok: 100,
+          status: "sold",
+        })
+        .select("id")
+        .single();
+      if (listingErr) throw listingErr;
+      listingId = listing.id;
+
+      const { data: notif, error: notifErr } = await admin
+        .from("favorite_sold_notifications")
+        .insert({ user_id: ownerId, listing_id: listingId })
+        .select("id")
+        .single();
+      if (notifErr) throw notifErr;
+      notifId = notif.id;
+    });
+
+    afterAll(async () => {
+      if (!canRun) return;
+      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+    });
+
+    it("lets the owner see and mark their own sold notification as read", async () => {
+      const owner = await signIn(emails.owner);
+      const { data, error } = await owner
+        .from("favorite_sold_notifications")
+        .select("id")
+        .eq("id", notifId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(1);
+
+      const { error: updateError, count } = await owner
+        .from("favorite_sold_notifications")
+        .update({ read_at: new Date().toISOString() }, { count: "exact" })
+        .eq("id", notifId);
+      expect(updateError).toBeNull();
+      expect(count).toBe(1);
+    });
+
+    it("hides the notification from an unrelated user", async () => {
+      const other = await signIn(emails.other);
+      const { data, error } = await other
+        .from("favorite_sold_notifications")
+        .select("id")
+        .eq("id", notifId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(0);
+    });
+
+    it("blocks clients from inserting sold-notification rows directly (server-only via trigger)", async () => {
+      const owner = await signIn(emails.owner);
+      const { error } = await owner
+        .from("favorite_sold_notifications")
+        .insert({ user_id: ownerId, listing_id: listingId });
+      expect(error).not.toBeNull();
+    });
+  },
+);

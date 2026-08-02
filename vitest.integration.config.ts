@@ -10,5 +10,10 @@ export default defineConfig({
     environment: "node",
     include: ["src/**/*.integration.test.ts"],
     exclude: ["**/node_modules/**"],
+    // Default 5s is too short once signInWithRetry's rate-limit backoff
+    // kicks in (up to ~1.5+3+4.5+6+7.5s across 5 attempts) — a test with
+    // two or three sign-ins can legitimately take longer than that even
+    // though nothing is actually broken.
+    testTimeout: 30000,
   },
 });

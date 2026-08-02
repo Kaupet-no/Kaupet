@@ -1550,14 +1550,19 @@ describe.skipIf(!canRun)(
       expect(data).toHaveLength(1);
     });
 
-    it("hides the review from an anonymous visitor (policy is TO authenticated only)", async () => {
+    it("lets an anonymous visitor read the review too (reputation data is public)", async () => {
+      // The SELECT policy went through two revisions: tightened to
+      // `TO authenticated` in 20260605123044_*.sql, then reopened to
+      // everyone (including anon, with a matching GRANT) in
+      // 20260610102257_*.sql — reviews are reputation data, meant to be
+      // publicly visible like a seller's star rating.
       const anon = createClient(URL!, ANON_KEY!);
       const { data, error } = await anon
         .from("user_reviews")
         .select("id")
         .eq("listing_id", listingId);
       expect(error).toBeNull();
-      expect(data).toHaveLength(0);
+      expect(data).toHaveLength(1);
     });
 
     it("blocks submitting a review that doesn't match the confirmed sale (wrong role/party)", async () => {

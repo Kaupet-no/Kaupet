@@ -1330,3 +1330,258 @@ describe.skipIf(!canRun)(
     });
   },
 );
+
+describe.skipIf(!canRun)(
+  "RLS: listing_sales — visible only to participants, only seller can confirm/undo",
+  () => {
+    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+    const suffix = Date.now();
+    const emails = {
+      seller: `rls-sale-seller-${suffix}@example.com`,
+      buyer: `rls-sale-buyer-${suffix}@example.com`,
+      other: `rls-sale-other-${suffix}@example.com`,
+    };
+
+    const userIds: string[] = [];
+    let sellerId: string;
+    let buyerId: string;
+    let otherId: string;
+    let listingId: string;
+    let conversationId: string;
+
+    async function signIn(email: string) {
+      return signInWithRetry(email);
+    }
+
+    beforeAll(async () => {
+      const mkUser = async (email: string) => {
+        const { data, error } = await admin.auth.admin.createUser({
+          email,
+          password: PASSWORD,
+          email_confirm: true,
+        });
+        if (error) throw error;
+        userIds.push(data.user!.id);
+        return data.user!.id;
+      };
+      sellerId = await mkUser(emails.seller);
+      buyerId = await mkUser(emails.buyer);
+      otherId = await mkUser(emails.other);
+
+      const { data: listing, error: listingErr } = await admin
+        .from("listings")
+        .insert({
+          seller_id: sellerId,
+          title: "RLS sale test listing",
+          price_nok: 100,
+          status: "active",
+        })
+        .select("id")
+        .single();
+      if (listingErr) throw listingErr;
+      listingId = listing.id;
+
+      const { data: conv, error: convErr } = await admin
+        .from("conversations")
+        .insert({ listing_id: listingId, buyer_id: buyerId, seller_id: sellerId })
+        .select("id")
+        .single();
+      if (convErr) throw convErr;
+      conversationId = conv.id;
+
+      const { error: saleErr } = await admin.from("listing_sales").insert({
+        listing_id: listingId,
+        seller_id: sellerId,
+        buyer_id: buyerId,
+        conversation_id: conversationId,
+      });
+      if (saleErr) throw saleErr;
+    });
+
+    afterAll(async () => {
+      if (!canRun) return;
+      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+    });
+
+    it("lets both the buyer and seller see the confirmed sale", async () => {
+      const seller = await signIn(emails.seller);
+      const { data: sellerData, error: sellerErr } = await seller
+        .from("listing_sales")
+        .select("listing_id")
+        .eq("listing_id", listingId);
+      expect(sellerErr).toBeNull();
+      expect(sellerData).toHaveLength(1);
+
+      const buyer = await signIn(emails.buyer);
+      const { data: buyerData, error: buyerErr } = await buyer
+        .from("listing_sales")
+        .select("listing_id")
+        .eq("listing_id", listingId);
+      expect(buyerErr).toBeNull();
+      expect(buyerData).toHaveLength(1);
+    });
+
+    it("hides the sale from an unrelated authenticated user and from anon", async () => {
+      const other = await signIn(emails.other);
+      const { data: otherData, error: otherErr } = await other
+        .from("listing_sales")
+        .select("listing_id")
+        .eq("listing_id", listingId);
+      expect(otherErr).toBeNull();
+      expect(otherData).toHaveLength(0);
+
+      const anon = createClient(URL!, ANON_KEY!);
+      const { data: anonData, error: anonErr } = await anon
+        .from("listing_sales")
+        .select("listing_id")
+        .eq("listing_id", listingId);
+      expect(anonErr).toBeNull();
+      expect(anonData).toHaveLength(0);
+    });
+
+    it("blocks a non-participant from confirming a sale using someone else's conversation", async () => {
+      const other = await signIn(emails.other);
+      const { error } = await other.from("listing_sales").insert({
+        listing_id: listingId,
+        seller_id: otherId,
+        buyer_id: buyerId,
+        conversation_id: conversationId,
+      });
+      expect(error).not.toBeNull();
+    });
+
+    it("blocks the buyer from undoing (deleting) the sale — only the seller can", async () => {
+      const buyer = await signIn(emails.buyer);
+      const { error, count } = await buyer
+        .from("listing_sales")
+        .delete({ count: "exact" })
+        .eq("listing_id", listingId);
+      expect(error).toBeNull();
+      expect(count).toBe(0);
+    });
+  },
+);
+
+describe.skipIf(!canRun)(
+  "RLS: user_reviews — readable by any authenticated user, writable only by the matching sale's participant",
+  () => {
+    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+    const suffix = Date.now();
+    const emails = {
+      seller: `rls-review-seller-${suffix}@example.com`,
+      buyer: `rls-review-buyer-${suffix}@example.com`,
+      other: `rls-review-other-${suffix}@example.com`,
+    };
+
+    const userIds: string[] = [];
+    let sellerId: string;
+    let buyerId: string;
+    let listingId: string;
+
+    async function signIn(email: string) {
+      return signInWithRetry(email);
+    }
+
+    beforeAll(async () => {
+      const mkUser = async (email: string) => {
+        const { data, error } = await admin.auth.admin.createUser({
+          email,
+          password: PASSWORD,
+          email_confirm: true,
+        });
+        if (error) throw error;
+        userIds.push(data.user!.id);
+        return data.user!.id;
+      };
+      sellerId = await mkUser(emails.seller);
+      buyerId = await mkUser(emails.buyer);
+      await mkUser(emails.other);
+
+      const { data: listing, error: listingErr } = await admin
+        .from("listings")
+        .insert({
+          seller_id: sellerId,
+          title: "RLS review test listing",
+          price_nok: 100,
+          status: "sold",
+        })
+        .select("id")
+        .single();
+      if (listingErr) throw listingErr;
+      listingId = listing.id;
+
+      const { data: conv, error: convErr } = await admin
+        .from("conversations")
+        .insert({ listing_id: listingId, buyer_id: buyerId, seller_id: sellerId })
+        .select("id")
+        .single();
+      if (convErr) throw convErr;
+
+      const { error: saleErr } = await admin.from("listing_sales").insert({
+        listing_id: listingId,
+        seller_id: sellerId,
+        buyer_id: buyerId,
+        conversation_id: conv.id,
+      });
+      if (saleErr) throw saleErr;
+
+      const { error: reviewErr } = await admin.from("user_reviews").insert({
+        listing_id: listingId,
+        reviewer_id: buyerId,
+        reviewee_id: sellerId,
+        role: "buyer",
+        rating: 5,
+      });
+      if (reviewErr) throw reviewErr;
+    });
+
+    afterAll(async () => {
+      if (!canRun) return;
+      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+    });
+
+    it("lets any authenticated user read the review, even an unrelated one", async () => {
+      const other = await signIn(emails.other);
+      const { data, error } = await other
+        .from("user_reviews")
+        .select("id")
+        .eq("listing_id", listingId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(1);
+    });
+
+    it("hides the review from an anonymous visitor (policy is TO authenticated only)", async () => {
+      const anon = createClient(URL!, ANON_KEY!);
+      const { data, error } = await anon
+        .from("user_reviews")
+        .select("id")
+        .eq("listing_id", listingId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(0);
+    });
+
+    it("blocks submitting a review that doesn't match the confirmed sale (wrong role/party)", async () => {
+      const other = await signIn(emails.other);
+      const { error } = await other.from("user_reviews").insert({
+        listing_id: listingId,
+        reviewer_id: buyerId,
+        reviewee_id: sellerId,
+        role: "seller",
+        rating: 1,
+      });
+      expect(error).not.toBeNull();
+    });
+
+    it("blocks a user from submitting a review as someone else", async () => {
+      const other = await signIn(emails.other);
+      const { error } = await other.from("user_reviews").insert({
+        listing_id: listingId,
+        reviewer_id: sellerId,
+        reviewee_id: buyerId,
+        role: "seller",
+        rating: 3,
+      });
+      expect(error).not.toBeNull();
+    });
+  },
+);

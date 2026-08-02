@@ -22,7 +22,7 @@ backoff ved Supabase sin auth-rate-limit — bruk den (ikke en ny lokal
 `signInWithPassword`-kall) i alle nye testgrupper, siden en full kjøring nå
 gjør 70+ innlogginger i løpet av sekunder.
 
-## Dekket (28 tabeller, verifisert 80/80 grønt mot staging 2026-08-02)
+## Dekket (34 tabeller, verifisert 88/88 grønt mot staging 2026-08-02)
 
 - `conversations` / `messages` — kun deltakere ser samtalen
 - `listings` — eier ser egne draft/disabled, andre ser kun aktive; ikke-eier
@@ -68,6 +68,11 @@ gjør 70+ innlogginger i løpet av sekunder.
   lesbare søkeforslag-data, ikke skrivbare fra klient
 - `search_query_stats` — ingen klientrolle (heller ikke admin) har noen
   policy på tabellen; skriving kun via `log_search_query()`-RPC-en
+- `categories` / `category_filters` / `category_flows` / `filter_synonyms`
+  — offentlig lesbare, kun admin kan skrive (`has_role`-gate til tross for
+  bred tabell-GRANT til `authenticated`)
+- `site_settings` — offentlig lesbar singleton-rad, kun admin kan oppdatere
+- `app_settings` — fullstendig server-only (lagrer bl.a. `push_dispatch_secret`)
 
 ## Funn fra testarbeidet (ikke bare testfiksinger)
 
@@ -90,7 +95,7 @@ gjør 70+ innlogginger i løpet av sekunder.
    flere testgrupper i samme fil vil trenge enda mer backoff-margin —
    vurder å dele filen i flere test-filer per tabellgruppe hvis kjøretiden
    blir et problem (hver fil kan kjøres separat med `vitest run <fil>`).
-   Ved 28 tabeller/80 tester tar en full kjøring nå ~89 sekunder.
+   Ved 34 tabeller/88 tester tar en full kjøring nå ~101 sekunder.
    `testTimeout` i `vitest.integration.config.ts` er satt til 30s (opp fra
    standard 5s) fordi en test med 2-3 sekvensielle innlogginger kan
    legitimt overskride 5s når backoff trigges.
@@ -130,18 +135,24 @@ gjør 70+ innlogginger i løpet av sekunder.
    `42501 permission denied`, ikke et RLS-tomt resultat — en annen feilmodus
    enn f.eks. `ip_bans`/`search_query_stats`, verdt å huske når du skriver
    assertions for tabeller uten GRANT.
+8. **Pass på singleton-/konfigurasjonsrader som allerede finnes i
+   miljøet — de er ekte, delte data, ikke testdata.** `site_settings`-
+   testen skrev opprinnelig over den reelle raden (roterende
+   søkeeksempler på forsiden) i en admin-update-test uten å gjenopprette
+   den i `afterAll`, som ville latt testverdien ligge igjen permanent på
+   staging. Oppdaget og fikset før kjøring — men en påminnelse om å alltid
+   lese og lagre eksisterende verdi i `beforeAll` og sette den tilbake i
+   `afterAll` når en test muterer en rad som ikke er opprettet av testen
+   selv (i motsetning til brukere/annonser testen selv oppretter og sletter).
 
 ## Gjenstående — prioritert rekkefølge
 
-Alle "høy" og "middels" prioritet-tabeller er nå dekket. Det som gjenstår er
-utelukkende lav prioritet (offentlig kategoridata og noen mindre
-systemtabeller) — ingen av disse forventes å inneholde sikkerhetskritiske
-funn, men bør dekkes for fullstendighet.
+Alle "høy" og "middels" prioritet-tabeller er nå dekket, samt kategoridata og
+site/app settings. Det som gjenstår er en håndfull mindre systemtabeller —
+ingen av disse forventes å inneholde sikkerhetskritiske funn, men bør dekkes
+for fullstendighet.
 
-1. `categories` / `category_filters` / `category_flows` / `filter_synonyms`
-   / `site_settings` / `app_settings` — offentlig lesedata, lite risiko,
-   men verifiser at skriving er admin/service-role-only
-2. `user_verifications`, `error_log`, `push_dispatch_failures`,
+1. `user_verifications`, `error_log`, `push_dispatch_failures`,
    `vipps_oauth_states`, `system_messages`
 
 ## Fremgangsmåte for neste økt

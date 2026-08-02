@@ -2298,3 +2298,306 @@ describe.skipIf(!canRun)(
     });
   },
 );
+
+describe.skipIf(!canRun)(
+  "RLS: listing_views — anyone can log a view, nobody (not even the owner) can read raw rows",
+  () => {
+    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+    const suffix = Date.now();
+    const email = `rls-views-owner-${suffix}@example.com`;
+    const userIds: string[] = [];
+    let listingId: string;
+    let viewId: string;
+
+    async function signIn() {
+      return signInWithRetry(email);
+    }
+
+    beforeAll(async () => {
+      const { data, error } = await admin.auth.admin.createUser({
+        email,
+        password: PASSWORD,
+        email_confirm: true,
+      });
+      if (error) throw error;
+      const ownerId = data.user!.id;
+      userIds.push(ownerId);
+
+      const { data: listing, error: listingErr } = await admin
+        .from("listings")
+        .insert({
+          seller_id: ownerId,
+          title: "RLS listing_views test listing",
+          price_nok: 100,
+          status: "active",
+        })
+        .select("id")
+        .single();
+      if (listingErr) throw listingErr;
+      listingId = listing.id;
+
+      const { data: view, error: viewErr } = await admin
+        .from("listing_views")
+        .insert({ listing_id: listingId, visitor_key: `rls-visitor-${suffix}` })
+        .select("id")
+        .single();
+      if (viewErr) throw viewErr;
+      viewId = view.id;
+    });
+
+    afterAll(async () => {
+      if (!canRun) return;
+      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+    });
+
+    it("lets an anonymous visitor log a view (core feature — view counting)", async () => {
+      const anon = createClient(URL!, ANON_KEY!);
+      const { error } = await anon
+        .from("listing_views")
+        .insert({ listing_id: listingId, visitor_key: `rls-anon-visitor-${suffix}` });
+      expect(error).toBeNull();
+    });
+
+    it("blocks even the listing owner from reading raw view rows directly (no SELECT policy — use the listing_stats RPC instead)", async () => {
+      // The original "Owners can read views for their listings" SELECT
+      // policy was intentionally dropped in 20260605075809_*.sql — owners
+      // now get view counts via the listing_stats() RPC, not a raw table
+      // read, presumably to keep individual visitor_key rows non-queryable.
+      const owner = await signIn();
+      const { data, error } = await owner.from("listing_views").select("id").eq("id", viewId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(0);
+    });
+  },
+);
+
+describe.skipIf(!canRun)(
+  "RLS: listing_view_events are readable only by admins, insertable only via the log_listing_view RPC",
+  () => {
+    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+    const suffix = Date.now();
+    const emails = {
+      admin: `rls-viewevents-admin-${suffix}@example.com`,
+      other: `rls-viewevents-other-${suffix}@example.com`,
+    };
+    const userIds: string[] = [];
+    let listingId: string;
+    let eventId: string;
+
+    async function signIn(email: string) {
+      return signInWithRetry(email);
+    }
+
+    beforeAll(async () => {
+      const mkUser = async (email: string) => {
+        const { data, error } = await admin.auth.admin.createUser({
+          email,
+          password: PASSWORD,
+          email_confirm: true,
+        });
+        if (error) throw error;
+        userIds.push(data.user!.id);
+        return data.user!.id;
+      };
+      const adminId = await mkUser(emails.admin);
+      const otherId = await mkUser(emails.other);
+      await grantAdmin(admin, adminId);
+
+      const { data: listing, error: listingErr } = await admin
+        .from("listings")
+        .insert({
+          seller_id: otherId,
+          title: "RLS view events test listing",
+          price_nok: 100,
+          status: "active",
+        })
+        .select("id")
+        .single();
+      if (listingErr) throw listingErr;
+      listingId = listing.id;
+
+      const { data: event, error: eventErr } = await admin
+        .from("listing_view_events")
+        .insert({ listing_id: listingId, visitor_key: `rls-event-visitor-${suffix}` })
+        .select("id")
+        .single();
+      if (eventErr) throw eventErr;
+      eventId = event.id;
+    });
+
+    afterAll(async () => {
+      if (!canRun) return;
+      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+    });
+
+    it("lets an admin read listing view events", async () => {
+      const adminClient = await signIn(emails.admin);
+      const { data, error } = await adminClient
+        .from("listing_view_events")
+        .select("id")
+        .eq("id", eventId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(1);
+    });
+
+    it("hides listing view events from a non-admin user", async () => {
+      const other = await signIn(emails.other);
+      const { data, error } = await other
+        .from("listing_view_events")
+        .select("id")
+        .eq("id", eventId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(0);
+    });
+
+    it("blocks a client from inserting a view event directly (no client GRANT — log_listing_view RPC only)", async () => {
+      const other = await signIn(emails.other);
+      const { error } = await other
+        .from("listing_view_events")
+        .insert({ listing_id: listingId, visitor_key: `rls-hijack-visitor-${suffix}` });
+      expect(error).not.toBeNull();
+    });
+  },
+);
+
+describe.skipIf(!canRun)(
+  "RLS: listing_category_word_stats / listing_keyword_stats are publicly readable, not client-writable",
+  () => {
+    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+    const suffix = Date.now();
+    const email = `rls-wordstats-${suffix}@example.com`;
+    const userIds: string[] = [];
+    let categoryId: string;
+    const lexeme = `rlstestword${suffix}`;
+
+    async function signIn() {
+      return signInWithRetry(email);
+    }
+
+    beforeAll(async () => {
+      const { data, error } = await admin.auth.admin.createUser({
+        email,
+        password: PASSWORD,
+        email_confirm: true,
+      });
+      if (error) throw error;
+      userIds.push(data.user!.id);
+
+      const { data: category, error: catErr } = await admin
+        .from("categories")
+        .select("id")
+        .limit(1)
+        .single();
+      if (catErr) throw catErr;
+      categoryId = category.id;
+
+      const { error: wordErr } = await admin
+        .from("listing_category_word_stats")
+        .insert({ lexeme, category_id: categoryId, listing_count: 1 });
+      if (wordErr) throw wordErr;
+
+      const { error: keywordErr } = await admin
+        .from("listing_keyword_stats")
+        .insert({ word: lexeme, category_id: categoryId, listing_count: 1 });
+      if (keywordErr) throw keywordErr;
+    });
+
+    afterAll(async () => {
+      if (!canRun) return;
+      await admin
+        .from("listing_category_word_stats")
+        .delete()
+        .eq("lexeme", lexeme)
+        .eq("category_id", categoryId);
+      await admin
+        .from("listing_keyword_stats")
+        .delete()
+        .eq("word", lexeme)
+        .eq("category_id", categoryId);
+      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+    });
+
+    it("lets an anonymous visitor read both stats tables", async () => {
+      const anon = createClient(URL!, ANON_KEY!);
+      const { data: wordData, error: wordErr } = await anon
+        .from("listing_category_word_stats")
+        .select("lexeme")
+        .eq("lexeme", lexeme);
+      expect(wordErr).toBeNull();
+      expect(wordData).toHaveLength(1);
+
+      const { data: keywordData, error: keywordErr } = await anon
+        .from("listing_keyword_stats")
+        .select("word")
+        .eq("word", lexeme);
+      expect(keywordErr).toBeNull();
+      expect(keywordData).toHaveLength(1);
+    });
+
+    it("blocks a regular authenticated client from writing to either stats table", async () => {
+      const client = await signIn();
+      const { error: wordErr } = await client
+        .from("listing_category_word_stats")
+        .insert({ lexeme: `${lexeme}-hijack`, category_id: categoryId, listing_count: 999 });
+      expect(wordErr).not.toBeNull();
+
+      const { error: keywordErr } = await client
+        .from("listing_keyword_stats")
+        .insert({ word: `${lexeme}-hijack`, category_id: categoryId, listing_count: 999 });
+      expect(keywordErr).not.toBeNull();
+    });
+  },
+);
+
+describe.skipIf(!canRun)(
+  "RLS: search_query_stats has no client access at all, not even for admins",
+  () => {
+    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+    const suffix = Date.now();
+    const emails = {
+      admin: `rls-searchstats-admin-${suffix}@example.com`,
+    };
+    const userIds: string[] = [];
+    const query = `rls test query ${suffix}`;
+
+    async function signIn(email: string) {
+      return signInWithRetry(email);
+    }
+
+    beforeAll(async () => {
+      const { data, error } = await admin.auth.admin.createUser({
+        email: emails.admin,
+        password: PASSWORD,
+        email_confirm: true,
+      });
+      if (error) throw error;
+      const adminId = data.user!.id;
+      userIds.push(adminId);
+      await grantAdmin(admin, adminId);
+
+      const { error: insertErr } = await admin
+        .from("search_query_stats")
+        .insert({ query, search_count: 1 });
+      if (insertErr) throw insertErr;
+    });
+
+    afterAll(async () => {
+      if (!canRun) return;
+      await admin.from("search_query_stats").delete().eq("query", query);
+      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+    });
+
+    it("never returns search_query_stats rows to a client, even an admin (zero policies on this table)", async () => {
+      const adminClient = await signIn(emails.admin);
+      const { data, error } = await adminClient
+        .from("search_query_stats")
+        .select("query")
+        .eq("query", query);
+      if (error) {
+        expect(error).not.toBeNull();
+      } else {
+        expect(data).toHaveLength(0);
+      }
+    });
+  },
+);

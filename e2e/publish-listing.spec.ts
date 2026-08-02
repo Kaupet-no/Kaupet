@@ -32,6 +32,12 @@ test("logger inn og publiserer en annonse", async ({ page }) => {
   // sets this param before navigating here).
   await page.goto("/ny-annonse?type=sell");
 
+  // The category grid is populated by a client-side query, so it isn't
+  // there yet right after goto() resolves — wait for the first tile before
+  // starting to drill down, or the loop below sees 0 tiles on its very
+  // first check and exits immediately without ever clicking anything.
+  await page.locator("button:has(span.leading-tight)").first().waitFor({ timeout: 10_000 });
+
   // Category must be chosen first — it's always the wizard's first step,
   // rendered as a drill-down grid (main category -> sub -> ... -> leaf) of
   // tiles, each an icon plus a name in a `.leading-tight` span (see

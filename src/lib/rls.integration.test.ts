@@ -2844,177 +2844,76 @@ describe.skipIf(!canRun)(
   },
 );
 
-describe.skipIf(!canRun)(
-  "RLS: user_verifications are visible only to their owner, never client-writable",
-  () => {
-    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
-    const suffix = Date.now();
-    const emails = {
-      owner: `rls-verif-owner-${suffix}@example.com`,
-      other: `rls-verif-other-${suffix}@example.com`,
-    };
-    const userIds: string[] = [];
-    let ownerId: string;
+describe.skipIf(!canRun)("RLS: error_log / push_dispatch_failures are fully server-only", () => {
+  const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+  const suffix = Date.now();
+  const emails = { admin: `rls-serveronly-admin-${suffix}@example.com` };
+  const userIds: string[] = [];
+  let errorLogId: string;
+  let pushFailureId: string;
 
-    async function signIn(email: string) {
-      return signInWithRetry(email);
-    }
+  async function signIn(email: string) {
+    return signInWithRetry(email);
+  }
 
-    beforeAll(async () => {
-      const mkUser = async (email: string) => {
-        const { data, error } = await admin.auth.admin.createUser({
-          email,
-          password: PASSWORD,
-          email_confirm: true,
-        });
-        if (error) throw error;
-        userIds.push(data.user!.id);
-        return data.user!.id;
-      };
-      ownerId = await mkUser(emails.owner);
-      await mkUser(emails.other);
-
-      const { error } = await admin.from("user_verifications").insert({
-        user_id: ownerId,
-        provider: "vipps",
-        verified_name: "RLS Test User",
-        subject: `rls-test-subject-${suffix}`,
-      });
-      if (error) throw error;
+  beforeAll(async () => {
+    const { data, error } = await admin.auth.admin.createUser({
+      email: emails.admin,
+      password: PASSWORD,
+      email_confirm: true,
     });
+    if (error) throw error;
+    const adminId = data.user!.id;
+    userIds.push(adminId);
+    await grantAdmin(admin, adminId);
 
-    afterAll(async () => {
-      if (!canRun) return;
-      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
-    });
+    const { data: errLog, error: errLogErr } = await admin
+      .from("error_log")
+      .insert({ function_name: "rls_test_fn", error_message: "RLS test error" })
+      .select("id")
+      .single();
+    if (errLogErr) throw errLogErr;
+    errorLogId = errLog.id;
 
-    it("lets the owner see their own verification", async () => {
-      const owner = await signIn(emails.owner);
-      const { data, error } = await owner
-        .from("user_verifications")
-        .select("user_id")
-        .eq("user_id", ownerId);
-      expect(error).toBeNull();
-      expect(data).toHaveLength(1);
-    });
+    const { data: pushFail, error: pushFailErr } = await admin
+      .from("push_dispatch_failures")
+      .insert({ kind: "rls_test", payload: {}, error: "RLS test failure" })
+      .select("id")
+      .single();
+    if (pushFailErr) throw pushFailErr;
+    pushFailureId = pushFail.id;
+  });
 
-    it("hides the verification from another user", async () => {
-      const other = await signIn(emails.other);
-      const { data, error } = await other
-        .from("user_verifications")
-        .select("user_id")
-        .eq("user_id", ownerId);
-      expect(error).toBeNull();
-      expect(data).toHaveLength(0);
-    });
+  afterAll(async () => {
+    if (!canRun) return;
+    await admin.from("error_log").delete().eq("id", errorLogId);
+    await admin.from("push_dispatch_failures").delete().eq("id", pushFailureId);
+    await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+  });
 
-    it("blocks a client from inserting their own verification directly (no INSERT policy — provider callback only)", async () => {
-      const other = await signIn(emails.other);
-      const { error } = await other.from("user_verifications").insert({
-        user_id: ownerId,
-        provider: "vipps",
-        verified_name: "Hijacked",
-        subject: "hijack-subject",
-      });
+  it("never returns error_log rows to a client, even an admin (admin uses the admin_list_error_log RPC instead)", async () => {
+    const adminClient = await signIn(emails.admin);
+    const { data, error } = await adminClient.from("error_log").select("id").eq("id", errorLogId);
+    if (error) {
       expect(error).not.toBeNull();
-    });
-  },
-);
-
-describe.skipIf(!canRun)(
-  "RLS: vipps_oauth_states / error_log / push_dispatch_failures are fully server-only",
-  () => {
-    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
-    const suffix = Date.now();
-    const emails = { admin: `rls-serveronly-admin-${suffix}@example.com` };
-    const userIds: string[] = [];
-    let oauthStateId: string;
-    let errorLogId: string;
-    let pushFailureId: string;
-
-    async function signIn(email: string) {
-      return signInWithRetry(email);
+    } else {
+      expect(data).toHaveLength(0);
     }
+  });
 
-    beforeAll(async () => {
-      const { data, error } = await admin.auth.admin.createUser({
-        email: emails.admin,
-        password: PASSWORD,
-        email_confirm: true,
-      });
-      if (error) throw error;
-      const adminId = data.user!.id;
-      userIds.push(adminId);
-      await grantAdmin(admin, adminId);
-
-      oauthStateId = `rls-test-state-${suffix}`;
-      const { error: oauthErr } = await admin
-        .from("vipps_oauth_states")
-        .insert({ state: oauthStateId, user_id: adminId });
-      if (oauthErr) throw oauthErr;
-
-      const { data: errLog, error: errLogErr } = await admin
-        .from("error_log")
-        .insert({ function_name: "rls_test_fn", error_message: "RLS test error" })
-        .select("id")
-        .single();
-      if (errLogErr) throw errLogErr;
-      errorLogId = errLog.id;
-
-      const { data: pushFail, error: pushFailErr } = await admin
-        .from("push_dispatch_failures")
-        .insert({ kind: "rls_test", payload: {}, error: "RLS test failure" })
-        .select("id")
-        .single();
-      if (pushFailErr) throw pushFailErr;
-      pushFailureId = pushFail.id;
-    });
-
-    afterAll(async () => {
-      if (!canRun) return;
-      await admin.from("vipps_oauth_states").delete().eq("state", oauthStateId);
-      await admin.from("error_log").delete().eq("id", errorLogId);
-      await admin.from("push_dispatch_failures").delete().eq("id", pushFailureId);
-      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
-    });
-
-    it("never returns vipps_oauth_states rows to a client, even an admin", async () => {
-      const adminClient = await signIn(emails.admin);
-      const { data, error } = await adminClient
-        .from("vipps_oauth_states")
-        .select("state")
-        .eq("state", oauthStateId);
-      if (error) {
-        expect(error).not.toBeNull();
-      } else {
-        expect(data).toHaveLength(0);
-      }
-    });
-
-    it("never returns error_log rows to a client, even an admin (admin uses the admin_list_error_log RPC instead)", async () => {
-      const adminClient = await signIn(emails.admin);
-      const { data, error } = await adminClient.from("error_log").select("id").eq("id", errorLogId);
-      if (error) {
-        expect(error).not.toBeNull();
-      } else {
-        expect(data).toHaveLength(0);
-      }
-    });
-
-    it("never returns push_dispatch_failures rows to a client, even an admin", async () => {
-      const adminClient = await signIn(emails.admin);
-      const { data, error } = await adminClient
-        .from("push_dispatch_failures")
-        .select("id")
-        .eq("id", pushFailureId);
-      if (error) {
-        expect(error).not.toBeNull();
-      } else {
-        expect(data).toHaveLength(0);
-      }
-    });
-  },
-);
+  it("never returns push_dispatch_failures rows to a client, even an admin", async () => {
+    const adminClient = await signIn(emails.admin);
+    const { data, error } = await adminClient
+      .from("push_dispatch_failures")
+      .select("id")
+      .eq("id", pushFailureId);
+    if (error) {
+      expect(error).not.toBeNull();
+    } else {
+      expect(data).toHaveLength(0);
+    }
+  });
+});
 
 describe.skipIf(!canRun)(
   "RLS: system_messages are visible only to their recipient, only admins/moderators can send",

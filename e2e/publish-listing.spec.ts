@@ -59,9 +59,12 @@ test("logger inn og publiserer en annonse", async ({ page }) => {
     await page.waitForTimeout(500);
   }
 
-  await page.getByLabel("Tittel").fill("E2E testannonse — Stokke Tripp Trapp");
+  // getByLabel is ambiguous here: the step indicator's progressbar carries
+  // an aria-label like "Steg 2 av 4: Bilder & tittel" / "... Beskrivelse",
+  // which also matches on substring. Scope to the actual textbox role.
+  await page.getByRole("textbox", { name: "Tittel" }).fill("E2E testannonse — Stokke Tripp Trapp");
   await page
-    .getByLabel("Beskrivelse")
+    .getByRole("textbox", { name: "Beskrivelse" })
     .fill("Automatisk opprettet av en e2e-test. Stol i god stand, lite brukt.");
 
   await page.getByRole("checkbox", { name: "Gis bort gratis" }).click();

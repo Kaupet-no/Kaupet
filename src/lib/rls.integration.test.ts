@@ -14,7 +14,7 @@
  * not full RLS coverage. Use the same pattern — service-role setup, two
  * signed-in clients, assert who can/can't see what — for other tables.
  */
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const URL = process.env.LOCAL_SUPABASE_URL;
@@ -809,6 +809,499 @@ describe.skipIf(!canRun)(
       const { error } = await other
         .from("user_blocks")
         .insert({ blocker_id: blockerId, blocked_id: blockedId, scope: "all" });
+      expect(error).not.toBeNull();
+    });
+  },
+);
+
+async function grantAdmin(admin: SupabaseClient, userId: string) {
+  const { error } = await admin.from("user_roles").insert({ user_id: userId, role: "admin" });
+  if (error) throw error;
+}
+
+describe.skipIf(!canRun)(
+  "RLS: user_bans — users see only their own ban, only admins can ban",
+  () => {
+    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+    const suffix = Date.now();
+    const emails = {
+      admin: `rls-ban-admin-${suffix}@example.com`,
+      banned: `rls-ban-banned-${suffix}@example.com`,
+      other: `rls-ban-other-${suffix}@example.com`,
+    };
+
+    const userIds: string[] = [];
+    let adminId: string;
+    let bannedId: string;
+
+    async function signIn(email: string) {
+      const client = createClient(URL!, ANON_KEY!);
+      const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD });
+      if (error) throw error;
+      return client;
+    }
+
+    beforeAll(async () => {
+      const mkUser = async (email: string) => {
+        const { data, error } = await admin.auth.admin.createUser({
+          email,
+          password: PASSWORD,
+          email_confirm: true,
+        });
+        if (error) throw error;
+        userIds.push(data.user!.id);
+        return data.user!.id;
+      };
+      adminId = await mkUser(emails.admin);
+      bannedId = await mkUser(emails.banned);
+      await mkUser(emails.other);
+      await grantAdmin(admin, adminId);
+
+      const { error } = await admin
+        .from("user_bans")
+        .insert({ user_id: bannedId, reason: "RLS test ban", banned_by: adminId });
+      if (error) throw error;
+    });
+
+    afterAll(async () => {
+      if (!canRun) return;
+      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+    });
+
+    it("lets the banned user see their own ban", async () => {
+      const banned = await signIn(emails.banned);
+      const { data, error } = await banned
+        .from("user_bans")
+        .select("user_id")
+        .eq("user_id", bannedId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(1);
+    });
+
+    it("hides the ban from an unrelated non-admin user", async () => {
+      const other = await signIn(emails.other);
+      const { data, error } = await other
+        .from("user_bans")
+        .select("user_id")
+        .eq("user_id", bannedId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(0);
+    });
+
+    it("lets an admin see any user's ban", async () => {
+      const adminClient = await signIn(emails.admin);
+      const { data, error } = await adminClient
+        .from("user_bans")
+        .select("user_id")
+        .eq("user_id", bannedId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(1);
+    });
+
+    it("blocks a non-admin from banning another user", async () => {
+      const other = await signIn(emails.other);
+      const { error } = await other
+        .from("user_bans")
+        .insert({ user_id: bannedId, reason: "self-service ban attempt", banned_by: bannedId });
+      expect(error).not.toBeNull();
+    });
+  },
+);
+
+describe.skipIf(!canRun)(
+  "RLS: user_suspensions — users see only their own, only admins can suspend",
+  () => {
+    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+    const suffix = Date.now();
+    const emails = {
+      admin: `rls-susp-admin-${suffix}@example.com`,
+      suspended: `rls-susp-suspended-${suffix}@example.com`,
+      other: `rls-susp-other-${suffix}@example.com`,
+    };
+
+    const userIds: string[] = [];
+    let adminId: string;
+    let suspendedId: string;
+
+    async function signIn(email: string) {
+      const client = createClient(URL!, ANON_KEY!);
+      const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD });
+      if (error) throw error;
+      return client;
+    }
+
+    beforeAll(async () => {
+      const mkUser = async (email: string) => {
+        const { data, error } = await admin.auth.admin.createUser({
+          email,
+          password: PASSWORD,
+          email_confirm: true,
+        });
+        if (error) throw error;
+        userIds.push(data.user!.id);
+        return data.user!.id;
+      };
+      adminId = await mkUser(emails.admin);
+      suspendedId = await mkUser(emails.suspended);
+      await mkUser(emails.other);
+      await grantAdmin(admin, adminId);
+
+      const { error } = await admin.from("user_suspensions").insert({
+        user_id: suspendedId,
+        reason: "RLS test suspension",
+        suspended_by: adminId,
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      });
+      if (error) throw error;
+    });
+
+    afterAll(async () => {
+      if (!canRun) return;
+      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+    });
+
+    it("lets the suspended user see their own suspension", async () => {
+      const suspended = await signIn(emails.suspended);
+      const { data, error } = await suspended
+        .from("user_suspensions")
+        .select("user_id")
+        .eq("user_id", suspendedId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(1);
+    });
+
+    it("hides the suspension from an unrelated non-admin user", async () => {
+      const other = await signIn(emails.other);
+      const { data, error } = await other
+        .from("user_suspensions")
+        .select("user_id")
+        .eq("user_id", suspendedId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(0);
+    });
+
+    it("blocks a non-admin from suspending another user", async () => {
+      const other = await signIn(emails.other);
+      const { error } = await other.from("user_suspensions").insert({
+        user_id: suspendedId,
+        reason: "self-service suspension attempt",
+        suspended_by: suspendedId,
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      });
+      expect(error).not.toBeNull();
+    });
+  },
+);
+
+describe.skipIf(!canRun)(
+  "RLS: ip_bans have no client grant at all — service-role/admin RPC only",
+  () => {
+    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+    const suffix = Date.now();
+    const emails = {
+      admin: `rls-ipban-admin-${suffix}@example.com`,
+      other: `rls-ipban-other-${suffix}@example.com`,
+    };
+
+    const userIds: string[] = [];
+
+    async function signIn(email: string) {
+      const client = createClient(URL!, ANON_KEY!);
+      const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD });
+      if (error) throw error;
+      return client;
+    }
+
+    beforeAll(async () => {
+      const mkUser = async (email: string) => {
+        const { data, error } = await admin.auth.admin.createUser({
+          email,
+          password: PASSWORD,
+          email_confirm: true,
+        });
+        if (error) throw error;
+        userIds.push(data.user!.id);
+        return data.user!.id;
+      };
+      const adminId = await mkUser(emails.admin);
+      await mkUser(emails.other);
+      await grantAdmin(admin, adminId);
+    });
+
+    afterAll(async () => {
+      if (!canRun) return;
+      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+    });
+
+    it("blocks even an admin from querying ip_bans directly (no GRANT to authenticated)", async () => {
+      const adminClient = await signIn(emails.admin);
+      const { error } = await adminClient.from("ip_bans").select("id").limit(1);
+      expect(error).not.toBeNull();
+    });
+
+    it("blocks a regular user from querying ip_bans directly", async () => {
+      const other = await signIn(emails.other);
+      const { error } = await other.from("ip_bans").select("id").limit(1);
+      expect(error).not.toBeNull();
+    });
+  },
+);
+
+describe.skipIf(!canRun)(
+  "RLS: reports — reporters can only submit their own, only admins/moderators can read",
+  () => {
+    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+    const suffix = Date.now();
+    const emails = {
+      admin: `rls-report-admin-${suffix}@example.com`,
+      reporter: `rls-report-reporter-${suffix}@example.com`,
+      seller: `rls-report-seller-${suffix}@example.com`,
+      other: `rls-report-other-${suffix}@example.com`,
+    };
+
+    const userIds: string[] = [];
+    let adminId: string;
+    let reporterId: string;
+    let listingId: string;
+    let reportId: string;
+
+    async function signIn(email: string) {
+      const client = createClient(URL!, ANON_KEY!);
+      const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD });
+      if (error) throw error;
+      return client;
+    }
+
+    beforeAll(async () => {
+      const mkUser = async (email: string) => {
+        const { data, error } = await admin.auth.admin.createUser({
+          email,
+          password: PASSWORD,
+          email_confirm: true,
+        });
+        if (error) throw error;
+        userIds.push(data.user!.id);
+        return data.user!.id;
+      };
+      adminId = await mkUser(emails.admin);
+      reporterId = await mkUser(emails.reporter);
+      const sellerId = await mkUser(emails.seller);
+      await mkUser(emails.other);
+      await grantAdmin(admin, adminId);
+
+      const { data: listing, error: listingErr } = await admin
+        .from("listings")
+        .insert({
+          seller_id: sellerId,
+          title: "RLS report test listing",
+          price_nok: 100,
+          status: "active",
+        })
+        .select("id")
+        .single();
+      if (listingErr) throw listingErr;
+      listingId = listing.id;
+
+      const { data: report, error: reportErr } = await admin
+        .from("reports")
+        .insert({ listing_id: listingId, reporter_id: reporterId, reason: "RLS test reason" })
+        .select("id")
+        .single();
+      if (reportErr) throw reportErr;
+      reportId = report.id;
+    });
+
+    afterAll(async () => {
+      if (!canRun) return;
+      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+    });
+
+    it("lets a user submit their own report", async () => {
+      const reporter = await signIn(emails.reporter);
+      const { error } = await reporter
+        .from("reports")
+        .insert({ listing_id: listingId, reporter_id: reporterId, reason: "Second report" });
+      expect(error).toBeNull();
+    });
+
+    it("blocks a user from submitting a report on someone else's behalf", async () => {
+      const other = await signIn(emails.other);
+      const { error } = await other
+        .from("reports")
+        .insert({ listing_id: listingId, reporter_id: reporterId, reason: "Impersonated report" });
+      expect(error).not.toBeNull();
+    });
+
+    it("hides reports from a regular user, even the reporter's own", async () => {
+      const reporter = await signIn(emails.reporter);
+      const { data, error } = await reporter.from("reports").select("id").eq("id", reportId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(0);
+    });
+
+    it("lets an admin see all reports", async () => {
+      const adminClient = await signIn(emails.admin);
+      const { data, error } = await adminClient.from("reports").select("id").eq("id", reportId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(1);
+    });
+  },
+);
+
+describe.skipIf(!canRun)(
+  "RLS: listing_promotions — owner and public see active ones, only owner/admin see pending",
+  () => {
+    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+    const suffix = Date.now();
+    const emails = {
+      owner: `rls-promo-owner-${suffix}@example.com`,
+      other: `rls-promo-other-${suffix}@example.com`,
+    };
+
+    const userIds: string[] = [];
+    let ownerId: string;
+    let pendingPromoId: string;
+    let activePromoId: string;
+
+    async function signIn(email: string) {
+      const client = createClient(URL!, ANON_KEY!);
+      const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD });
+      if (error) throw error;
+      return client;
+    }
+
+    beforeAll(async () => {
+      const mkUser = async (email: string) => {
+        const { data, error } = await admin.auth.admin.createUser({
+          email,
+          password: PASSWORD,
+          email_confirm: true,
+        });
+        if (error) throw error;
+        userIds.push(data.user!.id);
+        return data.user!.id;
+      };
+      ownerId = await mkUser(emails.owner);
+      await mkUser(emails.other);
+
+      const mkListing = async (title: string) => {
+        const { data, error } = await admin
+          .from("listings")
+          .insert({ seller_id: ownerId, title, price_nok: 100, status: "active" })
+          .select("id")
+          .single();
+        if (error) throw error;
+        return data.id;
+      };
+      const pendingListingId = await mkListing("RLS promo pending listing");
+      const activeListingId = await mkListing("RLS promo active listing");
+
+      const { data: pending, error: pendingErr } = await admin
+        .from("listing_promotions")
+        .insert({
+          listing_id: pendingListingId,
+          user_id: ownerId,
+          duration_days: 3,
+          price_nok: 49,
+          status: "pending",
+        })
+        .select("id")
+        .single();
+      if (pendingErr) throw pendingErr;
+      pendingPromoId = pending.id;
+
+      const { data: active, error: activeErr } = await admin
+        .from("listing_promotions")
+        .insert({
+          listing_id: activeListingId,
+          user_id: ownerId,
+          duration_days: 3,
+          price_nok: 49,
+          status: "active",
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        })
+        .select("id")
+        .single();
+      if (activeErr) throw activeErr;
+      activePromoId = active.id;
+    });
+
+    afterAll(async () => {
+      if (!canRun) return;
+      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+    });
+
+    it("lets the owner see both their pending and active promotion", async () => {
+      const owner = await signIn(emails.owner);
+      const { data, error } = await owner
+        .from("listing_promotions")
+        .select("id")
+        .in("id", [pendingPromoId, activePromoId]);
+      expect(error).toBeNull();
+      expect(new Set(data?.map((p) => p.id))).toEqual(new Set([pendingPromoId, activePromoId]));
+    });
+
+    it("hides the pending promotion from other users but shows the active one", async () => {
+      const other = await signIn(emails.other);
+      const { data, error } = await other
+        .from("listing_promotions")
+        .select("id")
+        .in("id", [pendingPromoId, activePromoId]);
+      expect(error).toBeNull();
+      expect(data?.map((p) => p.id)).toEqual([activePromoId]);
+    });
+
+    it("shows the active promotion to anonymous visitors but hides the pending one", async () => {
+      const anon = createClient(URL!, ANON_KEY!);
+      const { data, error } = await anon
+        .from("listing_promotions")
+        .select("id")
+        .in("id", [pendingPromoId, activePromoId]);
+      expect(error).toBeNull();
+      expect(data?.map((p) => p.id)).toEqual([activePromoId]);
+    });
+  },
+);
+
+describe.skipIf(!canRun)(
+  "RLS: vipps_webhook_secrets and vipps_webhook_events are fully server-only",
+  () => {
+    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+    const suffix = Date.now();
+    const email = `rls-vipps-${suffix}@example.com`;
+    const userIds: string[] = [];
+
+    async function signIn() {
+      const client = createClient(URL!, ANON_KEY!);
+      const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD });
+      if (error) throw error;
+      return client;
+    }
+
+    beforeAll(async () => {
+      const { data, error } = await admin.auth.admin.createUser({
+        email,
+        password: PASSWORD,
+        email_confirm: true,
+      });
+      if (error) throw error;
+      userIds.push(data.user!.id);
+    });
+
+    afterAll(async () => {
+      if (!canRun) return;
+      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+    });
+
+    it("blocks an authenticated client from reading vipps_webhook_secrets (no GRANT at all)", async () => {
+      const client = await signIn();
+      const { error } = await client.from("vipps_webhook_secrets").select("id").limit(1);
+      expect(error).not.toBeNull();
+    });
+
+    it("blocks an authenticated client from reading vipps_webhook_events (no GRANT at all)", async () => {
+      const client = await signIn();
+      const { error } = await client.from("vipps_webhook_events").select("id").limit(1);
       expect(error).not.toBeNull();
     });
   },

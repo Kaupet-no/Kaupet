@@ -22,13 +22,22 @@ const { email, password } = JSON.parse(
 ) as { email: string; password: string };
 
 // Dedicated e2e-only leaf under "Bil og MC" (see the
-// 20260803090000_e2e_test_vehicle_category.sql migration), with exactly the
-// two text attributes (Merke/Modell) the vehicle title computation needs
-// (see src/lib/vehicle/vehicle-title.ts) and nothing else — so filling in
-// the category's own attributes doesn't require guessing at real vehicle
-// data (fuel type, gearbox, ...). Never rename/delete its slug
-// ('e2e-test-vehicle') without updating this file.
+// 20260803090000_e2e_test_vehicle_category.sql and
+// 20260803100000_fix_e2e_test_vehicle_category_filter_types.sql
+// migrations), with exactly the two brand_select/model_select attributes
+// (Merke/Modell) the vehicle title computation needs (see
+// src/lib/vehicle/vehicle-title.ts) and nothing else. "isVehicle" is
+// determined solely by having a brand_select filter (see
+// vehicleCategoryGroupFor in src/lib/category-filters.ts), not by category
+// ancestry — using plain text filters here would silently fall through to
+// the generic (non-vehicle) attribute flow instead. Never rename/delete its
+// slug ('e2e-test-vehicle') without updating this file.
 const TEST_VEHICLE_CATEGORY_NAME = "E2E-test kjøretøy (ikke bruk)";
+// Curated, always-present reference data (see
+// 20260702000000_vehicle_brands_models.sql) — not e2e-specific, but stable
+// enough to depend on here.
+const TEST_BRAND = "Volvo";
+const TEST_MODEL = "XC60";
 
 test("logger inn og publiserer en kjøretøy-annonse (manuell registrering)", async ({ page }) => {
   await page.goto("/auth");
@@ -59,10 +68,14 @@ test("logger inn og publiserer en kjøretøy-annonse (manuell registrering)", as
 
   // Selecting the leaf reveals its attribute fields (Merke/Modell) on this
   // same page rather than advancing — wait for them instead of guessing at
-  // the picker's internal confirmation delay.
+  // the picker's internal confirmation delay. Both are Radix Select
+  // comboboxes (brand_select/model_select), not plain text inputs — Modell
+  // stays disabled until a recognized brand is picked.
   await page.getByLabel("Merke").waitFor();
-  await page.getByLabel("Merke").fill("Volvo");
-  await page.getByLabel("Modell").fill("V90");
+  await page.getByLabel("Merke").click();
+  await page.getByRole("option", { name: TEST_BRAND }).click();
+  await page.getByLabel("Modell").click();
+  await page.getByRole("option", { name: TEST_MODEL }).click();
   await page.getByTestId("wizard-next-button").click();
 
   // Bilder-siden (bundled with the now-inert generic category-attributes

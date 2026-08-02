@@ -131,9 +131,11 @@ export function VehicleBrandField({
 
   return (
     <div className="space-y-2">
-      <Label>Merke {required && <span className="text-destructive">*</span>}</Label>
+      <Label htmlFor="vehicle-brand">
+        Merke {required && <span className="text-destructive">*</span>}
+      </Label>
       <Select value={value ?? ""} onValueChange={(v) => onChange(v || undefined)}>
-        <SelectTrigger aria-invalid={!!error}>
+        <SelectTrigger id="vehicle-brand" aria-invalid={!!error}>
           <SelectValue placeholder="Velg merke…" />
         </SelectTrigger>
         <SelectContent>
@@ -172,8 +174,11 @@ export function VehicleModelField({
   if (freeText) {
     return (
       <div className="space-y-2">
-        <Label>Modell {required && <span className="text-destructive">*</span>}</Label>
+        <Label htmlFor="vehicle-model">
+          Modell {required && <span className="text-destructive">*</span>}
+        </Label>
         <Input
+          id="vehicle-model"
           aria-invalid={!!error}
           value={value ?? ""}
           onChange={(e) => onChange(e.target.value || undefined)}
@@ -185,13 +190,15 @@ export function VehicleModelField({
 
   return (
     <div className="space-y-2">
-      <Label>Modell {required && <span className="text-destructive">*</span>}</Label>
+      <Label htmlFor="vehicle-model">
+        Modell {required && <span className="text-destructive">*</span>}
+      </Label>
       <Select
         value={value ?? ""}
         onValueChange={(v) => onChange(v || undefined)}
         disabled={!brandKnown}
       >
-        <SelectTrigger aria-invalid={!!error}>
+        <SelectTrigger id="vehicle-model" aria-invalid={!!error}>
           <SelectValue placeholder={brandKnown ? "Velg modell…" : "Velg merke først"} />
         </SelectTrigger>
         <SelectContent>

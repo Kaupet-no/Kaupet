@@ -43,50 +43,44 @@ test("logger inn og publiserer en annonse", async ({ page }) => {
   await page.goto("/ny-annonse?type=sell");
 
   // Category must be chosen first — it's always the wizard's first step.
-  // Search directly for the known simple leaf above rather than drilling
+  // Search directly for the test category above rather than drilling
   // blind. Search matches across every level, so no drill-down is needed.
   // Tiles carry a stable data-category-name attribute (see
   // category-picker.tsx) instead of relying on the tile's accessible text,
-  // which is prefixed with a breadcrumb in search results (e.g. "Barn og
-  // baby / Møbler til barnerom / Stellebord og oppbevaring").
+  // which is prefixed with a breadcrumb in search results.
   const categorySearch = page.getByTestId("category-search-input");
   await categorySearch.waitFor({ timeout: 10_000 });
   await categorySearch.fill(TEST_CATEGORY_NAME);
-  await page.locator(`[data-category-name="${TEST_CATEGORY_NAME}"]`).click();
-  // Picker shows a checkmark confirmation for SELECTION_CONFIRM_MS before
-  // firing onSelect and advancing to the next step.
-  await page.waitForTimeout(500);
+  const categoryTile = page.locator(`[data-category-name="${TEST_CATEGORY_NAME}"]`);
+  await categoryTile.click();
+  // No fixed delay: picking a leaf category unmounts the whole
+  // category-select step (after its own internal SELECTION_CONFIRM_MS
+  // checkmark delay), so waiting for the clicked tile to detach from the
+  // DOM is a direct signal that the wizard has moved on — no guessing at
+  // how long that takes.
+  await categoryTile.waitFor({ state: "detached" });
 
   // Tittel, Kategori (already set), Tilstand and Pris all live on the same
   // "Bilder & tittel" step. The test category has no attributes, so there's
   // nothing else to fill in here.
+  await page.getByTestId("wizard-step-title-photos").waitFor();
   await page.getByTestId("listing-title-input").fill("E2E testannonse — Stokke Tripp Trapp");
   await page.getByRole("checkbox", { name: "Gis bort gratis" }).click();
 
-  // Beskrivelse, delivery/location and the publish confirmation are each
-  // their own subsequent step. Walk forward generically: fill Beskrivelse
-  // when its step is showing, dismiss the "no images added" confirmation
-  // dialog the first "Neste" click triggers, and stop once "Publiser
-  // annonse" appears.
-  for (let i = 0; i < 5; i++) {
-    const publishButton = page.getByTestId("publish-listing-button");
-    if (await publishButton.isVisible().catch(() => false)) break;
+  // No images were added, so the first "Neste" click prompts a "no images"
+  // confirmation dialog instead of advancing directly.
+  await page.getByTestId("wizard-next-button").click();
+  await page.getByTestId("continue-without-image-button").click();
 
-    const descriptionField = page.getByTestId("listing-description-textarea");
-    if (await descriptionField.isVisible().catch(() => false)) {
-      await descriptionField.fill(
-        "Automatisk opprettet av en e2e-test. Stol i god stand, lite brukt.",
-      );
-    }
+  // Beskrivelse is its own step.
+  await page.getByTestId("wizard-step-description-keywords").waitFor();
+  await page
+    .getByTestId("listing-description-textarea")
+    .fill("Automatisk opprettet av en e2e-test. Stol i god stand, lite brukt.");
+  await page.getByTestId("wizard-next-button").click();
 
-    await page.getByTestId("wizard-next-button").click();
-
-    const continueWithoutImage = page.getByTestId("continue-without-image-button");
-    if (await continueWithoutImage.isVisible().catch(() => false)) {
-      await continueWithoutImage.click();
-    }
-  }
-
+  // Final step: delivery/location + publish confirmation share one page.
+  await page.getByTestId("wizard-step-delivery-location").waitFor();
   await page.getByTestId("publish-listing-button").click();
   // Publishing without having opened the preview first prompts a "want to
   // preview before publishing?" dialog rather than publishing immediately.

@@ -22,7 +22,7 @@ backoff ved Supabase sin auth-rate-limit — bruk den (ikke en ny lokal
 `signInWithPassword`-kall) i alle nye testgrupper, siden en full kjøring nå
 gjør 70+ innlogginger i løpet av sekunder.
 
-## Dekket (16 tabeller, verifisert 50/50 grønt mot staging 2026-08-02)
+## Dekket (19 tabeller, verifisert 59/59 grønt mot staging 2026-08-02)
 
 - `conversations` / `messages` — kun deltakere ser samtalen
 - `listings` — eier ser egne draft/disabled, andre ser kun aktive; ikke-eier
@@ -50,6 +50,11 @@ gjør 70+ innlogginger i løpet av sekunder.
 - `user_reviews` — alle autentiserte (og faktisk også anonyme, se funn
   under) kan lese; kun en reell part i et bekreftet salg kan opprette en
   anmeldelse, med riktig rolle (håndhevet av trigger)
+- `wtb_listings` — eier ser egne uansett status, andre ser kun aktive
+- `vehicle_brands` / `vehicle_models` — offentlig lesbare, inkl. pending
+  (se funn under); en bruker kan ikke godkjenne seg selv eller foreslå på
+  andres vegne
+- `admin_moderation_log` — kun admin/moderator kan lese
 
 ## Funn fra testarbeidet (ikke bare testfiksinger)
 
@@ -72,7 +77,7 @@ gjør 70+ innlogginger i løpet av sekunder.
    flere testgrupper i samme fil vil trenge enda mer backoff-margin —
    vurder å dele filen i flere test-filer per tabellgruppe hvis kjøretiden
    blir et problem (hver fil kan kjøres separat med `vitest run <fil>`).
-   Ved 16 tabeller/50 tester tar en full kjøring nå ~38 sekunder.
+   Ved 19 tabeller/59 tester tar en full kjøring nå ~56 sekunder.
 4. **`user_reviews` fikk offentlig lesetilgang tilbake i en senere
    migrasjon.** Samme mønster som `profiles` (myk-sletting) — en
    mellomliggende innstramming (`20260605123044_*.sql`, til
@@ -81,33 +86,33 @@ gjør 70+ innlogginger i løpet av sekunder.
    Generell lærdom: **policyer for samme tabell/navn kan endres flere ganger
    på tvers av migrasjoner** — den kronologisk siste vinner, ikke den du
    fant først eller den som "høres mest riktig ut" for tabellens formål.
+5. **`vehicle_brands`/`vehicle_models` sin SELECT-policy mangler
+   statusfilter — bekreftet, ikke et sikkerhetsproblem.** Brukerforeslåtte
+   (`pending`) merke-/modellnavn er teknisk lesbare av anonyme besøkende
+   gjennom en direkte tabellspørring, siden `"...viewable by everyone"`
+   er `USING (true)` uten `status = 'approved'`-sjekk. Lav alvorlighet
+   (kun et forslått navn, ingen sensitiv data), men appen må filtrere
+   `pending`-verdier bort klient-side (f.eks. `VehicleBrandField`) —
+   verifiser dette hvis noen jobber med den komponenten videre.
 
 ## Gjenstående — prioritert rekkefølge
 
 ### Middels prioritet
 
-1. **`wtb_listings`** ("ønskes kjøpt"-annonser) — sannsynligvis lik
-   `listings`-mønsteret (eier ser egne, andre ser kun aktive).
-2. **`vehicle_brands` / `vehicle_models`** — offentlig lesbare, men
-   pending-approval-verdier (opprettet via `createVehicleBrand`/
-   `createVehicleModel` i `vehicle-confirm`-flyten) bør ikke være synlige/
-   brukbare før godkjenning; verifiser denne statusovergangen.
-3. **`admin_moderation_log`** — bør være admin/service-role-only (policy
-   finnes: `"Admins and moderators read moderation log"`).
-4. **`favorite_price_drops` / `favorite_sold_notifications`** — samme
+1. **`favorite_price_drops` / `favorite_sold_notifications`** — samme
    mønster som `saved_search_notifications` (varsler generert av triggere,
    ingen direkte klient-INSERT).
 
 ### Lav prioritet (mindre sikkerhetskritisk, men bør dekkes for fullstendighet)
 
-5. `listing_images`, `listing_360_capture_sessions`, `listing_360_frames`
-6. `listing_view_events` / `listing_views` / `search_query_stats` /
+2. `listing_images`, `listing_360_capture_sessions`, `listing_360_frames`
+3. `listing_view_events` / `listing_views` / `search_query_stats` /
    `listing_keyword_stats` / `listing_category_word_stats` — stort sett
    analytics/telemetri, sjekk om de faktisk er lesbare av klienter
-7. `categories` / `category_filters` / `category_flows` / `filter_synonyms`
+4. `categories` / `category_filters` / `category_flows` / `filter_synonyms`
    / `site_settings` / `app_settings` — offentlig lesedata, lite risiko,
    men verifiser at skriving er admin/service-role-only
-8. `user_verifications`, `error_log`, `push_dispatch_failures`,
+5. `user_verifications`, `error_log`, `push_dispatch_failures`,
    `vipps_oauth_states`, `system_messages`
 
 ## Fremgangsmåte for neste økt

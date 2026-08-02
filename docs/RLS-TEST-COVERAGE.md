@@ -22,7 +22,7 @@ backoff ved Supabase sin auth-rate-limit — bruk den (ikke en ny lokal
 `signInWithPassword`-kall) i alle nye testgrupper, siden en full kjøring nå
 gjør 70+ innlogginger i løpet av sekunder.
 
-## Dekket (14 tabeller, verifisert 42/42 grønt mot staging 2026-08-02)
+## Dekket (16 tabeller, verifisert 50/50 grønt mot staging 2026-08-02)
 
 - `conversations` / `messages` — kun deltakere ser samtalen
 - `listings` — eier ser egne draft/disabled, andre ser kun aktive; ikke-eier
@@ -45,6 +45,11 @@ gjør 70+ innlogginger i løpet av sekunder.
 - `listing_promotions` — kun eier/admin kan lese direkte (se funn under)
 - `vipps_webhook_secrets` / `vipps_webhook_events` — bekreftet at ingen
   klientrolle (heller ikke admin) har noen GRANT på disse tabellene
+- `listing_sales` — kun kjøper/selger ser handelen; ikke-deltaker kan ikke
+  bekrefte salg på andres vegne; kun selger (ikke kjøper) kan angre
+- `user_reviews` — alle autentiserte (og faktisk også anonyme, se funn
+  under) kan lese; kun en reell part i et bekreftet salg kan opprette en
+  anmeldelse, med riktig rolle (håndhevet av trigger)
 
 ## Funn fra testarbeidet (ikke bare testfiksinger)
 
@@ -67,66 +72,64 @@ gjør 70+ innlogginger i løpet av sekunder.
    flere testgrupper i samme fil vil trenge enda mer backoff-margin —
    vurder å dele filen i flere test-filer per tabellgruppe hvis kjøretiden
    blir et problem (hver fil kan kjøres separat med `vitest run <fil>`).
+   Ved 16 tabeller/50 tester tar en full kjøring nå ~38 sekunder.
+4. **`user_reviews` fikk offentlig lesetilgang tilbake i en senere
+   migrasjon.** Samme mønster som `profiles` (myk-sletting) — en
+   mellomliggende innstramming (`20260605123044_*.sql`, til
+   `TO authenticated`) ble reversert av en enda senere migrasjon
+   (`20260610102257_*.sql`, tilbake til `USING (true)` + `GRANT ... TO anon`).
+   Generell lærdom: **policyer for samme tabell/navn kan endres flere ganger
+   på tvers av migrasjoner** — den kronologisk siste vinner, ikke den du
+   fant først eller den som "høres mest riktig ut" for tabellens formål.
 
 ## Gjenstående — prioritert rekkefølge
 
-### Høy prioritet
-
-1. **`listing_sales`** — salgsbekreftelse; sjekk policyen i
-   `20260610102257_*.sql` ("Seller can confirm sale") — verifiser at kun
-   selger i den aktuelle samtalen kan bekrefte salg, og at kjøper/andre ikke
-   kan lese eller endre andres salgsrader.
-
 ### Middels prioritet
 
-2. **`wtb_listings`** ("ønskes kjøpt"-annonser) — sannsynligvis lik
+1. **`wtb_listings`** ("ønskes kjøpt"-annonser) — sannsynligvis lik
    `listings`-mønsteret (eier ser egne, andre ser kun aktive).
-3. **`user_reviews`** — offentlig lesbar per migrasjon
-   `20260610102257_*.sql` (`GRANT SELECT ... TO anon`), men verifiser at
-   kun den faktiske kjøperen/selgeren i en fullført handel kan opprette en
-   anmeldelse.
-4. **`vehicle_brands` / `vehicle_models`** — offentlig lesbare, men
+2. **`vehicle_brands` / `vehicle_models`** — offentlig lesbare, men
    pending-approval-verdier (opprettet via `createVehicleBrand`/
    `createVehicleModel` i `vehicle-confirm`-flyten) bør ikke være synlige/
    brukbare før godkjenning; verifiser denne statusovergangen.
-5. **`admin_moderation_log`** — bør være admin/service-role-only (policy
+3. **`admin_moderation_log`** — bør være admin/service-role-only (policy
    finnes: `"Admins and moderators read moderation log"`).
-6. **`favorite_price_drops` / `favorite_sold_notifications`** — samme
+4. **`favorite_price_drops` / `favorite_sold_notifications`** — samme
    mønster som `saved_search_notifications` (varsler generert av triggere,
    ingen direkte klient-INSERT).
 
 ### Lav prioritet (mindre sikkerhetskritisk, men bør dekkes for fullstendighet)
 
-7. `listing_images`, `listing_360_capture_sessions`, `listing_360_frames`
-8. `listing_view_events` / `listing_views` / `search_query_stats` /
+5. `listing_images`, `listing_360_capture_sessions`, `listing_360_frames`
+6. `listing_view_events` / `listing_views` / `search_query_stats` /
    `listing_keyword_stats` / `listing_category_word_stats` — stort sett
    analytics/telemetri, sjekk om de faktisk er lesbare av klienter
-9. `categories` / `category_filters` / `category_flows` / `filter_synonyms`
+7. `categories` / `category_filters` / `category_flows` / `filter_synonyms`
    / `site_settings` / `app_settings` — offentlig lesedata, lite risiko,
    men verifiser at skriving er admin/service-role-only
-10. `user_verifications`, `error_log`, `push_dispatch_failures`,
-    `vipps_oauth_states`, `system_messages`
+8. `user_verifications`, `error_log`, `push_dispatch_failures`,
+   `vipps_oauth_states`, `system_messages`
 
 ## Fremgangsmåte for neste økt
 
-1. Sjekk om `task_6c53cb70` (featured-listing-undersøkelsen) har landet —
-   følg opp eventuelt reelt funn før mer testarbeid.
-2. For hver tabell: `grep -n "CREATE POLICY\|DROP POLICY" supabase/migrations/*.sql | grep -i "on (public\.)?<tabell>"`
-   for å finne gjeldende policyer. **Viktig lærdom fra denne runden:** ikke
+1. For hver tabell: `grep -n "CREATE POLICY\|DROP POLICY" supabase/migrations/*.sql | grep -i "on (public\.)?<tabell>"`
+   for å finne gjeldende policyer. **Viktig lærdom fra to runder nå:** ikke
    bare se på første `CREATE POLICY` — sjekk om en senere migrasjon har
-   `DROP POLICY` for samme navn uten erstatning (skjedde med
-   `listing_promotions`), og les selve policy-definisjonen nøye (`FOR ALL`
-   vs. `FOR SELECT`, hvem den faktisk gjelder for) i stedet for å anta ut fra
-   tabellnavn/kontekst alene.
-3. Skriv testgruppe(r) etter samme mønster som eksisterende (se
+   `DROP POLICY`/`CREATE POLICY` for samme navn (policyer kan endres flere
+   ganger på tvers av migrasjoner, siste vinner — skjedde med både
+   `listing_promotions` og `user_reviews`), og les selve
+   policy-definisjonen nøye (`FOR ALL` vs. `FOR SELECT`, hvem den faktisk
+   gjelder for) i stedet for å anta ut fra tabellnavn/kontekst alene.
+2. Skriv testgruppe(r) etter samme mønster som eksisterende (se
    `src/lib/rls.integration.test.ts`), og bruk `signInWithRetry`, ikke en ny
    lokal `signInWithPassword`.
-4. Kjør `bunx tsc --noEmit` og `bunx eslint src/lib/rls.integration.test.ts`
+3. Kjør `bunx tsc --noEmit` og `bunx eslint src/lib/rls.integration.test.ts`
    lokalt — kan verifiseres uten Supabase-tilkobling.
-5. Commit + push til staging.
-6. Be brukeren kjøre PowerShell-kommandoen over og rapportere resultatet
+4. Commit + push til staging.
+5. Be brukeren kjøre PowerShell-kommandoen over og rapportere resultatet
    tilbake (Claude Code kan ikke selv koble til staging-Supabase i denne
    økten — miljøets sikkerhetsklassifiserer blokkerer det).
-7. Fiks eventuelle feil som dukker opp — vurder alltid om feilen er i testens
-   antakelse (som med `ip_bans`/`listing_promotions` denne runden) eller et
-   reelt RLS-hull, før du "fikser" ved å endre forventningen.
+6. Fiks eventuelle feil som dukker opp — vurder alltid om feilen er i testens
+   antakelse (som med `ip_bans`/`listing_promotions`/`user_reviews` denne
+   og forrige runde) eller et reelt RLS-hull, før du "fikser" ved å endre
+   forventningen.

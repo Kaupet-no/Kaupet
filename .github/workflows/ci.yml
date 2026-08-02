@@ -101,6 +101,29 @@ jobs:
       - name: Install Playwright browsers
         run: bunx playwright install --with-deps chromium
 
+      - name: Verify required Supabase env vars are set
+        # Catches a missing repo variable/secret in seconds with a clear
+        # message, instead of the job failing ~2 minutes in with a Playwright
+        # timeout that gives no hint the actual cause was a missing env var
+        # (see the SUPABASE_PUBLISHABLE_KEY incident this check exists for).
+        run: |
+          missing=""
+          for var in VITE_SUPABASE_URL VITE_SUPABASE_PUBLISHABLE_KEY SUPABASE_URL SUPABASE_PUBLISHABLE_KEY SUPABASE_SERVICE_ROLE_KEY; do
+            if [ -z "${!var}" ]; then
+              missing="$missing $var"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing required env var(s) for E2E job:$missing"
+            exit 1
+          fi
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
       - name: Run e2e tests
         # Runs the dev server locally against the staging Supabase project —
         # not against https://staging.kaupet.no directly, since that domain

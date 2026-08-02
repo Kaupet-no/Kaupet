@@ -27,7 +27,10 @@ test("logger inn og publiserer en annonse", async ({ page }) => {
   await page.getByRole("main").getByRole("button", { name: "Logg inn" }).click();
   await expect(page).toHaveURL("/", { timeout: 10_000 });
 
-  await page.goto("/ny-annonse");
+  // type=sell is required — without it the route redirects to "/" (entry
+  // is meant to go through the "Opprett en annonse" picker dialog, which
+  // sets this param before navigating here).
+  await page.goto("/ny-annonse?type=sell");
 
   // Category must be chosen first — it's always the wizard's first step,
   // rendered as a drill-down grid (main category -> sub -> ... -> leaf),

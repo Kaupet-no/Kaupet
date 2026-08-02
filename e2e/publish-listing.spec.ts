@@ -15,14 +15,15 @@ const { email, password } = JSON.parse(
   ),
 ) as { email: string; password: string };
 
-// A leaf category with no *required* attributes other than "Merke" (a
-// free-text field — see the category_filters seed for
-// 'stellebord-og-oppbevaring'). Many leaves (e.g. Elektronikk > TV og lyd >
-// TV) have several required attribute selects this test doesn't fill in,
-// which would block the wizard from advancing — this one keeps the test
-// simple. If this category is ever renamed or removed in the admin UI, swap
-// in another simple leaf here.
-const TEST_CATEGORY_NAME = "Stellebord og oppbevaring";
+// Dedicated e2e-only category (see the
+// 20260802210000_e2e_test_category.sql migration) — a root-level leaf with
+// zero category_filters rows, so the wizard needs no attribute inputs
+// filled in to advance past the category-select step. Using a real
+// production category here (as earlier versions of this test did) meant
+// the test broke whenever that category's attributes changed in admin;
+// this one is owned by the test suite. Never rename/delete its slug
+// ('e2e-test-listing') without updating this file.
+const TEST_CATEGORY_NAME = "E2E-test (ikke bruk)";
 
 test("logger inn og publiserer en annonse", async ({ page }) => {
   await page.goto("/auth");
@@ -57,11 +58,9 @@ test("logger inn og publiserer en annonse", async ({ page }) => {
   await page.waitForTimeout(500);
 
   // Tittel, Kategori (already set), Tilstand and Pris all live on the same
-  // "Bilder & tittel" step.
+  // "Bilder & tittel" step. The test category has no attributes, so there's
+  // nothing else to fill in here.
   await page.getByTestId("listing-title-input").fill("E2E testannonse — Stokke Tripp Trapp");
-  // The category's one attribute, "Merke", turns out to be required (marked
-  // "*", invalid until filled) despite being a free-text field.
-  await page.getByLabel("Merke").fill("Stokke");
   await page.getByRole("checkbox", { name: "Gis bort gratis" }).click();
 
   // Beskrivelse, delivery/location and the publish confirmation are each

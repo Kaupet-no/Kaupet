@@ -1590,3 +1590,246 @@ describe.skipIf(!canRun)(
     });
   },
 );
+
+describe.skipIf(!canRun)(
+  "RLS: wtb_listings — owner sees own regardless of status, others see only active",
+  () => {
+    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+    const suffix = Date.now();
+    const emails = {
+      owner: `rls-wtb-owner-${suffix}@example.com`,
+      other: `rls-wtb-other-${suffix}@example.com`,
+    };
+
+    const userIds: string[] = [];
+    let ownerId: string;
+    let activeId: string;
+    let fulfilledId: string;
+
+    async function signIn(email: string) {
+      return signInWithRetry(email);
+    }
+
+    beforeAll(async () => {
+      const mkUser = async (email: string) => {
+        const { data, error } = await admin.auth.admin.createUser({
+          email,
+          password: PASSWORD,
+          email_confirm: true,
+        });
+        if (error) throw error;
+        userIds.push(data.user!.id);
+        return data.user!.id;
+      };
+      ownerId = await mkUser(emails.owner);
+      await mkUser(emails.other);
+
+      const mkWtb = async (status: "active" | "fulfilled") => {
+        const { data, error } = await admin
+          .from("wtb_listings")
+          .insert({ user_id: ownerId, title: `RLS wtb ${status} listing`, status })
+          .select("id")
+          .single();
+        if (error) throw error;
+        return data.id;
+      };
+      activeId = await mkWtb("active");
+      fulfilledId = await mkWtb("fulfilled");
+    });
+
+    afterAll(async () => {
+      if (!canRun) return;
+      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+    });
+
+    it("lets the owner see both their active and fulfilled wtb listings", async () => {
+      const owner = await signIn(emails.owner);
+      const { data, error } = await owner
+        .from("wtb_listings")
+        .select("id")
+        .in("id", [activeId, fulfilledId]);
+      expect(error).toBeNull();
+      expect(new Set(data?.map((w) => w.id))).toEqual(new Set([activeId, fulfilledId]));
+    });
+
+    it("hides the fulfilled listing from other users but shows the active one", async () => {
+      const other = await signIn(emails.other);
+      const { data, error } = await other
+        .from("wtb_listings")
+        .select("id")
+        .in("id", [activeId, fulfilledId]);
+      expect(error).toBeNull();
+      expect(data?.map((w) => w.id)).toEqual([activeId]);
+    });
+
+    it("blocks a non-owner from updating someone else's wtb listing", async () => {
+      const other = await signIn(emails.other);
+      const { error, count } = await other
+        .from("wtb_listings")
+        .update({ title: "Hijacked" }, { count: "exact" })
+        .eq("id", activeId);
+      expect(error).toBeNull();
+      expect(count).toBe(0);
+    });
+
+    it("blocks a user from creating a wtb listing on someone else's behalf", async () => {
+      const other = await signIn(emails.other);
+      const { error } = await other
+        .from("wtb_listings")
+        .insert({ user_id: ownerId, title: "Impersonated wtb listing" });
+      expect(error).not.toBeNull();
+    });
+  },
+);
+
+describe.skipIf(!canRun)(
+  "RLS: vehicle_brands / vehicle_models — publicly readable, pending only insertable as pending by self",
+  () => {
+    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+    const suffix = Date.now();
+    const email = `rls-vehiclebrand-${suffix}@example.com`;
+    const userIds: string[] = [];
+    let userId: string;
+    let pendingBrandId: string;
+
+    async function signIn() {
+      return signInWithRetry(email);
+    }
+
+    beforeAll(async () => {
+      const { data, error } = await admin.auth.admin.createUser({
+        email,
+        password: PASSWORD,
+        email_confirm: true,
+      });
+      if (error) throw error;
+      userId = data.user!.id;
+      userIds.push(userId);
+
+      const { data: brand, error: brandErr } = await admin
+        .from("vehicle_brands")
+        .insert({
+          name: `RLS Test Brand ${suffix}`,
+          category_group: "bil",
+          status: "pending",
+          submitted_by: userId,
+        })
+        .select("id")
+        .single();
+      if (brandErr) throw brandErr;
+      pendingBrandId = brand.id;
+    });
+
+    afterAll(async () => {
+      if (!canRun) return;
+      await admin.from("vehicle_brands").delete().eq("id", pendingBrandId);
+      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+    });
+
+    it("lets an anonymous visitor read even a pending brand (SELECT policy has no status filter)", async () => {
+      // Documents actual current behavior, not necessarily ideal: the
+      // SELECT policy is USING (true) with no status check, so a
+      // not-yet-approved, user-submitted brand name is technically
+      // readable by anyone — the app is expected to filter pending values
+      // out client-side (e.g. VehicleBrandField) rather than relying on RLS.
+      const anon = createClient(URL!, ANON_KEY!);
+      const { data, error } = await anon
+        .from("vehicle_brands")
+        .select("id, status")
+        .eq("id", pendingBrandId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(1);
+      expect(data?.[0].status).toBe("pending");
+    });
+
+    it("blocks a user from inserting a brand pre-approved as 'approved'", async () => {
+      const client = await signIn();
+      const { error } = await client.from("vehicle_brands").insert({
+        name: `RLS Self-Approved Brand ${suffix}`,
+        category_group: "bil",
+        status: "approved",
+        submitted_by: userId,
+      });
+      expect(error).not.toBeNull();
+    });
+
+    it("blocks a user from proposing a brand on someone else's behalf", async () => {
+      const client = await signIn();
+      const { error } = await client.from("vehicle_brands").insert({
+        name: `RLS Impersonated Brand ${suffix}`,
+        category_group: "bil",
+        status: "pending",
+        submitted_by: "00000000-0000-0000-0000-000000000000",
+      });
+      expect(error).not.toBeNull();
+    });
+  },
+);
+
+describe.skipIf(!canRun)("RLS: admin_moderation_log is readable only by admins/moderators", () => {
+  const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+  const suffix = Date.now();
+  const emails = {
+    admin: `rls-modlog-admin-${suffix}@example.com`,
+    other: `rls-modlog-other-${suffix}@example.com`,
+  };
+
+  const userIds: string[] = [];
+  let logId: string;
+
+  async function signIn(email: string) {
+    return signInWithRetry(email);
+  }
+
+  beforeAll(async () => {
+    const mkUser = async (email: string) => {
+      const { data, error } = await admin.auth.admin.createUser({
+        email,
+        password: PASSWORD,
+        email_confirm: true,
+      });
+      if (error) throw error;
+      userIds.push(data.user!.id);
+      return data.user!.id;
+    };
+    const adminId = await mkUser(emails.admin);
+    await mkUser(emails.other);
+    await grantAdmin(admin, adminId);
+
+    const { data, error } = await admin
+      .from("admin_moderation_log")
+      .insert({
+        admin_id: adminId,
+        action: "rls_test_action",
+        target_type: "test",
+        target_id: "rls-test",
+        reason: "RLS test log entry",
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    logId = data.id;
+  });
+
+  afterAll(async () => {
+    if (!canRun) return;
+    await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+  });
+
+  it("lets an admin read the moderation log", async () => {
+    const adminClient = await signIn(emails.admin);
+    const { data, error } = await adminClient
+      .from("admin_moderation_log")
+      .select("id")
+      .eq("id", logId);
+    expect(error).toBeNull();
+    expect(data).toHaveLength(1);
+  });
+
+  it("hides the moderation log from a regular user", async () => {
+    const other = await signIn(emails.other);
+    const { data, error } = await other.from("admin_moderation_log").select("id").eq("id", logId);
+    expect(error).toBeNull();
+    expect(data).toHaveLength(0);
+  });
+});

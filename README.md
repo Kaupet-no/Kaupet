@@ -64,7 +64,7 @@ VITE_SUPABASE_PROJECT_ID=...
 - [shadcn/ui](https://ui.shadcn.com) komponenter
 - [Supabase](https://supabase.com) — database, auth, storage
 - [Cloudflare Workers](https://www.cloudflare.com/products/workers/) for hosting
-- [Capacitor](https://capacitorjs.com) for native iOS og Android-app
+- [Capacitor](https://capacitorjs.com) for native iOS og Android-app — se [README-CAPACITOR.md](README-CAPACITOR.md) for oppsett av native build
 
 ## Bidra
 

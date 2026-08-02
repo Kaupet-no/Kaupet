@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { z } from "zod";
 import { hapticNotification } from "@/lib/haptics";
 import { valueToCriteria, type AdvancedSearchValue } from "@/components/advanced-search-value";
@@ -68,6 +68,32 @@ export function useAnnonserSearchState(params: {
 
   const attrValues = useMemo(() => decodeAttrFilters(search.attrs), [search.attrs]);
 
+  // Category-specific attribute filters (e.g. vehicle brand) only make sense
+  // within the category they belong to. If the user navigates to a category
+  // that doesn't support a given attr key, prune it from the URL so it stops
+  // silently narrowing results after its filter chip has disappeared from
+  // the UI. Category-agnostic fields (price, condition, location, etc.) are
+  // untouched since they live outside `attrs`. Skip while categories/filters
+  // are still loading — attrFilters is empty then regardless of the real
+  // category, which would otherwise wipe valid attrs before data arrives.
+  useEffect(() => {
+    if (!categories || !allFilters) return;
+    const allowedKeys = new Set(attrFilters.map((f) => f.key));
+    const hasStale = Object.keys(attrValues).some((k) => !allowedKeys.has(k));
+    if (!hasStale) return;
+
+    const pruned: Record<string, AttributeFilterValue> = {};
+    for (const [k, v] of Object.entries(attrValues)) {
+      if (allowedKeys.has(k)) pruned[k] = v;
+    }
+    const nextAttrs = encodeAttrFilters(pruned);
+    if (nextAttrs === search.attrs) return;
+
+    navigate({
+      search: (prev: z.infer<typeof searchSchema>) => ({ ...prev, attrs: nextAttrs }),
+    });
+  }, [attrFilters, attrValues, search.attrs, navigate, categories, allFilters]);
+
   const handleAttrValueChange = (key: string, value: AttributeFilterValue | undefined) => {
     const next = setAttributeFilterValue(attrValues, key, value);
     navigate({
@@ -122,7 +148,10 @@ export function useAnnonserSearchState(params: {
   );
 
   const currentCriteria = useMemo(
-    () => ({ ...valueToCriteria(advancedInitial), sort: search.sort }),
+    () => ({
+      ...valueToCriteria(advancedInitial),
+      sort: search.sort === "relevance" ? "new" : search.sort,
+    }),
     [advancedInitial, search.sort],
   );
 

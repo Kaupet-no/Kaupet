@@ -1,73 +1,84 @@
-import { useMemo, useRef, useState } from "react";
-import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  FolderOpen,
-  Search as SearchIcon,
-} from "lucide-react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useEffect, useRef, useState } from "react";
+import { Link } from "@tanstack/react-router";
+import { Search as SearchIcon, ListPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ModeToggle } from "@/components/search-term-mode-toggle";
-import {
-  buildTree,
-  categoryLabel,
-  findCategorySuggestion,
-  selectAllForParent,
-  type Category,
-} from "@/lib/categories";
-import { describeTermGroup } from "@/lib/term-groups";
+import { TermGroupEditor } from "@/components/term-group-editor";
+import { describeTermGroup, type TermGroup } from "@/lib/term-groups";
+import { useSearchSuggestions } from "@/features/listing-search/use-search-suggestions";
 
-export type { Category };
+/** Rotates through the input's placeholder while it's empty and unfocused, to
+ * teach newcomers that the search box understands more than plain keywords
+ * (exclusion, price, condition) without needing a separate onboarding step. */
+const PLACEHOLDER_EXAMPLES = [
+  "Hva leter du etter?",
+  "Prøv: sykkel unntatt elsykkel",
+  "Prøv: iPhone under 3000",
+  "Prøv: sofa som ny",
+  "Prøv: bil automatgir",
+  "Prøv: mobiltelefon",
+];
 
 type Props = {
   q: string;
   onQChange: (v: string) => void;
   onSubmitQ: () => void;
-  selectedSlugs: string[];
-  onSelectedChange: (slugs: string[]) => void;
-  categories: Category[];
-  /** Hide the category control — used when the advanced search panel (which
-   * has its own, more capable category picker) is open, to avoid showing
-   * two different category UIs at once. */
-  hideCategory?: boolean;
   qMode: "all" | "any";
   onQModeChange: (v: "all" | "any") => void;
   /** Show the "Alle ord"/"Minst ett"-toggle for the "Hva" field — only
    * relevant once the advanced search panel is open, since that's where the
    * extra search lines that make the distinction matter live. */
   showQMode?: boolean;
+  /** Extra search lines ("Flere søkelinjer") — optional so callers that don't
+   * need them (none currently) aren't forced to wire up empty state. When
+   * provided, a settings button appears in the search bar for both this and
+   * `qMode`, replacing the old separate "Flere valg" filter chip. */
+  extraGroups?: TermGroup[];
+  onExtraGroupsChange?: (groups: TermGroup[]) => void;
 };
 
+/**
+ * Pure text-query search field. Category selection lives in
+ * CategoryHero/CategoryChipRow and in the automatic category-match effect
+ * (see search-category-match.ts) — this bar used to also show a "Gå til
+ * kategori" suggestion in its own dropdown, but that duplicated the
+ * automatic matcher and could fire out of step with it (the automatic one
+ * often applied before the suggestion was even clicked), so it was removed
+ * in favor of one single category-recognition path.
+ */
 export function SearchBar({
   q,
   onQChange,
   onSubmitQ,
-  selectedSlugs,
-  onSelectedChange,
-  categories,
-  hideCategory = false,
   qMode,
   onQModeChange,
   showQMode = false,
+  extraGroups,
+  onExtraGroupsChange,
 }: Props) {
-  const [catOpen, setCatOpen] = useState(false);
-  const [drillParentId, setDrillParentId] = useState<string | null>(null);
   const [qFocused, setQFocused] = useState(false);
-  const suggestionRef = useRef<HTMLButtonElement>(null);
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const firstSuggestionRef = useRef<HTMLElement>(null);
+  const showMoreButton = !showQMode && extraGroups != null && onExtraGroupsChange != null;
+  const moreCount = (extraGroups?.length ?? 0) + (qMode === "any" ? 1 : 0);
 
-  const tree = useMemo(() => buildTree(categories), [categories]);
-  const label = categoryLabel(selectedSlugs, tree);
-  const hasCategory = selectedSlugs.length > 0;
+  useEffect(() => {
+    if (q || qFocused) {
+      setPlaceholderIndex(0);
+      return;
+    }
+    const id = setInterval(() => {
+      setPlaceholderIndex((i) => (i + 1) % PLACEHOLDER_EXAMPLES.length);
+    }, 4000);
+    return () => clearInterval(id);
+  }, [q, qFocused]);
 
-  const drillParent = drillParentId ? (tree.byId.get(drillParentId) ?? null) : null;
-  const drillKids = drillParent ? (tree.childrenByParent.get(drillParent.id) ?? []) : [];
-
-  // Suggest a matching category while the user types in "Hva", so people who
-  // type a category name (e.g. "sykkel") discover that browsing by category
-  // is also possible from the same field, without needing a separate UI.
-  const qSuggestion = useMemo(() => findCategorySuggestion(categories, q), [q, categories]);
+  const { data: listingSuggestions } = useSearchSuggestions(q);
+  const hasDropdown = qFocused && !!listingSuggestions?.length;
 
   return (
     <form
@@ -77,171 +88,97 @@ export function SearchBar({
       }}
     >
       <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1 shadow-sm transition-shadow focus-within:shadow-md focus-within:ring-2 focus-within:ring-ring hover:shadow-md">
-        <div className="relative flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto [scrollbar-width:none] after:pointer-events-none after:absolute after:right-0 after:top-0 after:h-full after:w-8 after:bg-gradient-to-l after:from-card after:to-transparent [&::-webkit-scrollbar]:hidden">
-          {/* Hva */}
-          <div className="relative flex min-w-[120px] flex-1 items-center gap-2 rounded-full px-4 py-1.5">
-            <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
-            <Input
-              value={q}
-              onChange={(e) => onQChange(e.target.value)}
-              onFocus={() => setQFocused(true)}
-              onBlur={() => setQFocused(false)}
-              onKeyDown={(e) => {
-                if ((e.key === "ArrowDown" || e.key === "Tab") && qSuggestion && !e.shiftKey) {
-                  if (suggestionRef.current) {
-                    e.preventDefault();
-                    suggestionRef.current.focus();
-                  }
+        <div className="relative flex min-w-0 flex-1 items-center gap-2 rounded-full px-4 py-1.5">
+          <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
+          <Input
+            value={q}
+            onChange={(e) => onQChange(e.target.value)}
+            onFocus={() => setQFocused(true)}
+            onBlur={() => setQFocused(false)}
+            onKeyDown={(e) => {
+              if ((e.key === "ArrowDown" || e.key === "Tab") && hasDropdown && !e.shiftKey) {
+                if (firstSuggestionRef.current) {
+                  e.preventDefault();
+                  firstSuggestionRef.current.focus();
                 }
-              }}
-              placeholder="Hva leter du etter?"
-              className="h-8 border-0 bg-transparent p-0 shadow-none focus-visible:ring-0 focus-visible:outline-none"
-              aria-autocomplete="list"
-              aria-expanded={!!(qFocused && qSuggestion)}
-              aria-haspopup="listbox"
-            />
-            {qFocused && qSuggestion && (
-              <div
-                role="listbox"
-                aria-label="Kategorisøk"
-                className="absolute left-0 top-[calc(100%+0.5rem)] z-50 w-[min(320px,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-card p-1 shadow-md"
-              >
-                <button
-                  ref={suggestionRef}
-                  type="button"
+              }
+            }}
+            placeholder={PLACEHOLDER_EXAMPLES[placeholderIndex]}
+            className="h-8 border-0 bg-transparent p-0 shadow-none focus-visible:ring-0 focus-visible:outline-none"
+            aria-autocomplete="list"
+            aria-expanded={hasDropdown}
+            aria-haspopup="listbox"
+          />
+          {hasDropdown && (
+            <div
+              role="listbox"
+              aria-label="Søkeforslag"
+              className="absolute left-0 top-[calc(100%+0.5rem)] z-50 w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-card p-1 shadow-md"
+            >
+              {listingSuggestions?.map((s, i) => (
+                <Link
+                  key={s.id}
+                  ref={
+                    i === 0 ? (firstSuggestionRef as React.RefObject<HTMLAnchorElement>) : undefined
+                  }
+                  to="/$kaupetCode"
+                  params={{ kaupetCode: s.kaupet_code }}
                   role="option"
                   aria-selected="false"
-                  // Mouse-down fires before the input's blur, so the click
-                  // registers instead of being lost when focus leaves the field.
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    onSelectedChange([qSuggestion.slug]);
-                    onQChange("");
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      onSelectedChange([qSuggestion.slug]);
-                      onQChange("");
-                    } else if (e.key === "Escape") {
-                      setQFocused(false);
-                    }
-                  }}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setQFocused(false)}
                   className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <FolderOpen className="size-4 shrink-0 text-muted-foreground" />
-                  <span>
-                    Gå til kategori: <span className="font-medium">{qSuggestion.name_nb}</span>
-                  </span>
-                </button>
-              </div>
-            )}
-          </div>
-
-          {showQMode && (
-            <div className="shrink-0">
-              <ModeToggle
-                value={qMode}
-                onChange={onQModeChange}
-                labels={["Alle ord", "Minst ett"]}
-              />
+                  <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
+                  <span className="truncate">{s.title}</span>
+                </Link>
+              ))}
             </div>
           )}
-
-          {!hideCategory && (
-            <>
-              <Divider />
-
-              {/* Kategori */}
-              <Popover
-                open={catOpen}
-                onOpenChange={(o) => {
-                  setCatOpen(o);
-                  if (!o) setDrillParentId(null);
-                }}
-              >
-                <PopoverTrigger asChild>
-                  <BarButton active={hasCategory}>
-                    <span className="truncate">{label}</span>
-                    <ChevronDown className="size-4 opacity-60" />
-                  </BarButton>
-                </PopoverTrigger>
-                <PopoverContent
-                  align="start"
-                  className="max-h-[360px] w-[min(280px,calc(100vw-2rem))] overflow-y-auto p-1"
-                >
-                  {drillParent ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => setDrillParentId(null)}
-                        className="flex w-full items-center gap-1 rounded px-3 py-2 text-left text-xs text-muted-foreground hover:bg-muted"
-                      >
-                        <ChevronLeft className="size-3.5" /> Tilbake til hovedkategorier
-                      </button>
-                      <PopoverOption
-                        active={
-                          selectedSlugs.length === 1 + drillKids.length &&
-                          selectedSlugs.includes(drillParent.slug) &&
-                          drillKids.every((k) => selectedSlugs.includes(k.slug))
-                        }
-                        onClick={() => {
-                          onSelectedChange(selectAllForParent(drillParent, tree));
-                          setCatOpen(false);
-                          setDrillParentId(null);
-                        }}
-                      >
-                        <span className="font-medium">Alt i {drillParent.name_nb}</span>
-                      </PopoverOption>
-                      {drillKids.length === 0 ? (
-                        <p className="px-3 py-2 text-xs text-muted-foreground">
-                          Ingen underkategorier
-                        </p>
-                      ) : (
-                        drillKids.map((k) => (
-                          <PopoverOption
-                            key={k.id}
-                            active={selectedSlugs.length === 1 && selectedSlugs[0] === k.slug}
-                            onClick={() => {
-                              onSelectedChange([k.slug]);
-                              setCatOpen(false);
-                              setDrillParentId(null);
-                            }}
-                          >
-                            {k.name_nb}
-                          </PopoverOption>
-                        ))
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <PopoverOption
-                        active={!hasCategory}
-                        onClick={() => {
-                          onSelectedChange([]);
-                          setCatOpen(false);
-                        }}
-                      >
-                        Alle kategorier
-                      </PopoverOption>
-                      {tree.roots.map((c) => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => setDrillParentId(c.id)}
-                          className="flex w-full items-center justify-between gap-2 rounded px-3 py-2 text-left text-sm hover:bg-muted"
-                        >
-                          <span className="truncate">{c.name_nb}</span>
-                          <ChevronRight className="size-4 shrink-0 opacity-60" />
-                        </button>
-                      ))}
-                    </>
-                  )}
-                </PopoverContent>
-              </Popover>
-            </>
-          )}
         </div>
+
+        {showQMode && (
+          <div className="shrink-0">
+            <ModeToggle value={qMode} onChange={onQModeChange} labels={["Alle ord", "Minst ett"]} />
+          </div>
+        )}
+
+        {showMoreButton && (
+          <Popover open={moreOpen} onOpenChange={setMoreOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label="Flere søkevalg"
+                className={`relative flex size-9 shrink-0 items-center justify-center rounded-full transition ${
+                  moreCount > 0
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+              >
+                <ListPlus className="size-4" />
+                {moreCount > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white">
+                    {moreCount}
+                  </span>
+                )}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-96 space-y-4 p-4">
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-sm font-medium">Søkeordmodus</Label>
+                <ModeToggle
+                  value={qMode}
+                  onChange={onQModeChange}
+                  labels={["Alle ord", "Minst ett"]}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Flere søkelinjer</Label>
+                <TermGroupEditor groups={extraGroups ?? []} onChange={onExtraGroupsChange!} />
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
 
         <Button
           type="submit"
@@ -259,47 +196,5 @@ export function SearchBar({
         </p>
       )}
     </form>
-  );
-}
-
-function Divider() {
-  return <span aria-hidden className="h-6 w-px shrink-0 bg-border/70" />;
-}
-
-function BarButton({
-  children,
-  active,
-  disabled,
-  ...rest
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & { active?: boolean }) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      {...rest}
-      className={`flex max-w-[140px] shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 sm:max-w-[260px] ${
-        active ? "font-medium text-foreground" : "text-muted-foreground"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function PopoverOption({
-  children,
-  active,
-  ...rest
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & { active?: boolean }) {
-  return (
-    <button
-      type="button"
-      {...rest}
-      className={`block w-full rounded px-3 py-2 text-left text-sm hover:bg-muted ${
-        active ? "bg-muted font-medium" : ""
-      }`}
-    >
-      {children}
-    </button>
   );
 }

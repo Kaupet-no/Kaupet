@@ -23,7 +23,13 @@ test("søker fra forsiden og lander på annonser-siden med treff", async ({ page
   await expect(page.getByPlaceholder("Hva leter du etter?")).toHaveValue("sykkel");
   // Either real results or the explicit empty state — both prove the search
   // request round-tripped and the page rendered a result, not a crash.
+  // .first() because a 0-results response also renders "0 annonser" in the
+  // filter chips' "vis resultater" button alongside the empty state message —
+  // two elements match, but either one alone is proof enough here.
   await expect(
-    page.getByText(/\d+ annonser?/).or(page.getByText("Ingen annonser funnet")),
+    page
+      .getByText(/\d+ annonser?/)
+      .or(page.getByText("Ingen annonser funnet"))
+      .first(),
   ).toBeVisible({ timeout: 15_000 });
 });

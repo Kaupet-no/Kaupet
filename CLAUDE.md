@@ -3,3 +3,60 @@
 ## Commits
 
 - Ikke legg til `Co-Authored-By`-tagger i commit-meldinger.
+
+## Arkitektur
+
+Stack: TanStack Start (Vite + React) på Cloudflare Workers (via nitro/wrangler),
+Supabase (Postgres + RLS + Auth), Capacitor (iOS/Android-wrapper).
+
+`src/` er organisert feature-basert:
+
+- `routes/` — TanStack Router filbasert routing.
+- `features/<navn>/` — selvstendige featuremoduler (f.eks. `listing-creation`,
+  `listing-search`, `listing-edit`, `vehicle-360-capture`).
+- `components/` — delte UI-komponenter, inkl. `components/ui/` (Radix-baserte
+  primitiver, generert av shadcn — ikke lint-sjekket).
+- `lib/` — vertikal-agnostisk domenelogikk, valideringsregler, Supabase-hjelpere.
+- `integrations/supabase/` — klientoppsett.
+
+### Server/klient-grense
+
+Filnavn signaliserer kjøremiljø: `*.server.ts` og `*.functions.ts` kjører kun
+server-side (TanStack Start server functions) og kan trygt bruke
+`supabaseAdmin` (service-role, omgår RLS). Aldri importer disse fra
+klientkode — `no-restricted-imports`-regelen i `eslint.config.js` blokkerer
+`server-only`-pakken for å tvinge frem denne konvensjonen i stedet.
+
+### Vertikal-agnostisk kjerne vs. kjøretøy-spesifikk kode
+
+Kaupet startet med generisk annonselogikk og fikk siden en kjøretøy-vertikal
+(Bil og MC) lagt oppå. Filer som `src/lib/category-filters.ts`,
+`src/lib/category-behavior.ts`, `src/lib/listings.functions.ts` og
+kjerneflyten i `features/listing-creation/` er ment å forbli vertikal-
+agnostiske — kategori-spesifikk atferd skal uttrykkes via
+`CategoryBehavior` (`src/lib/category-behavior.ts`), ikke ved å importere
+`@/lib/vehicle/*` direkte eller strø `isVehicle`-boolske sjekker rundt i
+generisk kode. `eslint.config.js` håndhever dette med et `no-restricted-imports`-
+mønster for disse filene. Se commit `71fa7bd` for konkret eksempel på buggen
+denne typen drift forårsaket (leveringsvalidering som brøt for kjøretøy fordi
+en `isVehicle`-sjekk manglet ett sted).
+
+## Kjøretester og typecheck
+
+- `bun run test` — vitest (unit/komponent). `bun run test:coverage` kjører
+  samme med dekningsrapport og håndhevet minimumsterskel (se `vitest.config.ts`).
+- `bun run test:rls` — RLS-integrasjonstester. Krever en lokal Supabase-stack
+  (`supabase start`, forutsetter Docker) og miljøvariabler
+  (`LOCAL_SUPABASE_URL`, `LOCAL_SUPABASE_ANON_KEY`, `LOCAL_SUPABASE_SERVICE_ROLE_KEY`).
+  Kun `conversations`/`messages` har reell dekning per nå — resten av de ~45
+  RLS-aktiverte tabellene mangler tilsvarende tester.
+- `bun run test:e2e` — Playwright, kjører nå automatisk på PR mot `main`
+  (i tillegg til manuell `workflow_dispatch`), se `.github/workflows/ci.yml`.
+- `bunx tsc --noEmit` — typecheck, kjøres også som pre-push-hook (lefthook).
+- `bun run lint` — kjøres som pre-commit-hook på staged filer.
+
+## RLS-policyer
+
+Policyer bor i `supabase/migrations/`, én tabell kan ha policyer spredt over
+flere migrasjonsfiler kronologisk — søk etter `ALTER TABLE public.<tabell>`
+og `CREATE POLICY` for gjeldende tilstand, ikke bare siste migrasjon.

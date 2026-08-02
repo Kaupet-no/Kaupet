@@ -2,28 +2,38 @@ import { useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTriggerBare } from "@/components/ui/select";
 import { FilterChip } from "@/components/filter-chip";
 import { CategoryFilterFields } from "@/components/category-filter-fields";
+import { RangeFilterField } from "@/components/range-filter-field";
+import { CONDITIONS } from "@/components/advanced-search-value";
+import { PRICE_BOUNDS } from "@/lib/filter-range-bounds";
 import {
   useVehicleBrandOptions,
-  useVehicleModelOptions,
+  useVehicleModelOptionsForBrands,
 } from "@/features/listing-creation/modules/generic-attributes/vehicle-brand-model-fields";
-import { getAttributeChipState } from "@/lib/filter-chip-labels";
+import {
+  getAttributeChipState,
+  getPriceChipState,
+  getConditionChipState,
+} from "@/lib/filter-chip-labels";
 import { splitPrimaryFilters } from "@/lib/category-filters";
 import { hapticImpact } from "@/lib/haptics";
-import type {
-  AttributeFilterValue,
-  CategoryFilter,
-  VehicleBrandGroup,
+import {
+  SEARCH_MULTISELECT_KEYS,
+  type AttributeFilterValue,
+  type CategoryFilter,
+  type VehicleBrandGroup,
 } from "@/lib/category-filters";
 
 type Props = {
   /** Effective filters for the selected category/categories. Empty when no
-   * category is selected — the row then renders nothing. */
+   * category is selected — the row then renders nothing, unless Pris/Tilstand
+   * (below) are supplied, in which case those still show. */
   filters: CategoryFilter[];
   values: Record<string, AttributeFilterValue>;
   onChange: (key: string, value: AttributeFilterValue | undefined) => void;
@@ -32,7 +42,40 @@ type Props = {
   /** Current result count, shown on the native sheets' dismiss button the same
    * way NativeFilterChips does. */
   resultCount?: number;
+  /** The active free-text search box content — used to bring secondary
+   * filters whose label or options match a typed word to the top of "Se
+   * flere filter", so e.g. typing "sykkel" surfaces "Hjulstørrelse" instead
+   * of leaving it buried in a long, fixed admin-sorted list. Purely a
+   * same-session text match, no historical query data required. */
+  queryText?: string;
+  /** Pris/Tilstand — generic (non-category) search criteria that share this
+   * row on desktop so all visible criteria live in one component/line. Only
+   * wired up by desktop callers; native keeps these in NativeFilterChips. */
+  min?: number;
+  max?: number;
+  includeFree?: boolean;
+  onPriceChange?: (min: number | undefined, max: number | undefined, includeFree: boolean) => void;
+  conditions?: string[];
+  onConditionsChange?: (c: string[]) => void;
+  /** Hides the "Tilstand" chip — no listing under Bil og MC has that attribute. */
+  hideCondition?: boolean;
 };
+
+/** How many of a filter's typed-word matches count toward its relevance —
+ * only used to rank secondary filters, never to hide or filter them out. */
+function relevanceScore(filter: CategoryFilter, words: string[]): number {
+  if (words.length === 0) return 0;
+  const haystacks = [
+    filter.label_nb.toLowerCase(),
+    ...(filter.options ?? []).map((o) => o.label_nb.toLowerCase()),
+  ];
+  let score = 0;
+  for (const word of words) {
+    if (word.length < 2) continue;
+    if (haystacks.some((h) => h.includes(word))) score++;
+  }
+  return score;
+}
 
 /**
  * The category-dependent filter row on the search results page: the category's
@@ -47,13 +90,39 @@ export function AttributeFilterChips({
   onChange,
   isNative = false,
   resultCount,
+  queryText,
+  min,
+  max,
+  includeFree,
+  onPriceChange,
+  conditions,
+  onConditionsChange,
+  hideCondition = false,
 }: Props) {
   const [openKey, setOpenKey] = useState<string | null>(null);
+  const [priceConditionOpen, setPriceConditionOpen] = useState<"price" | "condition" | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
 
-  if (filters.length === 0) return null;
+  // Desktop callers wire up Pris/Tilstand here so all visible search criteria
+  // live in one row/component; native keeps them in NativeFilterChips.
+  const showPriceCondition = !isNative && onPriceChange != null;
 
-  const { primary, secondary } = splitPrimaryFilters(filters);
+  if (filters.length === 0 && !showPriceCondition) return null;
+
+  const { primary, secondaryRaw } = (() => {
+    const split = splitPrimaryFilters(filters);
+    return { primary: split.primary, secondaryRaw: split.secondary };
+  })();
+  // Same-session relevance boost: filters matching a typed word float to the
+  // top, so a search-in-progress makes "Se flere filter" feel search-aware
+  // rather than a fixed, admin-only-curated list — see relevanceScore above.
+  const queryWords = (queryText ?? "").trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const secondary =
+    queryWords.length === 0
+      ? secondaryRaw
+      : [...secondaryRaw].sort(
+          (a, b) => relevanceScore(b, queryWords) - relevanceScore(a, queryWords),
+        );
   const secondaryCount = secondary.filter((f) => values[f.key] !== undefined).length;
 
   const openField = (key: string | null) => {
@@ -93,6 +162,51 @@ export function AttributeFilterChips({
     const { label, active } = getAttributeChipState(f, values[f.key]);
     const current = values[f.key];
 
+    // Merke (brand) always opens into a surface (ComboboxField, via fieldFor)
+    // rather than the closed SelectChip dropdown below — see the matching
+    // special-case in category-filter-fields.tsx for why.
+    if (f.key === "brand" && (f.type === "text" || f.type === "select")) {
+      const chip = (
+        <FilterChip
+          label={label}
+          active={active}
+          onClick={isNative ? () => openField(f.key) : undefined}
+        />
+      );
+      if (isNative) return <span key={f.id}>{chip}</span>;
+      return (
+        <Popover
+          key={f.id}
+          open={openKey === f.key}
+          onOpenChange={(o) => openField(o ? f.key : null)}
+        >
+          <PopoverTrigger asChild>{chip}</PopoverTrigger>
+          <PopoverContent align="start" className="w-80 p-3">
+            {fieldFor(f)}
+          </PopoverContent>
+        </Popover>
+      );
+    }
+
+    // Karosseri/Farge/Drivstoff: a listing has one value, but a buyer
+    // narrowing search should be able to check several allowed values —
+    // see SEARCH_MULTISELECT_KEYS.
+    if (f.type === "select" && SEARCH_MULTISELECT_KEYS.includes(f.key)) {
+      const selected = current?.kind === "multiselect" ? current.values : [];
+      return (
+        <AttributeMultiChip
+          key={f.id}
+          filter={f}
+          label={label}
+          active={active}
+          values={selected}
+          onChange={(vals) =>
+            onChange(f.key, vals.length > 0 ? { kind: "multiselect", values: vals } : undefined)
+          }
+        />
+      );
+    }
+
     // Single-choice fields put their own menu/toggle on the chip: wrapping them
     // in a popover would cost a second tap to reach the only control inside it.
     if (f.type === "select") {
@@ -109,28 +223,38 @@ export function AttributeFilterChips({
       );
     }
     if (f.type === "brand_select") {
+      const selected = current?.kind === "multiselect" ? current.values : [];
       return (
-        <BrandChip
+        <BrandMultiChip
           key={f.id}
           filter={f}
           label={label}
           active={active}
-          value={current?.kind === "select" ? current.value : undefined}
-          onChange={(v) => onChange(f.key, v ? { kind: "select", value: v } : undefined)}
+          values={selected}
+          onChange={(vals) =>
+            onChange(f.key, vals.length > 0 ? { kind: "multiselect", values: vals } : undefined)
+          }
         />
       );
     }
     if (f.type === "model_select") {
+      const brandFilter = filters.find((bf) => bf.type === "brand_select");
+      const brandValues =
+        brandFilter && values[brandFilter.key]?.kind === "multiselect"
+          ? (values[brandFilter.key] as { kind: "multiselect"; values: string[] }).values
+          : [];
+      const selected = current?.kind === "multiselect" ? current.values : [];
       return (
-        <ModelChip
+        <ModelMultiChip
           key={f.id}
-          filter={f}
-          allFilters={filters}
-          values={values}
+          brandFilter={brandFilter}
+          brandValues={brandValues}
           label={label}
           active={active}
-          value={current?.kind === "select" ? current.value : undefined}
-          onChange={(v) => onChange(f.key, v ? { kind: "select", value: v } : undefined)}
+          values={selected}
+          onChange={(vals) =>
+            onChange(f.key, vals.length > 0 ? { kind: "multiselect", values: vals } : undefined)
+          }
         />
       );
     }
@@ -174,6 +298,76 @@ export function AttributeFilterChips({
     );
   });
 
+  const { label: priceLabel, active: priceActive } = getPriceChipState(
+    min,
+    max,
+    includeFree ?? true,
+  );
+  const { label: condLabel, active: condActive } = getConditionChipState(conditions ?? []);
+
+  const priceChip = showPriceCondition && (
+    <Popover
+      open={priceConditionOpen === "price"}
+      onOpenChange={(o) => setPriceConditionOpen(o ? "price" : null)}
+    >
+      <PopoverTrigger asChild>
+        <FilterChip
+          label={priceLabel}
+          active={priceActive}
+          icon={<span className="text-[11px] font-bold">kr</span>}
+        />
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-72 p-3">
+        <PricePopoverContent
+          min={min}
+          max={max}
+          includeFree={includeFree ?? true}
+          onApply={(mn, mx, free) => {
+            onPriceChange?.(mn, mx, free);
+            setPriceConditionOpen(null);
+          }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+
+  const conditionChip = showPriceCondition && !hideCondition && (
+    <Popover
+      open={priceConditionOpen === "condition"}
+      onOpenChange={(o) => setPriceConditionOpen(o ? "condition" : null)}
+    >
+      <PopoverTrigger asChild>
+        <FilterChip
+          label={condLabel}
+          active={condActive}
+          icon={<span className="text-[11px]">✦</span>}
+        />
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64 p-2">
+        <div className="flex flex-col gap-1">
+          {CONDITIONS.map((c) => (
+            <label
+              key={c.value}
+              className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted"
+            >
+              <Checkbox
+                checked={(conditions ?? []).includes(c.value)}
+                onCheckedChange={(checked) =>
+                  onConditionsChange?.(
+                    checked
+                      ? [...(conditions ?? []), c.value]
+                      : (conditions ?? []).filter((v) => v !== c.value),
+                  )
+                }
+              />
+              <span>{c.label}</span>
+            </label>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+
   const moreButton = secondary.length > 0 && (
     <Button
       type="button"
@@ -207,14 +401,15 @@ export function AttributeFilterChips({
     </div>
   );
 
-  return (
-    <div
-      className={
-        isNative
-          ? "flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          : "flex flex-wrap items-center gap-2"
-      }
-    >
+  // Native keeps its own horizontally-scrolling row — merging it with
+  // NativeFilterChips' row would just make one wider scroll strip, with no
+  // benefit on the narrow viewports it targets. Desktop instead returns a
+  // fragment: the caller wraps it together with DesktopFilterChips in one
+  // shared flex-wrap row, so Pris/Tilstand and Merke/Modell can share a line.
+  const body = (
+    <>
+      {priceChip}
+      {conditionChip}
       {chips}
       {moreButton}
 
@@ -255,6 +450,48 @@ export function AttributeFilterChips({
             </DialogContent>
           </Dialog>
         ))}
+    </>
+  );
+
+  if (isNative) {
+    return (
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {body}
+      </div>
+    );
+  }
+  return body;
+}
+
+function PricePopoverContent({
+  min,
+  max,
+  includeFree,
+  onApply,
+}: {
+  min?: number;
+  max?: number;
+  includeFree: boolean;
+  onApply: (min: number | undefined, max: number | undefined, includeFree: boolean) => void;
+}) {
+  const [draft, setDraft] = useState<{ min?: number; max?: number }>({ min, max });
+  const [freeDraft, setFreeDraft] = useState(includeFree);
+
+  return (
+    <div className="space-y-3">
+      <RangeFilterField label="Pris" bounds={PRICE_BOUNDS} value={draft} onChange={setDraft} />
+      <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+        <Checkbox checked={freeDraft} onCheckedChange={(c) => setFreeDraft(c === true)} />
+        Inkluder gratis-annonser
+      </label>
+      <Button
+        type="button"
+        size="sm"
+        className="w-full"
+        onClick={() => onApply(draft.min, draft.max, freeDraft)}
+      >
+        Bruk prisfilter
+      </Button>
     </div>
   );
 }
@@ -262,6 +499,9 @@ export function AttributeFilterChips({
 /** Filter types whose control doesn't fit on the chip itself and so need a
  * popover/sheet to open into. */
 function needsSurface(filter: CategoryFilter): boolean {
+  // Merke (brand) always needs a surface (ComboboxField) even when its type
+  // is "select" — see the matching special-case in the chips map above.
+  if (filter.key === "brand") return filter.type === "text" || filter.type === "select";
   return !["select", "brand_select", "model_select", "boolean"].includes(filter.type);
 }
 
@@ -311,66 +551,152 @@ function SelectChip({
   );
 }
 
-function BrandChip({
-  filter,
-  label,
-  active,
-  value,
-  onChange,
+/** Shared checkbox-list popover body for the Merke/Modell multiselect chips
+ * below — picking one option never closes the popover, since checking one
+ * brand/model is exactly when a user is most likely to want to check
+ * another (that's the whole point of the breadcrumb "broaden the search"
+ * behavior this exists for). */
+function MultiSelectPopoverBody({
+  options,
+  values,
+  onToggle,
+  emptyMessage,
 }: {
-  filter: CategoryFilter;
-  label: string;
-  active: boolean;
-  value: string | undefined;
-  onChange: (value: string | undefined) => void;
+  options: { value: string; label: string }[];
+  values: string[];
+  onToggle: (value: string) => void;
+  emptyMessage?: string;
 }) {
-  const options = useVehicleBrandOptions((filter.unit ?? "bil") as VehicleBrandGroup, value);
+  if (options.length === 0 && emptyMessage) {
+    return <p className="p-2 text-sm text-muted-foreground">{emptyMessage}</p>;
+  }
   return (
-    <SelectChip
-      label={label}
-      active={active}
-      options={options}
-      value={value}
-      placeholder={filter.label_nb}
-      onChange={onChange}
-    />
+    <div className="flex max-h-80 flex-col gap-0.5 overflow-y-auto">
+      {options.map((o) => (
+        <label
+          key={o.value}
+          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted"
+        >
+          <Checkbox checked={values.includes(o.value)} onCheckedChange={() => onToggle(o.value)} />
+          <span>{o.label}</span>
+        </label>
+      ))}
+    </div>
   );
 }
 
-function ModelChip({
+/** Karosseri/Farge/Drivstoff as a checkbox list rather than a single-pick
+ * dropdown — see SEARCH_MULTISELECT_KEYS for why these `type: "select"`
+ * filters get a multi-value chip in search despite each listing only
+ * carrying one value. */
+function AttributeMultiChip({
   filter,
-  allFilters,
-  values,
   label,
   active,
-  value,
+  values,
   onChange,
 }: {
   filter: CategoryFilter;
-  allFilters: CategoryFilter[];
-  values: Record<string, AttributeFilterValue>;
   label: string;
   active: boolean;
-  value: string | undefined;
-  onChange: (value: string | undefined) => void;
+  values: string[];
+  onChange: (values: string[]) => void;
 }) {
-  const brandFilter = allFilters.find((f) => f.type === "brand_select");
-  const brandValue = brandFilter ? values[brandFilter.key] : undefined;
-  const brandName = brandValue?.kind === "select" ? brandValue.value : undefined;
-  const { options, brandKnown } = useVehicleModelOptions(
-    (brandFilter?.unit ?? "bil") as VehicleBrandGroup,
-    brandName,
-    value,
-  );
+  const options = (filter.options ?? []).map((o) => ({ value: o.value, label: o.label_nb }));
+  const toggle = (v: string) => {
+    onChange(values.includes(v) ? values.filter((x) => x !== v) : [...values, v]);
+  };
   return (
-    <SelectChip
-      label={brandKnown ? label : "Velg merke først"}
-      active={active}
-      options={options}
-      value={value}
-      placeholder={filter.label_nb}
-      disabled={!brandKnown}
-      onChange={onChange}
-    />
+    <Popover>
+      <PopoverTrigger asChild>
+        <FilterChip label={label} active={active} />
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64 p-2">
+        <MultiSelectPopoverBody options={options} values={values} onToggle={toggle} />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/** Merke as a checkbox list rather than a single-pick dropdown — landing
+ * here via a breadcrumb click (see category-behavior.ts) pre-checks one
+ * brand but leaves every other brand checkable, broadening the search
+ * instead of narrowing it to a single fixed value. */
+function BrandMultiChip({
+  filter,
+  label,
+  active,
+  values,
+  onChange,
+}: {
+  filter: CategoryFilter;
+  label: string;
+  active: boolean;
+  values: string[];
+  onChange: (values: string[]) => void;
+}) {
+  const options = useVehicleBrandOptions((filter.unit ?? "bil") as VehicleBrandGroup, undefined);
+  const toggle = (v: string) => {
+    onChange(values.includes(v) ? values.filter((x) => x !== v) : [...values, v]);
+  };
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <FilterChip label={label} active={active} />
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64 p-2">
+        <MultiSelectPopoverBody options={options} values={values} onToggle={toggle} />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/** Modell as a checkbox list, sourced from every currently-selected brand at
+ * once (not just one) — checking a second brand in BrandMultiChip
+ * immediately adds that brand's models here too. */
+function ModelMultiChip({
+  brandFilter,
+  brandValues,
+  label,
+  active,
+  values,
+  onChange,
+}: {
+  brandFilter: CategoryFilter | undefined;
+  brandValues: string[];
+  label: string;
+  active: boolean;
+  values: string[];
+  onChange: (values: string[]) => void;
+}) {
+  const options = useVehicleModelOptionsForBrands(
+    (brandFilter?.unit ?? "bil") as VehicleBrandGroup,
+    brandValues,
+    values,
+  );
+  const brandKnown = brandValues.length > 0;
+  const toggle = (v: string) => {
+    onChange(values.includes(v) ? values.filter((x) => x !== v) : [...values, v]);
+  };
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <FilterChip
+          label={brandKnown ? label : "Velg merke først"}
+          active={active}
+          disabled={!brandKnown}
+        />
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-72 p-2">
+        <MultiSelectPopoverBody
+          options={options}
+          values={values}
+          onToggle={toggle}
+          emptyMessage={
+            brandKnown ? "Ingen modeller funnet." : "Velg minst ett merke for å se modeller."
+          }
+        />
+      </PopoverContent>
+    </Popover>
   );
 }

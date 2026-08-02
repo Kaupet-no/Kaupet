@@ -588,7 +588,13 @@ function ListingDetailPage() {
   const breadcrumb = (() => {
     if (!category || !allCategories) return undefined;
     const categoryChain = breadcrumbPath(category as Category, buildTree(allCategories));
-    const rootCategorySlug = categoryChain[0]?.slug ?? null;
+    // The listing's own (leaf) category, not the top-level root — brand/model
+    // (and the generic "brand" attribute) are defined as category_filters on
+    // the specific category (e.g. "Bil", not "Bil og MC"), so linking to the
+    // root would land on a search scope where those filter chips don't exist
+    // at all, silently dropping the very checkboxes this breadcrumb exists to
+    // offer.
+    const rootCategorySlug = categoryChain[categoryChain.length - 1]?.slug ?? null;
     return [
       ...categoryChain.map((c) => ({
         name_nb: c.name_nb,

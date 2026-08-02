@@ -7,6 +7,10 @@ export type RangeBounds = {
   step: number;
   /** Unit suffix shown next to the thumb values, e.g. "kr" or "km". */
   unit?: string;
+  /** Skips the nb-NO thousands-grouping in the displayed value — for a year,
+   * "2026" is a label, not a quantity, so "2 026" would read as wrong rather
+   * than as a formatted number. */
+  noGrouping?: boolean;
 };
 
 /** Price is not a category_filter — it's a first-class listing column — so its
@@ -18,8 +22,7 @@ export const PRICE_BOUNDS: RangeBounds = { min: 0, max: 1_000_000, step: 1000, u
  * ramp would be useless (a year slider starting at 0, a mileage slider
  * stepping by 1 km). Keys match category_filters.key. */
 const BOUNDS_BY_KEY: Record<string, Omit<RangeBounds, "unit">> = {
-  year: { min: 1950, max: currentYear(), step: 1 },
-  first_registration_year: { min: 1950, max: currentYear(), step: 1 },
+  year: { min: 1950, max: currentYear(), step: 1, noGrouping: true },
   mileage_km: { min: 0, max: 500_000, step: 1000 },
   hestekrefter: { min: 0, max: 1000, step: 5 },
   effekt_hk: { min: 0, max: 1000, step: 5 },
@@ -57,8 +60,9 @@ export function clampToBounds(value: number, bounds: RangeBounds): number {
   return Math.min(Math.max(value, bounds.min), bounds.max);
 }
 
-/** "120 000 km" / "2018" — space-grouped nb-NO digits plus the unit. */
-export function formatRangeValue(value: number, unit?: string): string {
-  const digits = value.toLocaleString("nb-NO");
+/** "120 000 km" / "2018" — space-grouped nb-NO digits plus the unit, unless
+ * `noGrouping` (e.g. a year) asks for the plain digits instead. */
+export function formatRangeValue(value: number, unit?: string, noGrouping?: boolean): string {
+  const digits = noGrouping ? String(value) : value.toLocaleString("nb-NO");
   return unit ? `${digits} ${unit}` : digits;
 }

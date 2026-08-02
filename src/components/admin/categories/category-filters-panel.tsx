@@ -32,12 +32,15 @@ import {
   type FilterType,
 } from "@/lib/category-filters";
 import { SortableFilterRow } from "./sortable-filter-row";
+import { FilterSynonymsDialog } from "./filter-synonyms-dialog";
+import { SuggestValuesButton } from "./suggest-values-button";
 import { FILTER_TYPES, filterKeyify, type Category, type EditableFilter } from "./shared";
 
 export function CategoryFiltersPanel({ category }: { category: Category }) {
   const qc = useQueryClient();
   const [draft, setDraft] = useState<EditableFilter | null>(null);
   const [keyTouched, setKeyTouched] = useState(false);
+  const [synonymsFilter, setSynonymsFilter] = useState<CategoryFilter | null>(null);
 
   const {
     data: filters,
@@ -207,6 +210,7 @@ export function CategoryFiltersPanel({ category }: { category: Category }) {
                       }
                       onEdit={() => startEdit(f)}
                       onDelete={() => remove.mutate(f.id)}
+                      onEditSynonyms={() => setSynonymsFilter(f)}
                     />
                   ))}
                 </ul>
@@ -296,6 +300,27 @@ export function CategoryFiltersPanel({ category }: { category: Category }) {
             />
             Vis alltid (av = under «Flere valg»)
           </label>
+          {(draft.type === "text" || usesOptions) && draft.key.trim() && (
+            <SuggestValuesButton
+              categoryId={category.id}
+              filterKey={draft.key.trim()}
+              onApply={(suggested) =>
+                setDraft((d) => {
+                  if (!d) return d;
+                  const existingValues = new Set(d.options.map((o) => o.value));
+                  const merged = [
+                    ...d.options.filter((o) => o.value.trim() || o.label_nb.trim()),
+                    ...suggested.filter((o) => !existingValues.has(o.value)),
+                  ];
+                  return {
+                    ...d,
+                    type: d.type === "text" ? "select" : d.type,
+                    options: merged.length > 0 ? merged : [{ value: "", label_nb: "" }],
+                  };
+                })
+              }
+            />
+          )}
           {usesOptions && (
             <div className="space-y-2">
               <Label>Valg</Label>
@@ -371,6 +396,14 @@ export function CategoryFiltersPanel({ category }: { category: Category }) {
         <Button type="button" variant="outline" onClick={startNew}>
           <Plus className="size-4" /> Nytt filter
         </Button>
+      )}
+
+      {synonymsFilter && (
+        <FilterSynonymsDialog
+          filter={synonymsFilter}
+          open={!!synonymsFilter}
+          onOpenChange={(open) => !open && setSynonymsFilter(null)}
+        />
       )}
     </>
   );

@@ -66,6 +66,49 @@ export function useVehicleModelOptions(
 }
 
 /**
+ * Model options across every brand in `brandNames` at once — used by the
+ * search-side Merke/Modell multiselect chips (attribute-filter-chips.tsx),
+ * where several brands can be checked simultaneously and the model list
+ * should cover all of them, unlike the listing-creation form's single-brand
+ * `useVehicleModelOptions` above (a listing only ever has one brand).
+ */
+export function useVehicleModelOptionsForBrands(
+  categoryGroup: VehicleBrandGroup,
+  brandNames: string[],
+  /** Currently-checked model values — included even if missing from the
+   * reference table (e.g. a just-imported, not-yet-approved model, same
+   * reasoning as useVehicleModelOptions above), so a model landed on via a
+   * breadcrumb click still shows up checked instead of silently vanishing
+   * from the list it should be pre-selected in. */
+  selectedValues: string[] = [],
+): VehicleOption[] {
+  const { data: allBrands } = useAllVehicleBrands();
+  const { data: allModels } = useAllVehicleModels();
+
+  return useMemo(() => {
+    const brandIdToName = new Map(
+      (allBrands ?? [])
+        .filter((b) => b.category_group === categoryGroup && brandNames.includes(b.name))
+        .map((b) => [b.id, b.name]),
+    );
+    if (brandIdToName.size === 0) return [];
+    const models = (allModels ?? []).filter((m) => brandIdToName.has(m.brand_id));
+    // Grouped by brand when more than one is selected, so the checkbox list
+    // doesn't read as one undifferentiated pile of models.
+    const multiBrand = brandIdToName.size > 1;
+    const options = models.map((m) => {
+      const brandName = brandIdToName.get(m.brand_id)!;
+      return { value: m.name, label: multiBrand ? `${m.name} (${brandName})` : m.name };
+    });
+    const known = new Set(options.map((o) => o.value));
+    for (const v of selectedValues) {
+      if (!known.has(v)) options.unshift({ value: v, label: `${v} (venter godkjenning)` });
+    }
+    return options;
+  }, [allBrands, allModels, categoryGroup, brandNames, selectedValues]);
+}
+
+/**
  * Koblede merke/modell-nedtrekksmenyer: et merke har mange modeller, en
  * modell har ett merke. Ingen fritekst — bruker kan kun velge fra
  * predefinerte verdier (nye verdier legges kun til via Statens

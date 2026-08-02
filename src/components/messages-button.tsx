@@ -58,7 +58,7 @@ async function fetchConversationPreviews(userId: string): Promise<ConvPreview[]>
     seller?: RawProfile | RawProfile[] | null;
   };
 
-  let rows: RawConv[] = [];
+  let rows: RawConv[];
 
   if (error) {
     // Fallback: fetch profiles separately

@@ -1,4 +1,4 @@
-import { Expand, LayoutList, LayoutGrid, Map as MapIcon, SearchX } from "lucide-react";
+import { ArrowUpDown, Expand, LayoutList, LayoutGrid, Map as MapIcon, SearchX } from "lucide-react";
 import { lazy, type ReactNode, Suspense, useEffect, useRef, useState } from "react";
 
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Dialog,
   DialogContent,
@@ -17,6 +18,9 @@ import type { MapListing } from "@/components/listings-map";
 import { FeaturedListingsSection } from "@/components/featured-listings-section";
 import { reverseGeocode } from "@/lib/geocode";
 import { hapticImpact } from "@/lib/haptics";
+import { getAttributeChipState, getSortChipState } from "@/lib/filter-chip-labels";
+import { SORT_OPTIONS, type SortValue } from "@/lib/categories";
+import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
 
 const ListingsMap = lazy(() =>
   import("@/components/listings-map").then((m) => ({ default: m.ListingsMap })),
@@ -35,12 +39,26 @@ type Props = {
   fetchNextPage: () => void;
   resetFilters: () => void;
   onClearCategoryFilter?: () => void;
+  /** Re-search with the last word of `q` dropped — offered on zero results
+   * for a multi-word query, since the last word is often the culprit. */
+  onDropLastWord?: (nextQ: string) => void;
+  /** Active category-attribute filters — used on zero results to suggest
+   * dropping the most restrictive one first (attribute/location filters are
+   * a more likely culprit than free-text terms, which already fall back to
+   * trigram matching). */
+  attrFilters?: CategoryFilter[];
+  attrValues?: Record<string, AttributeFilterValue>;
+  onRemoveAttr?: (key: string) => void;
   mapListings: MapListing[];
   mapCenter: { lat: number; lng: number } | null;
   radiusKm: number;
   onMapCenterChange: (c: { lat: number; lng: number }, label: string | null) => void;
   onMapRadiusChange?: (km: number) => void;
   onMapClearLocation?: () => void;
+  /** Sorting is a view setting, not a search criterion, so it lives here next
+   * to "Skjul kart"/"Lagre søk" instead of in the filter-chip row. */
+  sort: SortValue;
+  onSortChange: (v: SortValue) => void;
   /** Extra toolbar actions (e.g. "Lagre søk") — annonser-specific, so left to the caller. */
   toolbarExtra?: ReactNode;
 };
@@ -63,14 +81,32 @@ export function ResultList({
   fetchNextPage,
   resetFilters,
   onClearCategoryFilter,
+  onDropLastWord,
+  attrFilters = [],
+  attrValues = {},
+  onRemoveAttr,
   mapListings,
   mapCenter,
   radiusKm,
   onMapCenterChange,
   onMapRadiusChange,
   onMapClearLocation,
+  sort,
+  onSortChange,
   toolbarExtra,
 }: Props) {
+  const [sortOpen, setSortOpen] = useState(false);
+  const { label: sortLabel } = getSortChipState(sort);
+  const qWords = q.trim().split(/\s+/).filter(Boolean);
+  const lastWord = qWords.length > 1 ? qWords[qWords.length - 1] : null;
+  // Most restrictive active attribute filter, offered as the first recovery
+  // action on zero results — structured filters narrow the result set harder
+  // than a free-text term, which already tolerates typos via trigram fallback.
+  const [mostRestrictiveAttrKey] = Object.keys(attrValues);
+  const mostRestrictiveAttrFilter = attrFilters.find((f) => f.key === mostRestrictiveAttrKey);
+  const mostRestrictiveAttrLabel = mostRestrictiveAttrFilter
+    ? getAttributeChipState(mostRestrictiveAttrFilter, attrValues[mostRestrictiveAttrKey]).label
+    : null;
   const [mounted, setMounted] = useState(false);
   const [mobileMapOpen, setMobileMapOpen] = useState(false);
   const [bigMapOpen, setBigMapOpen] = useState(false);
@@ -89,7 +125,7 @@ export function ResultList({
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
-    if (!isNative || !sentinelRef.current) return;
+    if (!sentinelRef.current) return;
     const el = sentinelRef.current;
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -101,7 +137,7 @@ export function ResultList({
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [isNative, hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const renderMap = () =>
     mounted ? (
@@ -163,6 +199,30 @@ export function ResultList({
           )}
         </div>
         <div className="flex items-center gap-2">
+          <Popover open={sortOpen} onOpenChange={setSortOpen}>
+            <PopoverTrigger asChild>
+              <Button type="button" variant="outline" size="sm" className="gap-1.5">
+                <ArrowUpDown className="size-4" /> {sortLabel}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-56 p-1">
+              {SORT_OPTIONS.map((s) => (
+                <button
+                  key={s.value}
+                  type="button"
+                  onClick={() => {
+                    onSortChange(s.value);
+                    setSortOpen(false);
+                  }}
+                  className={`block w-full rounded px-3 py-2 text-left text-sm hover:bg-muted ${
+                    sort === s.value ? "bg-muted font-medium" : ""
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </PopoverContent>
+          </Popover>
           {!isDesktop && !isNative && (
             <Sheet open={mobileMapOpen} onOpenChange={setMobileMapOpen}>
               <SheetTrigger asChild>
@@ -233,9 +293,27 @@ export function ResultList({
               }
               action={
                 <>
+                  {mostRestrictiveAttrFilter && mostRestrictiveAttrLabel && onRemoveAttr && (
+                    <Button variant="outline" onClick={() => onRemoveAttr(mostRestrictiveAttrKey)}>
+                      Fjern «{mostRestrictiveAttrLabel}»
+                    </Button>
+                  )}
                   {effectiveCategories.length > 0 && onClearCategoryFilter && (
                     <Button variant="outline" onClick={onClearCategoryFilter}>
                       Fjern kategorifilter
+                    </Button>
+                  )}
+                  {lastWord && onDropLastWord && (
+                    <Button
+                      variant="outline"
+                      onClick={() => onDropLastWord(qWords.slice(0, -1).join(" "))}
+                    >
+                      Prøv uten «{lastWord}»
+                    </Button>
+                  )}
+                  {mapCenter && onMapClearLocation && (
+                    <Button variant="outline" onClick={onMapClearLocation}>
+                      Vis resultater i hele Norge
                     </Button>
                   )}
                   <Button variant="outline" onClick={resetFilters}>
@@ -264,20 +342,8 @@ export function ResultList({
               ))}
             </div>
           )}
-          {/* Last inn flere (web) / Infinite scroll sentinel (native) */}
-          {!isLoading &&
-            hasNextPage &&
-            (isNative ? (
-              <div ref={sentinelRef} className="h-4" />
-            ) : (
-              !isFetchingNextPage && (
-                <div className="mt-6 flex justify-center">
-                  <Button variant="outline" onClick={() => void fetchNextPage()}>
-                    Last inn flere annonser
-                  </Button>
-                </div>
-              )
-            ))}
+          {/* Infinite scroll sentinel — same pattern on web and native. */}
+          {!isLoading && hasNextPage && <div ref={sentinelRef} className="h-4" />}
           {isFetchingNextPage && (
             <div className="mt-6 flex justify-center">
               <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />

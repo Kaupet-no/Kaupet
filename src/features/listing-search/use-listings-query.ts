@@ -2,16 +2,31 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import type { Category } from "@/lib/categories";
 import { applyAttributeFilters } from "@/lib/category-filters";
 import {
   decodeAttrFilters,
-  rowContainsTerm,
   searchSchema,
   type ListingsPage,
 } from "@/features/listing-search/search-schema";
 
 const PAGE_SIZE = 20;
+
+type SelectedListingRow = {
+  id: string;
+  kaupet_code: string;
+  title: string;
+  subtitle: string | null;
+  price_nok: number | null;
+  is_free: boolean;
+  city: string | null;
+  display_lat: number | null;
+  display_lng: number | null;
+  created_at: string;
+  listing_images: { storage_path: string; sort_order: number }[] | null;
+  attributes: Json;
+};
 
 type SearchParams = z.infer<typeof searchSchema>;
 
@@ -25,9 +40,10 @@ type UseListingsQueryArgs = {
 
 /**
  * Encapsulates the /annonser listings search: the infinite-scroll Supabase
- * query, include/exclude term-group filtering, category/price/condition
- * filters, and the client-side exclusion pass for "exclude if ALL words
- * present" (which PostgREST can't express directly).
+ * query, category/price/condition filters, and — when there's a text query
+ * or extra search lines — the `search_listing_ids` RPC, which resolves
+ * matching ids and relevance rank against `listings.search_vector` (a
+ * Postgres full-text index) instead of ILIKE scans.
  */
 export function useListingsQuery({
   search,
@@ -48,58 +64,60 @@ export function useListingsQuery({
       const includeGroups = [
         { mode: search.qMode ?? "all", terms },
         ...extraGroups.filter((g) => !g.exclude),
-      ];
-      const excludeAnyGroups = extraGroups.filter((g) => g.exclude && g.mode === "any");
-      const excludeAllGroups = extraGroups.filter((g) => g.exclude && g.mode === "all");
-      // "exclude if ALL words present" needs a row-level AND-then-negate that
-      // PostgREST/supabase-js can't express via chained filters, so it's
-      // applied client-side below — fetch a larger buffer to compensate for
-      // rows trimmed after that pass.
-      const needsClientExclude = excludeAllGroups.length > 0;
+      ].filter((g) => g.terms.length > 0);
+      const excludeAnyTerms = extraGroups
+        .filter((g) => g.exclude && g.mode === "any")
+        .flatMap((g) => g.terms);
+      const excludeAllGroups = extraGroups
+        .filter((g) => g.exclude && g.mode === "all")
+        .map((g) => g.terms)
+        .filter((terms) => terms.length > 0);
+      const hasSearch =
+        includeGroups.length > 0 || excludeAnyTerms.length > 0 || excludeAllGroups.length > 0;
       const emptyPage: ListingsPage = { rows: [], totalCount: 0, nextOffset: null };
+
+      // Aggregated, fire-and-forget logging of the free-text query and its
+      // result count — only for the first page of a real text search, so
+      // future tuning (trigram threshold, synonyms) has data to work from.
+      const rawQuery = (search.q ?? "").trim();
+      const logSearch = (resultCount: number) => {
+        if (pageParam === 0 && rawQuery) {
+          void supabase.rpc("log_search_query", { _query: rawQuery, _result_count: resultCount });
+        }
+      };
+
+      // Rank of matching ids, keyed by id — used to sort by relevance and to
+      // constrain the main query to matching rows. Resolved server-side via
+      // the listings.search_vector GIN index instead of ILIKE scans.
+      let searchRank: Map<string, number> | null = null;
+      if (hasSearch) {
+        const { data: matches, error: searchError } = await supabase.rpc("search_listing_ids", {
+          include_groups: includeGroups,
+          exclude_any_terms: excludeAnyTerms.length > 0 ? excludeAnyTerms : null,
+          exclude_all_groups: excludeAllGroups,
+        });
+        if (searchError) throw searchError;
+        if (!matches || matches.length === 0) {
+          logSearch(0);
+          return emptyPage;
+        }
+        searchRank = new Map(matches.map((m) => [m.id, m.rank]));
+      }
 
       let qb = supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, subtitle, description, price_nok, is_free, city, display_lat, display_lng, created_at, listing_images(storage_path, sort_order)",
-          // Total antall treff hentes bare på første side; klient-ekskludering
-          // filtrerer etterpå, så der finnes ikke noe presist servertall.
-          { count: pageParam === 0 && !needsClientExclude ? "exact" : undefined },
+          "id, kaupet_code, title, subtitle, description, price_nok, is_free, city, display_lat, display_lng, created_at, listing_images(storage_path, sort_order), attributes",
+          { count: pageParam === 0 ? "exact" : undefined },
         )
         .eq("status", "active");
+
+      if (searchRank) qb = qb.in("id", Array.from(searchRank.keys()));
 
       if (search.lat != null && search.lng != null) {
         const ids = radiusIds ?? [];
         if (ids.length === 0) return emptyPage;
         qb = qb.in("id", ids);
-      }
-
-      // Include groups: AND between groups (each chained .or() call is ANDed
-      // by PostgREST), OR within a group's own words ("any") or AND of
-      // per-word .or() calls within a group ("all").
-      for (const g of includeGroups) {
-        if (g.terms.length === 0) continue;
-        if (g.mode === "all") {
-          for (const term of g.terms) {
-            const p = `%${term}%`;
-            qb = qb.or(`title.ilike.${p},description.ilike.${p},city.ilike.${p}`);
-          }
-        } else {
-          const parts = g.terms.flatMap((t: string) => {
-            const p = `%${t}%`;
-            return [`title.ilike.${p}`, `description.ilike.${p}`, `city.ilike.${p}`];
-          });
-          qb = qb.or(parts.join(","));
-        }
-      }
-
-      // Exclude groups (mode "any"): exclude rows where any word matches any
-      // field — AND of NOT-ilike per (word × field), chainable directly.
-      for (const g of excludeAnyGroups) {
-        for (const term of g.terms) {
-          const p = `%${term}%`;
-          qb = qb.not("title", "ilike", p).not("description", "ilike", p).not("city", "ilike", p);
-        }
       }
 
       // Categories — single selection; if a parent is chosen, include all children
@@ -146,23 +164,10 @@ export function useListingsQuery({
         }
       }
 
-      if (search.sort === "price_asc")
-        qb = qb.order("price_nok", { ascending: true, nullsFirst: false });
-      else if (search.sort === "price_desc")
-        qb = qb.order("price_nok", { ascending: false, nullsFirst: false });
-      else qb = qb.order("created_at", { ascending: false });
-
-      // pageParam er rå database-offset. Uten klient-ekskludering er én side
-      // nøyaktig PAGE_SIZE rader; med klient-ekskludering hentes en større
-      // buffer, filtreres, og neste offset settes til raden etter siste
-      // beholdte, så tidligere sider aldri re-hentes.
-      const fetchSize = needsClientExclude ? PAGE_SIZE * 4 : PAGE_SIZE;
-      const { data, error, count } = await qb.range(pageParam, pageParam + fetchSize - 1);
-      if (error) throw error;
-
-      const raw = data ?? [];
-      const mapRow = (l: (typeof raw)[number]) => {
+      const mapRow = (l: SelectedListingRow) => {
         const imgs = (l.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
+        const attrs = l.attributes as Record<string, unknown> | null;
+        const mileageRaw = attrs?.mileage_km;
         return {
           id: l.id,
           kaupet_code: l.kaupet_code,
@@ -175,36 +180,47 @@ export function useListingsQuery({
           lng: l.display_lng as number | null,
           created_at: l.created_at,
           cover_path: imgs[0]?.storage_path ?? null,
+          mileage_km: typeof mileageRaw === "number" ? mileageRaw : null,
         };
       };
 
-      if (!needsClientExclude) {
+      // Relevance sort can't be expressed as a DB ORDER BY (rank lives only
+      // in the RPC result, not a table column), so we paginate over the
+      // rank-sorted id list ourselves and re-sort the fetched rows to match.
+      if (search.sort === "relevance" && searchRank) {
+        const rankedIds = Array.from(searchRank.keys());
+        const pageIds = rankedIds.slice(pageParam, pageParam + PAGE_SIZE);
+        if (pageIds.length === 0) return emptyPage;
+        const { data, error } = await qb.in("id", pageIds);
+        if (error) throw error;
+        const byId = new Map((data ?? []).map((l) => [l.id, l]));
+        const rows = pageIds
+          .map((id) => byId.get(id))
+          .filter((l): l is NonNullable<typeof l> => l != null)
+          .map(mapRow);
+        logSearch(rankedIds.length);
         return {
-          rows: raw.map(mapRow),
-          totalCount: count ?? null,
-          nextOffset: raw.length === fetchSize ? pageParam + fetchSize : null,
+          rows,
+          totalCount: rankedIds.length,
+          nextOffset: pageParam + PAGE_SIZE < rankedIds.length ? pageParam + PAGE_SIZE : null,
         };
       }
 
-      const isExcluded = (l: (typeof raw)[number]) =>
-        excludeAllGroups.some(
-          (g) => g.terms.length > 0 && g.terms.every((t) => rowContainsTerm(l, t)),
-        );
-      const kept: typeof raw = [];
-      let consumed = raw.length;
-      for (let i = 0; i < raw.length; i++) {
-        if (isExcluded(raw[i])) continue;
-        kept.push(raw[i]);
-        if (kept.length === PAGE_SIZE) {
-          consumed = i + 1;
-          break;
-        }
-      }
-      const bufferExhausted = raw.length < fetchSize && kept.length < PAGE_SIZE;
+      if (search.sort === "price_asc")
+        qb = qb.order("price_nok", { ascending: true, nullsFirst: false });
+      else if (search.sort === "price_desc")
+        qb = qb.order("price_nok", { ascending: false, nullsFirst: false });
+      else qb = qb.order("created_at", { ascending: false });
+
+      const { data, error, count } = await qb.range(pageParam, pageParam + PAGE_SIZE - 1);
+      if (error) throw error;
+
+      const raw = data ?? [];
+      logSearch(count ?? raw.length);
       return {
-        rows: kept.map(mapRow),
-        totalCount: null,
-        nextOffset: bufferExhausted ? null : pageParam + consumed,
+        rows: raw.map(mapRow),
+        totalCount: count ?? null,
+        nextOffset: raw.length === PAGE_SIZE ? pageParam + PAGE_SIZE : null,
       };
     },
   });

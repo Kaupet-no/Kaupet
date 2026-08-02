@@ -179,14 +179,40 @@ function normalizeModelSpacing(model: string | null): string | null {
   return model.replace(/([A-Za-zÆØÅæøå]{4,})(\d+)/g, "$1 $2");
 }
 
-/** Best-effort mapping of common Norwegian fuel-type strings to our select options. */
-function mapFuelType(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const v = value.toLowerCase();
-  if (v.includes("diesel")) return "diesel";
-  if (v.includes("bensin")) return "bensin";
-  if (v.includes("elektrisk") || v === "el") return "el";
-  if (v.includes("hybrid")) return "hybrid";
+/** Best-effort mapping of SVV's DRIVSTOFFTYPE kodeverk (kodeNavn strings) to
+ * our select options:
+ * https://autosys-kjoretoy-api.atlas.vegvesen.no/kodeverk-ui/index-kodeverk.html?kodeverkId=DRIVSTOFFTYPE
+ * Codes 7/8 in that kodeverk are the literal, distinct values "Bensin
+ * hybrid"/"Diesel hybrid" — SVV already tells the two hybrid kinds apart, it
+ * isn't inferred by combining a separate "Bensin"/"Elektrisk" pair, so the
+ * hybrid check below matches on that combined phrase within a single
+ * kodeNavn. `drivstoff` is still an array (bi-fuel vehicles can report more
+ * than one entry), so every entry's kodeNavn is checked, not just the first.
+ *
+ * NB: the kodeverk table above lists further codes with no matching select
+ * option (Parafin, Biodiesel, Biobensin, Metanol, LPG/LNG/CNG variants,
+ * Komprimert luft, "Annet drivstoff"). LPG/LNG/CNG are folded into our
+ * "Gass (CNG)" option since that's the closest bucket we have; Biodiesel/
+ * Biobensin fold into plain Diesel/Bensin for the same reason. The rest
+ * return null (left unset) rather than guess. This mapping was verified
+ * against the kodeverk UI page's rendered content, not a raw API payload —
+ * double-check against a real lookup response before relying on it in prod. */
+function mapFuelType(values: Array<string | null | undefined> | null | undefined): string | null {
+  if (!values || values.length === 0) return null;
+  const lowered = values.filter((v): v is string => !!v).map((v) => v.toLowerCase());
+  if (lowered.length === 0) return null;
+  const has = (s: string) => lowered.some((v) => v.includes(s));
+  if (has("hybrid")) {
+    // "Diesel hybrid" vs "Bensin hybrid" — a bare "Hybrid" with no fuel
+    // qualifier defaults to bensin-hybrid, the far more common of the two.
+    return has("diesel") ? "hybrid_diesel" : "hybrid_bensin";
+  }
+  if (has("hydrogen")) return "hydrogen";
+  if (has("diesel")) return "diesel"; // also covers "Biodiesel"
+  if (has("bensin")) return "bensin"; // also covers "Biobensin"
+  if (has("elektrisk") || lowered.includes("el")) return "el";
+  if (has("cng") || has("lpg") || has("lng") || has("gass")) return "gass_cng";
+  if (has("etanol") || has("e85")) return "etanol_e85";
   return null;
 }
 
@@ -374,7 +400,7 @@ export async function lookupVehicle(registrationNumber: string): Promise<Vehicle
   const firstRegDate = vehicle.forstegangsregistrering?.registrertForstegangNorgeDato ?? null;
   const firstRegYear = firstRegDate?.slice(0, 4);
   const motor = teknisk?.motorOgDrivverk?.motor?.[0];
-  const fuelType = mapFuelType(motor?.drivstoff?.[0]?.drivstoffKode?.kodeNavn);
+  const fuelType = mapFuelType(motor?.drivstoff?.map((d) => d.drivstoffKode?.kodeNavn));
   const tilhengerkopling = teknisk?.tilhengerkopling?.kopling?.[0];
   const klassifisering = vehicle.godkjenning?.tekniskGodkjenning?.kjoretoyklassifisering;
 

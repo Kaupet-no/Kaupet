@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-import { Save } from "lucide-react";
+import { FolderOpen, Save, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -9,12 +9,12 @@ import type { ListingCardData } from "@/components/listing-card";
 import { Button } from "@/components/ui/button";
 import { SearchBar } from "@/components/search-bar";
 import { SaveSearchDialog } from "@/components/advanced-search-sheet";
-import { DesktopFilterChips } from "@/components/desktop-filter-chips";
 import { ActiveFilters } from "@/components/active-filters";
 import type { MapListing } from "@/components/listings-map";
 import { ResultList } from "@/components/result-list";
 import { NativeFilterChips } from "@/components/native-filter-chips";
 import { AttributeFilterChips } from "@/components/attribute-filter-chips";
+import { FilterHintBanner } from "@/components/filter-hint-banner";
 import { NativeSearchOverlay } from "@/components/native-search-overlay";
 import { NativeAdvancedSearch } from "@/components/native-advanced-search";
 import { saveLastSearchContext } from "@/lib/last-search-context";
@@ -22,12 +22,21 @@ import { summarizeCriteria } from "@/lib/saved-searches";
 import { WtbListingCard } from "@/components/wtb-listing-card";
 import { searchSchema, conditionEnum } from "@/features/listing-search/search-schema";
 import { useListingsQuery } from "@/features/listing-search/use-listings-query";
+import { useTextToFilterPipeline } from "@/features/listing-search/use-text-to-filter-pipeline";
+import {
+  matchCategoryPhrase,
+  matchVehicleBrandPhrase,
+  removeCategoryMatch,
+} from "@/lib/search-category-match";
+import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
+import { stripFillerWords } from "@/lib/search-stopwords";
 import {
   normalizeFilter,
   vehicleCategoryGroupFor,
   genericBrandFilterFor,
 } from "@/lib/category-filters";
 import { getCategoryBehavior } from "@/lib/category-behavior";
+import { isBilOgMcCategory } from "@/components/advanced-search-value";
 import { useWtbListings } from "@/features/listing-search/use-wtb-listings";
 import { useAuth } from "@/hooks/use-auth";
 import { useIsNative } from "@/hooks/use-is-native";
@@ -36,14 +45,11 @@ import { hapticImpact } from "@/lib/haptics";
 import { useScrollDirection } from "@/hooks/use-scroll-direction";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { useAnnonserSearchState } from "@/features/listing-search/use-annonser-search-state";
+import { useHeroCategoryActions } from "@/features/listing-search/use-hero-category-actions";
 import { CategoryHero } from "@/components/category-hero";
 import { CategoryChipRow } from "@/components/category-chip-row";
-import {
-  breadcrumbPath,
-  resolveHeroCategory,
-  selectAllForParent,
-  type Category,
-} from "@/lib/categories";
+import { BrowsePageSkeleton } from "@/components/browse-page-skeleton";
+import { breadcrumbPath, resolveHeroCategory, type Category } from "@/lib/categories";
 
 export const Route = createFileRoute("/annonser")({
   validateSearch: searchSchema,
@@ -105,6 +111,26 @@ function BrowsePage() {
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
   const [advancedOverlayOpen, setAdvancedOverlayOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"listings" | "wtb">("listings");
+  // The original typed phrase behind each auto-applied attribute value, keyed
+  // by "filterKey:optionValue" ("filterKey:" for single-value filters) — lets
+  // removing an auto-generated chip put the word back in the search box
+  // instead of deleting it outright, since the automation can guess wrong.
+  const [autoAppliedText, setAutoAppliedText] = useState<Record<string, string>>({});
+  // Composite keys of chips that were just auto-applied from typed text —
+  // flashed briefly in ActiveFilters so the transition from "word" to "chip"
+  // is visible instead of the word just disappearing.
+  const [justCreatedKeys, setJustCreatedKeys] = useState<Set<string>>(new Set());
+  const flashKeys = (keys: string[]) => {
+    if (keys.length === 0) return;
+    setJustCreatedKeys((prev) => new Set([...prev, ...keys]));
+    setTimeout(() => {
+      setJustCreatedKeys((prev) => {
+        const next = new Set(prev);
+        for (const k of keys) next.delete(k);
+        return next;
+      });
+    }, 1500);
+  };
 
   const { refreshing, pullDistance } = usePullToRefresh({
     enabled: isNative && mounted,
@@ -180,6 +206,10 @@ function BrowsePage() {
     resetFilters,
   } = useAnnonserSearchState({ search, navigate, categories, allFilters, setQDraft });
 
+  // No Bil og MC listing has a "Tilstand" attribute, so the condition filter
+  // is meaningless (and hidden) once the search narrows to that category.
+  const isBilOgMc = isBilOgMcCategory(categories ?? [], effectiveCategories);
+
   // When the category filter narrows the results down to a single main-category
   // branch, the page presents itself like that category's own landing page —
   // "/Kategori" over the category's color, with its subcategories to drill
@@ -199,6 +229,103 @@ function BrowsePage() {
     () => (hero ? breadcrumbPath(hero.main, categoryTree) : []),
     [hero, categoryTree],
   );
+
+  // Recognizes category-attribute vocabulary (e.g. "ryggekamera") and
+  // number+unit facts (e.g. "under 100000 km") typed into the search box
+  // and converts them into structured attribute filters — see
+  // use-text-to-filter-pipeline.ts, which coordinates both matchers in one
+  // atomic pass so they can't clobber each other. Synonym matching only
+  // runs once a category is selected — see use-search-synonym-matches.ts
+  // for why the vocabulary is ambiguous without one.
+  useTextToFilterPipeline({
+    qDraft,
+    setQDraft,
+    updateSearch,
+    attrFilters,
+    attrValues,
+    handleAttrValueChange,
+    categoryId: hero?.selected.id ?? null,
+    onApplied: (applied) => {
+      setAutoAppliedText((prev) => ({ ...prev, ...applied }));
+      flashKeys(Object.keys(applied));
+    },
+  });
+
+  // Removes an attribute filter the same way onRemoveAttr always has, but
+  // first checks whether it was auto-applied from typed text (see
+  // autoAppliedText above) — if so, the original word goes back into the
+  // search box instead of vanishing, since the automation guessing wrong
+  // shouldn't cost the user what they typed.
+  const removeAttrWithRestore = (key: string, value?: string) => {
+    const composite = `${key}:${value ?? ""}`;
+    const restoreText = autoAppliedText[composite];
+    const current = attrValues[key];
+    if (value !== undefined && current?.kind === "multiselect") {
+      const next = current.values.filter((v) => v !== value);
+      handleAttrValueChange(
+        key,
+        next.length > 0 ? { kind: "multiselect", values: next } : undefined,
+      );
+    } else {
+      handleAttrValueChange(key, undefined);
+    }
+    if (restoreText) {
+      setAutoAppliedText((prev) => {
+        const next = { ...prev };
+        delete next[composite];
+        return next;
+      });
+      const nextQ = qDraft ? `${qDraft} ${restoreText}` : restoreText;
+      setQDraft(nextQ);
+      updateSearch({ q: nextQ });
+    }
+  };
+
+  // Recognizes a category name typed as a whole phrase (e.g. "mobiltelefon")
+  // and applies it as the category filter — the same action as clicking the
+  // "Gå til kategori" suggestion in SearchBar, just without requiring the
+  // click. See search-category-match.ts. Only on /annonser: category
+  // landing pages are already scoped to one category, so auto-navigating
+  // away based on typed text there would be surprising rather than helpful.
+  // A category match is confirmed (click or Enter) rather than applied the
+  // instant it's recognized — unlike the attribute/number matches above, it
+  // triggers a full page navigation (new hero, new breadcrumb), which is too
+  // disruptive to fire mid-sentence while the user is still typing. Tracking
+  // `dismissedMatchText` keeps a closed suggestion closed for that exact
+  // phrase instead of it reappearing on every keystroke.
+  const [dismissedMatchText, setDismissedMatchText] = useState<string | null>(null);
+  // Vehicle brand names ("Volvo") don't match any category name, so without
+  // this a query like "Volvo med cruisecontrol" never gets a category
+  // assigned — and the equipment-synonym matcher above requires one to scope
+  // its vocabulary lookup, so "cruisecontrol" would just fall through to a
+  // plain text search that finds nothing. See matchVehicleBrandPhrase.
+  const { data: vehicleBrands } = useAllVehicleBrands();
+  const categoryMatch = useMemo(() => {
+    const m =
+      matchCategoryPhrase(qDraft, categories ?? []) ??
+      matchVehicleBrandPhrase(qDraft, vehicleBrands ?? []);
+    return m && m.matchedText !== dismissedMatchText ? m : null;
+  }, [qDraft, categories, vehicleBrands, dismissedMatchText]);
+
+  const applyCategoryMatch = () => {
+    if (!categoryMatch) return;
+    // Brand matches ("Volvo") stay in the query — they're still a useful
+    // title-search term — unlike category-name matches, which are redundant
+    // once the category filter itself exists.
+    const nextQ =
+      categoryMatch.source === "category"
+        ? stripFillerWords(removeCategoryMatch(qDraft, categoryMatch))
+        : qDraft;
+    setQDraft(nextQ);
+    updateSearch({
+      category: "",
+      categories: [categoryMatch.categorySlug],
+      catMode: "any",
+      q: nextQ,
+    });
+    setDismissedMatchText(null);
+  };
+
   // Always the main category's own direct children — not `hero.selected`'s,
   // which can drill deeper than the root once a single subcategory narrows
   // the selection. Keeping this anchored to the root is what makes selecting
@@ -251,64 +378,8 @@ function BrowsePage() {
     setAnimateHero(heroSelectedId != null && heroSelectedId !== prev);
   }, [mounted, categories, heroSelectedId]);
 
-  // Selecting a category inside the hero keeps the user on /annonser, so the
-  // query text and every other filter in the URL survive. Descendants are
-  // listed explicitly because the listings query only expands *root*
-  // categories one level (see use-listings-query.ts).
-  const selectHeroCategory = (target: Category) =>
-    updateSearch({
-      category: "",
-      categories: selectAllForParent(target, categoryTree),
-      catMode: "any",
-    });
-
-  // Always-visible category row above the search bar: tapping a main
-  // category selects its whole branch immediately (same as selectHeroCategory
-  // above); tapping a subcategory narrows to just that branch, toggling it
-  // off again falls back to the whole main category.
-  const selectRootCategory = (root: Category) => {
-    const alreadyActive = effectiveCategories.some((slug) =>
-      selectAllForParent(root, categoryTree).includes(slug),
-    );
-    updateSearch({
-      category: "",
-      categories: alreadyActive ? [] : selectAllForParent(root, categoryTree),
-      catMode: "any",
-    });
-  };
-
-  const toggleChildCategory = (root: Category, child: Category) => {
-    const selected = new Set(effectiveCategories);
-    const wholeBranch = selectAllForParent(root, categoryTree);
-    const wholeBranchSelected = wholeBranch.every((slug) => selected.has(slug));
-    const childBranch = selectAllForParent(child, categoryTree);
-    const childActive = !wholeBranchSelected && childBranch.every((slug) => selected.has(slug));
-
-    let next: string[];
-    if (wholeBranchSelected) {
-      // Narrowing from "everything in this main category" to just this child.
-      next = childBranch;
-    } else if (childActive) {
-      // Deselecting this child — fall back to the whole branch if nothing
-      // else is explicitly selected.
-      const remaining = effectiveCategories.filter((slug) => !childBranch.includes(slug));
-      next = remaining.length === 0 ? wholeBranch : remaining;
-    } else {
-      next = [...new Set([...effectiveCategories, ...childBranch])];
-    }
-    updateSearch({ category: "", categories: next, catMode: "any" });
-  };
-
-  const isHeroChildActive = (child: Category) => {
-    if (!hero) return false;
-    const wholeBranchSelected = selectAllForParent(hero.main, categoryTree).every((slug) =>
-      effectiveCategories.includes(slug),
-    );
-    if (wholeBranchSelected) return false;
-    return selectAllForParent(child, categoryTree).every((slug) =>
-      effectiveCategories.includes(slug),
-    );
-  };
+  const { selectHeroCategory, selectRootCategory, toggleChildCategory, isHeroChildActive } =
+    useHeroCategoryActions({ hero, categoryTree, effectiveCategories, updateSearch });
 
   useEffect(() => {
     if (!mounted) return;
@@ -378,27 +449,7 @@ function BrowsePage() {
     search.lat != null && search.lng != null ? { lat: search.lat, lng: search.lng } : null;
 
   if (!mounted) {
-    return (
-      <div className="mx-auto max-w-7xl px-4 py-10" aria-busy="true" aria-live="polite">
-        <h1 className="font-display text-3xl tracking-tight">Annonser</h1>
-        <span className="sr-only">Laster…</span>
-        <div className="mt-6 h-14 w-full animate-pulse rounded-full bg-muted" />
-        <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_420px]">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="space-y-3 rounded-xl border border-border p-3">
-                <div className="aspect-[4/3] w-full animate-pulse rounded-lg bg-muted" />
-                <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
-                <div className="h-4 w-1/3 animate-pulse rounded bg-muted" />
-              </div>
-            ))}
-          </div>
-          <div className="hidden lg:block">
-            <div className="sticky top-24 h-[calc(100vh-8rem)] w-full animate-pulse rounded-2xl bg-muted" />
-          </div>
-        </div>
-      </div>
-    );
+    return <BrowsePageSkeleton />;
   }
 
   return (
@@ -467,10 +518,6 @@ function BrowsePage() {
                   void hapticImpact("medium");
                   updateSearch({ q: qDraft });
                 }}
-                selectedSlugs={[]}
-                onSelectedChange={() => {}}
-                categories={categories ?? []}
-                hideCategory
                 qMode={search.qMode}
                 onQModeChange={(m) => updateSearch({ qMode: m })}
                 showQMode={false}
@@ -492,30 +539,62 @@ function BrowsePage() {
               onQChange={setQDraft}
               onSubmitQ={() => {
                 void hapticImpact("medium");
-                updateSearch({ q: qDraft });
+                // Pressing Enter with a pending category match confirms it
+                // (same action as clicking the suggestion chip below)
+                // instead of running a plain text search for it.
+                if (categoryMatch) applyCategoryMatch();
+                else updateSearch({ q: qDraft });
               }}
-              selectedSlugs={
-                search.category
-                  ? [
-                      search.category,
-                      ...search.categories.filter((s: string) => s !== search.category),
-                    ]
-                  : search.categories
-              }
-              onSelectedChange={(slugs) =>
-                updateSearch({ category: "", categories: slugs, catMode: "any" })
-              }
-              categories={categories ?? []}
-              hideCategory
               qMode={search.qMode}
               onQModeChange={(m) => updateSearch({ qMode: m })}
               showQMode={false}
+              extraGroups={search.extraGroups ?? []}
+              onExtraGroupsChange={(extraGroups) => updateSearch({ extraGroups })}
             />
           )}
+          {categoryMatch && (
+            <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+              <FolderOpen className="size-4 shrink-0 text-primary" />
+              <span className="flex-1">
+                {categoryMatch.source === "brand" ? (
+                  <>
+                    Fant «{categoryMatch.matchedText}» — søk i{" "}
+                    <button
+                      type="button"
+                      onClick={applyCategoryMatch}
+                      className="font-medium text-primary underline-offset-2 hover:underline"
+                    >
+                      {categoryMatch.categoryName}
+                    </button>
+                    ?
+                  </>
+                ) : (
+                  <>
+                    Mente du kategorien{" "}
+                    <button
+                      type="button"
+                      onClick={applyCategoryMatch}
+                      className="font-medium text-primary underline-offset-2 hover:underline"
+                    >
+                      {categoryMatch.categoryName}
+                    </button>
+                    ?
+                  </>
+                )}
+              </span>
+              <button
+                type="button"
+                onClick={() => setDismissedMatchText(categoryMatch.matchedText)}
+                className="shrink-0 rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Ikke nå"
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
+          )}
+          {!categoryMatch && <FilterHintBanner hasActiveCriteria={hasSearchCriteria} />}
           {isNative ? (
             <NativeFilterChips
-              sort={search.sort}
-              onSortChange={(s) => updateSearch({ sort: s })}
               min={search.min}
               max={search.max}
               includeFree={search.includeFree ?? true}
@@ -533,62 +612,63 @@ function BrowsePage() {
               advancedFilterCount={
                 (search.extraGroups?.length ?? 0) + (search.qMode === "any" ? 1 : 0)
               }
+              hideCondition={isBilOgMc}
             />
           ) : (
-            <DesktopFilterChips
-              sort={search.sort}
-              onSortChange={(s) => updateSearch({ sort: s })}
-              min={search.min}
-              max={search.max}
-              includeFree={search.includeFree ?? true}
-              onPriceChange={(mn, mx, free) =>
-                updateSearch({ min: mn, max: mx, includeFree: free })
-              }
-              conditions={search.conditions ?? []}
-              onConditionsChange={(c) =>
-                updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
-              }
-              qMode={search.qMode}
-              onQModeChange={(m) => updateSearch({ qMode: m })}
-              extraGroups={search.extraGroups ?? []}
-              onExtraGroupsChange={(extraGroups) => updateSearch({ extraGroups })}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <AttributeFilterChips
+                filters={attrFilters}
+                values={attrValues}
+                onChange={handleAttrValueChange}
+                isNative={isNative}
+                resultCount={totalCount ?? cards.length}
+                queryText={qDraft}
+                min={search.min}
+                max={search.max}
+                includeFree={search.includeFree ?? true}
+                onPriceChange={(mn, mx, free) =>
+                  updateSearch({ min: mn, max: mx, includeFree: free })
+                }
+                conditions={search.conditions ?? []}
+                onConditionsChange={(c) =>
+                  updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
+                }
+                hideCondition={isBilOgMc}
+              />
+            </div>
           )}
 
           {/* Category-dependent filter row: the selected category's primary
             fields stay visible, the rest sit behind "Se flere filter". */}
-          <AttributeFilterChips
-            filters={attrFilters}
-            values={attrValues}
-            onChange={handleAttrValueChange}
-            isNative={isNative}
-            resultCount={totalCount ?? cards.length}
+          {isNative && (
+            <AttributeFilterChips
+              filters={attrFilters}
+              values={attrValues}
+              onChange={handleAttrValueChange}
+              isNative={isNative}
+              resultCount={totalCount ?? cards.length}
+              queryText={qDraft}
+            />
+          )}
+
+          {/* Rendered inside the same space-y-2 group as the search bar and
+              filter chips above, rather than as a separately-spaced sibling,
+              so the active-criteria row reads as part of one continuous
+              search-and-filter unit instead of a visually detached block. */}
+          <ActiveFilters
+            search={search}
+            terms={terms}
+            onUpdate={(patch) => updateSearch(patch)}
+            attrFilters={attrFilters}
+            attrValues={attrValues}
+            location={location}
+            onRemoveLocation={() =>
+              updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
+            }
+            onRemoveAttr={removeAttrWithRestore}
+            justCreatedKeys={justCreatedKeys}
           />
         </div>
-
-        <ActiveFilters
-          search={search}
-          terms={terms}
-          onUpdate={(patch) => updateSearch(patch)}
-          attrFilters={attrFilters}
-          attrValues={attrValues}
-          location={location}
-          onRemoveLocation={() =>
-            updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
-          }
-          onRemoveAttr={(key, value) => {
-            const current = attrValues[key];
-            if (value !== undefined && current?.kind === "multiselect") {
-              const next = current.values.filter((v) => v !== value);
-              handleAttrValueChange(
-                key,
-                next.length > 0 ? { kind: "multiselect", values: next } : undefined,
-              );
-              return;
-            }
-            handleAttrValueChange(key, undefined);
-          }}
-        />
 
         {user && (
           <SaveSearchDialog
@@ -671,6 +751,13 @@ function BrowsePage() {
                 ? () => updateSearch({ category: "", categories: [] })
                 : undefined
             }
+            onDropLastWord={(nextQ) => {
+              setQDraft(nextQ);
+              updateSearch({ q: nextQ });
+            }}
+            attrFilters={attrFilters}
+            attrValues={attrValues}
+            onRemoveAttr={(key) => removeAttrWithRestore(key)}
             mapListings={mapListings}
             mapCenter={mapCenter}
             radiusKm={search.radius ?? 10}
@@ -681,6 +768,8 @@ function BrowsePage() {
             onMapClearLocation={() =>
               updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
             }
+            sort={search.sort}
+            onSortChange={(s) => updateSearch({ sort: s })}
             toolbarExtra={
               user ? (
                 <Button
@@ -704,6 +793,7 @@ function BrowsePage() {
             onClose={() => setSearchOverlayOpen(false)}
             initialQ={qDraft}
             categories={categories ?? []}
+            allFilters={allFilters ?? []}
           />
         )}
 

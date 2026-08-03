@@ -43,6 +43,14 @@ export async function goToNewListing(page: Page) {
  * retry attaches a screenshot to the test report for further diagnosis if
  * this still doesn't resolve it. See E2E-ROBUSTNESS-PLAN-STATUS.md, Fase 5
  * punkt 3 / "Ikke løst".
+ *
+ * Revurder denne retry-mekanismen etter 2026-11-01 eller 20 flere CI-
+ * kjøringer uten at loggingen fra E2E-ROBUSTNESS-PLAN-STATUS-3.md punkt 2
+ * (login-flake) eller den permanente konsoll-fangsten fra Fase B (runde 2)
+ * har gitt et spor til root cause. Hvis fortsatt uforklart innen da, tell
+ * det som "ikke reproduserbart i praksis" og vurder å forenkle til en enkel
+ * økt timeout uten retry-logikken. Se E2E-ROBUSTNESS-PLAN-STATUS-3.md
+ * punkt 4.
  */
 export async function clickNextAndWaitFor(page: Page, expected: Locator, testInfo: TestInfo) {
   const attempts = 3;

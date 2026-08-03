@@ -57,6 +57,7 @@ export const createVehicleModel = createServerFn({ method: "POST" })
       .object({
         brandId: z.string().uuid(),
         name: z.string().trim().min(1).max(80),
+        classId: z.string().uuid().optional(),
       })
       .parse(input),
   )
@@ -74,6 +75,7 @@ export const createVehicleModel = createServerFn({ method: "POST" })
       .from("vehicle_models")
       .insert({
         brand_id: data.brandId,
+        class_id: data.classId ?? null,
         name: data.name,
         status: "pending",
         submitted_by: context.userId,

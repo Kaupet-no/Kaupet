@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,11 @@ import {
   useVehicleBrandOptions,
   useVehicleModelOptionsForBrands,
 } from "@/features/listing-creation/modules/generic-attributes/vehicle-brand-model-fields";
+import {
+  useAllVehicleBrands,
+  useAllVehicleModelClasses,
+  useAllVehicleModels,
+} from "@/lib/vehicle/vehicle-brands";
 import {
   getAttributeChipState,
   getPriceChipState,
@@ -669,12 +674,46 @@ function ModelMultiChip({
   values: string[];
   onChange: (values: string[]) => void;
 }) {
-  const options = useVehicleModelOptionsForBrands(
-    (brandFilter?.unit ?? "bil") as VehicleBrandGroup,
-    brandValues,
-    values,
-  );
+  const categoryGroup = (brandFilter?.unit ?? "bil") as VehicleBrandGroup;
+  const options = useVehicleModelOptionsForBrands(categoryGroup, brandValues, values);
   const brandKnown = brandValues.length > 0;
+
+  // Klassevalg gir kun mening når nøyaktig ett merke er valgt — å velge
+  // klasse på tvers av flere merker samtidig er ikke en meningsfull
+  // avgrensning (klassenavn overlapper ikke mellom merker).
+  const { data: allBrands } = useAllVehicleBrands();
+  const { data: allModels } = useAllVehicleModels();
+  const { data: allClasses } = useAllVehicleModelClasses();
+  const [selectedClassId, setSelectedClassId] = useState<string | undefined>(undefined);
+
+  const singleBrandId = useMemo(() => {
+    if (brandValues.length !== 1) return undefined;
+    return allBrands?.find((b) => b.category_group === categoryGroup && b.name === brandValues[0])
+      ?.id;
+  }, [allBrands, categoryGroup, brandValues]);
+
+  const classesForBrand = useMemo(
+    () => (allClasses ?? []).filter((c) => c.brand_id === singleBrandId),
+    [allClasses, singleBrandId],
+  );
+
+  // "Alle" = ingen klassefilter valgt (default state), ikke en lagret
+  // sentinel-verdi — nullstilles også når merket endres siden en klasse-id
+  // fra forrige merke ikke er meningsfull for det nye.
+  const classId = classesForBrand.some((c) => c.id === selectedClassId)
+    ? selectedClassId
+    : undefined;
+
+  const visibleOptions = useMemo(() => {
+    if (!classId) return options;
+    const modelNamesInClass = new Set(
+      (allModels ?? [])
+        .filter((m) => m.brand_id === singleBrandId && m.class_id === classId)
+        .map((m) => m.name),
+    );
+    return options.filter((o) => modelNamesInClass.has(o.value) || values.includes(o.value));
+  }, [options, allModels, singleBrandId, classId, values]);
+
   const toggle = (v: string) => {
     onChange(values.includes(v) ? values.filter((x) => x !== v) : [...values, v]);
   };
@@ -688,8 +727,35 @@ function ModelMultiChip({
         />
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72 p-2">
+        {classesForBrand.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-1 border-b border-border pb-2">
+            <button
+              type="button"
+              onClick={() => setSelectedClassId(undefined)}
+              className={`rounded-full px-2 py-0.5 text-xs ${
+                !classId ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+              }`}
+            >
+              Alle
+            </button>
+            {classesForBrand.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setSelectedClassId(c.id)}
+                className={`rounded-full px-2 py-0.5 text-xs ${
+                  classId === c.id
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {c.name}
+              </button>
+            ))}
+          </div>
+        )}
         <MultiSelectPopoverBody
-          options={options}
+          options={visibleOptions}
           values={values}
           onToggle={toggle}
           emptyMessage={

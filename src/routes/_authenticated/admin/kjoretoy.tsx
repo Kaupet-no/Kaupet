@@ -45,6 +45,9 @@ import {
   adminCreateVehicleModel,
   adminUpdateVehicleModel,
   adminDeleteVehicleModel,
+  adminCreateVehicleModelClass,
+  adminUpdateVehicleModelClass,
+  adminDeleteVehicleModelClass,
 } from "@/lib/vehicle/admin-vehicle-brands.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/kjoretoy")({
@@ -57,10 +60,13 @@ type Row = {
   category_group: VehicleBrandGroup;
   model_id: string | null;
   model_name: string | null;
+  class_id: string | null;
+  class_name: string | null;
 };
 
 type Brand = { id: string; name: string; category_group: VehicleBrandGroup };
-type Model = { id: string; name: string };
+type Model = { id: string; name: string; class_id: string | null };
+type ModelClass = { id: string; name: string };
 
 const GROUPS = Object.keys(VEHICLE_BRAND_GROUP_LABELS_NB) as VehicleBrandGroup[];
 
@@ -103,10 +109,16 @@ function VehicleBrandsCrud() {
     mode: "create" | "edit";
     model: Model | null;
   } | null>(null);
+  const [classDialog, setClassDialog] = useState<{
+    mode: "create" | "edit";
+    modelClass: ModelClass | null;
+  } | null>(null);
   const [deletingBrand, setDeletingBrand] = useState<Brand | null>(null);
   const [deletingModel, setDeletingModel] = useState<Model | null>(null);
+  const [deletingClass, setDeletingClass] = useState<ModelClass | null>(null);
   const deleteBrandFn = useServerFn(adminDeleteVehicleBrand);
   const deleteModelFn = useServerFn(adminDeleteVehicleModel);
+  const deleteClassFn = useServerFn(adminDeleteVehicleModelClass);
 
   const {
     data: rows,
@@ -139,8 +151,25 @@ function VehicleBrandsCrud() {
     if (!selectedBrand) return [];
     return (rows ?? [])
       .filter((r) => r.brand_id === selectedBrand.id && r.model_id)
-      .map((r) => ({ id: r.model_id as string, name: r.model_name as string }))
+      .map((r) => ({
+        id: r.model_id as string,
+        name: r.model_name as string,
+        class_id: r.class_id,
+      }))
       .sort((a, b) => a.name.localeCompare(b.name, "nb-NO"));
+  }, [rows, selectedBrand]);
+
+  // De aller fleste merker har ingen klasser i det hele tatt — kolonnen
+  // grupperer da modellene rett under merket, uendret fra i dag.
+  const classesForBrand: ModelClass[] = useMemo(() => {
+    if (!selectedBrand) return [];
+    const byId = new Map<string, ModelClass>();
+    for (const r of rows ?? []) {
+      if (r.brand_id === selectedBrand.id && r.class_id && r.class_name) {
+        byId.set(r.class_id, { id: r.class_id, name: r.class_name });
+      }
+    }
+    return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name, "nb-NO"));
   }, [rows, selectedBrand]);
 
   const deleteBrand = ({ id, onDone }: { id: string; onDone: () => void }) => {
@@ -159,6 +188,15 @@ function VehicleBrandsCrud() {
         onDone();
       })
       .catch((e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke slette modellen")));
+  };
+
+  const deleteClass = ({ id, onDone }: { id: string; onDone: () => void }) => {
+    deleteClassFn({ data: { id } })
+      .then(() => {
+        showSuccessToast("Klasse slettet");
+        onDone();
+      })
+      .catch((e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke slette klassen")));
   };
 
   if (isLoading) {
@@ -273,48 +311,72 @@ function VehicleBrandsCrud() {
             <>
               <div className="flex items-center justify-between px-1">
                 <p className="text-sm font-medium">Modeller — {selectedBrand.name}</p>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className="gap-1"
-                  onClick={() => setModelDialog({ mode: "create", model: null })}
-                >
-                  <Plus className="size-4" /> Ny
-                </Button>
+                <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="gap-1"
+                    onClick={() => setClassDialog({ mode: "create", modelClass: null })}
+                  >
+                    <Plus className="size-4" /> Klasse
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="gap-1"
+                    onClick={() => setModelDialog({ mode: "create", model: null })}
+                  >
+                    <Plus className="size-4" /> Ny
+                  </Button>
+                </div>
               </div>
-              {models.length === 0 ? (
+              {models.length === 0 && classesForBrand.length === 0 ? (
                 <p className="p-3 text-sm text-muted-foreground">Ingen modeller registrert ennå.</p>
               ) : (
-                <div className="space-y-0.5">
-                  {models.map((m) => (
-                    <div
-                      key={m.id}
-                      className="flex items-center justify-between rounded-lg px-3 py-2 text-sm hover:bg-muted/60"
-                    >
-                      <span>{m.name}</span>
-                      <div className="flex gap-0.5">
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className="size-7"
-                          onClick={() => setModelDialog({ mode: "edit", model: m })}
-                          aria-label={`Rediger ${m.name}`}
-                        >
-                          <Pencil className="size-3.5" />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className="size-7 text-destructive hover:text-destructive"
-                          onClick={() => setDeletingModel(m)}
-                          aria-label={`Slett ${m.name}`}
-                        >
-                          <Trash2 className="size-3.5" />
-                        </Button>
+                <div className="space-y-3">
+                  {models.some((m) => !m.class_id) && (
+                    <ModelGroup
+                      title={classesForBrand.length > 0 ? "Uten klasse" : null}
+                      models={models.filter((m) => !m.class_id)}
+                      onEdit={(m) => setModelDialog({ mode: "edit", model: m })}
+                      onDelete={setDeletingModel}
+                    />
+                  )}
+                  {classesForBrand.map((c) => (
+                    <div key={c.id} className="space-y-0.5">
+                      <div className="flex items-center justify-between px-1">
+                        <p className="text-xs font-medium text-muted-foreground">{c.name}</p>
+                        <div className="flex gap-0.5">
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="size-6"
+                            onClick={() => setClassDialog({ mode: "edit", modelClass: c })}
+                            aria-label={`Rediger ${c.name}`}
+                          >
+                            <Pencil className="size-3" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="size-6 text-destructive hover:text-destructive"
+                            onClick={() => setDeletingClass(c)}
+                            aria-label={`Slett ${c.name}`}
+                          >
+                            <Trash2 className="size-3" />
+                          </Button>
+                        </div>
                       </div>
+                      <ModelGroup
+                        title={null}
+                        models={models.filter((m) => m.class_id === c.id)}
+                        onEdit={(m) => setModelDialog({ mode: "edit", model: m })}
+                        onDelete={setDeletingModel}
+                      />
                     </div>
                   ))}
                 </div>
@@ -338,7 +400,17 @@ function VehicleBrandsCrud() {
           mode={modelDialog.mode}
           model={modelDialog.model}
           brandId={selectedBrand.id}
+          classes={classesForBrand}
           onClose={() => setModelDialog(null)}
+          onSaved={invalidate}
+        />
+      )}
+      {classDialog && selectedBrand && (
+        <ModelClassFormDialog
+          mode={classDialog.mode}
+          modelClass={classDialog.modelClass}
+          brandId={selectedBrand.id}
+          onClose={() => setClassDialog(null)}
           onSaved={invalidate}
         />
       )}
@@ -403,6 +475,84 @@ function VehicleBrandsCrud() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={!!deletingClass} onOpenChange={(o) => !o && setDeletingClass(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Slette «{deletingClass?.name}»?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Klassen fjernes. Modeller under den blir liggende klasseløse, ikke slettet.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (!deletingClass) return;
+                deleteClass({
+                  id: deletingClass.id,
+                  onDone: () => {
+                    setDeletingClass(null);
+                    invalidate();
+                  },
+                });
+              }}
+            >
+              Slett
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+function ModelGroup({
+  title,
+  models,
+  onEdit,
+  onDelete,
+}: {
+  title: string | null;
+  models: Model[];
+  onEdit: (m: Model) => void;
+  onDelete: (m: Model) => void;
+}) {
+  if (models.length === 0) return null;
+  return (
+    <div className="space-y-0.5">
+      {title && <p className="px-1 text-xs font-medium text-muted-foreground">{title}</p>}
+      {models.map((m) => (
+        <div
+          key={m.id}
+          className="flex items-center justify-between rounded-lg px-3 py-2 text-sm hover:bg-muted/60"
+        >
+          <span>{m.name}</span>
+          <div className="flex gap-0.5">
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="size-7"
+              onClick={() => onEdit(m)}
+              aria-label={`Rediger ${m.name}`}
+            >
+              <Pencil className="size-3.5" />
+            </Button>
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="size-7 text-destructive hover:text-destructive"
+              onClick={() => onDelete(m)}
+              aria-label={`Slett ${m.name}`}
+            >
+              <Trash2 className="size-3.5" />
+            </Button>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -510,25 +660,32 @@ function ModelFormDialog({
   mode,
   model,
   brandId,
+  classes,
   onClose,
   onSaved,
 }: {
   mode: "create" | "edit";
   model: Model | null;
   brandId: string;
+  /** Merkets klasser, om noen — de aller fleste merker har ingen, og feltet
+   * skjules da helt. */
+  classes: ModelClass[];
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [name, setName] = useState(model?.name ?? "");
+  const [classId, setClassId] = useState<string | null>(model?.class_id ?? null);
   const createFn = useServerFn(adminCreateVehicleModel);
   const updateFn = useServerFn(adminUpdateVehicleModel);
 
   const save = useMutation({
     mutationFn: async () => {
       if (mode === "create") {
-        await createFn({ data: { brandId, name: name.trim() } });
+        await createFn({ data: { brandId, name: name.trim(), classId: classId ?? undefined } });
       } else if (model) {
-        await updateFn({ data: { id: model.id, name: name.trim() } });
+        await updateFn({
+          data: { id: model.id, name: name.trim(), classId: classId ?? undefined },
+        });
       }
     },
     onSuccess: () => {
@@ -564,6 +721,102 @@ function ModelFormDialog({
               onChange={(e) => setName(e.target.value)}
               maxLength={80}
               required
+            />
+          </div>
+          {classes.length > 0 && (
+            <div className="space-y-2">
+              <Label>Klasse</Label>
+              <Select
+                value={classId ?? "__none__"}
+                onValueChange={(v) => setClassId(v === "__none__" ? null : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Ingen klasse</SelectItem>
+                  {classes.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Avbryt
+            </Button>
+            <Button type="submit" disabled={save.isPending}>
+              {save.isPending ? <Loader2 className="size-4 animate-spin" /> : "Lagre"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ModelClassFormDialog({
+  mode,
+  modelClass,
+  brandId,
+  onClose,
+  onSaved,
+}: {
+  mode: "create" | "edit";
+  modelClass: ModelClass | null;
+  brandId: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [name, setName] = useState(modelClass?.name ?? "");
+  const createFn = useServerFn(adminCreateVehicleModelClass);
+  const updateFn = useServerFn(adminUpdateVehicleModelClass);
+
+  const save = useMutation({
+    mutationFn: async () => {
+      if (mode === "create") {
+        await createFn({ data: { brandId, name: name.trim() } });
+      } else if (modelClass) {
+        await updateFn({ data: { id: modelClass.id, name: name.trim() } });
+      }
+    },
+    onSuccess: () => {
+      showSuccessToast(mode === "create" ? "Klasse opprettet" : "Klasse oppdatert");
+      onSaved();
+      onClose();
+    },
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke lagre klassen")),
+  });
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{mode === "create" ? "Ny klasse" : "Rediger klasse"}</DialogTitle>
+        </DialogHeader>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!name.trim()) {
+              showErrorToast("Navn er påkrevd");
+              return;
+            }
+            save.mutate();
+          }}
+          className="space-y-4"
+        >
+          <div className="space-y-2">
+            <Label htmlFor="class-name">Navn</Label>
+            <Input
+              id="class-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={80}
+              required
+              placeholder="F.eks. C-klasse"
             />
           </div>
           <DialogFooter>

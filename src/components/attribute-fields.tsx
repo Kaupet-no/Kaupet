@@ -24,7 +24,7 @@ import {
 } from "@/lib/category-filters";
 import {
   VehicleBrandField,
-  VehicleModelField,
+  VehicleModelWithClassField,
 } from "@/features/listing-creation/modules/generic-attributes/vehicle-brand-model-fields";
 
 export type AttributeMap = Record<string, AttributeValue>;
@@ -131,7 +131,7 @@ export function AttributeFields({
               ? (value[brandFilter.key] as string)
               : undefined;
           return (
-            <VehicleModelField
+            <VehicleModelWithClassField
               key={f.id}
               categoryGroup={(brandFilter?.unit ?? "bil") as VehicleBrandGroup}
               brandName={brandName}

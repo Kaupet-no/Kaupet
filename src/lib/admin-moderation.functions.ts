@@ -150,7 +150,7 @@ export const submitReport = createServerFn({ method: "POST" })
     const { error } = await context.supabase.rpc("submit_listing_report", {
       _listing_id: data.listingId,
       _reason: data.reason,
-      _comment: data.comment ?? null,
+      _comment: data.comment ?? undefined,
     });
     if (error) throw error;
     return { ok: true };
@@ -171,7 +171,7 @@ export const submitUserReport = createServerFn({ method: "POST" })
     const { error } = await context.supabase.rpc("submit_user_report", {
       _reported_user_id: data.reportedUserId,
       _reason: data.reason,
-      _comment: data.comment ?? null,
+      _comment: data.comment ?? undefined,
     });
     if (error) throw error;
     return { ok: true };

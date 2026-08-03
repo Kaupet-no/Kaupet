@@ -1,4 +1,4 @@
-﻿import { useMemo } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAllVehicleBrands, useAllVehicleModels } from "@/lib/vehicle/vehicle-brands";
+import {
+  useAllVehicleBrands,
+  useAllVehicleModelClasses,
+  useAllVehicleModels,
+} from "@/lib/vehicle/vehicle-brands";
 import type { VehicleBrandGroup } from "@/lib/category-filters";
 
 /** One option in a brand/model dropdown. `label` differs from `value` only for
@@ -37,32 +41,82 @@ export function useVehicleBrandOptions(
   }, [allBrands, categoryGroup, value]);
 }
 
-/** The model options for a brand. `brandKnown` is false until a brand the
- * reference table recognizes is picked, which is when a model can be chosen. */
-export function useVehicleModelOptions(
+/** The model-class options for a brand (e.g. Mercedes-Benz's C-klasse,
+ * E-klasse). `hasClasses` is false for the vast majority of brands, which
+ * have no class level at all — callers should skip rendering a class field
+ * entirely in that case, not just disable it, to keep today's flat
+ * brand→model flow unchanged for those brands. */
+export function useVehicleModelClassOptions(
   categoryGroup: VehicleBrandGroup,
   brandName: string | undefined,
   value: string | undefined,
-): { options: VehicleOption[]; brandKnown: boolean } {
+): { options: VehicleOption[]; hasClasses: boolean } {
   const { data: allBrands } = useAllVehicleBrands();
-  const { data: allModels } = useAllVehicleModels();
+  const { data: allClasses } = useAllVehicleModelClasses();
 
   const brandId = useMemo(
     () => allBrands?.find((b) => b.category_group === categoryGroup && b.name === brandName)?.id,
     [allBrands, categoryGroup, brandName],
   );
 
+  const classes = useMemo(
+    () => (allClasses ?? []).filter((c) => c.brand_id === brandId),
+    [allClasses, brandId],
+  );
+
   const options = useMemo(() => {
-    const models = (allModels ?? []).filter((m) => m.brand_id === brandId);
+    const opts = classes.map((c) => ({ value: c.id, label: c.name }));
+    if (value && !classes.some((c) => c.id === value)) {
+      const name = allClasses?.find((c) => c.id === value)?.name ?? value;
+      opts.unshift({ value, label: `${name} (venter godkjenning)` });
+    }
+    return opts;
+  }, [classes, allClasses, value]);
+
+  return { options, hasClasses: classes.length > 0 };
+}
+
+/** The model options for a brand (and, when the brand has classes, a chosen
+ * class within it). `brandKnown` is false until a brand the reference table
+ * recognizes is picked, which is when a model can be chosen. When the brand
+ * has classes, `classId` must also be set before any model is offered —
+ * mirrors the same "disabled until known" pattern already used for
+ * brand→model. Brands without classes ignore `classId` entirely, so nothing
+ * changes for them. */
+export function useVehicleModelOptions(
+  categoryGroup: VehicleBrandGroup,
+  brandName: string | undefined,
+  value: string | undefined,
+  classId?: string | undefined,
+): { options: VehicleOption[]; brandKnown: boolean } {
+  const { data: allBrands } = useAllVehicleBrands();
+  const { data: allModels } = useAllVehicleModels();
+  const { data: allClasses } = useAllVehicleModelClasses();
+
+  const brandId = useMemo(
+    () => allBrands?.find((b) => b.category_group === categoryGroup && b.name === brandName)?.id,
+    [allBrands, categoryGroup, brandName],
+  );
+
+  const brandHasClasses = useMemo(
+    () => (allClasses ?? []).some((c) => c.brand_id === brandId),
+    [allClasses, brandId],
+  );
+
+  const options = useMemo(() => {
+    let models = (allModels ?? []).filter((m) => m.brand_id === brandId);
+    if (brandHasClasses) {
+      models = classId ? models.filter((m) => m.class_id === classId) : [];
+    }
     const opts = models.map((m) => ({ value: m.name, label: m.name }));
     // Same reasoning as for brands: a just-imported model isn't approved yet.
     if (value && !models.some((m) => m.name === value)) {
       opts.unshift({ value, label: `${value} (venter godkjenning)` });
     }
     return opts;
-  }, [allModels, brandId, value]);
+  }, [allModels, brandId, brandHasClasses, classId, value]);
 
-  return { options, brandKnown: !!brandId };
+  return { options, brandKnown: brandHasClasses ? !!classId : !!brandId };
 }
 
 /**
@@ -151,9 +205,55 @@ export function VehicleBrandField({
   );
 }
 
+/**
+ * Klassevalg (f.eks. Mercedes-Benz' C-klasse/E-klasse) mellom merke og
+ * modell. Rendres kun av kallsteder når `useVehicleModelClassOptions`
+ * rapporterer `hasClasses` — de aller fleste merker har ingen klasser og
+ * skal fortsette rett fra merke til modell som i dag.
+ */
+export function VehicleModelClassField({
+  categoryGroup,
+  brandName,
+  value,
+  onChange,
+  required,
+  error,
+}: {
+  categoryGroup: VehicleBrandGroup;
+  brandName: string | undefined;
+  value: string | undefined;
+  onChange: (classId: string | undefined) => void;
+  required?: boolean;
+  error?: string;
+}) {
+  const { options } = useVehicleModelClassOptions(categoryGroup, brandName, value);
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor="vehicle-model-class">
+        Modellklasse {required && <span className="text-destructive">*</span>}
+      </Label>
+      <Select value={value ?? ""} onValueChange={(v) => onChange(v || undefined)}>
+        <SelectTrigger id="vehicle-model-class" aria-invalid={!!error}>
+          <SelectValue placeholder="Velg klasse…" />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((o) => (
+            <SelectItem key={o.value} value={o.value}>
+              {o.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </div>
+  );
+}
+
 export function VehicleModelField({
   categoryGroup,
   brandName,
+  classId,
   value,
   onChange,
   required,
@@ -162,6 +262,8 @@ export function VehicleModelField({
 }: {
   categoryGroup: VehicleBrandGroup;
   brandName: string | undefined;
+  /** Valgt modellklasse, om merket har klasser (se `VehicleModelClassField`). */
+  classId?: string | undefined;
   value: string | undefined;
   onChange: (name: string | undefined) => void;
   required?: boolean;
@@ -169,7 +271,7 @@ export function VehicleModelField({
   /** Henger-kategorien: Vegvesenet har ofte kun produsent, ikke modell. */
   freeText?: boolean;
 }) {
-  const { options, brandKnown } = useVehicleModelOptions(categoryGroup, brandName, value);
+  const { options, brandKnown } = useVehicleModelOptions(categoryGroup, brandName, value, classId);
 
   if (freeText) {
     return (
@@ -211,5 +313,88 @@ export function VehicleModelField({
       </Select>
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
+  );
+}
+
+/**
+ * Modell-felt som selv håndterer det valgfrie klasse-mellomtrinnet (f.eks.
+ * Mercedes-Benz' C-klasse) — kallsteder trenger ikke selv vite om det valgte
+ * merket har klasser. For de aller fleste merker (ingen klasser) er dette
+ * identisk med å bruke `VehicleModelField` direkte.
+ */
+export function VehicleModelWithClassField({
+  categoryGroup,
+  brandName,
+  value,
+  onChange,
+  required,
+  error,
+  freeText = false,
+}: {
+  categoryGroup: VehicleBrandGroup;
+  brandName: string | undefined;
+  value: string | undefined;
+  onChange: (name: string | undefined) => void;
+  required?: boolean;
+  error?: string;
+  /** Henger-kategorien: Vegvesenet har ofte kun produsent, ikke modell. */
+  freeText?: boolean;
+}) {
+  const { data: allBrands } = useAllVehicleBrands();
+  const { data: allModels } = useAllVehicleModels();
+  const { hasClasses } = useVehicleModelClassOptions(categoryGroup, brandName, undefined);
+
+  const brandId = useMemo(
+    () => allBrands?.find((b) => b.category_group === categoryGroup && b.name === brandName)?.id,
+    [allBrands, categoryGroup, brandName],
+  );
+  // Utleder klassen fra en allerede valgt modell (f.eks. ved redigering av en
+  // eksisterende annonse), slik at klassefeltet forhåndsutfylles i stedet for
+  // å tvinge brukeren til å velge klasse på nytt for en verdi som alt er satt.
+  const derivedClassId = useMemo(
+    () => allModels?.find((m) => m.brand_id === brandId && m.name === value)?.class_id ?? undefined,
+    [allModels, brandId, value],
+  );
+  const [classId, setClassId] = useState<string | undefined>(derivedClassId ?? undefined);
+  useEffect(() => {
+    setClassId(derivedClassId ?? undefined);
+  }, [derivedClassId, brandName]);
+
+  if (freeText || !hasClasses) {
+    return (
+      <VehicleModelField
+        categoryGroup={categoryGroup}
+        brandName={brandName}
+        value={value}
+        onChange={onChange}
+        required={required}
+        error={error}
+        freeText={freeText}
+      />
+    );
+  }
+
+  return (
+    <>
+      <VehicleModelClassField
+        categoryGroup={categoryGroup}
+        brandName={brandName}
+        value={classId}
+        onChange={(next) => {
+          setClassId(next);
+          if (next !== derivedClassId) onChange(undefined);
+        }}
+        required={required}
+      />
+      <VehicleModelField
+        categoryGroup={categoryGroup}
+        brandName={brandName}
+        classId={classId}
+        value={value}
+        onChange={onChange}
+        required={required}
+        error={error}
+      />
+    </>
   );
 }

@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       account_deletions: {
@@ -62,6 +87,24 @@ export type Database = {
           reason?: string | null
           target_id?: string | null
           target_type?: string
+        }
+        Relationships: []
+      }
+      app_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: string
         }
         Relationships: []
       }
@@ -206,127 +249,6 @@ export type Database = {
           },
         ]
       }
-      filter_synonyms: {
-        Row: {
-          category_filter_id: string
-          created_at: string
-          id: string
-          is_generated: boolean
-          option_value: string | null
-          phrase: string
-        }
-        Insert: {
-          category_filter_id: string
-          created_at?: string
-          id?: string
-          is_generated?: boolean
-          option_value?: string | null
-          phrase: string
-        }
-        Update: {
-          category_filter_id?: string
-          created_at?: string
-          id?: string
-          is_generated?: boolean
-          option_value?: string | null
-          phrase?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "filter_synonyms_category_filter_id_fkey"
-            columns: ["category_filter_id"]
-            isOneToOne: false
-            referencedRelation: "category_filters"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      vehicle_brands: {
-        Row: {
-          id: string
-          name: string
-          category_group: string
-          status: string
-          submitted_by: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          name: string
-          category_group: string
-          status?: string
-          submitted_by?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          name?: string
-          category_group?: string
-          status?: string
-          submitted_by?: string | null
-          created_at?: string
-        }
-        Relationships: []
-      }
-      vehicle_models: {
-        Row: {
-          id: string
-          brand_id: string
-          name: string
-          status: string
-          submitted_by: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          brand_id: string
-          name: string
-          status?: string
-          submitted_by?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          brand_id?: string
-          name?: string
-          status?: string
-          submitted_by?: string | null
-          created_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "vehicle_models_brand_id_fkey"
-            columns: ["brand_id"]
-            isOneToOne: false
-            referencedRelation: "vehicle_brands"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      vehicle_lookup_log: {
-        Row: {
-          id: string
-          user_id: string
-          registration_number: string
-          created_at: string
-          classification_result: Json | null
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          registration_number: string
-          created_at?: string
-          classification_result?: Json | null
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          registration_number?: string
-          created_at?: string
-          classification_result?: Json | null
-        }
-        Relationships: []
-      }
       conversations: {
         Row: {
           buyer_id: string
@@ -335,9 +257,9 @@ export type Database = {
           id: string
           last_message_at: string
           listing_id: string | null
-          wtb_listing_id: string | null
           seller_id: string
           seller_last_read_at: string | null
+          wtb_listing_id: string | null
         }
         Insert: {
           buyer_id: string
@@ -346,9 +268,9 @@ export type Database = {
           id?: string
           last_message_at?: string
           listing_id?: string | null
-          wtb_listing_id?: string | null
           seller_id: string
           seller_last_read_at?: string | null
+          wtb_listing_id?: string | null
         }
         Update: {
           buyer_id?: string
@@ -357,11 +279,18 @@ export type Database = {
           id?: string
           last_message_at?: string
           listing_id?: string | null
-          wtb_listing_id?: string | null
           seller_id?: string
           seller_last_read_at?: string | null
+          wtb_listing_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "conversations_buyer_id_fkey"
+            columns: ["buyer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "conversations_listing_id_fkey"
             columns: ["listing_id"]
@@ -370,71 +299,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "conversations_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "conversations_wtb_listing_id_fkey"
             columns: ["wtb_listing_id"]
             isOneToOne: false
             referencedRelation: "wtb_listings"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      wtb_listings: {
-        Row: {
-          id: string
-          user_id: string
-          title: string
-          subtitle: string | null
-          description: string | null
-          category_id: string | null
-          max_price_nok: number | null
-          status: string
-          created_at: string
-          updated_at: string
-          expires_at: string
-          search_vector: unknown
-          attributes: Json
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          title: string
-          subtitle?: string | null
-          description?: string | null
-          category_id?: string | null
-          max_price_nok?: number | null
-          status?: string
-          created_at?: string
-          updated_at?: string
-          expires_at?: string
-          attributes?: Json
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          title?: string
-          subtitle?: string | null
-          description?: string | null
-          category_id?: string | null
-          max_price_nok?: number | null
-          status?: string
-          created_at?: string
-          updated_at?: string
-          expires_at?: string
-          attributes?: Json
-        }
-        Relationships: [
-          {
-            foreignKeyName: "wtb_listings_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "wtb_listings_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -568,6 +443,41 @@ export type Database = {
           },
         ]
       }
+      filter_synonyms: {
+        Row: {
+          category_filter_id: string
+          created_at: string
+          id: string
+          is_generated: boolean
+          option_value: string | null
+          phrase: string
+        }
+        Insert: {
+          category_filter_id: string
+          created_at?: string
+          id?: string
+          is_generated?: boolean
+          option_value?: string | null
+          phrase: string
+        }
+        Update: {
+          category_filter_id?: string
+          created_at?: string
+          id?: string
+          is_generated?: boolean
+          option_value?: string | null
+          phrase?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "filter_synonyms_category_filter_id_fkey"
+            columns: ["category_filter_id"]
+            isOneToOne: false
+            referencedRelation: "category_filters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ip_bans: {
         Row: {
           banned_by: string
@@ -595,36 +505,39 @@ export type Database = {
         }
         Relationships: []
       }
-      listing_images: {
+      listing_360_capture_sessions: {
         Row: {
-          caption: string | null
           created_at: string
+          created_by: string
+          expires_at: string | null
           id: string
           listing_id: string
-          sort_order: number
-          storage_path: string
+          token: string
+          used_at: string | null
         }
         Insert: {
-          caption?: string | null
           created_at?: string
+          created_by: string
+          expires_at?: string | null
           id?: string
           listing_id: string
-          sort_order?: number
-          storage_path: string
+          token: string
+          used_at?: string | null
         }
         Update: {
-          caption?: string | null
           created_at?: string
+          created_by?: string
+          expires_at?: string | null
           id?: string
           listing_id?: string
-          sort_order?: number
-          storage_path?: string
+          token?: string
+          used_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "listing_images_listing_id_fkey"
+            foreignKeyName: "listing_360_capture_sessions_listing_id_fkey"
             columns: ["listing_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "listings"
             referencedColumns: ["id"]
           },
@@ -662,40 +575,92 @@ export type Database = {
           },
         ]
       }
-      listing_360_capture_sessions: {
+      listing_category_word_stats: {
         Row: {
-          created_at: string
-          created_by: string
-          expires_at: string | null
-          id: string
-          listing_id: string
-          token: string
-          used_at: string | null
+          category_id: string
+          lexeme: string
+          listing_count: number
+          updated_at: string
         }
         Insert: {
-          created_at?: string
-          created_by: string
-          expires_at?: string | null
-          id?: string
-          listing_id: string
-          token: string
-          used_at?: string | null
+          category_id: string
+          lexeme: string
+          listing_count?: number
+          updated_at?: string
         }
         Update: {
-          created_at?: string
-          created_by?: string
-          expires_at?: string | null
-          id?: string
-          listing_id?: string
-          token?: string
-          used_at?: string | null
+          category_id?: string
+          lexeme?: string
+          listing_count?: number
+          updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "listing_360_capture_sessions_listing_id_fkey"
+            foreignKeyName: "listing_category_word_stats_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      listing_images: {
+        Row: {
+          caption: string | null
+          created_at: string
+          id: string
+          listing_id: string
+          sort_order: number
+          storage_path: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          id?: string
+          listing_id: string
+          sort_order?: number
+          storage_path: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          id?: string
+          listing_id?: string
+          sort_order?: number
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_images_listing_id_fkey"
             columns: ["listing_id"]
             isOneToOne: false
             referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      listing_keyword_stats: {
+        Row: {
+          category_id: string
+          listing_count: number
+          word: string
+        }
+        Insert: {
+          category_id: string
+          listing_count?: number
+          word: string
+        }
+        Update: {
+          category_id?: string
+          listing_count?: number
+          word?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_keyword_stats_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
             referencedColumns: ["id"]
           },
         ]
@@ -837,48 +802,21 @@ export type Database = {
         }
         Relationships: []
       }
-      listing_category_word_stats: {
-        Row: {
-          category_id: string
-          lexeme: string
-          listing_count: number
-          updated_at: string
-        }
-        Insert: {
-          category_id: string
-          lexeme: string
-          listing_count?: number
-          updated_at?: string
-        }
-        Update: {
-          category_id?: string
-          lexeme?: string
-          listing_count?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "listing_category_word_stats_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       listings: {
         Row: {
           attributes: Json
+          can_ship: boolean | null
           category_id: string | null
           city: string | null
           condition: Database["public"]["Enums"]["listing_condition"] | null
           counted_category_id: string | null
+          counted_keyword_category_id: string | null
+          counted_keywords: string[] | null
           counted_lexemes: string[] | null
           created_at: string
           description: string
           display_lat: number | null
           display_lng: number | null
-          can_ship: boolean | null
           expires_at: string | null
           id: string
           is_free: boolean
@@ -901,16 +839,18 @@ export type Database = {
         }
         Insert: {
           attributes?: Json
+          can_ship?: boolean | null
           category_id?: string | null
           city?: string | null
           condition?: Database["public"]["Enums"]["listing_condition"] | null
           counted_category_id?: string | null
+          counted_keyword_category_id?: string | null
+          counted_keywords?: string[] | null
           counted_lexemes?: string[] | null
           created_at?: string
           description?: string
           display_lat?: number | null
           display_lng?: number | null
-          can_ship?: boolean | null
           expires_at?: string | null
           id?: string
           is_free?: boolean
@@ -938,6 +878,8 @@ export type Database = {
           city?: string | null
           condition?: Database["public"]["Enums"]["listing_condition"] | null
           counted_category_id?: string | null
+          counted_keyword_category_id?: string | null
+          counted_keywords?: string[] | null
           counted_lexemes?: string[] | null
           created_at?: string
           description?: string
@@ -1053,32 +995,26 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
-          bio: string | null
           created_at: string
           deleted_at: string | null
           display_name: string
           id: string
-          location: string | null
           updated_at: string
         }
         Insert: {
           avatar_url?: string | null
-          bio?: string | null
           created_at?: string
           deleted_at?: string | null
           display_name: string
           id: string
-          location?: string | null
           updated_at?: string
         }
         Update: {
           avatar_url?: string | null
-          bio?: string | null
           created_at?: string
           deleted_at?: string | null
           display_name?: string
           id?: string
-          location?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -1107,6 +1043,30 @@ export type Database = {
           id?: string
           price_nok?: number
           updated_at?: string
+        }
+        Relationships: []
+      }
+      push_dispatch_failures: {
+        Row: {
+          created_at: string
+          error: string | null
+          id: string
+          kind: string
+          payload: Json
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          kind: string
+          payload: Json
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          kind?: string
+          payload?: Json
         }
         Relationships: []
       }
@@ -1196,30 +1156,6 @@ export type Database = {
           },
         ]
       }
-      system_messages: {
-        Row: {
-          body: string
-          created_at: string
-          id: string
-          read_at: string | null
-          recipient_id: string
-        }
-        Insert: {
-          body: string
-          created_at?: string
-          id?: string
-          read_at?: string | null
-          recipient_id: string
-        }
-        Update: {
-          body?: string
-          created_at?: string
-          id?: string
-          read_at?: string | null
-          recipient_id?: string
-        }
-        Relationships: []
-      }
       saved_search_notifications: {
         Row: {
           created_at: string
@@ -1262,6 +1198,57 @@ export type Database = {
           },
         ]
       }
+      saved_searches: {
+        Row: {
+          created_at: string
+          criteria: Json
+          id: string
+          name: string
+          notify: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          criteria?: Json
+          id?: string
+          name: string
+          notify?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          criteria?: Json
+          id?: string
+          name?: string
+          notify?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      search_query_stats: {
+        Row: {
+          last_searched_at: string
+          query: string
+          search_count: number
+          zero_result_count: number
+        }
+        Insert: {
+          last_searched_at?: string
+          query: string
+          search_count?: number
+          zero_result_count?: number
+        }
+        Update: {
+          last_searched_at?: string
+          query?: string
+          search_count?: number
+          zero_result_count?: number
+        }
+        Relationships: []
+      }
       site_settings: {
         Row: {
           default_search_examples: string[]
@@ -1280,36 +1267,27 @@ export type Database = {
         }
         Relationships: []
       }
-      saved_searches: {
+      system_messages: {
         Row: {
+          body: string
           created_at: string
-          criteria: Json
           id: string
-          last_checked_at: string
-          name: string
-          notify: boolean
-          updated_at: string
-          user_id: string
+          read_at: string | null
+          recipient_id: string
         }
         Insert: {
+          body: string
           created_at?: string
-          criteria?: Json
           id?: string
-          last_checked_at?: string
-          name: string
-          notify?: boolean
-          updated_at?: string
-          user_id: string
+          read_at?: string | null
+          recipient_id: string
         }
         Update: {
+          body?: string
           created_at?: string
-          criteria?: Json
           id?: string
-          last_checked_at?: string
-          name?: string
-          notify?: boolean
-          updated_at?: string
-          user_id?: string
+          read_at?: string | null
+          recipient_id?: string
         }
         Relationships: []
       }
@@ -1448,6 +1426,137 @@ export type Database = {
         }
         Relationships: []
       }
+      vehicle_brands: {
+        Row: {
+          category_group: string
+          created_at: string
+          id: string
+          name: string
+          status: string
+          submitted_by: string | null
+        }
+        Insert: {
+          category_group: string
+          created_at?: string
+          id?: string
+          name: string
+          status?: string
+          submitted_by?: string | null
+        }
+        Update: {
+          category_group?: string
+          created_at?: string
+          id?: string
+          name?: string
+          status?: string
+          submitted_by?: string | null
+        }
+        Relationships: []
+      }
+      vehicle_lookup_log: {
+        Row: {
+          classification_result: Json | null
+          created_at: string
+          id: string
+          registration_number: string
+          user_id: string
+        }
+        Insert: {
+          classification_result?: Json | null
+          created_at?: string
+          id?: string
+          registration_number: string
+          user_id: string
+        }
+        Update: {
+          classification_result?: Json | null
+          created_at?: string
+          id?: string
+          registration_number?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      vehicle_model_classes: {
+        Row: {
+          brand_id: string
+          created_at: string
+          id: string
+          name: string
+          status: string
+          submitted_by: string | null
+        }
+        Insert: {
+          brand_id: string
+          created_at?: string
+          id?: string
+          name: string
+          status?: string
+          submitted_by?: string | null
+        }
+        Update: {
+          brand_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          status?: string
+          submitted_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_model_classes_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_brands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicle_models: {
+        Row: {
+          brand_id: string
+          class_id: string | null
+          created_at: string
+          id: string
+          name: string
+          status: string
+          submitted_by: string | null
+        }
+        Insert: {
+          brand_id: string
+          class_id?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          status?: string
+          submitted_by?: string | null
+        }
+        Update: {
+          brand_id?: string
+          class_id?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          status?: string
+          submitted_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_models_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_models_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_model_classes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vipps_webhook_events: {
         Row: {
           event_id: string
@@ -1508,11 +1617,80 @@ export type Database = {
         }
         Relationships: []
       }
+      wtb_listings: {
+        Row: {
+          attributes: Json
+          category_id: string | null
+          created_at: string
+          description: string | null
+          expires_at: string
+          id: string
+          max_price_nok: number | null
+          search_vector: unknown
+          status: string
+          subtitle: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attributes?: Json
+          category_id?: string | null
+          created_at?: string
+          description?: string | null
+          expires_at?: string
+          id?: string
+          max_price_nok?: number | null
+          search_vector?: unknown
+          status?: string
+          subtitle?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attributes?: Json
+          category_id?: string | null
+          created_at?: string
+          description?: string | null
+          expires_at?: string
+          id?: string
+          max_price_nok?: number | null
+          search_vector?: unknown
+          status?: string
+          subtitle?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wtb_listings_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wtb_listings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      admin_approve_vehicle_brand: { Args: { _id: string }; Returns: undefined }
+      admin_approve_vehicle_model: { Args: { _id: string }; Returns: undefined }
+      admin_approve_vehicle_model_class: {
+        Args: { _id: string }
+        Returns: undefined
+      }
       admin_ban_ip: {
         Args: { _expires_at?: string; _ip: unknown; _reason: string }
         Returns: string
@@ -1521,8 +1699,85 @@ export type Database = {
         Args: { _reason: string; _user_id: string }
         Returns: undefined
       }
+      admin_create_vehicle_brand: {
+        Args: { _category_group: string; _name: string }
+        Returns: {
+          category_group: string
+          created_at: string
+          id: string
+          name: string
+          status: string
+          submitted_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "vehicle_brands"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_create_vehicle_model:
+        | {
+            Args: { _brand_id: string; _name: string }
+            Returns: {
+              brand_id: string
+              class_id: string | null
+              created_at: string
+              id: string
+              name: string
+              status: string
+              submitted_by: string | null
+            }
+            SetofOptions: {
+              from: "*"
+              to: "vehicle_models"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+        | {
+            Args: { _brand_id: string; _class_id?: string; _name: string }
+            Returns: {
+              brand_id: string
+              class_id: string | null
+              created_at: string
+              id: string
+              name: string
+              status: string
+              submitted_by: string | null
+            }
+            SetofOptions: {
+              from: "*"
+              to: "vehicle_models"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+      admin_create_vehicle_model_class: {
+        Args: { _brand_id: string; _name: string }
+        Returns: {
+          brand_id: string
+          created_at: string
+          id: string
+          name: string
+          status: string
+          submitted_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "vehicle_model_classes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       admin_delete_listing: {
         Args: { _id: string; _message: string }
+        Returns: undefined
+      }
+      admin_delete_vehicle_brand: { Args: { _id: string }; Returns: undefined }
+      admin_delete_vehicle_model: { Args: { _id: string }; Returns: undefined }
+      admin_delete_vehicle_model_class: {
+        Args: { _id: string }
         Returns: undefined
       }
       admin_disable_listing: {
@@ -1530,7 +1785,7 @@ export type Database = {
         Returns: undefined
       }
       admin_disable_listing_with_message: {
-        Args: { _id: string; _reason: string; _message: string }
+        Args: { _id: string; _message: string; _reason: string }
         Returns: undefined
       }
       admin_enable_listing: { Args: { _id: string }; Returns: undefined }
@@ -1548,111 +1803,11 @@ export type Database = {
         }[]
       }
       admin_grant_demo_role: { Args: { _user_id: string }; Returns: undefined }
-      admin_grant_moderator_role: { Args: { _user_id: string }; Returns: undefined }
+      admin_grant_moderator_role: {
+        Args: { _user_id: string }
+        Returns: undefined
+      }
       admin_grant_role: { Args: { _user_id: string }; Returns: undefined }
-      admin_list_reports: {
-        Args: { _limit?: number }
-        Returns: {
-          id: string
-          created_at: string
-          listing_id: string | null
-          kaupet_code: string | null
-          listing_title: string | null
-          reporter_id: string | null
-          reporter_name: string | null
-          owner_id: string | null
-          owner_name: string | null
-          reported_user_id: string | null
-          reported_user_name: string | null
-          reason: string | null
-          comment: string | null
-          status: string | null
-          resolved_at: string | null
-        }[]
-      }
-      admin_resolve_report: { Args: { _id: string }; Returns: undefined }
-      admin_revoke_moderator_role: { Args: { _user_id: string }; Returns: undefined }
-      admin_list_pending_vehicle_entries: {
-        Args: never
-        Returns: {
-          kind: string
-          id: string
-          name: string
-          category_group: string
-          brand_name: string | null
-          submitted_by: string | null
-          submitted_by_name: string | null
-          created_at: string
-        }[]
-      }
-      admin_approve_vehicle_brand: { Args: { _id: string }; Returns: undefined }
-      admin_reject_vehicle_brand: { Args: { _id: string }; Returns: undefined }
-      admin_approve_vehicle_model: { Args: { _id: string }; Returns: undefined }
-      admin_reject_vehicle_model: { Args: { _id: string }; Returns: undefined }
-      admin_create_vehicle_brand: {
-        Args: { _name: string; _category_group: string }
-        Returns: {
-          id: string
-          name: string
-          category_group: string
-          status: string
-          submitted_by: string | null
-          created_at: string
-        }
-      }
-      admin_update_vehicle_brand: {
-        Args: { _id: string; _name: string }
-        Returns: {
-          id: string
-          name: string
-          category_group: string
-          status: string
-          submitted_by: string | null
-          created_at: string
-        }
-      }
-      admin_delete_vehicle_brand: { Args: { _id: string }; Returns: undefined }
-      admin_create_vehicle_model: {
-        Args: { _brand_id: string; _name: string }
-        Returns: {
-          id: string
-          brand_id: string
-          name: string
-          status: string
-          submitted_by: string | null
-          created_at: string
-        }
-      }
-      admin_update_vehicle_model: {
-        Args: { _id: string; _name: string }
-        Returns: {
-          id: string
-          brand_id: string
-          name: string
-          status: string
-          submitted_by: string | null
-          created_at: string
-        }
-      }
-      admin_delete_vehicle_model: { Args: { _id: string }; Returns: undefined }
-      admin_list_vehicle_brands_with_models: {
-        Args: never
-        Returns: {
-          brand_id: string
-          brand_name: string
-          category_group: string
-          model_id: string | null
-          model_name: string | null
-        }[]
-      }
-      submit_listing_report: {
-        Args: { _listing_id: string; _reason: string; _comment?: string | null }
-        Returns: undefined
-      }
-      submit_user_report: {
-        Args: { _reported_user_id: string; _reason: string; _comment?: string | null }
-        Returns: undefined
-      }
       admin_list_bans: {
         Args: never
         Returns: {
@@ -1699,6 +1854,39 @@ export type Database = {
           target_type: string
         }[]
       }
+      admin_list_pending_vehicle_entries: {
+        Args: never
+        Returns: {
+          brand_name: string
+          category_group: string
+          created_at: string
+          id: string
+          kind: string
+          name: string
+          submitted_by: string
+          submitted_by_name: string
+        }[]
+      }
+      admin_list_reports: {
+        Args: { _limit?: number }
+        Returns: {
+          comment: string
+          created_at: string
+          id: string
+          kaupet_code: string
+          listing_id: string
+          listing_title: string
+          owner_id: string
+          owner_name: string
+          reason: string
+          reported_user_id: string
+          reported_user_name: string
+          reporter_id: string
+          reporter_name: string
+          resolved_at: string
+          status: string
+        }[]
+      }
       admin_list_suspensions: {
         Args: never
         Returns: {
@@ -1711,6 +1899,18 @@ export type Database = {
           user_id: string
         }[]
       }
+      admin_list_vehicle_brands_with_models: {
+        Args: never
+        Returns: {
+          brand_id: string
+          brand_name: string
+          category_group: string
+          class_id: string
+          class_name: string
+          model_id: string
+          model_name: string
+        }[]
+      }
       admin_overview_stats: {
         Args: never
         Returns: {
@@ -1720,15 +1920,6 @@ export type Database = {
           total_listings: number
           views_30d: number
           views_7d: number
-        }[]
-      }
-      admin_zero_result_searches: {
-        Args: { _limit?: number }
-        Returns: {
-          last_searched_at: string
-          query: string
-          search_count: number
-          zero_result_count: number
         }[]
       }
       admin_popular_categories: {
@@ -1752,7 +1943,18 @@ export type Database = {
           view_count: number
         }[]
       }
+      admin_reject_vehicle_brand: { Args: { _id: string }; Returns: undefined }
+      admin_reject_vehicle_model: { Args: { _id: string }; Returns: undefined }
+      admin_reject_vehicle_model_class: {
+        Args: { _id: string }
+        Returns: undefined
+      }
+      admin_resolve_report: { Args: { _id: string }; Returns: undefined }
       admin_revoke_demo_role: { Args: { _user_id: string }; Returns: undefined }
+      admin_revoke_moderator_role: {
+        Args: { _user_id: string }
+        Returns: undefined
+      }
       admin_revoke_role: { Args: { _user_id: string }; Returns: undefined }
       admin_search_listings: {
         Args: { _limit?: number; _query?: string; _status?: string }
@@ -1773,11 +1975,91 @@ export type Database = {
       admin_unban_ip: { Args: { _id: string }; Returns: undefined }
       admin_unban_user: { Args: { _user_id: string }; Returns: undefined }
       admin_unsuspend_user: { Args: { _user_id: string }; Returns: undefined }
+      admin_update_vehicle_brand: {
+        Args: { _id: string; _name: string }
+        Returns: {
+          category_group: string
+          created_at: string
+          id: string
+          name: string
+          status: string
+          submitted_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "vehicle_brands"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_update_vehicle_model:
+        | {
+            Args: { _id: string; _name: string }
+            Returns: {
+              brand_id: string
+              class_id: string | null
+              created_at: string
+              id: string
+              name: string
+              status: string
+              submitted_by: string | null
+            }
+            SetofOptions: {
+              from: "*"
+              to: "vehicle_models"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+        | {
+            Args: { _class_id?: string; _id: string; _name: string }
+            Returns: {
+              brand_id: string
+              class_id: string | null
+              created_at: string
+              id: string
+              name: string
+              status: string
+              submitted_by: string | null
+            }
+            SetofOptions: {
+              from: "*"
+              to: "vehicle_models"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+      admin_update_vehicle_model_class: {
+        Args: { _id: string; _name: string }
+        Returns: {
+          brand_id: string
+          created_at: string
+          id: string
+          name: string
+          status: string
+          submitted_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "vehicle_model_classes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       admin_views_timeseries: {
         Args: { _days?: number }
         Returns: {
           day: string
           views: number
+        }[]
+      }
+      admin_zero_result_searches: {
+        Args: { _limit?: number }
+        Returns: {
+          last_searched_at: string
+          query: string
+          search_count: number
+          zero_result_count: number
         }[]
       }
       cancel_account_deletion: { Args: never; Returns: boolean }
@@ -1824,6 +2106,10 @@ export type Database = {
           unique_visitors: number
         }[]
       }
+      listings_search_term_match: {
+        Args: { search_vector: unknown; term: string; title: string }
+        Returns: boolean
+      }
       listings_within_radius: {
         Args: { center_lat: number; center_lng: number; radius_km: number }
         Returns: {
@@ -1842,6 +2128,16 @@ export type Database = {
       match_listing_to_saved_searches: {
         Args: { _listing_id: string }
         Returns: undefined
+      }
+      match_search_synonyms: {
+        Args: { p_category_id: string; phrases: string[] }
+        Returns: {
+          filter_key: string
+          filter_label: string
+          option_label: string
+          option_value: string
+          phrase: string
+        }[]
       }
       my_listing_counts: {
         Args: never
@@ -1870,12 +2166,12 @@ export type Database = {
           is_free: boolean
           kaupet_code: string
           listing_id: string
+          mileage_km: number
           price_nok: number
+          subtitle: string
           title: string
-          subtitle: string | null
           total_views: number
           views_last_week: number
-          mileage_km: number | null
         }[]
       }
       popular_listings_last_week: {
@@ -1887,12 +2183,12 @@ export type Database = {
           is_free: boolean
           kaupet_code: string
           listing_id: string
+          mileage_km: number
           price_nok: number
+          subtitle: string
           title: string
-          subtitle: string | null
           total_views: number
           views_last_week: number
-          mileage_km: number | null
         }[]
       }
       purge_expired_accounts: { Args: never; Returns: number }
@@ -1904,39 +2200,32 @@ export type Database = {
           unread_count: number
         }[]
       }
-      match_search_synonyms: {
-        Args: {
-          p_category_id: string
-          phrases: string[]
-        }
-        Returns: {
-          phrase: string
-          filter_key: string
-          filter_label: string
-          option_value: string | null
-          option_label: string | null
-        }[]
-      }
       search_listing_ids: {
         Args: {
-          include_groups?: Json
-          exclude_any_terms?: string[] | null
           exclude_all_groups?: Json
+          exclude_any_terms?: string[]
+          include_groups?: Json
         }
         Returns: {
           id: string
           rank: number
         }[]
       }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
+      submit_listing_report: {
+        Args: { _comment?: string; _listing_id: string; _reason: string }
+        Returns: undefined
+      }
+      submit_user_report: {
+        Args: { _comment?: string; _reason: string; _reported_user_id: string }
+        Returns: undefined
+      }
       suggest_attribute_values: {
-        Args: {
-          p_category_id: string
-          p_key: string
-          p_limit?: number
-        }
+        Args: { p_category_id: string; p_key: string; p_limit?: number }
         Returns: {
-          value: string
           listing_count: number
+          value: string
         }[]
       }
       suggest_category_for_title: {
@@ -1944,17 +2233,17 @@ export type Database = {
         Returns: {
           category_id: string
           name_nb: string
-          parent_id: string | null
-          parent_name_nb: string | null
+          parent_id: string
+          parent_name_nb: string
           slug: string
           votes: number
         }[]
       }
       suggest_keywords_for_listing: {
-        Args: { _title: string; _category_id: string }
+        Args: { _category_id: string; _title: string }
         Returns: {
-          word: string
           listing_count: number
+          word: string
         }[]
       }
       user_review_summary: {
@@ -2113,9 +2402,12 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
-      app_role: ["admin", "user", "demo"],
+      app_role: ["admin", "user", "demo", "moderator"],
       block_scope: ["all", "conversation"],
       listing_condition: ["new", "like_new", "good", "acceptable", "for_parts"],
       listing_status: [

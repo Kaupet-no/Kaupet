@@ -19,7 +19,7 @@ import {
 } from "@/lib/category-filters";
 import {
   VehicleBrandField,
-  VehicleModelField,
+  VehicleModelWithClassField,
 } from "@/features/listing-creation/modules/generic-attributes/vehicle-brand-model-fields";
 import { RangeFilterField } from "@/components/range-filter-field";
 import { boundsForFilter } from "@/lib/filter-range-bounds";
@@ -90,7 +90,7 @@ export function CategoryFilterFields({
               ? (values[brandFilter.key] as { kind: "select"; value: string }).value
               : undefined;
           return (
-            <VehicleModelField
+            <VehicleModelWithClassField
               key={f.id}
               categoryGroup={(brandFilter?.unit ?? "bil") as VehicleBrandGroup}
               brandName={brandName}

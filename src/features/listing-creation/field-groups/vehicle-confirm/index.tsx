@@ -28,7 +28,7 @@ import { createVehicleBrand, createVehicleModel } from "@/lib/vehicle/vehicle-br
 import { VEHICLE_LEAF_SLUGS, type VehicleLeafSlug } from "@/lib/vehicle/vehicle-classification";
 import {
   VehicleBrandField,
-  VehicleModelField,
+  VehicleModelWithClassField,
 } from "@/features/listing-creation/modules/generic-attributes/vehicle-brand-model-fields";
 import type { VehicleBrandGroup } from "@/lib/category-filters";
 
@@ -383,7 +383,7 @@ export function VehicleConfirm({
                 )}
               </div>
               <div className="col-span-2 space-y-1">
-                <VehicleModelField
+                <VehicleModelWithClassField
                   categoryGroup={categoryGroup ?? "bil"}
                   brandName={brandOverride ?? brandName ?? undefined}
                   value={modelOverride ?? modelName ?? lookup.model ?? undefined}

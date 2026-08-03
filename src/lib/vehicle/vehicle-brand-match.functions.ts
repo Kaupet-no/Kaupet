@@ -27,12 +27,13 @@ import type { VehicleBrandGroup } from "@/lib/category-filters";
  * downstream, matching the user's expectation that a known model like
  * "Leaf" is what should be selected rather than proposed as a new value. */
 function findModelContainedIn(
-  models: { id: string; name: string }[],
+  models: { id: string; name: string; class_id: string | null }[],
   modelText: string,
-): { id: string; name: string } | null {
+): { id: string; name: string; class_id: string | null } | null {
   const lower = modelText.toLowerCase();
   const isWordChar = (ch: string) => /[a-z0-9æøå]/i.test(ch);
-  let best: { model: { id: string; name: string }; idx: number } | null = null;
+  let best: { model: { id: string; name: string; class_id: string | null }; idx: number } | null =
+    null;
   for (const m of models) {
     if (m.name.trim().length === 0) continue;
     const nameLower = m.name.toLowerCase();
@@ -63,10 +64,10 @@ export async function matchVehicleBrandAndModel(
   categoryGroup: VehicleBrandGroup,
 ): Promise<{
   brandMatch: { id: string; name: string } | null;
-  modelMatch: { id: string; name: string } | null;
+  modelMatch: { id: string; name: string; class_id: string | null } | null;
 }> {
   let brandMatch: { id: string; name: string } | null = null;
-  let modelMatch: { id: string; name: string } | null = null;
+  let modelMatch: { id: string; name: string; class_id: string | null } | null = null;
 
   if (brand) {
     const { data: brandRow } = await supabaseAdmin
@@ -81,7 +82,7 @@ export async function matchVehicleBrandAndModel(
       if (model) {
         const { data: modelRow } = await supabaseAdmin
           .from("vehicle_models")
-          .select("id, name")
+          .select("id, name, class_id")
           .eq("brand_id", brandRow.id)
           .eq("status", "approved")
           .ilike("name", model)
@@ -91,7 +92,7 @@ export async function matchVehicleBrandAndModel(
         } else {
           const { data: brandModels } = await supabaseAdmin
             .from("vehicle_models")
-            .select("id, name")
+            .select("id, name, class_id")
             .eq("brand_id", brandRow.id)
             .eq("status", "approved");
           modelMatch = findModelContainedIn(brandModels ?? [], model);

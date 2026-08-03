@@ -19,6 +19,8 @@ import {
   adminRejectVehicleBrand,
   adminApproveVehicleModel,
   adminRejectVehicleModel,
+  adminApproveVehicleModelClass,
+  adminRejectVehicleModelClass,
 } from "@/lib/vehicle/admin-vehicle-brands.functions";
 import { formatErrorMessage } from "@/lib/errors";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -41,6 +43,8 @@ export function VehicleBrandsTab() {
   const rejectBrandFn = useServerFn(adminRejectVehicleBrand);
   const approveModelFn = useServerFn(adminApproveVehicleModel);
   const rejectModelFn = useServerFn(adminRejectVehicleModel);
+  const approveClassFn = useServerFn(adminApproveVehicleModelClass);
+  const rejectClassFn = useServerFn(adminRejectVehicleModelClass);
 
   const {
     data: entries,
@@ -58,7 +62,9 @@ export function VehicleBrandsTab() {
     mutationFn: (row: PendingRow) =>
       row.kind === "brand"
         ? approveBrandFn({ data: { id: row.id } })
-        : approveModelFn({ data: { id: row.id } }),
+        : row.kind === "class"
+          ? approveClassFn({ data: { id: row.id } })
+          : approveModelFn({ data: { id: row.id } }),
     onSuccess: () => {
       showSuccessToast("Godkjent");
       invalidate();
@@ -70,7 +76,9 @@ export function VehicleBrandsTab() {
     mutationFn: (row: PendingRow) =>
       row.kind === "brand"
         ? rejectBrandFn({ data: { id: row.id } })
-        : rejectModelFn({ data: { id: row.id } }),
+        : row.kind === "class"
+          ? rejectClassFn({ data: { id: row.id } })
+          : rejectModelFn({ data: { id: row.id } }),
     onSuccess: () => {
       showSuccessToast("Avslått");
       invalidate();
@@ -136,11 +144,13 @@ export function VehicleBrandsTab() {
               {rows.map((r) => (
                 <TableRow key={`${r.kind}-${r.id}`}>
                   <TableCell>
-                    <Badge variant="outline">{r.kind === "brand" ? "Merke" : "Modell"}</Badge>
+                    <Badge variant="outline">
+                      {r.kind === "brand" ? "Merke" : r.kind === "class" ? "Klasse" : "Modell"}
+                    </Badge>
                   </TableCell>
                   <TableCell className="font-medium">{r.name}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {r.kind === "model" ? r.brand_name : r.category_group}
+                    {r.kind === "model" || r.kind === "class" ? r.brand_name : r.category_group}
                   </TableCell>
                   <TableCell className="text-sm">{r.submitted_by_name ?? "Ukjent"}</TableCell>
                   <TableCell className="whitespace-nowrap text-xs text-muted-foreground">

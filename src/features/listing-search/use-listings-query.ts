@@ -93,7 +93,7 @@ export function useListingsQuery({
       if (hasSearch) {
         const { data: matches, error: searchError } = await supabase.rpc("search_listing_ids", {
           include_groups: includeGroups,
-          exclude_any_terms: excludeAnyTerms.length > 0 ? excludeAnyTerms : null,
+          exclude_any_terms: excludeAnyTerms.length > 0 ? excludeAnyTerms : undefined,
           exclude_all_groups: excludeAllGroups,
         });
         if (searchError) throw searchError;

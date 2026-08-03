@@ -74,6 +74,12 @@ async function clickNextAndWaitFor(page: Page, expected: Locator, testInfo: Test
 test("logger inn og publiserer en kjøretøy-annonse (manuell registrering)", async ({
   page,
 }, testInfo) => {
+  // Permanent (not error-triggered) console/pageerror capture — investigating
+  // the silent "Neste"-klikk issue below via trace inspection alone found
+  // nothing, so this gives the next occurrence a chance to leave a trail in
+  // the CI job log even on a run that ultimately succeeds via retry.
+  page.on("console", (msg) => console.log(`[browser:${msg.type()}] ${msg.text()}`));
+  page.on("pageerror", (err) => console.log(`[pageerror] ${err.message}`));
   await page.goto("/auth");
   await page.waitForLoadState("networkidle");
   await page.getByLabel("E-post").fill(email);

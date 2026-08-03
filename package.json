@@ -145,7 +145,9 @@
     "tar": "^7.5.16",
     "minimatch": "^9.0.5",
     "uuid": "^11.1.1",
-    "esbuild": "^0.28.1"
+    "esbuild": "^0.28.1",
+    "brace-expansion": "^2.1.4",
+    "undici": "^8.9.0"
   },
   "patchedDependencies": {
     "eslint-plugin-jsx-a11y@6.10.2": "patches/eslint-plugin-jsx-a11y@6.10.2.patch"

@@ -49,24 +49,34 @@ ekte brukere siden 2026-06-22.
 
 ## 4 — Ett målrettet RLS-testtilfelle for annonsesletting
 
-**Lagt til**, men **ikke kjørt lokalt** — se avvik under.
+**Lagt til og kjørt — grønt.** Docker lot seg ikke starte i selve
+agent-sandboxen (se opprinnelig avvik-notat, bevart under), så brukeren
+kjørte `test:rls` selv, direkte mot det ekte staging-Supabase-prosjektet
+(`LOCAL_SUPABASE_*`-miljøvariablene pekt på `SUPABASE_URL`/
+`SUPABASE_PUBLISHABLE_KEY`/`SUPABASE_SERVICE_ROLE_KEY` fra `.env` i stedet
+for en lokal stack) fremfor en lokal Docker-stack.
 
 Ny test i `src/lib/rls.integration.test.ts`: en eier sletter sin egen
 aktive, kategoriserte annonse (samme scenario som faktisk brøt i runde 4
-punkt 1 — kun aktive/kategoriserte annonser trigger den interne
-tellings-oppdateringen), og forventer at slettingen lykkes uten
-trigger-/RLS-feil.
+punkt 1), og forventer at slettingen lykkes uten trigger-/RLS-feil.
 
-**Avvik fra plan:** `bun run test:rls` krever en lokal Supabase-stack via
-Docker. Docker Desktop lot seg ikke starte i denne sandbox-økten (verken
-via direkte prosess-start eller `cmd /c start` — prosessen dukket aldri opp
-i `tasklist`, sannsynligvis fordi GUI-appstart er blokkert i dette
-kjøremiljøet). Testen er derfor **ikke kjørt**, kun skrevet etter samme
-mønster som de øvrige 34 testblokkene i filen, og verifisert med
-`bunx tsc --noEmit` (grønn) og at den korrekt ekskluderes fra
-`bun run test` (separat `vitest.integration.config.ts`, bekreftet — 184
-tester fortsatt grønne, uendret). **Bør kjøres og bekreftes av noen med et
-kjørende lokalt Docker-oppsett før den stoles på.**
+**Resultat:** hele suiten (96 tester, 35 `describe`-blokker) grønn mot
+staging, inkludert den nye testen. Etterpå ble 10 `rls-*`-testbrukere fra
+**tidligere** (før-fiks) kjøringer av `test:rls` funnet og slettet — disse
+hadde sittet fast av nøyaktig samme root cause som runde 4 punkt 1, siden
+`rls-report-seller-*`-testene også oppretter en annonse som cascader inn i
+den samme trigger-buggen ved brukersletting. At alle 10 nå lot seg slette
+uten feil er en uavhengig bekreftelse på at fiksen holder — ikke bare for
+det ene scenarioet den nye testen dekker, men for et reelt, historisk
+tilfelle av samme bug.
+
+**Opprinnelig avvik-notat (agent-sandbox, før brukeren kjørte det selv):**
+`bun run test:rls` krever en lokal Supabase-stack via Docker. Docker
+Desktop lot seg ikke starte i agent-sandboxen (verken via direkte
+prosess-start eller `cmd /c start` — prosessen dukket aldri opp i
+`tasklist`, sannsynligvis fordi GUI-appstart er blokkert i det
+kjøremiljøet). Testen ble derfor først kun skrevet og typecheck-verifisert,
+ikke kjørt — løst ved at brukeren kjørte den selv mot staging i stedet.
 
 **Sidefunn — rettet:** `CLAUDE.md` hevdet "Kun `conversations`/`messages`
 har reell dekning per nå — resten av de ~45 RLS-aktiverte tabellene mangler

@@ -26,7 +26,8 @@ export default async function globalTeardown() {
     if (error) {
       console.warn(
         `[e2e global-teardown] Kunne ikke slette testbruker ${userId} (og dermed heller ikke ` +
-          `annonsene den opprettet): ${error.message}`,
+          `annonsene den opprettet): status=${error.status} code=${error.code} name=${error.name} ` +
+          `message=${error.message}`,
       );
     }
   }

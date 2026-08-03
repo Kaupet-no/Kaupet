@@ -233,6 +233,80 @@ describe.skipIf(!canRun)("RLS: listings — draft visibility and owner-only writ
   });
 });
 
+describe.skipIf(!canRun)(
+  "RLS: owner can delete their own active, categorized listing (regression for 20260622120000/20260624120000 stats triggers)",
+  () => {
+    // The AFTER DELETE stats triggers (listings_remove_category_word_stats,
+    // listings_remove_keyword_stats) only fire their internal UPDATE when
+    // the deleted listing had counted_category_id/counted_lexemes set —
+    // which only happens for an *active, categorized* listing (see the
+    // BEFORE trigger's `IF NEW.status = 'active' AND NEW.category_id IS NOT
+    // NULL` guard in 20260622120000_category_word_stats.sql). A draft or
+    // uncategorized listing wouldn't exercise this path at all, so this
+    // test deliberately goes through the app's real "publish" shape
+    // (active status + a real category + a title with real words) rather
+    // than the minimal fixtures used elsewhere in this file.
+    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+    const suffix = Date.now();
+    const emails = { seller: `rls-listing-delete-seller-${suffix}@example.com` };
+
+    const userIds: string[] = [];
+    let sellerId: string;
+    let listingId: string;
+
+    async function signIn(email: string) {
+      return signInWithRetry(email);
+    }
+
+    beforeAll(async () => {
+      const { data: userData, error: userErr } = await admin.auth.admin.createUser({
+        email: emails.seller,
+        password: PASSWORD,
+        email_confirm: true,
+      });
+      if (userErr) throw userErr;
+      sellerId = userData.user!.id;
+      userIds.push(sellerId);
+
+      const { data: category, error: catErr } = await admin
+        .from("categories")
+        .select("id")
+        .limit(1)
+        .single();
+      if (catErr) throw catErr;
+
+      const { data: listing, error: listingErr } = await admin
+        .from("listings")
+        .insert({
+          seller_id: sellerId,
+          title: "RLS delete-regression annonse med ord",
+          price_nok: 100,
+          status: "active",
+          category_id: category.id,
+        })
+        .select("id")
+        .single();
+      if (listingErr) throw listingErr;
+      listingId = listing.id;
+    });
+
+    afterAll(async () => {
+      if (!canRun) return;
+      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+    });
+
+    it("lets the owner delete their own active, categorized listing without a trigger permission/RLS error", async () => {
+      const seller = await signIn(emails.seller);
+      const { error, count } = await seller
+        .from("listings")
+        .delete({ count: "exact" })
+        .eq("id", listingId);
+      expect(error).toBeNull();
+      expect(count).toBe(1);
+    });
+  },
+);
+
 describe.skipIf(!canRun)("RLS: profiles — soft-deleted profiles are hidden from others", () => {
   const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
   const suffix = Date.now();

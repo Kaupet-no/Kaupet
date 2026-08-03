@@ -293,13 +293,14 @@ export function CategoryFiltersPanel({ category }: { category: Category }) {
               placeholder="f.eks. tommer, km"
             />
           </div>
-          <label className="flex items-center gap-2 text-sm">
+          <Label htmlFor="f-is-primary" className="flex items-center gap-2 text-sm font-normal">
             <Checkbox
+              id="f-is-primary"
               checked={draft.is_primary}
               onCheckedChange={(c) => setDraft((d) => (d ? { ...d, is_primary: c === true } : d))}
             />
             Vis alltid (av = under «Flere valg»)
-          </label>
+          </Label>
           {(draft.type === "text" || usesOptions) && draft.key.trim() && (
             <SuggestValuesButton
               categoryId={category.id}

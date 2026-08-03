@@ -75,6 +75,7 @@ export const Route = createFileRoute("/$kaupetCode")({
     const { data: mains, error: catError } = await supabase
       .from("categories")
       .select("id, slug, name_nb, parent_id, icon, color")
+      .eq("is_hidden", false)
       .is("parent_id", null);
     if (catError) throw catError;
     const exact = (mains ?? []).find((c) => c.slug === params.kaupetCode);

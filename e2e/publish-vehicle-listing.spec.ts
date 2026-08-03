@@ -12,7 +12,15 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import {
+  clickNextAndWaitFor,
+  fillDescriptionAndAdvance,
+  goToNewListing,
+  login,
+  publishAndExpectSuccess,
+  wizardStep,
+} from "./pages/listing-wizard";
 
 const { email, password } = JSON.parse(
   readFileSync(
@@ -39,50 +47,15 @@ const TEST_VEHICLE_CATEGORY_NAME = "E2E-test kjøretøy (ikke bruk)";
 const TEST_BRAND = "Volvo";
 const TEST_MODEL = "XC60";
 
-/**
- * Clicks the wizard's "Neste" button and waits for `expected` to appear.
- * Retries the click a bounded number of times if `expected` doesn't show up
- * in time — the click has been observed (via trace inspection) to complete
- * without error yet leave the page state unchanged, which every static
- * analysis of goToNextPage()'s validation logic says shouldn't be possible.
- * Rather than block on fully root-causing that, this treats "no progress
- * after a successful click" as an observable, retriable condition. Each
- * retry attaches a screenshot to the test report for further diagnosis if
- * this still doesn't resolve it.
- */
-async function clickNextAndWaitFor(page: Page, expected: Locator, testInfo: TestInfo) {
-  const attempts = 3;
-  for (let i = 0; i < attempts; i++) {
-    await page.getByTestId("wizard-next-button").click();
-    const appeared = await expected
-      .waitFor({ timeout: 8_000 })
-      .then(() => true)
-      .catch(() => false);
-    if (appeared) return;
-    if (i < attempts - 1) {
-      await testInfo.attach(`no-progress-after-neste-click-attempt-${i + 1}`, {
-        body: await page.screenshot(),
-        contentType: "image/png",
-      });
-    }
-  }
-  // Final attempt: let the normal timeout/error surface with Playwright's
-  // own diagnostics if it still hasn't appeared.
-  await expected.waitFor();
-}
-
 test("logger inn og publiserer en kjøretøy-annonse (manuell registrering)", async ({
   page,
 }, testInfo) => {
-  await page.goto("/auth");
-  await page.waitForLoadState("networkidle");
-  await page.getByLabel("E-post").fill(email);
-  await page.getByLabel("Passord").fill(password);
-  await expect(page.getByLabel("E-post")).toHaveValue(email);
-  await page.getByRole("main").getByRole("button", { name: "Logg inn" }).click();
-  await expect(page).toHaveURL("/", { timeout: 10_000 });
-
-  await page.goto("/ny-annonse?type=sell");
+  // Permanent console/pageerror capture is wired up inside login() (see
+  // listing-wizard.ts) — originally added here to investigate the silent
+  // "Neste"-klikk issue below, moved so both specs get it, including
+  // publish-listing.spec.ts's own unrelated, never-reproduced login flake.
+  await login(page, email, password);
+  await goToNewListing(page);
 
   // Top-level category-select step: "Bil og MC" is directly selectable
   // despite having children (see category-select/index.tsx's
@@ -96,7 +69,7 @@ test("logger inn og publiserer en kjøretøy-annonse (manuell registrering)", as
   // vehicle-registration step: skip the Statens vegvesen lookup path and
   // pick the test leaf manually instead. The embedded category picker here
   // reuses the same tile markup as the top-level one.
-  await page.getByTestId("wizard-step-vehicle-registration").waitFor();
+  await wizardStep(page, "vehicle-registration").waitFor();
   await page.getByRole("button", { name: "Kjøretøyet er ikke registrert" }).click();
   await page.locator(`[data-category-name="${TEST_VEHICLE_CATEGORY_NAME}"]`).click();
 
@@ -129,7 +102,7 @@ test("logger inn og publiserer en kjøretøy-annonse (manuell registrering)", as
   // generic flow, vehicles have no "Gis bort gratis" checkbox at all (see
   // the `!isVehicle &&` guard in price/index.tsx) — a real price is
   // required.
-  await page.getByTestId("wizard-step-vehicle-facts").waitFor();
+  await wizardStep(page, "vehicle-facts").waitFor();
   await page.getByLabel("Kilometerstand").fill("42000");
   // getByLabel("Pris") is ambiguous — the step progressbar's aria-label
   // ("Steg 4 av 7: Pris & detaljer") also matches as a substring.
@@ -137,19 +110,18 @@ test("logger inn og publiserer en kjøretøy-annonse (manuell registrering)", as
 
   // vehicle-condition: known-issues is required unless "no known issues" is
   // checked. Tilstand keeps its default value.
-  await clickNextAndWaitFor(page, page.getByTestId("wizard-step-vehicle-condition"), testInfo);
+  await clickNextAndWaitFor(page, wizardStep(page, "vehicle-condition"), testInfo);
   await page.getByRole("checkbox", { name: "Ingen kjente feil eller mangler" }).click();
 
   // Beskrivelse is its own step, identical to the generic flow.
-  await clickNextAndWaitFor(page, page.getByTestId("wizard-step-description-keywords"), testInfo);
-  await page
-    .getByTestId("listing-description-textarea")
-    .fill("Automatisk opprettet av en e2e-test. Bil i god stand, lite brukt.");
+  await clickNextAndWaitFor(page, wizardStep(page, "description-keywords"), testInfo);
+  await fillDescriptionAndAdvance(
+    page,
+    testInfo,
+    "Automatisk opprettet av en e2e-test. Bil i god stand, lite brukt.",
+  );
 
   // Final step: delivery/location (vehicles can't be shipped, so this step
   // has nothing required to fill in) + publish confirmation share one page.
-  await clickNextAndWaitFor(page, page.getByTestId("wizard-step-delivery-location"), testInfo);
-  await page.getByTestId("publish-listing-button").click();
-  await page.getByTestId("publish-anyway-button").click();
-  await expect(page.getByText("Annonsen er publisert")).toBeVisible({ timeout: 15_000 });
+  await publishAndExpectSuccess(page);
 });

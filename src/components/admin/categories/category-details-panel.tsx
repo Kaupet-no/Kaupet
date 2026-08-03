@@ -6,6 +6,7 @@ import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { supabase } from "@/integrations/supabase/client";
 import { CategoryPicker } from "@/components/category-picker";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -67,6 +68,7 @@ export function CategoryDetailsPanel({
   const [searchExamples, setSearchExamples] = useState<string>(
     (category?.search_examples ?? []).join("\n"),
   );
+  const [isHidden, setIsHidden] = useState(category?.is_hidden ?? false);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -83,6 +85,7 @@ export function CategoryDetailsPanel({
           .split("\n")
           .map((w) => w.trim())
           .filter(Boolean),
+        is_hidden: isHidden,
       };
       if (category) {
         const { data, error } = await supabase
@@ -90,7 +93,7 @@ export function CategoryDetailsPanel({
           .update(payload)
           .eq("id", category.id)
           .select(
-            "id, name_nb, slug, parent_id, sort_order, icon, color, heading_font, search_examples",
+            "id, name_nb, slug, parent_id, sort_order, icon, color, heading_font, search_examples, is_hidden",
           )
           .single();
         if (error) throw error;
@@ -108,7 +111,7 @@ export function CategoryDetailsPanel({
           .from("categories")
           .insert({ ...payload, sort_order: siblingMaxSortOrder + 10 })
           .select(
-            "id, name_nb, slug, parent_id, sort_order, icon, color, heading_font, search_examples",
+            "id, name_nb, slug, parent_id, sort_order, icon, color, heading_font, search_examples, is_hidden",
           )
           .single();
         if (error) throw error;
@@ -314,6 +317,24 @@ export function CategoryDetailsPanel({
           <p className="text-xs text-muted-foreground">
             Ett ord/uttrykk per linje. Rulleres i søkefeltets typewriter-animasjon på landingssiden
             når kategorien er valgt. Tom liste faller tilbake til underkategorinavn.
+          </p>
+        </div>
+        <div className="space-y-2">
+          <Label
+            htmlFor="is-hidden"
+            className="flex items-center gap-2 text-sm font-normal text-foreground"
+          >
+            <Checkbox
+              id="is-hidden"
+              checked={isHidden}
+              onCheckedChange={(v) => setIsHidden(Boolean(v))}
+            />
+            Skjult for sluttbrukere
+          </Label>
+          <p className="text-xs text-muted-foreground">
+            Filtreres bort fra landingssider, søk/browse, kategorisider og sitemap.xml. Fortsatt
+            valgbar i kategorivelgeren ved annonseopprettelse — bruk til f.eks. dedikerte
+            e2e-testkategorier.
           </p>
         </div>
         <div className="grid gap-4">

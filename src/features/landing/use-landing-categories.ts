@@ -11,15 +11,16 @@ export function useLandingCategories() {
     isError: categoriesIsError,
     refetch: refetchCategories,
   } = useQuery({
-    // Distinct key from useCategories()/annonser.tsx's slimmer `categories`
-    // query — this one selects extra columns (icon/color/etc.), and sharing
-    // a key would let whichever query wins the race cache incomplete rows
-    // for up to the global staleTime, silently emptying the landing chips.
+    // Distinct key from annonser.tsx's slimmer `categories` query — this one
+    // selects extra columns (icon/color/etc.), and sharing a key would let
+    // whichever query wins the race cache incomplete rows for up to the
+    // global staleTime, silently emptying the landing chips.
     queryKey: ["categories", "landing"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
         .select("id, slug, name_nb, parent_id, icon, color, heading_font, search_examples")
+        .eq("is_hidden", false)
         .order("sort_order")
         .order("name_nb");
       if (error) throw error;

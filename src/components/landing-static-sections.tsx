@@ -1,39 +1,67 @@
-import { Heart, MapPin, ShieldCheck } from "lucide-react";
+import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const HOW_IT_WORKS_ITEMS = [
-  {
-    icon: Heart,
-    title: "Finn noe du liker",
-    body: "Søk etter brukte skatter fra hele Norge — eller bare nabolaget ditt.",
-  },
-  {
-    icon: MapPin,
-    title: "Møt selgeren",
-    body: "Send en melding, avtal henting lokalt eller post i posten.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Trygt og åpent",
-    body: "Kaupet.no utvikles som åpen kildekode. Du kan se nøyaktig hvordan dataene dine håndteres.",
-  },
+const PRIVACY_POINTS = [
+  "Null sporingsverktøy og tredjeparts-analyse",
+  "Ingen personopplysninger å selge videre",
+  "Kildekoden er offentlig — sjekk selv",
 ];
 
 export function HowItWorksSection() {
   return (
     <section className="bg-surface">
       <div className="mx-auto max-w-6xl px-4 py-16">
-        <h2 className="font-display text-3xl tracking-tight">Slik fungerer det</h2>
-        <div className="mt-8 grid gap-6 md:grid-cols-3">
-          {HOW_IT_WORKS_ITEMS.map((item) => (
-            <div key={item.title} className="rounded-2xl border border-border bg-card p-6">
-              <div className="mb-4 flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <item.icon className="size-5" />
-              </div>
-              <h3 className="font-display text-xl">{item.title}</h3>
-              <p className="mt-2 text-sm text-muted-foreground">{item.body}</p>
+        <div className="grid items-center gap-10 md:grid-cols-[1.1fr_1fr]">
+          <div>
+            <span className="text-accent-text mb-3 block text-xs font-semibold tracking-wide uppercase">
+              En litt annerledes markedsplass
+            </span>
+            <h2 className="font-display text-3xl tracking-tight md:text-4xl">
+              Bygget for et fritt og åpent internett
+            </h2>
+            <p className="mt-4 max-w-xl text-muted-foreground">
+              Kaupet er bygget rundt et enkelt prinsipp: minst mulig data, mest mulig åpenhet. Vi
+              kan ikke misbruke eller dele data vi aldri samler inn.
+            </p>
+            <ul className="mt-6 flex flex-col gap-3">
+              {PRIVACY_POINTS.map((point) => (
+                <li key={point} className="flex items-start gap-2.5 text-sm">
+                  <Check className="text-accent-text mt-0.5 size-4 shrink-0" />
+                  <span>{point}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-lg">
+            <div className="flex items-center gap-2 border-b border-border bg-surface px-4 py-2.5">
+              <div className="size-2.5 rounded-full bg-border" />
+              <div className="size-2.5 rounded-full bg-border" />
+              <div className="size-2.5 rounded-full bg-border" />
+              <span className="ml-1 font-mono text-xs text-muted-foreground">
+                github.com/kaupet-no/kaupet
+              </span>
             </div>
-          ))}
+            <pre className="overflow-x-auto px-5 py-5 font-mono text-[13px] leading-7 text-foreground">
+              <span className="text-muted-foreground">{"// analytics.ts"}</span>
+              {"\n"}
+              <span className="text-accent-text">export const</span> trackers = [];
+              {"\n"}
+              <span className="text-muted-foreground">{"// ingen tredjeparts sporing"}</span>
+              {"\n\n"}
+              <span className="text-accent-text">export function</span> collectPersonalData() {"{"}
+              {"\n  "}
+              <span className="text-accent-text">return</span> null;{" "}
+              <span className="text-muted-foreground">
+                {"// vi lagrer kun det vi må, ikke mer"}
+              </span>
+              {"\n"}
+              {"}"}
+              {"\n\n"}
+              <span className="text-muted-foreground">
+                {"// lisens: AGPL-3.0 — fritt å lese, dele, bygge videre på"}
+              </span>
+            </pre>
+          </div>
         </div>
       </div>
     </section>
@@ -50,10 +78,8 @@ export function OpenSourceCtaSection() {
               Et alternativ vi bygger sammen.
             </h2>
             <p className="mt-3 max-w-xl opacity-90">
-              Kaupet.no bygges på åpen kildekode, med rett til personvern som et grunnprinsipp. Vi
-              benytter derfor ingen sporende informasjonskapsler eller tredjeparts analyseverktøy.
+              Ønsker du å bidra? Sjekk ut repoet på GitHub. Alle bidrag er hjertelig velkommen.
             </p>
-            <p>Ønsker du å bidra? Sjekk ut repoet på GitHub. Alle bidrag er hjertelig velkommen.</p>
           </div>
           <div className="flex flex-wrap gap-3 md:justify-end">
             <a href="https://github.com/Kaupet-no/kaupet" target="_blank" rel="noreferrer">

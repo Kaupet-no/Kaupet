@@ -48,8 +48,9 @@ en `isVehicle`-sjekk manglet ett sted).
 - `bun run test:rls` — RLS-integrasjonstester. Krever en lokal Supabase-stack
   (`supabase start`, forutsetter Docker) og miljøvariabler
   (`LOCAL_SUPABASE_URL`, `LOCAL_SUPABASE_ANON_KEY`, `LOCAL_SUPABASE_SERVICE_ROLE_KEY`).
-  Kun `conversations`/`messages` har reell dekning per nå — resten av de ~45
-  RLS-aktiverte tabellene mangler tilsvarende tester.
+  Dekker nå ~35 tabeller/scenarioer (se `describe`-blokkene i filen for
+  gjeldende liste) — ikke lenger begrenset til `conversations`/`messages`.
+  Kjøres ikke i CI (krever Docker); kun manuell/lokal kjøring per nå.
 - `bun run test:e2e` — Playwright, kjører nå automatisk på PR mot `main`
   (i tillegg til manuell `workflow_dispatch`), se `.github/workflows/ci.yml`.
 - `bunx tsc --noEmit` — typecheck, kjøres også som pre-push-hook (lefthook).

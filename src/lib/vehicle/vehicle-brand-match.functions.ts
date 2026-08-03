@@ -26,7 +26,7 @@ import type { VehicleBrandGroup } from "@/lib/category-filters";
  * canonical name (not the raw SVV variant text) is what gets used
  * downstream, matching the user's expectation that a known model like
  * "Leaf" is what should be selected rather than proposed as a new value. */
-function findModelContainedIn(
+export function findModelContainedIn(
   models: { id: string; name: string; class_id: string | null }[],
   modelText: string,
 ): { id: string; name: string; class_id: string | null } | null {

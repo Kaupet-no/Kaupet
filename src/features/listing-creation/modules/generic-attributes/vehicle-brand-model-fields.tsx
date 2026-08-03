@@ -1,16 +1,19 @@
-﻿import { useMemo } from "react";
+﻿import { useMemo, useState } from "react";
+import { Check, ChevronDown } from "lucide-react";
 
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 import {
   useAllVehicleBrands,
   useAllVehicleModelClasses,
@@ -159,24 +162,65 @@ export function VehicleBrandField({
   error?: string;
 }) {
   const options = useVehicleBrandOptions(categoryGroup, value);
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const currentLabel = options.find((o) => o.value === value)?.label;
 
   return (
     <div className="space-y-2">
       <Label htmlFor="vehicle-brand">
         Merke {required && <span className="text-destructive">*</span>}
       </Label>
-      <Select value={value ?? ""} onValueChange={(v) => onChange(v || undefined)}>
-        <SelectTrigger id="vehicle-brand" aria-invalid={!!error}>
-          <SelectValue placeholder="Velg merke…" />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((o) => (
-            <SelectItem key={o.value} value={o.value}>
-              {o.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <Popover
+        open={open}
+        onOpenChange={(o) => {
+          setOpen(o);
+          if (!o) setSearch("");
+        }}
+      >
+        <PopoverTrigger asChild>
+          <Button
+            id="vehicle-brand"
+            type="button"
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            aria-invalid={!!error}
+            className="w-full justify-between font-normal hover:text-foreground"
+          >
+            <span className={cn("truncate", !currentLabel && "text-muted-foreground")}>
+              {currentLabel ?? "Velg merke…"}
+            </span>
+            <ChevronDown className="size-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
+          <Command shouldFilter>
+            <CommandInput placeholder="Søk merke…" value={search} onValueChange={setSearch} />
+            <CommandList>
+              <CommandEmpty>Ingen treff.</CommandEmpty>
+              <CommandGroup>
+                {options.map((o) => (
+                  <CommandItem
+                    key={o.value}
+                    value={o.label}
+                    onSelect={() => {
+                      onChange(o.value);
+                      setOpen(false);
+                      setSearch("");
+                    }}
+                  >
+                    <Check
+                      className={cn("size-4", value === o.value ? "opacity-100" : "opacity-0")}
+                    />
+                    {o.label}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
@@ -200,11 +244,16 @@ export function VehicleModelField({
   /** Henger-kategorien: Vegvesenet har ofte kun produsent, ikke modell. */
   freeText?: boolean;
 }) {
-  const { hasClasses, groups, ungrouped, brandKnown } = useVehicleModelOptionsGrouped(
+  const { groups, ungrouped, brandKnown } = useVehicleModelOptionsGrouped(
     categoryGroup,
     brandName,
     value,
   );
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const currentLabel = [...groups.flatMap((g) => g.options), ...ungrouped].find(
+    (o) => o.value === value,
+  )?.label;
 
   if (freeText) {
     return (
@@ -228,42 +277,80 @@ export function VehicleModelField({
       <Label htmlFor="vehicle-model">
         Modell {required && <span className="text-destructive">*</span>}
       </Label>
-      <Select
-        value={value ?? ""}
-        onValueChange={(v) => onChange(v || undefined)}
-        disabled={!brandKnown}
+      <Popover
+        open={open}
+        onOpenChange={(o) => {
+          setOpen(o);
+          if (!o) setSearch("");
+        }}
       >
-        <SelectTrigger id="vehicle-model" aria-invalid={!!error}>
-          <SelectValue placeholder={brandKnown ? "Velg modell…" : "Velg merke først"} />
-        </SelectTrigger>
-        <SelectContent>
-          {hasClasses ? (
-            <>
+        <PopoverTrigger asChild>
+          <Button
+            id="vehicle-model"
+            type="button"
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            aria-invalid={!!error}
+            disabled={!brandKnown}
+            className="w-full justify-between font-normal hover:text-foreground"
+          >
+            <span className={cn("truncate", !currentLabel && "text-muted-foreground")}>
+              {currentLabel ?? (brandKnown ? "Velg modell…" : "Velg merke først")}
+            </span>
+            <ChevronDown className="size-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
+          <Command shouldFilter>
+            <CommandInput placeholder="Søk modell…" value={search} onValueChange={setSearch} />
+            <CommandList>
+              <CommandEmpty>Ingen treff.</CommandEmpty>
               {groups.map((g) => (
-                <SelectGroup key={g.classId}>
-                  <SelectLabel>{g.className}</SelectLabel>
+                <CommandGroup key={g.classId} heading={g.className}>
                   {g.options.map((o) => (
-                    <SelectItem key={o.value} value={o.value} className="pl-6">
+                    <CommandItem
+                      key={o.value}
+                      value={o.label}
+                      className="pl-6"
+                      onSelect={() => {
+                        onChange(o.value);
+                        setOpen(false);
+                        setSearch("");
+                      }}
+                    >
+                      <Check
+                        className={cn("size-4", value === o.value ? "opacity-100" : "opacity-0")}
+                      />
                       {o.label}
-                    </SelectItem>
+                    </CommandItem>
                   ))}
-                </SelectGroup>
+                </CommandGroup>
               ))}
-              {ungrouped.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </>
-          ) : (
-            ungrouped.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-              </SelectItem>
-            ))
-          )}
-        </SelectContent>
-      </Select>
+              {ungrouped.length > 0 && (
+                <CommandGroup>
+                  {ungrouped.map((o) => (
+                    <CommandItem
+                      key={o.value}
+                      value={o.label}
+                      onSelect={() => {
+                        onChange(o.value);
+                        setOpen(false);
+                        setSearch("");
+                      }}
+                    >
+                      <Check
+                        className={cn("size-4", value === o.value ? "opacity-100" : "opacity-0")}
+                      />
+                      {o.label}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
@@ -305,5 +392,174 @@ export function VehicleModelWithClassField({
       error={error}
       freeText={freeText}
     />
+  );
+}
+
+/**
+ * Modell-multiselect med søk og gruppering per klasse (samme "{klasse} (Alle)"
+ * -rad som velger/fjerner alle modellene i klassen på én gang) — brukes av
+ * søkesider der flere modeller kan krysses av samtidig, i motsetning til
+ * annonse-skjemaets `VehicleModelField` (én annonse har kun én modell). Kun
+ * innholdet (Command/søkefelt/liste), ingen egen trigger-knapp — kallsteder
+ * som skal ha en ferdig felt-med-trigger bruker `VehicleModelMultiField`
+ * under, kallsteder med egen chip/trigger (f.eks. attribute-filter-chips.tsx)
+ * bruker denne direkte inni sin egen `PopoverContent`.
+ */
+export function VehicleModelMultiComboboxContent({
+  categoryGroup,
+  brandNames,
+  values,
+  onChange,
+  emptyMessage,
+}: {
+  categoryGroup: VehicleBrandGroup;
+  brandNames: string[];
+  values: string[];
+  onChange: (values: string[]) => void;
+  emptyMessage?: string;
+}) {
+  const singleBrand = brandNames.length === 1 ? brandNames[0] : undefined;
+  const grouped = useVehicleModelOptionsGrouped(categoryGroup, singleBrand, undefined);
+  const flatOptions = useVehicleModelOptionsForBrands(categoryGroup, brandNames, values);
+  const brandKnown = brandNames.length > 0;
+  const [search, setSearch] = useState("");
+
+  const toggle = (v: string) => {
+    onChange(values.includes(v) ? values.filter((x) => x !== v) : [...values, v]);
+  };
+  const toggleAll = (modelNames: string[], checked: boolean) => {
+    if (checked) onChange([...values, ...modelNames.filter((n) => !values.includes(n))]);
+    else onChange(values.filter((v) => !modelNames.includes(v)));
+  };
+
+  const useGrouped = singleBrand != null && grouped.hasClasses;
+
+  return (
+    <Command shouldFilter>
+      <CommandInput placeholder="Søk modell…" value={search} onValueChange={setSearch} />
+      <CommandList>
+        <CommandEmpty>
+          {emptyMessage ??
+            (brandKnown ? "Ingen modeller funnet." : "Velg minst ett merke for å se modeller.")}
+        </CommandEmpty>
+        {useGrouped ? (
+          <>
+            {grouped.groups.map((g) => {
+              const modelNames = g.options.map((o) => o.value);
+              const allChecked =
+                modelNames.length > 0 && modelNames.every((n) => values.includes(n));
+              return (
+                <CommandGroup key={g.classId} heading={g.className}>
+                  <CommandItem
+                    value={`${g.className} (Alle)`}
+                    className="font-medium"
+                    onSelect={() => toggleAll(modelNames, !allChecked)}
+                  >
+                    <Check className={cn("size-4", allChecked ? "opacity-100" : "opacity-0")} />
+                    {g.className} (Alle)
+                  </CommandItem>
+                  {g.options.map((o) => (
+                    <CommandItem
+                      key={o.value}
+                      value={o.label}
+                      className="pl-6"
+                      onSelect={() => toggle(o.value)}
+                    >
+                      <Check
+                        className={cn(
+                          "size-4",
+                          values.includes(o.value) ? "opacity-100" : "opacity-0",
+                        )}
+                      />
+                      {o.label}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              );
+            })}
+            {grouped.ungrouped.length > 0 && (
+              <CommandGroup>
+                {grouped.ungrouped.map((o) => (
+                  <CommandItem key={o.value} value={o.label} onSelect={() => toggle(o.value)}>
+                    <Check
+                      className={cn(
+                        "size-4",
+                        values.includes(o.value) ? "opacity-100" : "opacity-0",
+                      )}
+                    />
+                    {o.label}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+          </>
+        ) : (
+          <CommandGroup>
+            {flatOptions.map((o) => (
+              <CommandItem key={o.value} value={o.label} onSelect={() => toggle(o.value)}>
+                <Check
+                  className={cn("size-4", values.includes(o.value) ? "opacity-100" : "opacity-0")}
+                />
+                {o.label}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+      </CommandList>
+    </Command>
+  );
+}
+
+/** Full felt (label + trigger-knapp + popover) rundt
+ * `VehicleModelMultiComboboxContent` — for kallsteder uten egen trigger/chip
+ * fra før, som søkefilter-panelet på forsiden (`category-filter-fields.tsx`).
+ */
+export function VehicleModelMultiField({
+  categoryGroup,
+  brandNames,
+  values,
+  onChange,
+  label = "Modell",
+}: {
+  categoryGroup: VehicleBrandGroup;
+  brandNames: string[];
+  values: string[];
+  onChange: (values: string[]) => void;
+  label?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const brandKnown = brandNames.length > 0;
+  const triggerLabel =
+    values.length === 0 ? undefined : values.length === 1 ? values[0] : `${values.length} valgt`;
+
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            disabled={!brandKnown}
+            className="w-full justify-between font-normal hover:text-foreground"
+          >
+            <span className={cn("truncate", !triggerLabel && "text-muted-foreground")}>
+              {triggerLabel ?? (brandKnown ? `Velg ${label.toLowerCase()}…` : "Velg merke først")}
+            </span>
+            <ChevronDown className="size-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
+          <VehicleModelMultiComboboxContent
+            categoryGroup={categoryGroup}
+            brandNames={brandNames}
+            values={values}
+            onChange={onChange}
+          />
+        </PopoverContent>
+      </Popover>
+    </div>
   );
 }

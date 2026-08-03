@@ -102,6 +102,44 @@ stedet for `page.goto()` — som ville endret hva testen faktisk verifiserer)
 Anbefaling: la den stå, den er nå forklart og forstått, ikke lenger et
 mysterium.
 
+## Anbefalte neste steg
+
+Oppdaget ved å grep'e alle 4 stedene i kodebasen som bruker
+`supabase.channel(...)`, for å sjekke om samme buggklasse fantes flere
+steder enn de to allerede fikset i punkt 2. Den fant to til:
+
+1. **`src/hooks/use-unread.ts:56-67`** — identisk mønster som de to
+   allerede fikset (`}, [user, refetch])` i stedet for `user?.id`),
+   ufikset. Brukes fra både `MessagesIconLink` (desktop-header) og
+   `MessagesButton` (native bottom-nav), så den kan i praksis kjøre flere
+   uavhengige abonnement-instanser samtidig.
+2. **`src/routes/_authenticated/meldinger.$id.tsx:180-231`** — samme
+   mønster, men **mer alvorlig**: avhengighetslisten er
+   `[id, queryClient, conv, user]`, skjult bak en
+   `eslint-disable-next-line react-hooks/exhaustive-deps`-kommentar. `conv`
+   er selve React Query-resultatet for samtalen, som denne kanalens EGEN
+   UPDATE-handler skriver til (`setQueryData(["conversation", id], ...)`) —
+   en potensiell selvforsterkende løkke: melding kommer inn → `conv`
+   oppdateres → effekten kjører på nytt (fordi `conv` er i deps) → kanalen
+   rives ned og settes opp igjen → mulig tap av meldinger i det korte
+   vinduet kanalen er nede, midt i en aktiv chat. Dette er inne i selve
+   meldingsfunksjonen med tettere trigger-frekvens enn de to allerede
+   fikset — **høyere prioritet enn de forrige to var**.
+
+**Anbefaling:** fiks begge på samme måte som punkt 2 over (depend på
+`user?.id`), og for `meldinger.$id.tsx` spesifikt fjern `conv` fra
+avhengighetslisten siden effekten bruker `queryClient.setQueryData`
+(trenger ikke en fersk `conv` i closure).
+
+**Lavere prioritet / verdt å nevne, ikke undersøkt videre:**
+
+- Sjekk om `MessagesIconLink` og `MessagesButton` noensinne er montert
+  samtidig (samme side, samme økt) — hvis ja, er det duplikate
+  WebSocket-abonnementer for samme bruker/tabell som kunne slås sammen til
+  én delt hook-instans, men bare hvis dette faktisk skjer i praksis.
+- Ikke noe nytt om det stille "Neste"-klikket (punkt 1) — venter fortsatt
+  på det daterte sjekkpunktet 2026-11-01.
+
 ## Lærdom fra denne runden
 
 1. **En "løst"-merket root-årsak bør sjekkes for om fiksen faktisk er

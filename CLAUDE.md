@@ -81,3 +81,19 @@ mer robust mot markup-endringer og tettere på hva en bruker faktisk opplever.
 Policyer bor i `supabase/migrations/`, én tabell kan ha policyer spredt over
 flere migrasjonsfiler kronologisk — søk etter `ALTER TABLE public.<tabell>`
 og `CREATE POLICY` for gjeldende tilstand, ikke bare siste migrasjon.
+
+## Migrasjoner og Supabase-CI
+
+Migrasjoner i `supabase/migrations/` pushes til Supabase automatisk av
+Supabase sin egen GitHub-plugin (ikke en jobb i `.github/workflows/` i dette
+repoet — den finnes ikke her og skal ikke letes opp lokalt). Det betyr:
+
+- Ikke kjør `supabase db push` manuelt mot et lenket prosjekt (f.eks.
+  `staging_kaupet`) — det er allerede dekket, og en manuell push kan komme i
+  utakt med det GitHub-pluginen tror er anvendt.
+- Når en endring i samme omgang både legger til en migrasjon (f.eks. en ny
+  kolonne) og appkode som avhenger av den (f.eks. en `.eq(...)`-spørring mot
+  den nye kolonnen), commit og push migrasjonen for seg selv først, og vent
+  til den er bekreftet anvendt før appkode-endringen som avhenger av den
+  pushes — ellers kan allerede-levende spørringer feile mot databasen i
+  vinduet mellom de to.

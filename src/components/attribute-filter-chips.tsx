@@ -40,6 +40,19 @@ import {
   type VehicleBrandGroup,
 } from "@/lib/category-filters";
 
+/**
+ * The homepage's single-brand widget stores its pick as `{ kind: "select" }`
+ * (see `category-filter-fields.tsx`), while this results page lets a buyer
+ * check several brands and stores that as `{ kind: "multiselect" }`. Accept
+ * either shape so a brand chosen on the homepage still shows as selected
+ * here, and still unlocks the Modell chip.
+ */
+function brandSelectValues(value: AttributeFilterValue | undefined): string[] {
+  if (value?.kind === "multiselect") return value.values;
+  if (value?.kind === "select") return [value.value];
+  return [];
+}
+
 type Props = {
   /** Effective filters for the selected category/categories. Empty when no
    * category is selected — the row then renders nothing, unless Pris/Tilstand
@@ -233,7 +246,7 @@ export function AttributeFilterChips({
       );
     }
     if (f.type === "brand_select") {
-      const selected = current?.kind === "multiselect" ? current.values : [];
+      const selected = brandSelectValues(current);
       return (
         <BrandMultiChip
           key={f.id}
@@ -249,10 +262,7 @@ export function AttributeFilterChips({
     }
     if (f.type === "model_select") {
       const brandFilter = filters.find((bf) => bf.type === "brand_select");
-      const brandValues =
-        brandFilter && values[brandFilter.key]?.kind === "multiselect"
-          ? (values[brandFilter.key] as { kind: "multiselect"; values: string[] }).values
-          : [];
+      const brandValues = brandFilter ? brandSelectValues(values[brandFilter.key]) : [];
       const selected = current?.kind === "multiselect" ? current.values : [];
       return (
         <ModelMultiChip

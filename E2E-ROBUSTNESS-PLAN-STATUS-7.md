@@ -53,9 +53,15 @@ en rest fra den gamle bugen.
 - `set -a && source .env && set +a && bunx playwright test
 publish-listing.spec.ts publish-vehicle-listing.spec.ts` — begge grønt
   (2/2), ingen nye konsoll-/`pageerror`-varsler utover den kjente,
-  allerede forklarte "hasn't mounted yet"-advarselen fra runde 6 punkt 2
-  (urelatert til denne endringen — den gjenstår som forklart, ikke
-  reintrodusert).
+  allerede forklarte WebSocket-advarselen fra runde 6 punkt 3 (benign
+  navigasjonsartefakt i e2e-testen, urelatert til denne endringen).
+  **Rettelse (verifisert på nytt etter at denne rapporten først ble
+  skrevet):** teksten over nevnte opprinnelig feilaktig "hasn't mounted
+  yet"-advarselen (runde 6 punkt 2) som fortsatt tilstedeværende — det
+  stemmer ikke. To ekstra kjøringer bekreftet **null**
+  mount-advarsler; fiksen fra runde 6 punkt 2 holder fortsatt. Den
+  eneste konsoll-advarselen i noen kjøring er WebSocket-advarselen fra
+  punkt 3, som er korrekt.
 
 ## Nye funn / lærdommer
 

@@ -6,7 +6,15 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { expect, test } from "@playwright/test";
+import { test } from "@playwright/test";
+import {
+  clickNextAndWaitFor,
+  fillDescriptionAndAdvance,
+  goToNewListing,
+  login,
+  publishAndExpectSuccess,
+  wizardStep,
+} from "./pages/listing-wizard";
 
 const { email, password } = JSON.parse(
   readFileSync(
@@ -25,22 +33,9 @@ const { email, password } = JSON.parse(
 // ('e2e-test-listing') without updating this file.
 const TEST_CATEGORY_NAME = "E2E-test (ikke bruk)";
 
-test("logger inn og publiserer en annonse", async ({ page }) => {
-  await page.goto("/auth");
-  // Inputs are controlled (SSR-rendered, then hydrated) — filling before
-  // hydration finishes gets clobbered when React reconciles to its initial
-  // empty state, so wait for the network to settle first.
-  await page.waitForLoadState("networkidle");
-  await page.getByLabel("E-post").fill(email);
-  await page.getByLabel("Passord").fill(password);
-  await expect(page.getByLabel("E-post")).toHaveValue(email);
-  await page.getByRole("main").getByRole("button", { name: "Logg inn" }).click();
-  await expect(page).toHaveURL("/", { timeout: 10_000 });
-
-  // type=sell is required — without it the route redirects to "/" (entry
-  // is meant to go through the "Opprett en annonse" picker dialog, which
-  // sets this param before navigating here).
-  await page.goto("/ny-annonse?type=sell");
+test("logger inn og publiserer en annonse", async ({ page }, testInfo) => {
+  await login(page, email, password);
+  await goToNewListing(page);
 
   // Category must be chosen first — it's always the wizard's first step.
   // Search directly for the test category above rather than drilling
@@ -63,27 +58,20 @@ test("logger inn og publiserer en annonse", async ({ page }) => {
   // Tittel, Kategori (already set), Tilstand and Pris all live on the same
   // "Bilder & tittel" step. The test category has no attributes, so there's
   // nothing else to fill in here.
-  await page.getByTestId("wizard-step-title-photos").waitFor();
+  await wizardStep(page, "title-photos").waitFor();
   await page.getByTestId("listing-title-input").fill("E2E testannonse — Stokke Tripp Trapp");
   await page.getByRole("checkbox", { name: "Gis bort gratis" }).click();
 
   // No images were added, so the first "Neste" click prompts a "no images"
   // confirmation dialog instead of advancing directly.
-  await page.getByTestId("wizard-next-button").click();
+  await clickNextAndWaitFor(page, page.getByTestId("continue-without-image-button"), testInfo);
   await page.getByTestId("continue-without-image-button").click();
 
-  // Beskrivelse is its own step.
-  await page.getByTestId("wizard-step-description-keywords").waitFor();
-  await page
-    .getByTestId("listing-description-textarea")
-    .fill("Automatisk opprettet av en e2e-test. Stol i god stand, lite brukt.");
-  await page.getByTestId("wizard-next-button").click();
+  await fillDescriptionAndAdvance(
+    page,
+    testInfo,
+    "Automatisk opprettet av en e2e-test. Stol i god stand, lite brukt.",
+  );
 
-  // Final step: delivery/location + publish confirmation share one page.
-  await page.getByTestId("wizard-step-delivery-location").waitFor();
-  await page.getByTestId("publish-listing-button").click();
-  // Publishing without having opened the preview first prompts a "want to
-  // preview before publishing?" dialog rather than publishing immediately.
-  await page.getByTestId("publish-anyway-button").click();
-  await expect(page.getByText("Annonsen er publisert")).toBeVisible({ timeout: 15_000 });
+  await publishAndExpectSuccess(page);
 });

@@ -55,6 +55,27 @@ en `isVehicle`-sjekk manglet ett sted).
 - `bunx tsc --noEmit` — typecheck, kjøres også som pre-push-hook (lefthook).
 - `bun run lint` — kjøres som pre-commit-hook på staged filer.
 
+## E2E-testid-konvensjon
+
+Etablert gjennom `e2e/pages/listing-wizard.ts` og annonse-wizardens
+spec-filer (`e2e/publish-listing.spec.ts`, `e2e/publish-vehicle-listing.spec.ts`):
+
+- Steg i annonse-wizarden: `wizard-step-<group-key>` (f.eks.
+  `wizard-step-vehicle-facts`), satt på steg-containeren i `ny-annonse.tsx`.
+  `<group-key>` er nøkkelen fra `field-groups/registry.ts`.
+- Navigasjonsknapper: `wizard-next-button`, `continue-without-image-button`,
+  `publish-listing-button`, `publish-anyway-button`.
+- Feltspesifikke input-er der `getByLabel`/`getByRole` er tvetydig eller
+  ustabilt på tvers av innholdsendringer: `listing-title-input`,
+  `listing-description-textarea`, `category-search-input`.
+- Unntak: kategoriflisene identifiseres via `data-category-name` (ikke
+  `data-testid`) siden testene trenger å målrette en spesifikk kategori ved
+  navn, ikke bare "en flis".
+
+Tommelfingerregel: bruk `data-testid` kun når `getByRole`/`getByLabel` er
+tvetydig eller ustabilt — ellers foretrekk `getByRole`/`getByLabel`, som er
+mer robust mot markup-endringer og tettere på hva en bruker faktisk opplever.
+
 ## RLS-policyer
 
 Policyer bor i `supabase/migrations/`, én tabell kan ha policyer spredt over

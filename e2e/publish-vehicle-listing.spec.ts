@@ -50,13 +50,10 @@ const TEST_MODEL = "XC60";
 test("logger inn og publiserer en kjøretøy-annonse (manuell registrering)", async ({
   page,
 }, testInfo) => {
-  // Permanent (not error-triggered) console/pageerror capture — investigating
-  // the silent "Neste"-klikk issue below via trace inspection alone found
-  // nothing, so this gives the next occurrence a chance to leave a trail in
-  // the CI job log even on a run that ultimately succeeds via retry.
-  page.on("console", (msg) => console.log(`[browser:${msg.type()}] ${msg.text()}`));
-  page.on("pageerror", (err) => console.log(`[pageerror] ${err.message}`));
-
+  // Permanent console/pageerror capture is wired up inside login() (see
+  // listing-wizard.ts) — originally added here to investigate the silent
+  // "Neste"-klikk issue below, moved so both specs get it, including
+  // publish-listing.spec.ts's own unrelated, never-reproduced login flake.
   await login(page, email, password);
   await goToNewListing(page);
 

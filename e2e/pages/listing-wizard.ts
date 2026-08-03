@@ -7,6 +7,14 @@
 import { expect, type Locator, type Page, type TestInfo } from "@playwright/test";
 
 export async function login(page: Page, email: string, password: string) {
+  // Permanent (not error-triggered) console/pageerror capture — a single
+  // login flake was observed once in publish-listing.spec.ts (never
+  // reproduced or root-caused), so this gives the next occurrence a chance
+  // to leave a trail in the CI job log. Attached to login() rather than each
+  // spec individually so both specs get it automatically.
+  page.on("console", (msg) => console.log(`[browser:${msg.type()}] ${msg.text()}`));
+  page.on("pageerror", (err) => console.log(`[pageerror] ${err.message}`));
+
   await page.goto("/auth");
   // Inputs are controlled (SSR-rendered, then hydrated) — filling before
   // hydration finishes gets clobbered when React reconciles to its initial

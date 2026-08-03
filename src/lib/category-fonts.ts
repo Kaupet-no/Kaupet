@@ -4,7 +4,7 @@
  * (see src/styles.css), so picking one never requires loading new assets.
  */
 export const CATEGORY_HEADING_FONTS = {
-  display: { label: "Fraunces (standard)", stack: "var(--font-display)" },
+  display: { label: "Newsreader (standard)", stack: "var(--font-display)" },
   sans: { label: "Inter", stack: "var(--font-sans)" },
   serif_system: { label: "Systemserif", stack: "ui-serif, Georgia, serif" },
   sans_system: { label: "Systemgrotesk", stack: "ui-sans-serif, system-ui, sans-serif" },

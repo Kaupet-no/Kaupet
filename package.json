@@ -48,8 +48,8 @@
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
-    "@fontsource-variable/fraunces": "^5.3.0",
     "@fontsource-variable/inter": "^5.3.0",
+    "@fontsource-variable/newsreader": "^5.3.0",
     "@hookform/resolvers": "^5.4.0",
     "@marsidev/react-turnstile": "^1.5.3",
     "@radix-ui/react-accordion": "^1.2.18",
@@ -145,7 +145,9 @@
     "tar": "^7.5.16",
     "minimatch": "^9.0.5",
     "uuid": "^11.1.1",
-    "esbuild": "^0.28.1"
+    "esbuild": "^0.28.1",
+    "brace-expansion": "^2.1.4",
+    "undici": "^8.9.0"
   },
   "patchedDependencies": {
     "eslint-plugin-jsx-a11y@6.10.2": "patches/eslint-plugin-jsx-a11y@6.10.2.patch"

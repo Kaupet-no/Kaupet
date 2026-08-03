@@ -1,7 +1,7 @@
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
-@import "@fontsource-variable/fraunces/opsz.css";
+@import "@fontsource-variable/newsreader/opsz.css";
 @import "@fontsource-variable/inter/wght.css";
 
 @custom-variant dark (&:is(.dark *));
@@ -9,11 +9,11 @@
 /*
  * Kaupet.no design system
  * Warm, Nordic, community-feeling. Cream paper background, deep forest green,
- * terracotta accent. Display font: Fraunces (editorial serif). Body: Inter.
+ * terracotta accent. Display font: Newsreader (editorial serif). Body: Inter.
  */
 
 @theme inline {
-  --font-display: "Fraunces Variable", ui-serif, Georgia, serif;
+  --font-display: "Newsreader Variable", ui-serif, Georgia, serif;
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
 
   --radius-sm: calc(var(--radius) - 4px);

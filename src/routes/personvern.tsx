@@ -32,7 +32,7 @@ function PersonvernPage() {
           <h1 className="mt-2 font-display text-4xl leading-tight tracking-tight">
             Personvernerklæring
           </h1>
-          <p className="mt-3 text-sm text-muted-foreground">Sist oppdatert 26. juni 2026</p>
+          <p className="mt-3 text-sm text-muted-foreground">Sist oppdatert 3. august 2026</p>
         </header>
       )}
 
@@ -121,8 +121,8 @@ function PersonvernPage() {
               <li>
                 <strong>Moderering</strong> — ved brudd på reglene kan administrator registrere en{" "}
                 <em>utestengelse</em>, <em>midlertidig suspensjon</em> eller <em>IP-blokkering</em>.
-                Ved IP-blokkering lagres IP-adressen som er blokkert. Slike administrative
-                handlinger logges internt med tidspunkt og årsak.
+                Ved IP-blokkering lagres IP-adressen så lenge blokkeringen er aktiv, og fjernes når
+                den oppheves. Slike administrative handlinger logges internt med tidspunkt og årsak.
               </li>
               <li>
                 <strong>Sletteforespørsler</strong> — når du ber om å slette kontoen, lagrer vi
@@ -190,7 +190,21 @@ function PersonvernPage() {
                 <strong>kaupet_photo_guide_seen</strong> — husker at du har sett veiledningen for
                 opplasting av bilder, slik at den ikke vises på nytt.
               </li>
+              <li>
+                <strong>kaupet:filter-hint-seen</strong> — husker at du har lukket hintet om
+                filtermuligheter i søket, slik at det ikke vises på nytt.
+              </li>
+              <li>
+                <strong>kaupet_360_hint_seen</strong> — husker at du har sett veiledningen for
+                360°-visning av kjøretøy, slik at den ikke vises på nytt.
+              </li>
             </ul>
+            <p className="border-t border-border px-4 py-3 text-muted-foreground">
+              I tillegg lagrer vi <strong>kaupet:lastAnnonserSearch</strong> i nettleserens{" "}
+              <code>sessionStorage</code>, som — i motsetning til de andre nøklene over — slettes
+              automatisk når du lukker fanen. Denne brukes til å ta deg tilbake til søkeresultatene
+              dine etter å ha sett på en annonse.
+            </p>
           </details>
 
           <details className="group rounded-lg border border-border">
@@ -243,6 +257,17 @@ function PersonvernPage() {
         </section>
 
         <section>
+          <h2 className="font-display text-2xl">Hvor lenge vi lagrer data</h2>
+          <p className="mt-3">
+            Vi lagrer opplysninger så lenge du har en aktiv konto og de er nødvendige for tjenesten.
+            Annonser, meldinger og vurderinger beholdes til du selv sletter dem eller sletter
+            kontoen din. Unntak med egne frister er angitt eksplisitt ovenfor (blant annet
+            angrefristen på 7 dager ved kontosletting, og IP-blokkeringer som fjernes når de
+            oppheves).
+          </p>
+        </section>
+
+        <section>
           <h2 className="font-display text-2xl">Juridisk grunnlag</h2>
           <p className="mt-3">
             Behandlingen skjer på grunnlag av <strong>avtale</strong> (nødvendig for å levere
@@ -256,8 +281,20 @@ function PersonvernPage() {
           <h2 className="font-display text-2xl">Dine rettigheter</h2>
           <p className="mt-3">
             Du har rett til innsyn, retting, sletting og dataportabilitet for opplysningene vi har
-            om deg. Du kan også trekke tilbake samtykke og klage til Datatilsynet. Kontakt oss for å
-            utøve rettighetene dine.
+            om deg. Du kan også trekke tilbake samtykke og klage til{" "}
+            <a
+              href="https://www.datatilsynet.no"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline underline-offset-2"
+            >
+              Datatilsynet
+            </a>
+            . Kontakt oss for å utøve rettighetene dine.
+          </p>
+          <p className="mt-3">
+            Tjenesten er ikke rettet mot barn, og krever at brukeren er minst 15 år ved registrering
+            av konto. Brukere under 18 år må ha samtykke fra foresatte.
           </p>
         </section>
 
@@ -315,8 +352,10 @@ function PersonvernPage() {
             <li>
               <strong>Google Firebase Cloud Messaging (FCM)</strong> — brukes for å sende
               push-varslinger til Kaupet-appen på iOS og Android. Varsler leveres via Googles
-              infrastruktur, som dermed ser enhetsinformasjon og varselinnhold. FCM brukes kun når
-              du har aktivert push-varslinger. Du kan lese Googles personvernerklæring på{" "}
+              infrastruktur, som dermed ser enhetsinformasjon og varselinnhold. Dette kan innebære
+              overføring av data til land utenfor EØS, basert på Googles standard
+              personvernbestemmelser (SCC) for slike overføringer. FCM brukes kun når du har
+              aktivert push-varslinger. Du kan lese Googles personvernerklæring på{" "}
               <a
                 href="https://policies.google.com/privacy"
                 target="_blank"
@@ -326,10 +365,6 @@ function PersonvernPage() {
                 policies.google.com/privacy
               </a>
               .
-            </li>
-            <li>
-              <strong>Google Fonts</strong> — skrifttyper lastes direkte fra Googles servere.
-              IP-adressen din blir synlig for Google ved henting av skrifttypene.
             </li>
             <li>
               <strong>OpenStreetMap / CARTO</strong> — kartfliser og adressesøk (Nominatim) for

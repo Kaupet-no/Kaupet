@@ -305,7 +305,7 @@ function RootBody({ native }: { native: boolean }) {
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="space-y-1">
                 <p>
-                  © {new Date().getFullYear()} Kaupet.no — Bygget med åpen kildekode,{" "}
+                  © {new Date().getFullYear()} Kaupet.no — Bygges som åpen kildekode,{" "}
                   <a
                     href="https://www.gnu.org/licenses/agpl-3.0.html"
                     target="_blank"

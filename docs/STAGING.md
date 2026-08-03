@@ -13,7 +13,7 @@ Produksjon (`main`) er uberørt av dette — `deploy`-jobben der bruker fortsatt
 ## Testing
 
 - `bun run test` — kjører unittester (Vitest). Inngår i CI.
-- `bun run test:e2e` — kjører Playwright-e2e-tester. Starter selv en lokal dev-server mot Supabase-prosjektet i din `.env` (krever `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`, samme variabler som resten av appen bruker server-side, for å opprette en bekreftet testbruker). Ikke en del av vanlig CI; trigges manuelt via `workflow_dispatch` på `e2e`-jobben i `ci.yml`, som kjører mot staging-Supabase-prosjektet. **Forutsetning:** den jobben trenger en `SUPABASE_SERVICE_ROLE_KEY`-secret i GitHub Environment `staging` (ikke satt opp i dag — service role key ligger i dag kun på selve workeren, ikke som GitHub-secret. Legg den til manuelt i repo-innstillingene før jobben kan kjøre).
+- `bun run test:e2e` — kjører Playwright-e2e-tester. Starter selv en lokal dev-server mot Supabase-prosjektet i din `.env` (krever `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`, samme variabler som resten av appen bruker server-side, for å opprette en bekreftet testbruker). Kjører automatisk i CI på PR mot `main` (i tillegg til manuell `workflow_dispatch`) via `e2e`-jobben i `ci.yml`, mot staging-Supabase-prosjektet. Jobben bruker `secrets.SUPABASE_SERVICE_ROLE_KEY` fra GitHub Environment `staging`.
 - `bun run test:rls` — kjører RLS-integrasjonstester mot en lokal Supabase-stack. Krever Docker:
   ```bash
   supabase start
@@ -23,4 +23,4 @@ Produksjon (`main`) er uberørt av dette — `deploy`-jobben der bruker fortsatt
   LOCAL_SUPABASE_SERVICE_ROLE_KEY=... \
   bun run test:rls
   ```
-  `src/lib/rls.integration.test.ts` dekker 37 av ~47 RLS-aktiverte tabeller (94 tester) — bruk samme mønster (service-role-oppsett, flere innloggede klienter, verifiser hvem som kan/ikke kan se og endre hva) for å utvide dekningen videre.
+  `src/lib/rls.integration.test.ts` dekker ~35 RLS-aktiverte tabeller/scenarioer (96 tester) — bruk samme mønster (service-role-oppsett, flere innloggede klienter, verifiser hvem som kan/ikke kan se og endre hva) for å utvide dekningen videre.

@@ -181,7 +181,10 @@ BEGIN
 END $$;
 
 -- Utvid admin-CRUD-listen med klasse-kolonner slik at siden kan gruppere
--- modeller per klasse i ett kall, uten N+1.
+-- modeller per klasse i ett kall, uten N+1. CREATE OR REPLACE kan ikke endre
+-- RETURNS TABLE-formen på en eksisterende funksjon (SQLSTATE 42P13), så den
+-- må droppes eksplisitt først.
+DROP FUNCTION IF EXISTS public.admin_list_vehicle_brands_with_models();
 CREATE OR REPLACE FUNCTION public.admin_list_vehicle_brands_with_models()
 RETURNS TABLE(
   brand_id uuid,
@@ -205,6 +208,8 @@ BEGIN
     WHERE b.status = 'approved'
     ORDER BY b.category_group, b.name, mc.name NULLS FIRST, m.name;
 END $$;
+REVOKE ALL ON FUNCTION public.admin_list_vehicle_brands_with_models FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.admin_list_vehicle_brands_with_models TO authenticated;
 
 -- Proof-of-concept-data: Mercedes-Benz sine flate "C-klasse"/"E-klasse"-rader
 -- var egentlig klassenavn, ikke modeller — konverter dem til klasser og legg

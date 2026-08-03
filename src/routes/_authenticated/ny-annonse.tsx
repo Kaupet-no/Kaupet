@@ -911,6 +911,7 @@ function NewListingPage() {
           const nextGroups = pages[step]?.groups ?? [];
           return (
             <div
+              data-testid={groups[0] ? `wizard-step-${groups[0].key}` : undefined}
               className={isNativeDescriptionSoloPage ? "flex flex-col" : "space-y-6"}
               style={
                 isNativeDescriptionSoloPage

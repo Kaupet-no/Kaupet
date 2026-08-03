@@ -44,7 +44,8 @@ export const Route = createFileRoute("/sitemap.xml")({
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
           const { data } = await supabaseAdmin
             .from("categories")
-            .select("id, slug, parent_id, color");
+            .select("id, slug, parent_id, color")
+            .eq("is_hidden", false);
           const all = data ?? [];
           // Main categories are colored root categories — same rule used across the app.
           const mains = all.filter((c) => c.parent_id == null && !!c.color);

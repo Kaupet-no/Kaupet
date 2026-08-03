@@ -72,6 +72,7 @@ export type Database = {
           heading_font: string | null
           icon: string | null
           id: string
+          is_hidden: boolean
           name_nb: string
           parent_id: string | null
           search_examples: string[]
@@ -84,6 +85,7 @@ export type Database = {
           heading_font?: string | null
           icon?: string | null
           id?: string
+          is_hidden?: boolean
           name_nb: string
           parent_id?: string | null
           search_examples?: string[]
@@ -96,6 +98,7 @@ export type Database = {
           heading_font?: string | null
           icon?: string | null
           id?: string
+          is_hidden?: boolean
           name_nb?: string
           parent_id?: string | null
           search_examples?: string[]

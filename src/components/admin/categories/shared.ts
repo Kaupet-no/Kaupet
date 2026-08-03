@@ -10,6 +10,7 @@ export type Category = {
   color: string | null;
   heading_font: string | null;
   search_examples: string[] | null;
+  is_hidden: boolean;
 };
 
 // Suggested unique colors for main categories (OKLch, matching the design system).

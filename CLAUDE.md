@@ -15,7 +15,7 @@ Supabase (Postgres + RLS + Auth), Capacitor (iOS/Android-wrapper).
 - `features/<navn>/` — selvstendige featuremoduler (f.eks. `listing-creation`,
   `listing-search`, `listing-edit`, `vehicle-360-capture`).
 - `components/` — delte UI-komponenter, inkl. `components/ui/` (Radix-baserte
-  primitiver, generert av shadcn — ikke lint-sjekket).
+  primitiver, generert av shadcn).
 - `lib/` — vertikal-agnostisk domenelogikk, valideringsregler, Supabase-hjelpere.
 - `integrations/supabase/` — klientoppsett.
 

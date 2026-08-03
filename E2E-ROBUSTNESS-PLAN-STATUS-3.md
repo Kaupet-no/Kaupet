@@ -124,3 +124,72 @@ a component that hasn't mounted yet`) — ikke reprodusert isolert, ikke
   duplisert `data-category-name`-oppslag som kunne vært en del av
   Page Object-et (begge lavt prioritert, ingen ny informasjon denne runden
   som endrer den vurderingen).
+
+## Anbefalte aksjonspunkter videre
+
+Det opprinnelige formålet med disse tre rundene var å gjøre e2e-testene
+robuste mot UI-/innholdsendringer — ikke å maksimere testinfrastruktur. Tre
+runder inn er den underliggende risikoen (skjøre selektorer, lånte
+produksjonskategorier, faste ventinger) adressert. Herfra bør innsatsen dreie
+fra **å legge til mer** til **å fjerne det som ikke lenger trekker vekten**,
+og bare fikse konkrete, observerte feil fremfor å bygge mer rundt dem de ikke
+er forstått. Rangert etter verdi/innsats, med begrunnelse i begge retninger:
+
+1. **Undersøk hvorfor `deleteUser` feiler i teardown — konsekvent, ikke
+   sporadisk.** `[e2e global-teardown] Kunne ikke slette testbruker ...`
+   dukket opp i **samtlige** lokale kjøringer denne sesjonen (ikke bare
+   noen), på tvers av begge spec-filene og over flere dager med testbrukere.
+   Fase 3 (runde 1) antok dette var en sjelden feilmodus verdt å logge og gå
+   videre fra; ferske data tyder på at det er systematisk — enten mangler
+   service-role-nøkkelen en rettighet den pleide å ha, eller noe i
+   bruker-slettingen (f.eks. en avhengig rad uten `ON DELETE CASCADE`) har
+   endret seg. Konsekvensen er reell teknisk gjeld, ikke bare støy: hver
+   testkjøring etterlater en ubrukt bruker og tilhørende annonser i
+   staging-databasen permanent. **Lav innsats** (sannsynligvis én
+   root-årsak), **høy verdi** (stopper en pågående datalekkasje i staging,
+   reduserer fremtidig opprydningsbehov) — anbefales som neste konkrete
+   oppgave, fremfor å fortsette å bygge nye mekanismer oppå et miljø som
+   sakte fylles med testdata.
+2. **Slett `useCategories()` (`src/hooks/use-root-categories.ts`) i stedet
+   for å la den stå som en korrekt-men-ubrukt eksport.** Denne runden
+   filtrerte den for korrekthets skyld, men det er i seg selv et symptom på
+   å legge til vedlikeholdsflate (enda et sted som må huskes ved fremtidige
+   kategori-skjemaendringer) for kode ingen bruker. Sjekk `git blame`/-log
+   for om den er tenkt gjenbrukt snart; hvis ikke, fjern filen og kommentaren
+   i `annonser.tsx` som feilaktig hevder delt cache med den. **Reduserer**
+   kompleksitet direkte, null robusthetskostnad siden ingenting importerer
+   den.
+3. **Ikke bygg en Page Object-utvidelse eller flere abstraksjonslag med
+   mindre en tredje wizard-test faktisk dukker opp.** `listing-wizard.ts` er
+   akkurat passe stor for to spec-filer; å forhåndsbygge mer generalitet nå
+   (f.eks. en full "steg-graf"-abstraksjon) ville vært kompleksitet betalt
+   for en fleksibilitet ingen har bedt om ennå. Eksplisitt anbefaling om å
+   **ikke** gjøre dette, ikke bare en lavt prioritert "kan gjøres".
+4. **Sett en eksplisitt utløpsdato eller et hendelses-tak på
+   `clickNextAndWaitFor`-retry-mekanismen, i stedet for å la den stå som en
+   permanent, uforklart sikring.** Den dekker over et ukjent problem (Fase
+   5/B) — det er en fornuftig pragmatisk løsning på kort sikt, men en
+   3-forsøks-retry med skjermbilde-diagnostikk er ikke gratis kompleksitet:
+   den gjør testfeil tregere å forstå (feiler først etter 3×8s), og den er
+   nå duplisert implisitt inn i mental modell av hvordan wizarden "egentlig"
+   oppfører seg. Konkret forslag: hvis loggingen fra punkt 2 (runde 3) og
+   den permanente konsoll-fangsten fra Fase B (runde 2) ikke har gitt et
+   spor **innen utgangen av neste kvartal eller 20 flere CI-kjøringer**, tell
+   det som "ikke reproduserbart i praksis" og vurder å forenkle til en enkel
+   økt timeout uten retry-logikken — retry-en er nå den mest komplekse enkelt-
+   delen av hele e2e-oppsettet for et problem ingen har sett gjenta seg
+   siden det ble observert.
+5. **Ikke utvid `is_hidden`-mekanismen til flere tabeller eller flere
+   filtreringssteder uten et konkret nytt behov.** Den ble bevisst holdt smal
+   (8 browsing-steder, ikke 19) i denne runden nettopp for å unngå
+   test/produksjon-friksjon. Fristelsen til å "gjøre den komplett" ved et
+   senere tidspunkt (f.eks. filtrere kategorivelgeren også, eller legge til
+   tilsvarende flagg på `listings`) bør motstås med mindre et reelt
+   produktbehov (ikke bare konsistens-instinkt) driver det — se lærdom #4
+   over.
+6. **Lavest prioritet, kun hvis tid:** root-årsaken til det stille
+   "Neste"-klikket og den nyoppdagede React-mount-advarselen. Begge er reelle
+   nok til å notere, men ingen av dem har vist seg å faktisk bryte en
+   testkjøring siden de ble oppdaget — å bruke mer tid på blind
+   root-årsak-jakt uten nye data er akkurat den typen investering denne
+   anbefalingen ber om å nedprioritere.

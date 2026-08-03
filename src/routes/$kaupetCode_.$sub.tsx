@@ -16,7 +16,8 @@ export const Route = createFileRoute("/$kaupetCode_/$sub")({
   loader: async ({ params }) => {
     const { data: cats, error } = await supabase
       .from("categories")
-      .select("id, slug, name_nb, parent_id, icon, color");
+      .select("id, slug, name_nb, parent_id, icon, color")
+      .eq("is_hidden", false);
     if (error) throw error;
     const all = (cats ?? []) as Category[];
 

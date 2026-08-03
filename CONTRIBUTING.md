@@ -46,6 +46,7 @@ chore: oppgrader Tailwind til 4.1
 ## Overordnet arkitektur
 
 - `src/routes/` — sider (file-based routing via TanStack Start)
+- `src/features/<navn>/` — selvstendige featuremoduler (f.eks. annonseopprettelse, annonsesøk)
 - `src/components/` — gjenbrukbare UI-komponenter
 - `src/lib/` — hjelpere, server-funksjoner (`*.functions.ts`)
 - `src/integrations/supabase/` — auto-generert, ikke rør

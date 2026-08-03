@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 
 const PRIVACY_POINTS = [
   "Null sporingsverktøy og tredjeparts-analyse",
-  "Ingen personopplysninger å selge videre",
+  "Ingen adferdsdata å selge videre",
   "Kildekoden er offentlig — sjekk selv",
 ];
 
@@ -20,8 +20,9 @@ export function HowItWorksSection() {
               Bygget for et fritt og åpent internett
             </h2>
             <p className="mt-4 max-w-xl text-muted-foreground">
-              Kaupet er bygget rundt et enkelt prinsipp: minst mulig data, mest mulig åpenhet. Vi
-              kan ikke misbruke eller dele data vi aldri samler inn.
+              Kaupet er bygget rundt et enkelt prinsipp: personvern først. Minst mulig data om deg,
+              mest mulig åpenhet i koden. Det vi ikke samler inn, kan vi heller ikke selge eller
+              misbruke.
             </p>
             <ul className="mt-6 flex flex-col gap-3">
               {PRIVACY_POINTS.map((point) => (

@@ -1,6 +1,7 @@
 import js from "@eslint/js";
 import eslintPluginPrettier from "eslint-plugin-prettier/recommended";
 import globals from "globals";
+import jsxA11y from "eslint-plugin-jsx-a11y";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
@@ -28,9 +29,16 @@ export default tseslint.config(
     plugins: {
       "react-hooks": reactHooks,
       "react-refresh": reactRefresh,
+      "jsx-a11y": jsxA11y,
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      "jsx-a11y/label-has-associated-control": [
+        "error",
+        // Radix primitives that render a focusable control but aren't
+        // recognized by the rule's default (native-tag-only) control list.
+        { controlComponents: ["Checkbox", "Switch", "RadioGroupItem"] },
+      ],
       // Downgraded from "error" (not "off") pending an incremental cleanup —
       // there are ~60 pre-existing violations across the codebase that need
       // per-file review rather than a blind bulk fix. New violations still

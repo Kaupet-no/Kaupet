@@ -47,6 +47,7 @@ function ConversationPage() {
   const keyboardVisible = useKeyboardVisible();
   const { id } = Route.useParams();
   const { user } = useAuth();
+  const userId = user?.id;
   const queryClient = useQueryClient();
   const listMyBlocksFn = useServerFn(listMyBlocks);
   const listBlocksAgainstMeFn = useServerFn(listBlocksAgainstMe);
@@ -228,7 +229,7 @@ function ConversationPage() {
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, queryClient, conv, user]);
+  }, [id, queryClient, userId]);
 
   // Auto-scroll + markér som lest når meldinger lastes/oppdateres
   useEffect(() => {

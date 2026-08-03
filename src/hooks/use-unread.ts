@@ -53,10 +53,11 @@ export function useUnreadConversationsCount(): number {
   });
 
   // Realtime: refetch når nye meldinger kommer inn for denne brukeren
+  const userId = user?.id;
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
     const channel = supabase
-      .channel(`unread:${user.id}`)
+      .channel(`unread:${userId}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, () => {
         refetch();
       })
@@ -64,7 +65,7 @@ export function useUnreadConversationsCount(): number {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, refetch]);
+  }, [userId, refetch]);
 
   // Fallback: refresh når fanen får fokus igjen (i tilfelle realtime ikke leverer)
   useEffect(() => {

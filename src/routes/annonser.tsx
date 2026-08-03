@@ -157,6 +157,7 @@ function BrowsePage() {
       const { data, error } = await supabase
         .from("categories")
         .select("id, slug, name_nb, parent_id, icon, color, heading_font")
+        .eq("is_hidden", false)
         .order("sort_order")
         .order("name_nb");
       if (error) throw error;

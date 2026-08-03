@@ -3,6 +3,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Languages, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { FILTER_TYPE_LABELS, type CategoryFilter } from "@/lib/category-filters";
 
 /** Filter types whose values can be recognized as search-phrase synonyms —
@@ -56,13 +57,17 @@ export function SortableFilterRow({
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Label
+          htmlFor={`primary-${filter.id}`}
+          className="flex items-center gap-1.5 text-xs font-normal text-muted-foreground"
+        >
           <Checkbox
+            id={`primary-${filter.id}`}
             checked={filter.is_primary}
             onCheckedChange={(c) => onTogglePrimary(c === true)}
           />
           Vis alltid
-        </label>
+        </Label>
         {SYNONYM_ELIGIBLE_TYPES.includes(filter.type) && (
           <Button
             variant="ghost"

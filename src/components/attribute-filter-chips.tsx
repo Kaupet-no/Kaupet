@@ -659,6 +659,46 @@ function BrandMultiChip({
 /** Modell as a checkbox list, sourced from every currently-selected brand at
  * once (not just one) — checking a second brand in BrandMultiChip
  * immediately adds that brand's models here too. */
+/** One class' models within `ModelMultiChip`'s grouped popover: a heading, a
+ * bold "{className} (Alle)" row that checks/unchecks every model in the
+ * class at once, then the class' models indented underneath. */
+function ModelClassGroup({
+  className,
+  modelNames,
+  values,
+  onToggle,
+  onToggleAll,
+}: {
+  className: string;
+  modelNames: string[];
+  values: string[];
+  onToggle: (value: string) => void;
+  onToggleAll: (modelNames: string[], checked: boolean) => void;
+}) {
+  const allChecked = modelNames.length > 0 && modelNames.every((n) => values.includes(n));
+  return (
+    <div className="flex flex-col gap-0.5">
+      <p className="px-2 pt-2 text-xs font-semibold text-muted-foreground">{className}</p>
+      <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm font-medium hover:bg-muted">
+        <Checkbox
+          checked={allChecked}
+          onCheckedChange={(checked) => onToggleAll(modelNames, checked === true)}
+        />
+        <span>{className} (Alle)</span>
+      </label>
+      {modelNames.map((name) => (
+        <label
+          key={name}
+          className="flex cursor-pointer items-center gap-2 rounded py-1.5 pl-8 pr-2 text-sm hover:bg-muted"
+        >
+          <Checkbox checked={values.includes(name)} onCheckedChange={() => onToggle(name)} />
+          <span>{name}</span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
 function ModelMultiChip({
   brandFilter,
   brandValues,
@@ -678,13 +718,12 @@ function ModelMultiChip({
   const options = useVehicleModelOptionsForBrands(categoryGroup, brandValues, values);
   const brandKnown = brandValues.length > 0;
 
-  // Klassevalg gir kun mening når nøyaktig ett merke er valgt — å velge
-  // klasse på tvers av flere merker samtidig er ikke en meningsfull
-  // avgrensning (klassenavn overlapper ikke mellom merker).
+  // Klassevisning gir kun mening når nøyaktig ett merke er valgt — å gruppere
+  // på tvers av flere merker samtidig er ikke meningsfullt (klassenavn
+  // overlapper ikke mellom merker).
   const { data: allBrands } = useAllVehicleBrands();
   const { data: allModels } = useAllVehicleModels();
   const { data: allClasses } = useAllVehicleModelClasses();
-  const [selectedClassId, setSelectedClassId] = useState<string | undefined>(undefined);
 
   const singleBrandId = useMemo(() => {
     if (brandValues.length !== 1) return undefined;
@@ -697,26 +736,36 @@ function ModelMultiChip({
     [allClasses, singleBrandId],
   );
 
-  // "Alle" = ingen klassefilter valgt (default state), ikke en lagret
-  // sentinel-verdi — nullstilles også når merket endres siden en klasse-id
-  // fra forrige merke ikke er meningsfull for det nye.
-  const classId = classesForBrand.some((c) => c.id === selectedClassId)
-    ? selectedClassId
-    : undefined;
+  const groups = useMemo(() => {
+    if (classesForBrand.length === 0) return [];
+    const optionValues = new Set(options.map((o) => o.value));
+    return classesForBrand.map((c) => ({
+      classId: c.id,
+      className: c.name,
+      modelNames: (allModels ?? [])
+        .filter((m) => m.brand_id === singleBrandId && m.class_id === c.id)
+        .map((m) => m.name)
+        .filter((name) => optionValues.has(name)),
+    }));
+  }, [classesForBrand, allModels, singleBrandId, options]);
 
-  const visibleOptions = useMemo(() => {
-    if (!classId) return options;
-    const modelNamesInClass = new Set(
-      (allModels ?? [])
-        .filter((m) => m.brand_id === singleBrandId && m.class_id === classId)
-        .map((m) => m.name),
-    );
-    return options.filter((o) => modelNamesInClass.has(o.value) || values.includes(o.value));
-  }, [options, allModels, singleBrandId, classId, values]);
+  const ungroupedOptions = useMemo(() => {
+    if (classesForBrand.length === 0) return options;
+    const groupedNames = new Set(groups.flatMap((g) => g.modelNames));
+    return options.filter((o) => !groupedNames.has(o.value));
+  }, [classesForBrand, options, groups]);
 
   const toggle = (v: string) => {
     onChange(values.includes(v) ? values.filter((x) => x !== v) : [...values, v]);
   };
+  const toggleAll = (modelNames: string[], checked: boolean) => {
+    if (checked) {
+      onChange([...values, ...modelNames.filter((n) => !values.includes(n))]);
+    } else {
+      onChange(values.filter((v) => !modelNames.includes(v)));
+    }
+  };
+
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -727,41 +776,36 @@ function ModelMultiChip({
         />
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72 p-2">
-        {classesForBrand.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-1 border-b border-border pb-2">
-            <button
-              type="button"
-              onClick={() => setSelectedClassId(undefined)}
-              className={`rounded-full px-2 py-0.5 text-xs ${
-                !classId ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-              }`}
-            >
-              Alle
-            </button>
-            {classesForBrand.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => setSelectedClassId(c.id)}
-                className={`rounded-full px-2 py-0.5 text-xs ${
-                  classId === c.id
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground"
-                }`}
-              >
-                {c.name}
-              </button>
+        {groups.length > 0 ? (
+          <div className="flex max-h-80 flex-col gap-1 overflow-y-auto">
+            {groups.map((g) => (
+              <ModelClassGroup
+                key={g.classId}
+                className={g.className}
+                modelNames={g.modelNames}
+                values={values}
+                onToggle={toggle}
+                onToggleAll={toggleAll}
+              />
             ))}
+            {ungroupedOptions.length > 0 && (
+              <MultiSelectPopoverBody
+                options={ungroupedOptions}
+                values={values}
+                onToggle={toggle}
+              />
+            )}
           </div>
+        ) : (
+          <MultiSelectPopoverBody
+            options={options}
+            values={values}
+            onToggle={toggle}
+            emptyMessage={
+              brandKnown ? "Ingen modeller funnet." : "Velg minst ett merke for å se modeller."
+            }
+          />
         )}
-        <MultiSelectPopoverBody
-          options={visibleOptions}
-          values={values}
-          onToggle={toggle}
-          emptyMessage={
-            brandKnown ? "Ingen modeller funnet." : "Velg minst ett merke for å se modeller."
-          }
-        />
       </PopoverContent>
     </Popover>
   );

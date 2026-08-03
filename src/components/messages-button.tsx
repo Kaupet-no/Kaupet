@@ -142,10 +142,15 @@ export function MessagesButton() {
     refetchInterval: 60_000,
   });
 
+  const userId = user?.id;
   useEffect(() => {
-    if (!user) return;
+    // Depend on the id, not the `user` object — AuthProvider gives it a new
+    // reference on every auth event (e.g. TOKEN_REFRESHED), which would
+    // otherwise tear down and resubscribe this Realtime channel throughout
+    // the session even though the logged-in user hasn't actually changed.
+    if (!userId) return;
     const ch = supabase
-      .channel(`messages-preview:${user.id}`)
+      .channel(`messages-preview:${userId}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, () => {
         void refetch();
         qc.invalidateQueries({ queryKey: ["unread-conversations"] });
@@ -154,7 +159,7 @@ export function MessagesButton() {
     return () => {
       supabase.removeChannel(ch);
     };
-  }, [user, refetch, qc]);
+  }, [userId, refetch, qc]);
 
   useEffect(() => {
     if (!user) return;

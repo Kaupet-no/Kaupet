@@ -87,17 +87,22 @@ export function NotificationsBell() {
   });
 
   // Realtime
+  const userId = user?.id;
   useEffect(() => {
-    if (!user) return;
+    // Depend on the id, not the `user` object — AuthProvider gives it a new
+    // reference on every auth event (e.g. TOKEN_REFRESHED), which would
+    // otherwise tear down and resubscribe this Realtime channel throughout
+    // the session even though the logged-in user hasn't actually changed.
+    if (!userId) return;
     const ch = supabase
-      .channel(`notifs:${user.id}`)
+      .channel(`notifs:${userId}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "saved_search_notifications",
-          filter: `user_id=eq.${user.id}`,
+          filter: `user_id=eq.${userId}`,
         },
         () => {
           qc.invalidateQueries({ queryKey: ["notifications"] });
@@ -110,7 +115,7 @@ export function NotificationsBell() {
           event: "*",
           schema: "public",
           table: "favorite_price_drops",
-          filter: `user_id=eq.${user.id}`,
+          filter: `user_id=eq.${userId}`,
         },
         () => {
           qc.invalidateQueries({ queryKey: ["notifications"] });
@@ -121,7 +126,7 @@ export function NotificationsBell() {
     return () => {
       supabase.removeChannel(ch);
     };
-  }, [user, refetch, qc]);
+  }, [userId, refetch, qc]);
 
   // Fallback: refresh når fanen får fokus igjen
   useEffect(() => {

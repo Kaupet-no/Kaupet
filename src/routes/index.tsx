@@ -247,7 +247,7 @@ function WebLanding() {
             transform: activeCategory ? "translateX(0)" : "translateX(-100%)",
           }}
         />
-        <div className="relative z-10 mx-auto max-w-2xl px-4 py-14 text-center md:py-20">
+        <div className="relative z-10 mx-auto max-w-3xl px-4 py-14 text-center md:py-20">
           {/* Hero text and the category heading are mutually exclusive, each
               sliding in from the direction matching the background tint and
               the subcategory grid below, so picking a category visibly moves
@@ -736,7 +736,7 @@ function WebLanding() {
         <>
           {/* Populært akkurat nå — egen seksjon, lenger ned slik at søkefeltet
               eier hero-seksjonen alene */}
-          <section className="mx-auto max-w-6xl px-4 pb-16">
+          <section className="mx-auto max-w-6xl px-4 pb-16 pt-10">
             <PopularCarousel
               popular={popular}
               isError={popularIsError}

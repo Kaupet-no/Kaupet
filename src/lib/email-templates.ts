@@ -68,7 +68,7 @@ export function renderNotificationEmail(params: {
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;">
             <tr>
               <td style="padding-bottom:24px;" align="center">
-                <span style="font-family:Georgia,'Fraunces',serif; font-size:20px; font-weight:600; letter-spacing:-0.01em;">
+                <span style="font-family:Georgia,'Newsreader',serif; font-size:20px; font-weight:600; letter-spacing:-0.01em;">
                   <span style="color:${COLOR.primary};">Kaupet</span><span style="color:${COLOR.accent};">.</span><span style="color:${COLOR.muted};">no</span>
                 </span>
               </td>
@@ -78,7 +78,7 @@ export function renderNotificationEmail(params: {
                 <p style="margin:0 0 8px; font-size:12px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:${COLOR.accent};">
                   ${escapeHtml(eyebrow)}
                 </p>
-                <h1 style="margin:0 0 16px; font-family:Georgia,'Fraunces',serif; font-size:22px; font-weight:600; color:${COLOR.text}; letter-spacing:-0.01em;">
+                <h1 style="margin:0 0 16px; font-family:Georgia,'Newsreader',serif; font-size:22px; font-weight:600; color:${COLOR.text}; letter-spacing:-0.01em;">
                   ${escapeHtml(params.title)}
                 </h1>
                 <p style="margin:0 0 12px; font-size:15px; line-height:1.6; color:${COLOR.muted};">

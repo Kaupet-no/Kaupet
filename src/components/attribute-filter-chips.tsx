@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTriggerBare } from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { FilterChip } from "@/components/filter-chip";
 import { CategoryFilterFields } from "@/components/category-filter-fields";
 import { RangeFilterField } from "@/components/range-filter-field";
@@ -14,13 +24,8 @@ import { CONDITIONS } from "@/components/advanced-search-value";
 import { PRICE_BOUNDS } from "@/lib/filter-range-bounds";
 import {
   useVehicleBrandOptions,
-  useVehicleModelOptionsForBrands,
+  VehicleModelMultiComboboxContent,
 } from "@/features/listing-creation/modules/generic-attributes/vehicle-brand-model-fields";
-import {
-  useAllVehicleBrands,
-  useAllVehicleModelClasses,
-  useAllVehicleModels,
-} from "@/lib/vehicle/vehicle-brands";
 import {
   getAttributeChipState,
   getPriceChipState,
@@ -34,6 +39,19 @@ import {
   type CategoryFilter,
   type VehicleBrandGroup,
 } from "@/lib/category-filters";
+
+/**
+ * The homepage's single-brand widget stores its pick as `{ kind: "select" }`
+ * (see `category-filter-fields.tsx`), while this results page lets a buyer
+ * check several brands and stores that as `{ kind: "multiselect" }`. Accept
+ * either shape so a brand chosen on the homepage still shows as selected
+ * here, and still unlocks the Modell chip.
+ */
+function brandSelectValues(value: AttributeFilterValue | undefined): string[] {
+  if (value?.kind === "multiselect") return value.values;
+  if (value?.kind === "select") return [value.value];
+  return [];
+}
 
 type Props = {
   /** Effective filters for the selected category/categories. Empty when no
@@ -228,7 +246,7 @@ export function AttributeFilterChips({
       );
     }
     if (f.type === "brand_select") {
-      const selected = current?.kind === "multiselect" ? current.values : [];
+      const selected = brandSelectValues(current);
       return (
         <BrandMultiChip
           key={f.id}
@@ -244,10 +262,7 @@ export function AttributeFilterChips({
     }
     if (f.type === "model_select") {
       const brandFilter = filters.find((bf) => bf.type === "brand_select");
-      const brandValues =
-        brandFilter && values[brandFilter.key]?.kind === "multiselect"
-          ? (values[brandFilter.key] as { kind: "multiselect"; values: string[] }).values
-          : [];
+      const brandValues = brandFilter ? brandSelectValues(values[brandFilter.key]) : [];
       const selected = current?.kind === "multiselect" ? current.values : [];
       return (
         <ModelMultiChip
@@ -556,11 +571,12 @@ function SelectChip({
   );
 }
 
-/** Shared checkbox-list popover body for the Merke/Modell multiselect chips
- * below — picking one option never closes the popover, since checking one
- * brand/model is exactly when a user is most likely to want to check
- * another (that's the whole point of the breadcrumb "broaden the search"
- * behavior this exists for). */
+/** Shared searchable checkbox-list popover body for the Merke/Modell
+ * multiselect chips below — picking one option never closes the popover,
+ * since checking one brand/model is exactly when a user is most likely to
+ * want to check another (that's the whole point of the breadcrumb "broaden
+ * the search" behavior this exists for). The search box matters here since
+ * these lists (e.g. every car brand) can run well past what fits on screen. */
 function MultiSelectPopoverBody({
   options,
   values,
@@ -572,21 +588,27 @@ function MultiSelectPopoverBody({
   onToggle: (value: string) => void;
   emptyMessage?: string;
 }) {
+  const [search, setSearch] = useState("");
   if (options.length === 0 && emptyMessage) {
     return <p className="p-2 text-sm text-muted-foreground">{emptyMessage}</p>;
   }
   return (
-    <div className="flex max-h-80 flex-col gap-0.5 overflow-y-auto">
-      {options.map((o) => (
-        <label
-          key={o.value}
-          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted"
-        >
-          <Checkbox checked={values.includes(o.value)} onCheckedChange={() => onToggle(o.value)} />
-          <span>{o.label}</span>
-        </label>
-      ))}
-    </div>
+    <Command shouldFilter>
+      <CommandInput placeholder="Søk…" value={search} onValueChange={setSearch} />
+      <CommandList className="max-h-80">
+        <CommandEmpty>Ingen treff.</CommandEmpty>
+        <CommandGroup>
+          {options.map((o) => (
+            <CommandItem key={o.value} value={o.label} onSelect={() => onToggle(o.value)}>
+              <Check
+                className={cn("size-4", values.includes(o.value) ? "opacity-100" : "opacity-0")}
+              />
+              {o.label}
+            </CommandItem>
+          ))}
+        </CommandGroup>
+      </CommandList>
+    </Command>
   );
 }
 
@@ -616,7 +638,7 @@ function AttributeMultiChip({
       <PopoverTrigger asChild>
         <FilterChip label={label} active={active} />
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-64 p-2">
+      <PopoverContent align="start" className="w-64 p-0">
         <MultiSelectPopoverBody options={options} values={values} onToggle={toggle} />
       </PopoverContent>
     </Popover>
@@ -649,16 +671,18 @@ function BrandMultiChip({
       <PopoverTrigger asChild>
         <FilterChip label={label} active={active} />
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-64 p-2">
+      <PopoverContent align="start" className="w-64 p-0">
         <MultiSelectPopoverBody options={options} values={values} onToggle={toggle} />
       </PopoverContent>
     </Popover>
   );
 }
 
-/** Modell as a checkbox list, sourced from every currently-selected brand at
- * once (not just one) — checking a second brand in BrandMultiChip
- * immediately adds that brand's models here too. */
+/** Modell as a searchable, class-grouped checkbox list, sourced from every
+ * currently-selected brand at once (not just one) — checking a second brand
+ * in BrandMultiChip immediately adds that brand's models here too. The body
+ * (search box, class headers, "{klasse} (Alle)" rows) is shared with the
+ * front page's model filter via `VehicleModelMultiComboboxContent`. */
 function ModelMultiChip({
   brandFilter,
   brandValues,
@@ -675,48 +699,8 @@ function ModelMultiChip({
   onChange: (values: string[]) => void;
 }) {
   const categoryGroup = (brandFilter?.unit ?? "bil") as VehicleBrandGroup;
-  const options = useVehicleModelOptionsForBrands(categoryGroup, brandValues, values);
   const brandKnown = brandValues.length > 0;
 
-  // Klassevalg gir kun mening når nøyaktig ett merke er valgt — å velge
-  // klasse på tvers av flere merker samtidig er ikke en meningsfull
-  // avgrensning (klassenavn overlapper ikke mellom merker).
-  const { data: allBrands } = useAllVehicleBrands();
-  const { data: allModels } = useAllVehicleModels();
-  const { data: allClasses } = useAllVehicleModelClasses();
-  const [selectedClassId, setSelectedClassId] = useState<string | undefined>(undefined);
-
-  const singleBrandId = useMemo(() => {
-    if (brandValues.length !== 1) return undefined;
-    return allBrands?.find((b) => b.category_group === categoryGroup && b.name === brandValues[0])
-      ?.id;
-  }, [allBrands, categoryGroup, brandValues]);
-
-  const classesForBrand = useMemo(
-    () => (allClasses ?? []).filter((c) => c.brand_id === singleBrandId),
-    [allClasses, singleBrandId],
-  );
-
-  // "Alle" = ingen klassefilter valgt (default state), ikke en lagret
-  // sentinel-verdi — nullstilles også når merket endres siden en klasse-id
-  // fra forrige merke ikke er meningsfull for det nye.
-  const classId = classesForBrand.some((c) => c.id === selectedClassId)
-    ? selectedClassId
-    : undefined;
-
-  const visibleOptions = useMemo(() => {
-    if (!classId) return options;
-    const modelNamesInClass = new Set(
-      (allModels ?? [])
-        .filter((m) => m.brand_id === singleBrandId && m.class_id === classId)
-        .map((m) => m.name),
-    );
-    return options.filter((o) => modelNamesInClass.has(o.value) || values.includes(o.value));
-  }, [options, allModels, singleBrandId, classId, values]);
-
-  const toggle = (v: string) => {
-    onChange(values.includes(v) ? values.filter((x) => x !== v) : [...values, v]);
-  };
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -726,41 +710,12 @@ function ModelMultiChip({
           disabled={!brandKnown}
         />
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-72 p-2">
-        {classesForBrand.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-1 border-b border-border pb-2">
-            <button
-              type="button"
-              onClick={() => setSelectedClassId(undefined)}
-              className={`rounded-full px-2 py-0.5 text-xs ${
-                !classId ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-              }`}
-            >
-              Alle
-            </button>
-            {classesForBrand.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => setSelectedClassId(c.id)}
-                className={`rounded-full px-2 py-0.5 text-xs ${
-                  classId === c.id
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground"
-                }`}
-              >
-                {c.name}
-              </button>
-            ))}
-          </div>
-        )}
-        <MultiSelectPopoverBody
-          options={visibleOptions}
+      <PopoverContent align="start" className="w-72 p-0">
+        <VehicleModelMultiComboboxContent
+          categoryGroup={categoryGroup}
+          brandNames={brandValues}
           values={values}
-          onToggle={toggle}
-          emptyMessage={
-            brandKnown ? "Ingen modeller funnet." : "Velg minst ett merke for å se modeller."
-          }
+          onChange={onChange}
         />
       </PopoverContent>
     </Popover>

@@ -19,7 +19,7 @@ import {
 } from "@/lib/category-filters";
 import {
   VehicleBrandField,
-  VehicleModelWithClassField,
+  VehicleModelMultiField,
 } from "@/features/listing-creation/modules/generic-attributes/vehicle-brand-model-fields";
 import { RangeFilterField } from "@/components/range-filter-field";
 import { boundsForFilter } from "@/lib/filter-range-bounds";
@@ -89,13 +89,20 @@ export function CategoryFilterFields({
             brandFilter && values[brandFilter.key]?.kind === "select"
               ? (values[brandFilter.key] as { kind: "select"; value: string }).value
               : undefined;
+          // Multiselect (not the wizard's single-value model field) so a
+          // whole class can be picked at once via the "{klasse} (Alle)" row —
+          // a search filter benefits from "any C-klasse", unlike a listing,
+          // which always has exactly one concrete model.
+          const modelValues = current?.kind === "multiselect" ? current.values : [];
           return (
-            <VehicleModelWithClassField
+            <VehicleModelMultiField
               key={f.id}
               categoryGroup={(brandFilter?.unit ?? "bil") as VehicleBrandGroup}
-              brandName={brandName}
-              value={current?.kind === "select" ? current.value : undefined}
-              onChange={(v) => onChange(f.key, v ? { kind: "select", value: v } : undefined)}
+              brandNames={brandName ? [brandName] : []}
+              values={modelValues}
+              onChange={(next) =>
+                onChange(f.key, next.length > 0 ? { kind: "multiselect", values: next } : undefined)
+              }
             />
           );
         }

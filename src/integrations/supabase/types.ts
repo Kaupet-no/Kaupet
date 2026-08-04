@@ -121,6 +121,7 @@ export type Database = {
           search_examples: string[]
           slug: string
           sort_order: number
+          updated_at: string
         }
         Insert: {
           color?: string | null
@@ -134,6 +135,7 @@ export type Database = {
           search_examples?: string[]
           slug: string
           sort_order?: number
+          updated_at?: string
         }
         Update: {
           color?: string | null
@@ -147,6 +149,7 @@ export type Database = {
           search_examples?: string[]
           slug?: string
           sort_order?: number
+          updated_at?: string
         }
         Relationships: [
           {
@@ -172,6 +175,7 @@ export type Database = {
           sort_order: number
           type: string
           unit: string | null
+          updated_at: string
         }
         Insert: {
           category_id: string
@@ -186,6 +190,7 @@ export type Database = {
           sort_order?: number
           type: string
           unit?: string | null
+          updated_at?: string
         }
         Update: {
           category_id?: string
@@ -200,6 +205,7 @@ export type Database = {
           sort_order?: number
           type?: string
           unit?: string | null
+          updated_at?: string
         }
         Relationships: [
           {
@@ -220,6 +226,7 @@ export type Database = {
           modules: string[]
           sort_order: number
           steps: string[]
+          updated_at: string
         }
         Insert: {
           category_id: string
@@ -229,6 +236,7 @@ export type Database = {
           modules?: string[]
           sort_order?: number
           steps?: string[]
+          updated_at?: string
         }
         Update: {
           category_id?: string
@@ -238,6 +246,7 @@ export type Database = {
           modules?: string[]
           sort_order?: number
           steps?: string[]
+          updated_at?: string
         }
         Relationships: [
           {
@@ -248,6 +257,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      category_sync_status: {
+        Row: {
+          id: boolean
+          last_synced_at: string | null
+          last_synced_by: string | null
+        }
+        Insert: {
+          id?: boolean
+          last_synced_at?: string | null
+          last_synced_by?: string | null
+        }
+        Update: {
+          id?: boolean
+          last_synced_at?: string | null
+          last_synced_by?: string | null
+        }
+        Relationships: []
       }
       conversations: {
         Row: {
@@ -451,6 +478,7 @@ export type Database = {
           is_generated: boolean
           option_value: string | null
           phrase: string
+          updated_at: string
         }
         Insert: {
           category_filter_id: string
@@ -459,6 +487,7 @@ export type Database = {
           is_generated?: boolean
           option_value?: string | null
           phrase: string
+          updated_at?: string
         }
         Update: {
           category_filter_id?: string
@@ -467,6 +496,7 @@ export type Database = {
           is_generated?: boolean
           option_value?: string | null
           phrase?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -2245,6 +2275,17 @@ export type Database = {
           listing_count: number
           word: string
         }[]
+      }
+      sync_categories_from_payload: {
+        Args: {
+          p_categories: Json
+          p_category_filters: Json
+          p_category_flows: Json
+          p_default_search_examples: string[]
+          p_filter_synonyms: Json
+          p_synced_by: string
+        }
+        Returns: undefined
       }
       user_review_summary: {
         Args: { _user_id: string }

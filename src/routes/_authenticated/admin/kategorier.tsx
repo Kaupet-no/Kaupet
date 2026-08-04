@@ -44,6 +44,7 @@ import { flattenTree } from "@/lib/category-admin-tree";
 import { DefaultSearchExamplesCard } from "@/components/admin/categories/default-search-examples-card";
 import { SortableCategoryRow } from "@/components/admin/categories/sortable-category-row";
 import { CategoryDialog } from "@/components/admin/categories/category-dialog";
+import { StagingSyncCard } from "@/components/admin/categories/staging-sync-card";
 import type { Category } from "@/components/admin/categories/shared";
 import { INDENT_WIDTH } from "@/components/admin/categories/shared";
 
@@ -51,6 +52,10 @@ export const Route = createFileRoute("/_authenticated/admin/kategorier")({
   head: () => ({ meta: [{ title: "Kategoriadministrasjon — Kaupet.no" }] }),
   component: AdminCategories,
 });
+
+// Kategorier redigeres kun i staging; produksjon er read-only og synker
+// derfra via StagingSyncCard (se CLAUDE.md om staging/produksjon-oppsettet).
+const isProduction = import.meta.env.VITE_ENVIRONMENT === "production";
 
 function AdminCategories() {
   const qc = useQueryClient();
@@ -290,25 +295,34 @@ function AdminCategories() {
         updates.push({ id: item.id, sort_order: newSortOrder, parent_id: effectiveParentId });
       }
     }
-    if (updates.length === 0) return;
+    if (updates.length === 0 || isProduction) return;
     reorderMutation.mutate(updates);
   }
 
   return (
     <div className="space-y-6">
       <h2 className="font-display text-xl tracking-tight">Kategorier</h2>
+
+      {isProduction && <StagingSyncCard />}
+
       <div className="flex items-center justify-between gap-4">
         <p className="text-sm text-muted-foreground">
-          Administrer kategorier og underkategorier. Endringer påvirker alle annonser.
+          {isProduction
+            ? "Kategorier redigeres i staging og synkroniseres hit — se statuskortet over."
+            : "Administrer kategorier og underkategorier. Endringer påvirker alle annonser."}
         </p>
-        <Button
-          onClick={() => setDialogState({ category: null, parentId: null, initialTab: "details" })}
-        >
-          <Plus className="size-4" /> Ny kategori
-        </Button>
+        {!isProduction && (
+          <Button
+            onClick={() =>
+              setDialogState({ category: null, parentId: null, initialTab: "details" })
+            }
+          >
+            <Plus className="size-4" /> Ny kategori
+          </Button>
+        )}
       </div>
 
-      <DefaultSearchExamplesCard />
+      <DefaultSearchExamplesCard readOnly={isProduction} />
 
       <Input
         value={search}
@@ -374,6 +388,7 @@ function AdminCategories() {
                       onManageFlow={(cat) =>
                         setDialogState({ category: cat, parentId: null, initialTab: "flow" })
                       }
+                      readOnly={isProduction}
                     />
                   ))}
                 </ul>

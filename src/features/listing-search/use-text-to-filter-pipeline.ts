@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 import { useSearchSynonymMatches, removeMatchedWords } from "./use-search-synonym-matches";
 import { parseNumericFilters, removeNumericMatches } from "@/lib/search-number-parser";
 import { stripFillerWords } from "@/lib/search-stopwords";
+import { negateSynonymMatches } from "@/lib/search-negation";
 import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
 
 /**
@@ -27,6 +28,7 @@ export function useTextToFilterPipeline({
   setQDraft,
   updateSearch,
   attrFilters,
+  allFilters,
   attrValues,
   handleAttrValueChange,
   categoryId,
@@ -36,6 +38,14 @@ export function useTextToFilterPipeline({
   setQDraft: (q: string) => void;
   updateSearch: (patch: { q: string }) => void;
   attrFilters: CategoryFilter[];
+  /** Every category's filters, unscoped — used only to look up a matched
+   * key's filter `type` (select/multiselect/boolean) when no category is
+   * selected yet, so `attrFilters` (which is category-scoped and empty in
+   * that case) still has something to check the match against. Synonym
+   * matching itself already searches globally when `categoryId` is null
+   * (see use-search-synonym-matches.ts); this just lets the result actually
+   * get applied instead of being dropped for lack of a known filter type. */
+  allFilters: CategoryFilter[];
   attrValues: Record<string, AttributeFilterValue>;
   handleAttrValueChange: (key: string, value: AttributeFilterValue | undefined) => void;
   categoryId: string | null;
@@ -44,7 +54,15 @@ export function useTextToFilterPipeline({
    * reversibility (autoAppliedText) and/or a just-applied flash animation. */
   onApplied?: (applied: Record<string, string>) => void;
 }) {
-  const { data: synonymMatches } = useSearchSynonymMatches(categoryId, qDraft);
+  const { data: rawSynonymMatches, debouncedQ: matchedQ } = useSearchSynonymMatches(
+    categoryId,
+    qDraft,
+  );
+  const synonymMatches = useMemo(
+    () =>
+      rawSynonymMatches ? negateSynonymMatches(matchedQ, rawSynonymMatches) : rawSynonymMatches,
+    [matchedQ, rawSynonymMatches],
+  );
   const numericMatches = useMemo(
     () => parseNumericFilters(qDraft, attrFilters),
     [qDraft, attrFilters],
@@ -59,8 +77,24 @@ export function useTextToFilterPipeline({
 
     if (hasSynonyms) {
       for (const m of synonymMatches!) {
-        const filter = attrFilters.find((f) => f.key === m.filterKey);
+        const filter =
+          attrFilters.find((f) => f.key === m.filterKey) ??
+          allFilters.find((f) => f.key === m.filterKey);
         if (!filter) continue;
+        if (m.negated) {
+          if ((filter.type === "select" || filter.type === "multiselect") && m.optionValue) {
+            const current = attrValues[m.filterKey];
+            const values = current?.kind === "exclude" ? current.values : [];
+            if (!values.includes(m.optionValue)) {
+              handleAttrValueChange(m.filterKey, {
+                kind: "exclude",
+                values: [...values, m.optionValue],
+              });
+            }
+            applied[`${m.filterKey}:!${m.optionValue}`] = m.matchedText;
+          }
+          continue;
+        }
         if (filter.type === "boolean") {
           handleAttrValueChange(m.filterKey, { kind: "boolean", value: true });
           applied[`${m.filterKey}:`] = m.matchedText;

@@ -475,6 +475,7 @@ export type Database = {
           category_filter_id: string
           created_at: string
           id: string
+          is_ambiguous: boolean
           is_generated: boolean
           option_value: string | null
           phrase: string
@@ -484,6 +485,7 @@ export type Database = {
           category_filter_id: string
           created_at?: string
           id?: string
+          is_ambiguous?: boolean
           is_generated?: boolean
           option_value?: string | null
           phrase: string
@@ -493,6 +495,7 @@ export type Database = {
           category_filter_id?: string
           created_at?: string
           id?: string
+          is_ambiguous?: boolean
           is_generated?: boolean
           option_value?: string | null
           phrase?: string
@@ -2162,8 +2165,10 @@ export type Database = {
       match_search_synonyms: {
         Args: { p_category_id: string | null; phrases: string[] }
         Returns: {
+          category_id: string
           filter_key: string
           filter_label: string
+          is_ambiguous: boolean
           option_label: string
           option_value: string
           phrase: string

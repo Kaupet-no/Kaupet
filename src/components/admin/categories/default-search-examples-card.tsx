@@ -10,7 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatErrorMessage } from "@/lib/errors";
 
-export function DefaultSearchExamplesCard() {
+export function DefaultSearchExamplesCard({ readOnly = false }: { readOnly?: boolean }) {
   const qc = useQueryClient();
   const [draft, setDraft] = useState<string | null>(null);
 
@@ -71,17 +71,20 @@ export function DefaultSearchExamplesCard() {
               value={value}
               onChange={(e) => setDraft(e.target.value)}
               rows={5}
+              disabled={readOnly}
             />
-            <div className="flex justify-end">
-              <Button
-                type="button"
-                size="sm"
-                disabled={draft === null || save.isPending}
-                onClick={() => save.mutate()}
-              >
-                {save.isPending ? <Loader2 className="size-4 animate-spin" /> : "Lagre"}
-              </Button>
-            </div>
+            {!readOnly && (
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={draft === null || save.isPending}
+                  onClick={() => save.mutate()}
+                >
+                  {save.isPending ? <Loader2 className="size-4 animate-spin" /> : "Lagre"}
+                </Button>
+              </div>
+            )}
           </>
         )}
       </CardContent>

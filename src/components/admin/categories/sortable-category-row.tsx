@@ -27,6 +27,7 @@ export function SortableCategoryRow({
   onAddChild,
   onManageFilters,
   onManageFlow,
+  readOnly = false,
 }: {
   category: Category;
   depth: number;
@@ -39,6 +40,8 @@ export function SortableCategoryRow({
   onAddChild: (c: Category) => void;
   onManageFilters: (c: Category) => void;
   onManageFlow: (c: Category) => void;
+  /** Produksjon: kategorier redigeres kun i staging og synkroniseres hit. */
+  readOnly?: boolean;
 }) {
   const Icon = getCategoryIcon(category.icon);
   const listingCount = countsById.get(category.id) ?? 0;
@@ -58,15 +61,19 @@ export function SortableCategoryRow({
         style={{ paddingLeft: `${depth * INDENT_WIDTH + 8}px` }}
       >
         <div className="flex min-w-0 items-center gap-2">
-          <button
-            type="button"
-            {...attributes}
-            {...listeners}
-            className="cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
-            aria-label="Dra for å endre rekkefølge og nivå"
-          >
-            <GripVertical className="size-4" />
-          </button>
+          {readOnly ? (
+            <span className="inline-block size-4" aria-hidden />
+          ) : (
+            <button
+              type="button"
+              {...attributes}
+              {...listeners}
+              className="cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
+              aria-label="Dra for å endre rekkefølge og nivå"
+            >
+              <GripVertical className="size-4" />
+            </button>
+          )}
           {hasChildren ? (
             <button
               type="button"
@@ -98,41 +105,50 @@ export function SortableCategoryRow({
               aria-hidden
             />
           )}
-          {depth < MAX_CATEGORY_DEPTH - 1 && (
+          {!readOnly && depth < MAX_CATEGORY_DEPTH - 1 && (
             <Button variant="ghost" size="sm" onClick={() => onAddChild(category)}>
               <Plus className="size-4" /> Underkategori
             </Button>
           )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onManageFilters(category)}
-            aria-label="Filtre"
-            title="Administrer filtre"
-          >
-            <SlidersHorizontal className="size-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onManageFlow(category)}
-            aria-label="Annonseflyt"
-            title="Administrer annonseflyt"
-          >
-            <Workflow className="size-4" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={() => onEdit(category)} aria-label="Rediger">
-            <Pencil className="size-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onDelete(category)}
-            aria-label="Slett"
-            className="text-destructive hover:text-destructive"
-          >
-            <Trash2 className="size-4" />
-          </Button>
+          {!readOnly && (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onManageFilters(category)}
+                aria-label="Filtre"
+                title="Administrer filtre"
+              >
+                <SlidersHorizontal className="size-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onManageFlow(category)}
+                aria-label="Annonseflyt"
+                title="Administrer annonseflyt"
+              >
+                <Workflow className="size-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onEdit(category)}
+                aria-label="Rediger"
+              >
+                <Pencil className="size-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onDelete(category)}
+                aria-label="Slett"
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </li>

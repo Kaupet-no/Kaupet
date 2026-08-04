@@ -51,6 +51,7 @@ function describeAttrValue(filter: CategoryFilter, value: AttributeFilterValue):
       return filter.label_nb;
     }
     case "multiselect":
+    case "exclude":
       return "";
   }
 }
@@ -146,6 +147,23 @@ export function ActiveFilters({
               label={`${filter.label_nb}: ${opt?.label_nb ?? v}`}
               onRemove={() => onRemoveAttr?.(key, v)}
               justCreated={justCreatedKeys?.has(`${key}:${v}`)}
+            />
+          ),
+        });
+      }
+      continue;
+    }
+    if (value.kind === "exclude") {
+      for (const v of value.values) {
+        const opt = filter.options?.find((o) => o.value === v);
+        allItems.push({
+          key: `${key}:!${v}`,
+          node: (
+            <AttrChip
+              key={`${key}:!${v}`}
+              label={`${filter.label_nb}: Ikke ${opt?.label_nb ?? v}`}
+              onRemove={() => onRemoveAttr?.(key, v)}
+              justCreated={justCreatedKeys?.has(`${key}:!${v}`)}
             />
           ),
         });

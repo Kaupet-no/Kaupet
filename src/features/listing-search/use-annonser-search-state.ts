@@ -20,6 +20,23 @@ import {
 type Search = z.infer<typeof searchSchema>;
 type Category = { id: string; slug: string; name_nb: string; parent_id: string | null };
 
+/** Whether `filter`'s own options actually contain the value(s) held in
+ * `value` — used to disambiguate a shared attribute key (e.g. "fuel_type")
+ * between categories that define completely different vocabularies for it.
+ * Kinds without an option list (boolean/text/range) have nothing to
+ * validate against, so they're treated as a match by default. */
+function filterMatchesValue(
+  filter: CategoryFilter,
+  value: AttributeFilterValue | undefined,
+): boolean {
+  if (!value) return false;
+  if (value.kind === "select") return !!filter.options?.some((o) => o.value === value.value);
+  if (value.kind === "multiselect" || value.kind === "exclude") {
+    return value.values.every((v) => filter.options?.some((o) => o.value === v));
+  }
+  return true;
+}
+
 /**
  * Derives all the search-page state that follows purely from the URL search
  * params (`search`) plus the categories/filters lookups: category tree,
@@ -59,14 +76,44 @@ export function useAnnonserSearchState(params: {
 
   const categoryTree = useMemo(() => buildTree(categories ?? []), [categories]);
 
+  const attrValues = useMemo(() => decodeAttrFilters(search.attrs), [search.attrs]);
+
   const attrFilters = useMemo(() => {
     const ids = effectiveCategories
       .map((slug: string) => categoryTree.bySlug.get(slug)?.id)
       .filter((id): id is string => !!id);
-    return effectiveFiltersForCategories(ids, allFilters ?? [], categoryTree.byId);
-  }, [effectiveCategories, categoryTree, allFilters]);
-
-  const attrValues = useMemo(() => decodeAttrFilters(search.attrs), [search.attrs]);
+    const scoped = effectiveFiltersForCategories(ids, allFilters ?? [], categoryTree.byId);
+    if (effectiveCategories.length > 0) return scoped;
+    // No category selected: `effectiveFiltersForCategories` is always []
+    // then, since it's category-scoped — but free-text search can now set
+    // attribute values without a category (e.g. "elektrisk SUV"), and those
+    // still need a CategoryFilter (for its label/options) to render as an
+    // editable/removable chip instead of silently disappearing.
+    const activeKeys = new Set(Object.keys(attrValues));
+    if (activeKeys.size === 0) return [];
+    const byKey = new Map<string, CategoryFilter>();
+    for (const f of allFilters ?? []) {
+      if (!activeKeys.has(f.key)) continue;
+      const existing = byKey.get(f.key);
+      if (!existing) {
+        byKey.set(f.key, f);
+        continue;
+      }
+      // The same key can mean entirely different things in different
+      // categories (e.g. "fuel_type" is "Drivstoff"/el·bensin·diesel on
+      // vehicles, but "Brenseltype"/gass·kull·elektrisk on Grill) — prefer
+      // whichever candidate's own options actually contain the matched
+      // value, so the chip shows the right label/option instead of an
+      // arbitrary other category's vocabulary.
+      if (
+        !filterMatchesValue(existing, attrValues[f.key]) &&
+        filterMatchesValue(f, attrValues[f.key])
+      ) {
+        byKey.set(f.key, f);
+      }
+    }
+    return Array.from(byKey.values());
+  }, [effectiveCategories, categoryTree, allFilters, attrValues]);
 
   // Category-specific attribute filters (e.g. vehicle brand) only make sense
   // within the category they belong to. If the user navigates to a category
@@ -78,7 +125,16 @@ export function useAnnonserSearchState(params: {
   // category, which would otherwise wipe valid attrs before data arrives.
   useEffect(() => {
     if (!categories || !allFilters) return;
-    const allowedKeys = new Set(attrFilters.map((f) => f.key));
+    // With no category selected, `attrFilters` is always empty (it's
+    // category-scoped) — that's not the same as "no attribute keys are
+    // valid": free-text search can now recognize e.g. "elbil"/"SUV" without
+    // a category chosen (see useTextToFilterPipeline), so any key that
+    // exists on *some* category is allowed to stick around rather than
+    // being wiped the instant it's set.
+    const allowedKeys =
+      effectiveCategories.length === 0
+        ? new Set(allFilters.map((f) => f.key))
+        : new Set(attrFilters.map((f) => f.key));
     const hasStale = Object.keys(attrValues).some((k) => !allowedKeys.has(k));
     if (!hasStale) return;
 
@@ -92,12 +148,29 @@ export function useAnnonserSearchState(params: {
     navigate({
       search: (prev: z.infer<typeof searchSchema>) => ({ ...prev, attrs: nextAttrs }),
     });
-  }, [attrFilters, attrValues, search.attrs, navigate, categories, allFilters]);
+  }, [
+    attrFilters,
+    attrValues,
+    search.attrs,
+    navigate,
+    categories,
+    allFilters,
+    effectiveCategories,
+  ]);
 
+  // Derives the next `attrs` from the router's own `prev` search state
+  // rather than the `attrValues` closed over at render time — the text-to-
+  // filter pipeline can call this more than once in the same synchronous
+  // pass (e.g. "elektrisk SUV" matching both fuel_type and body_type at
+  // once), and each call would otherwise compute `next` from the *same*
+  // stale `attrValues` snapshot, so the second call's `navigate` would
+  // silently overwrite the first call's change instead of building on it.
   const handleAttrValueChange = (key: string, value: AttributeFilterValue | undefined) => {
-    const next = setAttributeFilterValue(attrValues, key, value);
     navigate({
-      search: (prev: z.infer<typeof searchSchema>) => ({ ...prev, attrs: encodeAttrFilters(next) }),
+      search: (prev: z.infer<typeof searchSchema>) => {
+        const next = setAttributeFilterValue(decodeAttrFilters(prev.attrs), key, value);
+        return { ...prev, attrs: encodeAttrFilters(next) };
+      },
     });
   };
 

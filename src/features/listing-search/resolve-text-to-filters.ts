@@ -1,6 +1,7 @@
 import { fetchSynonymMatches, removeMatchedWords } from "./use-search-synonym-matches";
 import { parseNumericFilters, removeNumericMatches } from "@/lib/search-number-parser";
 import { stripFillerWords } from "@/lib/search-stopwords";
+import { negateSynonymMatches } from "@/lib/search-negation";
 import {
   matchCategoryPhrase,
   matchVehicleBrandPhrase,
@@ -10,6 +11,7 @@ import {
   effectiveFiltersForCategories,
   type AttributeFilterValue,
   type CategoryFilter,
+  type VehicleBrandGroup,
 } from "@/lib/category-filters";
 import { buildTree, type Category } from "@/lib/categories";
 
@@ -38,7 +40,7 @@ export type ResolvedTextFilters = {
 export async function resolveTextToFilters(params: {
   q: string;
   categories: Category[];
-  vehicleBrands: { name: string }[];
+  vehicleBrands: { name: string; category_group: VehicleBrandGroup }[];
   allFilters: CategoryFilter[];
 }): Promise<ResolvedTextFilters> {
   const { categories, vehicleBrands, allFilters } = params;
@@ -73,15 +75,36 @@ export async function resolveTextToFilters(params: {
 
   let synonymMatches: Awaited<ReturnType<typeof fetchSynonymMatches>>;
   try {
-    synonymMatches = categoryId ? await fetchSynonymMatches(categoryId, q) : [];
+    // categoryId is undefined when no category name/brand was recognized in
+    // the text — fetchSynonymMatches(null, ...) then searches every
+    // category's vocabulary instead of one, so "elbil"/"ikke el"/"SUV" style
+    // matches still resolve without a category (see
+    // match_search_synonyms_global.sql for the ambiguity trade-off this makes).
+    synonymMatches = await fetchSynonymMatches(categoryId ?? null, q);
   } catch {
     // RPC unavailable (offline, timeout) — fall through with whatever was
     // already resolved rather than blocking the search entirely.
     synonymMatches = [];
   }
+  synonymMatches = negateSynonymMatches(q, synonymMatches);
   for (const m of synonymMatches) {
-    const filter = attrFilters.find((f) => f.key === m.filterKey);
+    // attrFilters is category-scoped (empty when no category was
+    // recognized) — fall back to the unscoped list so a globally-resolved
+    // match still finds its filter `type` (select/multiselect/boolean).
+    const filter =
+      attrFilters.find((f) => f.key === m.filterKey) ??
+      allFilters.find((f) => f.key === m.filterKey);
     if (!filter) continue;
+    if (m.negated) {
+      if ((filter.type === "select" || filter.type === "multiselect") && m.optionValue) {
+        const current = attrPatch[m.filterKey];
+        const values = current?.kind === "exclude" ? current.values : [];
+        if (!values.includes(m.optionValue)) {
+          attrPatch[m.filterKey] = { kind: "exclude", values: [...values, m.optionValue] };
+        }
+      }
+      continue;
+    }
     if (filter.type === "boolean") {
       attrPatch[m.filterKey] = { kind: "boolean", value: true };
     } else if (filter.type === "select" && m.optionValue) {

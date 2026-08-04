@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import type { Category } from "@/lib/categories";
 import { applyAttributeFilters } from "@/lib/category-filters";
+import { expandBodyTypeSearchValues } from "@/lib/vehicle/body-type-search-expansion";
 import {
   decodeAttrFilters,
   searchSchema,
@@ -144,7 +145,21 @@ export function useListingsQuery({
 
       // Category-specific attribute filters (e.g. Bil's "hestekrefter")
       const attrFilters = decodeAttrFilters(search.attrs);
-      qb = applyAttributeFilters(qb, attrFilters);
+      // Widen a "SUV" body_type search to also include "Kombi" — many SUVs
+      // are misclassified as Kombi — without changing what appears checked
+      // in the search UI (URL state stays untouched).
+      const bodyType = attrFilters.body_type;
+      const queryAttrFilters =
+        bodyType?.kind === "multiselect"
+          ? {
+              ...attrFilters,
+              body_type: {
+                kind: "multiselect" as const,
+                values: expandBodyTypeSearchValues(bodyType.values),
+              },
+            }
+          : attrFilters;
+      qb = applyAttributeFilters(qb, queryAttrFilters);
 
       // Price
       const includeFree = search.includeFree ?? true;

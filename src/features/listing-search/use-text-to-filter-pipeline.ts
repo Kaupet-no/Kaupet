@@ -28,6 +28,7 @@ export function useTextToFilterPipeline({
   setQDraft,
   updateSearch,
   attrFilters,
+  allFilters,
   attrValues,
   handleAttrValueChange,
   categoryId,
@@ -37,6 +38,14 @@ export function useTextToFilterPipeline({
   setQDraft: (q: string) => void;
   updateSearch: (patch: { q: string }) => void;
   attrFilters: CategoryFilter[];
+  /** Every category's filters, unscoped — used only to look up a matched
+   * key's filter `type` (select/multiselect/boolean) when no category is
+   * selected yet, so `attrFilters` (which is category-scoped and empty in
+   * that case) still has something to check the match against. Synonym
+   * matching itself already searches globally when `categoryId` is null
+   * (see use-search-synonym-matches.ts); this just lets the result actually
+   * get applied instead of being dropped for lack of a known filter type. */
+  allFilters: CategoryFilter[];
   attrValues: Record<string, AttributeFilterValue>;
   handleAttrValueChange: (key: string, value: AttributeFilterValue | undefined) => void;
   categoryId: string | null;
@@ -68,7 +77,9 @@ export function useTextToFilterPipeline({
 
     if (hasSynonyms) {
       for (const m of synonymMatches!) {
-        const filter = attrFilters.find((f) => f.key === m.filterKey);
+        const filter =
+          attrFilters.find((f) => f.key === m.filterKey) ??
+          allFilters.find((f) => f.key === m.filterKey);
         if (!filter) continue;
         if (m.negated) {
           if ((filter.type === "select" || filter.type === "multiselect") && m.optionValue) {

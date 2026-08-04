@@ -78,7 +78,16 @@ export function useAnnonserSearchState(params: {
   // category, which would otherwise wipe valid attrs before data arrives.
   useEffect(() => {
     if (!categories || !allFilters) return;
-    const allowedKeys = new Set(attrFilters.map((f) => f.key));
+    // With no category selected, `attrFilters` is always empty (it's
+    // category-scoped) — that's not the same as "no attribute keys are
+    // valid": free-text search can now recognize e.g. "elbil"/"SUV" without
+    // a category chosen (see useTextToFilterPipeline), so any key that
+    // exists on *some* category is allowed to stick around rather than
+    // being wiped the instant it's set.
+    const allowedKeys =
+      effectiveCategories.length === 0
+        ? new Set(allFilters.map((f) => f.key))
+        : new Set(attrFilters.map((f) => f.key));
     const hasStale = Object.keys(attrValues).some((k) => !allowedKeys.has(k));
     if (!hasStale) return;
 
@@ -92,12 +101,29 @@ export function useAnnonserSearchState(params: {
     navigate({
       search: (prev: z.infer<typeof searchSchema>) => ({ ...prev, attrs: nextAttrs }),
     });
-  }, [attrFilters, attrValues, search.attrs, navigate, categories, allFilters]);
+  }, [
+    attrFilters,
+    attrValues,
+    search.attrs,
+    navigate,
+    categories,
+    allFilters,
+    effectiveCategories,
+  ]);
 
+  // Derives the next `attrs` from the router's own `prev` search state
+  // rather than the `attrValues` closed over at render time — the text-to-
+  // filter pipeline can call this more than once in the same synchronous
+  // pass (e.g. "elektrisk SUV" matching both fuel_type and body_type at
+  // once), and each call would otherwise compute `next` from the *same*
+  // stale `attrValues` snapshot, so the second call's `navigate` would
+  // silently overwrite the first call's change instead of building on it.
   const handleAttrValueChange = (key: string, value: AttributeFilterValue | undefined) => {
-    const next = setAttributeFilterValue(attrValues, key, value);
     navigate({
-      search: (prev: z.infer<typeof searchSchema>) => ({ ...prev, attrs: encodeAttrFilters(next) }),
+      search: (prev: z.infer<typeof searchSchema>) => {
+        const next = setAttributeFilterValue(decodeAttrFilters(prev.attrs), key, value);
+        return { ...prev, attrs: encodeAttrFilters(next) };
+      },
     });
   };
 

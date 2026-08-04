@@ -237,14 +237,17 @@ function BrowsePage() {
   // number+unit facts (e.g. "under 100000 km") typed into the search box
   // and converts them into structured attribute filters — see
   // use-text-to-filter-pipeline.ts, which coordinates both matchers in one
-  // atomic pass so they can't clobber each other. Synonym matching only
-  // runs once a category is selected — see use-search-synonym-matches.ts
-  // for why the vocabulary is ambiguous without one.
+  // atomic pass so they can't clobber each other. Synonym matching also
+  // works with no category selected (searches every category's vocabulary
+  // instead of one), though number+unit matching still only runs once a
+  // category is selected — see use-search-synonym-matches.ts for the
+  // ambiguity trade-off this makes.
   useTextToFilterPipeline({
     qDraft,
     setQDraft,
     updateSearch,
     attrFilters,
+    allFilters: allFilters ?? [],
     attrValues,
     handleAttrValueChange,
     categoryId: hero?.selected.id ?? null,

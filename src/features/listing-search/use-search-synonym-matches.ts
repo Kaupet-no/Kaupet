@@ -42,10 +42,12 @@ function buildNgrams(words: string[]): { text: string; start: number; end: numbe
  * dictionary — the SQL side owns which phrases are known, this hook only
  * turns "which n-grams of the query match" into a set of non-overlapping,
  * longest-phrase-wins matches the caller can convert into structured
- * attribute filters. Scoped to a single category (with its ancestors),
- * since equipment vocabulary is ambiguous without that context — callers
- * should pass `categoryId: null` when no category is selected, which
- * disables matching entirely.
+ * attribute filters. Scoped to a single category (with its ancestors) when
+ * one is given, which disambiguates vocabulary that means different things
+ * in different verticals; pass `categoryId: null` to search every
+ * category's vocabulary instead (e.g. no category selected yet on
+ * /annonser) — see match_search_synonyms_global.sql for the accepted
+ * trade-off this makes.
  */
 /**
  * The actual RPC call + n-gram matching, factored out of the `useQuery`
@@ -59,7 +61,7 @@ export async function fetchSynonymMatches(
 ): Promise<SynonymMatch[]> {
   const words = q.trim().length > 0 ? q.trim().split(/\s+/) : [];
   const ngrams = buildNgrams(words);
-  if (ngrams.length === 0 || !categoryId) return [];
+  if (ngrams.length === 0) return [];
 
   const { data, error } = await supabase.rpc("match_search_synonyms", {
     p_category_id: categoryId,
@@ -117,7 +119,7 @@ export function useSearchSynonymMatches(categoryId: string | null, q: string) {
   const query = useQuery({
     queryKey: ["search-synonym-matches", categoryId, debouncedQ],
     queryFn: () => fetchSynonymMatches(categoryId, debouncedQ),
-    enabled: words.length > 0 && !!categoryId,
+    enabled: words.length > 0,
     staleTime: 30_000,
   });
 

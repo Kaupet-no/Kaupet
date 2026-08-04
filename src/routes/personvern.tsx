@@ -191,10 +191,6 @@ function PersonvernPage() {
                 opplasting av bilder, slik at den ikke vises på nytt.
               </li>
               <li>
-                <strong>kaupet:filter-hint-seen</strong> — husker at du har lukket hintet om
-                filtermuligheter i søket, slik at det ikke vises på nytt.
-              </li>
-              <li>
                 <strong>kaupet_360_hint_seen</strong> — husker at du har sett veiledningen for
                 360°-visning av kjøretøy, slik at den ikke vises på nytt.
               </li>

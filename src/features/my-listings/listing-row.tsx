@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { formatPrice } from "@/lib/format";
 import { STATUS_LABEL } from "@/lib/constants";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export type Row = {
   id: string;
@@ -56,6 +57,20 @@ export type Row = {
   expires_at: string | null;
   cover_path: string | null;
 };
+
+function RowImage({ imgUrl, hasCoverPath }: { imgUrl: string | null; hasCoverPath: boolean }) {
+  if (imgUrl) {
+    return <img src={imgUrl} alt="" className="size-full object-cover" />;
+  }
+  if (hasCoverPath) {
+    return <Skeleton className="size-full rounded-none" />;
+  }
+  return (
+    <div className="flex size-full items-center justify-center text-xs text-muted-foreground">
+      Ingen bilde
+    </div>
+  );
+}
 
 function daysLeft(expires_at: string | null): number | null {
   if (!expires_at) return null;
@@ -168,14 +183,11 @@ export function ListingRow({
   if (native) {
     return (
       <li className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
-        <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-muted">
-          {imgUrl ? (
-            <img src={imgUrl} alt="" className="size-full object-cover" />
-          ) : (
-            <div className="flex size-full items-center justify-center text-xs text-muted-foreground">
-              Ingen bilde
-            </div>
-          )}
+        <div
+          className="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-muted"
+          style={{ width: "5rem", height: "5rem" }}
+        >
+          <RowImage imgUrl={imgUrl} hasCoverPath={!!row.cover_path} />
         </div>
         <div className="min-w-0 flex-1">
           <Link
@@ -272,14 +284,11 @@ export function ListingRow({
 
   return (
     <li className="flex flex-col gap-4 rounded-xl border border-border bg-card p-3 sm:flex-row sm:items-center">
-      <div className="size-24 shrink-0 overflow-hidden rounded-lg bg-muted">
-        {imgUrl ? (
-          <img src={imgUrl} alt="" className="size-full object-cover" />
-        ) : (
-          <div className="flex size-full items-center justify-center text-xs text-muted-foreground">
-            Ingen bilde
-          </div>
-        )}
+      <div
+        className="size-24 shrink-0 overflow-hidden rounded-lg bg-muted"
+        style={{ width: "6rem", height: "6rem" }}
+      >
+        <RowImage imgUrl={imgUrl} hasCoverPath={!!row.cover_path} />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">

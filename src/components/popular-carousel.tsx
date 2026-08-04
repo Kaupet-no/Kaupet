@@ -9,6 +9,7 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
 
 // Defined at module scope (not inside WebLanding's render body) so it keeps
@@ -78,7 +79,11 @@ export function PopularCarousel({
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-muted" />
+            <div key={i} className="space-y-2 rounded-xl border border-border p-3">
+              <Skeleton className="aspect-[4/3] w-full" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-4 w-1/3" />
+            </div>
           ))}
         </div>
       )}

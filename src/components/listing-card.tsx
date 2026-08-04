@@ -5,6 +5,7 @@ import { signListingImageUrls } from "@/lib/storage";
 import { formatPrice } from "@/lib/format";
 import { FavoriteButton } from "@/components/favorite-button";
 import { useIsNative } from "@/hooks/use-is-native";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export type ListingCardData = {
   id: string;
@@ -42,10 +43,12 @@ type Props = {
 
 function ListingImage({
   imgUrl,
+  hasCoverPath,
   alt,
   compact,
 }: {
   imgUrl: string | null;
+  hasCoverPath: boolean;
   alt: string;
   compact: boolean;
 }) {
@@ -58,6 +61,9 @@ function ListingImage({
         loading="lazy"
       />
     );
+  }
+  if (hasCoverPath) {
+    return <Skeleton className="size-full rounded-none" />;
   }
   return (
     <div
@@ -104,9 +110,13 @@ export function ListingCard({
         state={linkState}
         className={`${linkClass} flex gap-3 p-2`}
       >
-        <div className="relative size-20 shrink-0 overflow-hidden rounded-lg bg-muted">
+        <div
+          className="relative size-20 shrink-0 overflow-hidden rounded-lg bg-muted"
+          style={{ width: "5rem", height: "5rem" }}
+        >
           <ListingImage
             imgUrl={imgUrl}
+            hasCoverPath={!!listing.cover_path}
             alt={`${listing.title} — ${formatPrice(listing)}`}
             compact
           />
@@ -138,9 +148,10 @@ export function ListingCard({
       onMouseLeave={onHoverChange ? () => onHoverChange(null) : undefined}
       className={linkClass}
     >
-      <div className="relative aspect-[4/3] bg-muted">
+      <div className="relative aspect-[4/3] bg-muted" style={{ aspectRatio: "4 / 3" }}>
         <ListingImage
           imgUrl={imgUrl}
+          hasCoverPath={!!listing.cover_path}
           alt={`${listing.title} — ${formatPrice(listing)}`}
           compact={false}
         />

@@ -32,6 +32,7 @@ import { useListingEditMutations } from "@/features/listing-edit/use-listing-edi
 import { VehiclePlateEditDialog } from "@/features/listing-edit/vehicle-plate-edit-dialog";
 import { CategoryChangeDialog } from "@/features/listing-edit/category-change-dialog";
 import type { ListingEditContextValue } from "@/features/listing-edit/edit-mode-context";
+import { ListingDetailSkeleton } from "@/components/listing-detail-skeleton";
 
 // crypto.randomUUID() requires a secure context and isn't available in every
 // WebView — fall back to a non-crypto random ID so anonymous view-count
@@ -191,6 +192,9 @@ export const Route = createFileRoute("/$kaupetCode")({
     };
   },
   component: RootSlugPage,
+  pendingComponent: ListingDetailSkeleton,
+  pendingMs: 200,
+  pendingMinMs: 300,
   errorComponent: ListingErrorBoundary,
   notFoundComponent: () => (
     <div className="mx-auto max-w-2xl px-4 py-20 text-center">

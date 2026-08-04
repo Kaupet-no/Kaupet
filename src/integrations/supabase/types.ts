@@ -2130,7 +2130,7 @@ export type Database = {
         Returns: undefined
       }
       match_search_synonyms: {
-        Args: { p_category_id: string; phrases: string[] }
+        Args: { p_category_id: string | null; phrases: string[] }
         Returns: {
           filter_key: string
           filter_label: string

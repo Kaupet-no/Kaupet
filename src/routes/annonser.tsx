@@ -25,6 +25,7 @@ import { useTextToFilterPipeline } from "@/features/listing-search/use-text-to-f
 import {
   matchCategoryPhrase,
   matchVehicleBrandPhrase,
+  matchVehicleAttributeOptionPhrase,
   removeCategoryMatch,
 } from "@/lib/search-category-match";
 import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
@@ -305,9 +306,10 @@ function BrowsePage() {
   const rawCategoryMatch = useMemo(() => {
     const m =
       matchCategoryPhrase(qDraft, categories ?? []) ??
-      matchVehicleBrandPhrase(qDraft, vehicleBrands ?? []);
+      matchVehicleBrandPhrase(qDraft, vehicleBrands ?? []) ??
+      matchVehicleAttributeOptionPhrase(qDraft, allFilters ?? [], categories ?? []);
     return m && m.matchedText !== dismissedMatchText ? m : null;
-  }, [qDraft, categories, vehicleBrands, dismissedMatchText]);
+  }, [qDraft, categories, vehicleBrands, allFilters, dismissedMatchText]);
 
   // For a brand match, resolve the "Bil og MC" root fallback from
   // matchVehicleBrandPhrase down to the actual subcategory (e.g. "Bil") the

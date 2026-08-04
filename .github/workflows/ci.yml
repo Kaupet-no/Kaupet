@@ -71,6 +71,7 @@ jobs:
       - name: Build
         run: bun run build
         env:
+          VITE_ENVIRONMENT: production
           VITE_SUPABASE_PROJECT_ID: ${{ vars.VITE_SUPABASE_PROJECT_ID }}
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
@@ -78,6 +79,18 @@ jobs:
 
       - name: Deploy
         run: bun run deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # Kategori-synk (staging -> produksjon) i produksjonens admin-panel
+      # leser fra staging sitt Supabase-prosjekt med service-role. Disse må
+      # også finnes som Worker-secrets (wrangler secret put), siden Worker-
+      # runtime env ikke er det samme som CI build-env.
+      - name: Set staging-sync secrets on the production Worker
+        run: |
+          echo "${{ vars.STAGING_SUPABASE_URL }}" | bunx wrangler secret put STAGING_SUPABASE_URL --name kaupet-no
+          echo "${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}" | bunx wrangler secret put STAGING_SUPABASE_SERVICE_ROLE_KEY --name kaupet-no
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -162,6 +175,7 @@ jobs:
       - name: Build
         run: bun run build
         env:
+          VITE_ENVIRONMENT: staging
           VITE_SUPABASE_PROJECT_ID: ${{ vars.VITE_SUPABASE_PROJECT_ID }}
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}

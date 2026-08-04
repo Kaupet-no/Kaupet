@@ -5,7 +5,11 @@
 -- 20260804160000_ambiguous_filter_synonyms.sql for kolonnen og
 -- src/features/listing-search/use-search-synonym-matches.ts for sperren.
 -- Ren tilleggsendring i SELECT-listen -- påvirker ikke DISTINCT ON/ORDER BY.
-CREATE OR REPLACE FUNCTION public.match_search_synonyms(
+-- Postgres tillater ikke CREATE OR REPLACE når OUT-parameterne (radtypen)
+-- endres, så den gamle signaturen må droppes eksplisitt først.
+DROP FUNCTION IF EXISTS public.match_search_synonyms(uuid, text[]);
+
+CREATE FUNCTION public.match_search_synonyms(
   p_category_id uuid,
   phrases text[]
 )

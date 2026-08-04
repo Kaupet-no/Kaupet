@@ -6,8 +6,17 @@
 # versjonene ikke lenger er representert som egne filer (reverted),
 # og at baseline-squash-filen dekker det samme innholdet (applied).
 # Ingen SQL kjøres mot databasen - kun historikk-tabellen oppdateres.
+#
+# `supabase link` trenger databasepassordet for å koble til via pooler
+# (uten det kan CLI-en falle tilbake til en direkte IPv6-tilkobling som
+# feiler på nettverk uten IPv6-rute). Sett STAGING_DB_PASSWORD og
+# PROD_DB_PASSWORD som miljøvariabler før du kjører dette scriptet,
+# f.eks. hentet med `sops -d secrets/migration.env`.
 
 set -euo pipefail
+
+: "${STAGING_DB_PASSWORD:?Sett STAGING_DB_PASSWORD før du kjører scriptet}"
+: "${PROD_DB_PASSWORD:?Sett PROD_DB_PASSWORD før du kjører scriptet}"
 
 if command -v supabase >/dev/null 2>&1; then
   SB="supabase"
@@ -24,15 +33,16 @@ OLD_VERSIONS="20260604073224 20260604073236 20260604073313 20260604084639 202606
 
 repair_project() {
   local ref="$1"
+  local password="$2"
   echo "== Repairing project $ref =="
-  $SB link --project-ref "$ref"
+  $SB link --project-ref "$ref" -p "$password"
   $SB migration repair --status reverted $OLD_VERSIONS
   $SB migration repair --status applied 20260604073223
   $SB migration list
 }
 
 # Staging
-repair_project zpazmwzhvylptptygzlw
+repair_project zpazmwzhvylptptygzlw "$STAGING_DB_PASSWORD"
 
 # Prod
-repair_project efuexbrxdvjznrvoqbsd
+repair_project efuexbrxdvjznrvoqbsd "$PROD_DB_PASSWORD"

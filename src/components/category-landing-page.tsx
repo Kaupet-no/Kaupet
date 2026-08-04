@@ -193,6 +193,7 @@ export function CategoryLandingPage({
     setQDraft,
     updateSearch,
     attrFilters,
+    allFilters: allFilters ?? [],
     attrValues,
     handleAttrValueChange,
     categoryId: selected.id,

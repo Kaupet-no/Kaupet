@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getPublicProfile, listUserReviews } from "@/lib/reviews.functions";
 import { formatErrorMessage } from "@/lib/errors";
+import { ProfilePageSkeleton } from "@/components/profile-page-skeleton";
 
 export const Route = createFileRoute("/bruker/$id")({
   loader: async ({ params }) => {
@@ -40,6 +41,9 @@ export const Route = createFileRoute("/bruker/$id")({
     };
   },
   component: PublicProfilePage,
+  pendingComponent: ProfilePageSkeleton,
+  pendingMs: 200,
+  pendingMinMs: 300,
   errorComponent: ({ error }) => (
     <div className="mx-auto max-w-2xl px-4 py-20 text-center">
       <h1 className="font-display text-2xl">Kunne ikke laste brukerprofilen</h1>

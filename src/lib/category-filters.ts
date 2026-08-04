@@ -264,6 +264,30 @@ export function vehicleCategoryGroupFor(
 }
 
 /**
+ * Returns every category whose `brand_select` filter reads from the given
+ * `vehicle_brands.category_group` — i.e. the category/categories a brand in
+ * that group belongs to. Computed live from `vehicleCategoryGroupFor` (driven
+ * by admin-configured `category_filters`) rather than a hardcoded
+ * `group -> slug` table, so it stays correct as the category tree is
+ * restructured. Usually returns exactly one category (e.g. "bil" for the
+ * "bil" group), but some groups now cover more than one category after being
+ * split (e.g. "moped_atv" spans both "ATV" and "Snøscooter") — callers that
+ * need a single answer must disambiguate among the results themselves.
+ */
+export function vehicleCategoriesForBrandGroup<
+  T extends { id: string; slug: string; name_nb: string },
+>(
+  group: VehicleBrandGroup,
+  categories: T[],
+  allFilters: CategoryFilter[],
+  categoriesById: Map<string, CategoryNode>,
+): T[] {
+  return categories.filter(
+    (c) => vehicleCategoryGroupFor(c.id, allFilters, categoriesById) === group,
+  );
+}
+
+/**
  * Returns the category's generic (non-vehicle) "brand" filter — a plain
  * text/select attribute keyed "brand" — or null if the category has none.
  * Distinct from `vehicleCategoryGroupFor`'s `brand_select`, which is a

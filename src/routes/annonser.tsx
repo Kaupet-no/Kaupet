@@ -14,7 +14,6 @@ import type { MapListing } from "@/components/listings-map";
 import { ResultList } from "@/components/result-list";
 import { NativeFilterChips } from "@/components/native-filter-chips";
 import { AttributeFilterChips } from "@/components/attribute-filter-chips";
-import { FilterHintBanner } from "@/components/filter-hint-banner";
 import { NativeSearchOverlay } from "@/components/native-search-overlay";
 import { NativeAdvancedSearch } from "@/components/native-advanced-search";
 import { saveLastSearchContext } from "@/lib/last-search-context";
@@ -29,10 +28,12 @@ import {
   removeCategoryMatch,
 } from "@/lib/search-category-match";
 import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
+import { useBrandCategoryCandidate } from "@/features/listing-search/use-brand-category-candidate";
 import { stripFillerWords } from "@/lib/search-stopwords";
 import {
   normalizeFilter,
   vehicleCategoryGroupFor,
+  vehicleCategoriesForBrandGroup,
   genericBrandFilterFor,
 } from "@/lib/category-filters";
 import { getCategoryBehavior } from "@/lib/category-behavior";
@@ -301,12 +302,54 @@ function BrowsePage() {
   // its vocabulary lookup, so "cruisecontrol" would just fall through to a
   // plain text search that finds nothing. See matchVehicleBrandPhrase.
   const { data: vehicleBrands } = useAllVehicleBrands();
-  const categoryMatch = useMemo(() => {
+  const rawCategoryMatch = useMemo(() => {
     const m =
       matchCategoryPhrase(qDraft, categories ?? []) ??
       matchVehicleBrandPhrase(qDraft, vehicleBrands ?? []);
     return m && m.matchedText !== dismissedMatchText ? m : null;
   }, [qDraft, categories, vehicleBrands, dismissedMatchText]);
+
+  // For a brand match, resolve the "Bil og MC" root fallback from
+  // matchVehicleBrandPhrase down to the actual subcategory (e.g. "Bil") the
+  // brand's category_group implies — computed live from the category tree
+  // (vehicleCategoriesForBrandGroup) rather than a hardcoded slug table, so
+  // it survives category-tree restructuring. Some groups (moped_atv,
+  // bobil_campingvogn) now span two categories after being split, so those
+  // need useBrandCategoryCandidate to pick the one with more matching
+  // listings for the current query.
+  const brandCategoryCandidates = useMemo(() => {
+    if (rawCategoryMatch?.source !== "brand" || !rawCategoryMatch.brandCategoryGroup) return [];
+    return vehicleCategoriesForBrandGroup(
+      rawCategoryMatch.brandCategoryGroup,
+      categories ?? [],
+      allFilters ?? [],
+      categoryTree.byId,
+    );
+  }, [rawCategoryMatch, categories, allFilters, categoryTree]);
+  const { candidate: brandCategoryCandidate, isLoading: brandCategoryCandidateLoading } =
+    useBrandCategoryCandidate(brandCategoryCandidates, qDraft);
+
+  const categoryMatch = useMemo(() => {
+    if (!rawCategoryMatch) return null;
+    if (rawCategoryMatch.source !== "brand" || brandCategoryCandidates.length === 0) {
+      return rawCategoryMatch;
+    }
+    // Ambiguous group (2+ candidates): wait for the count comparison before
+    // showing the banner, so it doesn't first suggest "Bil og MC" and then
+    // jump to the resolved subcategory under the user.
+    if (brandCategoryCandidateLoading) return null;
+    if (!brandCategoryCandidate) return rawCategoryMatch;
+    return {
+      ...rawCategoryMatch,
+      categorySlug: brandCategoryCandidate.slug,
+      categoryName: brandCategoryCandidate.name_nb,
+    };
+  }, [
+    rawCategoryMatch,
+    brandCategoryCandidates,
+    brandCategoryCandidateLoading,
+    brandCategoryCandidate,
+  ]);
 
   const applyCategoryMatch = () => {
     if (!categoryMatch) return;
@@ -557,31 +600,14 @@ function BrowsePage() {
             <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
               <FolderOpen className="size-4 shrink-0 text-primary" />
               <span className="flex-1">
-                {categoryMatch.source === "brand" ? (
-                  <>
-                    Fant «{categoryMatch.matchedText}» — søk i{" "}
-                    <button
-                      type="button"
-                      onClick={applyCategoryMatch}
-                      className="font-medium text-primary underline-offset-2 hover:underline"
-                    >
-                      {categoryMatch.categoryName}
-                    </button>
-                    ?
-                  </>
-                ) : (
-                  <>
-                    Mente du kategorien{" "}
-                    <button
-                      type="button"
-                      onClick={applyCategoryMatch}
-                      className="font-medium text-primary underline-offset-2 hover:underline"
-                    >
-                      {categoryMatch.categoryName}
-                    </button>
-                    ?
-                  </>
-                )}
+                Begrens søket til{" "}
+                <button
+                  type="button"
+                  onClick={applyCategoryMatch}
+                  className="font-medium text-primary underline-offset-2 hover:underline"
+                >
+                  {categoryMatch.categoryName}
+                </button>
               </span>
               <button
                 type="button"
@@ -593,7 +619,6 @@ function BrowsePage() {
               </button>
             </div>
           )}
-          {!categoryMatch && <FilterHintBanner hasActiveCriteria={hasSearchCriteria} />}
           {isNative ? (
             <NativeFilterChips
               min={search.min}

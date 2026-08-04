@@ -82,6 +82,11 @@ type Props = {
   onConditionsChange?: (c: string[]) => void;
   /** Hides the "Tilstand" chip — no listing under Bil og MC has that attribute. */
   hideCondition?: boolean;
+  /** Whether a category is currently selected. When false and `filters` is
+   * empty (no category-scoped filters to show), a hint is rendered in their
+   * place pointing the user at the category picker instead of leaving the
+   * row silently empty. */
+  hasCategory?: boolean;
 };
 
 /** How many of a filter's typed-word matches count toward its relevance —
@@ -121,6 +126,7 @@ export function AttributeFilterChips({
   conditions,
   onConditionsChange,
   hideCondition = false,
+  hasCategory = true,
 }: Props) {
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [priceConditionOpen, setPriceConditionOpen] = useState<"price" | "condition" | null>(null);
@@ -130,7 +136,12 @@ export function AttributeFilterChips({
   // live in one row/component; native keeps them in NativeFilterChips.
   const showPriceCondition = !isNative && onPriceChange != null;
 
-  if (filters.length === 0 && !showPriceCondition) return null;
+  // No category selected and nothing to show in its place (no filters, and
+  // possibly no Pris/Tilstand on native) — point the user at the category
+  // picker instead of leaving the row empty.
+  const showNoCategoryHint = !hasCategory && filters.length === 0;
+
+  if (filters.length === 0 && !showPriceCondition && !showNoCategoryHint) return null;
 
   const { primary, secondaryRaw } = (() => {
     const split = splitPrimaryFilters(filters);
@@ -426,8 +437,15 @@ export function AttributeFilterChips({
   // benefit on the narrow viewports it targets. Desktop instead returns a
   // fragment: the caller wraps it together with DesktopFilterChips in one
   // shared flex-wrap row, so Pris/Tilstand and Merke/Modell can share a line.
+  const noCategoryHint = showNoCategoryHint && (
+    <span className="text-sm text-muted-foreground">
+      Velg en kategori for å se flere filtermuligheter ⤴
+    </span>
+  );
+
   const body = (
     <>
+      {noCategoryHint}
       {priceChip}
       {conditionChip}
       {chips}

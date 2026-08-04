@@ -12,6 +12,8 @@ function match(
     filterLabel: "Drivstoff",
     optionValue: "el",
     optionLabel: "El",
+    isAmbiguous: false,
+    categoryId: null,
     ...partial,
   };
 }

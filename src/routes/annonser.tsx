@@ -367,7 +367,10 @@ function BrowsePage() {
       catMode: "any",
       q: nextQ,
     });
-    setDismissedMatchText(null);
+    // Brand matches keep the brand name in the query, so without this the
+    // banner would immediately reappear for the same text after the
+    // category filter is applied — dismiss it explicitly instead.
+    setDismissedMatchText(categoryMatch.matchedText);
   };
 
   // Always the main category's own direct children — not `hero.selected`'s,
@@ -599,16 +602,14 @@ function BrowsePage() {
           {categoryMatch && (
             <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
               <FolderOpen className="size-4 shrink-0 text-primary" />
-              <span className="flex-1">
+              <button
+                type="button"
+                onClick={applyCategoryMatch}
+                className="flex-1 text-left underline-offset-2 hover:underline"
+              >
                 Begrens søket til{" "}
-                <button
-                  type="button"
-                  onClick={applyCategoryMatch}
-                  className="font-medium text-primary underline-offset-2 hover:underline"
-                >
-                  {categoryMatch.categoryName}
-                </button>
-              </span>
+                <span className="font-medium text-primary">{categoryMatch.categoryName}</span>
+              </button>
               <button
                 type="button"
                 onClick={() => setDismissedMatchText(categoryMatch.matchedText)}

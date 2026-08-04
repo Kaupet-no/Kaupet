@@ -2,7 +2,7 @@
 
 [![Lisens: AGPL-3.0](https://img.shields.io/badge/lisens-AGPL--3.0-blue.svg)](LICENSE)
 [![CI](https://github.com/Kaupet-no/Kaupet/actions/workflows/ci.yml/badge.svg)](https://github.com/Kaupet-no/Kaupet/actions/workflows/ci.yml)
-[![Ko-fi](https://img.shields.io/badge/Ko--fi-doner-ff5f5f.svg?logo=ko-fi&logoColor=white)](https://ko-fi.com/sprudlevann)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-support-ff5f5f.svg?logo=ko-fi&logoColor=white)](https://ko-fi.com/sprudlevann)
 
 **Kaupet.no** en markedsplass for kjøp og salg av brukte ting, bygget på **åpen** og **fri** kode.
 

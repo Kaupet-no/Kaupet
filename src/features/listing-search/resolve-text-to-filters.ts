@@ -5,6 +5,7 @@ import { negateSynonymMatches } from "@/lib/search-negation";
 import {
   matchCategoryPhrase,
   matchVehicleBrandPhrase,
+  matchVehicleAttributeOptionPhrase,
   removeCategoryMatch,
 } from "@/lib/search-category-match";
 import {
@@ -47,11 +48,24 @@ export async function resolveTextToFilters(params: {
   let q = params.q.trim();
   if (!q) return { q, attrPatch: {} };
 
+  // "attribute" is last-priority: it infers a category from a body-type
+  // option word ("SUV") that only exists on one category (Bil), so a search
+  // with no explicit category/brand name still scopes synonym matching
+  // correctly (e.g. "Elektrisk SUV" needs categoryId=Bil for "elektrisk" to
+  // resolve to fuel_type=el at all, since global matching gates ambiguous
+  // synonyms like "elektrisk" behind a corroborating signal — see
+  // fetchSynonymMatches/filterAmbiguousMatches).
   const categoryMatch =
-    matchCategoryPhrase(q, categories) ?? matchVehicleBrandPhrase(q, vehicleBrands);
+    matchCategoryPhrase(q, categories) ??
+    matchVehicleBrandPhrase(q, vehicleBrands) ??
+    matchVehicleAttributeOptionPhrase(q, allFilters, categories);
   if (categoryMatch?.source === "category") {
     q = removeCategoryMatch(q, categoryMatch);
   }
+  // Attribute matches ("SUV") aren't stripped here — the word itself is
+  // still valid input to the synonym matcher below, which will now resolve
+  // it (and remove it from the free text) as the category-scoped body_type
+  // filter it actually is, since categoryId is no longer null.
 
   const tree = buildTree(categories);
   const categoryId = categoryMatch ? tree.bySlug.get(categoryMatch.categorySlug)?.id : undefined;

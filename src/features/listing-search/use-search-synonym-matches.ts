@@ -17,6 +17,14 @@ export type SynonymMatch = {
    * word ("ikke"/"uten") — the phrase should exclude rather than select
    * this value. Never set by `fetchSynonymMatches` itself. */
   negated?: boolean;
+  /** True for synonyms that are also common words outside their category's
+   * vocabulary (e.g. "elektrisk" for fuel_type=el) — see
+   * filterAmbiguousMatches for how these are gated when no category is
+   * selected. */
+  isAmbiguous: boolean;
+  /** The matched filter's own category — used to corroborate ambiguous
+   * matches against another, non-ambiguous match in the same category. */
+  categoryId: string | null;
 };
 
 const DEBOUNCE_MS = 250;
@@ -91,9 +99,31 @@ export async function fetchSynonymMatches(
       filterLabel: row.filter_label,
       optionValue: row.option_value,
       optionLabel: row.option_label,
+      isAmbiguous: row.is_ambiguous,
+      categoryId: row.category_id,
     });
   }
-  return accepted.sort((a, b) => a.startWord - b.startWord);
+  return filterAmbiguousMatches(accepted, categoryId).sort((a, b) => a.startWord - b.startWord);
+}
+
+/**
+ * Drops ambiguous synonym matches (e.g. "elektrisk" -> fuel_type=el, which
+ * is also just a generic adjective) unless another, non-ambiguous match in
+ * the same result set shares its category — i.e. some other Bil-specific
+ * signal (body type, brand, ...) is also present in the search. Only
+ * applies when no category is already selected/recognized (`categoryId ===
+ * null`): once a category is established, the ambiguity is already
+ * resolved by that choice, so the gate is skipped.
+ */
+export function filterAmbiguousMatches(
+  matches: SynonymMatch[],
+  categoryId: string | null,
+): SynonymMatch[] {
+  if (categoryId !== null) return matches;
+  const corroboratedCategoryIds = new Set(
+    matches.filter((m) => !m.isAmbiguous && m.categoryId).map((m) => m.categoryId),
+  );
+  return matches.filter((m) => !m.isAmbiguous || corroboratedCategoryIds.has(m.categoryId));
 }
 
 /**

@@ -1,4 +1,4 @@
-import type { VehicleBrandGroup } from "@/lib/category-filters";
+import type { CategoryFilter, VehicleBrandGroup } from "@/lib/category-filters";
 
 export type CategoryMatch = {
   matchedText: string;
@@ -8,8 +8,11 @@ export type CategoryMatch = {
    * from the query once applied (redundant once the filter exists).
    * "brand": the matched text is a vehicle brand (e.g. "Volvo") that
    * implies the category but should stay in the query, since it's still a
-   * useful title-search term and isn't itself a category name. */
-  source: "category" | "brand";
+   * useful title-search term and isn't itself a category name.
+   * "attribute": the matched text is a category-exclusive attribute option
+   * value (e.g. "Stasjonsvogn", a `body_type` option only "Bil" has) — like
+   * "brand", it stays in the query since it's still a useful search term. */
+  source: "category" | "brand" | "attribute";
   /** Set only for `source: "brand"`: the brand's `vehicle_brands.category_group`,
    * for resolving the actual subcategory (e.g. "Bil") via
    * `vehicleCategoriesForBrandGroup` — `categorySlug`/`categoryName` above
@@ -104,6 +107,51 @@ export function matchVehicleBrandPhrase(
         source: "brand",
         brandCategoryGroup: b.category_group,
       };
+    }
+  }
+  return best;
+}
+
+/**
+ * Finds a whole-word match against the option labels of a category-exclusive
+ * attribute filter (currently just `body_type`, e.g. "Stasjonsvogn"/"SUV" —
+ * see 20260731170000_karosseri_filter.sql, scoped to the "Bil" category
+ * only, unlike `color`/`fuel_type` which are shared across several vehicle
+ * categories and would make this ambiguous). Since each option is only ever
+ * defined on one category, this can map straight to that category without
+ * the brand matcher's async candidate-disambiguation step.
+ */
+export function matchVehicleAttributeOptionPhrase<
+  T extends { id: string; slug: string; name_nb: string },
+>(
+  query: string,
+  allFilters: CategoryFilter[],
+  categories: T[],
+  keys: readonly string[] = ["body_type"],
+): CategoryMatch | null {
+  const q = query.trim();
+  if (!q) return null;
+
+  let best: CategoryMatch | null = null;
+  for (const filter of allFilters) {
+    if (!keys.includes(filter.key)) continue;
+    const category = categories.find((c) => c.id === filter.category_id);
+    if (!category) continue;
+    for (const opt of filter.options ?? []) {
+      const label = opt.label_nb.trim();
+      if (!label) continue;
+      const re = new RegExp(`\\b${escapeRegExp(label)}\\b`, "i");
+      const m = q.match(re);
+      if (!m) continue;
+      if (!best || m[0].length > best.matchedText.length) {
+        best = {
+          matchedText: m[0],
+          categorySlug: category.slug,
+          categoryName: category.name_nb,
+          source: "attribute",
+          brandCategoryGroup: null,
+        };
+      }
     }
   }
   return best;

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Select,
@@ -23,6 +24,7 @@ type SynonymRow = {
   option_value: string | null;
   phrase: string;
   is_generated: boolean;
+  is_ambiguous: boolean;
 };
 
 /**
@@ -44,6 +46,7 @@ export function FilterSynonymsDialog({
   const qc = useQueryClient();
   const [newPhrase, setNewPhrase] = useState("");
   const [newOptionValue, setNewOptionValue] = useState(filter.options?.[0]?.value ?? "");
+  const [newIsAmbiguous, setNewIsAmbiguous] = useState(false);
 
   const queryKey = ["admin", "filter-synonyms", filter.id];
 
@@ -52,7 +55,7 @@ export function FilterSynonymsDialog({
     queryFn: async (): Promise<SynonymRow[]> => {
       const { data, error } = await supabase
         .from("filter_synonyms")
-        .select("id, option_value, phrase, is_generated")
+        .select("id, option_value, phrase, is_generated, is_ambiguous")
         .eq("category_filter_id", filter.id)
         .order("phrase");
       if (error) throw error;
@@ -68,13 +71,18 @@ export function FilterSynonymsDialog({
       const phrase = newPhrase.trim().toLowerCase();
       if (!phrase) throw new Error("Frase er påkrevd");
       const option_value = filter.type === "boolean" ? null : newOptionValue || null;
-      const { error } = await supabase
-        .from("filter_synonyms")
-        .insert({ category_filter_id: filter.id, option_value, phrase, is_generated: false });
+      const { error } = await supabase.from("filter_synonyms").insert({
+        category_filter_id: filter.id,
+        option_value,
+        phrase,
+        is_generated: false,
+        is_ambiguous: newIsAmbiguous,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
       setNewPhrase("");
+      setNewIsAmbiguous(false);
       invalidate();
       showSuccessToast("Synonym lagt til");
     },
@@ -125,6 +133,9 @@ export function FilterSynonymsDialog({
                   {r.is_generated && (
                     <span className="ml-1 text-xs text-muted-foreground">(auto)</span>
                   )}
+                  {r.is_ambiguous && (
+                    <span className="ml-1 text-xs text-muted-foreground">(tvetydig)</span>
+                  )}
                 </span>
                 <Button
                   type="button"
@@ -173,6 +184,16 @@ export function FilterSynonymsDialog({
               </Select>
             </div>
           )}
+          <div className="flex items-center gap-1.5 pb-2">
+            <Checkbox
+              id="syn-ambiguous"
+              checked={newIsAmbiguous}
+              onCheckedChange={(v) => setNewIsAmbiguous(v === true)}
+            />
+            <Label htmlFor="syn-ambiguous" className="text-xs font-normal">
+              Tvetydig (krever annet Bil-signal)
+            </Label>
+          </div>
           <Button type="submit" disabled={add.isPending}>
             {add.isPending ? <Loader2 className="size-4 animate-spin" /> : "Legg til"}
           </Button>

@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 import { useSearchSynonymMatches, removeMatchedWords } from "./use-search-synonym-matches";
 import { parseNumericFilters, removeNumericMatches } from "@/lib/search-number-parser";
 import { stripFillerWords } from "@/lib/search-stopwords";
+import { negateSynonymMatches } from "@/lib/search-negation";
 import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
 
 /**
@@ -44,7 +45,15 @@ export function useTextToFilterPipeline({
    * reversibility (autoAppliedText) and/or a just-applied flash animation. */
   onApplied?: (applied: Record<string, string>) => void;
 }) {
-  const { data: synonymMatches } = useSearchSynonymMatches(categoryId, qDraft);
+  const { data: rawSynonymMatches, debouncedQ: matchedQ } = useSearchSynonymMatches(
+    categoryId,
+    qDraft,
+  );
+  const synonymMatches = useMemo(
+    () =>
+      rawSynonymMatches ? negateSynonymMatches(matchedQ, rawSynonymMatches) : rawSynonymMatches,
+    [matchedQ, rawSynonymMatches],
+  );
   const numericMatches = useMemo(
     () => parseNumericFilters(qDraft, attrFilters),
     [qDraft, attrFilters],
@@ -61,6 +70,20 @@ export function useTextToFilterPipeline({
       for (const m of synonymMatches!) {
         const filter = attrFilters.find((f) => f.key === m.filterKey);
         if (!filter) continue;
+        if (m.negated) {
+          if ((filter.type === "select" || filter.type === "multiselect") && m.optionValue) {
+            const current = attrValues[m.filterKey];
+            const values = current?.kind === "exclude" ? current.values : [];
+            if (!values.includes(m.optionValue)) {
+              handleAttrValueChange(m.filterKey, {
+                kind: "exclude",
+                values: [...values, m.optionValue],
+              });
+            }
+            applied[`${m.filterKey}:!${m.optionValue}`] = m.matchedText;
+          }
+          continue;
+        }
         if (filter.type === "boolean") {
           handleAttrValueChange(m.filterKey, { kind: "boolean", value: true });
           applied[`${m.filterKey}:`] = m.matchedText;

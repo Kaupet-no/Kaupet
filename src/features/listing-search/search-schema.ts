@@ -70,6 +70,8 @@ export function encodeAttrFilters(values: Record<string, AttributeFilterValue>):
           return `${key}:r:${v.min ?? ""}-${v.max ?? ""}`;
         case "text":
           return `${key}:t:${encodeURIComponent(v.value)}`;
+        case "exclude":
+          return `${key}:x:${v.values.map(encodeURIComponent).join("|")}`;
       }
     })
     .join(",");
@@ -114,6 +116,12 @@ export function decodeAttrFilters(attrs: string | undefined): Record<string, Att
         }
         case "t":
           result[key] = { kind: "text", value: decodeURIComponent(payload) };
+          break;
+        case "x":
+          result[key] = {
+            kind: "exclude",
+            values: payload.length > 0 ? payload.split("|").map(decodeURIComponent) : [],
+          };
           break;
       }
     } catch {

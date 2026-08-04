@@ -13,6 +13,10 @@ export type SynonymMatch = {
   /** Null for boolean filters — the filter itself is the value. */
   optionValue: string | null;
   optionLabel: string | null;
+  /** Set by search-negation.ts when this match was preceded by a negation
+   * word ("ikke"/"uten") — the phrase should exclude rather than select
+   * this value. Never set by `fetchSynonymMatches` itself. */
+  negated?: boolean;
 };
 
 const DEBOUNCE_MS = 250;
@@ -90,6 +94,16 @@ export async function fetchSynonymMatches(
   return accepted.sort((a, b) => a.startWord - b.startWord);
 }
 
+/**
+ * Wraps the query result with the exact (debounced) text it was resolved
+ * against — callers that need to re-derive something positional from the
+ * matches (e.g. negateSynonymMatches's "word immediately before the match")
+ * must use this `debouncedQ`, not the live `q` passed in, since `q` can
+ * already have moved on (e.g. a previous match's text was just stripped out)
+ * by the time a given match set renders — using the live value there would
+ * silently mismatch word indices against a query text the matches were
+ * never computed from.
+ */
 export function useSearchSynonymMatches(categoryId: string | null, q: string) {
   const [debouncedQ, setDebouncedQ] = useState(q.trim());
 
@@ -100,12 +114,14 @@ export function useSearchSynonymMatches(categoryId: string | null, q: string) {
 
   const words = debouncedQ.length > 0 ? debouncedQ.split(/\s+/) : [];
 
-  return useQuery({
+  const query = useQuery({
     queryKey: ["search-synonym-matches", categoryId, debouncedQ],
     queryFn: () => fetchSynonymMatches(categoryId, debouncedQ),
     enabled: words.length > 0 && !!categoryId,
     staleTime: 30_000,
   });
+
+  return { ...query, debouncedQ };
 }
 
 /** Removes the matched word ranges from the raw query, used to move a

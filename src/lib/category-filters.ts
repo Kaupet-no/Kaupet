@@ -348,7 +348,13 @@ export type AttributeFilterValue =
   | { kind: "multiselect"; values: string[] }
   | { kind: "boolean"; value: boolean }
   | { kind: "range"; min?: number; max?: number }
-  | { kind: "text"; value: string };
+  | { kind: "text"; value: string }
+  /** Excludes listings whose attribute equals any of `values` — a listing
+   * with no value for this key is kept (e.g. "ikke elbil" shouldn't hide
+   * listings that never set `fuel_type`). Currently only produced by the
+   * free-text negation matcher (search-negation.ts) for select/multiselect
+   * filters. */
+  | { kind: "exclude"; values: string[] };
 
 /**
  * Applies attribute filter predicates to a Supabase query on a table that has a
@@ -384,6 +390,15 @@ export function applyAttributeFilters<T>(
         break;
       case "text":
         if (f.value) q = q.ilike(`attributes->>${key}`, `%${f.value}%`);
+        break;
+      case "exclude":
+        // Keep listings that never set this attribute — only exclude ones
+        // that explicitly match one of the excluded values.
+        if (f.values.length > 0) {
+          q = q.or(
+            `attributes->>${key}.is.null,attributes->>${key}.not.in.(${f.values.join(",")})`,
+          );
+        }
         break;
     }
   }

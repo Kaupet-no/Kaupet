@@ -260,15 +260,21 @@ function BrowsePage() {
   // search box instead of vanishing, since the automation guessing wrong
   // shouldn't cost the user what they typed.
   const removeAttrWithRestore = (key: string, value?: string) => {
-    const composite = `${key}:${value ?? ""}`;
-    const restoreText = autoAppliedText[composite];
     const current = attrValues[key];
+    const composite =
+      value !== undefined && current?.kind === "exclude"
+        ? `${key}:!${value}`
+        : `${key}:${value ?? ""}`;
+    const restoreText = autoAppliedText[composite];
     if (value !== undefined && current?.kind === "multiselect") {
       const next = current.values.filter((v) => v !== value);
       handleAttrValueChange(
         key,
         next.length > 0 ? { kind: "multiselect", values: next } : undefined,
       );
+    } else if (value !== undefined && current?.kind === "exclude") {
+      const next = current.values.filter((v) => v !== value);
+      handleAttrValueChange(key, next.length > 0 ? { kind: "exclude", values: next } : undefined);
     } else {
       handleAttrValueChange(key, undefined);
     }

@@ -88,18 +88,97 @@ export const getCategorySyncStatus = createServerFn({ method: "GET" })
 
 type DiffEntry<T> = { added: T[]; updated: { before: T; after: T }[]; removed: T[] };
 
-function diffById<T extends { id: string }>(prodRows: T[], stagingRows: T[]): DiffEntry<T> {
-  const prodById = new Map(prodRows.map((r) => [r.id, r]));
-  const stagingById = new Map(stagingRows.map((r) => [r.id, r]));
+// Staging og produksjon er to uavhengige Supabase-prosjekter: samme logiske
+// kategori/filter/flow/synonym har ulik UUID i hvert miljø, så en id-basert
+// diff ville feilaktig vist ALT som lagt til + slettet hver gang (se
+// bugfix-migrasjonen 20260804100000). Match i stedet på en stabil "naturlig
+// nøkkel" (slug, filter-nøkkel osv.), forhåndsbygget separat for hver side
+// (nøklene er sammenlignbare på tvers av miljøer selv om radenes egne id-er
+// ikke er det). "Endret" avgjøres via normalize, som utelater
+// id/created_at/updated_at og andre miljø-spesifikke fremmednøkler.
+function diffByKey<T>(
+  prodByKey: Map<string, T>,
+  stagingByKey: Map<string, T>,
+  normalize: (r: T) => unknown,
+): DiffEntry<T> {
   const added: T[] = [];
   const updated: { before: T; after: T }[] = [];
-  for (const [id, after] of stagingById) {
-    const before = prodById.get(id);
+  for (const [key, after] of stagingByKey) {
+    const before = prodByKey.get(key);
     if (!before) added.push(after);
-    else if (JSON.stringify(before) !== JSON.stringify(after)) updated.push({ before, after });
+    else if (JSON.stringify(normalize(before)) !== JSON.stringify(normalize(after)))
+      updated.push({ before, after });
   }
-  const removed = prodRows.filter((r) => !stagingById.has(r.id));
+  const removed = [...prodByKey.entries()]
+    .filter(([key]) => !stagingByKey.has(key))
+    .map(([, row]) => row);
   return { added, updated, removed };
+}
+
+function keyByCategorySlug(rows: CategoryRow[]): Map<string, CategoryRow> {
+  return new Map(rows.map((r) => [r.slug, r]));
+}
+
+function keyByCategoryAndField<T extends { category_id: string }>(
+  rows: T[],
+  categoryIdToSlug: Map<string, string>,
+  field: (r: T) => string,
+): Map<string, T> {
+  return new Map(
+    rows.map((r) => [`${categoryIdToSlug.get(r.category_id) ?? r.category_id}::${field(r)}`, r]),
+  );
+}
+
+function keyBySynonymIdentity(
+  rows: FilterSynonymRow[],
+  filterIdToKey: Map<string, string>,
+): Map<string, FilterSynonymRow> {
+  return new Map(
+    rows.map((r) => [
+      `${filterIdToKey.get(r.category_filter_id) ?? r.category_filter_id}::${r.option_value ?? ""}::${r.phrase}`,
+      r,
+    ]),
+  );
+}
+
+function normalizeCategory(c: CategoryRow) {
+  return {
+    ...c,
+    id: undefined,
+    parent_id: undefined,
+    created_at: undefined,
+    updated_at: undefined,
+  };
+}
+
+function normalizeCategoryFilter(f: CategoryFilterRow) {
+  return {
+    ...f,
+    id: undefined,
+    category_id: undefined,
+    created_at: undefined,
+    updated_at: undefined,
+  };
+}
+
+function normalizeCategoryFlow(f: CategoryFlowRow) {
+  return {
+    ...f,
+    id: undefined,
+    category_id: undefined,
+    created_at: undefined,
+    updated_at: undefined,
+  };
+}
+
+function normalizeFilterSynonym(s: FilterSynonymRow) {
+  return {
+    ...s,
+    id: undefined,
+    category_filter_id: undefined,
+    created_at: undefined,
+    updated_at: undefined,
+  };
 }
 
 export const getCategorySyncDiff = createServerFn({ method: "GET" })
@@ -114,11 +193,43 @@ export const getCategorySyncDiff = createServerFn({ method: "GET" })
       fetchCategorySyncTables(supabaseAdmin),
     ]);
 
+    const stagingSlugById = new Map(staging.categories.map((c) => [c.id, c.slug]));
+    const prodSlugById = new Map(prod.categories.map((c) => [c.id, c.slug]));
+
+    const stagingFilterKeyById = new Map(
+      staging.categoryFilters.map((f) => [
+        f.id,
+        `${stagingSlugById.get(f.category_id) ?? f.category_id}::${f.key}`,
+      ]),
+    );
+    const prodFilterKeyById = new Map(
+      prod.categoryFilters.map((f) => [
+        f.id,
+        `${prodSlugById.get(f.category_id) ?? f.category_id}::${f.key}`,
+      ]),
+    );
+
     return {
-      categories: diffById(prod.categories, staging.categories),
-      categoryFilters: diffById(prod.categoryFilters, staging.categoryFilters),
-      categoryFlows: diffById(prod.categoryFlows, staging.categoryFlows),
-      filterSynonyms: diffById(prod.filterSynonyms, staging.filterSynonyms),
+      categories: diffByKey(
+        keyByCategorySlug(prod.categories),
+        keyByCategorySlug(staging.categories),
+        normalizeCategory,
+      ),
+      categoryFilters: diffByKey(
+        keyByCategoryAndField(prod.categoryFilters, prodSlugById, (f) => f.key),
+        keyByCategoryAndField(staging.categoryFilters, stagingSlugById, (f) => f.key),
+        normalizeCategoryFilter,
+      ),
+      categoryFlows: diffByKey(
+        keyByCategoryAndField(prod.categoryFlows, prodSlugById, () => ""),
+        keyByCategoryAndField(staging.categoryFlows, stagingSlugById, () => ""),
+        normalizeCategoryFlow,
+      ),
+      filterSynonyms: diffByKey(
+        keyBySynonymIdentity(prod.filterSynonyms, prodFilterKeyById),
+        keyBySynonymIdentity(staging.filterSynonyms, stagingFilterKeyById),
+        normalizeFilterSynonym,
+      ),
       defaultSearchExamplesChanged:
         JSON.stringify(prod.defaultSearchExamples ?? []) !==
         JSON.stringify(staging.defaultSearchExamples ?? []),

@@ -1,6 +1,7 @@
 import { fetchSynonymMatches, removeMatchedWords } from "./use-search-synonym-matches";
 import { parseNumericFilters, removeNumericMatches } from "@/lib/search-number-parser";
 import { stripFillerWords } from "@/lib/search-stopwords";
+import { negateSynonymMatches } from "@/lib/search-negation";
 import {
   matchCategoryPhrase,
   matchVehicleBrandPhrase,
@@ -80,9 +81,20 @@ export async function resolveTextToFilters(params: {
     // already resolved rather than blocking the search entirely.
     synonymMatches = [];
   }
+  synonymMatches = negateSynonymMatches(q, synonymMatches);
   for (const m of synonymMatches) {
     const filter = attrFilters.find((f) => f.key === m.filterKey);
     if (!filter) continue;
+    if (m.negated) {
+      if ((filter.type === "select" || filter.type === "multiselect") && m.optionValue) {
+        const current = attrPatch[m.filterKey];
+        const values = current?.kind === "exclude" ? current.values : [];
+        if (!values.includes(m.optionValue)) {
+          attrPatch[m.filterKey] = { kind: "exclude", values: [...values, m.optionValue] };
+        }
+      }
+      continue;
+    }
     if (filter.type === "boolean") {
       attrPatch[m.filterKey] = { kind: "boolean", value: true };
     } else if (filter.type === "select" && m.optionValue) {

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyAttributeFilters,
   effectiveFiltersForCategory,
   normalizeFilter,
   splitPrimaryFilters,
+  type AttributeFilterValue,
   type CategoryFilter,
   type CategoryNode,
 } from "./category-filters";
@@ -103,5 +105,44 @@ describe("splitPrimaryFilters", () => {
     const { primary, secondary } = splitPrimaryFilters(filters);
     expect(primary.map((x) => x.key)).toEqual(["a", "c"]);
     expect(secondary.map((x) => x.key)).toEqual(["b"]);
+  });
+});
+
+function fakeQuery() {
+  const calls: { method: string; args: unknown[] }[] = [];
+  const q = {
+    calls,
+    or: (...args: unknown[]) => {
+      calls.push({ method: "or", args });
+      return q;
+    },
+    contains: (...args: unknown[]) => {
+      calls.push({ method: "contains", args });
+      return q;
+    },
+  };
+  return q;
+}
+
+describe("applyAttributeFilters", () => {
+  it("keeps listings with the attribute unset when excluding values", () => {
+    const filters: Record<string, AttributeFilterValue> = {
+      fuel_type: { kind: "exclude", values: ["el"] },
+    };
+    const q = applyAttributeFilters(fakeQuery(), filters);
+    expect(q.calls).toEqual([
+      {
+        method: "or",
+        args: ["attributes->>fuel_type.is.null,attributes->>fuel_type.not.in.(el)"],
+      },
+    ]);
+  });
+
+  it("does nothing when the exclude list is empty", () => {
+    const filters: Record<string, AttributeFilterValue> = {
+      fuel_type: { kind: "exclude", values: [] },
+    };
+    const q = applyAttributeFilters(fakeQuery(), filters);
+    expect(q.calls).toEqual([]);
   });
 });

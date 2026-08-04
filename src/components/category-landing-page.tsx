@@ -8,7 +8,6 @@ import type { MapListing } from "@/components/listings-map";
 import { ResultList } from "@/components/result-list";
 import { NativeFilterChips } from "@/components/native-filter-chips";
 import { AttributeFilterChips } from "@/components/attribute-filter-chips";
-import { FilterHintBanner } from "@/components/filter-hint-banner";
 import { CategoryHero } from "@/components/category-hero";
 import { buildTree, descendants, pathFromAncestor, type Category } from "@/lib/categories";
 import {
@@ -330,11 +329,6 @@ export function CategoryLandingPage({
             showQMode={false}
             extraGroups={search.extraGroups ?? []}
             onExtraGroupsChange={(extraGroups) => updateSearch({ extraGroups })}
-          />
-          <FilterHintBanner
-            hasActiveCriteria={
-              terms.length > 0 || Object.keys(attrValues).length > 0 || location?.lat != null
-            }
           />
           {isNative ? (
             <NativeFilterChips

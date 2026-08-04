@@ -22,8 +22,13 @@ export type SynonymMatch = {
    * filterAmbiguousMatches for how these are gated when no category is
    * selected. */
   isAmbiguous: boolean;
-  /** The matched filter's own category — used to corroborate ambiguous
-   * matches against another, non-ambiguous match in the same category. */
+  /** The matched filter's topmost category ancestor (root), not its direct
+   * category — used to corroborate ambiguous matches against another,
+   * non-ambiguous match under the same vertical (e.g. "SUV" under Bil
+   * corroborating "elektrisk" resolved arbitrarily to Bobil/Motorsykkel,
+   * since fuel_type is defined on several sibling vehicle categories and
+   * the RPC's DISTINCT ON can land on any one of them — comparing roots
+   * instead of the exact leaf category makes that pick irrelevant). */
   categoryId: string | null;
 };
 

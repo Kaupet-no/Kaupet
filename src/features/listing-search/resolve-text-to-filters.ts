@@ -10,6 +10,7 @@ import {
   effectiveFiltersForCategories,
   type AttributeFilterValue,
   type CategoryFilter,
+  type VehicleBrandGroup,
 } from "@/lib/category-filters";
 import { buildTree, type Category } from "@/lib/categories";
 
@@ -38,7 +39,7 @@ export type ResolvedTextFilters = {
 export async function resolveTextToFilters(params: {
   q: string;
   categories: Category[];
-  vehicleBrands: { name: string }[];
+  vehicleBrands: { name: string; category_group: VehicleBrandGroup }[];
   allFilters: CategoryFilter[];
 }): Promise<ResolvedTextFilters> {
   const { categories, vehicleBrands, allFilters } = params;

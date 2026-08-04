@@ -1,3 +1,5 @@
+import type { VehicleBrandGroup } from "@/lib/category-filters";
+
 export type CategoryMatch = {
   matchedText: string;
   categorySlug: string;
@@ -8,6 +10,12 @@ export type CategoryMatch = {
    * implies the category but should stay in the query, since it's still a
    * useful title-search term and isn't itself a category name. */
   source: "category" | "brand";
+  /** Set only for `source: "brand"`: the brand's `vehicle_brands.category_group`,
+   * for resolving the actual subcategory (e.g. "Bil") via
+   * `vehicleCategoriesForBrandGroup` — `categorySlug`/`categoryName` above
+   * are just the "Bil og MC" root fallback until that resolution completes.
+   * See annonser.tsx for how this gets resolved into the final suggestion. */
+  brandCategoryGroup: VehicleBrandGroup | null;
 };
 
 function escapeRegExp(s: string): string {
@@ -43,7 +51,13 @@ export function matchCategoryPhrase<T extends { slug: string; name_nb: string }>
     const m = q.match(re);
     if (!m) continue;
     if (!best || m[0].length > best.matchedText.length) {
-      best = { matchedText: m[0], categorySlug: c.slug, categoryName: name, source: "category" };
+      best = {
+        matchedText: m[0],
+        categorySlug: c.slug,
+        categoryName: name,
+        source: "category",
+        brandCategoryGroup: null,
+      };
     }
   }
   return best;
@@ -58,15 +72,18 @@ export function matchCategoryPhrase<T extends { slug: string; name_nb: string }>
  * (it requires a category to scope its vocabulary lookup against), and the
  * whole query falls through to a plain text search that finds nothing.
  *
- * Scoped to the "Bil og MC" root (not the specific "Bil"/"Motorsykkel"/...
- * subcategory the brand's `category_group` implies) — the root already
- * carries the shared equipment filters (utstyr_*) that this exists to
- * unlock, and guessing the exact subcategory slug from `category_group`
- * risks a wrong mapping; the root is always correct and sufficient.
+ * `categorySlug`/`categoryName` here are always the "Bil og MC" root — the
+ * actual subcategory (e.g. "Bil") is resolved separately by the caller via
+ * `vehicleCategoriesForBrandGroup` (category-filters.ts), using the brand's
+ * `category_group` returned here as `brandCategoryGroup`. That resolution
+ * needs live category-tree/filter data this function doesn't have, and for
+ * some groups needs an async result-count comparison (see annonser.tsx) —
+ * so this function only does the synchronous brand-name match and leaves
+ * subcategory resolution to the caller.
  */
 export function matchVehicleBrandPhrase(
   query: string,
-  brands: { name: string }[],
+  brands: { name: string; category_group: VehicleBrandGroup }[],
   vehicleRootSlug = "bil-og-mc",
 ): CategoryMatch | null {
   const q = query.trim();
@@ -85,6 +102,7 @@ export function matchVehicleBrandPhrase(
         categorySlug: vehicleRootSlug,
         categoryName: "Bil og MC",
         source: "brand",
+        brandCategoryGroup: b.category_group,
       };
     }
   }

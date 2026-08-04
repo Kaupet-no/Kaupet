@@ -8,6 +8,12 @@ import { nitro } from "nitro/vite";
 // Change `preset` here if Kaupet moves to a different host later.
 const NITRO_PRESET = "cloudflare-module";
 
+// Server-only secrets that features silently need at runtime. Warn early in
+// dev so a missing key surfaces at `bun run dev` instead of mid-wizard when a
+// user hits the feature that needs it (e.g. STATENS_VEGVESEN_API_KEY only
+// errors once someone starts a Bil/MC listing).
+const REQUIRED_DEV_SECRETS = ["STATENS_VEGVESEN_API_KEY"];
+
 export default defineConfig(({ command, mode }) => {
   // Statically inline VITE_* env vars so they're also available in the
   // Nitro-bundled server output, not just the client bundle.
@@ -15,6 +21,17 @@ export default defineConfig(({ command, mode }) => {
   const envDefine = Object.fromEntries(
     Object.entries(env).map(([key, value]) => [`import.meta.env.${key}`, JSON.stringify(value)]),
   );
+
+  if (command === "serve") {
+    const allEnv = loadEnv(mode, process.cwd(), "");
+    const missing = REQUIRED_DEV_SECRETS.filter((key) => !allEnv[key]);
+    if (missing.length > 0) {
+      console.warn(
+        `\n⚠️  Mangler miljøvariabler i .env: ${missing.join(", ")}\n` +
+          `   Funksjoner som er avhengige av disse vil feile ved bruk (se .env.example).\n`,
+      );
+    }
+  }
 
   return {
     define: envDefine,

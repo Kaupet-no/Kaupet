@@ -672,6 +672,7 @@ function BrowsePage() {
                   updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
                 }
                 hideCondition={isBilOgMc}
+                hasCategory={effectiveCategories.length > 0}
               />
             </div>
           )}
@@ -686,6 +687,7 @@ function BrowsePage() {
               isNative={isNative}
               resultCount={totalCount ?? cards.length}
               queryText={qDraft}
+              hasCategory={effectiveCategories.length > 0}
             />
           )}
 

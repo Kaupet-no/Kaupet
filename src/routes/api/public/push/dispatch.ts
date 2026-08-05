@@ -35,6 +35,10 @@ const PayloadSchema = z.discriminatedUnion("type", [
     type: z.literal("sold"),
     sold_notification_id: z.string().uuid(),
   }),
+  z.object({
+    type: z.literal("wtb_match"),
+    notification_id: z.string().uuid(),
+  }),
 ]);
 
 function formatKr(n: number) {
@@ -263,7 +267,7 @@ export const Route = createFileRoute("/api/public/push/dispatch")({
           body = `Ned ${pct}% · ${formatKr(drop.old_price_nok)} → ${formatKr(drop.new_price_nok)}`;
           url = `/annonse/${drop.listing_id}`;
           tag = `price-drop-${drop.listing_id}`;
-        } else {
+        } else if (payload.type === "sold") {
           const { data: sold } = await supabaseAdmin
             .from("favorite_sold_notifications")
             .select("user_id, listing_id")
@@ -282,6 +286,30 @@ export const Route = createFileRoute("/api/public/push/dispatch")({
           body = `${listing?.title ?? "Favoritten din"} er ikke lenger tilgjengelig`;
           url = `/annonse/${sold.listing_id}`;
           tag = `sold-${sold.listing_id}`;
+        } else {
+          const { data: notif } = await supabaseAdmin
+            .from("wtb_match_notifications")
+            .select("user_id, listing_id, wtb_listing_id")
+            .eq("id", payload.notification_id)
+            .maybeSingle();
+          if (!notif) return new Response(null, { status: 204 });
+          userId = notif.user_id;
+
+          const { data: listing } = await supabaseAdmin
+            .from("listings")
+            .select("title")
+            .eq("id", notif.listing_id)
+            .maybeSingle();
+          const { data: wtb } = await supabaseAdmin
+            .from("wtb_listings")
+            .select("title")
+            .eq("id", notif.wtb_listing_id)
+            .maybeSingle();
+
+          title = `Nytt treff: ${wtb?.title ?? "Ønskes kjøpt"}`;
+          body = listing?.title ?? "Ny annonse matcher kriteriene dine";
+          url = `/annonse/${notif.listing_id}`;
+          tag = `wtb-${notif.wtb_listing_id}-${notif.listing_id}`;
         }
 
         if (!userId) return new Response(null, { status: 204 });
@@ -290,7 +318,7 @@ export const Route = createFileRoute("/api/public/push/dispatch")({
         const { data: prefs } = await supabaseAdmin
           .from("notification_preferences")
           .select(
-            "web_push_messages, web_push_saved_searches, web_push_price_drops, web_push_sold, email_messages, email_saved_searches, email_price_drops, email_sold",
+            "web_push_messages, web_push_saved_searches, web_push_price_drops, web_push_sold, web_push_wtb_matches, email_messages, email_saved_searches, email_price_drops, email_sold, email_wtb_matches",
           )
           .eq("user_id", userId)
           .maybeSingle();
@@ -299,12 +327,14 @@ export const Route = createFileRoute("/api/public/push/dispatch")({
           saved_search: prefs?.web_push_saved_searches ?? true,
           price_drop: prefs?.web_push_price_drops ?? true,
           sold: prefs?.web_push_sold ?? true,
+          wtb_match: prefs?.web_push_wtb_matches ?? true,
         }[payload.type];
         const emailEnabled = {
           message: prefs?.email_messages ?? false,
           saved_search: prefs?.email_saved_searches ?? false,
           price_drop: prefs?.email_price_drops ?? false,
           sold: prefs?.email_sold ?? false,
+          wtb_match: prefs?.email_wtb_matches ?? false,
         }[payload.type];
 
         if (!pushEnabled && !emailEnabled) {

@@ -11,7 +11,8 @@ const COLOR = {
   accent: "#c1693f",
 };
 
-export type NotificationEmailType = "message" | "saved_search" | "price_drop" | "sold";
+export type NotificationEmailType =
+  "message" | "saved_search" | "price_drop" | "sold" | "wtb_match";
 
 const COPY: Record<NotificationEmailType, { eyebrow: string; intro: string; cta: string }> = {
   message: {
@@ -22,6 +23,11 @@ const COPY: Record<NotificationEmailType, { eyebrow: string; intro: string; cta:
   saved_search: {
     eyebrow: "Nytt treff",
     intro: "En ny annonse matcher et av de lagrede søkene dine.",
+    cta: "Se annonsen",
+  },
+  wtb_match: {
+    eyebrow: "Nytt treff",
+    intro: "En ny annonse matcher kriteriene i en av dine ønskes kjøpt-annonser.",
     cta: "Se annonsen",
   },
   price_drop: {

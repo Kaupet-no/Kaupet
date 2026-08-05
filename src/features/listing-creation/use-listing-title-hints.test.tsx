@@ -192,7 +192,14 @@ describe("useListingTitleHints", () => {
       timeout: 3000,
     });
     expect(matchWtbListingsForListingMock).toHaveBeenCalledWith({
-      data: { title: "Syk", category_id: "cat-1" },
+      data: {
+        title: "Syk",
+        description: "",
+        category_id: "cat-1",
+        price_nok: null,
+        is_free: false,
+        attributes: {},
+      },
     });
   });
 });

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { suggestCategoryForTitle } from "@/lib/category-suggestion.functions";
 import { useTitleBasedListingHints } from "@/features/listing-creation/use-title-based-listing-hints";
+import type { AttributeMap } from "@/components/attribute-fields";
 
 type CategorySuggestion = {
   category_id: string;
@@ -29,6 +30,9 @@ export function useListingTitleHints(params: {
   categoryTouchedManually: boolean;
   setSelectedParentId: (id: string) => void;
   setCategoryTouchedManually: (touched: boolean) => void;
+  priceNok?: number | undefined;
+  isFree?: boolean;
+  attributes?: AttributeMap;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setValue: (field: any, value: any, options?: any) => void;
 }) {
@@ -39,6 +43,9 @@ export function useListingTitleHints(params: {
     categoryTouchedManually,
     setSelectedParentId,
     setCategoryTouchedManually,
+    priceNok,
+    isFree,
+    attributes,
     setValue,
   } = params;
 
@@ -77,7 +84,15 @@ export function useListingTitleHints(params: {
     keywordSuggestions,
     keywordsFetching,
     appendTagToDescription,
-  } = useTitleBasedListingHints({ title, description, categoryId, setValue });
+  } = useTitleBasedListingHints({
+    title,
+    description,
+    categoryId,
+    priceNok,
+    isFree,
+    attributes,
+    setValue,
+  });
 
   return {
     categorySuggestion,

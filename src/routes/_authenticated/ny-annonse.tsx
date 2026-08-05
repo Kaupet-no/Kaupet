@@ -151,6 +151,11 @@ function NewListingPage() {
   const [previewNudgeOpen, setPreviewNudgeOpen] = useState(false);
   const [attributes, setAttributes] = useState<AttributeMap>({});
   const [attributesTouched, setAttributesTouched] = useState(false);
+  const [pendingCategoryChange, setPendingCategoryChange] = useState<{
+    id: string;
+    parentId: string;
+    via: "wizard" | "sheet";
+  } | null>(null);
   const native = isNative();
   const { data: isDemo = false } = useIsDemo();
   const turnstileEnabled = !!import.meta.env.VITE_TURNSTILE_SITE_KEY;
@@ -161,14 +166,20 @@ function NewListingPage() {
   const { data: categories } = useQuery({
     queryKey: ["categories", "with-parent"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("categories")
-        .select("id, name_nb, slug, parent_id, icon, color")
-        .order("sort_order");
+      // select("*") rather than a column list so the query keeps working in
+      // the window before the title_example migration is applied.
+      const { data, error } = await supabase.from("categories").select("*").order("sort_order");
       if (error) throw error;
       return data;
     },
   });
+
+  // Hidden categories (e.g. the E2E test category) are only pickable for
+  // demo/admin users — mirrors the is_hidden filtering on the browse surfaces.
+  const pickableCategories = useMemo(
+    () => (categories ?? []).filter((c) => isDemo || !c.is_hidden),
+    [categories, isDemo],
+  );
 
   const bilOgMcCategoryId = useMemo(
     () => (categories ?? []).find((c) => c.slug === "bil-og-mc" && !c.parent_id)?.id ?? null,
@@ -180,7 +191,10 @@ function NewListingPage() {
   const { data: allFilters } = useAllCategoryFilters();
   const { data: allFlows } = useAllCategoryFlows();
   const categoriesById = useMemo(() => {
-    const m = new Map<string, CategoryNode & { name_nb: string; slug?: string }>();
+    const m = new Map<
+      string,
+      CategoryNode & { name_nb: string; slug?: string; title_example?: string | null }
+    >();
     for (const c of categories ?? []) m.set(c.id, c);
     return m;
   }, [categories]);
@@ -297,15 +311,18 @@ function NewListingPage() {
     goNext: () => goNextRef.current(),
   });
 
-  const vehicleAttributeHiddenKeys = [
-    ...(vehicleLookupResult ? VEHICLE_LOOKUP_FILTER_KEYS : []),
-    ...VEHICLE_WIZARD_MANAGED_KEYS,
-  ];
-
   const baseFieldGroupKeys = useMemo(
     () => effectiveFlowForCategory(categoryId || null, allFlows ?? [], categoriesById).fieldGroups,
     [categoryId, allFlows, categoriesById],
   );
+
+  const vehicleAttributeHiddenKeys = [
+    ...(vehicleLookupResult ? VEHICLE_LOOKUP_FILTER_KEYS : []),
+    ...VEHICLE_WIZARD_MANAGED_KEYS,
+    // Boat brand/model are captured (with autocomplete) by the boat-facts
+    // group — hide them from the generic category-attributes rendering.
+    ...(baseFieldGroupKeys.includes("boat-facts") ? ["brand", "model"] : []),
+  ];
 
   // Whether the *flow* is vehicle-shaped — true as soon as the user has
   // picked "Bil og MC" (or a descendant), regardless of whether a specific
@@ -726,6 +743,67 @@ function NewListingPage() {
     }
   }, [listingType, hasDraftData, navigate]);
 
+  // Nearest ancestor with a title_example wins; null → generic placeholder.
+  const titleExample = useMemo(() => {
+    let current = categoryId ? categoriesById.get(categoryId) : undefined;
+    const visited = new Set<string>();
+    while (current && !visited.has(current.id)) {
+      visited.add(current.id);
+      if (current.title_example) return current.title_example;
+      current = current.parent_id ? categoriesById.get(current.parent_id) : undefined;
+    }
+    return null;
+  }, [categoryId, categoriesById]);
+
+  const applyCategorySelect = (via: "wizard" | "sheet", id: string, parentId: string) => {
+    setCategoryTouchedManually(true);
+    setSelectedParentId(parentId);
+    setValue("category_id", id, { shouldValidate: true });
+    setCategorySuggestion(null);
+    if (via !== "wizard") return;
+    if (currentPage?.groups?.some((g) => g.key === "category-select")) {
+      goToNextPage();
+    } else if (
+      currentPage?.groups?.some((g) => g.key === "vehicle-registration") &&
+      id !== bilOgMcCategoryId
+    ) {
+      // Uregistrert kjøretøy: lagre det som et eget, søkbart attributt (i
+      // stedet for bare transient wizard-state) og rydd bort ev. tidligere
+      // SVV-oppslagsdata, symmetrisk med is_registered: true i
+      // confirmVehicleData. Ikke goNext() her — brukeren skal fylle inn de
+      // samme tekniske feltene manuelt rett under kategorivelgeren på dette
+      // steget før de går videre (se VehicleRegistration).
+      setAttributes((prev) => {
+        const next: AttributeMap = { ...prev, is_registered: false };
+        delete next.registration_number;
+        delete next.vehicle_lookup;
+        return next;
+      });
+    }
+  };
+
+  // Switching to a different category mid-flow discards the category-specific
+  // fields the user already filled — confirm before applying.
+  const requestCategorySelect = (via: "wizard" | "sheet", id: string, parentId: string) => {
+    if (categoryId && id !== categoryId && Object.keys(attributes).length > 0) {
+      setPendingCategoryChange({ id, parentId, via });
+      return;
+    }
+    applyCategorySelect(via, id, parentId);
+  };
+
+  const confirmPendingCategoryChange = () => {
+    if (!pendingCategoryChange) return;
+    setAttributes({});
+    setAttributesTouched(false);
+    applyCategorySelect(
+      pendingCategoryChange.via,
+      pendingCategoryChange.id,
+      pendingCategoryChange.parentId,
+    );
+    setPendingCategoryChange(null);
+  };
+
   const sharedProps: WizardSharedProps = {
     native,
     isVehicle,
@@ -753,34 +831,11 @@ function NewListingPage() {
     noKnownIssues: !!noKnownIssues,
     maintenanceHistory,
 
-    categories: categories ?? [],
+    categories: pickableCategories,
     categoryLabel,
+    titleExample,
     setCategoryPickerOpen,
-    onCategorySelect: (id, parentId) => {
-      setCategoryTouchedManually(true);
-      setSelectedParentId(parentId);
-      setValue("category_id", id, { shouldValidate: true });
-      setCategorySuggestion(null);
-      if (currentPage?.groups?.some((g) => g.key === "category-select")) {
-        goToNextPage();
-      } else if (
-        currentPage?.groups?.some((g) => g.key === "vehicle-registration") &&
-        id !== bilOgMcCategoryId
-      ) {
-        // Uregistrert kjøretøy: lagre det som et eget, søkbart attributt (i
-        // stedet for bare transient wizard-state) og rydd bort ev. tidligere
-        // SVV-oppslagsdata, symmetrisk med is_registered: true i
-        // confirmVehicleData. Ikke goNext() her — brukeren skal fylle inn de
-        // samme tekniske feltene manuelt rett under kategorivelgeren på dette
-        // steget før de går videre (se VehicleRegistration).
-        setAttributes((prev) => {
-          const next: AttributeMap = { ...prev, is_registered: false };
-          delete next.registration_number;
-          delete next.vehicle_lookup;
-          return next;
-        });
-      }
-    },
+    onCategorySelect: (id, parentId) => requestCategorySelect("wizard", id, parentId),
     categorySuggestion,
     categoryTouchedManually,
     applyCategorySuggestion,
@@ -997,15 +1052,38 @@ function NewListingPage() {
       <CategoryPicker
         open={categoryPickerOpen}
         onOpenChange={setCategoryPickerOpen}
-        categories={categories ?? []}
+        categories={pickableCategories}
         selectedId={categoryId}
-        onSelect={(id, parentId) => {
-          setCategoryTouchedManually(true);
-          setSelectedParentId(parentId);
-          setValue("category_id", id, { shouldValidate: true });
-          setCategorySuggestion(null);
-        }}
+        onSelect={(id, parentId) => requestCategorySelect("sheet", id, parentId)}
       />
+
+      {/* Confirm discarding category-specific data on mid-flow category change */}
+      <AlertDialog
+        open={!!pendingCategoryChange}
+        onOpenChange={(open) => {
+          if (!open) setPendingCategoryChange(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Bytte kategori?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Informasjonen du har fylt ut for denne kategorien går tapt hvis du bytter.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingCategoryChange(null)}>
+              Avbryt
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmPendingCategoryChange}
+            >
+              Ja, bytt kategori
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* No-image confirmation dialog */}
       <AlertDialog open={showNoImageDialog} onOpenChange={setShowNoImageDialog}>

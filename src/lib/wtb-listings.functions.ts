@@ -2,7 +2,26 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { attributesSchema } from "@/lib/category-filters";
+
+/** WTB criteria value shapes (see src/features/wtb/wtb-criteria-types.ts):
+ * multi-value selects (string[]), from–to ranges ({min,max}), earliest-date
+ * ({minDate}) plus the plain scalar shapes older listings stored. Deliberately
+ * separate from the stricter shared `attributesSchema`, which sell listings
+ * keep using. */
+const wtbAttributeValueSchema = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.array(z.string()),
+  z
+    .object({
+      min: z.number().optional(),
+      max: z.number().optional(),
+    })
+    .strict(),
+  z.object({ minDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).strict(),
+]);
+const wtbAttributesSchema = z.record(z.string(), wtbAttributeValueSchema);
 
 export type WtbListing = {
   id: string;
@@ -30,7 +49,7 @@ const wtbInputSchema = z.object({
   category_id: z.string().uuid().nullable().optional(),
   max_price_nok: z.number().int().min(0).max(10_000_000).nullable().optional(),
   // Filters are always optional for WTB listings — never enforced server-side.
-  attributes: attributesSchema.optional(),
+  attributes: wtbAttributesSchema.optional(),
 });
 
 export const createWtbListing = createServerFn({ method: "POST" })
@@ -81,7 +100,7 @@ const wtbUpdateSchema = z.object({
   description: z.string().trim().max(2000, "Maks 2000 tegn").optional(),
   category_id: z.string().uuid().nullable().optional(),
   max_price_nok: z.number().int().min(0).max(10_000_000).nullable().optional(),
-  attributes: attributesSchema.optional(),
+  attributes: wtbAttributesSchema.optional(),
   status: z.enum(["active", "fulfilled", "archived"]).optional(),
 });
 

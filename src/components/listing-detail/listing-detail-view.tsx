@@ -8,6 +8,11 @@ import { ImageGallery } from "@/components/listing-detail/image-gallery";
 import { type Vehicle360Frame } from "@/components/listing-detail/vehicle/vehicle-360-viewer";
 import { VehicleEquipmentList } from "@/components/listing-detail/vehicle/vehicle-equipment-list";
 import { VehicleInfoGrid } from "@/components/listing-detail/vehicle/vehicle-info-grid";
+import {
+  BoatExtraInfo,
+  BoatInfoGrid,
+  isBoatAttributes,
+} from "@/components/listing-detail/boat/boat-info-grid";
 import { RegistrationPlate } from "@/components/listing-detail/vehicle/registration-plate";
 import { VehicleTechTable } from "@/components/listing-detail/vehicle/vehicle-tech-table";
 import { LoanCalculator } from "@/components/listing-detail/vehicle/loan-calculator";
@@ -694,6 +699,10 @@ function ListingDetailViewBody({
             />
           )}
 
+          {!isVehicleListing && isBoatAttributes(attributes) && (
+            <BoatInfoGrid attributes={attributes} />
+          )}
+
           <EditableField
             fieldKey="description"
             value={description}
@@ -726,6 +735,10 @@ function ListingDetailViewBody({
               await editCtx?.saveField({ group: "description", description: v.trim() });
             }}
           />
+
+          {!isVehicleListing && isBoatAttributes(attributes) && (
+            <BoatExtraInfo attributes={attributes} />
+          )}
 
           {isVehicleListing && (
             <EditableRegion

@@ -20,15 +20,26 @@ export type ListingCardData = {
   total_views?: number;
   views_last_week?: number;
   mileage_km?: number | null;
+  engine_hours?: number | null;
 };
 
-function MileageLabel({ mileageKm, className }: { mileageKm: number; className?: string }) {
+/** Usage metric under the title: kilometers for vehicles, engine hours for
+ * boats — whichever the listing's attributes carry. */
+function UsageLabel({
+  value,
+  unit,
+  className,
+}: {
+  value: number;
+  unit: string;
+  className?: string;
+}) {
   return (
     <p
       className={`flex shrink-0 items-center gap-1 text-xs text-muted-foreground ${className ?? ""}`}
     >
       <Gauge className="size-3" />
-      {mileageKm.toLocaleString("nb-NO")} km
+      {value.toLocaleString("nb-NO")} {unit}
     </p>
   );
 }
@@ -128,9 +139,11 @@ export function ListingCard({
           )}
           <div className="flex items-baseline justify-between gap-2">
             <p className="font-display text-base font-semibold">{formatPrice(listing)}</p>
-            {typeof listing.mileage_km === "number" && (
-              <MileageLabel mileageKm={listing.mileage_km} />
-            )}
+            {typeof listing.mileage_km === "number" ? (
+              <UsageLabel value={listing.mileage_km} unit="km" />
+            ) : typeof listing.engine_hours === "number" ? (
+              <UsageLabel value={listing.engine_hours} unit="t" />
+            ) : null}
           </div>
           {listing.city && <p className="text-xs text-muted-foreground">{listing.city}</p>}
         </div>
@@ -166,9 +179,11 @@ export function ListingCard({
           <p className={`font-display ${isNative ? "text-lg font-semibold" : "text-base"}`}>
             {formatPrice(listing)}
           </p>
-          {typeof listing.mileage_km === "number" && (
-            <MileageLabel mileageKm={listing.mileage_km} />
-          )}
+          {typeof listing.mileage_km === "number" ? (
+            <UsageLabel value={listing.mileage_km} unit="km" />
+          ) : typeof listing.engine_hours === "number" ? (
+            <UsageLabel value={listing.engine_hours} unit="t" />
+          ) : null}
         </div>
         {listing.city && (
           <p

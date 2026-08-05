@@ -12,11 +12,9 @@ import { ChevronDown, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { updateWtbListing } from "@/lib/wtb-listings.functions";
 import { CategoryPicker } from "@/components/category-picker";
-import {
-  AttributeFields,
-  useAllCategoryFilters,
-  type AttributeMap,
-} from "@/components/attribute-fields";
+import { useAllCategoryFilters } from "@/components/attribute-fields";
+import { WtbCriteriaFields } from "@/features/wtb/wtb-criteria-fields";
+import { wtbInvalidCheckedKeys, type WtbAttributeMap } from "@/features/wtb/wtb-criteria-types";
 import {
   categoryBreadcrumb,
   vehicleCategoryGroupFor,
@@ -41,7 +39,6 @@ import { formatErrorMessage } from "@/lib/errors";
 
 const wtbSchema = z.object({
   title: z.string().trim().min(3, "Tittelen må være minst 3 tegn").max(120, "Maks 120 tegn"),
-  subtitle: z.string().trim().max(80, "Maks 80 tegn").optional().or(z.literal("")),
   description: z.string().trim().max(2000, "Maks 2000 tegn").optional().or(z.literal("")),
   category_id: z.string().uuid().nullable().optional(),
   max_price_nok: z
@@ -62,7 +59,9 @@ function EditWtbPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
-  const [attributes, setAttributes] = useState<AttributeMap>({});
+  const [attributes, setAttributes] = useState<WtbAttributeMap>({});
+  const [checkedKeys, setCheckedKeys] = useState<string[]>([]);
+  const [showCriteriaErrors, setShowCriteriaErrors] = useState(false);
 
   const { data: categories } = useQuery({
     queryKey: ["categories"],
@@ -93,7 +92,6 @@ function EditWtbPage() {
     if (!listing) return undefined;
     return {
       title: listing.title,
-      subtitle: listing.subtitle ?? "",
       description: listing.description ?? "",
       category_id: listing.category_id ?? null,
       max_price_nok: listing.max_price_nok ?? "",
@@ -111,7 +109,6 @@ function EditWtbPage() {
     values: formValues,
     defaultValues: {
       title: "",
-      subtitle: "",
       description: "",
       category_id: null,
       max_price_nok: "",
@@ -119,7 +116,6 @@ function EditWtbPage() {
   });
 
   const categoryId = watch("category_id");
-  const subtitle = watch("subtitle");
 
   const categoriesById = useMemo(() => {
     const m = new Map<string, CategoryNode & { name_nb: string }>();
@@ -136,7 +132,8 @@ function EditWtbPage() {
   const attributesHydratedFor = useMemo(() => listing?.id, [listing?.id]);
   useEffect(() => {
     if (listing?.attributes && typeof listing.attributes === "object") {
-      setAttributes(listing.attributes as AttributeMap);
+      setAttributes(listing.attributes as WtbAttributeMap);
+      setCheckedKeys(Object.keys(listing.attributes));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attributesHydratedFor]);
@@ -159,7 +156,6 @@ function EditWtbPage() {
         data: {
           id,
           title: values.title,
-          subtitle: values.subtitle?.trim() || null,
           description: values.description || undefined,
           category_id: values.category_id ?? null,
           max_price_nok: typeof values.max_price_nok === "number" ? values.max_price_nok : null,
@@ -218,26 +214,20 @@ function EditWtbPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="mt-8 flex flex-col gap-6">
+      <form
+        onSubmit={handleSubmit((v) => {
+          if (wtbInvalidCheckedKeys(checkedKeys, attributes).length > 0) {
+            setShowCriteriaErrors(true);
+            return;
+          }
+          mutation.mutate(v);
+        })}
+        className="mt-8 flex flex-col gap-6"
+      >
         <section className="space-y-2">
           <Label htmlFor="title">{vehicleGroup ? "Tittel" : "Hva leter du etter?"}</Label>
           <Input id="title" {...register("title")} />
           {errors.title && <p className="text-sm text-destructive">{errors.title.message}</p>}
-        </section>
-
-        <section className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="subtitle">
-              Undertittel <span className="font-normal text-muted-foreground">(valgfritt)</span>
-            </Label>
-            <span className="text-xs text-muted-foreground">{(subtitle ?? "").length}/80</span>
-          </div>
-          <Input
-            id="subtitle"
-            placeholder="F.eks. utstyrsvariant, spesifikk modell, eller annet selgere bør vite"
-            {...register("subtitle")}
-          />
-          {errors.subtitle && <p className="text-sm text-destructive">{errors.subtitle.message}</p>}
         </section>
 
         <section className="space-y-2">
@@ -267,7 +257,7 @@ function EditWtbPage() {
               />
             </>
           )}
-          <AttributeFields
+          <WtbCriteriaFields
             categoryId={categoryId ?? null}
             categories={categories ?? []}
             value={attributes}
@@ -275,6 +265,9 @@ function EditWtbPage() {
               attributesDirtyRef.current = true;
               setAttributes(next);
             }}
+            checkedKeys={checkedKeys}
+            onCheckedKeysChange={setCheckedKeys}
+            showErrors={showCriteriaErrors}
           />
         </section>
 

@@ -13,10 +13,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { createWtbListing } from "@/lib/wtb-listings.functions";
 import { createSavedSearch, summarizeCriteria } from "@/lib/saved-searches";
 import { CategoryPicker } from "@/components/category-picker";
-import { useAllCategoryFilters, type AttributeMap } from "@/components/attribute-fields";
-import { modulesForKeys } from "@/features/listing-creation/modules/registry";
-import { effectiveFlowForCategory } from "@/features/listing-creation/category-flows";
-import { useAllCategoryFlows } from "@/features/listing-creation/use-all-category-flows";
+import { useAllCategoryFilters } from "@/components/attribute-fields";
+import { WtbCriteriaFields } from "@/features/wtb/wtb-criteria-fields";
+import {
+  isWtbRangeValue,
+  wtbInvalidCheckedKeys,
+  type WtbAttributeMap,
+} from "@/features/wtb/wtb-criteria-types";
 import {
   categoryBreadcrumb,
   vehicleCategoryGroupFor,
@@ -41,7 +44,6 @@ import {
 
 const wtbSchema = z.object({
   title: z.string().trim().min(3, "Tittelen må være minst 3 tegn").max(120, "Maks 120 tegn"),
-  subtitle: z.string().trim().max(80, "Maks 80 tegn").optional().or(z.literal("")),
   description: z.string().trim().max(2000, "Maks 2000 tegn").optional().or(z.literal("")),
   category_id: z.string().uuid().nullable().optional(),
   max_price_nok: z
@@ -103,12 +105,11 @@ function capitalizeWord(value: unknown): string | null {
   return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
 }
 
-type WtbStep = "category" | "attributes" | "title" | "details";
-const STEPS: WtbStep[] = ["category", "attributes", "title", "details"];
+type WtbStep = "category" | "attributes" | "details";
+const STEPS: WtbStep[] = ["category", "attributes", "details"];
 const STEP_LABELS: Record<WtbStep, string> = {
   category: "Kategori",
   attributes: "Søkekriterier",
-  title: "Tittel",
   details: "Detaljer",
 };
 
@@ -120,7 +121,9 @@ function NewWtbPage() {
   const [savedSearch, setSavedSearch] = useState(false);
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [published, setPublished] = useState(false);
-  const [attributes, setAttributes] = useState<AttributeMap>({});
+  const [attributes, setAttributes] = useState<WtbAttributeMap>({});
+  const [checkedKeys, setCheckedKeys] = useState<string[]>([]);
+  const [showCriteriaErrors, setShowCriteriaErrors] = useState(false);
   const [titleManualOverride, setTitleManualOverride] = useState(false);
 
   const step = STEPS[stepIndex];
@@ -139,7 +142,6 @@ function NewWtbPage() {
   });
 
   const { data: allFilters } = useAllCategoryFilters();
-  const { data: allFlows } = useAllCategoryFlows();
   const categoriesById = useMemo(() => {
     const m = new Map<string, CategoryNode & { name_nb: string }>();
     for (const c of categories) m.set(c.id, c);
@@ -156,7 +158,6 @@ function NewWtbPage() {
     resolver: zodResolver(wtbSchema),
     defaultValues: {
       title: "",
-      subtitle: "",
       description: "",
       category_id: null,
       max_price_nok: "",
@@ -166,25 +167,30 @@ function NewWtbPage() {
   const categoryId = watch("category_id");
   const title = watch("title");
   const titleLength = title.length;
-  const subtitle = watch("subtitle");
   const description = watch("description");
   const descriptionLength = (description ?? "").length;
-
-  const activeModules = useMemo(
-    () =>
-      modulesForKeys(
-        effectiveFlowForCategory(categoryId ?? null, allFlows ?? [], categoriesById).modules,
-      ),
-    [categoryId, allFlows, categoriesById],
-  );
 
   const vehicleGroup = useMemo(
     () => vehicleCategoryGroupFor(categoryId ?? null, allFilters ?? [], categoriesById),
     [categoryId, allFilters, categoriesById],
   );
 
+  // Year is a from–to range criterion in the WTB flow, so the auto-title
+  // renders it as "2015–2020" / "2015+" / "til 2020" rather than one year.
+  const yearValue = attributes.year;
+  const yearLabel = isWtbRangeValue(yearValue)
+    ? yearValue.min != null && yearValue.max != null
+      ? `${yearValue.min}–${yearValue.max}`
+      : yearValue.min != null
+        ? `${yearValue.min}+`
+        : yearValue.max != null
+          ? `til ${yearValue.max}`
+          : null
+    : typeof yearValue === "string" || typeof yearValue === "number"
+      ? String(yearValue)
+      : null;
   const computedTitle = vehicleGroup
-    ? [attributes.year, capitalizeWord(attributes.brand), capitalizeWord(attributes.model)]
+    ? [yearLabel, capitalizeWord(attributes.brand), capitalizeWord(attributes.model)]
         .filter((v) => v !== undefined && v !== null && v !== "")
         .join(" ")
     : null;
@@ -212,7 +218,7 @@ function NewWtbPage() {
       const result = await createFn({
         data: {
           title: values.title,
-          subtitle: values.subtitle?.trim() || null,
+          subtitle: null,
           description: values.description || undefined,
           category_id: values.category_id ?? null,
           max_price_nok: typeof values.max_price_nok === "number" ? values.max_price_nok : null,
@@ -249,6 +255,11 @@ function NewWtbPage() {
   };
 
   function goNext() {
+    // A checked-but-empty criterion is required before moving on.
+    if (step === "attributes" && wtbInvalidCheckedKeys(checkedKeys, attributes).length > 0) {
+      setShowCriteriaErrors(true);
+      return;
+    }
     setStepIndex((i) => Math.min(i + 1, STEPS.length - 1));
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -345,10 +356,9 @@ function NewWtbPage() {
         })}
       </nav>
 
-      <form
-        onSubmit={handleSubmit((values) => publish(values))}
-        className="mt-8 flex flex-col gap-6 pb-24"
-      >
+      {/* Ingen <form>: publisering skjer kun via eksplisitt klikk på publiser-knappen,
+          slik at verken Enter i input-felter eller knappe-bytte i footeren kan utløse den. */}
+      <div className="mt-8 flex flex-col gap-6 pb-24">
         {step === "category" && (
           <section className="space-y-3">
             <div className="flex items-center justify-between">
@@ -378,56 +388,21 @@ function NewWtbPage() {
                 Kategori: <span className="font-medium text-foreground">{categoryLabel}</span>
               </p>
             )}
-            <Label>Søkekriterier</Label>
-            {activeModules.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                Ingen ekstra søkekriterier for denne kategorien.
-              </p>
-            )}
-            {activeModules.map(({ key, Component }) => (
-              <Component
-                key={key}
-                categoryId={categoryId ?? null}
-                categories={categories}
-                value={attributes}
-                onChange={setAttributes}
-              />
-            ))}
-          </section>
-        )}
-
-        {step === "title" && (
-          <section className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="title">
-                  {vehicleGroup ? "Tittel" : "Hva leter du etter?"}{" "}
-                  <span className="text-destructive">*</span>
-                </Label>
-                <div className="flex items-center gap-1.5">
-                  <FieldValid show={!!touchedFields.title && !errors.title} />
-                  <span
-                    className={`text-xs ${titleLength > 100 ? "text-destructive" : "text-muted-foreground"}`}
-                  >
-                    {titleLength}/120
-                  </span>
+            {!vehicleGroup && (
+              <div className="mb-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="title">
+                    Hva leter du etter? <span className="text-destructive">*</span>
+                  </Label>
+                  <div className="flex items-center gap-1.5">
+                    <FieldValid show={!!touchedFields.title && !errors.title} />
+                    <span
+                      className={`text-xs ${titleLength > 100 ? "text-destructive" : "text-muted-foreground"}`}
+                    >
+                      {titleLength}/120
+                    </span>
+                  </div>
                 </div>
-              </div>
-              {vehicleGroup && !titleManualOverride ? (
-                <div className="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
-                  <span className={computedTitle ? "" : "text-muted-foreground"}>
-                    {computedTitle || "Fylles ut fra Årsmodell, Merke og Modell"}
-                  </span>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setTitleManualOverride(true)}
-                  >
-                    Rediger manuelt
-                  </Button>
-                </div>
-              ) : (
                 <Input
                   id="title"
                   placeholder="f.eks. PlayStation 5, Trek sykkel, iPhone 14..."
@@ -436,40 +411,91 @@ function NewWtbPage() {
                   aria-describedby={errors.title ? "title-error" : undefined}
                   {...register("title")}
                 />
-              )}
-              {errors.title && (
-                <p id="title-error" className="text-sm text-destructive">
-                  {errors.title.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="subtitle">
-                  Undertittel <span className="font-normal text-muted-foreground">(valgfritt)</span>
-                </Label>
-                <span className="text-xs text-muted-foreground">{(subtitle ?? "").length}/80</span>
+                {errors.title && (
+                  <p id="title-error" className="text-sm text-destructive">
+                    {errors.title.message}
+                  </p>
+                )}
               </div>
+            )}
+            <WtbCriteriaFields
+              categoryId={categoryId ?? null}
+              categories={categories}
+              value={attributes}
+              onChange={setAttributes}
+              checkedKeys={checkedKeys}
+              onCheckedKeysChange={setCheckedKeys}
+              showErrors={showCriteriaErrors}
+            />
+            <div className="space-y-2 pt-4">
+              <Label htmlFor="wtb-freetext">
+                Fritekstsøk <span className="font-normal text-muted-foreground">(valgfritt)</span>
+              </Label>
               <Input
-                id="subtitle"
-                placeholder={
-                  vehicleGroup
-                    ? "F.eks. utstyrspakke, modellkode eller annen viktig info"
-                    : "F.eks. utstyrsvariant, spesifikk modell, eller annet selgere bør vite"
+                id="wtb-freetext"
+                placeholder="Utstyrskode eller annen relevant informasjon"
+                value={typeof attributes.__freetext === "string" ? attributes.__freetext : ""}
+                onChange={(e) =>
+                  setAttributes((prev) => {
+                    const next = { ...prev };
+                    if (e.target.value) next.__freetext = e.target.value;
+                    else delete next.__freetext;
+                    return next;
+                  })
                 }
-                aria-invalid={!!errors.subtitle}
-                {...register("subtitle")}
               />
-              {errors.subtitle && (
-                <p className="text-sm text-destructive">{errors.subtitle.message}</p>
-              )}
             </div>
           </section>
         )}
 
         {step === "details" && (
           <>
+            {vehicleGroup && (
+              <section className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="title">
+                    Tittel <span className="text-destructive">*</span>
+                  </Label>
+                  <div className="flex items-center gap-1.5">
+                    <FieldValid show={!!touchedFields.title && !errors.title} />
+                    <span
+                      className={`text-xs ${titleLength > 100 ? "text-destructive" : "text-muted-foreground"}`}
+                    >
+                      {titleLength}/120
+                    </span>
+                  </div>
+                </div>
+                {!titleManualOverride ? (
+                  <div className="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
+                    <span className={computedTitle ? "" : "text-muted-foreground"}>
+                      {computedTitle || "Fylles ut fra Årsmodell, Merke og Modell"}
+                    </span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setTitleManualOverride(true)}
+                    >
+                      Rediger manuelt
+                    </Button>
+                  </div>
+                ) : (
+                  <Input
+                    id="title"
+                    placeholder="f.eks. 2019 BMW 320d"
+                    autoFocus
+                    aria-invalid={!!errors.title}
+                    aria-describedby={errors.title ? "title-error" : undefined}
+                    {...register("title")}
+                  />
+                )}
+                {errors.title && (
+                  <p id="title-error" className="text-sm text-destructive">
+                    {errors.title.message}
+                  </p>
+                )}
+              </section>
+            )}
             <section className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="description">Beskrivelse / krav (valgfritt)</Label>
@@ -524,17 +550,26 @@ function NewWtbPage() {
             </Button>
           )}
           {step !== "details" ? (
-            <Button type="button" onClick={goNext} disabled={step === "title" && !title.trim()}>
+            <Button
+              type="button"
+              onClick={goNext}
+              disabled={step === "attributes" && !vehicleGroup && !title.trim()}
+            >
               Neste: {STEP_LABELS[STEPS[stepIndex + 1]]} <ChevronRight className="size-4" />
             </Button>
           ) : (
-            <Button type="submit" disabled={isPending} className="gap-2">
+            <Button
+              type="button"
+              onClick={handleSubmit((values) => publish(values))}
+              disabled={isPending}
+              className="gap-2"
+            >
               {isPending && <Loader2 className="size-4 animate-spin" />}
               Publiser ønskes kjøpt
             </Button>
           )}
         </div>
-      </form>
+      </div>
 
       <AlertDialog
         open={blocker.status === "blocked"}

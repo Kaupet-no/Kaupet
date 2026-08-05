@@ -2258,6 +2258,35 @@ export type Database = {
         Args: { _listing_id: string }
         Returns: undefined
       }
+      match_listing_to_wtb_listings: {
+        Args: { _listing_id: string }
+        Returns: undefined
+      }
+      compute_wtb_matches: {
+        Args: {
+          _category_id: string | null
+          _price_nok: number | null
+          _is_free: boolean
+          _title: string | null
+          _description: string | null
+          _attributes: Json
+        }
+        Returns: {
+          id: string
+          user_id: string
+          title: string
+          subtitle: string | null
+          description: string | null
+          category_id: string | null
+          max_price_nok: number | null
+          status: string
+          attributes: Json
+          search_vector: unknown
+          created_at: string
+          updated_at: string
+          expires_at: string
+        }[]
+      }
       match_search_synonyms: {
         Args: { p_category_id: string | null; phrases: string[] }
         Returns: {

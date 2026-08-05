@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { supabase } from "@/integrations/supabase/client";
 
 /** WTB criteria value shapes (see src/features/wtb/wtb-criteria-types.ts):
  * multi-value selects (string[]), from–to ranges ({min,max}), earliest-date
@@ -257,3 +258,46 @@ export const matchWtbListingsForListing = createServerFn({ method: "GET" })
     const maxPrice = prices.length ? Math.max(...prices) : null;
     return { count: count ?? 0, maxPrice };
   });
+
+/** Varsel om at en ny/endret annonse matcher kriteriene i en av brukerens
+ * egne ØK-annonser (skrevet av match_listing_to_wtb_listings — se
+ * supabase/migrations/20260805100500_wtb_matching_engine.sql). Speiler
+ * SavedSearchNotification/listNotifications-mønsteret i saved-searches.ts. */
+export type WtbMatchNotification = {
+  id: string;
+  wtb_listing_id: string;
+  listing_id: string;
+  read_at: string | null;
+  created_at: string;
+};
+
+export async function listWtbMatchNotifications(limit = 30, offset = 0) {
+  const { data, error } = await supabase
+    .from("wtb_match_notifications")
+    .select("id, wtb_listing_id, listing_id, read_at, created_at")
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error) throw error;
+  return (data ?? []) as WtbMatchNotification[];
+}
+
+export async function markWtbMatchNotificationRead(id: string) {
+  const { error } = await supabase
+    .from("wtb_match_notifications")
+    .update({ read_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function markAllWtbMatchNotificationsRead() {
+  const { error } = await supabase
+    .from("wtb_match_notifications")
+    .update({ read_at: new Date().toISOString() })
+    .is("read_at", null);
+  if (error) throw error;
+}
+
+export async function deleteWtbMatchNotification(id: string) {
+  const { error } = await supabase.from("wtb_match_notifications").delete().eq("id", id);
+  if (error) throw error;
+}

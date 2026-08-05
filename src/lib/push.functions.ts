@@ -112,7 +112,7 @@ export const getNotificationPreferences = createServerFn({ method: "GET" })
     const { data, error } = await supabase
       .from("notification_preferences")
       .select(
-        "web_push_messages, web_push_saved_searches, web_push_price_drops, web_push_sold, email_messages, email_saved_searches, email_price_drops, email_sold",
+        "web_push_messages, web_push_saved_searches, web_push_price_drops, web_push_sold, web_push_wtb_matches, email_messages, email_saved_searches, email_price_drops, email_sold, email_wtb_matches",
       )
       .eq("user_id", userId)
       .maybeSingle();
@@ -122,10 +122,12 @@ export const getNotificationPreferences = createServerFn({ method: "GET" })
       web_push_saved_searches: data?.web_push_saved_searches ?? true,
       web_push_price_drops: data?.web_push_price_drops ?? true,
       web_push_sold: data?.web_push_sold ?? true,
+      web_push_wtb_matches: data?.web_push_wtb_matches ?? true,
       email_messages: data?.email_messages ?? false,
       email_saved_searches: data?.email_saved_searches ?? false,
       email_price_drops: data?.email_price_drops ?? false,
       email_sold: data?.email_sold ?? false,
+      email_wtb_matches: data?.email_wtb_matches ?? false,
     };
   });
 
@@ -134,10 +136,12 @@ const PrefsSchema = z.object({
   web_push_saved_searches: z.boolean(),
   web_push_price_drops: z.boolean(),
   web_push_sold: z.boolean(),
+  web_push_wtb_matches: z.boolean(),
   email_messages: z.boolean(),
   email_saved_searches: z.boolean(),
   email_price_drops: z.boolean(),
   email_sold: z.boolean(),
+  email_wtb_matches: z.boolean(),
 });
 
 export const updateNotificationPreferences = createServerFn({ method: "POST" })
@@ -152,10 +156,12 @@ export const updateNotificationPreferences = createServerFn({ method: "POST" })
         web_push_saved_searches: data.web_push_saved_searches,
         web_push_price_drops: data.web_push_price_drops,
         web_push_sold: data.web_push_sold,
+        web_push_wtb_matches: data.web_push_wtb_matches,
         email_messages: data.email_messages,
         email_saved_searches: data.email_saved_searches,
         email_price_drops: data.email_price_drops,
         email_sold: data.email_sold,
+        email_wtb_matches: data.email_wtb_matches,
       },
       { onConflict: "user_id" },
     );

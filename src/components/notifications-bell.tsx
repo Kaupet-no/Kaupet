@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, CheckCheck, TrendingDown, X } from "lucide-react";
+import { Bell, CheckCheck, ShoppingBag, TrendingDown, X } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
 
@@ -23,6 +23,13 @@ import {
   type SavedSearchNotification,
   type PriceDropNotification,
 } from "@/lib/saved-searches";
+import {
+  listWtbMatchNotifications,
+  markAllWtbMatchNotificationsRead,
+  markWtbMatchNotificationRead,
+  deleteWtbMatchNotification,
+  type WtbMatchNotification,
+} from "@/lib/wtb-listings.functions";
 
 type SearchItem = SavedSearchNotification & {
   kind: "search";
@@ -35,7 +42,13 @@ type PriceDropItem = PriceDropNotification & {
   listing_title: string | null;
   listing_code: string | null;
 };
-type Item = SearchItem | PriceDropItem;
+type WtbMatchItem = WtbMatchNotification & {
+  kind: "wtb_match";
+  listing_title: string | null;
+  listing_code: string | null;
+  wtb_title: string | null;
+};
+type Item = SearchItem | PriceDropItem | WtbMatchItem;
 
 function formatKr(n: number) {
   return new Intl.NumberFormat("nb-NO").format(n) + " kr";
@@ -49,21 +62,34 @@ export function NotificationsBell() {
     queryKey: ["notifications", user?.id],
     enabled: !!user,
     queryFn: async (): Promise<Item[]> => {
-      const [notifs, drops] = await Promise.all([listNotifications(30), listPriceDrops(30)]);
+      const [notifs, drops, wtbMatches] = await Promise.all([
+        listNotifications(30),
+        listPriceDrops(30),
+        listWtbMatchNotifications(30),
+      ]);
       const listingIds = Array.from(
-        new Set([...notifs.map((n) => n.listing_id), ...drops.map((d) => d.listing_id)]),
+        new Set([
+          ...notifs.map((n) => n.listing_id),
+          ...drops.map((d) => d.listing_id),
+          ...wtbMatches.map((m) => m.listing_id),
+        ]),
       );
       const searchIds = Array.from(new Set(notifs.map((n) => n.saved_search_id)));
-      const [listingsRes, searchesRes] = await Promise.all([
+      const wtbListingIds = Array.from(new Set(wtbMatches.map((m) => m.wtb_listing_id)));
+      const [listingsRes, searchesRes, wtbListingsRes] = await Promise.all([
         listingIds.length
           ? supabase.from("listings").select("id, title, kaupet_code").in("id", listingIds)
           : Promise.resolve({ data: [] as { id: string; title: string; kaupet_code: string }[] }),
         searchIds.length
           ? supabase.from("saved_searches").select("id, name").in("id", searchIds)
           : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+        wtbListingIds.length
+          ? supabase.from("wtb_listings").select("id, title").in("id", wtbListingIds)
+          : Promise.resolve({ data: [] as { id: string; title: string }[] }),
       ]);
       const listingMap = new Map((listingsRes.data ?? []).map((l) => [l.id, l]));
       const searchMap = new Map((searchesRes.data ?? []).map((s) => [s.id, s.name]));
+      const wtbListingMap = new Map((wtbListingsRes.data ?? []).map((w) => [w.id, w.title]));
 
       const searchItems: SearchItem[] = notifs.map((n) => ({
         ...n,
@@ -78,8 +104,15 @@ export function NotificationsBell() {
         listing_title: listingMap.get(d.listing_id)?.title ?? null,
         listing_code: listingMap.get(d.listing_id)?.kaupet_code ?? null,
       }));
+      const wtbMatchItems: WtbMatchItem[] = wtbMatches.map((m) => ({
+        ...m,
+        kind: "wtb_match",
+        listing_title: listingMap.get(m.listing_id)?.title ?? null,
+        listing_code: listingMap.get(m.listing_id)?.kaupet_code ?? null,
+        wtb_title: wtbListingMap.get(m.wtb_listing_id) ?? null,
+      }));
 
-      return [...searchItems, ...dropItems].sort(
+      return [...searchItems, ...dropItems, ...wtbMatchItems].sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       );
     },
@@ -122,6 +155,19 @@ export function NotificationsBell() {
           void refetch();
         },
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "wtb_match_notifications",
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          qc.invalidateQueries({ queryKey: ["notifications"] });
+          void refetch();
+        },
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
@@ -154,20 +200,26 @@ export function NotificationsBell() {
   const unread = notifications.filter((n) => !n.read_at).length;
 
   const handleMarkAllRead = async () => {
-    await Promise.all([markAllNotificationsRead(), markAllPriceDropsRead()]);
+    await Promise.all([
+      markAllNotificationsRead(),
+      markAllPriceDropsRead(),
+      markAllWtbMatchNotificationsRead(),
+    ]);
     qc.invalidateQueries({ queryKey: ["notifications"] });
   };
 
   const handleClick = async (n: Item) => {
     if (n.read_at) return;
     if (n.kind === "search") await markNotificationRead(n.id);
-    else await markPriceDropRead(n.id);
+    else if (n.kind === "price_drop") await markPriceDropRead(n.id);
+    else await markWtbMatchNotificationRead(n.id);
     qc.invalidateQueries({ queryKey: ["notifications"] });
   };
 
   const handleDelete = async (n: Item) => {
     if (n.kind === "search") await deleteNotification(n.id);
-    else await deletePriceDrop(n.id);
+    else if (n.kind === "price_drop") await deletePriceDrop(n.id);
+    else await deleteWtbMatchNotification(n.id);
     qc.invalidateQueries({ queryKey: ["notifications"] });
   };
 
@@ -235,12 +287,17 @@ export function NotificationsBell() {
                         {n.kind === "price_drop" && (
                           <TrendingDown className="mr-1 inline size-3.5 text-accent" />
                         )}
+                        {n.kind === "wtb_match" && (
+                          <ShoppingBag className="mr-1 inline size-3.5 text-accent" />
+                        )}
                         {n.listing_title ??
                           (n.kind === "price_drop" ? "Favoritten din" : "Ny annonse")}
                       </p>
                       <p className="line-clamp-1 text-xs text-muted-foreground">
                         {n.kind === "search" ? (
                           <>Treff i "{n.search_name ?? "Lagret søk"}"</>
+                        ) : n.kind === "wtb_match" ? (
+                          <>Treff på "{n.wtb_title ?? "Ønskes kjøpt"}"</>
                         ) : (
                           <>
                             Prisfall −{Number(n.drop_pct).toFixed(0)} % ·{" "}

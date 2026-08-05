@@ -145,10 +145,12 @@ export function NotificationsSection() {
       web_push_saved_searches: boolean;
       web_push_price_drops: boolean;
       web_push_sold: boolean;
+      web_push_wtb_matches: boolean;
       email_messages: boolean;
       email_saved_searches: boolean;
       email_price_drops: boolean;
       email_sold: boolean;
+      email_wtb_matches: boolean;
     }) => {
       await updatePrefs({ data: values });
     },
@@ -353,6 +355,13 @@ export function NotificationsSection() {
                     emailKey: "email_sold",
                     title: "Favoritt blir solgt",
                     description: "Varsel når en favoritt-annonse blir markert som solgt.",
+                  },
+                  {
+                    pushKey: "web_push_wtb_matches",
+                    emailKey: "email_wtb_matches",
+                    title: "Treff på ønskes kjøpt-annonser",
+                    description:
+                      "Varsel når en ny annonse matcher kriteriene i en av dine ønskes kjøpt-annonser.",
                   },
                 ] as const
               ).map((row) => (

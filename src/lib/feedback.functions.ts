@@ -21,6 +21,7 @@ function throttle(key: string): boolean {
 const feedbackSchema = z.object({
   type: z.enum(["ris", "ros"]),
   message: z.string().trim().min(1, "Skriv en melding").max(2000, "Maks 2000 tegn"),
+  pageUrl: z.string().trim().max(2000).optional(),
 });
 
 /** Submits a "Ris og Ros" feedback message. Works without login — when a
@@ -53,6 +54,7 @@ export const submitFeedback = createServerFn({ method: "POST" })
       type: data.type,
       message: data.message,
       user_id: userId,
+      page_url: data.pageUrl ?? null,
     });
     if (error) throw error;
   });

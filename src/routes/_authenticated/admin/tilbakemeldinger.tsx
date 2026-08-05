@@ -48,6 +48,15 @@ export const Route = createFileRoute("/_authenticated/admin/tilbakemeldinger")({
 
 type SortBy = "created_at" | "type";
 
+function formatFeedbackPagePath(url: string): string {
+  try {
+    const { pathname, search } = new URL(url);
+    return `${pathname}${search}` || "/";
+  } catch {
+    return url;
+  }
+}
+
 function FeedbackAdminPage() {
   const qc = useQueryClient();
   const listFn = useServerFn(adminListFeedback);
@@ -162,6 +171,7 @@ function FeedbackAdminPage() {
                 </TableHead>
                 <TableHead>Melding</TableHead>
                 <TableHead>Bruker</TableHead>
+                <TableHead>Side</TableHead>
                 <TableHead>
                   <button
                     type="button"
@@ -203,6 +213,21 @@ function FeedbackAdminPage() {
                       </Link>
                     ) : (
                       <span className="text-muted-foreground">Anonym bruker</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="max-w-[160px] text-sm">
+                    {r.page_url ? (
+                      <a
+                        href={r.page_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block truncate text-primary underline-offset-2 hover:underline"
+                        title={r.page_url}
+                      >
+                        {formatFeedbackPagePath(r.page_url)}
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>
                   <TableCell className="whitespace-nowrap text-sm text-muted-foreground">

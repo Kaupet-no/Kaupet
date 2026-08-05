@@ -16,7 +16,7 @@ test("søker fra forsiden og lander på annonser-siden med treff", async ({ page
   await page.goto("/");
   await page.waitForLoadState("networkidle");
 
-  await page.getByPlaceholder(/f\.eks\./).fill("sykkel");
+  await page.getByLabel("Søk i annonser").fill("sykkel");
   await page.getByRole("button", { name: "Søk", exact: true }).click();
 
   await expect(page).toHaveURL(/\/annonser\?/);

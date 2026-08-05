@@ -178,8 +178,7 @@ export function AppLanding() {
               className="h-14 w-full rounded-full border border-border bg-card pl-12 pr-4 text-base shadow-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
             />
             {!placeholderPaused && (
-              <div className="pointer-events-none absolute inset-y-0 left-12 right-4 flex items-center gap-1">
-                <span className="select-none text-base text-muted-foreground">f.eks.</span>
+              <div className="pointer-events-none absolute inset-y-0 left-12 right-4 flex items-center">
                 <AnimatedSearchPlaceholder
                   key={activeCategory?.id ?? "all"}
                   words={typewriterWords}

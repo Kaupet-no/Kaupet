@@ -26,7 +26,7 @@ type Options = {
  * by the browser itself, which is reliable everywhere.
  */
 export function useTypewriterText(words: string[], options: Options = {}): string {
-  const { typeSpeed = 90, deleteSpeed = 40, hold = 1400, paused = false, resetKey } = options;
+  const { typeSpeed = 70, deleteSpeed = 30, hold = 1200, paused = false, resetKey } = options;
 
   const [wordIndex, setWordIndex] = useState(() => Math.floor(Math.random() * words.length));
   const [text, setText] = useState("");
@@ -48,7 +48,13 @@ export function useTypewriterText(words: string[], options: Options = {}): strin
 
     if (phase === "typing") {
       if (text.length < word.length) {
-        const id = window.setTimeout(() => setText(word.slice(0, text.length + 1)), typeSpeed);
+        // Small random jitter per character so typing feels human rather
+        // than a robotic fixed-interval metronome.
+        const jitter = typeSpeed * (Math.random() * 0.4 - 0.2);
+        const id = window.setTimeout(
+          () => setText(word.slice(0, text.length + 1)),
+          typeSpeed + jitter,
+        );
         return () => window.clearTimeout(id);
       }
       const id = window.setTimeout(() => setPhase("holding"), hold);
@@ -62,7 +68,11 @@ export function useTypewriterText(words: string[], options: Options = {}): strin
 
     // deleting
     if (text.length > 0) {
-      const id = window.setTimeout(() => setText(word.slice(0, text.length - 1)), deleteSpeed);
+      const jitter = deleteSpeed * (Math.random() * 0.4 - 0.2);
+      const id = window.setTimeout(
+        () => setText(word.slice(0, text.length - 1)),
+        deleteSpeed + jitter,
+      );
       return () => window.clearTimeout(id);
     }
     setWordIndex((i) => {

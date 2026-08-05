@@ -279,7 +279,7 @@ function WebLanding() {
                 onChange={(e) => setQDraft(e.target.value)}
                 onFocus={() => setQFocused(true)}
                 onBlur={() => setQFocused(false)}
-                placeholder={typewriterPlaceholder ? `f.eks. ${typewriterPlaceholder}` : ""}
+                placeholder={typewriterPlaceholder}
                 className="h-12 border-border bg-card pl-9 text-base shadow-md"
                 aria-label="Søk i annonser"
               />

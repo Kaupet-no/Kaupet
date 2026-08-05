@@ -18,7 +18,7 @@ type Props = {
 export function AnimatedSearchPlaceholder({
   words,
   hold = 2400,
-  fade = 350,
+  fade = 300,
   paused = false,
   className = "",
 }: Props) {
@@ -53,6 +53,7 @@ export function AnimatedSearchPlaceholder({
       style={{
         opacity: visible ? 1 : 0,
         transitionDuration: `${fade}ms`,
+        transitionTimingFunction: "ease-in-out",
       }}
     >
       {words[index]}

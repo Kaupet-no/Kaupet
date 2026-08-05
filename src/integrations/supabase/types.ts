@@ -1023,12 +1023,14 @@ export type Database = {
           email_price_drops: boolean
           email_saved_searches: boolean
           email_sold: boolean
+          email_wtb_matches: boolean
           updated_at: string
           user_id: string
           web_push_messages: boolean
           web_push_price_drops: boolean
           web_push_saved_searches: boolean
           web_push_sold: boolean
+          web_push_wtb_matches: boolean
         }
         Insert: {
           created_at?: string
@@ -1036,12 +1038,14 @@ export type Database = {
           email_price_drops?: boolean
           email_saved_searches?: boolean
           email_sold?: boolean
+          email_wtb_matches?: boolean
           updated_at?: string
           user_id: string
           web_push_messages?: boolean
           web_push_price_drops?: boolean
           web_push_saved_searches?: boolean
           web_push_sold?: boolean
+          web_push_wtb_matches?: boolean
         }
         Update: {
           created_at?: string
@@ -1049,12 +1053,14 @@ export type Database = {
           email_price_drops?: boolean
           email_saved_searches?: boolean
           email_sold?: boolean
+          email_wtb_matches?: boolean
           updated_at?: string
           user_id?: string
           web_push_messages?: boolean
           web_push_price_drops?: boolean
           web_push_saved_searches?: boolean
           web_push_sold?: boolean
+          web_push_wtb_matches?: boolean
         }
         Relationships: []
       }
@@ -1682,6 +1688,48 @@ export type Database = {
           webhook_id?: string
         }
         Relationships: []
+      }
+      wtb_match_notifications: {
+        Row: {
+          created_at: string
+          id: string
+          listing_id: string
+          read_at: string | null
+          user_id: string
+          wtb_listing_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          listing_id: string
+          read_at?: string | null
+          user_id: string
+          wtb_listing_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          listing_id?: string
+          read_at?: string | null
+          user_id?: string
+          wtb_listing_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wtb_match_notifications_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wtb_match_notifications_wtb_listing_id_fkey"
+            columns: ["wtb_listing_id"]
+            isOneToOne: false
+            referencedRelation: "wtb_listings"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       wtb_listings: {
         Row: {

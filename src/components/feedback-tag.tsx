@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, X } from "lucide-react";
+import { Loader2, MessageSquareHeart, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,6 +24,7 @@ export function FeedbackPanel({ onDone }: { onDone?: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const submitFn = useServerFn(submitFeedback);
   const doneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const confettiCanvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(
     () => () => {
@@ -37,11 +38,18 @@ export function FeedbackPanel({ onDone }: { onDone?: () => void }) {
     setSending(true);
     setError(null);
     try {
-      await submitFn({ data: { type, message: message.trim() } });
+      const pageUrl = typeof window !== "undefined" ? window.location.href : undefined;
+      await submitFn({ data: { type, message: message.trim(), pageUrl } });
       setSent(true);
       try {
-        const confetti = (await import("canvas-confetti")).default;
-        confetti({ particleCount: 90, spread: 70, origin: { y: 0.7 } });
+        if (confettiCanvasRef.current) {
+          const confetti = (await import("canvas-confetti")).default;
+          const fire = confetti.create(confettiCanvasRef.current, {
+            resize: true,
+            useWorker: false,
+          });
+          fire({ particleCount: 60, spread: 70, startVelocity: 25, origin: { y: 0.7 } });
+        }
       } catch {
         // Confetti is decorative — never block the thank-you on it.
       }
@@ -58,58 +66,64 @@ export function FeedbackPanel({ onDone }: { onDone?: () => void }) {
     }
   };
 
-  if (sent) {
-    return (
-      <p className="px-2 py-6 text-center text-sm font-medium">Tilbakemelding sendt! Tusen takk!</p>
-    );
-  }
-
   return (
-    <div className="space-y-3">
-      <div className="flex justify-center gap-3">
-        <button
-          type="button"
-          aria-label="Ros"
-          aria-pressed={type === "ros"}
-          onClick={() => setType("ros")}
-          className={`rounded-full p-1 text-3xl transition-transform hover:scale-110 ${
-            type === "ros" ? "bg-primary/10 ring-2 ring-primary" : ""
-          }`}
-        >
-          🤩
-        </button>
-        <button
-          type="button"
-          aria-label="Ris"
-          aria-pressed={type === "ris"}
-          onClick={() => setType("ris")}
-          className={`rounded-full p-1 text-3xl transition-transform hover:scale-110 ${
-            type === "ris" ? "bg-destructive/10 ring-2 ring-destructive" : ""
-          }`}
-        >
-          😖
-        </button>
-      </div>
-      {type && (
-        <div className="space-y-2">
-          <Textarea
-            autoFocus
-            rows={4}
-            maxLength={2000}
-            placeholder={type === "ros" ? "Hva liker du?" : "Hva kan vi gjøre bedre?"}
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-          />
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          <Button
-            type="button"
-            className="w-full gap-2"
-            disabled={sending || !message.trim()}
-            onClick={send}
-          >
-            {sending && <Loader2 className="size-4 animate-spin" />}
-            Send tilbakemelding
-          </Button>
+    <div className="relative">
+      <canvas
+        ref={confettiCanvasRef}
+        className="pointer-events-none absolute inset-0 z-10 size-full"
+      />
+      {sent ? (
+        <p className="px-2 py-6 text-center text-sm font-medium">
+          Tilbakemelding sendt! Tusen takk!
+        </p>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex justify-center gap-3">
+            <button
+              type="button"
+              aria-label="Ros"
+              aria-pressed={type === "ros"}
+              onClick={() => setType("ros")}
+              className={`rounded-full p-1 text-3xl transition-transform duration-150 ease-out hover:-translate-y-1 ${
+                type === "ros" ? "bg-primary/10 ring-2 ring-primary" : ""
+              }`}
+            >
+              🤩
+            </button>
+            <button
+              type="button"
+              aria-label="Ris"
+              aria-pressed={type === "ris"}
+              onClick={() => setType("ris")}
+              className={`rounded-full p-1 text-3xl transition-transform duration-150 ease-out hover:-translate-y-1 ${
+                type === "ris" ? "bg-destructive/10 ring-2 ring-destructive" : ""
+              }`}
+            >
+              😖
+            </button>
+          </div>
+          {type && (
+            <div className="space-y-2">
+              <Textarea
+                autoFocus
+                rows={4}
+                maxLength={2000}
+                placeholder={type === "ros" ? "Hva liker du?" : "Hva kan vi gjøre bedre?"}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+              />
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              <Button
+                type="button"
+                className="w-full gap-2"
+                disabled={sending || !message.trim()}
+                onClick={send}
+              >
+                {sending && <Loader2 className="size-4 animate-spin" />}
+                Send tilbakemelding
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -117,10 +131,10 @@ export function FeedbackPanel({ onDone }: { onDone?: () => void }) {
 }
 
 /**
- * "Ris og Ros" — a tag-shaped feedback button fixed to the right edge in the
- * lower half of the window. Web desktop only (hidden on native and below lg,
- * where horizontal space is precious): hover nudges it out, click springs the
- * panel fully open.
+ * "Ris og Ros" — a compact icon-only feedback button fixed to the right edge
+ * in the lower half of the window. Web desktop only (hidden on native and
+ * below lg, where horizontal space is precious): hover glides the label into
+ * view, click opens the panel.
  */
 export function FeedbackTag() {
   const native = useIsNative();
@@ -148,10 +162,13 @@ export function FeedbackTag() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="block translate-x-1.5 rounded-l-md bg-red-700 px-1.5 py-4 text-sm font-semibold tracking-wide text-white shadow-md transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:translate-x-0"
-          style={{ writingMode: "vertical-rl" }}
+          aria-label="Ris og Ros"
+          className="group flex h-10 w-10 items-center justify-center overflow-hidden rounded-l-md border border-r-0 border-border bg-card/95 text-muted-foreground shadow-md backdrop-blur transition-[width,color,background-color] duration-200 ease-out hover:w-28 hover:bg-card hover:text-foreground"
         >
-          Ris og Ros
+          <MessageSquareHeart className="size-4 shrink-0 text-rose-500/80" />
+          <span className="ml-0 max-w-0 overflow-hidden whitespace-nowrap text-sm font-semibold tracking-wide opacity-0 transition-[max-width,margin-left,opacity] duration-200 ease-out group-hover:ml-1.5 group-hover:max-w-[5rem] group-hover:opacity-100">
+            Ris og Ros
+          </span>
         </button>
       )}
     </div>

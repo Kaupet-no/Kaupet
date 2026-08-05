@@ -11,6 +11,7 @@ export type AdminFeedbackRow = {
   created_at: string;
   user_id: string | null;
   display_name: string | null;
+  page_url: string | null;
 };
 
 const listSchema = z.object({
@@ -30,7 +31,7 @@ export const adminListFeedback = createServerFn({ method: "GET" })
 
     let query = supabaseAdmin
       .from("feedback")
-      .select("id, type, message, created_at, user_id", { count: "exact" })
+      .select("id, type, message, created_at, user_id, page_url", { count: "exact" })
       .order(data.sortBy, { ascending: data.ascending })
       .range(data.offset, data.offset + data.limit - 1);
     if (data.typeFilter) query = query.eq("type", data.typeFilter);
@@ -58,6 +59,7 @@ export const adminListFeedback = createServerFn({ method: "GET" })
       created_at: r.created_at,
       user_id: r.user_id,
       display_name: r.user_id ? (names.get(r.user_id) ?? null) : null,
+      page_url: r.page_url,
     }));
     return { rows: result, total: count ?? 0 };
   });

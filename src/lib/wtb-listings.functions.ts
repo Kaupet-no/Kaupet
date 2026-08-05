@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabase } from "@/integrations/supabase/client";
+import { attributesSchema } from "@/lib/category-filters";
 
 /** WTB criteria value shapes (see src/features/wtb/wtb-criteria-types.ts):
  * multi-value selects (string[]), from–to ranges ({min,max}), earliest-date
@@ -224,39 +225,42 @@ export const countWtbListings = createServerFn({ method: "GET" })
     return count ?? 0;
   });
 
+/** Fase 4 av ØK-matching: brukes av prisstegets "N brukere ønsker å kjøpe
+ * noe lignende"-banner mens brukeren fortsatt fyller ut opprettelsesflyten
+ * (annonsen finnes ikke i databasen ennå). Kaller wtb_match_count-RPC-en,
+ * som gjenbruker den samme compute_wtb_matches-sammenligningen som faktisk
+ * skriver treffvarsler ved publisering — banneret reflekterer derfor ekte
+ * attributt-treff, ikke bare tittel-tekstoverlapp som tidligere. */
 export const matchWtbListingsForListing = createServerFn({ method: "GET" })
   .inputValidator((input: unknown) =>
     z
-      .object({ title: z.string().min(1), category_id: z.string().uuid().nullable().optional() })
+      .object({
+        title: z.string(),
+        description: z.string().optional(),
+        category_id: z.string().uuid().nullable().optional(),
+        price_nok: z.number().int().nullable().optional(),
+        is_free: z.boolean().optional(),
+        // Selgerens (pågående) annonseattributter — sell-flytens
+        // attributesSchema, IKKE ØK-kriterieformen (wtbAttributesSchema
+        // over), som er noe helt annet (aksepterte verdier, ikke faktiske).
+        attributes: attributesSchema.optional(),
+      })
       .parse(input),
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const words = data.title
-      .split(/\s+/)
-      .filter((w) => w.length > 2)
-      .slice(0, 6)
-      .join(" | ");
+    const { data: rows, error } = await supabaseAdmin.rpc("wtb_match_count", {
+      _category_id: data.category_id ?? null,
+      _price_nok: data.price_nok ?? null,
+      _is_free: data.is_free ?? false,
+      _title: data.title,
+      _description: data.description ?? null,
+      _attributes: data.attributes ?? {},
+    });
+    if (error || !rows?.[0]) return { count: 0, maxPrice: null };
 
-    if (!words) return { count: 0, maxPrice: null };
-
-    let query = supabaseAdmin
-      .from("wtb_listings")
-      .select("max_price_nok", { count: "exact" })
-      .eq("status", "active")
-      .textSearch("search_vector", words, { type: "plain", config: "norwegian" });
-
-    if (data.category_id) {
-      query = query.eq("category_id", data.category_id);
-    }
-
-    const { data: rows, count, error } = await query;
-    if (error) return { count: 0, maxPrice: null };
-
-    const prices = (rows ?? []).map((r) => r.max_price_nok).filter((p): p is number => p != null);
-    const maxPrice = prices.length ? Math.max(...prices) : null;
-    return { count: count ?? 0, maxPrice };
+    return { count: rows[0].match_count ?? 0, maxPrice: rows[0].max_price ?? null };
   });
 
 /** Varsel om at en ny/endret annonse matcher kriteriene i en av brukerens

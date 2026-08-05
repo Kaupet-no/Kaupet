@@ -1,4 +1,5 @@
 import { useTitleBasedListingHints } from "@/features/listing-creation/use-title-based-listing-hints";
+import type { AttributeMap } from "@/components/attribute-fields";
 
 /**
  * Everything the listing-edit page derives from the title as the user
@@ -15,16 +16,23 @@ export function useEditListingHints(params: {
   description: string | undefined;
   categoryId: string;
   listingId: string;
+  priceNok?: number | undefined;
+  isFree?: boolean;
+  attributes?: AttributeMap;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setValue: (field: any, value: any, options?: any) => void;
 }) {
-  const { title, description, categoryId, listingId, setValue } = params;
+  const { title, description, categoryId, listingId, priceNok, isFree, attributes, setValue } =
+    params;
 
   return useTitleBasedListingHints({
     title,
     description,
     categoryId,
     excludeListingId: listingId,
+    priceNok,
+    isFree,
+    attributes,
     setValue,
   });
 }

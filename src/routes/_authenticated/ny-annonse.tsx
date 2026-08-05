@@ -514,6 +514,9 @@ function NewListingPage() {
     categoryTouchedManually,
     setSelectedParentId,
     setCategoryTouchedManually,
+    priceNok: typeof priceNok === "number" ? priceNok : undefined,
+    isFree,
+    attributes,
     setValue,
   });
 

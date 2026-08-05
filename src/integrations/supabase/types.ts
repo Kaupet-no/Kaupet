@@ -113,6 +113,7 @@ export type Database = {
           created_at: string
           id: string
           message: string
+          page_url: string | null
           type: string
           user_id: string | null
         }
@@ -120,6 +121,7 @@ export type Database = {
           created_at?: string
           id?: string
           message: string
+          page_url?: string | null
           type: string
           user_id?: string | null
         }
@@ -127,6 +129,7 @@ export type Database = {
           created_at?: string
           id?: string
           message?: string
+          page_url?: string | null
           type?: string
           user_id?: string | null
         }
@@ -2285,6 +2288,20 @@ export type Database = {
           created_at: string
           updated_at: string
           expires_at: string
+        }[]
+      }
+      wtb_match_count: {
+        Args: {
+          _category_id: string | null
+          _price_nok: number | null
+          _is_free: boolean
+          _title: string | null
+          _description: string | null
+          _attributes: Json
+        }
+        Returns: {
+          match_count: number
+          max_price: number | null
         }[]
       }
       match_search_synonyms: {

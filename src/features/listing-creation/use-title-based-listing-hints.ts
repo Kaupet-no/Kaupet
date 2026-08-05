@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { suggestKeywordsForListing } from "@/lib/keyword-suggestion.functions";
 import { matchWtbListingsForListing } from "@/lib/wtb-listings.functions";
+import type { AttributeMap } from "@/components/attribute-fields";
 
 export const SIMILAR_STOPWORDS = new Set([
   "og",
@@ -83,10 +84,24 @@ export function useTitleBasedListingHints(params: {
   description: string | undefined;
   categoryId: string;
   excludeListingId?: string;
+  /** Prisstegets pågående verdier — brukes kun til det attributtbaserte
+   * ØK-treff-banneret (wtbMatch), ikke til de andre hintene i denne hooken. */
+  priceNok?: number | undefined;
+  isFree?: boolean;
+  attributes?: AttributeMap;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setValue: (field: any, value: any, options?: any) => void;
 }) {
-  const { title, description, categoryId, excludeListingId, setValue } = params;
+  const {
+    title,
+    description,
+    categoryId,
+    excludeListingId,
+    priceNok,
+    isFree,
+    attributes,
+    setValue,
+  } = params;
 
   const [debouncedTitle, setDebouncedTitle] = useState("");
   useEffect(() => {
@@ -121,12 +136,47 @@ export function useTitleBasedListingHints(params: {
     },
   });
 
+  // Egen debounce for det attributtbaserte ØK-treff-banneret: den skal reagere
+  // på pris/attributter i tillegg til tittel (ofte kjent først i pris-steget,
+  // etter at kategori/attributter allerede er fylt ut), men uten å påvirke
+  // debouncedTitle-drevne similarListings/keywordSuggestions ovenfor.
+  const [debouncedWtbInputs, setDebouncedWtbInputs] = useState({
+    title,
+    priceNok,
+    isFree,
+    attributes,
+  });
+  useEffect(() => {
+    const t = window.setTimeout(
+      () => setDebouncedWtbInputs({ title, priceNok, isFree, attributes }),
+      800,
+    );
+    return () => window.clearTimeout(t);
+  }, [title, priceNok, isFree, attributes]);
+
   const matchWtbFn = useServerFn(matchWtbListingsForListing);
   const { data: wtbMatch } = useQuery({
-    queryKey: ["wtb-match", categoryId ?? null, debouncedTitle],
-    enabled: debouncedTitle.length >= 3,
-    staleTime: 120_000,
-    queryFn: () => matchWtbFn({ data: { title: debouncedTitle, category_id: categoryId || null } }),
+    queryKey: [
+      "wtb-match",
+      categoryId ?? null,
+      debouncedWtbInputs.title,
+      debouncedWtbInputs.priceNok ?? null,
+      debouncedWtbInputs.isFree ?? false,
+      debouncedWtbInputs.attributes ?? null,
+    ],
+    enabled: (debouncedWtbInputs.title ?? "").length >= 3,
+    staleTime: 30_000,
+    queryFn: () =>
+      matchWtbFn({
+        data: {
+          title: debouncedWtbInputs.title ?? "",
+          description,
+          category_id: categoryId || null,
+          price_nok: debouncedWtbInputs.priceNok ?? null,
+          is_free: debouncedWtbInputs.isFree ?? false,
+          attributes: debouncedWtbInputs.attributes ?? {},
+        },
+      }),
   });
 
   const { data: keywordSuggestions, isFetching: keywordsFetching } = useQuery({

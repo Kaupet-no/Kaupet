@@ -15,6 +15,7 @@ import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
 import { saveListingField } from "./save-listing-field";
 import { getCategoryBehavior } from "@/lib/category-behavior";
+import { useIsDemo } from "@/hooks/use-is-demo";
 
 /**
  * Modal for changing the listing's category — not inline, since switching
@@ -38,17 +39,21 @@ export function CategoryChangeDialog({
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
 
+  const { data: isDemo = false } = useIsDemo();
   const { data: categories } = useQuery({
-    queryKey: ["categories"],
+    queryKey: ["categories", "with-hidden-flag"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
-        .select("id, name_nb, slug, parent_id, icon, color")
+        .select("id, name_nb, slug, parent_id, icon, color, is_hidden")
         .order("sort_order");
       if (error) throw error;
       return data;
     },
     enabled: open,
+    // Hidden categories (e.g. the E2E test category) are only pickable for
+    // demo/admin users.
+    select: (rows) => rows.filter((c) => isDemo || !c.is_hidden),
   });
 
   // Only subcategories may be changed inline — switching main category is a

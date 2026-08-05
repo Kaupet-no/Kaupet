@@ -17,6 +17,7 @@ import {
   filterDependencyMet,
   getMissingRequiredFilters,
   normalizeFilter,
+  NUMERIC_DIGIT_CAPS,
   type AttributeValue,
   type CategoryFilter,
   type CategoryNode,
@@ -34,11 +35,12 @@ export function useAllCategoryFilters() {
   return useQuery({
     queryKey: ["category-filters", "all"],
     queryFn: async () => {
+      // select("*") rather than a column list so the query keeps working in
+      // the window before the depends_on_not_value/is_optional migration is
+      // applied.
       const { data, error } = await supabase
         .from("category_filters")
-        .select(
-          "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value",
-        )
+        .select("*")
         .order("sort_order");
       if (error) throw error;
       return (data ?? []).map(normalizeFilter);
@@ -244,21 +246,27 @@ function AttributeField({
   const isNumber = filter.type === "number" || filter.type === "range";
   // `range` filters are search-only and so excluded from
   // getMissingRequiredFilters — marking them "*" here promised a validation
-  // that never fires.
-  const showRequiredMark = required && filter.type !== "range";
+  // that never fires. Same for `is_optional` filters.
+  const showRequiredMark = required && filter.type !== "range" && !filter.is_optional;
+  const digitCap = isNumber ? NUMERIC_DIGIT_CAPS[filter.key] : undefined;
   const fieldId = `attr-${filter.key}`;
   return (
     <div className="space-y-2">
       <Label htmlFor={fieldId}>
         {label} {showRequiredMark && <span className="text-destructive">*</span>}
+        {required && filter.is_optional && (
+          <span className="font-normal text-muted-foreground"> (valgfritt)</span>
+        )}
       </Label>
       <Input
         id={fieldId}
         type={isNumber ? "number" : "text"}
+        inputMode={isNumber ? "numeric" : undefined}
         aria-invalid={!!error}
         value={value === undefined ? "" : String(value)}
         onChange={(e) => {
-          const raw = e.target.value;
+          let raw = e.target.value;
+          if (isNumber && digitCap) raw = raw.replace(/\D/g, "").slice(0, digitCap);
           if (raw === "") return onChange(undefined);
           onChange(isNumber ? Number(raw) : raw);
         }}

@@ -44,6 +44,24 @@ export type FilterOption = { value: string; label_nb: string };
  * since that form is unaffected by this key list. */
 export const SEARCH_MULTISELECT_KEYS: readonly string[] = ["body_type", "color", "fuel_type"];
 
+/** Max digits allowed in the creation-flow input for numeric attribute keys
+ * with a naturally bounded magnitude (a year has 4 digits, a boat length 3).
+ * Keys not listed are unrestricted. Enforced by AttributeFields' number
+ * input; keyed by category_filters.key so it applies across categories. */
+export const NUMERIC_DIGIT_CAPS: Record<string, number> = {
+  year: 4,
+  length_ft: 3,
+  engine_hours: 8,
+  power_hk: 4,
+  hestekrefter: 4,
+  max_speed_knots: 3,
+  sleeping_places: 2,
+  seats: 3,
+  width_cm: 4,
+  depth_cm: 4,
+  weight_kg: 7,
+};
+
 /** For brand_select filters, `unit` stores which vehicle_brands.category_group to read from. */
 export type VehicleBrandGroup =
   "bil" | "motorsykkel" | "moped_atv" | "bobil_campingvogn" | "henger";
@@ -71,6 +89,12 @@ export type CategoryFilter = {
    * (compared as a string). Null means always shown. */
   depends_on_key: string | null;
   depends_on_value: string | null;
+  /** Inverse dependency: only shown/required while the `depends_on_key`
+   * filter does NOT have this value — e.g. boat Drivstoff/Hestekrefter/
+   * Maksfart hidden once Motortype = "uten_motor". */
+  depends_on_not_value: string | null;
+  /** Shown in the creation flow but never required (e.g. boat Driftstimer). */
+  is_optional: boolean;
 };
 
 export const FILTER_TYPE_LABELS: Record<FilterType, string> = {
@@ -97,6 +121,8 @@ export function normalizeFilter(row: {
   is_primary: boolean;
   depends_on_key?: string | null;
   depends_on_value?: string | null;
+  depends_on_not_value?: string | null;
+  is_optional?: boolean;
 }): CategoryFilter {
   return {
     id: row.id,
@@ -110,6 +136,8 @@ export function normalizeFilter(row: {
     is_primary: row.is_primary,
     depends_on_key: row.depends_on_key ?? null,
     depends_on_value: row.depends_on_value ?? null,
+    depends_on_not_value: row.depends_on_not_value ?? null,
+    is_optional: row.is_optional ?? false,
   };
 }
 
@@ -117,10 +145,13 @@ export function normalizeFilter(row: {
  * attribute values — e.g. Bilsport's "Gren"/"Klasse" only apply once
  * "Er bilen lisensiert?" is true. Filters without a dependency always apply. */
 export function filterDependencyMet(
-  filter: Pick<CategoryFilter, "depends_on_key" | "depends_on_value">,
+  filter: Pick<CategoryFilter, "depends_on_key" | "depends_on_value" | "depends_on_not_value">,
   attributes: Record<string, AttributeValue>,
 ): boolean {
   if (!filter.depends_on_key) return true;
+  if (filter.depends_on_not_value != null) {
+    return String(attributes[filter.depends_on_key]) !== filter.depends_on_not_value;
+  }
   return String(attributes[filter.depends_on_key]) === filter.depends_on_value;
 }
 
@@ -206,6 +237,7 @@ export function getMissingRequiredFilters(
     (f) =>
       f.type !== "range" &&
       f.type !== "boolean" &&
+      !f.is_optional &&
       f.key !== "registration_number" &&
       !excluded?.has(f.key) &&
       filterDependencyMet(f, attributes),

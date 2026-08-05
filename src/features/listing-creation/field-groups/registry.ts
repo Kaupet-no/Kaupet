@@ -8,6 +8,7 @@ import { VehicleConfirm } from "./vehicle-confirm";
 import { Condition } from "./condition";
 import { PriceGroup } from "./price";
 import { VehicleFactsGroup } from "./vehicle-facts";
+import { BoatFactsGroup } from "./boat-facts";
 import { VehicleConditionGroup } from "./vehicle-condition";
 import { VehicleEquipmentGroup } from "./vehicle-equipment";
 import { DescriptionKeywordsGroup } from "./description-keywords";
@@ -135,6 +136,24 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
       return null;
     },
   },
+  "boat-facts": {
+    key: "boat-facts",
+    Component: BoatFactsGroup,
+    fieldsToValidate: ["subtitle"],
+    validateExtra: (ctx) => {
+      // Brand/model live in this group (with autocomplete) and are hidden
+      // from category-attributes, so they must be required here instead.
+      const brand = ctx.attributes.brand;
+      if (typeof brand !== "string" || !brand.trim()) {
+        return "Fyll inn merke før du går videre.";
+      }
+      const model = ctx.attributes.model;
+      if (typeof model !== "string" || !model.trim()) {
+        return "Fyll inn modell før du går videre.";
+      }
+      return null;
+    },
+  },
   "vehicle-condition": {
     key: "vehicle-condition",
     Component: VehicleConditionGroup,
@@ -190,6 +209,7 @@ const FIELD_GROUP_LABEL_NATIVE_NB: Record<string, string> = {
   condition: "Detaljer",
   price: "Detaljer",
   "vehicle-facts": "Detaljer",
+  "boat-facts": "Båt",
   "vehicle-condition": "Tilstand",
   "vehicle-equipment": "Utstyr",
   "description-keywords": "Beskrivelse",
@@ -206,6 +226,7 @@ const FIELD_GROUP_LABEL_WEB_NB: Record<string, string> = {
   condition: "Detaljer",
   price: "Detaljer",
   "vehicle-facts": "Pris & detaljer",
+  "boat-facts": "Merke & modell",
   "vehicle-condition": "Tilstand",
   "vehicle-equipment": "Utstyr",
   "description-keywords": "Beskrivelse",
@@ -229,6 +250,7 @@ export const FIELD_GROUP_LABELS_NB: Record<string, string> = {
   condition: "Tilstand",
   price: "Pris",
   "vehicle-facts": "Kjøretøy: Tittel, pris & kilometerstand",
+  "boat-facts": "Båt: Merke, modell & undertittel",
   "vehicle-condition": "Kjøretøy: Tilstand & historikk",
   "vehicle-equipment": "Kjøretøy: Utstyr",
   "description-keywords": "Beskrivelse & nøkkelord",

@@ -183,6 +183,7 @@ export function useListingsQuery({
         const imgs = (l.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
         const attrs = l.attributes as Record<string, unknown> | null;
         const mileageRaw = attrs?.mileage_km;
+        const engineHoursRaw = attrs?.engine_hours;
         return {
           id: l.id,
           kaupet_code: l.kaupet_code,
@@ -196,6 +197,7 @@ export function useListingsQuery({
           created_at: l.created_at,
           cover_path: imgs[0]?.storage_path ?? null,
           mileage_km: typeof mileageRaw === "number" ? mileageRaw : null,
+          engine_hours: typeof engineHoursRaw === "number" ? engineHoursRaw : null,
         };
       };
 

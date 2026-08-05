@@ -108,6 +108,30 @@ export type Database = {
         }
         Relationships: []
       }
+      feedback: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          type: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          type: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          type?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           color: string | null
@@ -121,6 +145,7 @@ export type Database = {
           search_examples: string[]
           slug: string
           sort_order: number
+          title_example: string | null
           updated_at: string
         }
         Insert: {
@@ -135,6 +160,7 @@ export type Database = {
           search_examples?: string[]
           slug: string
           sort_order?: number
+          title_example?: string | null
           updated_at?: string
         }
         Update: {
@@ -149,6 +175,7 @@ export type Database = {
           search_examples?: string[]
           slug?: string
           sort_order?: number
+          title_example?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -166,7 +193,9 @@ export type Database = {
           category_id: string
           created_at: string
           depends_on_key: string | null
+          depends_on_not_value: string | null
           depends_on_value: string | null
+          is_optional: boolean
           id: string
           is_primary: boolean
           key: string
@@ -181,7 +210,9 @@ export type Database = {
           category_id: string
           created_at?: string
           depends_on_key?: string | null
+          depends_on_not_value?: string | null
           depends_on_value?: string | null
+          is_optional?: boolean
           id?: string
           is_primary?: boolean
           key: string
@@ -196,7 +227,9 @@ export type Database = {
           category_id?: string
           created_at?: string
           depends_on_key?: string | null
+          depends_on_not_value?: string | null
           depends_on_value?: string | null
+          is_optional?: boolean
           id?: string
           is_primary?: boolean
           key?: string
@@ -1930,6 +1963,21 @@ export type Database = {
           reason: string
           suspended_by: string
           user_id: string
+        }[]
+      }
+      attribute_value_suggestions: {
+        Args: { cat_id: string; attr_key: string; q: string }
+        Returns: {
+          value: string
+          cnt: number
+        }[]
+      }
+      attribute_range_bounds: {
+        Args: { cat_id: string }
+        Returns: {
+          key: string
+          min_val: number
+          max_val: number
         }[]
       }
       admin_list_vehicle_brands_with_models: {

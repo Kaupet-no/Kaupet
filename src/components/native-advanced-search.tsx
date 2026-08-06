@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   ArrowLeft,
@@ -33,6 +33,7 @@ import {
   resetAdvancedSearchValue,
 } from "@/lib/advanced-search-actions";
 import { hapticImpact, hapticNotification } from "@/lib/haptics";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 
 type Props = {
   open: boolean;
@@ -47,6 +48,9 @@ export function NativeAdvancedSearch({ open, onClose, initial, categories, onApp
   const [v, setV] = useAdvancedSearchValue(open, initial);
   const [saveOpen, setSaveOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<TermGroup | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useFocusTrap(dialogRef, open);
 
   const handleReset = () => {
     void hapticImpact("light");
@@ -91,7 +95,13 @@ export function NativeAdvancedSearch({ open, onClose, initial, categories, onApp
     <>
       {open &&
         createPortal(
-          <div className="fixed inset-0 z-[9999] flex flex-col bg-background animate-in slide-in-from-bottom-4 duration-200">
+          <div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Avansert søk"
+            className="fixed inset-0 z-[9999] flex flex-col bg-background animate-in slide-in-from-bottom-4 duration-200"
+          >
             {/* Header */}
             <div className="flex items-center gap-2 border-b border-border px-4 pt-safe pb-3">
               <button

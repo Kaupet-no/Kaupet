@@ -175,8 +175,17 @@ export function AppLanding() {
               onBlur={() => setFocused(false)}
               placeholder=""
               aria-label="Søk i annonser"
+              aria-describedby={typewriterWords.length > 0 ? "landing-search-examples" : undefined}
               className="h-14 w-full rounded-full border border-border bg-card pl-12 pr-4 text-base shadow-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
             />
+            {typewriterWords.length > 0 && (
+              // Static (not tied to the rotating animation) so screen reader
+              // users get the example searches once, on focus, instead of
+              // an aria-live region re-announcing every ~2.7s.
+              <span id="landing-search-examples" className="sr-only">
+                For eksempel: {typewriterWords.join(", ")}
+              </span>
+            )}
             {!placeholderPaused && (
               <div className="pointer-events-none absolute inset-y-0 left-12 right-4 flex items-center">
                 <AnimatedSearchPlaceholder

@@ -437,10 +437,13 @@ export function AttributeFilterChips({
 
   // Live text filter on top of the relevance sort above — the sort alone
   // still leaves a buyer scanning past unrelated fields to find one by name
-  // in a dialog that can hold 8-12 filters.
-  const moreSearchWords = moreSearch.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  // in a dialog that can hold 8-12 filters. Same 2-character floor as the
+  // main search box (no results shown for a single typed letter there
+  // either), so a stray first keystroke doesn't blank the whole list.
+  const moreSearchTrimmed = moreSearch.trim();
+  const moreSearchWords = moreSearchTrimmed.toLowerCase().split(/\s+/).filter(Boolean);
   const visibleSecondary =
-    moreSearchWords.length === 0
+    moreSearchTrimmed.length < 2
       ? secondary
       : secondary.filter((f) => relevanceScore(f, moreSearchWords) > 0);
 

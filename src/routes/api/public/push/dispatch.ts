@@ -96,7 +96,7 @@ async function dispatchPush(params: {
   } & typeof import("web-push");
   const webpush = webpushModule.default ?? webpushModule;
 
-  const subject = process.env.VAPID_SUBJECT || "mailto:post@kaupet.no";
+  const subject = process.env.VAPID_SUBJECT || "mailto:kontakt@kaupet.no";
   // Must match VAPID_PUBLIC_KEY in src/lib/push.ts — the client signs
   // subscriptions against that key, so the server must sign with the
   // matching private key or push services reject with InvalidSignature.

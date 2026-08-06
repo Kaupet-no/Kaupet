@@ -146,7 +146,7 @@ export function FeedbackTag() {
       {open ? (
         <div className="w-72 rounded-l-xl border border-r-0 border-border bg-card p-4 shadow-lg duration-200 animate-in slide-in-from-right-4">
           <div className="mb-2 flex items-center justify-between">
-            <p className="text-sm font-semibold">Ris og Ros</p>
+            <p className="text-sm font-semibold">Vi vil gjerne høre fra deg!</p>
             <button
               type="button"
               aria-label="Lukk"

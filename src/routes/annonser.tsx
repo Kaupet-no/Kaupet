@@ -48,6 +48,7 @@ import { hapticImpact } from "@/lib/haptics";
 import { useScrollDirection } from "@/hooks/use-scroll-direction";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { useAnnonserSearchState } from "@/features/listing-search/use-annonser-search-state";
+import { useFilterFacetCounts } from "@/features/listing-search/use-filter-facet-counts";
 import { useHeroCategoryActions } from "@/features/listing-search/use-hero-category-actions";
 import { CategoryHero } from "@/components/category-hero";
 import { CategoryChipRow } from "@/components/category-chip-row";
@@ -209,6 +210,17 @@ function BrowsePage() {
     handleLocationChange,
     resetFilters,
   } = useAnnonserSearchState({ search, navigate, categories, allFilters, setQDraft });
+
+  const { data: facetCounts } = useFilterFacetCounts({
+    filters: attrFilters,
+    values: attrValues,
+    categories,
+    effectiveCategories,
+    conditions: search.conditions ?? [],
+    min: search.min,
+    max: search.max,
+    includeFree: search.includeFree ?? true,
+  });
 
   // No Bil og MC listing has a "Tilstand" attribute, so the condition filter
   // is meaningless (and hidden) once the search narrows to that category.
@@ -748,6 +760,7 @@ function BrowsePage() {
                   updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
                 }
                 hideCondition={isBilOgMc}
+                counts={facetCounts}
               />
             </div>
           )}

@@ -15,6 +15,7 @@ import { ResultList } from "@/components/result-list";
 import { NativeFilterChips } from "@/components/native-filter-chips";
 import { AttributeFilterChips } from "@/components/attribute-filter-chips";
 import { FilterSidebar } from "@/components/filter-sidebar";
+import { FilterSheet } from "@/components/filter-sheet";
 import { NativeSearchOverlay } from "@/components/native-search-overlay";
 import { NativeAdvancedSearch } from "@/components/native-advanced-search";
 import { saveLastSearchContext } from "@/lib/last-search-context";
@@ -668,17 +669,13 @@ function BrowsePage() {
               hideCondition={isBilOgMc}
             />
           ) : (
-            // Mobile web still uses the old popover-chip row until the
-            // bottom-sheet equivalent of FilterSidebar lands (next step) —
-            // the persistent sidebar below only shows at md: and up.
-            <div className="flex flex-wrap items-center gap-2 md:hidden">
-              <AttributeFilterChips
+            // Mobile web: same sections as the desktop FilterSidebar, in a
+            // bottom sheet triggered by one "Filter" button.
+            <div className="md:hidden">
+              <FilterSheet
                 filters={attrFilters}
                 values={attrValues}
                 onChange={handleAttrValueChange}
-                isNative={isNative}
-                resultCount={totalCount ?? cards.length}
-                queryText={qDraft}
                 min={search.min}
                 max={search.max}
                 includeFree={search.includeFree ?? true}
@@ -690,7 +687,14 @@ function BrowsePage() {
                   updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
                 }
                 hideCondition={isBilOgMc}
-                hasCategory={effectiveCategories.length > 0}
+                counts={facetCounts}
+                activeCount={
+                  Object.keys(attrValues).length +
+                  (search.conditions?.length ?? 0) +
+                  (search.min != null ? 1 : 0) +
+                  (search.max != null ? 1 : 0)
+                }
+                resultCount={totalCount ?? cards.length}
               />
             </div>
           )}

@@ -417,8 +417,12 @@ export function applyAttributeFilters<T>(
         }
         break;
       case "range":
-        if (typeof f.min === "number") q = q.gte(`attributes->>${key}`, f.min);
-        if (typeof f.max === "number") q = q.lte(`attributes->>${key}`, f.max);
+        // `->>` extracts JSON as text, so PostgREST compares it lexicographically
+        // against the number ("78000" >= "100000" is true as text, since '7' > '1') —
+        // `->` keeps it as jsonb instead, which numeric attribute values are always
+        // stored as, so Postgres compares them numerically like the filter intends.
+        if (typeof f.min === "number") q = q.gte(`attributes->${key}`, f.min);
+        if (typeof f.max === "number") q = q.lte(`attributes->${key}`, f.max);
         break;
       case "text":
         if (f.value) q = q.ilike(`attributes->>${key}`, `%${f.value}%`);

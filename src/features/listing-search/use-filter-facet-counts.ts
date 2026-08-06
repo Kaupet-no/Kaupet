@@ -1,14 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { supabase } from "@/integrations/supabase/client";
-import type { Category } from "@/lib/categories";
 import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
 
 type Args = {
   filters: CategoryFilter[];
   values: Record<string, AttributeFilterValue>;
-  categories: Pick<Category, "id" | "slug" | "parent_id">[] | undefined;
-  effectiveCategories: string[];
+  categoryIds: string[] | null;
   conditions: string[];
   min: number | undefined;
   max: number | undefined;
@@ -16,40 +14,24 @@ type Args = {
 };
 
 /**
- * Per-value result counts (e.g. "Diesel 98") for the FilterSidebar, via the
+ * Per-value result counts (e.g. "Diesel 98") shown next to filter options in
+ * chip popovers and the "Flere filter" dialog, via the
  * `listing_filter_facet_counts` RPC. Mirrors the category/condition/price
  * resolution `use-listings-query.ts` does for the main listings fetch, minus
  * the free-text/radius id constraint — a facet count that ignores an active
- * text search or map radius is a deliberate v1 simplification (see the
+ * text search or map radius is a deliberate simplification (see the
  * implementation plan's follow-up list), not an oversight.
  */
 export function useFilterFacetCounts({
   filters,
   values,
-  categories,
-  effectiveCategories,
+  categoryIds,
   conditions,
   min,
   max,
   includeFree,
 }: Args) {
   const facetKeys = filters.map((f) => f.key);
-
-  const categoryIds = (() => {
-    if (effectiveCategories.length === 0 || !categories) return null;
-    const selectedSlugs = new Set(effectiveCategories);
-    const selectedCats = categories.filter((c) => selectedSlugs.has(c.slug));
-    const ids = new Set<string>();
-    for (const c of selectedCats) {
-      ids.add(c.id);
-      if (c.parent_id == null) {
-        for (const child of categories) {
-          if (child.parent_id === c.id) ids.add(child.id);
-        }
-      }
-    }
-    return Array.from(ids);
-  })();
 
   return useQuery({
     queryKey: [

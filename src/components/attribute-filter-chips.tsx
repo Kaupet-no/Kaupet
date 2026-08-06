@@ -2,6 +2,7 @@ import { useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -87,6 +88,9 @@ type Props = {
    * place pointing the user at the category picker instead of leaving the
    * row silently empty. */
   hasCategory?: boolean;
+  /** Facet result counts per filter key/value (e.g. `{ fuel_type: { diesel: 98 } }`),
+   * shown next to options in chip popovers and the "Flere filter" dialog. */
+  counts?: Record<string, Record<string, number>>;
 };
 
 /** How many of a filter's typed-word matches count toward its relevance —
@@ -127,10 +131,12 @@ export function AttributeFilterChips({
   onConditionsChange,
   hideCondition = false,
   hasCategory = true,
+  counts,
 }: Props) {
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [priceConditionOpen, setPriceConditionOpen] = useState<"price" | "condition" | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [moreSearch, setMoreSearch] = useState("");
 
   // Desktop callers wire up Pris/Tilstand here so all visible search criteria
   // live in one row/component; native keeps them in NativeFilterChips.
@@ -189,6 +195,7 @@ export function AttributeFilterChips({
       brandLookupFilters={filters}
       values={values}
       onChange={onChange}
+      counts={counts}
     />
   );
 
@@ -234,6 +241,7 @@ export function AttributeFilterChips({
           label={label}
           active={active}
           values={selected}
+          counts={counts?.[f.key]}
           onChange={(vals) =>
             onChange(f.key, vals.length > 0 ? { kind: "multiselect", values: vals } : undefined)
           }
@@ -249,7 +257,13 @@ export function AttributeFilterChips({
           key={f.id}
           label={label}
           active={active}
-          options={(f.options ?? []).map((o) => ({ value: o.value, label: o.label_nb }))}
+          options={(f.options ?? []).map((o) => ({
+            value: o.value,
+            label:
+              counts?.[f.key]?.[o.value] != null
+                ? `${o.label_nb} (${counts[f.key][o.value]})`
+                : o.label_nb,
+          }))}
           value={current?.kind === "select" ? current.value : undefined}
           placeholder={f.label_nb}
           onChange={(v) => onChange(f.key, v ? { kind: "select", value: v } : undefined)}
@@ -265,6 +279,7 @@ export function AttributeFilterChips({
           label={label}
           active={active}
           values={selected}
+          counts={counts?.[f.key]}
           onChange={(vals) =>
             onChange(f.key, vals.length > 0 ? { kind: "multiselect", values: vals } : undefined)
           }
@@ -420,14 +435,36 @@ export function AttributeFilterChips({
     </Button>
   );
 
+  // Live text filter on top of the relevance sort above — the sort alone
+  // still leaves a buyer scanning past unrelated fields to find one by name
+  // in a dialog that can hold 8-12 filters.
+  const moreSearchWords = moreSearch.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const visibleSecondary =
+    moreSearchWords.length === 0
+      ? secondary
+      : secondary.filter((f) => relevanceScore(f, moreSearchWords) > 0);
+
   const overlayBody = (
     <div className="space-y-4">
-      <CategoryFilterFields
-        filters={secondary}
-        brandLookupFilters={filters}
-        values={values}
-        onChange={onChange}
-      />
+      {secondary.length > 5 && (
+        <Input
+          value={moreSearch}
+          onChange={(e) => setMoreSearch(e.target.value)}
+          placeholder="Søk etter filter…"
+          autoFocus={!isNative}
+        />
+      )}
+      {visibleSecondary.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Ingen filter matcher «{moreSearch}».</p>
+      ) : (
+        <CategoryFilterFields
+          filters={visibleSecondary}
+          brandLookupFilters={filters}
+          values={values}
+          onChange={onChange}
+          counts={counts}
+        />
+      )}
       {dismissButton(() => setMoreOpen(false))}
     </div>
   );
@@ -439,7 +476,7 @@ export function AttributeFilterChips({
   // shared flex-wrap row, so Pris/Tilstand and Merke/Modell can share a line.
   const noCategoryHint = showNoCategoryHint && (
     <span className="text-sm text-muted-foreground">
-      Velg en kategori for å se flere filtermuligheter ⤴
+      Velg en kategori for å se flere søkefilter ⤴
     </span>
   );
 
@@ -470,7 +507,13 @@ export function AttributeFilterChips({
       {/* "Se flere filter" overlay. */}
       {secondary.length > 0 &&
         (isNative ? (
-          <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+          <Sheet
+            open={moreOpen}
+            onOpenChange={(o) => {
+              setMoreOpen(o);
+              if (!o) setMoreSearch("");
+            }}
+          >
             <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl">
               <SheetHeader>
                 <SheetTitle>Flere filter</SheetTitle>
@@ -479,7 +522,13 @@ export function AttributeFilterChips({
             </SheetContent>
           </Sheet>
         ) : (
-          <Dialog open={moreOpen} onOpenChange={setMoreOpen}>
+          <Dialog
+            open={moreOpen}
+            onOpenChange={(o) => {
+              setMoreOpen(o);
+              if (!o) setMoreSearch("");
+            }}
+          >
             <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
               <DialogHeader>
                 <DialogTitle>Flere filter</DialogTitle>
@@ -600,11 +649,14 @@ function MultiSelectPopoverBody({
   values,
   onToggle,
   emptyMessage,
+  counts,
 }: {
   options: { value: string; label: string }[];
   values: string[];
   onToggle: (value: string) => void;
   emptyMessage?: string;
+  /** Result counts keyed by option value, e.g. `{ diesel: 98 }`. */
+  counts?: Record<string, number>;
 }) {
   const [search, setSearch] = useState("");
   if (options.length === 0 && emptyMessage) {
@@ -621,7 +673,7 @@ function MultiSelectPopoverBody({
               <Check
                 className={cn("size-4", values.includes(o.value) ? "opacity-100" : "opacity-0")}
               />
-              {o.label}
+              {counts?.[o.value] != null ? `${o.label} (${counts[o.value]})` : o.label}
             </CommandItem>
           ))}
         </CommandGroup>
@@ -639,12 +691,14 @@ function AttributeMultiChip({
   label,
   active,
   values,
+  counts,
   onChange,
 }: {
   filter: CategoryFilter;
   label: string;
   active: boolean;
   values: string[];
+  counts?: Record<string, number>;
   onChange: (values: string[]) => void;
 }) {
   const options = (filter.options ?? []).map((o) => ({ value: o.value, label: o.label_nb }));
@@ -657,7 +711,12 @@ function AttributeMultiChip({
         <FilterChip label={label} active={active} />
       </PopoverTrigger>
       <PopoverContent align="start" className="w-64 p-0">
-        <MultiSelectPopoverBody options={options} values={values} onToggle={toggle} />
+        <MultiSelectPopoverBody
+          options={options}
+          values={values}
+          onToggle={toggle}
+          counts={counts}
+        />
       </PopoverContent>
     </Popover>
   );
@@ -672,12 +731,14 @@ function BrandMultiChip({
   label,
   active,
   values,
+  counts,
   onChange,
 }: {
   filter: CategoryFilter;
   label: string;
   active: boolean;
   values: string[];
+  counts?: Record<string, number>;
   onChange: (values: string[]) => void;
 }) {
   const options = useVehicleBrandOptions((filter.unit ?? "bil") as VehicleBrandGroup, undefined);
@@ -690,7 +751,12 @@ function BrandMultiChip({
         <FilterChip label={label} active={active} />
       </PopoverTrigger>
       <PopoverContent align="start" className="w-64 p-0">
-        <MultiSelectPopoverBody options={options} values={values} onToggle={toggle} />
+        <MultiSelectPopoverBody
+          options={options}
+          values={values}
+          onToggle={toggle}
+          counts={counts}
+        />
       </PopoverContent>
     </Popover>
   );

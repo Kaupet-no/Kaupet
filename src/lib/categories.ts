@@ -12,6 +12,32 @@ export type Category = {
 export function mainCategories(categories: Category[]): Category[] {
   return categories.filter((c) => c.parent_id == null && !!c.color);
 }
+
+/**
+ * Resolves selected category slugs (e.g. from `/annonser`'s `categories`
+ * search param) to concrete category ids to filter listings by — a chosen
+ * root category also includes all of its direct children, so picking a hub
+ * like "Bil og MC" still matches listings filed under its subcategories.
+ * Returns `null` when nothing is selected (no category constraint).
+ */
+export function resolveCategoryIds(
+  selectedSlugs: string[],
+  categories: Pick<Category, "id" | "slug" | "parent_id">[],
+): string[] | null {
+  if (selectedSlugs.length === 0) return null;
+  const slugSet = new Set(selectedSlugs);
+  const selected = categories.filter((c) => slugSet.has(c.slug));
+  const ids = new Set<string>();
+  for (const c of selected) {
+    ids.add(c.id);
+    if (c.parent_id == null) {
+      for (const child of categories) {
+        if (child.parent_id === c.id) ids.add(child.id);
+      }
+    }
+  }
+  return Array.from(ids);
+}
 export type SortValue = "new" | "relevance" | "price_asc" | "price_desc";
 
 export const SORT_OPTIONS: Array<{ value: SortValue; label: string }> = [

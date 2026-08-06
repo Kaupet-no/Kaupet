@@ -286,6 +286,8 @@ export function CategoryLandingPage({
     city: l.city,
     created_at: l.created_at,
     cover_path: l.cover_path,
+    category_slug: l.category_slug,
+    attributes: l.attributes,
   }));
 
   const mapListings: MapListing[] = (listings ?? [])

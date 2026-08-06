@@ -143,6 +143,8 @@ export type SearchListing = {
   lng: number | null;
   created_at: string;
   cover_path: string | null;
+  category_slug: string | null;
+  attributes: Record<string, unknown> | null;
 };
 
 export type ListingsPage = {

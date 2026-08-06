@@ -87,6 +87,8 @@ export function AppLanding() {
         cover_path: l.cover_path,
         total_views: Number(l.total_views ?? 0),
         views_last_week: Number(l.views_last_week ?? 0),
+        category_slug: l.category_slug,
+        attributes: l.attributes as Record<string, unknown> | null,
       }));
     },
   });

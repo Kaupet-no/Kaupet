@@ -27,6 +27,7 @@ type SelectedListingRow = {
   created_at: string;
   listing_images: { storage_path: string; sort_order: number }[] | null;
   attributes: Json;
+  categories: { slug: string } | { slug: string }[] | null;
 };
 
 type SearchParams = z.infer<typeof searchSchema>;
@@ -108,7 +109,7 @@ export function useListingsQuery({
       let qb = supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, subtitle, description, price_nok, is_free, city, display_lat, display_lng, created_at, listing_images(storage_path, sort_order), attributes",
+          "id, kaupet_code, title, subtitle, description, price_nok, is_free, city, display_lat, display_lng, created_at, listing_images(storage_path, sort_order), attributes, categories(slug)",
           { count: pageParam === 0 ? "exact" : undefined },
         )
         .eq("status", "active");
@@ -184,6 +185,7 @@ export function useListingsQuery({
         const attrs = l.attributes as Record<string, unknown> | null;
         const mileageRaw = attrs?.mileage_km;
         const engineHoursRaw = attrs?.engine_hours;
+        const category = Array.isArray(l.categories) ? l.categories[0] : l.categories;
         return {
           id: l.id,
           kaupet_code: l.kaupet_code,
@@ -198,6 +200,8 @@ export function useListingsQuery({
           cover_path: imgs[0]?.storage_path ?? null,
           mileage_km: typeof mileageRaw === "number" ? mileageRaw : null,
           engine_hours: typeof engineHoursRaw === "number" ? engineHoursRaw : null,
+          category_slug: category?.slug ?? null,
+          attributes: attrs,
         };
       };
 

@@ -10,6 +10,7 @@ export type Category = {
   color: string | null;
   heading_font: string | null;
   search_examples: string[] | null;
+  title_example: string | null;
   is_hidden: boolean;
 };
 

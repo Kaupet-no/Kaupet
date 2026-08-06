@@ -85,6 +85,10 @@ export type WizardSharedProps = {
     color?: string | null;
   })[];
   categoryLabel: string | null;
+  /** Category-specific example for the title input's "F.eks. …" placeholder
+   * (nearest ancestor's categories.title_example); null falls back to the
+   * generic example. */
+  titleExample: string | null;
   setCategoryPickerOpen: (open: boolean) => void;
   onCategorySelect: (categoryId: string, parentId: string) => void;
   categorySuggestion: {

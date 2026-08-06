@@ -90,7 +90,7 @@ function AdminCategories() {
       const { data, error } = await supabase
         .from("categories")
         .select(
-          "id, name_nb, slug, parent_id, sort_order, icon, color, heading_font, search_examples, is_hidden",
+          "id, name_nb, slug, parent_id, sort_order, icon, color, heading_font, search_examples, title_example, is_hidden",
         )
         .order("sort_order")
         .order("name_nb");

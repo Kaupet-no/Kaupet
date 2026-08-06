@@ -51,5 +51,9 @@
 	<string>Kaupet bruker posisjonen din for å vise annonser i nærheten.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Kaupet bruker posisjonen din for å vise annonser i nærheten.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Kaupet bruker kameraet ditt for å ta bilder til annonsene dine.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Kaupet trenger tilgang til bildebiblioteket for å legge til bilder i annonsene dine.</string>
 </dict>
 </plist>

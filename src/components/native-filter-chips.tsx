@@ -10,6 +10,7 @@ import { RangeFilterField } from "@/components/range-filter-field";
 import { PRICE_BOUNDS } from "@/lib/filter-range-bounds";
 import { hapticImpact } from "@/lib/haptics";
 import { getPriceChipState, getConditionChipState } from "@/lib/filter-chip-labels";
+import { FilterChip } from "@/components/filter-chip";
 
 type Props = {
   min?: number;
@@ -74,35 +75,39 @@ export function NativeFilterChips({
   return (
     <>
       <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <Chip
+        <FilterChip
           label={priceLabel}
           active={priceActive}
           icon={<span className="text-[11px] font-bold">kr</span>}
-          onPress={() => open("price")}
+          onClick={() => open("price")}
+          hideChevron
         />
         {!hideCondition && (
-          <Chip
+          <FilterChip
             label={condLabel}
             active={condActive}
             icon={<span className="text-[11px]">✦</span>}
-            onPress={() => open("condition")}
+            onClick={() => open("condition")}
+            hideChevron
           />
         )}
-        <Chip
+        <FilterChip
           label={locLabel}
           active={locActive}
           icon={<MapPin className="size-3.5" />}
-          onPress={() => open("location")}
+          onClick={() => open("location")}
+          hideChevron
         />
-        <Chip
+        <FilterChip
           label="Mer"
           active={advancedFilterCount > 0}
           icon={<MoreHorizontal className="size-3.5" />}
-          onPress={() => {
+          onClick={() => {
             void hapticImpact("light");
             onOpenAdvanced();
           }}
           badge={advancedFilterCount > 0 ? advancedFilterCount : undefined}
+          hideChevron
         />
       </div>
 
@@ -174,40 +179,6 @@ export function NativeFilterChips({
         </SheetContent>
       </Sheet>
     </>
-  );
-}
-
-function Chip({
-  label,
-  active,
-  icon,
-  onPress,
-  badge,
-}: {
-  label: string;
-  active: boolean;
-  icon: React.ReactNode;
-  onPress: () => void;
-  badge?: number;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onPress}
-      className={`relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm transition active:scale-[0.96] ${
-        active
-          ? "border-primary bg-primary text-primary-foreground"
-          : "border-border bg-card text-foreground"
-      }`}
-    >
-      {icon}
-      <span className="max-w-[120px] truncate">{label}</span>
-      {badge != null && badge > 0 && (
-        <span className="absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white">
-          {badge}
-        </span>
-      )}
-    </button>
   );
 }
 

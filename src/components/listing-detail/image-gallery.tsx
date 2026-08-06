@@ -206,14 +206,14 @@ export function ImageGallery({
                         >
                           <img
                             src={imgUrls[img.storage_path]}
-                            alt={title}
+                            alt={i === 0 && !has360 ? title : `${title} – bilde ${i + 1}`}
                             className="relative size-full object-contain"
                           />
                         </button>
                       ) : (
                         <img
                           src={imgUrls[img.storage_path]}
-                          alt={title}
+                          alt={i === 0 && !has360 ? title : `${title} – bilde ${i + 1}`}
                           className="relative size-full object-contain"
                         />
                       )}

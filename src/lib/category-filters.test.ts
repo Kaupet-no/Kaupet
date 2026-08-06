@@ -30,6 +30,8 @@ function f(
     is_primary: true,
     depends_on_key: null,
     depends_on_value: null,
+    depends_on_not_value: null,
+    is_optional: false,
     ...partial,
   };
 }

@@ -43,6 +43,8 @@ export function useCategoryFeed({ categoryIds, sort }: UseCategoryFeedArgs) {
           total_views: Number(l.total_views ?? 0),
           views_last_week: Number(l.views_last_week ?? 0),
           mileage_km: l.mileage_km != null ? Number(l.mileage_km) : null,
+          category_slug: l.category_slug,
+          attributes: l.attributes as Record<string, unknown> | null,
         }));
         return { rows, nextOffset: rows.length === PAGE_SIZE ? pageParam + PAGE_SIZE : null };
       }
@@ -50,7 +52,7 @@ export function useCategoryFeed({ categoryIds, sort }: UseCategoryFeedArgs) {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, subtitle, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order), attributes",
+          "id, kaupet_code, title, subtitle, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order), attributes, categories(slug)",
         )
         .eq("status", "active")
         .in("category_id", categoryIds)
@@ -62,6 +64,7 @@ export function useCategoryFeed({ categoryIds, sort }: UseCategoryFeedArgs) {
         const imgs = (l.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
         const attrs = l.attributes as Record<string, unknown> | null;
         const mileageRaw = attrs?.mileage_km;
+        const category = Array.isArray(l.categories) ? l.categories[0] : l.categories;
         return {
           id: l.id,
           kaupet_code: l.kaupet_code,
@@ -73,6 +76,8 @@ export function useCategoryFeed({ categoryIds, sort }: UseCategoryFeedArgs) {
           created_at: l.created_at,
           cover_path: imgs[0]?.storage_path ?? null,
           mileage_km: typeof mileageRaw === "number" ? mileageRaw : null,
+          category_slug: category?.slug ?? null,
+          attributes: attrs,
         };
       });
       return { rows, nextOffset: rows.length === PAGE_SIZE ? pageParam + PAGE_SIZE : null };

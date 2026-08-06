@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   ArrowLeft,
@@ -9,7 +9,6 @@ import {
   Save,
   Search as SearchIcon,
   Trash2,
-  X,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -18,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { CategoryPicker, SaveSearchDialog } from "@/components/advanced-search-sheet";
+import { TermGroupRow } from "@/components/term-group-editor";
 import {
   CONDITIONS,
   isBilOgMcCategory,
@@ -33,6 +33,7 @@ import {
   resetAdvancedSearchValue,
 } from "@/lib/advanced-search-actions";
 import { hapticImpact, hapticNotification } from "@/lib/haptics";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 
 type Props = {
   open: boolean;
@@ -47,6 +48,9 @@ export function NativeAdvancedSearch({ open, onClose, initial, categories, onApp
   const [v, setV] = useAdvancedSearchValue(open, initial);
   const [saveOpen, setSaveOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<TermGroup | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useFocusTrap(dialogRef, open);
 
   const handleReset = () => {
     void hapticImpact("light");
@@ -91,7 +95,13 @@ export function NativeAdvancedSearch({ open, onClose, initial, categories, onApp
     <>
       {open &&
         createPortal(
-          <div className="fixed inset-0 z-[9999] flex flex-col bg-background animate-in slide-in-from-bottom-4 duration-200">
+          <div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Avansert søk"
+            className="fixed inset-0 z-[9999] flex flex-col bg-background animate-in slide-in-from-bottom-4 duration-200"
+          >
             {/* Header */}
             <div className="flex items-center gap-2 border-b border-border px-4 pt-safe pb-3">
               <button
@@ -329,29 +339,14 @@ function TermGroupSheet({
   onSave: (g: TermGroup) => void;
 }) {
   const [draft, setDraft] = useState<TermGroup>(group ?? emptyTermGroup());
-  const [termInput, setTermInput] = useState("");
 
   useEffect(() => {
-    if (group) {
-      setDraft(group);
-      setTermInput("");
-    }
+    if (group) setDraft(group);
   }, [group]);
 
-  const addTerm = () => {
-    const t = termInput.trim();
-    if (!t || draft.terms.includes(t)) {
-      setTermInput("");
-      return;
-    }
+  const updateDraft = (next: TermGroup) => {
     void hapticImpact("light");
-    setDraft((prev) => ({ ...prev, terms: [...prev.terms, t] }));
-    setTermInput("");
-  };
-
-  const removeTerm = (t: string) => {
-    void hapticImpact("light");
-    setDraft((prev) => ({ ...prev, terms: prev.terms.filter((x) => x !== t) }));
+    setDraft(next);
   };
 
   return (
@@ -366,109 +361,8 @@ function TermGroupSheet({
           <SheetTitle>Søkelinje</SheetTitle>
         </SheetHeader>
 
-        <div className="mt-4 space-y-5">
-          {/* Include / Exclude */}
-          <div className="space-y-2">
-            <Label className="text-sm text-muted-foreground">Type</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { value: false, label: "Inkluder", desc: "Vis annonser med disse ordene" },
-                { value: true, label: "Ekskluder", desc: "Skjul annonser med disse ordene" },
-              ].map(({ value, label, desc }) => (
-                <button
-                  key={String(value)}
-                  type="button"
-                  onClick={() => {
-                    void hapticImpact("light");
-                    setDraft((p) => ({ ...p, exclude: value }));
-                  }}
-                  className={`flex flex-col items-start rounded-xl border px-3 py-2.5 text-left transition active:scale-[0.98] ${
-                    draft.exclude === value
-                      ? value
-                        ? "border-destructive bg-destructive/5 text-destructive"
-                        : "border-primary bg-primary/5 text-primary"
-                      : "border-border bg-card text-muted-foreground"
-                  }`}
-                >
-                  <span className="text-sm font-medium">{label}</span>
-                  <span className="text-xs opacity-70">{desc}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* All / Any */}
-          <div className="space-y-2">
-            <Label className="text-sm text-muted-foreground">Match-modus</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { value: "all" as const, label: "Alle ord", desc: "Alle ord må finnes" },
-                { value: "any" as const, label: "Minst ett ord", desc: "Minst ett ord må finnes" },
-              ].map(({ value, label, desc }) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => {
-                    void hapticImpact("light");
-                    setDraft((p) => ({ ...p, mode: value }));
-                  }}
-                  className={`flex flex-col items-start rounded-xl border px-3 py-2.5 text-left transition active:scale-[0.98] ${
-                    draft.mode === value
-                      ? "border-primary bg-primary/5 text-primary"
-                      : "border-border bg-card text-muted-foreground"
-                  }`}
-                >
-                  <span className="text-sm font-medium">{label}</span>
-                  <span className="text-xs opacity-70">{desc}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Term input */}
-          <div className="space-y-2">
-            <Label className="text-sm text-muted-foreground">Ord</Label>
-            <div className="flex gap-2">
-              <Input
-                value={termInput}
-                onChange={(e) => setTermInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addTerm();
-                  }
-                }}
-                placeholder="f.eks. rød"
-                className="h-11"
-              />
-              <Button type="button" variant="outline" onClick={addTerm} className="h-11 shrink-0">
-                <Plus className="size-4" /> Legg til
-              </Button>
-            </div>
-
-            {draft.terms.length > 0 && (
-              <div className="flex flex-wrap gap-2 pt-1">
-                {draft.terms.map((t) => (
-                  <span
-                    key={t}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm ${
-                      draft.exclude ? "bg-destructive/10 text-destructive" : "bg-muted"
-                    }`}
-                  >
-                    {t}
-                    <button
-                      type="button"
-                      onClick={() => removeTerm(t)}
-                      className="rounded-full p-0.5 opacity-60 hover:opacity-100"
-                      aria-label={`Fjern ${t}`}
-                    >
-                      <X className="size-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
+        <div className="mt-4">
+          <TermGroupRow group={draft} onChange={updateDraft} />
         </div>
 
         <Button

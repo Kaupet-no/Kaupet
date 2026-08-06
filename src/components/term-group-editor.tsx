@@ -34,14 +34,14 @@ export function TermGroupEditor({ groups, onChange }: Props) {
   );
 }
 
-function TermGroupRow({
+export function TermGroupRow({
   group,
   onChange,
   onRemove,
 }: {
   group: TermGroup;
   onChange: (g: TermGroup) => void;
-  onRemove: () => void;
+  onRemove?: () => void;
 }) {
   const [draft, setDraft] = useState("");
 
@@ -77,14 +77,16 @@ function TermGroupRow({
             labels={["Alle ord", "Minst ett"]}
           />
         </div>
-        <button
-          type="button"
-          onClick={onRemove}
-          className="-m-2 rounded p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-          aria-label="Fjern søkelinje"
-        >
-          <Trash2 className="size-3.5" />
-        </button>
+        {onRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="-m-2 rounded p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+            aria-label="Fjern søkelinje"
+          >
+            <Trash2 className="size-3.5" />
+          </button>
+        )}
       </div>
 
       <div

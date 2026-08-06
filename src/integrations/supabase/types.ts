@@ -108,6 +108,33 @@ export type Database = {
         }
         Relationships: []
       }
+      feedback: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          page_url: string | null
+          type: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          page_url?: string | null
+          type: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          page_url?: string | null
+          type?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           color: string | null
@@ -121,6 +148,7 @@ export type Database = {
           search_examples: string[]
           slug: string
           sort_order: number
+          title_example: string | null
           updated_at: string
         }
         Insert: {
@@ -135,6 +163,7 @@ export type Database = {
           search_examples?: string[]
           slug: string
           sort_order?: number
+          title_example?: string | null
           updated_at?: string
         }
         Update: {
@@ -149,6 +178,7 @@ export type Database = {
           search_examples?: string[]
           slug?: string
           sort_order?: number
+          title_example?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -166,7 +196,9 @@ export type Database = {
           category_id: string
           created_at: string
           depends_on_key: string | null
+          depends_on_not_value: string | null
           depends_on_value: string | null
+          is_optional: boolean
           id: string
           is_primary: boolean
           key: string
@@ -181,7 +213,9 @@ export type Database = {
           category_id: string
           created_at?: string
           depends_on_key?: string | null
+          depends_on_not_value?: string | null
           depends_on_value?: string | null
+          is_optional?: boolean
           id?: string
           is_primary?: boolean
           key: string
@@ -196,7 +230,9 @@ export type Database = {
           category_id?: string
           created_at?: string
           depends_on_key?: string | null
+          depends_on_not_value?: string | null
           depends_on_value?: string | null
+          is_optional?: boolean
           id?: string
           is_primary?: boolean
           key?: string
@@ -990,12 +1026,14 @@ export type Database = {
           email_price_drops: boolean
           email_saved_searches: boolean
           email_sold: boolean
+          email_wtb_matches: boolean
           updated_at: string
           user_id: string
           web_push_messages: boolean
           web_push_price_drops: boolean
           web_push_saved_searches: boolean
           web_push_sold: boolean
+          web_push_wtb_matches: boolean
         }
         Insert: {
           created_at?: string
@@ -1003,12 +1041,14 @@ export type Database = {
           email_price_drops?: boolean
           email_saved_searches?: boolean
           email_sold?: boolean
+          email_wtb_matches?: boolean
           updated_at?: string
           user_id: string
           web_push_messages?: boolean
           web_push_price_drops?: boolean
           web_push_saved_searches?: boolean
           web_push_sold?: boolean
+          web_push_wtb_matches?: boolean
         }
         Update: {
           created_at?: string
@@ -1016,12 +1056,14 @@ export type Database = {
           email_price_drops?: boolean
           email_saved_searches?: boolean
           email_sold?: boolean
+          email_wtb_matches?: boolean
           updated_at?: string
           user_id?: string
           web_push_messages?: boolean
           web_push_price_drops?: boolean
           web_push_saved_searches?: boolean
           web_push_sold?: boolean
+          web_push_wtb_matches?: boolean
         }
         Relationships: []
       }
@@ -1650,6 +1692,48 @@ export type Database = {
         }
         Relationships: []
       }
+      wtb_match_notifications: {
+        Row: {
+          created_at: string
+          id: string
+          listing_id: string
+          read_at: string | null
+          user_id: string
+          wtb_listing_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          listing_id: string
+          read_at?: string | null
+          user_id: string
+          wtb_listing_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          listing_id?: string
+          read_at?: string | null
+          user_id?: string
+          wtb_listing_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wtb_match_notifications_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wtb_match_notifications_wtb_listing_id_fkey"
+            columns: ["wtb_listing_id"]
+            isOneToOne: false
+            referencedRelation: "wtb_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wtb_listings: {
         Row: {
           attributes: Json
@@ -1932,6 +2016,21 @@ export type Database = {
           user_id: string
         }[]
       }
+      attribute_value_suggestions: {
+        Args: { cat_id: string; attr_key: string; q: string }
+        Returns: {
+          value: string
+          cnt: number
+        }[]
+      }
+      attribute_range_bounds: {
+        Args: { cat_id: string }
+        Returns: {
+          key: string
+          min_val: number
+          max_val: number
+        }[]
+      }
       admin_list_vehicle_brands_with_models: {
         Args: never
         Returns: {
@@ -2162,6 +2261,49 @@ export type Database = {
         Args: { _listing_id: string }
         Returns: undefined
       }
+      match_listing_to_wtb_listings: {
+        Args: { _listing_id: string }
+        Returns: undefined
+      }
+      compute_wtb_matches: {
+        Args: {
+          _category_id: string | null
+          _price_nok: number | null
+          _is_free: boolean
+          _title: string | null
+          _description: string | null
+          _attributes: Json
+        }
+        Returns: {
+          id: string
+          user_id: string
+          title: string
+          subtitle: string | null
+          description: string | null
+          category_id: string | null
+          max_price_nok: number | null
+          status: string
+          attributes: Json
+          search_vector: unknown
+          created_at: string
+          updated_at: string
+          expires_at: string
+        }[]
+      }
+      wtb_match_count: {
+        Args: {
+          _category_id: string | null
+          _price_nok: number | null
+          _is_free: boolean
+          _title: string | null
+          _description: string | null
+          _attributes: Json
+        }
+        Returns: {
+          match_count: number
+          max_price: number | null
+        }[]
+      }
       match_search_synonyms: {
         Args: { p_category_id: string | null; phrases: string[] }
         Returns: {
@@ -2195,6 +2337,8 @@ export type Database = {
       popular_listings_by_category: {
         Args: { _category_ids: string[]; _limit?: number; _offset?: number }
         Returns: {
+          attributes: Json
+          category_slug: string
           city: string
           cover_path: string
           created_at: string
@@ -2212,6 +2356,8 @@ export type Database = {
       popular_listings_last_week: {
         Args: { _limit?: number }
         Returns: {
+          attributes: Json
+          category_slug: string
           city: string
           cover_path: string
           created_at: string

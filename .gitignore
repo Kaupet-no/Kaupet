@@ -57,6 +57,8 @@ android/app/build/
 android/build/
 android/local.properties
 android/app/google-services.json
+android/keystore/
+android/keystore.properties
 
 # SOPS / age — privatnøkler skal ALDRI committes
 *.agekey

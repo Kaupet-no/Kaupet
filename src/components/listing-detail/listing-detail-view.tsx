@@ -369,6 +369,7 @@ export function ListingDetailView({
       driveType={driveType}
       avgiftNote={avgiftNote}
       totalPriceKr={totalPriceKr}
+      isNative={isNative}
     >
       {children}
     </ListingDetailViewBody>
@@ -440,6 +441,7 @@ function ListingDetailViewBody({
   driveType,
   avgiftNote,
   totalPriceKr,
+  isNative,
   children,
 }: {
   title: string;
@@ -490,11 +492,19 @@ function ListingDetailViewBody({
   driveType: string | null;
   avgiftNote: string | null;
   totalPriceKr: number | null;
+  isNative: boolean;
   children?: ReactNode;
 }) {
   const editCtx = useListingEdit();
   const [locationPickerOpen, setLocationPickerOpen] = useState(false);
   const [pendingCoords, setPendingCoords] = useState<{ lat: number; lng: number } | null>(null);
+  // Native app requests a distinct layout for Bil og MC and Båter listings:
+  // seller info promoted up under the spec grid instead of the bottom of
+  // the sidebar (which native stacks below all main content). The plate
+  // itself only ever renders for vehicle listings — boats have no plate.
+  const isBoatListing = !isVehicleListing && isBoatAttributes(attributes);
+  const nativeSpecLayout = isNative && (isVehicleListing || isBoatListing);
+  const nativePlateUnderTitle = isNative && isVehicleListing;
 
   return (
     <div className={`mx-auto max-w-6xl px-4 py-8 ${showStickyContact ? "pb-28 md:pb-8" : ""}`}>
@@ -598,7 +608,7 @@ function ListingDetailViewBody({
                   }}
                 />
               )}
-              {isVehicleListing && vehicleLookup?.registrationNumber && (
+              {isVehicleListing && !nativePlateUnderTitle && vehicleLookup?.registrationNumber && (
                 <RegistrationPlate
                   value={vehicleLookup.registrationNumber}
                   className="h-7 shrink-0"
@@ -607,6 +617,16 @@ function ListingDetailViewBody({
                 />
               )}
             </div>
+            {nativePlateUnderTitle && vehicleLookup?.registrationNumber && (
+              <div className="mt-2">
+                <RegistrationPlate
+                  value={vehicleLookup.registrationNumber}
+                  className="h-7"
+                  editable={!!editCtx?.editMode}
+                  onEdit={() => editCtx?.openVehicleLookupModal()}
+                />
+              </div>
+            )}
             <EditableField
               fieldKey="subtitle"
               value={subtitle ?? ""}
@@ -643,7 +663,7 @@ function ListingDetailViewBody({
       </header>
 
       <div className="mt-6 grid gap-8 md:grid-cols-[1.4fr_1fr]">
-        <div>
+        <div className="min-w-0">
           <div className="mb-8">
             <ImageGallery
               images={sortedImages}
@@ -698,8 +718,7 @@ function ListingDetailViewBody({
             />
           )}
 
-          {!isVehicleListing &&
-            isBoatAttributes(attributes) &&
+          {isBoatListing &&
             (categoryId ? (
               <EditableRegion
                 render={() => <BoatInfoGrid attributes={attributes} />}
@@ -714,6 +733,8 @@ function ListingDetailViewBody({
             ) : (
               <BoatInfoGrid attributes={attributes} />
             ))}
+
+          {nativeSpecLayout && sellerContactSlot && <div className="mt-6">{sellerContactSlot}</div>}
 
           <EditableField
             fieldKey="description"
@@ -1011,7 +1032,7 @@ function ListingDetailViewBody({
           )}
 
           {ownerStatsSlot}
-          {sellerContactSlot}
+          {!nativeSpecLayout && sellerContactSlot}
         </aside>
       </div>
 

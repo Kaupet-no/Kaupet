@@ -298,6 +298,7 @@ export function AttributeFilterChips({
           label={label}
           active={active}
           values={selected}
+          counts={counts?.[f.key]}
           onChange={(vals) =>
             onChange(f.key, vals.length > 0 ? { kind: "multiselect", values: vals } : undefined)
           }
@@ -776,6 +777,7 @@ function ModelMultiChip({
   label,
   active,
   values,
+  counts,
   onChange,
 }: {
   brandFilter: CategoryFilter | undefined;
@@ -783,6 +785,7 @@ function ModelMultiChip({
   label: string;
   active: boolean;
   values: string[];
+  counts?: Record<string, number>;
   onChange: (values: string[]) => void;
 }) {
   const categoryGroup = (brandFilter?.unit ?? "bil") as VehicleBrandGroup;
@@ -803,6 +806,7 @@ function ModelMultiChip({
           brandNames={brandValues}
           values={values}
           onChange={onChange}
+          counts={counts}
         />
       </PopoverContent>
     </Popover>

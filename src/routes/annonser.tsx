@@ -671,7 +671,47 @@ function BrowsePage() {
               hideCondition={isBilOgMc}
             />
           ) : (
-            <div className="flex flex-wrap items-center gap-2">
+            <>
+              {effectiveCategories.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Velg en kategori for å se flere søkefilter
+                </p>
+              )}
+              <div className="flex flex-wrap items-center gap-2">
+                <AttributeFilterChips
+                  filters={attrFilters}
+                  values={attrValues}
+                  onChange={handleAttrValueChange}
+                  isNative={isNative}
+                  resultCount={totalCount ?? cards.length}
+                  queryText={qDraft}
+                  min={search.min}
+                  max={search.max}
+                  includeFree={search.includeFree ?? true}
+                  onPriceChange={(mn, mx, free) =>
+                    updateSearch({ min: mn, max: mx, includeFree: free })
+                  }
+                  conditions={search.conditions ?? []}
+                  onConditionsChange={(c) =>
+                    updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
+                  }
+                  hideCondition={isBilOgMc}
+                  hasCategory={effectiveCategories.length > 0}
+                  counts={facetCounts}
+                />
+              </div>
+            </>
+          )}
+
+          {/* Category-dependent filter row: the selected category's primary
+            fields stay visible, the rest sit behind "Se flere filter". */}
+          {isNative && (
+            <>
+              {effectiveCategories.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Velg en kategori for å se flere søkefilter
+                </p>
+              )}
               <AttributeFilterChips
                 filters={attrFilters}
                 values={attrValues}
@@ -679,35 +719,9 @@ function BrowsePage() {
                 isNative={isNative}
                 resultCount={totalCount ?? cards.length}
                 queryText={qDraft}
-                min={search.min}
-                max={search.max}
-                includeFree={search.includeFree ?? true}
-                onPriceChange={(mn, mx, free) =>
-                  updateSearch({ min: mn, max: mx, includeFree: free })
-                }
-                conditions={search.conditions ?? []}
-                onConditionsChange={(c) =>
-                  updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
-                }
-                hideCondition={isBilOgMc}
                 hasCategory={effectiveCategories.length > 0}
-                counts={facetCounts}
               />
-            </div>
-          )}
-
-          {/* Category-dependent filter row: the selected category's primary
-            fields stay visible, the rest sit behind "Se flere filter". */}
-          {isNative && (
-            <AttributeFilterChips
-              filters={attrFilters}
-              values={attrValues}
-              onChange={handleAttrValueChange}
-              isNative={isNative}
-              resultCount={totalCount ?? cards.length}
-              queryText={qDraft}
-              hasCategory={effectiveCategories.length > 0}
-            />
+            </>
           )}
 
           {/* Rendered inside the same space-y-2 group as the search bar and

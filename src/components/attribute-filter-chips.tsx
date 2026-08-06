@@ -142,12 +142,7 @@ export function AttributeFilterChips({
   // live in one row/component; native keeps them in NativeFilterChips.
   const showPriceCondition = !isNative && onPriceChange != null;
 
-  // No category selected and nothing to show in its place (no filters, and
-  // possibly no Pris/Tilstand on native) — point the user at the category
-  // picker instead of leaving the row empty.
-  const showNoCategoryHint = !hasCategory && filters.length === 0;
-
-  if (filters.length === 0 && !showPriceCondition && !showNoCategoryHint) return null;
+  if (filters.length === 0 && !showPriceCondition && hasCategory) return null;
 
   const { primary, secondaryRaw } = (() => {
     const split = splitPrimaryFilters(filters);
@@ -358,11 +353,7 @@ export function AttributeFilterChips({
       onOpenChange={(o) => setPriceConditionOpen(o ? "price" : null)}
     >
       <PopoverTrigger asChild>
-        <FilterChip
-          label={priceLabel}
-          active={priceActive}
-          icon={<span className="text-[11px] font-bold">kr</span>}
-        />
+        <FilterChip label={priceLabel} active={priceActive} />
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72 p-3">
         <PricePopoverContent
@@ -478,15 +469,8 @@ export function AttributeFilterChips({
   // benefit on the narrow viewports it targets. Desktop instead returns a
   // fragment: the caller wraps it together with DesktopFilterChips in one
   // shared flex-wrap row, so Pris/Tilstand and Merke/Modell can share a line.
-  const noCategoryHint = showNoCategoryHint && (
-    <span className="text-sm text-muted-foreground">
-      Velg en kategori for å se flere søkefilter ⤴
-    </span>
-  );
-
   const body = (
     <>
-      {noCategoryHint}
       {priceChip}
       {conditionChip}
       {chips}

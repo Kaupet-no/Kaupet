@@ -42,7 +42,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -584,7 +583,7 @@ function ListingDetailViewBody({
                     <Input
                       value={v}
                       onChange={(e) => onChange(e.target.value)}
-                      onBlur={onCommit}
+                      onBlur={() => onCommit()}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") onCommit();
                         if (e.key === "Escape") onCancel();
@@ -624,7 +623,7 @@ function ListingDetailViewBody({
                 <Input
                   value={v}
                   onChange={(e) => onChange(e.target.value)}
-                  onBlur={onCommit}
+                  onBlur={() => onCommit()}
                   placeholder="Undertittel (valgfritt)"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") onCommit();
@@ -699,9 +698,22 @@ function ListingDetailViewBody({
             />
           )}
 
-          {!isVehicleListing && isBoatAttributes(attributes) && (
-            <BoatInfoGrid attributes={attributes} />
-          )}
+          {!isVehicleListing &&
+            isBoatAttributes(attributes) &&
+            (categoryId ? (
+              <EditableRegion
+                render={() => <BoatInfoGrid attributes={attributes} />}
+                panel={({ close }) => (
+                  <GenericAttributesPanel
+                    categoryId={categoryId}
+                    attributes={attributes}
+                    onClose={close}
+                  />
+                )}
+              />
+            ) : (
+              <BoatInfoGrid attributes={attributes} />
+            ))}
 
           <EditableField
             fieldKey="description"
@@ -722,7 +734,7 @@ function ListingDetailViewBody({
                   rows={6}
                   value={v}
                   onChange={(e) => onChange(e.target.value)}
-                  onBlur={onCommit}
+                  onBlur={() => onCommit()}
                   onKeyDown={(e) => {
                     if (e.key === "Escape") onCancel();
                   }}
@@ -736,9 +748,22 @@ function ListingDetailViewBody({
             }}
           />
 
-          {!isVehicleListing && isBoatAttributes(attributes) && (
-            <BoatExtraInfo attributes={attributes} />
-          )}
+          {!isVehicleListing &&
+            isBoatAttributes(attributes) &&
+            (categoryId ? (
+              <EditableRegion
+                render={() => <BoatExtraInfo attributes={attributes} />}
+                panel={({ close }) => (
+                  <GenericAttributesPanel
+                    categoryId={categoryId}
+                    attributes={attributes}
+                    onClose={close}
+                  />
+                )}
+              />
+            ) : (
+              <BoatExtraInfo attributes={attributes} />
+            ))}
 
           {isVehicleListing && (
             <EditableRegion
@@ -796,24 +821,31 @@ function ListingDetailViewBody({
             />
           )}
 
-          {!isVehicleListing && editCtx?.editMode && categoryId && (
-            <EditableRegion
-              className="mt-8"
-              render={() => (
-                <section className="mt-8">
-                  <h2 className="font-display text-xl">Egenskaper</h2>
-                  <p className="mt-2 text-sm text-muted-foreground">Klikk for å redigere</p>
-                </section>
-              )}
-              panel={({ close }) => (
-                <GenericAttributesPanel
-                  categoryId={categoryId}
-                  attributes={attributes}
-                  onClose={close}
-                />
-              )}
-            />
-          )}
+          {/* Boat attributes already have a direct edit entry point via the
+              BoatInfoGrid/BoatExtraInfo regions above — this fallback only
+              covers non-vehicle, non-boat categories with no dedicated
+              display component of their own. */}
+          {!isVehicleListing &&
+            !isBoatAttributes(attributes) &&
+            editCtx?.editMode &&
+            categoryId && (
+              <EditableRegion
+                className="mt-8"
+                render={() => (
+                  <section className="mt-8">
+                    <h2 className="font-display text-xl">Egenskaper</h2>
+                    <p className="mt-2 text-sm text-muted-foreground">Klikk for å redigere</p>
+                  </section>
+                )}
+                panel={({ close }) => (
+                  <GenericAttributesPanel
+                    categoryId={categoryId}
+                    attributes={attributes}
+                    onClose={close}
+                  />
+                )}
+              />
+            )}
         </div>
 
         <aside className="@container space-y-5">
@@ -873,6 +905,7 @@ function ListingDetailViewBody({
                           value={v ?? undefined}
                           onValueChange={(next) => {
                             onChange(next);
+                            onCommit(next);
                           }}
                         >
                           <SelectTrigger className="mt-1 h-8">
@@ -886,14 +919,6 @@ function ListingDetailViewBody({
                             ))}
                           </SelectContent>
                         </Select>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="mt-1 h-7"
-                          onClick={onCommit}
-                        >
-                          Lagre
-                        </Button>
                       </div>
                     )}
                     onSave={async (v) => {
@@ -942,7 +967,11 @@ function ListingDetailViewBody({
                         <dt className="text-muted-foreground">Levering</dt>
                         <Select
                           value={v === true ? "ship" : v === false ? "pickup" : undefined}
-                          onValueChange={(next) => onChange(next !== "pickup")}
+                          onValueChange={(next) => {
+                            const nextValue = next !== "pickup";
+                            onChange(nextValue);
+                            onCommit(nextValue);
+                          }}
                         >
                           <SelectTrigger className="mt-1 h-8">
                             <SelectValue placeholder="Velg" />
@@ -952,14 +981,6 @@ function ListingDetailViewBody({
                             <SelectItem value="ship">Frakt</SelectItem>
                           </SelectContent>
                         </Select>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="mt-1 h-7"
-                          onClick={onCommit}
-                        >
-                          Lagre
-                        </Button>
                       </div>
                     )}
                     onSave={async (v) => {

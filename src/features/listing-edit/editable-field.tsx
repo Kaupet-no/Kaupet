@@ -11,7 +11,10 @@ export type EditableFieldProps<T> = {
   editRender: (props: {
     value: T;
     onChange: (v: T) => void;
-    onCommit: () => void;
+    // Optional value lets callers commit synchronously right after a
+    // selection (e.g. a Select's onValueChange) without waiting for the
+    // `draft` state update from onChange to land in a re-render first.
+    onCommit: (v?: T) => void;
     onCancel: () => void;
   }) => ReactNode;
   onSave: (v: T) => Promise<void>;
@@ -51,9 +54,10 @@ export function EditableField<T>({
 
   const status = ctx.fieldStatus[fieldKey];
 
-  async function commit() {
+  async function commit(overrideValue?: T) {
     if (savingRef.current) return;
-    const err = validate?.(draft) ?? null;
+    const v = overrideValue !== undefined ? overrideValue : draft;
+    const err = validate?.(v) ?? null;
     if (err) {
       setError(err);
       return;
@@ -61,7 +65,7 @@ export function EditableField<T>({
     setError(null);
     savingRef.current = true;
     try {
-      await onSave(draft);
+      await onSave(v);
       setActive(false);
     } catch {
       // status/toast handled by saveField

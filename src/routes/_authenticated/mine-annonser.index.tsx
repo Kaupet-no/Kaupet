@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { republishListing } from "@/lib/listings.functions";
 import { getMyActivePromotions } from "@/lib/promotions.functions";
 import { PromoteListingDialog } from "@/components/promote-listing-dialog";
+import { MarkSoldDialog } from "@/components/listing-detail/mark-sold-dialog";
 import { useIsDemo } from "@/hooks/use-is-demo";
 import { useIsNative } from "@/hooks/use-is-native";
 import { hapticImpact, hapticNotification } from "@/lib/haptics";
@@ -60,6 +61,7 @@ function MyListingsPage() {
     missingImages: boolean;
   } | null>(null);
   const [promoteId, setPromoteId] = useState<string | null>(null);
+  const [markSoldId, setMarkSoldId] = useState<string | null>(null);
   const { data: isDemo = false } = useIsDemo();
   const native = useIsNative();
 
@@ -298,7 +300,7 @@ function MyListingsPage() {
                       isDemo={isDemo}
                       activePromotion={activePromoByListing.get(r.id) ?? null}
                       onPromote={() => setPromoteId(r.id)}
-                      onMarkSold={() => updateStatus.mutate({ id: r.id, status: "sold" })}
+                      onMarkSold={() => setMarkSoldId(r.id)}
                       onReactivate={() => updateStatus.mutate({ id: r.id, status: "active" })}
                       onRepublish={() => republish.mutate(r.id)}
                       onPublishDraft={() => {
@@ -436,6 +438,14 @@ function MyListingsPage() {
             listingId={promoteId}
             open={!!promoteId}
             onOpenChange={(o) => !o && setPromoteId(null)}
+          />
+        )}
+
+        {markSoldId && (
+          <MarkSoldDialog
+            listingId={markSoldId}
+            open={!!markSoldId}
+            onOpenChange={(o) => !o && setMarkSoldId(null)}
           />
         )}
 

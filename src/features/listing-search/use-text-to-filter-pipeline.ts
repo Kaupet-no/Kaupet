@@ -63,9 +63,12 @@ export function useTextToFilterPipeline({
       rawSynonymMatches ? negateSynonymMatches(matchedQ, rawSynonymMatches) : rawSynonymMatches,
     [matchedQ, rawSynonymMatches],
   );
+  // Matched against the same debounced text as the synonym matcher (not the
+  // live qDraft) so a number isn't auto-stripped from the box mid-keystroke
+  // (e.g. "300" matching before the user finishes typing "3000").
   const numericMatches = useMemo(
-    () => parseNumericFilters(qDraft, attrFilters),
-    [qDraft, attrFilters],
+    () => parseNumericFilters(matchedQ, attrFilters),
+    [matchedQ, attrFilters],
   );
 
   useEffect(() => {

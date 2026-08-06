@@ -14,6 +14,7 @@ import type { MapListing } from "@/components/listings-map";
 import { ResultList } from "@/components/result-list";
 import { NativeFilterChips } from "@/components/native-filter-chips";
 import { AttributeFilterChips } from "@/components/attribute-filter-chips";
+import { FilterSidebar } from "@/components/filter-sidebar";
 import { NativeSearchOverlay } from "@/components/native-search-overlay";
 import { NativeAdvancedSearch } from "@/components/native-advanced-search";
 import { saveLastSearchContext } from "@/lib/last-search-context";
@@ -655,7 +656,10 @@ function BrowsePage() {
               hideCondition={isBilOgMc}
             />
           ) : (
-            <div className="flex flex-wrap items-center gap-2">
+            // Mobile web still uses the old popover-chip row until the
+            // bottom-sheet equivalent of FilterSidebar lands (next step) —
+            // the persistent sidebar below only shows at md: and up.
+            <div className="flex flex-wrap items-center gap-2 md:hidden">
               <AttributeFilterChips
                 filters={attrFilters}
                 values={attrValues}
@@ -722,111 +726,144 @@ function BrowsePage() {
           />
         )}
 
-        {/* ØK-tab — vises kun når søkkriterier gir treff */}
-        {hasSearchCriteria && wtbCount > 0 && (
-          <div className="mt-4 flex gap-2" role="tablist" aria-label="Annonsetype">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === "listings"}
-              onClick={() => setActiveTab("listings")}
-              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                activeTab === "listings"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80"
-              }`}
-            >
-              Til salgs
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === "wtb"}
-              onClick={() => setActiveTab("wtb")}
-              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                activeTab === "wtb"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80"
-              }`}
-            >
-              Ønskes kjøpt ({wtbCount})
-            </button>
-          </div>
-        )}
-
-        {activeTab === "wtb" ? (
-          <div className="mt-4">
-            {wtbLoading ? (
-              <div className="flex items-center justify-center py-16">
-                <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              </div>
-            ) : wtbListings.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border bg-surface p-12 text-center">
-                <p className="text-lg font-medium">Ingen ønskes kjøpt-annonser funnet</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Ingen etterspør dette akkurat nå. Prøv et bredere søk.
-                </p>
-              </div>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {wtbListings.map((w) => (
-                  <WtbListingCard key={w.id} listing={w} />
-                ))}
+        <div
+          className={
+            !isNative ? "md:grid md:grid-cols-[240px_1fr] md:items-start md:gap-8" : undefined
+          }
+        >
+          {!isNative && (
+            <div className="hidden md:block">
+              <FilterSidebar
+                filters={attrFilters}
+                values={attrValues}
+                onChange={handleAttrValueChange}
+                min={search.min}
+                max={search.max}
+                includeFree={search.includeFree ?? true}
+                onPriceChange={(mn, mx, free) =>
+                  updateSearch({ min: mn, max: mx, includeFree: free })
+                }
+                conditions={search.conditions ?? []}
+                onConditionsChange={(c) =>
+                  updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
+                }
+                hideCondition={isBilOgMc}
+              />
+            </div>
+          )}
+          <div>
+            {/* ØK-tab — vises kun når søkkriterier gir treff */}
+            {hasSearchCriteria && wtbCount > 0 && (
+              <div className="mt-4 flex gap-2" role="tablist" aria-label="Annonsetype">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "listings"}
+                  onClick={() => setActiveTab("listings")}
+                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                    activeTab === "listings"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  }`}
+                >
+                  Til salgs
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "wtb"}
+                  onClick={() => setActiveTab("wtb")}
+                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                    activeTab === "wtb"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  }`}
+                >
+                  Ønskes kjøpt ({wtbCount})
+                </button>
               </div>
             )}
+
+            {activeTab === "wtb" ? (
+              <div className="mt-4">
+                {wtbLoading ? (
+                  <div className="flex items-center justify-center py-16">
+                    <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  </div>
+                ) : wtbListings.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border bg-surface p-12 text-center">
+                    <p className="text-lg font-medium">Ingen ønskes kjøpt-annonser funnet</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Ingen etterspør dette akkurat nå. Prøv et bredere søk.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {wtbListings.map((w) => (
+                      <WtbListingCard key={w.id} listing={w} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <ResultList
+                isNative={isNative}
+                isDesktop={isDesktop}
+                q={search.q}
+                effectiveCategories={effectiveCategories}
+                cards={cards}
+                totalCount={totalCount}
+                isLoading={isLoading}
+                hasNextPage={!!hasNextPage}
+                isFetchingNextPage={isFetchingNextPage}
+                fetchNextPage={() => void fetchNextPage()}
+                resetFilters={resetFilters}
+                onClearCategoryFilter={
+                  effectiveCategories.length > 0
+                    ? () => updateSearch({ category: "", categories: [] })
+                    : undefined
+                }
+                onDropLastWord={(nextQ) => {
+                  setQDraft(nextQ);
+                  updateSearch({ q: nextQ });
+                }}
+                attrFilters={attrFilters}
+                attrValues={attrValues}
+                onRemoveAttr={(key) => removeAttrWithRestore(key)}
+                mapListings={mapListings}
+                mapCenter={mapCenter}
+                radiusKm={search.radius ?? 10}
+                onMapCenterChange={(c, label) =>
+                  updateSearch({ lat: c.lat, lng: c.lng, loc: label ?? "" })
+                }
+                onMapRadiusChange={(km) => updateSearch({ radius: km })}
+                onMapClearLocation={() =>
+                  updateSearch({
+                    lat: undefined,
+                    lng: undefined,
+                    radius: undefined,
+                    loc: undefined,
+                  })
+                }
+                sort={search.sort}
+                onSortChange={(s) => updateSearch({ sort: s })}
+                toolbarExtra={
+                  user ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSaveSearchOpen(true)}
+                      className="gap-1.5"
+                    >
+                      <Save className="size-4" /> Lagre søk
+                    </Button>
+                  ) : undefined
+                }
+              />
+            )}
           </div>
-        ) : (
-          <ResultList
-            isNative={isNative}
-            isDesktop={isDesktop}
-            q={search.q}
-            effectiveCategories={effectiveCategories}
-            cards={cards}
-            totalCount={totalCount}
-            isLoading={isLoading}
-            hasNextPage={!!hasNextPage}
-            isFetchingNextPage={isFetchingNextPage}
-            fetchNextPage={() => void fetchNextPage()}
-            resetFilters={resetFilters}
-            onClearCategoryFilter={
-              effectiveCategories.length > 0
-                ? () => updateSearch({ category: "", categories: [] })
-                : undefined
-            }
-            onDropLastWord={(nextQ) => {
-              setQDraft(nextQ);
-              updateSearch({ q: nextQ });
-            }}
-            attrFilters={attrFilters}
-            attrValues={attrValues}
-            onRemoveAttr={(key) => removeAttrWithRestore(key)}
-            mapListings={mapListings}
-            mapCenter={mapCenter}
-            radiusKm={search.radius ?? 10}
-            onMapCenterChange={(c, label) =>
-              updateSearch({ lat: c.lat, lng: c.lng, loc: label ?? "" })
-            }
-            onMapRadiusChange={(km) => updateSearch({ radius: km })}
-            onMapClearLocation={() =>
-              updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
-            }
-            sort={search.sort}
-            onSortChange={(s) => updateSearch({ sort: s })}
-            toolbarExtra={
-              user ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSaveSearchOpen(true)}
-                  className="gap-1.5"
-                >
-                  <Save className="size-4" /> Lagre søk
-                </Button>
-              ) : undefined
-            }
-          />
-        )}
+        </div>
 
         {/* Native full-screen search overlay */}
         {isNative && (

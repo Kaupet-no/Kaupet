@@ -57,6 +57,7 @@ export function CategoryFilterFields({
   values,
   onChange,
   brandLookupFilters,
+  counts,
 }: {
   filters: CategoryFilter[];
   values: Record<string, AttributeFilterValue>;
@@ -66,8 +67,16 @@ export function CategoryFilterFields({
    * a model field in isolation (e.g. its own chip popover on the search page),
    * so the models offered still follow the selected brand. */
   brandLookupFilters?: CategoryFilter[];
+  /** Facet result counts per filter key/value (e.g. `{ fuel_type: { diesel: 98 } }`),
+   * shown next to select/multiselect option labels when supplied. Omit to
+   * render without counts (e.g. the listing wizard, which has no result set). */
+  counts?: Record<string, Record<string, number>>;
 }) {
   const brandScope = brandLookupFilters ?? filters;
+  const countLabel = (key: string, value: string, label: string) => {
+    const c = counts?.[key]?.[value];
+    return c == null ? label : `${label} (${c})`;
+  };
   return (
     <>
       {filters.map((f) => {
@@ -176,7 +185,7 @@ export function CategoryFilterFields({
                   <SelectItem value="__all__">Alle</SelectItem>
                   {(f.options ?? []).map((o) => (
                     <SelectItem key={o.value} value={o.value}>
-                      {o.label_nb}
+                      {countLabel(f.key, o.value, o.label_nb)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -215,7 +224,7 @@ export function CategoryFilterFields({
                       checked={selected.includes(o.value)}
                       onCheckedChange={() => toggle(o.value)}
                     />
-                    {o.label_nb}
+                    {countLabel(f.key, o.value, o.label_nb)}
                   </label>
                 ))}
               </CollapsibleContent>

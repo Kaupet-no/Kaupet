@@ -9,6 +9,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useIsNative } from "@/hooks/use-is-native";
+import { ScrollArrowRow } from "@/components/scroll-arrow-row";
 import {
   Carousel,
   CarouselContent,
@@ -124,7 +125,7 @@ export function ImageGallery({
 
   const thumbnailStrip =
     totalSlides > 1 ? (
-      <div className="mt-10 flex gap-2 overflow-x-auto" role="list">
+      <ScrollArrowRow className="mt-10">
         {has360 && (
           <button
             type="button"
@@ -157,7 +158,7 @@ export function ImageGallery({
             </button>
           );
         })}
-      </div>
+      </ScrollArrowRow>
     ) : null;
 
   if (totalSlides > 0) {

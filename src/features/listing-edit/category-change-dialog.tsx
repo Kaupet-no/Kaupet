@@ -10,6 +10,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { CategoryPicker } from "@/components/category-picker";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
@@ -38,6 +48,7 @@ export function CategoryChangeDialog({
 }) {
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
+  const [pendingCategoryId, setPendingCategoryId] = useState<string | null>(null);
 
   const { data: isDemo = false } = useIsDemo();
   const { data: categories } = useQuery({
@@ -74,19 +85,23 @@ export function CategoryChangeDialog({
     return cur.id;
   }, [categories, currentCategoryId]);
 
-  async function handleSelect(newCategoryId: string) {
-    if (saving || newCategoryId === currentCategoryId) {
+  function handleSelect(newCategoryId: string) {
+    if (newCategoryId === currentCategoryId) {
       onOpenChange(false);
       return;
     }
+    setPendingCategoryId(newCategoryId);
+  }
+
+  async function confirmChange() {
+    const newCategoryId = pendingCategoryId;
+    if (saving || !newCategoryId) return;
     setSaving(true);
     try {
-      // Attributes are intentionally kept as-is here (server-side RLS still
-      // scopes writes to the owner) — a full filter-key validity check
-      // against the new category's `category_filters` would need the same
-      // registry used by the create wizard; kept minimal for now and safe
-      // because stale attribute keys not read by the new category's field
-      // groups are simply ignored, not exposed anywhere.
+      // Attributes are wiped, not carried over — a category's attributes are
+      // only meaningful against its own `category_filters`, and a full
+      // filter-key remap would need the same registry the create wizard
+      // uses. The confirmation dialog above tells the user this happens.
       await saveListingField(
         listingId,
         { group: "category", category_id: newCategoryId, attributes: {} },
@@ -94,6 +109,7 @@ export function CategoryChangeDialog({
       );
       await queryClient.invalidateQueries({ queryKey: ["listing", kaupetCode] });
       showSuccessToast("Kategori oppdatert");
+      setPendingCategoryId(null);
       onOpenChange(false);
     } catch (e) {
       showErrorToast(formatErrorMessage(e, "Kunne ikke oppdatere kategori"));
@@ -127,6 +143,31 @@ export function CategoryChangeDialog({
           inline
         />
       </DialogContent>
+
+      <AlertDialog
+        open={!!pendingCategoryId}
+        onOpenChange={(o) => !o && setPendingCategoryId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Bytte kategori?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Egenskaper som er fylt ut for gjeldende kategori (spesifikasjoner, utstyr o.l.) blir
+              slettet og kan ikke gjenopprettes. Dette kan ikke angres.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={saving}
+              onClick={() => void confirmChange()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Bytt kategori
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

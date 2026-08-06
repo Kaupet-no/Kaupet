@@ -175,13 +175,61 @@ describe("useDraftAutosave", () => {
     const setValue = vi.fn();
     const setSelectedParentId = vi.fn();
     const setLocationMethod = vi.fn();
+    const setAttributes = vi.fn();
 
-    act(() => result.current.restoreDraft({ setValue, setSelectedParentId, setLocationMethod }));
+    act(() =>
+      result.current.restoreDraft({
+        setValue,
+        setSelectedParentId,
+        setLocationMethod,
+        setAttributes,
+      }),
+    );
 
     expect(setValue).toHaveBeenCalledWith("title", "Restored title");
     expect(setValue).toHaveBeenCalledWith("postal_code", "0150");
     expect(setLocationMethod).toHaveBeenCalledWith("postal");
     expect(setValue).toHaveBeenCalledWith("category_id", "cat-1");
     expect(result.current.hasDraftData).toBeNull();
+  });
+
+  it("restoreDraft also restores saved attributes", () => {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        title: "Restored title",
+        attributes: { brand: "Volvo", year: 2020 },
+        saved_at: Date.now(),
+      }),
+    );
+    const { result } = renderHook(() => useDraftAutosave(baseFields));
+
+    const setValue = vi.fn();
+    const setSelectedParentId = vi.fn();
+    const setLocationMethod = vi.fn();
+    const setAttributes = vi.fn();
+
+    act(() =>
+      result.current.restoreDraft({
+        setValue,
+        setSelectedParentId,
+        setLocationMethod,
+        setAttributes,
+      }),
+    );
+
+    expect(setAttributes).toHaveBeenCalledWith({ brand: "Volvo", year: 2020 });
+  });
+
+  it("persists attributes into the localStorage draft", () => {
+    vi.useFakeTimers();
+    renderHook(() =>
+      useDraftAutosave({ ...baseFields, title: "En fin sykkel", attributes: { brand: "Trek" } }),
+    );
+
+    act(() => vi.advanceTimersByTime(2000));
+
+    const saved = JSON.parse(localStorage.getItem(DRAFT_KEY)!);
+    expect(saved.attributes).toEqual({ brand: "Trek" });
   });
 });

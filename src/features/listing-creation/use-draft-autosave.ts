@@ -34,6 +34,7 @@ type RestoreTarget = {
   setValue: (field: any, value: any) => void;
   setSelectedParentId: (id: string) => void;
   setLocationMethod: (method: "gps" | "postal" | null) => void;
+  setAttributes: (attributes: AttributeMap) => void;
 };
 
 /**
@@ -86,7 +87,11 @@ export function useDraftAutosave(fields: DraftFields) {
     }
   }, []);
 
-  // Autosave to localStorage on field changes
+  // Autosave to localStorage on field changes.
+  // ponytail: images (raw File objects) aren't included here — persisting
+  // them would need IndexedDB/Blob storage instead of localStorage's string
+  // API. Attributes (plain JSON) are the highest-value piece to recover
+  // since they hold the specs/equipment that take longest to fill in.
   useEffect(() => {
     const t = window.setTimeout(() => {
       try {
@@ -104,6 +109,7 @@ export function useDraftAutosave(fields: DraftFields) {
             price_nok: priceNok,
             postal_code: postalCode,
             city,
+            attributes,
             saved_at: Date.now(),
           }),
         );
@@ -125,6 +131,7 @@ export function useDraftAutosave(fields: DraftFields) {
     priceNok,
     postalCode,
     city,
+    attributes,
   ]);
 
   async function saveDraftToSupabase(): Promise<string | null> {
@@ -223,7 +230,7 @@ export function useDraftAutosave(fields: DraftFields) {
 
   function restoreDraft(target: RestoreTarget) {
     if (!hasDraftData) return;
-    const { setValue, setSelectedParentId, setLocationMethod } = target;
+    const { setValue, setSelectedParentId, setLocationMethod, setAttributes } = target;
     if (typeof hasDraftData.title === "string") setValue("title", hasDraftData.title);
     if (typeof hasDraftData.subtitle === "string") setValue("subtitle", hasDraftData.subtitle);
     if (typeof hasDraftData.description === "string")
@@ -246,6 +253,8 @@ export function useDraftAutosave(fields: DraftFields) {
       setSelectedParentId(hasDraftData.selectedParentId);
     if (typeof hasDraftData.category_id === "string")
       setValue("category_id", hasDraftData.category_id);
+    if (hasDraftData.attributes && typeof hasDraftData.attributes === "object")
+      setAttributes(hasDraftData.attributes as AttributeMap);
     setHasDraftData(null);
     showSuccessToast("Utkast gjenopprettet!");
   }

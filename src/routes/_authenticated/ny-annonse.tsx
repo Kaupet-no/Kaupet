@@ -473,7 +473,7 @@ function NewListingPage() {
   });
 
   function restoreDraft() {
-    restoreDraftFields({ setValue, setSelectedParentId, setLocationMethod });
+    restoreDraftFields({ setValue, setSelectedParentId, setLocationMethod, setAttributes });
   }
 
   // Pre-fill location from user's last listing (if no draft)

@@ -115,7 +115,7 @@ export function FilterSidebar({
       )}
 
       {primary.length > 0 && (
-        <Section title="Kjøretøyspesifikt" defaultOpen>
+        <Section title="Spesifikasjoner" defaultOpen>
           <CategoryFilterFields
             filters={primary}
             brandLookupFilters={filters}

@@ -2337,6 +2337,8 @@ export type Database = {
       popular_listings_by_category: {
         Args: { _category_ids: string[]; _limit?: number; _offset?: number }
         Returns: {
+          attributes: Json
+          category_slug: string
           city: string
           cover_path: string
           created_at: string
@@ -2354,6 +2356,8 @@ export type Database = {
       popular_listings_last_week: {
         Args: { _limit?: number }
         Returns: {
+          attributes: Json
+          category_slug: string
           city: string
           cover_path: string
           created_at: string

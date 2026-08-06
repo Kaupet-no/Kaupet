@@ -3,6 +3,7 @@ import { Eye, Gauge, ImageOff, MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 import { signListingImageUrls } from "@/lib/storage";
 import { formatPrice } from "@/lib/format";
+import { computeListingTotalPriceKr } from "@/lib/vehicle/vehicle-classification";
 import { FavoriteButton } from "@/components/favorite-button";
 import { useIsNative } from "@/hooks/use-is-native";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -21,7 +22,18 @@ export type ListingCardData = {
   views_last_week?: number;
   mileage_km?: number | null;
   engine_hours?: number | null;
+  category_slug?: string | null;
+  attributes?: Record<string, unknown> | null;
 };
+
+/** Vehicle listing cards show the price including omregistreringsavgift —
+ * same total as the listing detail page — not just what the seller set. */
+function displayPriceNok(listing: ListingCardData): number | null {
+  return (
+    computeListingTotalPriceKr(listing.category_slug, listing.price_nok, listing.attributes) ??
+    listing.price_nok
+  );
+}
 
 /** Usage metric under the title: kilometers for vehicles, engine hours for
  * boats — whichever the listing's attributes carry. */
@@ -95,6 +107,7 @@ export function ListingCard({
 }: Props) {
   const isNative = useIsNative();
   const [imgUrl, setImgUrl] = useState<string | null>(null);
+  const priceLabel = formatPrice({ price_nok: displayPriceNok(listing), is_free: listing.is_free });
 
   useEffect(() => {
     if (!listing.cover_path) return;
@@ -128,7 +141,7 @@ export function ListingCard({
           <ListingImage
             imgUrl={imgUrl}
             hasCoverPath={!!listing.cover_path}
-            alt={`${listing.title} — ${formatPrice(listing)}`}
+            alt={`${listing.title} — ${priceLabel}`}
             compact
           />
         </div>
@@ -138,7 +151,7 @@ export function ListingCard({
             <p className="line-clamp-1 text-xs text-muted-foreground">{listing.subtitle}</p>
           )}
           <div className="flex items-baseline justify-between gap-2">
-            <p className="font-display text-base font-semibold">{formatPrice(listing)}</p>
+            <p className="font-display text-base font-semibold">{priceLabel}</p>
             {typeof listing.mileage_km === "number" ? (
               <UsageLabel value={listing.mileage_km} unit="km" />
             ) : typeof listing.engine_hours === "number" ? (
@@ -165,7 +178,7 @@ export function ListingCard({
         <ListingImage
           imgUrl={imgUrl}
           hasCoverPath={!!listing.cover_path}
-          alt={`${listing.title} — ${formatPrice(listing)}`}
+          alt={`${listing.title} — ${priceLabel}`}
           compact={false}
         />
         <FavoriteButton listingId={listing.id} size="sm" className="absolute right-2 top-2" />
@@ -177,7 +190,7 @@ export function ListingCard({
         )}
         <div className="flex items-baseline justify-between gap-2">
           <p className={`font-display ${isNative ? "text-lg font-semibold" : "text-base"}`}>
-            {formatPrice(listing)}
+            {priceLabel}
           </p>
           {typeof listing.mileage_km === "number" ? (
             <UsageLabel value={listing.mileage_km} unit="km" />

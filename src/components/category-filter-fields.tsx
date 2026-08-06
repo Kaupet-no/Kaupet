@@ -112,6 +112,7 @@ export function CategoryFilterFields({
               onChange={(next) =>
                 onChange(f.key, next.length > 0 ? { kind: "multiselect", values: next } : undefined)
               }
+              counts={counts?.[f.key]}
             />
           );
         }

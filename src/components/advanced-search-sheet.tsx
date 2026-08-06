@@ -536,7 +536,7 @@ export function SaveSearchDialog({
             Varsle meg om nye treff
           </label>
           {hasNoFilters(criteria) && (
-            <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-800">
+            <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-900 dark:text-amber-200">
               Dette søket har ingen filtre og vil varsle deg om <strong>alle</strong> nye annonser
               på Kaupet.
             </p>

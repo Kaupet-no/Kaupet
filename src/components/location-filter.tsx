@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Locate, MapPin, Search as SearchIcon, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -9,19 +9,13 @@ import {
   getCurrentPosition,
   requestLocationPermission,
 } from "@/lib/native";
+import { useNominatimSearch, type NominatimResult } from "@/hooks/use-nominatim-search";
 
 export type LocationValue = {
   lat: number | null;
   lng: number | null;
   radius: number;
   label?: string;
-};
-
-type NominatimResult = {
-  place_id: number;
-  display_name: string;
-  lat: string;
-  lon: string;
 };
 
 type LocationPickerProps = {
@@ -35,10 +29,8 @@ type LocationPickerProps = {
 
 export function LocationPicker({ value, onChange, onDone, autoFocus = true }: LocationPickerProps) {
   const [query, setQuery] = useState(value.label ?? "");
-  const [results, setResults] = useState<NominatimResult[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { results, loading } = useNominatimSearch(query);
   const [locationPermission, setLocationPermission] = useState<"granted" | "denied" | null>(null);
-  const debounce = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     checkLocationPermission().then((status) => {
@@ -49,37 +41,6 @@ export function LocationPicker({ value, onChange, onDone, autoFocus = true }: Lo
   useEffect(() => {
     setQuery(value.label ?? "");
   }, [value.label]);
-
-  useEffect(() => {
-    if (!query || query.length < 2) {
-      setResults([]);
-      return;
-    }
-    window.clearTimeout(debounce.current);
-    debounce.current = window.setTimeout(async () => {
-      setLoading(true);
-      try {
-        const url = new URL("https://nominatim.openstreetmap.org/search");
-        url.searchParams.set("q", query);
-        url.searchParams.set("format", "json");
-        url.searchParams.set("countrycodes", "no");
-        url.searchParams.set("limit", "6");
-        url.searchParams.set("addressdetails", "0");
-        const res = await fetch(url.toString(), {
-          headers: { "Accept-Language": "nb" },
-        });
-        if (res.ok) {
-          const data: NominatimResult[] = await res.json();
-          setResults(data);
-        }
-      } catch {
-        // ignore
-      } finally {
-        setLoading(false);
-      }
-    }, 350);
-    return () => window.clearTimeout(debounce.current);
-  }, [query]);
 
   const pick = (r: NominatimResult) => {
     onChange({
@@ -119,7 +80,6 @@ export function LocationPicker({ value, onChange, onDone, autoFocus = true }: Lo
   const clear = () => {
     onChange({ lat: null, lng: null, radius: value.radius, label: "" });
     setQuery("");
-    setResults([]);
   };
 
   const hasLocation = value.lat != null && value.lng != null;

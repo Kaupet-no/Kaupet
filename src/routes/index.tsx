@@ -33,6 +33,7 @@ import { usePopularListings } from "@/features/landing/use-popular-listings";
 import { useLandingResultCount } from "@/features/landing/use-landing-result-count";
 import { useCategoryFeed, type CategoryFeedSort } from "@/features/landing/use-category-feed";
 import { useCategoryDrilldown } from "@/features/landing/use-category-drilldown";
+import { useFilterFacetCounts } from "@/features/listing-search/use-filter-facet-counts";
 
 const searchSchema = z.object({
   q: z.string().optional(),
@@ -135,6 +136,16 @@ function WebLanding() {
     goBack,
     jumpToDepth,
   } = useCategoryDrilldown({ childrenByParent, categoriesById, allFilters, navigate });
+
+  const { data: facetCounts } = useFilterFacetCounts({
+    filters: [...primaryFilters, ...secondaryFilters],
+    values: filterValues,
+    categoryIds: currentCategoryIds,
+    conditions: [],
+    min: priceMin,
+    max: priceMax,
+    includeFree: true,
+  });
 
   const resultCount = useLandingResultCount({
     categoryIds: currentCategoryIds,
@@ -547,6 +558,7 @@ function WebLanding() {
                                 onChange={(key, v) =>
                                   setFilterValues((prev) => setAttributeFilterValue(prev, key, v))
                                 }
+                                counts={facetCounts}
                               />
                             </div>
                             {secondaryFilters.length > 0 && (
@@ -568,6 +580,7 @@ function WebLanding() {
                                         setAttributeFilterValue(prev, key, v),
                                       )
                                     }
+                                    counts={facetCounts}
                                   />
                                 </CollapsibleContent>
                               </Collapsible>

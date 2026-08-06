@@ -135,7 +135,7 @@ export function ScrollArrowRow({ children, className, gapClassName = "gap-2" }: 
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
         onClickCapture={onClickCapture}
-        className={`flex flex-nowrap items-start overflow-x-auto scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+        className={`flex flex-nowrap items-start overflow-x-auto scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&_img]:pointer-events-none [&_img]:[-webkit-user-drag:none] ${
           isNative ? "" : "px-10"
         } ${dragging ? "cursor-grabbing select-none scroll-auto" : "cursor-grab"} ${gapClassName} ${className ?? ""}`}
       >

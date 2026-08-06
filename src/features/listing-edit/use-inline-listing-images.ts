@@ -29,9 +29,9 @@ type ListingImageRow = {
 };
 
 /**
- * Autosave variant of `useEditableListingImages` — each action (add/remove/
- * reorder/caption) writes immediately instead of collecting a batch for one
- * big save, mirroring `EditableField`'s per-action autosave for inline
+ * Each action (add/remove/reorder/caption) writes immediately instead of
+ * collecting a batch for one big save, mirroring `EditableField`'s
+ * per-action autosave for inline
  * listing editing.
  */
 export function useInlineListingImages(params: {

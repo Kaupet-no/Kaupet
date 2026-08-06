@@ -15,10 +15,9 @@ import { MapPin, Search as SearchIcon, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { signListingImageUrls } from "@/lib/storage";
+import { useNominatimSearch, type NominatimResult } from "@/hooks/use-nominatim-search";
 
 const EARTH_RADIUS_KM = 6371;
-
-type GeocodeResult = { place_id: number; display_name: string; lat: string; lon: string };
 
 const centerIcon = L.divIcon({
   className: "",
@@ -244,9 +243,7 @@ export function ListingsMap({
   const [isSliderInteracting, setIsSliderInteracting] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [locQuery, setLocQuery] = useState("");
-  const [locResults, setLocResults] = useState<GeocodeResult[]>([]);
-  const [locLoading, setLocLoading] = useState(false);
-  const locDebounce = useRef<number | undefined>(undefined);
+  const { results: locResults, loading: locLoading } = useNominatimSearch(locQuery);
 
   useEffect(() => {
     // Når et filter allerede er aktivt (eller brukeren har justert slideren
@@ -272,36 +269,9 @@ export function ListingsMap({
     if (previewRadiusKm !== radiusKm) onRadiusChange?.(previewRadiusKm);
   };
 
-  useEffect(() => {
-    if (locQuery.trim().length < 2) {
-      setLocResults([]);
-      return;
-    }
-    window.clearTimeout(locDebounce.current);
-    locDebounce.current = window.setTimeout(async () => {
-      setLocLoading(true);
-      try {
-        const url = new URL("https://nominatim.openstreetmap.org/search");
-        url.searchParams.set("q", locQuery);
-        url.searchParams.set("format", "json");
-        url.searchParams.set("countrycodes", "no");
-        url.searchParams.set("limit", "6");
-        url.searchParams.set("addressdetails", "0");
-        const res = await fetch(url.toString(), { headers: { "Accept-Language": "nb" } });
-        if (res.ok) setLocResults(await res.json());
-      } catch {
-        // ignore
-      } finally {
-        setLocLoading(false);
-      }
-    }, 350);
-    return () => window.clearTimeout(locDebounce.current);
-  }, [locQuery]);
-
-  const pickLocResult = (r: GeocodeResult) => {
+  const pickLocResult = (r: NominatimResult) => {
     commitCenter({ lat: parseFloat(r.lat), lng: parseFloat(r.lon) });
     setLocQuery("");
-    setLocResults([]);
   };
 
   return (

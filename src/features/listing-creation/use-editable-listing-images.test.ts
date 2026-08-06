@@ -15,6 +15,9 @@ vi.mock("@/lib/storage", () => ({
   describeImageError: (...args: unknown[]) => describeImageErrorMock(...args),
   signListingImageUrls: (...args: unknown[]) => signListingImageUrlsMock(...args),
 }));
+vi.mock("@/lib/image-compression", () => ({
+  compressImage: (file: File) => Promise.resolve(file),
+}));
 
 beforeEach(() => {
   validateImagesMock.mockReset().mockReturnValue(null);
@@ -60,11 +63,11 @@ describe("useEditableListingImages", () => {
     expect(signListingImageUrlsMock).toHaveBeenCalledTimes(1);
   });
 
-  it("addFiles appends valid files as new items and marks the set dirty", () => {
+  it("addFiles appends valid files as new items and marks the set dirty", async () => {
     const { result } = renderHook(() => useEditableListingImages(listing));
     const file = new File(["x"], "photo.jpg", { type: "image/jpeg" });
 
-    act(() => result.current.addFiles([file]));
+    await act(() => result.current.addFiles([file]));
 
     expect(result.current.items).toHaveLength(3);
     const added = result.current.items[2];
@@ -78,7 +81,7 @@ describe("useEditableListingImages", () => {
     const { result } = renderHook(() => useEditableListingImages(listing));
     const file = new File(["x"], "photo.jpg", { type: "image/jpeg" });
 
-    act(() => result.current.addFiles([file]));
+    await act(() => result.current.addFiles([file]));
 
     expect(result.current.items).toHaveLength(2);
     expect(describeImageErrorMock).toHaveBeenCalledWith("too_many");
@@ -95,10 +98,10 @@ describe("useEditableListingImages", () => {
     expect(result.current.imagesDirty).toBe(true);
   });
 
-  it("removeItem on a newly added image revokes its object URL instead of tracking it as removed", () => {
+  it("removeItem on a newly added image revokes its object URL instead of tracking it as removed", async () => {
     const { result } = renderHook(() => useEditableListingImages(listing));
     const file = new File(["x"], "photo.jpg", { type: "image/jpeg" });
-    act(() => result.current.addFiles([file]));
+    await act(() => result.current.addFiles([file]));
     const newKey = result.current.items[2].key;
 
     act(() => result.current.removeItem(newKey));

@@ -6,7 +6,7 @@
 
 import imageCompression from "browser-image-compression";
 
-export type CompressPreset = "avatar" | "listing" | "vehicle360";
+export type CompressPreset = "avatar" | "listing" | "listing-thumb" | "vehicle360";
 
 type PresetConfig = {
   maxWidthOrHeight: number;
@@ -17,10 +17,12 @@ type PresetConfig = {
 // Avatarer rendres lite (~80px) og kan komprimeres hardt. Annonsebilder trenger
 // høyere oppløsning, men kan fortsatt skaleres betraktelig ned fra originalen.
 // 360-frames vises kun små/animert i spin-visningen, aldri i full skjerm
-// enkeltvis — komprimeres derfor hardere enn galleribilder.
+// enkeltvis — komprimeres derfor hardere enn galleribilder. "listing-thumb"
+// er den lille varianten som vises på annonsekort i søk/favoritter/etc.
 const PRESETS: Record<CompressPreset, PresetConfig> = {
   avatar: { maxWidthOrHeight: 512, maxSizeMB: 0.15, initialQuality: 0.7 },
   listing: { maxWidthOrHeight: 1600, maxSizeMB: 0.6, initialQuality: 0.8 },
+  "listing-thumb": { maxWidthOrHeight: 480, maxSizeMB: 0.1, initialQuality: 0.75 },
   vehicle360: { maxWidthOrHeight: 1024, maxSizeMB: 0.3, initialQuality: 0.82 },
 };
 
@@ -95,7 +97,8 @@ async function drawWatermark(file: File): Promise<File> {
  * uendret — opplasting skal aldri brytes av komprimeringssteget.
  *
  * Annonsebilder (preset "listing"/"vehicle360") får i tillegg et lite
- * favicon-vannmerke nederst til høyre. Avatarer vannmerkes ikke.
+ * favicon-vannmerke nederst til høyre. Avatarer og kort-thumbnails
+ * ("listing-thumb") vannmerkes ikke.
  */
 export async function compressImage(file: File, preset: CompressPreset): Promise<File> {
   const cfg = PRESETS[preset];
@@ -119,6 +122,6 @@ export async function compressImage(file: File, preset: CompressPreset): Promise
     console.warn("Bildekomprimering feilet, laster opp original", err);
   }
 
-  if (preset === "avatar") return result;
+  if (preset === "avatar" || preset === "listing-thumb") return result;
   return drawWatermark(result);
 }

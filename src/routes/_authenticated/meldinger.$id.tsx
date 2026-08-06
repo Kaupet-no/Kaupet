@@ -560,6 +560,9 @@ function ConversationPage() {
 
         <div
           ref={scrollRef}
+          role="log"
+          aria-live="polite"
+          aria-relevant="additions"
           className="mt-3 flex-1 space-y-2 overflow-y-auto rounded-xl border border-border bg-surface p-4"
         >
           {messagesLoading ? (

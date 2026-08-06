@@ -1,5 +1,6 @@
 import { useEffect, useRef, lazy, Suspense } from "react";
 import { X } from "lucide-react";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 
 const ListingDetailMap = lazy(() =>
   import("@/components/listing-detail-map").then((m) => ({ default: m.ListingDetailMap })),
@@ -13,6 +14,9 @@ type Props = {
 
 export function MapOverlay({ lat, lng, onClose }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useFocusTrap(dialogRef, true);
 
   useEffect(() => {
     closeRef.current?.focus();
@@ -35,6 +39,7 @@ export function MapOverlay({ lat, lng, onClose }: Props) {
   return (
     // Clicking the semi-transparent backdrop closes the overlay
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label="Kart for annonse"

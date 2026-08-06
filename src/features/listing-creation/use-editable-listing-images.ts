@@ -1,10 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { showErrorToast } from "@/lib/toast";
 import { describeImageError, signListingImageUrls, validateImages } from "@/lib/storage";
+import { compressImage } from "@/lib/image-compression";
 
 export type EditorItem =
   | { kind: "existing"; key: string; storage_path: string; url?: string; caption?: string }
-  | { kind: "new"; key: string; file: File; previewUrl: string; caption?: string };
+  | {
+      kind: "new";
+      key: string;
+      file: File;
+      thumbFile: File;
+      previewUrl: string;
+      caption?: string;
+    };
 
 type EditableListing = {
   id: string;
@@ -60,16 +68,21 @@ export function useEditableListingImages(listing: EditableListing | undefined) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const addFiles = (files: File[]) => {
+  const addFiles = async (files: File[]) => {
     const err = validateImages(files);
     if (err) {
       showErrorToast(describeImageError(err));
       return;
     }
-    const next: EditorItem[] = files.map((file) => ({
+    const [compressed, thumbs] = await Promise.all([
+      Promise.all(files.map((file) => compressImage(file, "listing"))),
+      Promise.all(files.map((file) => compressImage(file, "listing-thumb"))),
+    ]);
+    const next: EditorItem[] = compressed.map((file, i) => ({
       kind: "new",
       key: crypto.randomUUID(),
       file,
+      thumbFile: thumbs[i],
       previewUrl: URL.createObjectURL(file),
     }));
     setItems((curr) => [...curr, ...next]);

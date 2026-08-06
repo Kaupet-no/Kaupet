@@ -26,6 +26,7 @@ import { initUniversalLinkNavigation } from "@/lib/native";
 import { useIsNative } from "@/hooks/use-is-native";
 import { useKeyboardVisible } from "@/hooks/use-keyboard-visible";
 import { AppBottomNav } from "@/components/app-bottom-nav";
+import { FeedbackTag } from "@/components/feedback-tag";
 import { TestEnvBanner } from "@/components/test-env-banner";
 import { TestEnvGate } from "@/components/test-env-gate";
 import { useIsTestEnv } from "@/lib/env";
@@ -342,6 +343,7 @@ function RootBody({ native }: { native: boolean }) {
         </footer>
       )}
       {native && !keyboardVisible && <AppBottomNav />}
+      <FeedbackTag />
     </div>
   );
 

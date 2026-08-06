@@ -8,6 +8,11 @@ import { ImageGallery } from "@/components/listing-detail/image-gallery";
 import { type Vehicle360Frame } from "@/components/listing-detail/vehicle/vehicle-360-viewer";
 import { VehicleEquipmentList } from "@/components/listing-detail/vehicle/vehicle-equipment-list";
 import { VehicleInfoGrid } from "@/components/listing-detail/vehicle/vehicle-info-grid";
+import {
+  BoatExtraInfo,
+  BoatInfoGrid,
+  isBoatAttributes,
+} from "@/components/listing-detail/boat/boat-info-grid";
 import { RegistrationPlate } from "@/components/listing-detail/vehicle/registration-plate";
 import { VehicleTechTable } from "@/components/listing-detail/vehicle/vehicle-tech-table";
 import { LoanCalculator } from "@/components/listing-detail/vehicle/loan-calculator";
@@ -37,7 +42,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -365,6 +369,7 @@ export function ListingDetailView({
       driveType={driveType}
       avgiftNote={avgiftNote}
       totalPriceKr={totalPriceKr}
+      isNative={isNative}
     >
       {children}
     </ListingDetailViewBody>
@@ -436,6 +441,7 @@ function ListingDetailViewBody({
   driveType,
   avgiftNote,
   totalPriceKr,
+  isNative,
   children,
 }: {
   title: string;
@@ -486,11 +492,19 @@ function ListingDetailViewBody({
   driveType: string | null;
   avgiftNote: string | null;
   totalPriceKr: number | null;
+  isNative: boolean;
   children?: ReactNode;
 }) {
   const editCtx = useListingEdit();
   const [locationPickerOpen, setLocationPickerOpen] = useState(false);
   const [pendingCoords, setPendingCoords] = useState<{ lat: number; lng: number } | null>(null);
+  // Native app requests a distinct layout for Bil og MC and Båter listings:
+  // seller info promoted up under the spec grid instead of the bottom of
+  // the sidebar (which native stacks below all main content). The plate
+  // itself only ever renders for vehicle listings — boats have no plate.
+  const isBoatListing = !isVehicleListing && isBoatAttributes(attributes);
+  const nativeSpecLayout = isNative && (isVehicleListing || isBoatListing);
+  const nativePlateUnderTitle = isNative && isVehicleListing;
 
   return (
     <div className={`mx-auto max-w-6xl px-4 py-8 ${showStickyContact ? "pb-28 md:pb-8" : ""}`}>
@@ -579,7 +593,7 @@ function ListingDetailViewBody({
                     <Input
                       value={v}
                       onChange={(e) => onChange(e.target.value)}
-                      onBlur={onCommit}
+                      onBlur={() => onCommit()}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") onCommit();
                         if (e.key === "Escape") onCancel();
@@ -594,7 +608,7 @@ function ListingDetailViewBody({
                   }}
                 />
               )}
-              {isVehicleListing && vehicleLookup?.registrationNumber && (
+              {isVehicleListing && !nativePlateUnderTitle && vehicleLookup?.registrationNumber && (
                 <RegistrationPlate
                   value={vehicleLookup.registrationNumber}
                   className="h-7 shrink-0"
@@ -603,6 +617,16 @@ function ListingDetailViewBody({
                 />
               )}
             </div>
+            {nativePlateUnderTitle && vehicleLookup?.registrationNumber && (
+              <div className="mt-2">
+                <RegistrationPlate
+                  value={vehicleLookup.registrationNumber}
+                  className="h-7"
+                  editable={!!editCtx?.editMode}
+                  onEdit={() => editCtx?.openVehicleLookupModal()}
+                />
+              </div>
+            )}
             <EditableField
               fieldKey="subtitle"
               value={subtitle ?? ""}
@@ -619,7 +643,7 @@ function ListingDetailViewBody({
                 <Input
                   value={v}
                   onChange={(e) => onChange(e.target.value)}
-                  onBlur={onCommit}
+                  onBlur={() => onCommit()}
                   placeholder="Undertittel (valgfritt)"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") onCommit();
@@ -639,7 +663,7 @@ function ListingDetailViewBody({
       </header>
 
       <div className="mt-6 grid gap-8 md:grid-cols-[1.4fr_1fr]">
-        <div>
+        <div className="min-w-0">
           <div className="mb-8">
             <ImageGallery
               images={sortedImages}
@@ -694,6 +718,24 @@ function ListingDetailViewBody({
             />
           )}
 
+          {isBoatListing &&
+            (categoryId ? (
+              <EditableRegion
+                render={() => <BoatInfoGrid attributes={attributes} />}
+                panel={({ close }) => (
+                  <GenericAttributesPanel
+                    categoryId={categoryId}
+                    attributes={attributes}
+                    onClose={close}
+                  />
+                )}
+              />
+            ) : (
+              <BoatInfoGrid attributes={attributes} />
+            ))}
+
+          {nativeSpecLayout && sellerContactSlot && <div className="mt-6">{sellerContactSlot}</div>}
+
           <EditableField
             fieldKey="description"
             value={description}
@@ -713,7 +755,7 @@ function ListingDetailViewBody({
                   rows={6}
                   value={v}
                   onChange={(e) => onChange(e.target.value)}
-                  onBlur={onCommit}
+                  onBlur={() => onCommit()}
                   onKeyDown={(e) => {
                     if (e.key === "Escape") onCancel();
                   }}
@@ -726,6 +768,23 @@ function ListingDetailViewBody({
               await editCtx?.saveField({ group: "description", description: v.trim() });
             }}
           />
+
+          {!isVehicleListing &&
+            isBoatAttributes(attributes) &&
+            (categoryId ? (
+              <EditableRegion
+                render={() => <BoatExtraInfo attributes={attributes} />}
+                panel={({ close }) => (
+                  <GenericAttributesPanel
+                    categoryId={categoryId}
+                    attributes={attributes}
+                    onClose={close}
+                  />
+                )}
+              />
+            ) : (
+              <BoatExtraInfo attributes={attributes} />
+            ))}
 
           {isVehicleListing && (
             <EditableRegion
@@ -783,24 +842,31 @@ function ListingDetailViewBody({
             />
           )}
 
-          {!isVehicleListing && editCtx?.editMode && categoryId && (
-            <EditableRegion
-              className="mt-8"
-              render={() => (
-                <section className="mt-8">
-                  <h2 className="font-display text-xl">Egenskaper</h2>
-                  <p className="mt-2 text-sm text-muted-foreground">Klikk for å redigere</p>
-                </section>
-              )}
-              panel={({ close }) => (
-                <GenericAttributesPanel
-                  categoryId={categoryId}
-                  attributes={attributes}
-                  onClose={close}
-                />
-              )}
-            />
-          )}
+          {/* Boat attributes already have a direct edit entry point via the
+              BoatInfoGrid/BoatExtraInfo regions above — this fallback only
+              covers non-vehicle, non-boat categories with no dedicated
+              display component of their own. */}
+          {!isVehicleListing &&
+            !isBoatAttributes(attributes) &&
+            editCtx?.editMode &&
+            categoryId && (
+              <EditableRegion
+                className="mt-8"
+                render={() => (
+                  <section className="mt-8">
+                    <h2 className="font-display text-xl">Egenskaper</h2>
+                    <p className="mt-2 text-sm text-muted-foreground">Klikk for å redigere</p>
+                  </section>
+                )}
+                panel={({ close }) => (
+                  <GenericAttributesPanel
+                    categoryId={categoryId}
+                    attributes={attributes}
+                    onClose={close}
+                  />
+                )}
+              />
+            )}
         </div>
 
         <aside className="@container space-y-5">
@@ -860,6 +926,7 @@ function ListingDetailViewBody({
                           value={v ?? undefined}
                           onValueChange={(next) => {
                             onChange(next);
+                            onCommit(next);
                           }}
                         >
                           <SelectTrigger className="mt-1 h-8">
@@ -873,14 +940,6 @@ function ListingDetailViewBody({
                             ))}
                           </SelectContent>
                         </Select>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="mt-1 h-7"
-                          onClick={onCommit}
-                        >
-                          Lagre
-                        </Button>
                       </div>
                     )}
                     onSave={async (v) => {
@@ -929,7 +988,11 @@ function ListingDetailViewBody({
                         <dt className="text-muted-foreground">Levering</dt>
                         <Select
                           value={v === true ? "ship" : v === false ? "pickup" : undefined}
-                          onValueChange={(next) => onChange(next !== "pickup")}
+                          onValueChange={(next) => {
+                            const nextValue = next !== "pickup";
+                            onChange(nextValue);
+                            onCommit(nextValue);
+                          }}
                         >
                           <SelectTrigger className="mt-1 h-8">
                             <SelectValue placeholder="Velg" />
@@ -939,14 +1002,6 @@ function ListingDetailViewBody({
                             <SelectItem value="ship">Frakt</SelectItem>
                           </SelectContent>
                         </Select>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="mt-1 h-7"
-                          onClick={onCommit}
-                        >
-                          Lagre
-                        </Button>
                       </div>
                     )}
                     onSave={async (v) => {
@@ -977,7 +1032,7 @@ function ListingDetailViewBody({
           )}
 
           {ownerStatsSlot}
-          {sellerContactSlot}
+          {!nativeSpecLayout && sellerContactSlot}
         </aside>
       </div>
 

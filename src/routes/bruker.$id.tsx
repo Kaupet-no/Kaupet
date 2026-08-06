@@ -87,7 +87,7 @@ function PublicProfilePage() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, subtitle, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order), attributes",
+          "id, kaupet_code, title, subtitle, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order), attributes, categories(slug)",
         )
         .eq("seller_id", id)
         .eq("status", "active")
@@ -106,6 +106,7 @@ function PublicProfilePage() {
         created_at: string;
         listing_images: ListingImage[] | null;
         attributes: Json;
+        categories: { slug: string } | { slug: string }[] | null;
       };
       return (data ?? []).map((l: ListingRow) => {
         const imgs = (l.listing_images ?? [])
@@ -113,6 +114,7 @@ function PublicProfilePage() {
           .sort((a: ListingImage, b: ListingImage) => a.sort_order - b.sort_order);
         const attrs = l.attributes as Record<string, unknown> | null;
         const mileageRaw = attrs?.mileage_km;
+        const category = Array.isArray(l.categories) ? l.categories[0] : l.categories;
         return {
           id: l.id,
           kaupet_code: l.kaupet_code,
@@ -124,6 +126,8 @@ function PublicProfilePage() {
           created_at: l.created_at,
           cover_path: imgs[0]?.storage_path ?? null,
           mileage_km: typeof mileageRaw === "number" ? mileageRaw : null,
+          category_slug: category?.slug ?? null,
+          attributes: attrs,
         };
       });
     },

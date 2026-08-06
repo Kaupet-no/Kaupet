@@ -9,6 +9,7 @@ import { resolveTextToFilters } from "@/features/listing-search/resolve-text-to-
 import { encodeAttrFilters } from "@/features/listing-search/search-schema";
 import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
 import type { CategoryFilter } from "@/lib/category-filters";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 
 const HISTORY_KEY = "kaupet_recent_searches_v1";
 const MAX_HISTORY = 5;
@@ -50,8 +51,11 @@ export function NativeSearchOverlay({
   const [history, setHistory] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { data: vehicleBrands } = useAllVehicleBrands();
+
+  useFocusTrap(dialogRef, open);
 
   useEffect(() => {
     if (open) {
@@ -109,7 +113,13 @@ export function NativeSearchOverlay({
   if (!open) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex flex-col bg-background animate-in slide-in-from-bottom-4 duration-200">
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Søk"
+      className="fixed inset-0 z-[9999] flex flex-col bg-background animate-in slide-in-from-bottom-4 duration-200"
+    >
       {/* Header */}
       <div className="flex items-center gap-2 border-b border-border px-4 pt-safe pb-2">
         <button

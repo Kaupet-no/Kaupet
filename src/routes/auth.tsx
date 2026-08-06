@@ -43,12 +43,19 @@ const emailField = z
 const signInSchema = z.object({
   displayName: z.string().optional(),
   email: emailField,
-  password: z.string().min(6, "Passordet må være minst 6 tegn"),
+  // Only checks presence here — the account may have been created back when
+  // a shorter password was allowed, so this must never reject a legitimate
+  // existing password. Actual correctness is checked server-side.
+  password: z.string().min(1, "Skriv inn passordet ditt"),
   acceptedTerms: z.boolean().optional(),
 });
 
 const signUpSchema = signInSchema.extend({
   displayName: z.string().trim().max(50, "Maks 50 tegn").optional().or(z.literal("")),
+  // Matches the minimum enforced when changing password in Kontoinnstillinger
+  // (see account-section.tsx) — keeping both in sync avoids a signup letting
+  // through a password that account settings would later reject.
+  password: z.string().min(8, "Minst 8 tegn"),
   acceptedTerms: z.boolean().refine((v) => v === true, {
     message: "Du må godta brukervilkårene og personvernerklæringen for å opprette konto.",
   }),

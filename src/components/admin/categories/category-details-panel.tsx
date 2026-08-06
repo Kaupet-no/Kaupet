@@ -68,6 +68,7 @@ export function CategoryDetailsPanel({
   const [searchExamples, setSearchExamples] = useState<string>(
     (category?.search_examples ?? []).join("\n"),
   );
+  const [titleExample, setTitleExample] = useState<string>(category?.title_example ?? "");
   const [isHidden, setIsHidden] = useState(category?.is_hidden ?? false);
 
   const save = useMutation({
@@ -85,6 +86,7 @@ export function CategoryDetailsPanel({
           .split("\n")
           .map((w) => w.trim())
           .filter(Boolean),
+        title_example: titleExample.trim() || null,
         is_hidden: isHidden,
       };
       if (category) {
@@ -93,7 +95,7 @@ export function CategoryDetailsPanel({
           .update(payload)
           .eq("id", category.id)
           .select(
-            "id, name_nb, slug, parent_id, sort_order, icon, color, heading_font, search_examples, is_hidden",
+            "id, name_nb, slug, parent_id, sort_order, icon, color, heading_font, search_examples, title_example, is_hidden",
           )
           .single();
         if (error) throw error;
@@ -111,7 +113,7 @@ export function CategoryDetailsPanel({
           .from("categories")
           .insert({ ...payload, sort_order: siblingMaxSortOrder + 10 })
           .select(
-            "id, name_nb, slug, parent_id, sort_order, icon, color, heading_font, search_examples, is_hidden",
+            "id, name_nb, slug, parent_id, sort_order, icon, color, heading_font, search_examples, title_example, is_hidden",
           )
           .single();
         if (error) throw error;
@@ -317,6 +319,20 @@ export function CategoryDetailsPanel({
           <p className="text-xs text-muted-foreground">
             Ett ord/uttrykk per linje. Rulleres i søkefeltets typewriter-animasjon på landingssiden
             når kategorien er valgt. Tom liste faller tilbake til underkategorinavn.
+          </p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="title-example">Tittel-eksempel</Label>
+          <Input
+            id="title-example"
+            value={titleExample}
+            onChange={(e) => setTitleExample(e.target.value)}
+            maxLength={120}
+            placeholder="Levis Ribcage Straight Blå Jeans"
+          />
+          <p className="text-xs text-muted-foreground">
+            Vises som «F.eks. …»-eksempel i tittelfeltet ved annonseopprettelse for denne kategorien
+            og underkategoriene uten eget eksempel. Tom faller tilbake til overordnet kategori.
           </p>
         </div>
         <div className="space-y-2">

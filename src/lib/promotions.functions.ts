@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isTestHost } from "@/lib/env";
 import { logServerError } from "@/lib/server-error-log";
+import { computeListingTotalPriceKr } from "@/lib/vehicle/vehicle-classification";
 
 export const getPromotionPricing = createServerFn({ method: "GET" }).handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -337,19 +338,25 @@ export const getFeaturedListings = createServerFn({ method: "GET" })
     const { data: listings, error } = await supabaseAdmin
       .from("listings")
       .select(
-        "id, kaupet_code, title, subtitle, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order)",
+        "id, kaupet_code, title, subtitle, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order), attributes, categories(slug)",
       )
       .in("id", ids)
       .eq("status", "active");
     if (error) throw error;
     return (listings ?? []).map((l) => {
       const imgs = (l.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
+      const category = Array.isArray(l.categories) ? l.categories[0] : l.categories;
+      const totalPriceKr = computeListingTotalPriceKr(
+        category?.slug ?? null,
+        l.price_nok,
+        l.attributes as Record<string, unknown> | null,
+      );
       return {
         id: l.id,
         kaupet_code: l.kaupet_code,
         title: l.title,
         subtitle: l.subtitle,
-        price_nok: l.price_nok,
+        price_nok: totalPriceKr ?? l.price_nok,
         is_free: l.is_free,
         city: l.city,
         created_at: l.created_at,

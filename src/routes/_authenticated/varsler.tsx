@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useIsNative } from "@/hooks/use-is-native";
 import { useState } from "react";
-import { CheckCheck, TrendingDown, X } from "lucide-react";
+import { CheckCheck, ShoppingBag, TrendingDown, X } from "lucide-react";
 
 import { NativePageHeader } from "@/components/native-page-header";
 import { formatDistanceToNow } from "date-fns";
@@ -24,6 +24,13 @@ import {
   type SavedSearchNotification,
   type PriceDropNotification,
 } from "@/lib/saved-searches";
+import {
+  listWtbMatchNotifications,
+  markAllWtbMatchNotificationsRead,
+  markWtbMatchNotificationRead,
+  deleteWtbMatchNotification,
+  type WtbMatchNotification,
+} from "@/lib/wtb-listings.functions";
 
 export const Route = createFileRoute("/_authenticated/varsler")({
   head: () => ({ meta: [{ title: "Mine varsler — Kaupet.no" }] }),
@@ -43,7 +50,13 @@ type PriceDropItem = PriceDropNotification & {
   listing_title: string | null;
   listing_code: string | null;
 };
-type Item = SearchItem | PriceDropItem;
+type WtbMatchItem = WtbMatchNotification & {
+  kind: "wtb_match";
+  listing_title: string | null;
+  listing_code: string | null;
+  wtb_title: string | null;
+};
+type Item = SearchItem | PriceDropItem | WtbMatchItem;
 
 function formatKr(n: number) {
   return new Intl.NumberFormat("nb-NO").format(n) + " kr";
@@ -59,24 +72,34 @@ function VarslerPage() {
     queryKey: ["notifications-history", user?.id, pageSize],
     enabled: !!user,
     queryFn: async (): Promise<{ items: Item[]; hasMore: boolean }> => {
-      const [notifs, drops] = await Promise.all([
+      const [notifs, drops, wtbMatches] = await Promise.all([
         listNotifications(pageSize, 0),
         listPriceDrops(pageSize, 0),
+        listWtbMatchNotifications(pageSize, 0),
       ]);
       const listingIds = Array.from(
-        new Set([...notifs.map((n) => n.listing_id), ...drops.map((d) => d.listing_id)]),
+        new Set([
+          ...notifs.map((n) => n.listing_id),
+          ...drops.map((d) => d.listing_id),
+          ...wtbMatches.map((m) => m.listing_id),
+        ]),
       );
       const searchIds = Array.from(new Set(notifs.map((n) => n.saved_search_id)));
-      const [listingsRes, searchesRes] = await Promise.all([
+      const wtbListingIds = Array.from(new Set(wtbMatches.map((m) => m.wtb_listing_id)));
+      const [listingsRes, searchesRes, wtbListingsRes] = await Promise.all([
         listingIds.length
           ? supabase.from("listings").select("id, title, kaupet_code").in("id", listingIds)
           : Promise.resolve({ data: [] as { id: string; title: string; kaupet_code: string }[] }),
         searchIds.length
           ? supabase.from("saved_searches").select("id, name").in("id", searchIds)
           : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+        wtbListingIds.length
+          ? supabase.from("wtb_listings").select("id, title").in("id", wtbListingIds)
+          : Promise.resolve({ data: [] as { id: string; title: string }[] }),
       ]);
       const listingMap = new Map((listingsRes.data ?? []).map((l) => [l.id, l]));
       const searchMap = new Map((searchesRes.data ?? []).map((s) => [s.id, s.name]));
+      const wtbListingMap = new Map((wtbListingsRes.data ?? []).map((w) => [w.id, w.title]));
 
       const searchItems: SearchItem[] = notifs.map((n) => ({
         ...n,
@@ -91,11 +114,22 @@ function VarslerPage() {
         listing_title: listingMap.get(d.listing_id)?.title ?? null,
         listing_code: listingMap.get(d.listing_id)?.kaupet_code ?? null,
       }));
+      const wtbMatchItems: WtbMatchItem[] = wtbMatches.map((m) => ({
+        ...m,
+        kind: "wtb_match",
+        listing_title: listingMap.get(m.listing_id)?.title ?? null,
+        listing_code: listingMap.get(m.listing_id)?.kaupet_code ?? null,
+        wtb_title: wtbListingMap.get(m.wtb_listing_id) ?? null,
+      }));
 
-      const items = [...searchItems, ...dropItems].sort(
+      const items = [...searchItems, ...dropItems, ...wtbMatchItems].sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       );
-      return { items, hasMore: notifs.length === pageSize || drops.length === pageSize };
+      return {
+        items,
+        hasMore:
+          notifs.length === pageSize || drops.length === pageSize || wtbMatches.length === pageSize,
+      };
     },
   });
 
@@ -105,7 +139,11 @@ function VarslerPage() {
   const unread = items.filter((n) => !n.read_at).length;
 
   const handleMarkAllRead = async () => {
-    await Promise.all([markAllNotificationsRead(), markAllPriceDropsRead()]);
+    await Promise.all([
+      markAllNotificationsRead(),
+      markAllPriceDropsRead(),
+      markAllWtbMatchNotificationsRead(),
+    ]);
     qc.invalidateQueries({ queryKey: ["notifications-history"] });
     qc.invalidateQueries({ queryKey: ["notifications"] });
     qc.invalidateQueries({ queryKey: ["saved-search-unread-counts"] });
@@ -114,7 +152,8 @@ function VarslerPage() {
   const handleClick = async (n: Item) => {
     if (n.read_at) return;
     if (n.kind === "search") await markNotificationRead(n.id);
-    else await markPriceDropRead(n.id);
+    else if (n.kind === "price_drop") await markPriceDropRead(n.id);
+    else await markWtbMatchNotificationRead(n.id);
     qc.invalidateQueries({ queryKey: ["notifications-history"] });
     qc.invalidateQueries({ queryKey: ["notifications"] });
     qc.invalidateQueries({ queryKey: ["saved-search-unread-counts"] });
@@ -122,7 +161,8 @@ function VarslerPage() {
 
   const handleDelete = async (n: Item) => {
     if (n.kind === "search") await deleteNotification(n.id);
-    else await deletePriceDrop(n.id);
+    else if (n.kind === "price_drop") await deletePriceDrop(n.id);
+    else await deleteWtbMatchNotification(n.id);
     qc.invalidateQueries({ queryKey: ["notifications-history"] });
     qc.invalidateQueries({ queryKey: ["notifications"] });
     qc.invalidateQueries({ queryKey: ["saved-search-unread-counts"] });
@@ -188,12 +228,17 @@ function VarslerPage() {
                           {n.kind === "price_drop" && (
                             <TrendingDown className="mr-1 inline size-3.5 text-accent" />
                           )}
+                          {n.kind === "wtb_match" && (
+                            <ShoppingBag className="mr-1 inline size-3.5 text-accent" />
+                          )}
                           {n.listing_title ??
                             (n.kind === "price_drop" ? "Favoritten din" : "Ny annonse")}
                         </p>
                         <p className="line-clamp-1 text-xs text-muted-foreground">
                           {n.kind === "search" ? (
                             <>Treff i "{n.search_name ?? "Lagret søk"}"</>
+                          ) : n.kind === "wtb_match" ? (
+                            <>Treff på "{n.wtb_title ?? "Ønskes kjøpt"}"</>
                           ) : (
                             <>
                               Prisfall −{Number(n.drop_pct).toFixed(0)} % ·{" "}

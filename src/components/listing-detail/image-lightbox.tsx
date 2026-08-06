@@ -5,6 +5,7 @@ import {
   Vehicle360Viewer,
   type Vehicle360Frame,
 } from "@/components/listing-detail/vehicle/vehicle-360-viewer";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 
 type ListingImage = { storage_path: string; sort_order: number; caption?: string | null };
 
@@ -28,12 +29,15 @@ export function ImageLightbox({
   vehicle360,
 }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [emblaRef, emblaApi] = useEmblaCarousel({ startIndex: initialIndex, loop: true });
 
   const has360 = !!vehicle360 && vehicle360.frames.length > 0;
   const offset = has360 ? 1 : 0;
   const totalSlides = images.length + offset;
+
+  useFocusTrap(dialogRef, true);
 
   useEffect(() => {
     closeRef.current?.focus();
@@ -82,6 +86,7 @@ export function ImageLightbox({
   return (
     // Clicking the backdrop (anywhere that isn't a button or thumbnail) closes the lightbox
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label={`Bildegalleri for ${title}`}

@@ -105,7 +105,14 @@ describe("useEditListingHints", () => {
       timeout: 3000,
     });
     expect(matchWtbListingsForListingMock).toHaveBeenCalledWith({
-      data: { title: "Sof", category_id: "cat-1" },
+      data: {
+        title: "Sof",
+        description: "",
+        category_id: "cat-1",
+        price_nok: null,
+        is_free: false,
+        attributes: {},
+      },
     });
   });
 });

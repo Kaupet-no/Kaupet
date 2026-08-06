@@ -100,6 +100,27 @@ export async function deletePreviousAvatarImage(previousPublicUrl: string | null
 
 const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
 
+let pendingBatch: { paths: Set<string>; promise: Promise<void> } | null = null;
+
+async function flushSignedUrlBatch(expiresInSeconds: number) {
+  const batch = pendingBatch;
+  pendingBatch = null;
+  if (!batch) return;
+  const now = Date.now();
+  const { data, error } = await supabase.storage
+    .from(LISTING_BUCKET)
+    .createSignedUrls(Array.from(batch.paths), expiresInSeconds);
+  if (error) throw error;
+  for (const item of data ?? []) {
+    if (item.signedUrl && item.path) {
+      signedUrlCache.set(item.path, {
+        url: item.signedUrl,
+        expiresAt: now + expiresInSeconds * 1000,
+      });
+    }
+  }
+}
+
 export async function signListingImageUrls(
   paths: string[],
   expiresInSeconds = 60 * 60,
@@ -116,18 +137,20 @@ export async function signListingImageUrls(
     }
   }
   if (need.length > 0) {
-    const { data, error } = await supabase.storage
-      .from(LISTING_BUCKET)
-      .createSignedUrls(need, expiresInSeconds);
-    if (error) throw error;
-    for (const item of data ?? []) {
-      if (item.signedUrl && item.path) {
-        signedUrlCache.set(item.path, {
-          url: item.signedUrl,
-          expiresAt: now + expiresInSeconds * 1000,
-        });
-        result[item.path] = item.signedUrl;
-      }
+    // Batches every call made within the same tick (e.g. one per
+    // ListingCard on a results grid, each firing its own effect on mount)
+    // into a single createSignedUrls request instead of one per caller.
+    if (!pendingBatch) {
+      pendingBatch = {
+        paths: new Set(),
+        promise: Promise.resolve().then(() => flushSignedUrlBatch(expiresInSeconds)),
+      };
+    }
+    for (const p of need) pendingBatch.paths.add(p);
+    await pendingBatch.promise;
+    for (const p of need) {
+      const cached = signedUrlCache.get(p);
+      if (cached) result[p] = cached.url;
     }
   }
   return result;

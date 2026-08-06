@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Search as SearchIcon, ListPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,17 +9,19 @@ import { ModeToggle } from "@/components/search-term-mode-toggle";
 import { TermGroupEditor } from "@/components/term-group-editor";
 import { describeTermGroup, type TermGroup } from "@/lib/term-groups";
 import { useSearchSuggestions } from "@/features/listing-search/use-search-suggestions";
+import { useDefaultSearchExamples } from "@/hooks/use-default-search-examples";
 
-/** Rotates through the input's placeholder while it's empty and unfocused, to
- * teach newcomers that the search box understands more than plain keywords
- * (exclusion, price, condition) without needing a separate onboarding step. */
-const PLACEHOLDER_EXAMPLES = [
-  "Hva leter du etter?",
+/** Teaches newcomers that the search box understands more than plain
+ * keywords (exclusion, price, condition) — kept as fixed syntax examples
+ * since they demonstrate query operators, not searchable vocabulary, so
+ * they don't belong in the admin-editable `default_search_examples` list
+ * (see useDefaultSearchExamples, which supplies the vocabulary examples
+ * mixed in below). */
+const SYNTAX_EXAMPLES = [
   "Prøv: sykkel unntatt elsykkel",
   "Prøv: iPhone under 3000",
   "Prøv: sofa som ny",
   "Prøv: bil automatgir",
-  "Prøv: mobiltelefon",
 ];
 
 type Props = {
@@ -66,16 +68,26 @@ export function SearchBar({
   const showMoreButton = !showQMode && extraGroups != null && onExtraGroupsChange != null;
   const moreCount = (extraGroups?.length ?? 0) + (qMode === "any" ? 1 : 0);
 
+  const defaultSearchExamples = useDefaultSearchExamples();
+  const placeholderExamples = useMemo(
+    () => [
+      "Hva leter du etter?",
+      ...SYNTAX_EXAMPLES,
+      ...defaultSearchExamples.slice(0, 3).map((w) => `Prøv: ${w}`),
+    ],
+    [defaultSearchExamples],
+  );
+
   useEffect(() => {
     if (q || qFocused) {
       setPlaceholderIndex(0);
       return;
     }
     const id = setInterval(() => {
-      setPlaceholderIndex((i) => (i + 1) % PLACEHOLDER_EXAMPLES.length);
+      setPlaceholderIndex((i) => (i + 1) % placeholderExamples.length);
     }, 4000);
     return () => clearInterval(id);
-  }, [q, qFocused]);
+  }, [q, qFocused, placeholderExamples.length]);
 
   const { data: listingSuggestions } = useSearchSuggestions(q);
   const hasDropdown = qFocused && !!listingSuggestions?.length;
@@ -103,7 +115,7 @@ export function SearchBar({
                 }
               }
             }}
-            placeholder={PLACEHOLDER_EXAMPLES[placeholderIndex]}
+            placeholder={placeholderExamples[placeholderIndex % placeholderExamples.length]}
             className="h-8 border-0 bg-transparent p-0 shadow-none focus-visible:ring-0 focus-visible:outline-none"
             aria-autocomplete="list"
             aria-expanded={hasDropdown}

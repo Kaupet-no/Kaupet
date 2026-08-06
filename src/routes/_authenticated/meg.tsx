@@ -5,6 +5,7 @@ import {
   Heart,
   ListChecks,
   LogOut,
+  MessageSquareHeart,
   Search,
   Settings,
   Shield,
@@ -25,6 +26,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { NativePageHeader } from "@/components/native-page-header";
+import { FeedbackPanel } from "@/components/feedback-tag";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authenticated/meg")({
@@ -48,6 +51,7 @@ function MegPage() {
   const canToggleTest = !!(isAdmin || isDemo);
   const isTest = useIsTestEnv();
   const [toggling, setToggling] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const callSetTestMode = useServerFn(setTestMode);
 
   async function handleToggleTest(next: boolean) {
@@ -178,6 +182,28 @@ function MegPage() {
             )}
           </div>
         </div>
+
+        {/* Ris og Ros — native-motstykket til web-ens FeedbackTag */}
+        <div className="mt-6">
+          <div className="overflow-hidden rounded-2xl border border-border bg-card">
+            <NavRow
+              icon={<MessageSquareHeart className="size-5 text-primary" />}
+              label="Ris og Ros"
+              last
+              onClick={() => setFeedbackOpen(true)}
+            />
+          </div>
+        </div>
+        <Sheet open={feedbackOpen} onOpenChange={setFeedbackOpen}>
+          <SheetContent side="bottom" className="pb-8">
+            <SheetHeader>
+              <SheetTitle>Ris og Ros</SheetTitle>
+            </SheetHeader>
+            <div className="px-4">
+              <FeedbackPanel onDone={() => setFeedbackOpen(false)} />
+            </div>
+          </SheetContent>
+        </Sheet>
 
         {/* Om Kaupet.no — samme personvern-/åpen kildekode-budskap som vises
             i footer på web, som native-brukere ellers aldri ser. */}

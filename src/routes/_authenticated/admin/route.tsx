@@ -7,6 +7,7 @@ import {
   Sparkles,
   Webhook,
   Car,
+  MessageSquareHeart,
   Search,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -72,6 +73,11 @@ function AdminLayout() {
               to="/admin/vipps-webhooks"
               icon={<Webhook className="size-4" />}
               label="Vipps webhooks"
+            />
+            <NavTab
+              to="/admin/tilbakemeldinger"
+              icon={<MessageSquareHeart className="size-4" />}
+              label="Ris og Ros"
             />
           </>
         )}

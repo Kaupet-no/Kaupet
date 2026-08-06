@@ -36,6 +36,14 @@ export default async function globalSetup() {
   });
   if (error) throw error;
 
+  // The publish specs pick the hidden "E2E-test (ikke bruk)" category, which
+  // the creation flow only shows to demo/admin users (see useIsDemo) — so the
+  // test user needs the demo role.
+  const { error: roleError } = await admin
+    .from("user_roles")
+    .insert({ user_id: data.user!.id, role: "demo" });
+  if (roleError) throw roleError;
+
   mkdirSync(path.dirname(AUTH_FILE), { recursive: true });
   writeFileSync(AUTH_FILE, JSON.stringify({ email, password, userId: data.user!.id }));
 }

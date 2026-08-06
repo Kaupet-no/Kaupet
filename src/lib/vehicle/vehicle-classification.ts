@@ -19,6 +19,9 @@
  * low-confidence mappings as a suggestion the user must confirm, not a fact.
  */
 
+import { firstRegistrationYear } from "@/lib/vehicle/first-registration";
+import { parseVehicleLookup } from "@/lib/vehicle/parse-vehicle-lookup";
+
 export type VehicleLeafSlug =
   | "bil"
   | "bobil"
@@ -302,4 +305,39 @@ export function computeOmregistreringsavgift(
   }
 
   return null;
+}
+
+/**
+ * Price shown on a listing card/search result must include the
+ * omregistreringsavgift the buyer pays on top for a vehicle listing — same
+ * total the listing detail page shows. Reads the seller's override/fritatt/
+ * inkludert flags and the SVV lookup snapshot straight out of `attributes`,
+ * so callers only need `price_nok`, the listing's leaf category slug, and
+ * the raw `attributes` blob. Returns `null` for non-vehicle listings or a
+ * missing price — callers should fall back to `price_nok` in that case.
+ */
+export function computeListingTotalPriceKr(
+  leafSlug: string | null | undefined,
+  priceNok: number | null | undefined,
+  attributes: Record<string, unknown> | null | undefined,
+): number | null {
+  if (!leafSlug || !VEHICLE_LEAF_SLUGS.includes(leafSlug as VehicleLeafSlug)) return null;
+  if (priceNok == null) return null;
+
+  if (attributes?.omregistreringsavgift_fritatt === true) return priceNok;
+  if (attributes?.omregistreringsavgift_inkludert === true) return priceNok;
+
+  const overrideRaw = attributes?.omregistreringsavgift_override_kr;
+  const vehicleLookup = parseVehicleLookup(attributes?.vehicle_lookup);
+  const avgiftKr =
+    typeof overrideRaw === "number"
+      ? overrideRaw
+      : computeOmregistreringsavgift(
+          leafSlug as VehicleLeafSlug,
+          vehicleLookup?.weight_kg ?? null,
+          firstRegistrationYear(vehicleLookup?.first_registration_date),
+          (attributes?.avgiftskode_gruppe as AvgiftskodeGruppe | undefined) ?? null,
+        );
+
+  return priceNok + (avgiftKr ?? 0);
 }

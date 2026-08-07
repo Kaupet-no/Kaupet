@@ -100,9 +100,16 @@ export async function fillDescriptionAndAdvance(
  * Final step: delivery/location + publish confirmation share one page.
  * Publishing without having opened the preview first prompts a "want to
  * preview before publishing?" dialog rather than publishing immediately.
+ *
+ * Asserts on the PublishedListingDialog's persistent title, not the
+ * success toast — the toast auto-dismisses after a few seconds and was
+ * the source of an intermittent CI flake (the toast could already be gone
+ * by the time this assertion ran, even though publishing had succeeded).
  */
 export async function publishAndExpectSuccess(page: Page) {
   await page.getByTestId("publish-listing-button").click();
   await page.getByTestId("publish-anyway-button").click();
-  await expect(page.getByText("Annonsen er publisert")).toBeVisible({ timeout: 15_000 });
+  await expect(
+    page.getByRole("heading", { name: "Annonsen din er publisert, bra jobba!" }),
+  ).toBeVisible({ timeout: 15_000 });
 }

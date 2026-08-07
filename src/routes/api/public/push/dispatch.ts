@@ -24,6 +24,10 @@ const PayloadSchema = z.discriminatedUnion("type", [
     message_id: z.string().uuid(),
   }),
   z.object({
+    type: z.literal("conversation_created"),
+    conversation_id: z.string().uuid(),
+  }),
+  z.object({
     type: z.literal("saved_search"),
     notification_id: z.string().uuid(),
   }),
@@ -223,6 +227,32 @@ export const Route = createFileRoute("/api/public/push/dispatch")({
           body = (msg.body ?? "").slice(0, 140);
           url = `/meldinger/${msg.conversation_id}`;
           tag = `msg-${msg.conversation_id}`;
+        } else if (payload.type === "conversation_created") {
+          const { data: conv } = await supabaseAdmin
+            .from("conversations")
+            .select("buyer_id, seller_id, listing_id")
+            .eq("id", payload.conversation_id)
+            .maybeSingle();
+          if (!conv) return new Response(null, { status: 204 });
+
+          userId = conv.seller_id;
+
+          let listingTitle: string | null = null;
+          if (conv.listing_id) {
+            const { data: listing } = await supabaseAdmin
+              .from("listings")
+              .select("title")
+              .eq("id", conv.listing_id)
+              .maybeSingle();
+            listingTitle = listing?.title ?? null;
+          }
+
+          title = "Ny chat";
+          body = listingTitle
+            ? `Noen vil chatte om «${listingTitle}»`
+            : "Noen har startet en chat med deg";
+          url = `/meldinger/${payload.conversation_id}`;
+          tag = `conv-${payload.conversation_id}`;
         } else if (payload.type === "saved_search") {
           const { data: notif } = await supabaseAdmin
             .from("saved_search_notifications")
@@ -324,6 +354,7 @@ export const Route = createFileRoute("/api/public/push/dispatch")({
           .maybeSingle();
         const pushEnabled = {
           message: prefs?.web_push_messages ?? true,
+          conversation_created: prefs?.web_push_messages ?? true,
           saved_search: prefs?.web_push_saved_searches ?? true,
           price_drop: prefs?.web_push_price_drops ?? true,
           sold: prefs?.web_push_sold ?? true,
@@ -331,6 +362,7 @@ export const Route = createFileRoute("/api/public/push/dispatch")({
         }[payload.type];
         const emailEnabled = {
           message: prefs?.email_messages ?? false,
+          conversation_created: prefs?.email_messages ?? false,
           saved_search: prefs?.email_saved_searches ?? false,
           price_drop: prefs?.email_price_drops ?? false,
           sold: prefs?.email_sold ?? false,

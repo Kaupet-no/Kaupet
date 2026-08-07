@@ -12,13 +12,18 @@ const COLOR = {
 };
 
 export type NotificationEmailType =
-  "message" | "saved_search" | "price_drop" | "sold" | "wtb_match";
+  "message" | "conversation_created" | "saved_search" | "price_drop" | "sold" | "wtb_match";
 
 const COPY: Record<NotificationEmailType, { eyebrow: string; intro: string; cta: string }> = {
   message: {
     eyebrow: "Ny melding",
     intro: "Du har fått en ny melding på Kaupet.no.",
     cta: "Svar på meldingen",
+  },
+  conversation_created: {
+    eyebrow: "Ny chat",
+    intro: "Noen har startet en chat med deg på Kaupet.no.",
+    cta: "Åpne chatten",
   },
   saved_search: {
     eyebrow: "Nytt treff",

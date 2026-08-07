@@ -2031,6 +2031,23 @@ export type Database = {
           max_val: number
         }[]
       }
+      listing_filter_facet_counts: {
+        Args: {
+          p_category_ids?: string[]
+          p_conditions?: string[]
+          p_price_min?: number
+          p_price_max?: number
+          p_include_free?: boolean
+          p_listing_ids?: string[]
+          p_active_attrs?: Json
+          p_facet_keys?: string[]
+        }
+        Returns: {
+          attr_key: string
+          attr_value: string
+          cnt: number
+        }[]
+      }
       admin_list_vehicle_brands_with_models: {
         Args: never
         Returns: {

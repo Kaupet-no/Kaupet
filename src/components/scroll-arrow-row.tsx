@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useIsNative } from "@/hooks/use-is-native";
 
 type Props = {
   children: React.ReactNode;
@@ -19,6 +20,7 @@ type Props = {
  * the mouse (touch already scrolls natively via `overflow-x-auto`).
  */
 export function ScrollArrowRow({ children, className, gapClassName = "gap-2" }: Props) {
+  const isNative = useIsNative();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(false);
@@ -105,23 +107,27 @@ export function ScrollArrowRow({ children, className, gapClassName = "gap-2" }: 
           sitting in the row. Taller than the row itself (extends past its
           top/bottom edge) so it also reads as a separate navigation element
           rather than another category panel at the same height. */}
-      <div
-        className={`pointer-events-none absolute -top-2 -bottom-2 left-0 z-10 flex w-10 items-center bg-gradient-to-r from-background to-transparent transition-opacity ${
-          canLeft ? "opacity-100" : "opacity-0"
-        }`}
-      >
-        <button
-          type="button"
-          onClick={() => scrollBy(-1)}
-          aria-label="Bla til venstre"
-          tabIndex={canLeft ? 0 : -1}
-          className={`flex h-full w-full items-center justify-start pl-1 text-muted-foreground transition hover:text-foreground ${
-            canLeft ? "pointer-events-auto" : "pointer-events-none"
+      {!isNative && (
+        <div
+          className={`pointer-events-none absolute -top-2 -bottom-2 left-0 z-10 flex w-10 items-center bg-gradient-to-r from-background to-transparent transition-opacity ${
+            canLeft ? "opacity-100" : "opacity-0"
           }`}
         >
-          <ChevronLeft className="size-5" />
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={() => scrollBy(-1)}
+            aria-label="Bla til venstre"
+            tabIndex={canLeft ? 0 : -1}
+            className={`flex h-full w-full items-center justify-start pl-1 ${
+              canLeft ? "pointer-events-auto" : "pointer-events-none"
+            }`}
+          >
+            <span className="flex size-8 items-center justify-center rounded-full border border-border bg-card/90 text-foreground shadow-sm backdrop-blur transition hover:bg-card">
+              <ChevronLeft className="size-5" />
+            </span>
+          </button>
+        </div>
+      )}
       <div
         ref={scrollRef}
         onPointerDown={onPointerDown}
@@ -129,29 +135,33 @@ export function ScrollArrowRow({ children, className, gapClassName = "gap-2" }: 
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
         onClickCapture={onClickCapture}
-        className={`flex flex-nowrap items-start overflow-x-auto scroll-smooth px-10 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
-          dragging ? "cursor-grabbing select-none scroll-auto" : "cursor-grab"
-        } ${gapClassName} ${className ?? ""}`}
+        className={`flex flex-nowrap items-start overflow-x-auto scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&_img]:pointer-events-none [&_img]:[-webkit-user-drag:none] ${
+          isNative ? "" : "px-10"
+        } ${dragging ? "cursor-grabbing select-none scroll-auto" : "cursor-grab"} ${gapClassName} ${className ?? ""}`}
       >
         {children}
       </div>
-      <div
-        className={`pointer-events-none absolute -top-2 -bottom-2 right-0 z-10 flex w-10 items-center justify-end bg-gradient-to-l from-background to-transparent transition-opacity ${
-          canRight ? "opacity-100" : "opacity-0"
-        }`}
-      >
-        <button
-          type="button"
-          onClick={() => scrollBy(1)}
-          aria-label="Bla til høyre"
-          tabIndex={canRight ? 0 : -1}
-          className={`flex h-full w-full items-center justify-end pr-1 text-muted-foreground transition hover:text-foreground ${
-            canRight ? "pointer-events-auto" : "pointer-events-none"
+      {!isNative && (
+        <div
+          className={`pointer-events-none absolute -top-2 -bottom-2 right-0 z-10 flex w-10 items-center justify-end bg-gradient-to-l from-background to-transparent transition-opacity ${
+            canRight ? "opacity-100" : "opacity-0"
           }`}
         >
-          <ChevronRight className="size-5" />
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={() => scrollBy(1)}
+            aria-label="Bla til høyre"
+            tabIndex={canRight ? 0 : -1}
+            className={`flex h-full w-full items-center justify-end pr-1 ${
+              canRight ? "pointer-events-auto" : "pointer-events-none"
+            }`}
+          >
+            <span className="flex size-8 items-center justify-center rounded-full border border-border bg-card/90 text-foreground shadow-sm backdrop-blur transition hover:bg-card">
+              <ChevronRight className="size-5" />
+            </span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

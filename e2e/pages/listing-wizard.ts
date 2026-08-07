@@ -6,12 +6,13 @@
  */
 import { expect, type Locator, type Page, type TestInfo } from "@playwright/test";
 
-export async function login(page: Page, email: string, password: string) {
-  // Permanent (not error-triggered) console/pageerror capture — a single
-  // login flake was observed once in publish-listing.spec.ts (never
-  // reproduced or root-caused), so this gives the next occurrence a chance
-  // to leave a trail in the CI job log. Attached to login() rather than each
-  // spec individually so both specs get it automatically.
+export async function login(page: Page, email: string, password: string, testInfo: TestInfo) {
+  // Permanent (not error-triggered) console/pageerror capture — a login
+  // flake was observed a few times across CI runs (never reproduced or
+  // root-caused beyond "click completed, page stayed on /auth"), so this
+  // gives the next occurrence a chance to leave a trail in the CI job log.
+  // Attached to login() rather than each spec individually so both specs
+  // get it automatically.
   page.on("console", (msg) => console.log(`[browser:${msg.type()}] ${msg.text()}`));
   page.on("pageerror", (err) => console.log(`[pageerror] ${err.message}`));
 
@@ -23,7 +24,25 @@ export async function login(page: Page, email: string, password: string) {
   await page.getByLabel("E-post").fill(email);
   await page.getByLabel("Passord").fill(password);
   await expect(page.getByLabel("E-post")).toHaveValue(email);
-  await page.getByRole("main").getByRole("button", { name: "Logg inn" }).click();
+
+  // Retried for the same reason as clickAndWaitFor's other call sites (see
+  // its docstring) — but the "expected" condition here is a URL change, not
+  // an element appearing, so this doesn't go through clickAndWaitFor itself.
+  const attempts = 3;
+  for (let i = 0; i < attempts; i++) {
+    await page.getByRole("main").getByRole("button", { name: "Logg inn" }).click();
+    const loggedIn = await page
+      .waitForURL("/", { timeout: 8_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (loggedIn) return;
+    if (i < attempts - 1) {
+      await testInfo.attach(`no-progress-after-login-click-attempt-${i + 1}`, {
+        body: await page.screenshot(),
+        contentType: "image/png",
+      });
+    }
+  }
   await expect(page).toHaveURL("/", { timeout: 10_000 });
 }
 
@@ -33,16 +52,20 @@ export async function goToNewListing(page: Page) {
 }
 
 /**
- * Clicks the wizard's "Neste" button and waits for `expected` to appear.
- * Retries the click a bounded number of times if `expected` doesn't show up
- * in time — the click has been observed (via trace inspection) to complete
- * without error yet leave the page state unchanged, which every static
- * analysis of goToNextPage()'s validation logic says shouldn't be possible.
+ * Clicks `trigger` and waits for `expected` to appear. Retries the click a
+ * bounded number of times if `expected` doesn't show up in time — clicks in
+ * this wizard have been observed (via trace inspection) to complete without
+ * error yet leave the page state unchanged, which every static analysis of
+ * the underlying validation/mutation logic says shouldn't be possible.
  * Rather than block on fully root-causing that, this treats "no progress
  * after a successful click" as an observable, retriable condition. Each
  * retry attaches a screenshot to the test report for further diagnosis if
  * this still doesn't resolve it. See E2E-ROBUSTNESS-PLAN-STATUS.md, Fase 5
  * punkt 3 / "Ikke løst".
+ *
+ * Originally scoped to just the "Neste"-button; generalized to cover the
+ * publish-button and login-button click sites, which showed the identical
+ * symptom (see PR discussion on the flaky E2E run of 2026-08-07).
  *
  * Revurder denne retry-mekanismen etter 2026-11-01 eller 20 flere CI-
  * kjøringer uten at loggingen fra E2E-ROBUSTNESS-PLAN-STATUS-3.md punkt 2
@@ -52,17 +75,31 @@ export async function goToNewListing(page: Page) {
  * økt timeout uten retry-logikken. Se E2E-ROBUSTNESS-PLAN-STATUS-3.md
  * punkt 4.
  */
-export async function clickNextAndWaitFor(page: Page, expected: Locator, testInfo: TestInfo) {
+export async function clickAndWaitFor(
+  page: Page,
+  trigger: Locator,
+  expected: Locator,
+  testInfo: TestInfo,
+  attachmentLabel = "no-progress-after-click",
+) {
   const attempts = 3;
   for (let i = 0; i < attempts; i++) {
-    await page.getByTestId("wizard-next-button").click();
+    // Some triggers (e.g. a dialog's confirm button) detach once the click
+    // has actually registered and the action it kicks off is under way but
+    // not yet finished — re-clicking a detached trigger just hangs waiting
+    // for it to reappear, which never happens. Only click while it's still
+    // there; otherwise treat "trigger already gone" as progress and fall
+    // through to waiting for `expected`.
+    if (await trigger.isVisible().catch(() => false)) {
+      await trigger.click({ timeout: 5_000 }).catch(() => {});
+    }
     const appeared = await expected
       .waitFor({ timeout: 8_000 })
       .then(() => true)
       .catch(() => false);
     if (appeared) return;
     if (i < attempts - 1) {
-      await testInfo.attach(`no-progress-after-neste-click-attempt-${i + 1}`, {
+      await testInfo.attach(`${attachmentLabel}-attempt-${i + 1}`, {
         body: await page.screenshot(),
         contentType: "image/png",
       });
@@ -71,6 +108,16 @@ export async function clickNextAndWaitFor(page: Page, expected: Locator, testInf
   // Final attempt: let the normal timeout/error surface with Playwright's
   // own diagnostics if it still hasn't appeared.
   await expected.waitFor();
+}
+
+export async function clickNextAndWaitFor(page: Page, expected: Locator, testInfo: TestInfo) {
+  await clickAndWaitFor(
+    page,
+    page.getByTestId("wizard-next-button"),
+    expected,
+    testInfo,
+    "no-progress-after-neste-click",
+  );
 }
 
 export function wizardStep(page: Page, groupKey: string) {
@@ -100,9 +147,25 @@ export async function fillDescriptionAndAdvance(
  * Final step: delivery/location + publish confirmation share one page.
  * Publishing without having opened the preview first prompts a "want to
  * preview before publishing?" dialog rather than publishing immediately.
+ *
+ * Asserts on the PublishedListingDialog's persistent title, not the
+ * success toast — the toast auto-dismisses after a few seconds and was
+ * the source of an intermittent CI flake (the toast could already be gone
+ * by the time this assertion ran, even though publishing had succeeded).
  */
-export async function publishAndExpectSuccess(page: Page) {
-  await page.getByTestId("publish-listing-button").click();
-  await page.getByTestId("publish-anyway-button").click();
-  await expect(page.getByText("Annonsen er publisert")).toBeVisible({ timeout: 15_000 });
+export async function publishAndExpectSuccess(page: Page, testInfo: TestInfo) {
+  await clickAndWaitFor(
+    page,
+    page.getByTestId("publish-listing-button"),
+    page.getByTestId("publish-anyway-button"),
+    testInfo,
+    "no-progress-after-publish-click",
+  );
+  await clickAndWaitFor(
+    page,
+    page.getByTestId("publish-anyway-button"),
+    page.getByRole("heading", { name: "Annonsen din er publisert, bra jobba!" }),
+    testInfo,
+    "no-progress-after-publish-anyway-click",
+  );
 }

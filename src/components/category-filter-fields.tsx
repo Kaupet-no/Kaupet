@@ -1,4 +1,4 @@
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -24,6 +24,18 @@ import {
 import { RangeFilterField } from "@/components/range-filter-field";
 import { boundsForFilter } from "@/lib/filter-range-bounds";
 import { ComboboxMultiContent } from "@/components/combobox-field";
+import { EuControlDateField } from "@/features/listing-creation/field-groups/vehicle-confirm/eu-control-date-field";
+import { EU_CONTROL_KEY } from "@/features/wtb/wtb-criteria-types";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
+/** "Tillatt hengervekt" only makes sense once "Hengerfeste" is on, so the two
+ * are grouped into one field with the weight range disabled until then. */
+const TOW_HITCH_KEY = "tow_hitch";
+const MAX_TOW_WEIGHT_KEY = "max_tow_weight_kg";
+/** "Vekt" and "Tillatt totalvekt" are grouped together as a pair of related
+ * weight fields, no dependency between the two (unlike Hengerfeste above). */
+const WEIGHT_KEY = "weight_kg";
+const MAX_TOTAL_WEIGHT_KEY = "max_total_weight_kg";
 
 /**
  * Trigger button for the "Se flere valg" `Collapsible` wrapping a category's
@@ -57,6 +69,7 @@ export function CategoryFilterFields({
   values,
   onChange,
   brandLookupFilters,
+  counts,
 }: {
   filters: CategoryFilter[];
   values: Record<string, AttributeFilterValue>;
@@ -66,8 +79,40 @@ export function CategoryFilterFields({
    * a model field in isolation (e.g. its own chip popover on the search page),
    * so the models offered still follow the selected brand. */
   brandLookupFilters?: CategoryFilter[];
+  /** Facet result counts per filter key/value (e.g. `{ fuel_type: { diesel: 98 } }`),
+   * shown next to select/multiselect option labels when supplied. Omit to
+   * render without counts (e.g. the listing wizard, which has no result set). */
+  counts?: Record<string, Record<string, number>>;
 }) {
   const brandScope = brandLookupFilters ?? filters;
+  // Shared by the plain range fallback below and the grouped fields
+  // (Hengerfeste/Tillatt hengervekt, Vekt/Tillatt totalvekt) so all three
+  // read a range value and call onChange the same way.
+  const rangeField = (filter: CategoryFilter, disabled?: boolean) => {
+    const v = values[filter.key];
+    const range = v?.kind === "range" ? v : { min: undefined, max: undefined };
+    return (
+      <RangeFilterField
+        key={filter.id}
+        label={filter.label_nb}
+        bounds={boundsForFilter(filter)}
+        value={{ min: range.min, max: range.max }}
+        onChange={(next) =>
+          onChange(
+            filter.key,
+            next.min === undefined && next.max === undefined
+              ? undefined
+              : { kind: "range", min: next.min, max: next.max },
+          )
+        }
+        disabled={disabled}
+      />
+    );
+  };
+  const countLabel = (key: string, value: string, label: string) => {
+    const c = counts?.[key]?.[value];
+    return c == null ? label : `${label} (${c})`;
+  };
   return (
     <>
       {filters.map((f) => {
@@ -103,6 +148,7 @@ export function CategoryFilterFields({
               onChange={(next) =>
                 onChange(f.key, next.length > 0 ? { kind: "multiselect", values: next } : undefined)
               }
+              counts={counts?.[f.key]}
             />
           );
         }
@@ -146,6 +192,86 @@ export function CategoryFilterFields({
             </div>
           );
         }
+        // Hengerfeste + Tillatt hengervekt are grouped into one field below
+        // (rendered when we reach max_tow_weight_kg) — skip tow_hitch's own
+        // standalone checkbox here so it isn't rendered twice. Only skip when
+        // the category actually has both keys, so a category with just
+        // "Hengerfeste" (no weight field) still gets its own checkbox.
+        if (f.key === TOW_HITCH_KEY && filters.some((x) => x.key === MAX_TOW_WEIGHT_KEY)) {
+          return null;
+        }
+        if (f.key === MAX_TOW_WEIGHT_KEY) {
+          const towHitch = values[TOW_HITCH_KEY];
+          const hasTowHitch = towHitch?.kind === "boolean" && towHitch.value;
+          return (
+            <div key={f.id} className="space-y-3">
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={hasTowHitch}
+                  onCheckedChange={(c) => {
+                    onChange(
+                      TOW_HITCH_KEY,
+                      c === true ? { kind: "boolean", value: true } : undefined,
+                    );
+                    // Clear the weight filter along with it — otherwise it
+                    // stays applied to the search while showing disabled.
+                    if (c !== true) onChange(f.key, undefined);
+                  }}
+                />
+                Hengerfeste
+              </label>
+              {rangeField(f, !hasTowHitch)}
+            </div>
+          );
+        }
+        // Vekt + Tillatt totalvekt are grouped into one field, same reasoning
+        // as Hengerfeste/Tillatt hengervekt above — just without a
+        // disable relationship, since both stand on their own.
+        if (f.key === WEIGHT_KEY && filters.some((x) => x.key === MAX_TOTAL_WEIGHT_KEY)) {
+          return null;
+        }
+        if (f.key === MAX_TOTAL_WEIGHT_KEY) {
+          const weightFilter = filters.find((x) => x.key === WEIGHT_KEY);
+          return (
+            <div key={f.id} className="space-y-4">
+              {weightFilter && rangeField(weightFilter)}
+              {rangeField(f)}
+            </div>
+          );
+        }
+        // "Tidligst neste EU-kontroll" — a search-only earliest-date filter,
+        // not the plain text box its category_filters.type="text" would
+        // otherwise render. Mirrors the same key's date picker in the WTB
+        // criteria form (wtb-criteria-fields.tsx).
+        if (f.key === EU_CONTROL_KEY) {
+          const minDate = current?.kind === "date_min" ? current.value : "";
+          return (
+            <div key={f.id} className="space-y-2">
+              <div className="flex items-center gap-1.5">
+                <Label>Tidligst neste EU-kontroll</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="text-muted-foreground hover:text-foreground"
+                      aria-label="Om dette filteret"
+                    >
+                      <Info className="size-3.5" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-64 text-xs text-muted-foreground">
+                    Søket matcher annonser der neste EU-kontroll er på valgt dato eller senere.
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <EuControlDateField
+                id={`attr-${f.key}`}
+                value={minDate}
+                onChange={(v) => onChange(f.key, v ? { kind: "date_min", value: v } : undefined)}
+              />
+            </div>
+          );
+        }
         if (f.type === "boolean") {
           return (
             <label key={f.id} className="flex items-center gap-2 text-sm">
@@ -176,7 +302,7 @@ export function CategoryFilterFields({
                   <SelectItem value="__all__">Alle</SelectItem>
                   {(f.options ?? []).map((o) => (
                     <SelectItem key={o.value} value={o.value}>
-                      {o.label_nb}
+                      {countLabel(f.key, o.value, o.label_nb)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -215,7 +341,7 @@ export function CategoryFilterFields({
                       checked={selected.includes(o.value)}
                       onCheckedChange={() => toggle(o.value)}
                     />
-                    {o.label_nb}
+                    {countLabel(f.key, o.value, o.label_nb)}
                   </label>
                 ))}
               </CollapsibleContent>
@@ -239,23 +365,7 @@ export function CategoryFilterFields({
             </div>
           );
         }
-        const range = current?.kind === "range" ? current : { min: undefined, max: undefined };
-        return (
-          <RangeFilterField
-            key={f.id}
-            label={f.label_nb}
-            bounds={boundsForFilter(f)}
-            value={{ min: range.min, max: range.max }}
-            onChange={(next) =>
-              onChange(
-                f.key,
-                next.min === undefined && next.max === undefined
-                  ? undefined
-                  : { kind: "range", min: next.min, max: next.max },
-              )
-            }
-          />
-        );
+        return rangeField(f);
       })}
     </>
   );

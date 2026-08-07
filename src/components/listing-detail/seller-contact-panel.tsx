@@ -85,11 +85,11 @@ export function SellerContactPanel({
             <div className="flex items-start gap-1.5 text-muted-foreground">
               <ShieldCheck className="mt-0.5 size-3.5 shrink-0" />
               <p>
-                Vi viser selgerinfo kun til innloggede brukere, for å beskytte selgere mot spam.{" "}
+                Du må være innlogget for å se selgerinformasjon.{" "}
                 <Link to="/auth" className="underline hover:text-foreground">
                   Logg inn
                 </Link>{" "}
-                for å se den.
+                for å vise.
               </p>
             </div>
           )}

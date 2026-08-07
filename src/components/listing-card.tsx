@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Eye, Gauge, ImageOff, MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
-import { signListingImageUrls } from "@/lib/storage";
+import { signListingImageUrls, thumbPathFor } from "@/lib/storage";
 import { formatPrice } from "@/lib/format";
 import { computeListingTotalPriceKr } from "@/lib/vehicle/vehicle-classification";
 import { FavoriteButton } from "@/components/favorite-button";
@@ -110,10 +110,20 @@ export function ListingCard({
   const priceLabel = formatPrice({ price_nok: displayPriceNok(listing), is_free: listing.is_free });
 
   useEffect(() => {
-    if (!listing.cover_path) return;
+    const coverPath = listing.cover_path;
+    if (!coverPath) return;
     let cancelled = false;
-    signListingImageUrls([listing.cover_path]).then((map) => {
-      if (!cancelled) setImgUrl(map[listing.cover_path!] ?? null);
+    // Prøv den lille kort-thumbnailen først; eldre annonser uten en faller
+    // tilbake til fullstørrelsesbildet.
+    const thumbPath = thumbPathFor(coverPath);
+    signListingImageUrls([thumbPath]).then(async (map) => {
+      if (cancelled) return;
+      if (map[thumbPath]) {
+        setImgUrl(map[thumbPath]);
+        return;
+      }
+      const fallback = await signListingImageUrls([coverPath]);
+      if (!cancelled) setImgUrl(fallback[coverPath] ?? null);
     });
     return () => {
       cancelled = true;

@@ -122,6 +122,14 @@ function fakeQuery() {
       calls.push({ method: "contains", args });
       return q;
     },
+    gte: (...args: unknown[]) => {
+      calls.push({ method: "gte", args });
+      return q;
+    },
+    lte: (...args: unknown[]) => {
+      calls.push({ method: "lte", args });
+      return q;
+    },
   };
   return q;
 }
@@ -146,5 +154,22 @@ describe("applyAttributeFilters", () => {
     };
     const q = applyAttributeFilters(fakeQuery(), filters);
     expect(q.calls).toEqual([]);
+  });
+
+  it("compares range filters as jsonb (->), not text (->>), so numbers sort numerically", () => {
+    // A regression test for a real bug: `->>` extracts JSON as text, so
+    // Postgres compared "78000" against "100000" lexicographically (both
+    // start differently at the first digit) instead of numerically — a
+    // listing with mileage_km: 78000 failed a `<= 100000` filter and
+    // wrongly passed a `>= 100000` filter. `->` keeps the jsonb type, which
+    // Postgres compares numerically for JSON numbers.
+    const filters: Record<string, AttributeFilterValue> = {
+      mileage_km: { kind: "range", min: 0, max: 100000 },
+    };
+    const q = applyAttributeFilters(fakeQuery(), filters);
+    expect(q.calls).toEqual([
+      { method: "gte", args: ["attributes->mileage_km", 0] },
+      { method: "lte", args: ["attributes->mileage_km", 100000] },
+    ]);
   });
 });

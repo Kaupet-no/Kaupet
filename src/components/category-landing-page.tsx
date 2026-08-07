@@ -9,7 +9,13 @@ import { ResultList } from "@/components/result-list";
 import { NativeFilterChips } from "@/components/native-filter-chips";
 import { AttributeFilterChips } from "@/components/attribute-filter-chips";
 import { CategoryHero } from "@/components/category-hero";
-import { buildTree, descendants, pathFromAncestor, type Category } from "@/lib/categories";
+import {
+  buildTree,
+  descendants,
+  pathFromAncestor,
+  resolveCategoryIds,
+  type Category,
+} from "@/lib/categories";
 import {
   normalizeFilter,
   vehicleCategoryGroupFor,
@@ -20,6 +26,7 @@ import { BIL_OG_MC_SLUG } from "@/components/advanced-search-value";
 import { SearchBar } from "@/components/search-bar";
 import { searchSchema, conditionEnum } from "@/features/listing-search/search-schema";
 import { useAnnonserSearchState } from "@/features/listing-search/use-annonser-search-state";
+import { useFilterFacetCounts } from "@/features/listing-search/use-filter-facet-counts";
 import { useListingsQuery } from "@/features/listing-search/use-listings-query";
 import { useTextToFilterPipeline } from "@/features/listing-search/use-text-to-filter-pipeline";
 import { useIsNative } from "@/hooks/use-is-native";
@@ -182,6 +189,16 @@ export function CategoryLandingPage({
     categories: categories ?? undefined,
     allFilters,
     setQDraft,
+  });
+
+  const { data: facetCounts } = useFilterFacetCounts({
+    filters: attrFilters,
+    values: attrValues,
+    categoryIds: resolveCategoryIds(effectiveCategories, categories ?? []),
+    conditions: search.conditions ?? [],
+    min: search.min,
+    max: search.max,
+    includeFree: search.includeFree ?? true,
   });
 
   // Recognizes category-attribute vocabulary (e.g. "ryggekamera") and
@@ -353,27 +370,30 @@ export function CategoryLandingPage({
               hideCondition={isBilOgMc}
             />
           ) : (
-            <div className="flex flex-wrap items-center gap-2">
-              <AttributeFilterChips
-                filters={attrFilters}
-                values={attrValues}
-                onChange={handleAttrValueChange}
-                isNative={isNative}
-                resultCount={totalCount ?? cards.length}
-                queryText={qDraft}
-                min={search.min}
-                max={search.max}
-                includeFree={search.includeFree ?? true}
-                onPriceChange={(mn, mx, free) =>
-                  updateSearch({ min: mn, max: mx, includeFree: free })
-                }
-                conditions={search.conditions ?? []}
-                onConditionsChange={(c) =>
-                  updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
-                }
-                hideCondition={isBilOgMc}
-              />
-            </div>
+            <AttributeFilterChips
+              filters={attrFilters}
+              values={attrValues}
+              onChange={handleAttrValueChange}
+              isNative={isNative}
+              resultCount={totalCount ?? cards.length}
+              queryText={qDraft}
+              min={search.min}
+              max={search.max}
+              includeFree={search.includeFree ?? true}
+              onPriceChange={(mn, mx, free) =>
+                updateSearch({ min: mn, max: mx, includeFree: free })
+              }
+              conditions={search.conditions ?? []}
+              onConditionsChange={(c) =>
+                updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
+              }
+              hideCondition={isBilOgMc}
+              counts={facetCounts}
+              layout="card"
+              location={location}
+              onLocationChange={handleLocationChange}
+              onReset={resetFilters}
+            />
           )}
 
           {/* Category-dependent filter row: primary fields stay visible, the

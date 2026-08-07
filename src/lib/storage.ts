@@ -55,6 +55,26 @@ export async function uploadListingImage(opts: {
   return path;
 }
 
+// Kort-thumbnailen for et annonsebilde ligger ved siden av originalen under
+// samme path med "-thumb" satt inn før filendelsen. Ren navnekonvensjon —
+// ingen egen DB-kolonne trengs, og eldre bilder uten thumbnail faller
+// naturlig tilbake til fullstørrelsesbildet (se ListingCard).
+export function thumbPathFor(path: string): string {
+  const dot = path.lastIndexOf(".");
+  return dot > 0 ? `${path.slice(0, dot)}-thumb${path.slice(dot)}` : `${path}-thumb`;
+}
+
+export async function uploadListingImageThumb(opts: { path: string; file: File }): Promise<void> {
+  const { error } = await supabase.storage
+    .from(LISTING_BUCKET)
+    .upload(thumbPathFor(opts.path), opts.file, {
+      contentType: opts.file.type,
+      cacheControl: "31536000",
+      upsert: false,
+    });
+  if (error) throw error;
+}
+
 export function validateAvatarImage(file: File): ImageValidationError | null {
   if (!ALLOWED_MIME.includes(file.type as (typeof ALLOWED_MIME)[number])) {
     return { kind: "bad-type", name: file.name, type: file.type || "ukjent" };

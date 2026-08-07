@@ -131,18 +131,59 @@ export function FeedbackPanel({ onDone }: { onDone?: () => void }) {
 }
 
 /**
- * "Ris og Ros" — a compact icon-only feedback button fixed to the right edge
- * in the lower half of the window. Web desktop only (hidden on native and
- * below lg, where horizontal space is precious): hover glides the label into
- * view, click opens the panel.
+ * "Ris og Ros" — a compact icon-only feedback button fixed to the right edge,
+ * near the bottom of the top quarter of the viewport (never above the
+ * header). Web only, from md up: hover glides the label into view, click
+ * opens the panel.
  */
 export function FeedbackTag() {
   const native = useIsNative();
   const [open, setOpen] = useState(false);
+  const [overlapping, setOverlapping] = useState(false);
+  const tagRef = useRef<HTMLDivElement>(null);
+
+  // Hide the collapsed button whenever page content (e.g. a ScrollArrowRow's
+  // right-edge arrow in a hero near the top of the page) sits under its
+  // corners — a full-bleed wrapper spanning most of the viewport width
+  // doesn't count, only something specific enough to actually collide.
+  useEffect(() => {
+    if (native || open) return;
+    const el = tagRef.current;
+    if (!el) return;
+    const check = () => {
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0) return;
+      const corners: [number, number][] = [
+        [rect.left + 2, rect.top + 2],
+        [rect.left + 2, rect.bottom - 2],
+      ];
+      const hit = corners.some(([x, y]) =>
+        document
+          .elementsFromPoint(x, y)
+          .some(
+            (n) => !el.contains(n) && n.getBoundingClientRect().width < window.innerWidth * 0.9,
+          ),
+      );
+      setOverlapping(hit);
+    };
+    check();
+    window.addEventListener("scroll", check, { passive: true });
+    window.addEventListener("resize", check);
+    return () => {
+      window.removeEventListener("scroll", check);
+      window.removeEventListener("resize", check);
+    };
+  }, [native, open]);
+
   if (native) return null;
 
   return (
-    <div className="fixed right-0 top-2/3 z-40 hidden -translate-y-1/2 lg:block print:hidden">
+    <div
+      ref={tagRef}
+      className={`fixed right-0 top-[max(25vh,4.5rem)] z-40 hidden md:block print:hidden ${
+        overlapping && !open ? "invisible" : ""
+      }`}
+    >
       {open ? (
         <div className="w-72 rounded-l-xl border border-r-0 border-border bg-card p-4 shadow-lg duration-200 animate-in slide-in-from-right-4">
           <div className="mb-2 flex items-center justify-between">

@@ -10,7 +10,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { createListing } from "@/lib/listings.functions";
-import { uploadListingImage } from "@/lib/storage";
+import { uploadListingImage, uploadListingImageThumb } from "@/lib/storage";
 import { geocodeNorwayAddress } from "@/lib/geocode";
 import { type PendingImage } from "@/components/image-uploader";
 import { FullscreenLocationPicker } from "@/components/fullscreen-location-picker";
@@ -654,6 +654,12 @@ function NewListingPage() {
               index: i,
               file: img.file,
             });
+            // Best-effort: kortvisning faller tilbake til fullstørrelsesbildet
+            // hvis thumbnailen mangler, så en feil her skal ikke stoppe
+            // publiseringen.
+            uploadListingImageThumb({ path, file: img.thumbFile }).catch((err) =>
+              console.warn("Kunne ikke laste opp kort-thumbnail", err),
+            );
             done += 1;
             setUploadProgress({ done, total: images.length });
             return { storage_path: path, sort_order: i, caption: img.caption?.trim() || null };

@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
-import type { Category } from "@/lib/categories";
+import { resolveCategoryIds, type Category } from "@/lib/categories";
 import { applyAttributeFilters } from "@/lib/category-filters";
 import { expandBodyTypeSearchValues } from "@/lib/vehicle/body-type-search-expansion";
 import {
@@ -124,19 +124,9 @@ export function useListingsQuery({
 
       // Categories — single selection; if a parent is chosen, include all children
       if (effectiveCategories.length > 0 && categories) {
-        const selectedSlugs = new Set(effectiveCategories);
-        const selectedCats = categories.filter((c) => selectedSlugs.has(c.slug));
-        const ids = new Set<string>();
-        for (const c of selectedCats) {
-          ids.add(c.id);
-          if (c.parent_id == null) {
-            for (const child of categories) {
-              if (child.parent_id === c.id) ids.add(child.id);
-            }
-          }
-        }
-        if (ids.size === 0) return emptyPage;
-        qb = qb.in("category_id", Array.from(ids));
+        const ids = resolveCategoryIds(effectiveCategories, categories) ?? [];
+        if (ids.length === 0) return emptyPage;
+        qb = qb.in("category_id", ids);
       }
 
       // Conditions

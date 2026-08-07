@@ -47,11 +47,17 @@ import { hapticImpact } from "@/lib/haptics";
 import { useScrollDirection } from "@/hooks/use-scroll-direction";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { useAnnonserSearchState } from "@/features/listing-search/use-annonser-search-state";
+import { useFilterFacetCounts } from "@/features/listing-search/use-filter-facet-counts";
 import { useHeroCategoryActions } from "@/features/listing-search/use-hero-category-actions";
 import { CategoryHero } from "@/components/category-hero";
 import { CategoryChipRow } from "@/components/category-chip-row";
 import { BrowsePageSkeleton } from "@/components/browse-page-skeleton";
-import { breadcrumbPath, resolveHeroCategory, type Category } from "@/lib/categories";
+import {
+  breadcrumbPath,
+  resolveCategoryIds,
+  resolveHeroCategory,
+  type Category,
+} from "@/lib/categories";
 
 export const Route = createFileRoute("/annonser")({
   validateSearch: searchSchema,
@@ -208,6 +214,16 @@ function BrowsePage() {
     handleLocationChange,
     resetFilters,
   } = useAnnonserSearchState({ search, navigate, categories, allFilters, setQDraft });
+
+  const { data: facetCounts } = useFilterFacetCounts({
+    filters: attrFilters,
+    values: attrValues,
+    categoryIds: resolveCategoryIds(effectiveCategories, categories ?? []),
+    conditions: search.conditions ?? [],
+    min: search.min,
+    max: search.max,
+    includeFree: search.includeFree ?? true,
+  });
 
   // No Bil og MC listing has a "Tilstand" attribute, so the condition filter
   // is meaningless (and hidden) once the search narrows to that category.
@@ -655,7 +671,12 @@ function BrowsePage() {
               hideCondition={isBilOgMc}
             />
           ) : (
-            <div className="flex flex-wrap items-center gap-2">
+            <>
+              {effectiveCategories.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Velg en kategori for å se flere søkefilter
+                </p>
+              )}
               <AttributeFilterChips
                 filters={attrFilters}
                 values={attrValues}
@@ -675,22 +696,35 @@ function BrowsePage() {
                 }
                 hideCondition={isBilOgMc}
                 hasCategory={effectiveCategories.length > 0}
+                counts={facetCounts}
+                layout="card"
+                location={location}
+                onLocationChange={handleLocationChange}
+                onReset={resetFilters}
+                moreFilterHref
               />
-            </div>
+            </>
           )}
 
           {/* Category-dependent filter row: the selected category's primary
             fields stay visible, the rest sit behind "Se flere filter". */}
           {isNative && (
-            <AttributeFilterChips
-              filters={attrFilters}
-              values={attrValues}
-              onChange={handleAttrValueChange}
-              isNative={isNative}
-              resultCount={totalCount ?? cards.length}
-              queryText={qDraft}
-              hasCategory={effectiveCategories.length > 0}
-            />
+            <>
+              {effectiveCategories.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Velg en kategori for å se flere søkefilter
+                </p>
+              )}
+              <AttributeFilterChips
+                filters={attrFilters}
+                values={attrValues}
+                onChange={handleAttrValueChange}
+                isNative={isNative}
+                resultCount={totalCount ?? cards.length}
+                queryText={qDraft}
+                hasCategory={effectiveCategories.length > 0}
+              />
+            </>
           )}
 
           {/* Rendered inside the same space-y-2 group as the search bar and
@@ -808,7 +842,12 @@ function BrowsePage() {
             }
             onMapRadiusChange={(km) => updateSearch({ radius: km })}
             onMapClearLocation={() =>
-              updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
+              updateSearch({
+                lat: undefined,
+                lng: undefined,
+                radius: undefined,
+                loc: undefined,
+              })
             }
             sort={search.sort}
             onSortChange={(s) => updateSearch({ sort: s })}

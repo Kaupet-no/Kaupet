@@ -43,8 +43,11 @@ export function NativeFilterChips({
   const locActive = location.lat != null;
   const locLabel = locActive ? (location.label ? location.label.split(",")[0] : "Sted") : "Sted";
 
+  // No wrapping row here — the caller renders this together with
+  // AttributeFilterChips' primary chips in one shared scroll row, so all
+  // native filter chips read as a single bar instead of two stacked ones.
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <>
       <FilterChip
         label={priceLabel}
         active={priceActive}
@@ -76,6 +79,6 @@ export function NativeFilterChips({
         badge={advancedFilterCount > 0 ? advancedFilterCount : undefined}
         hideChevron
       />
-    </div>
+    </>
   );
 }

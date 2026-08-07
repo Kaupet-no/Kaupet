@@ -741,13 +741,10 @@ export function AttributeFilterChips({
     </>
   );
 
-  if (isNative) {
-    return (
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {body}
-      </div>
-    );
-  }
+  // No wrapping row here on native — the caller (annonser.tsx,
+  // category-landing-page.tsx) renders this together with NativeFilterChips
+  // inside one shared scroll row, so Pris/Sted/Mer and Merke/Modell read as
+  // one filter bar instead of two stacked ones.
   return body;
 }
 

@@ -359,7 +359,8 @@ export function CategoryLandingPage({
             onExtraGroupsChange={(extraGroups) => updateSearch({ extraGroups })}
           />
           {isNative ? (
-            <>
+            // One shared scroll row — see the matching comment in annonser.tsx.
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <NativeFilterChips
                 min={search.min}
                 max={search.max}
@@ -385,7 +386,7 @@ export function CategoryLandingPage({
                 resultCount={totalCount ?? cards.length}
                 queryText={qDraft}
               />
-            </>
+            </div>
           ) : (
             <AttributeFilterChips
               filters={attrFilters}

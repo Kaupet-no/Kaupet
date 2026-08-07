@@ -15,6 +15,9 @@ type Props = {
   advancedFilterCount?: number;
   /** Hides the "Tilstand" chip — no listing under Bil og MC has that attribute. */
   hideCondition?: boolean;
+  /** Tab the "Mer" chip opens to — "attributes" (the panel's "Mer" tab) when
+   * the selected category has secondary filters, "search" otherwise. */
+  moreSection?: NativeAdvancedSearchSection;
 };
 
 /**
@@ -32,6 +35,7 @@ export function NativeFilterChips({
   onOpenAdvanced,
   advancedFilterCount = 0,
   hideCondition = false,
+  moreSection = "search",
 }: Props) {
   const open = (section: NativeAdvancedSearchSection) => {
     void hapticImpact("light");
@@ -75,7 +79,7 @@ export function NativeFilterChips({
         label="Mer"
         active={advancedFilterCount > 0}
         icon={<MoreHorizontal className="size-3.5" />}
-        onClick={() => open("search")}
+        onClick={() => open(moreSection)}
         badge={advancedFilterCount > 0 ? advancedFilterCount : undefined}
         hideChevron
       />

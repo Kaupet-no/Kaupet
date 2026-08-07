@@ -50,7 +50,12 @@ import {
 import { PushEnablePrompt } from "@/components/push-enable-prompt";
 import { EmptyState } from "@/components/ui/empty-state";
 import { AdvancedSearchSheet } from "@/components/advanced-search-sheet";
-import { criteriaToValue, valueToCriteria } from "@/components/advanced-search-value";
+import { NativeAdvancedSearch } from "@/components/native-advanced-search";
+import {
+  criteriaToValue,
+  valueToCriteria,
+  type AdvancedSearchValue,
+} from "@/components/advanced-search-value";
 import {
   deleteSavedSearch,
   listSavedSearches,
@@ -148,6 +153,18 @@ function MineSokPage() {
       showErrorToast(formatErrorMessage(e, "Kunne ikke endre navn"));
     } finally {
       setRenaming(false);
+    }
+  };
+
+  const applyEditedSearch = async (search: SavedSearch, v: AdvancedSearchValue) => {
+    try {
+      await updateSavedSearch(search.id, { criteria: valueToCriteria(v) });
+      qc.invalidateQueries({ queryKey: ["saved-searches"] });
+      showSuccessToast("Søket er oppdatert");
+    } catch (e) {
+      showErrorToast(formatErrorMessage(e, "Kunne ikke oppdatere søket"));
+    } finally {
+      setEditingSearch(null);
     }
   };
 
@@ -335,28 +352,29 @@ function MineSokPage() {
           </DialogContent>
         </Dialog>
 
-        {editingSearch && (
-          <AdvancedSearchSheet
-            open={editingSearch !== null}
-            onOpenChange={(o) => !o && setEditingSearch(null)}
-            initial={criteriaToValue(editingSearch.criteria)}
-            categories={categories ?? []}
-            currentSort={editingSearch.criteria.sort}
-            applyLabel="Lagre endringer"
-            hideSaveAction
-            onApply={async (v) => {
-              try {
-                await updateSavedSearch(editingSearch.id, { criteria: valueToCriteria(v) });
-                qc.invalidateQueries({ queryKey: ["saved-searches"] });
-                showSuccessToast("Søket er oppdatert");
-              } catch (e) {
-                showErrorToast(formatErrorMessage(e, "Kunne ikke oppdatere søket"));
-              } finally {
-                setEditingSearch(null);
-              }
-            }}
-          />
-        )}
+        {editingSearch &&
+          (native ? (
+            <NativeAdvancedSearch
+              open={editingSearch !== null}
+              onClose={() => setEditingSearch(null)}
+              initial={criteriaToValue(editingSearch.criteria)}
+              categories={categories ?? []}
+              applyLabel="Lagre endringer"
+              hideSaveAction
+              onApply={(v) => void applyEditedSearch(editingSearch, v)}
+            />
+          ) : (
+            <AdvancedSearchSheet
+              open={editingSearch !== null}
+              onOpenChange={(o) => !o && setEditingSearch(null)}
+              initial={criteriaToValue(editingSearch.criteria)}
+              categories={categories ?? []}
+              currentSort={editingSearch.criteria.sort}
+              applyLabel="Lagre endringer"
+              hideSaveAction
+              onApply={(v) => void applyEditedSearch(editingSearch, v)}
+            />
+          ))}
       </div>
     </>
   );

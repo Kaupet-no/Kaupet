@@ -7,6 +7,10 @@ import type { ListingCardData } from "@/components/listing-card";
 import type { MapListing } from "@/components/listings-map";
 import { ResultList } from "@/components/result-list";
 import { NativeFilterChips } from "@/components/native-filter-chips";
+import {
+  NativeAdvancedSearch,
+  type NativeAdvancedSearchSection,
+} from "@/components/native-advanced-search";
 import { AttributeFilterChips } from "@/components/attribute-filter-chips";
 import { CategoryHero } from "@/components/category-hero";
 import {
@@ -74,6 +78,8 @@ export function CategoryLandingPage({
   const isNative = useIsNative();
   const [qDraft, setQDraft] = useState(search.q);
   const [isDesktop, setIsDesktop] = useState(false);
+  const [advancedOverlayOpen, setAdvancedOverlayOpen] = useState(false);
+  const [advancedSection, setAdvancedSection] = useState<NativeAdvancedSearchSection>("search");
   // See annonser.tsx's identical field for why this exists — keyed by
   // "filterKey:optionValue" ("filterKey:" for single-value filters).
   const [autoAppliedText, setAutoAppliedText] = useState<Record<string, string>>({});
@@ -183,6 +189,8 @@ export function CategoryLandingPage({
     updateSearch,
     handleLocationChange,
     resetFilters,
+    advancedInitial,
+    handleApply,
   } = useAnnonserSearchState({
     search: effectiveSearch,
     navigate,
@@ -355,18 +363,15 @@ export function CategoryLandingPage({
               min={search.min}
               max={search.max}
               includeFree={search.includeFree ?? true}
-              onPriceChange={(mn, mx, free) =>
-                updateSearch({ min: mn, max: mx, includeFree: free })
-              }
               conditions={search.conditions ?? []}
-              onConditionsChange={(c) =>
-                updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
-              }
               location={location}
-              onLocationChange={handleLocationChange}
-              resultCount={totalCount ?? cards.length}
-              onOpenAdvanced={() => {}}
-              advancedFilterCount={0}
+              onOpenAdvanced={(section) => {
+                setAdvancedSection(section);
+                setAdvancedOverlayOpen(true);
+              }}
+              advancedFilterCount={
+                (search.extraGroups?.length ?? 0) + (search.qMode === "any" ? 1 : 0)
+              }
               hideCondition={isBilOgMc}
             />
           ) : (
@@ -461,6 +466,19 @@ export function CategoryLandingPage({
           onSortChange={(s) => updateSearch({ sort: s })}
         />
       </div>
+
+      {isNative && (
+        <NativeAdvancedSearch
+          open={advancedOverlayOpen}
+          onClose={() => setAdvancedOverlayOpen(false)}
+          initial={advancedInitial}
+          categories={categories ?? []}
+          onApply={handleApply}
+          location={location}
+          onLocationChange={handleLocationChange}
+          initialSection={advancedSection}
+        />
+      )}
     </div>
   );
 }

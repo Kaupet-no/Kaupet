@@ -15,7 +15,10 @@ import { ResultList } from "@/components/result-list";
 import { NativeFilterChips } from "@/components/native-filter-chips";
 import { AttributeFilterChips } from "@/components/attribute-filter-chips";
 import { NativeSearchOverlay } from "@/components/native-search-overlay";
-import { NativeAdvancedSearch } from "@/components/native-advanced-search";
+import {
+  NativeAdvancedSearch,
+  type NativeAdvancedSearchSection,
+} from "@/components/native-advanced-search";
 import { saveLastSearchContext } from "@/lib/last-search-context";
 import { summarizeCriteria } from "@/lib/saved-searches";
 import { WtbListingCard } from "@/components/wtb-listing-card";
@@ -118,6 +121,7 @@ function BrowsePage() {
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
   const [advancedOverlayOpen, setAdvancedOverlayOpen] = useState(false);
+  const [advancedSection, setAdvancedSection] = useState<NativeAdvancedSearchSection>("search");
   const [activeTab, setActiveTab] = useState<"listings" | "wtb">("listings");
   // The original typed phrase behind each auto-applied attribute value, keyed
   // by "filterKey:optionValue" ("filterKey:" for single-value filters) — lets
@@ -654,17 +658,12 @@ function BrowsePage() {
               min={search.min}
               max={search.max}
               includeFree={search.includeFree ?? true}
-              onPriceChange={(mn, mx, free) =>
-                updateSearch({ min: mn, max: mx, includeFree: free })
-              }
               conditions={search.conditions ?? []}
-              onConditionsChange={(c) =>
-                updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
-              }
               location={location}
-              onLocationChange={handleLocationChange}
-              resultCount={totalCount ?? cards.length}
-              onOpenAdvanced={() => setAdvancedOverlayOpen(true)}
+              onOpenAdvanced={(section) => {
+                setAdvancedSection(section);
+                setAdvancedOverlayOpen(true);
+              }}
               advancedFilterCount={
                 (search.extraGroups?.length ?? 0) + (search.qMode === "any" ? 1 : 0)
               }
@@ -886,6 +885,9 @@ function BrowsePage() {
             initial={advancedInitial}
             categories={categories ?? []}
             onApply={handleApply}
+            location={location}
+            onLocationChange={handleLocationChange}
+            initialSection={advancedSection}
           />
         )}
       </div>

@@ -118,9 +118,17 @@ function MineSokPage() {
     showSuccessToast(s.notify ? "Varsler slått av" : "Varsler slått på");
     if (turningOn && !push.savedSearchesActive) {
       if (!push.supported) {
-        toast.message("Push-varsler er ikke tilgjengelig i denne nettleseren");
+        toast.message(
+          native
+            ? "Push-varsler støttes ikke på denne enheten"
+            : "Push-varsler er ikke tilgjengelig i denne nettleseren",
+        );
       } else if (push.permission === "denied") {
-        toast.message("Push er blokkert i nettleseren — endre tillatelsen for å motta varsler her");
+        toast.message(
+          native
+            ? "Push er blokkert — endre varseltillatelsen for appen i enhetens innstillinger"
+            : "Push er blokkert i nettleseren — endre tillatelsen for å motta varsler her",
+        );
       } else {
         toast.message("Aktiver push-varsler øverst på siden for å motta dem på denne enheten");
       }

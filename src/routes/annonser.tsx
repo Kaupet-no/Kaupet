@@ -677,29 +677,31 @@ function BrowsePage() {
                   Velg en kategori for å se flere søkefilter
                 </p>
               )}
-              <div className="flex flex-wrap items-center gap-2">
-                <AttributeFilterChips
-                  filters={attrFilters}
-                  values={attrValues}
-                  onChange={handleAttrValueChange}
-                  isNative={isNative}
-                  resultCount={totalCount ?? cards.length}
-                  queryText={qDraft}
-                  min={search.min}
-                  max={search.max}
-                  includeFree={search.includeFree ?? true}
-                  onPriceChange={(mn, mx, free) =>
-                    updateSearch({ min: mn, max: mx, includeFree: free })
-                  }
-                  conditions={search.conditions ?? []}
-                  onConditionsChange={(c) =>
-                    updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
-                  }
-                  hideCondition={isBilOgMc}
-                  hasCategory={effectiveCategories.length > 0}
-                  counts={facetCounts}
-                />
-              </div>
+              <AttributeFilterChips
+                filters={attrFilters}
+                values={attrValues}
+                onChange={handleAttrValueChange}
+                isNative={isNative}
+                resultCount={totalCount ?? cards.length}
+                queryText={qDraft}
+                min={search.min}
+                max={search.max}
+                includeFree={search.includeFree ?? true}
+                onPriceChange={(mn, mx, free) =>
+                  updateSearch({ min: mn, max: mx, includeFree: free })
+                }
+                conditions={search.conditions ?? []}
+                onConditionsChange={(c) =>
+                  updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
+                }
+                hideCondition={isBilOgMc}
+                hasCategory={effectiveCategories.length > 0}
+                counts={facetCounts}
+                layout="card"
+                location={location}
+                onLocationChange={handleLocationChange}
+                onReset={resetFilters}
+              />
             </>
           )}
 

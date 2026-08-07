@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { SlidersHorizontal } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { SlidersHorizontal, RotateCcw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,10 +23,12 @@ import { CategoryFilterFields } from "@/components/category-filter-fields";
 import { RangeFilterField } from "@/components/range-filter-field";
 import { CONDITIONS } from "@/components/advanced-search-value";
 import { PRICE_BOUNDS } from "@/lib/filter-range-bounds";
+import { digitsOnlyClamped, formatThousands } from "@/lib/number-input";
 import {
   useVehicleBrandOptions,
   VehicleModelMultiComboboxContent,
 } from "@/features/listing-creation/modules/generic-attributes/vehicle-brand-model-fields";
+import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/location-filter";
 import {
   getAttributeChipState,
   getPriceChipState,
@@ -91,6 +93,30 @@ type Props = {
   /** Facet result counts per filter key/value (e.g. `{ fuel_type: { diesel: 98 } }`),
    * shown next to options in chip popovers and the "Flere filter" dialog. */
   counts?: Record<string, Record<string, number>>;
+  /** "chips" (default): the horizontal-scroll pill row. "card": a bordered
+   * card with a labeled field per primary filter, plus an "up to"-only price
+   * field and a city/radius field — matches mobile.de's landing-page search
+   * widget. Desktop-only; native ignores this. */
+  layout?: "chips" | "card";
+  /** City/radius filter, shown as its own field in `layout="card"`. Desktop
+   * callers already own this state for `NativeFilterChips` — pass it through
+   * here too rather than duplicating it. */
+  location?: LocationValue;
+  onLocationChange?: (v: LocationValue) => void;
+  /** Clears every active filter — shown as a "Nullstill" link next to "Se
+   * flere filter" in `layout="card"`. */
+  onReset?: () => void;
+  /** Skips the card's own `rounded-2xl border ... shadow-sm` wrapper — for
+   * embedding the field grid inside a caller that already supplies its own
+   * card chrome (the homepage's category-drilldown panel), so the fields
+   * don't end up double-boxed. `layout="card"` only. */
+  embedCard?: boolean;
+  /** Extra content in the card's bottom bar, alongside "Nullstill"/"Flere
+   * filter" — `footerLeft` sits before them (e.g. a live result count),
+   * `footerRight` after (e.g. a "Vis treff" submit button for a caller that
+   * navigates elsewhere instead of filtering in place). `layout="card"` only. */
+  footerLeft?: ReactNode;
+  footerRight?: ReactNode;
 };
 
 /** How many of a filter's typed-word matches count toward its relevance —
@@ -132,11 +158,21 @@ export function AttributeFilterChips({
   hideCondition = false,
   hasCategory = true,
   counts,
+  layout = "chips",
+  location,
+  onLocationChange,
+  onReset,
+  embedCard = false,
+  footerLeft,
+  footerRight,
 }: Props) {
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [priceConditionOpen, setPriceConditionOpen] = useState<"price" | "condition" | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const [moreSearch, setMoreSearch] = useState("");
+  const [locationOpen, setLocationOpen] = useState(false);
+  const isCard = layout === "card" && !isNative;
+  const fieldProps = isCard ? { variant: "field" as const } : {};
 
   // Desktop callers wire up Pris/Tilstand here so all visible search criteria
   // live in one row/component; native keeps them in NativeFilterChips.
@@ -207,6 +243,8 @@ export function AttributeFilterChips({
           label={label}
           active={active}
           onClick={isNative ? () => openField(f.key) : undefined}
+          {...fieldProps}
+          fieldLabel={f.label_nb}
         />
       );
       if (isNative) return <span key={f.id}>{chip}</span>;
@@ -240,6 +278,8 @@ export function AttributeFilterChips({
           onChange={(vals) =>
             onChange(f.key, vals.length > 0 ? { kind: "multiselect", values: vals } : undefined)
           }
+          {...fieldProps}
+          fieldLabel={f.label_nb}
         />
       );
     }
@@ -262,6 +302,8 @@ export function AttributeFilterChips({
           value={current?.kind === "select" ? current.value : undefined}
           placeholder={f.label_nb}
           onChange={(v) => onChange(f.key, v ? { kind: "select", value: v } : undefined)}
+          {...fieldProps}
+          fieldLabel={f.label_nb}
         />
       );
     }
@@ -278,6 +320,8 @@ export function AttributeFilterChips({
           onChange={(vals) =>
             onChange(f.key, vals.length > 0 ? { kind: "multiselect", values: vals } : undefined)
           }
+          {...fieldProps}
+          fieldLabel={f.label_nb}
         />
       );
     }
@@ -297,6 +341,8 @@ export function AttributeFilterChips({
           onChange={(vals) =>
             onChange(f.key, vals.length > 0 ? { kind: "multiselect", values: vals } : undefined)
           }
+          {...fieldProps}
+          fieldLabel={f.label_nb}
         />
       );
     }
@@ -312,6 +358,7 @@ export function AttributeFilterChips({
             if (isNative) void hapticImpact("light");
             onChange(f.key, on ? undefined : { kind: "boolean", value: true });
           }}
+          {...fieldProps}
         />
       );
     }
@@ -323,6 +370,8 @@ export function AttributeFilterChips({
         label={label}
         active={active}
         onClick={isNative ? () => openField(f.key) : undefined}
+        {...fieldProps}
+        fieldLabel={f.label_nb}
       />
     );
     if (isNative) return <span key={f.id}>{chip}</span>;
@@ -347,27 +396,37 @@ export function AttributeFilterChips({
   );
   const { label: condLabel, active: condActive } = getConditionChipState(conditions ?? []);
 
-  const priceChip = showPriceCondition && (
-    <Popover
-      open={priceConditionOpen === "price"}
-      onOpenChange={(o) => setPriceConditionOpen(o ? "price" : null)}
-    >
-      <PopoverTrigger asChild>
-        <FilterChip label={priceLabel} active={priceActive} />
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-72 p-3">
-        <PricePopoverContent
-          min={min}
-          max={max}
-          includeFree={includeFree ?? true}
-          onApply={(mn, mx, free) => {
-            onPriceChange?.(mn, mx, free);
-            setPriceConditionOpen(null);
-          }}
-        />
-      </PopoverContent>
-    </Popover>
-  );
+  // Card layout: Pris is a bare "opp til"-input right in the row (mobile.de
+  // style) instead of a popover — the full min–max slider still lives in the
+  // "Flere filter" dialog for buyers who want finer control.
+  const priceChip =
+    showPriceCondition &&
+    (isCard ? (
+      <PriceUpToField
+        value={max}
+        onChange={(mx) => onPriceChange?.(min, mx, includeFree ?? true)}
+      />
+    ) : (
+      <Popover
+        open={priceConditionOpen === "price"}
+        onOpenChange={(o) => setPriceConditionOpen(o ? "price" : null)}
+      >
+        <PopoverTrigger asChild>
+          <FilterChip label={priceLabel} active={priceActive} />
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-72 p-3">
+          <PricePopoverContent
+            min={min}
+            max={max}
+            includeFree={includeFree ?? true}
+            onApply={(mn, mx, free) => {
+              onPriceChange?.(mn, mx, free);
+              setPriceConditionOpen(null);
+            }}
+          />
+        </PopoverContent>
+      </Popover>
+    ));
 
   const conditionChip = showPriceCondition && !hideCondition && (
     <Popover
@@ -378,7 +437,9 @@ export function AttributeFilterChips({
         <FilterChip
           label={condLabel}
           active={condActive}
-          icon={<span className="text-[11px]">✦</span>}
+          icon={!isCard ? <span className="text-[11px]">✦</span> : undefined}
+          {...fieldProps}
+          fieldLabel="Tilstand"
         />
       </PopoverTrigger>
       <PopoverContent align="start" className="w-64 p-2">
@@ -406,24 +467,78 @@ export function AttributeFilterChips({
     </Popover>
   );
 
+  // City/radius — desktop card layout only; native keeps its own sheet in
+  // NativeFilterChips, and the chip-row layout has never surfaced this field
+  // (only Pris/Tilstand share the row with the category-attribute chips).
+  const locationLabel = location?.lat != null ? (location.label?.split(",")[0] ?? "Sted") : "Sted";
+  const cityField = isCard && onLocationChange && (
+    <Popover open={locationOpen} onOpenChange={setLocationOpen}>
+      <PopoverTrigger asChild>
+        <FilterChip
+          label={locationLabel}
+          active={location?.lat != null}
+          variant="field"
+          fieldLabel="By eller postnummer"
+        />
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-80 space-y-3 p-3">
+        <LocationPicker
+          value={location ?? { lat: null, lng: null, radius: 20 }}
+          onChange={onLocationChange}
+          onDone={() => setLocationOpen(false)}
+        />
+        <RadiusPicker
+          value={location?.radius ?? 20}
+          onChange={(r) =>
+            onLocationChange({ ...(location ?? { lat: null, lng: null, radius: 20 }), radius: r })
+          }
+          disabled={location?.lat == null}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+
   const moreButton = secondary.length > 0 && (
     <Button
       type="button"
-      variant="outline"
+      variant={isCard ? "ghost" : "outline"}
       size="sm"
-      className="relative h-9 shrink-0 gap-1.5 rounded-full"
+      className={
+        isCard
+          ? "relative gap-1.5 px-0 text-primary hover:bg-transparent"
+          : "relative h-9 shrink-0 gap-1.5 rounded-full"
+      }
       onClick={() => {
         if (isNative) void hapticImpact("light");
         setMoreOpen(true);
       }}
     >
       <SlidersHorizontal className="size-3.5" />
-      Se flere filter
+      Flere filter
       {secondaryCount > 0 && (
-        <span className="absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white">
+        <span
+          className={
+            isCard
+              ? "flex size-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white"
+              : "absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white"
+          }
+        >
           {secondaryCount}
         </span>
       )}
+    </Button>
+  );
+
+  const resetLink = isCard && onReset && (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="gap-1.5 px-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
+      onClick={onReset}
+    >
+      <RotateCcw className="size-3.5" />
+      Nullstill
     </Button>
   );
 
@@ -452,15 +567,43 @@ export function AttributeFilterChips({
       {visibleSecondary.length === 0 ? (
         <p className="text-sm text-muted-foreground">Ingen filter matcher «{moreSearch}».</p>
       ) : (
-        <CategoryFilterFields
-          filters={visibleSecondary}
-          brandLookupFilters={filters}
-          values={values}
-          onChange={onChange}
-          counts={counts}
-        />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <CategoryFilterFields
+            filters={visibleSecondary}
+            brandLookupFilters={filters}
+            values={values}
+            onChange={onChange}
+            counts={counts}
+          />
+        </div>
       )}
       {dismissButton(() => setMoreOpen(false))}
+    </div>
+  );
+
+  // Card layout: one bordered card, primary fields in a responsive grid with
+  // labels above each (mobile.de-style), "Flere filter"/"Nullstill" as plain
+  // links along the bottom instead of buttons in the field row.
+  const cardFields = (
+    <div
+      className={embedCard ? undefined : "rounded-2xl border border-border bg-card p-6 shadow-sm"}
+    >
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        {chips}
+        {priceChip}
+        {cityField}
+        {!hideCondition && conditionChip}
+      </div>
+      {(moreButton || resetLink || footerLeft || footerRight) && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+          <div>{footerLeft}</div>
+          <div className="flex flex-wrap items-center gap-4">
+            {resetLink}
+            {moreButton}
+            {footerRight}
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -471,10 +614,16 @@ export function AttributeFilterChips({
   // shared flex-wrap row, so Pris/Tilstand and Merke/Modell can share a line.
   const body = (
     <>
-      {priceChip}
-      {conditionChip}
-      {chips}
-      {moreButton}
+      {isCard ? (
+        cardFields
+      ) : (
+        <>
+          {priceChip}
+          {conditionChip}
+          {chips}
+          {moreButton}
+        </>
+      )}
 
       {/* Native: one bottom sheet per primary field that needs a surface. */}
       {isNative &&
@@ -571,6 +720,61 @@ function PricePopoverContent({
   );
 }
 
+/** Above this, "Pris opp til" reads as "no cap" rather than a real ceiling —
+ * typing a higher number clears the filter instead of silently clamping to
+ * some arbitrary max the buyer never asked for. */
+const PRICE_UPTO_MAX = 99_999_999;
+
+/** The card layout's Pris field: a bare "opp til" number input right in the
+ * row (mobile.de style), styled to match `FilterChip`'s "field" variant box.
+ * Min stays whatever it already was — the card only ever writes `max`; the
+ * full min–max slider (`RangeFilterField`, via `PricePopoverContent`) still
+ * lives in the "Flere filter" dialog for buyers who want a lower bound too. */
+function PriceUpToField({
+  value,
+  onChange,
+}: {
+  value: number | undefined;
+  onChange: (max: number | undefined) => void;
+}) {
+  const [draft, setDraft] = useState(value != null ? String(value) : "");
+  useEffect(() => {
+    setDraft(value != null ? String(value) : "");
+  }, [value]);
+  const commit = () => {
+    const n = draft ? Number(draft) : undefined;
+    if (n != null && n > PRICE_UPTO_MAX) {
+      setDraft("");
+      onChange(undefined);
+      return;
+    }
+    onChange(n);
+  };
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-xs font-medium text-muted-foreground">Pris opp til</span>
+      <div className="relative">
+        <Input
+          inputMode="numeric"
+          placeholder="Alle"
+          value={formatThousands(draft, PRICE_UPTO_MAX * 10)}
+          onChange={(e) => setDraft(digitsOnlyClamped(e.target.value, PRICE_UPTO_MAX * 10))}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+          }}
+          className="h-11 pr-8"
+        />
+        {draft && (
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+            kr
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** Filter types whose control doesn't fit on the chip itself and so need a
  * popover/sheet to open into. */
 function needsSurface(filter: CategoryFilter): boolean {
@@ -595,6 +799,8 @@ function SelectChip({
   placeholder,
   disabled,
   onChange,
+  variant,
+  fieldLabel,
 }: {
   label: string;
   active: boolean;
@@ -604,6 +810,8 @@ function SelectChip({
   placeholder: string;
   disabled?: boolean;
   onChange: (value: string | undefined) => void;
+  variant?: "pill" | "field";
+  fieldLabel?: string;
 }) {
   return (
     <Select
@@ -612,7 +820,13 @@ function SelectChip({
       onValueChange={(v) => onChange(v === ALL ? undefined : v)}
     >
       <SelectTriggerBare asChild>
-        <FilterChip label={label} active={active} disabled={disabled} />
+        <FilterChip
+          label={label}
+          active={active}
+          disabled={disabled}
+          variant={variant}
+          fieldLabel={fieldLabel}
+        />
       </SelectTriggerBare>
       <SelectContent>
         <SelectItem value={ALL}>Alle ({placeholder.toLowerCase()})</SelectItem>
@@ -681,6 +895,8 @@ function AttributeMultiChip({
   values,
   counts,
   onChange,
+  variant,
+  fieldLabel,
 }: {
   filter: CategoryFilter;
   label: string;
@@ -688,6 +904,8 @@ function AttributeMultiChip({
   values: string[];
   counts?: Record<string, number>;
   onChange: (values: string[]) => void;
+  variant?: "pill" | "field";
+  fieldLabel?: string;
 }) {
   const options = (filter.options ?? []).map((o) => ({ value: o.value, label: o.label_nb }));
   const toggle = (v: string) => {
@@ -696,7 +914,7 @@ function AttributeMultiChip({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <FilterChip label={label} active={active} />
+        <FilterChip label={label} active={active} variant={variant} fieldLabel={fieldLabel} />
       </PopoverTrigger>
       <PopoverContent align="start" className="w-64 p-0">
         <MultiSelectPopoverBody
@@ -721,6 +939,8 @@ function BrandMultiChip({
   values,
   counts,
   onChange,
+  variant,
+  fieldLabel,
 }: {
   filter: CategoryFilter;
   label: string;
@@ -728,6 +948,8 @@ function BrandMultiChip({
   values: string[];
   counts?: Record<string, number>;
   onChange: (values: string[]) => void;
+  variant?: "pill" | "field";
+  fieldLabel?: string;
 }) {
   const options = useVehicleBrandOptions((filter.unit ?? "bil") as VehicleBrandGroup, undefined);
   const toggle = (v: string) => {
@@ -736,7 +958,7 @@ function BrandMultiChip({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <FilterChip label={label} active={active} />
+        <FilterChip label={label} active={active} variant={variant} fieldLabel={fieldLabel} />
       </PopoverTrigger>
       <PopoverContent align="start" className="w-64 p-0">
         <MultiSelectPopoverBody
@@ -763,6 +985,8 @@ function ModelMultiChip({
   values,
   counts,
   onChange,
+  variant,
+  fieldLabel,
 }: {
   brandFilter: CategoryFilter | undefined;
   brandValues: string[];
@@ -771,6 +995,8 @@ function ModelMultiChip({
   values: string[];
   counts?: Record<string, number>;
   onChange: (values: string[]) => void;
+  variant?: "pill" | "field";
+  fieldLabel?: string;
 }) {
   const categoryGroup = (brandFilter?.unit ?? "bil") as VehicleBrandGroup;
   const brandKnown = brandValues.length > 0;
@@ -782,6 +1008,8 @@ function ModelMultiChip({
           label={brandKnown ? label : "Velg merke først"}
           active={active}
           disabled={!brandKnown}
+          variant={variant}
+          fieldLabel={fieldLabel}
         />
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72 p-0">

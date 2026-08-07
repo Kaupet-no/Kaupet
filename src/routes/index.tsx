@@ -8,7 +8,6 @@ import { OnboardingFlow } from "@/components/onboarding-flow";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { ChevronLeft } from "lucide-react";
 import { useIsNative } from "@/hooks/use-is-native";
@@ -22,11 +21,12 @@ import { Badge } from "@/components/ui/badge";
 import { useTypewriterText } from "@/hooks/use-typewriter-text";
 import { useDefaultSearchExamples } from "@/hooks/use-default-search-examples";
 import { categoryHeadingFontStack } from "@/lib/category-fonts";
-import { CategoryFilterFields, MoreFiltersToggle } from "@/components/category-filter-fields";
 import { setAttributeFilterValue } from "@/lib/category-filters";
+import { AttributeFilterChips } from "@/components/attribute-filter-chips";
 import { PopularCarousel } from "@/components/popular-carousel";
 import { HowItWorksSection, OpenSourceCtaSection } from "@/components/landing-static-sections";
 import { ListingCard } from "@/components/listing-card";
+import { EmptyState } from "@/components/ui/empty-state";
 import type { CategoryRow } from "@/features/landing/landing-types";
 import { useLandingCategories } from "@/features/landing/use-landing-categories";
 import { usePopularListings } from "@/features/landing/use-popular-listings";
@@ -124,10 +124,7 @@ function WebLanding() {
     priceMax,
     setPriceMax,
     subcatRef,
-    primaryFilters,
-    secondaryFilters,
-    moreFiltersOpen,
-    setMoreFiltersOpen,
+    activeFilters,
     currentCategoryIds,
     goToCategory,
     goToCategoryPage,
@@ -138,7 +135,7 @@ function WebLanding() {
   } = useCategoryDrilldown({ childrenByParent, categoriesById, allFilters, navigate });
 
   const { data: facetCounts } = useFilterFacetCounts({
-    filters: [...primaryFilters, ...secondaryFilters],
+    filters: activeFilters,
     values: filterValues,
     categoryIds: currentCategoryIds,
     conditions: [],
@@ -291,7 +288,7 @@ function WebLanding() {
                 onFocus={() => setQFocused(true)}
                 onBlur={() => setQFocused(false)}
                 placeholder={typewriterPlaceholder}
-                className="h-12 border-border bg-card pl-9 text-base shadow-md"
+                className="h-12 rounded-full border-border bg-card pl-9 text-base shadow-sm transition-shadow hover:shadow-md focus-visible:shadow-md"
                 aria-label="Søk i annonser"
               />
               {qFocused && heroSuggestion && (
@@ -484,7 +481,7 @@ function WebLanding() {
                                 ? "Beregner antall treff …"
                                 : `${resultCount} ${resultCount === 1 ? "treff" : "treff"} akkurat nå`}
                             </span>
-                            <Button type="submit" variant="outline">
+                            <Button type="submit" variant="outline" size="sm">
                               {resultCount === undefined
                                 ? "Vis alt i " + currentParent.name_nb
                                 : `Vis ${resultCount} treff`}
@@ -523,80 +520,48 @@ function WebLanding() {
                             ))}
                           </div>
 
-                          {/* Høyre kolonne — filtre gruppert i et rutenett i
-                              stedet for én lang vertikal stabel. */}
+                          {/* Høyre kolonne — samme felt-stil (labeled bokser i
+                              et rutenett) som søkeresultatsidens filterkort,
+                              via AttributeFilterChips' layout="card". `embedCard`
+                              hopper over dens egen kort-ramme siden denne
+                              kolonnen allerede sitter inni skjemaets kort. */}
                           <div className="min-w-0">
-                            <div className="grid gap-4 sm:grid-cols-2">
-                              <div className="space-y-2">
-                                <Label>Pris (kr)</Label>
-                                <div className="flex items-center gap-2">
-                                  <Input
-                                    type="number"
-                                    placeholder="Fra"
-                                    value={priceMin ?? ""}
-                                    onChange={(e) =>
-                                      setPriceMin(
-                                        e.target.value === "" ? undefined : Number(e.target.value),
-                                      )
-                                    }
-                                  />
-                                  <Input
-                                    type="number"
-                                    placeholder="Til"
-                                    value={priceMax ?? ""}
-                                    onChange={(e) =>
-                                      setPriceMax(
-                                        e.target.value === "" ? undefined : Number(e.target.value),
-                                      )
-                                    }
-                                  />
-                                </div>
-                              </div>
-                              <CategoryFilterFields
-                                filters={primaryFilters}
-                                values={filterValues}
-                                onChange={(key, v) =>
-                                  setFilterValues((prev) => setAttributeFilterValue(prev, key, v))
-                                }
-                                counts={facetCounts}
-                              />
-                            </div>
-                            {secondaryFilters.length > 0 && (
-                              <Collapsible
-                                open={moreFiltersOpen}
-                                onOpenChange={setMoreFiltersOpen}
-                                className="mt-4"
-                              >
-                                <MoreFiltersToggle
-                                  open={moreFiltersOpen}
-                                  count={secondaryFilters.length}
-                                />
-                                <CollapsibleContent className="grid gap-4 pt-4 data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:slide-in-from-top-2 data-[state=closed]:animate-out data-[state=closed]:fade-out sm:grid-cols-2">
-                                  <CategoryFilterFields
-                                    filters={secondaryFilters}
-                                    values={filterValues}
-                                    onChange={(key, v) =>
-                                      setFilterValues((prev) =>
-                                        setAttributeFilterValue(prev, key, v),
-                                      )
-                                    }
-                                    counts={facetCounts}
-                                  />
-                                </CollapsibleContent>
-                              </Collapsible>
-                            )}
-                            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-                              <span className="text-sm text-muted-foreground">
-                                {resultCount === undefined
-                                  ? "Beregner antall treff …"
-                                  : `${resultCount} ${resultCount === 1 ? "treff" : "treff"} akkurat nå`}
-                              </span>
-                              <Button type="submit">
-                                {resultCount === undefined
-                                  ? "Vis treff"
-                                  : `Vis ${resultCount} treff`}
-                              </Button>
-                            </div>
+                            <AttributeFilterChips
+                              filters={activeFilters}
+                              values={filterValues}
+                              onChange={(key, v) =>
+                                setFilterValues((prev) => setAttributeFilterValue(prev, key, v))
+                              }
+                              layout="card"
+                              embedCard
+                              hideCondition
+                              min={priceMin}
+                              max={priceMax}
+                              onPriceChange={(mn, mx) => {
+                                setPriceMin(mn);
+                                setPriceMax(mx);
+                              }}
+                              onReset={() => {
+                                setFilterValues({});
+                                setPriceMin(undefined);
+                                setPriceMax(undefined);
+                              }}
+                              counts={facetCounts}
+                              footerLeft={
+                                <span className="text-sm text-muted-foreground">
+                                  {resultCount === undefined
+                                    ? "Beregner antall treff …"
+                                    : `${resultCount} ${resultCount === 1 ? "treff" : "treff"} akkurat nå`}
+                                </span>
+                              }
+                              footerRight={
+                                <Button type="submit" variant="outline" size="sm">
+                                  {resultCount === undefined
+                                    ? "Vis treff"
+                                    : `Vis ${resultCount} treff`}
+                                </Button>
+                              }
+                            />
                           </div>
                         </div>
                       )}
@@ -675,14 +640,14 @@ function WebLanding() {
         <section className="mx-auto max-w-6xl px-4 pt-8 pb-16">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-semibold">Annonser i {activeCategory.name_nb}</h2>
-            <div className="inline-flex rounded-lg border border-border bg-card p-0.5 text-sm">
+            <div className="inline-flex gap-2">
               <button
                 type="button"
                 onClick={() => setFeedSort("popular")}
-                className={`rounded-md px-3 py-1.5 transition ${
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                   feedSort === "popular"
                     ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
                 }`}
               >
                 Populært
@@ -690,10 +655,10 @@ function WebLanding() {
               <button
                 type="button"
                 onClick={() => setFeedSort("new")}
-                className={`rounded-md px-3 py-1.5 transition ${
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                   feedSort === "new"
                     ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
                 }`}
               >
                 Nyest
@@ -702,12 +667,14 @@ function WebLanding() {
           </div>
 
           {feedIsError && (
-            <div className="flex flex-col items-center gap-2 rounded-xl border border-border bg-card py-10 text-center">
-              <p className="text-sm text-muted-foreground">Klarte ikke å hente annonser.</p>
-              <Button variant="outline" size="sm" onClick={() => void refetchFeed()}>
-                Prøv igjen
-              </Button>
-            </div>
+            <EmptyState
+              title="Klarte ikke å hente annonser."
+              action={
+                <Button variant="outline" size="sm" onClick={() => void refetchFeed()}>
+                  Prøv igjen
+                </Button>
+              }
+            />
           )}
 
           {!feedIsError && feedIsLoading && (
@@ -719,9 +686,7 @@ function WebLanding() {
           )}
 
           {!feedIsError && !feedIsLoading && feedListings.length === 0 && (
-            <p className="rounded-xl border border-border bg-card py-10 text-center text-sm text-muted-foreground">
-              Ingen annonser i denne kategorien ennå.
-            </p>
+            <EmptyState title="Ingen annonser i denne kategorien ennå." />
           )}
 
           {!feedIsError && feedListings.length > 0 && (
@@ -735,6 +700,7 @@ function WebLanding() {
                 <div className="mt-6 flex justify-center">
                   <Button
                     variant="outline"
+                    size="sm"
                     onClick={() => void feedFetchNextPage()}
                     disabled={feedIsFetchingNextPage}
                   >

@@ -397,7 +397,7 @@ function MineSokPage() {
         {editingSearch &&
           (native ? (
             <NativeAdvancedSearch
-              open={editingSearch !== null}
+              open
               onClose={() => setEditingSearch(null)}
               initial={criteriaToValue(editingSearch.criteria)}
               categories={categories ?? []}
@@ -407,7 +407,7 @@ function MineSokPage() {
             />
           ) : (
             <AdvancedSearchSheet
-              open={editingSearch !== null}
+              open
               onOpenChange={(o) => !o && setEditingSearch(null)}
               initial={criteriaToValue(editingSearch.criteria)}
               categories={categories ?? []}

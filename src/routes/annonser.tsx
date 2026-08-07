@@ -701,6 +701,7 @@ function BrowsePage() {
                 location={location}
                 onLocationChange={handleLocationChange}
                 onReset={resetFilters}
+                moreFilterHref
               />
             </>
           )}

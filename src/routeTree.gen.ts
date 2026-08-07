@@ -29,6 +29,7 @@ import { Route as AuthenticatedNyOkAnnonseRouteImport } from './routes/_authenti
 import { Route as AuthenticatedProfilRouteImport } from './routes/_authenticated/profil'
 import { Route as AuthenticatedVarslerRouteImport } from './routes/_authenticated/varsler'
 import { Route as AnnonseListingIdRouteImport } from './routes/annonse.$listingId'
+import { Route as AnnonserFilterRouteImport } from './routes/annonser_.filter'
 import { Route as BrukerIdRouteImport } from './routes/bruker.$id'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedAdminBrukereRouteImport } from './routes/_authenticated/admin/brukere'
@@ -146,6 +147,11 @@ const AuthenticatedVarslerRoute = AuthenticatedVarslerRouteImport.update({
 const AnnonseListingIdRoute = AnnonseListingIdRouteImport.update({
   id: '/annonse/$listingId',
   path: '/annonse/$listingId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AnnonserFilterRoute = AnnonserFilterRouteImport.update({
+  id: '/annonser_/filter',
+  path: '/annonser/filter',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BrukerIdRoute = BrukerIdRouteImport.update({
@@ -272,6 +278,7 @@ export interface FileRoutesByFullPath {
   '/profil': typeof AuthenticatedProfilRoute
   '/varsler': typeof AuthenticatedVarslerRoute
   '/annonse/$listingId': typeof AnnonseListingIdRoute
+  '/annonser/filter': typeof AnnonserFilterRoute
   '/bruker/$id': typeof BrukerIdRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
@@ -310,6 +317,7 @@ export interface FileRoutesByTo {
   '/profil': typeof AuthenticatedProfilRoute
   '/varsler': typeof AuthenticatedVarslerRoute
   '/annonse/$listingId': typeof AnnonseListingIdRoute
+  '/annonser/filter': typeof AnnonserFilterRoute
   '/bruker/$id': typeof BrukerIdRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
@@ -351,6 +359,7 @@ export interface FileRoutesById {
   '/_authenticated/profil': typeof AuthenticatedProfilRoute
   '/_authenticated/varsler': typeof AuthenticatedVarslerRoute
   '/annonse/$listingId': typeof AnnonseListingIdRoute
+  '/annonser_/filter': typeof AnnonserFilterRoute
   '/bruker/$id': typeof BrukerIdRoute
   '/_authenticated/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/_authenticated/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
@@ -392,6 +401,7 @@ export interface FileRouteTypes {
     | '/profil'
     | '/varsler'
     | '/annonse/$listingId'
+    | '/annonser/filter'
     | '/bruker/$id'
     | '/admin/brukere'
     | '/admin/kategorier'
@@ -430,6 +440,7 @@ export interface FileRouteTypes {
     | '/profil'
     | '/varsler'
     | '/annonse/$listingId'
+    | '/annonser/filter'
     | '/bruker/$id'
     | '/admin/brukere'
     | '/admin/kategorier'
@@ -470,6 +481,7 @@ export interface FileRouteTypes {
     | '/_authenticated/profil'
     | '/_authenticated/varsler'
     | '/annonse/$listingId'
+    | '/annonser_/filter'
     | '/bruker/$id'
     | '/_authenticated/admin/brukere'
     | '/_authenticated/admin/kategorier'
@@ -503,6 +515,7 @@ export interface RootRouteChildren {
   KaupetCodeSubRoute: typeof KaupetCodeSubRoute
   R360OpptakTokenRoute: typeof R360OpptakTokenRoute
   AnnonseListingIdRoute: typeof AnnonseListingIdRoute
+  AnnonserFilterRoute: typeof AnnonserFilterRoute
   BrukerIdRoute: typeof BrukerIdRoute
   ApiPublicPushDispatchRoute: typeof ApiPublicPushDispatchRoute
   ApiPublicVippsWebhookRoute: typeof ApiPublicVippsWebhookRoute
@@ -648,6 +661,13 @@ declare module '@tanstack/react-router' {
       path: '/annonse/$listingId'
       fullPath: '/annonse/$listingId'
       preLoaderRoute: typeof AnnonseListingIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/annonser_/filter': {
+      id: '/annonser_/filter'
+      path: '/annonser/filter'
+      fullPath: '/annonser/filter'
+      preLoaderRoute: typeof AnnonserFilterRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/bruker/$id': {
@@ -861,6 +881,7 @@ const rootRouteChildren: RootRouteChildren = {
   KaupetCodeSubRoute: KaupetCodeSubRoute,
   R360OpptakTokenRoute: R360OpptakTokenRoute,
   AnnonseListingIdRoute: AnnonseListingIdRoute,
+  AnnonserFilterRoute: AnnonserFilterRoute,
   BrukerIdRoute: BrukerIdRoute,
   ApiPublicPushDispatchRoute: ApiPublicPushDispatchRoute,
   ApiPublicVippsWebhookRoute: ApiPublicVippsWebhookRoute,

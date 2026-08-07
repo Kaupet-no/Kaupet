@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { Link } from "@tanstack/react-router";
 import { SlidersHorizontal, RotateCcw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -111,6 +112,11 @@ type Props = {
    * card chrome (the homepage's category-drilldown panel), so the fields
    * don't end up double-boxed. `layout="card"` only. */
   embedCard?: boolean;
+  /** When set, "Flere filter" links to the dedicated `/annonser/filter` page
+   * (current search params preserved) instead of opening the in-place
+   * dialog — used by `/annonser` itself, which owns that page. Other card
+   * callers (landing pages) keep the dialog since they aren't on `/annonser`. */
+  moreFilterHref?: boolean;
   /** Extra content in the card's bottom bar, alongside "Nullstill"/"Flere
    * filter" — `footerLeft` sits before them (e.g. a live result count),
    * `footerRight` after (e.g. a "Vis treff" submit button for a caller that
@@ -163,6 +169,7 @@ export function AttributeFilterChips({
   onLocationChange,
   onReset,
   embedCard = false,
+  moreFilterHref = false,
   footerLeft,
   footerRight,
 }: Props) {
@@ -498,21 +505,8 @@ export function AttributeFilterChips({
     </Popover>
   );
 
-  const moreButton = secondary.length > 0 && (
-    <Button
-      type="button"
-      variant={isCard ? "ghost" : "outline"}
-      size="sm"
-      className={
-        isCard
-          ? "relative gap-1.5 px-0 text-primary hover:bg-transparent"
-          : "relative h-9 shrink-0 gap-1.5 rounded-full"
-      }
-      onClick={() => {
-        if (isNative) void hapticImpact("light");
-        setMoreOpen(true);
-      }}
-    >
+  const moreButtonContent = (
+    <>
       <SlidersHorizontal className="size-3.5" />
       Flere filter
       {secondaryCount > 0 && (
@@ -526,8 +520,41 @@ export function AttributeFilterChips({
           {secondaryCount}
         </span>
       )}
-    </Button>
+    </>
   );
+  const moreButtonClassName = isCard
+    ? "relative gap-1.5 px-0 text-primary hover:bg-transparent"
+    : "relative h-9 shrink-0 gap-1.5 rounded-full";
+  const moreButton =
+    secondary.length > 0 && !isNative && moreFilterHref ? (
+      <Button
+        type="button"
+        variant={isCard ? "ghost" : "outline"}
+        size="sm"
+        className={moreButtonClassName}
+        asChild
+      >
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- shared component, not tied to one route's search type */}
+        <Link to="/annonser/filter" search={(prev: any) => prev}>
+          {moreButtonContent}
+        </Link>
+      </Button>
+    ) : (
+      secondary.length > 0 && (
+        <Button
+          type="button"
+          variant={isCard ? "ghost" : "outline"}
+          size="sm"
+          className={moreButtonClassName}
+          onClick={() => {
+            if (isNative) void hapticImpact("light");
+            setMoreOpen(true);
+          }}
+        >
+          {moreButtonContent}
+        </Button>
+      )
+    );
 
   const resetLink = isCard && onReset && (
     <Button

@@ -84,7 +84,15 @@ export async function clickAndWaitFor(
 ) {
   const attempts = 3;
   for (let i = 0; i < attempts; i++) {
-    await trigger.click();
+    // Some triggers (e.g. a dialog's confirm button) detach once the click
+    // has actually registered and the action it kicks off is under way but
+    // not yet finished — re-clicking a detached trigger just hangs waiting
+    // for it to reappear, which never happens. Only click while it's still
+    // there; otherwise treat "trigger already gone" as progress and fall
+    // through to waiting for `expected`.
+    if (await trigger.isVisible().catch(() => false)) {
+      await trigger.click({ timeout: 5_000 }).catch(() => {});
+    }
     const appeared = await expected
       .waitFor({ timeout: 8_000 })
       .then(() => true)

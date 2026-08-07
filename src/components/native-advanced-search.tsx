@@ -16,14 +16,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryPicker, SaveSearchDialog } from "@/components/advanced-search-sheet";
 import { TermGroupRow } from "@/components/term-group-editor";
+import { FilterChip } from "@/components/filter-chip";
 import {
   CONDITIONS,
   isBilOgMcCategory,
   type AdvancedSearchValue,
 } from "@/components/advanced-search-value";
 import type { Category } from "@/lib/categories";
+import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/location-filter";
 import { emptyTermGroup, type TermGroup } from "@/lib/term-groups";
 import { useAuth } from "@/hooks/use-auth";
 import { useAdvancedSearchValue } from "@/hooks/use-advanced-search-value";
@@ -35,12 +38,24 @@ import {
 import { hapticImpact, hapticNotification } from "@/lib/haptics";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
 
+export type NativeAdvancedSearchSection = "search" | "categories" | "price" | "location";
+
 type Props = {
   open: boolean;
   onClose: () => void;
   initial: AdvancedSearchValue;
   categories: Category[];
   onApply: (v: AdvancedSearchValue) => void;
+  /** Sted er eid av søkefeltet og oppdateres umiddelbart, i motsetning til
+   * resten av panelet som samles i et utkast og committes ved "Bruk søk" —
+   * se kommentaren over handleApply i use-annonser-search-state.ts. Utelates
+   * ved redigering av et lagret søk (mine-sok.tsx), der sted i stedet er en
+   * del av utkastet som committes sammen med resten av kriteriene. */
+  location?: LocationValue;
+  onLocationChange?: (v: LocationValue) => void;
+  /** Fanen som er aktiv når panelet åpnes — lar filter-chippene hoppe rett
+   * til riktig seksjon i stedet for å åpne separate ark. */
+  initialSection?: NativeAdvancedSearchSection;
   /** Label for the primary footer action (default "Bruk søk"). */
   applyLabel?: string;
   /** Hide the internal "Lagre" action — used when this overlay is already
@@ -55,6 +70,9 @@ export function NativeAdvancedSearch({
   initial,
   categories,
   onApply,
+  location: locationProp,
+  onLocationChange: onLocationChangeProp,
+  initialSection = "search",
   applyLabel = "Bruk søk",
   hideSaveAction = false,
 }: Props) {
@@ -62,9 +80,15 @@ export function NativeAdvancedSearch({
   const [v, setV] = useAdvancedSearchValue(open, initial);
   const [saveOpen, setSaveOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<TermGroup | null>(null);
+  const [section, setSection] = useState<NativeAdvancedSearchSection>(initialSection);
   const dialogRef = useRef<HTMLDivElement>(null);
 
   useFocusTrap(dialogRef, open);
+
+  // Jump to the section the triggering chip asked for each time the panel opens.
+  useEffect(() => {
+    if (open) setSection(initialSection);
+  }, [open, initialSection]);
 
   const handleReset = () => {
     void hapticImpact("light");
@@ -101,6 +125,15 @@ export function NativeAdvancedSearch({
   };
 
   const { criteria, defaultName } = buildAdvancedSearchCriteria(v);
+  const showCondition = !isBilOgMcCategory(categories, v.categories);
+  // Falls back to editing the draft's own location when no live location is
+  // passed in (saved-search editing on mine-sok.tsx), so the "Sted" tab works
+  // in both contexts without a second code path.
+  const location = locationProp ?? v.location;
+  const onLocationChange =
+    onLocationChangeProp ??
+    ((next: LocationValue) => setV((prev) => ({ ...prev, location: next })));
+  const locationActive = location.lat != null;
 
   // The Sheet (editingGroup) is rendered outside the portal so it sits in the
   // normal React tree. Its Radix portal uses z-[10000] and safely appears above
@@ -113,7 +146,7 @@ export function NativeAdvancedSearch({
             ref={dialogRef}
             role="dialog"
             aria-modal="true"
-            aria-label="Avansert søk"
+            aria-label="Filter"
             className="fixed inset-0 z-[9999] flex flex-col bg-background animate-in slide-in-from-bottom-4 duration-200"
           >
             {/* Header */}
@@ -129,7 +162,7 @@ export function NativeAdvancedSearch({
               >
                 <ArrowLeft className="size-5" />
               </button>
-              <h2 className="font-display text-lg tracking-tight">Avansert søk</h2>
+              <h2 className="font-display text-lg tracking-tight">Filter</h2>
               <button
                 type="button"
                 onClick={handleReset}
@@ -140,168 +173,188 @@ export function NativeAdvancedSearch({
               </button>
             </div>
 
-            {/* Scrollable content */}
-            <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6 pb-safe">
-              {/* Extra search lines */}
-              <section className="space-y-3">
-                <Label className="text-sm font-medium">Flere søkelinjer</Label>
+            <Tabs
+              value={section}
+              onValueChange={(s) => setSection(s as NativeAdvancedSearchSection)}
+              className="flex flex-1 flex-col overflow-hidden"
+            >
+              <TabsList className="mx-4 mt-3 grid grid-cols-4">
+                <TabsTrigger value="categories">Kategori</TabsTrigger>
+                <TabsTrigger value="price">Pris</TabsTrigger>
+                <TabsTrigger value="location">Sted</TabsTrigger>
+                <TabsTrigger value="search">Søk</TabsTrigger>
+              </TabsList>
 
-                {v.extraGroups.map((g) => (
-                  <button
-                    key={g.id}
-                    type="button"
-                    onClick={() => {
-                      void hapticImpact("light");
-                      setEditingGroup(g);
-                    }}
-                    className={`flex w-full items-start gap-3 rounded-xl border px-4 py-3 text-left transition active:scale-[0.98] ${
-                      g.exclude ? "border-destructive/40 bg-destructive/5" : "border-border bg-card"
-                    }`}
-                  >
-                    <span
-                      className={`mt-0.5 shrink-0 ${g.exclude ? "text-destructive" : "text-muted-foreground"}`}
-                    >
-                      {g.exclude ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                    </span>
-                    <span className="flex-1 min-w-0">
-                      <span
-                        className={`block text-sm font-medium ${g.exclude ? "text-destructive" : ""}`}
-                      >
-                        {g.exclude ? "Ekskluder" : "Inkluder"} —{" "}
-                        {g.mode === "all" ? "alle ord" : "minst ett ord"}
-                      </span>
-                      <span className="block truncate text-sm text-muted-foreground">
-                        {g.terms.length > 0 ? g.terms.join(", ") : "Ingen ord lagt til"}
-                      </span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeGroup(g.id);
-                      }}
-                      className="shrink-0 rounded-full p-1.5 text-muted-foreground hover:text-foreground"
-                      aria-label="Fjern søkelinje"
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
-                  </button>
-                ))}
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    void hapticImpact("light");
-                    setEditingGroup(emptyTermGroup());
-                  }}
-                  className="flex w-full items-center gap-2 rounded-xl border border-dashed border-border bg-card px-4 py-3 text-sm text-muted-foreground transition active:scale-[0.98] hover:border-primary hover:text-primary"
-                >
-                  <Plus className="size-4" />
-                  Legg til søkelinje
-                </button>
-              </section>
-
-              {/* Categories */}
-              <CategoryPicker
-                categories={categories}
-                selected={v.categories}
-                onChange={(slugs) =>
-                  setV((prev) => ({ ...prev, categories: slugs, catMode: "any" }))
-                }
-              />
-
-              {/* Price */}
-              <section className="space-y-3">
-                <Label className="text-sm font-medium">Pris (NOK)</Label>
-                <div className="flex gap-3">
-                  <div className="flex-1 space-y-1">
-                    <Label htmlFor="adv-min" className="text-xs text-muted-foreground">
-                      Fra
-                    </Label>
-                    <Input
-                      id="adv-min"
-                      type="number"
-                      inputMode="numeric"
-                      min={0}
-                      placeholder="0"
-                      value={v.min ?? ""}
-                      onChange={(e) =>
-                        setV((prev) => ({
-                          ...prev,
-                          min: e.target.value ? Number(e.target.value) : null,
-                        }))
-                      }
-                      className="h-11"
-                    />
-                  </div>
-                  <div className="flex-1 space-y-1">
-                    <Label htmlFor="adv-max" className="text-xs text-muted-foreground">
-                      Til
-                    </Label>
-                    <Input
-                      id="adv-max"
-                      type="number"
-                      inputMode="numeric"
-                      min={0}
-                      placeholder="–"
-                      value={v.max ?? ""}
-                      onChange={(e) =>
-                        setV((prev) => ({
-                          ...prev,
-                          max: e.target.value ? Number(e.target.value) : null,
-                        }))
-                      }
-                      className="h-11"
-                    />
-                  </div>
-                </div>
-                <label className="flex cursor-pointer items-center gap-3">
-                  <Checkbox
-                    checked={v.includeFree}
-                    onCheckedChange={(c) => {
-                      void hapticImpact("light");
-                      setV((prev) => ({ ...prev, includeFree: c === true }));
-                    }}
-                    id="adv-free"
+              <div className="flex-1 overflow-y-auto px-4 py-5 pb-safe">
+                <TabsContent value="categories" className="mt-0">
+                  <CategoryPicker
+                    categories={categories}
+                    selected={v.categories}
+                    onChange={(slugs) =>
+                      setV((prev) => ({ ...prev, categories: slugs, catMode: "any" }))
+                    }
                   />
-                  <Label htmlFor="adv-free" className="cursor-pointer text-base">
-                    Inkluder gratis-annonser
-                  </Label>
-                </label>
-              </section>
+                </TabsContent>
 
-              {/* Condition */}
-              {!isBilOgMcCategory(categories, v.categories) && (
-                <section className="space-y-3">
-                  <Label className="text-sm font-medium">Tilstand</Label>
-                  <div className="flex flex-col gap-3">
-                    {CONDITIONS.map((c) => (
-                      <label
-                        key={c.value}
-                        className="flex cursor-pointer items-center gap-3 py-0.5"
-                      >
-                        <Checkbox
-                          checked={v.conditions.includes(c.value)}
-                          onCheckedChange={() => {
-                            void hapticImpact("light");
+                <TabsContent value="price" className="mt-0 space-y-6">
+                  <section className="space-y-3">
+                    <Label className="text-sm font-medium">Pris (NOK)</Label>
+                    <div className="flex gap-3">
+                      <div className="flex-1 space-y-1">
+                        <Label htmlFor="adv-min" className="text-xs text-muted-foreground">
+                          Fra
+                        </Label>
+                        <Input
+                          id="adv-min"
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          placeholder="0"
+                          value={v.min ?? ""}
+                          onChange={(e) =>
                             setV((prev) => ({
                               ...prev,
-                              conditions: prev.conditions.includes(c.value)
-                                ? prev.conditions.filter((x) => x !== c.value)
-                                : [...prev.conditions, c.value],
-                            }));
-                          }}
-                          id={`adv-cond-${c.value}`}
+                              min: e.target.value ? Number(e.target.value) : null,
+                            }))
+                          }
+                          className="h-11"
                         />
-                        <Label htmlFor={`adv-cond-${c.value}`} className="cursor-pointer text-base">
-                          {c.label}
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <Label htmlFor="adv-max" className="text-xs text-muted-foreground">
+                          Til
                         </Label>
-                      </label>
+                        <Input
+                          id="adv-max"
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          placeholder="–"
+                          value={v.max ?? ""}
+                          onChange={(e) =>
+                            setV((prev) => ({
+                              ...prev,
+                              max: e.target.value ? Number(e.target.value) : null,
+                            }))
+                          }
+                          className="h-11"
+                        />
+                      </div>
+                    </div>
+                    <label className="flex cursor-pointer items-center gap-3">
+                      <Checkbox
+                        checked={v.includeFree}
+                        onCheckedChange={(c) => {
+                          void hapticImpact("light");
+                          setV((prev) => ({ ...prev, includeFree: c === true }));
+                        }}
+                        id="adv-free"
+                      />
+                      <Label htmlFor="adv-free" className="cursor-pointer text-base">
+                        Inkluder gratis-annonser
+                      </Label>
+                    </label>
+                  </section>
+
+                  {showCondition && (
+                    <section className="space-y-3">
+                      <Label className="text-sm font-medium">Tilstand</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {CONDITIONS.map((c) => (
+                          <FilterChip
+                            key={c.value}
+                            label={c.label}
+                            active={v.conditions.includes(c.value)}
+                            hideChevron
+                            onClick={() => {
+                              void hapticImpact("light");
+                              setV((prev) => ({
+                                ...prev,
+                                conditions: prev.conditions.includes(c.value)
+                                  ? prev.conditions.filter((x) => x !== c.value)
+                                  : [...prev.conditions, c.value],
+                              }));
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="location" className="mt-0 space-y-4">
+                  <LocationPicker value={location} onChange={onLocationChange} autoFocus={false} />
+                  {locationActive && (
+                    <RadiusPicker
+                      value={location.radius}
+                      onChange={(r) => onLocationChange({ ...location, radius: r })}
+                    />
+                  )}
+                </TabsContent>
+
+                <TabsContent value="search" className="mt-0">
+                  <section className="space-y-3">
+                    <Label className="text-sm font-medium">Flere søkelinjer</Label>
+
+                    {v.extraGroups.map((g) => (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => {
+                          void hapticImpact("light");
+                          setEditingGroup(g);
+                        }}
+                        className={`flex w-full items-start gap-3 rounded-xl border px-4 py-3 text-left transition active:scale-[0.98] ${
+                          g.exclude
+                            ? "border-destructive/40 bg-destructive/5"
+                            : "border-border bg-card"
+                        }`}
+                      >
+                        <span
+                          className={`mt-0.5 shrink-0 ${g.exclude ? "text-destructive" : "text-muted-foreground"}`}
+                        >
+                          {g.exclude ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                        </span>
+                        <span className="flex-1 min-w-0">
+                          <span
+                            className={`block text-sm font-medium ${g.exclude ? "text-destructive" : ""}`}
+                          >
+                            {g.exclude ? "Ekskluder" : "Inkluder"} —{" "}
+                            {g.mode === "all" ? "alle ord" : "minst ett ord"}
+                          </span>
+                          <span className="block truncate text-sm text-muted-foreground">
+                            {g.terms.length > 0 ? g.terms.join(", ") : "Ingen ord lagt til"}
+                          </span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeGroup(g.id);
+                          }}
+                          className="shrink-0 rounded-full p-1.5 text-muted-foreground hover:text-foreground"
+                          aria-label="Fjern søkelinje"
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
+                      </button>
                     ))}
-                  </div>
-                </section>
-              )}
-            </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void hapticImpact("light");
+                        setEditingGroup(emptyTermGroup());
+                      }}
+                      className="flex w-full items-center gap-2 rounded-xl border border-dashed border-border bg-card px-4 py-3 text-sm text-muted-foreground transition active:scale-[0.98] hover:border-primary hover:text-primary"
+                    >
+                      <Plus className="size-4" />
+                      Legg til søkelinje
+                    </button>
+                  </section>
+                </TabsContent>
+              </div>
+            </Tabs>
 
             {/* Sticky footer */}
             <div className="border-t border-border px-4 py-3 pb-safe flex gap-2">

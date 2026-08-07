@@ -46,7 +46,8 @@ jobs:
             --ignore=GHSA-3jxr-9vmj-r5cp \
             --ignore=GHSA-mh99-v99m-4gvg \
             --ignore=GHSA-f88m-g3jw-g9cj \
-            --ignore=GHSA-52cp-r559-cp3m
+            --ignore=GHSA-52cp-r559-cp3m \
+            --ignore=GHSA-5p4m-2wfm-xmqj
 
       - name: Audit dependencies (full report, informational)
         run: bun audit

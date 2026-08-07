@@ -12,6 +12,19 @@ export function isNative(): boolean {
   }
 }
 
+/**
+ * Fades out and removes the boot-time overlay (see __root.tsx RootShell).
+ * Call only after the native layout has actually painted — hiding it
+ * earlier would re-expose the web-layout flash it exists to cover.
+ */
+export function hideNativeBootSplash(): void {
+  const el = document.getElementById("native-boot-splash");
+  document.documentElement.classList.remove("native-boot");
+  if (!el) return;
+  el.style.opacity = "0";
+  window.setTimeout(() => el.remove(), 200);
+}
+
 export function nativePlatform(): "ios" | "android" | "web" {
   try {
     const p = Capacitor.getPlatform();

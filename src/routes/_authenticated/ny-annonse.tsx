@@ -155,6 +155,7 @@ function NewListingPage() {
     id: string;
     parentId: string;
     via: "wizard" | "sheet";
+    kind: "select" | "deselect";
   } | null>(null);
   const native = isNative();
   const { data: isDemo = false } = useIsDemo();
@@ -322,6 +323,11 @@ function NewListingPage() {
     // Boat brand/model are captured (with autocomplete) by the boat-facts
     // group — hide them from the generic category-attributes rendering.
     ...(baseFieldGroupKeys.includes("boat-facts") ? ["brand", "model"] : []),
+    // Utstyr-nøklene inherits from Bil og MC (see category_filters), but are
+    // only meant to be filled in via the dedicated vehicle-equipment step —
+    // hidden here unconditionally so a category without that step (e.g.
+    // Bilsport) doesn't get them leaking into the generic attributes list.
+    ...VEHICLE_EQUIPMENT_FILTER_KEYS,
   ];
 
   // Whether the *flow* is vehicle-shaped — true as soon as the user has
@@ -793,9 +799,25 @@ function NewListingPage() {
 
   // Switching to a different category mid-flow discards the category-specific
   // fields the user already filled — confirm before applying.
+  // Re-opening the collapsed vehicle-registration category grid to pick a
+  // different subcategory discards the same manually-filled fields as an
+  // ordinary category switch, so it goes through the same confirm dialog.
+  // Resets to the "Bil og MC" group itself (not ""), since an empty
+  // category_id falls back to the generic non-vehicle flow/page set
+  // (effectiveFlowForCategory(null, ...)) — that reshapes `pages` under the
+  // wizard's still-current step index and reads as an unwanted jump forward.
+  const requestCategoryDeselect = (parentId: string) => {
+    const resetId = bilOgMcCategoryId ?? "";
+    if (Object.keys(attributes).length > 0) {
+      setPendingCategoryChange({ id: resetId, parentId, via: "wizard", kind: "deselect" });
+      return;
+    }
+    applyCategorySelect("wizard", resetId, parentId);
+  };
+
   const requestCategorySelect = (via: "wizard" | "sheet", id: string, parentId: string) => {
     if (categoryId && id !== categoryId && Object.keys(attributes).length > 0) {
-      setPendingCategoryChange({ id, parentId, via });
+      setPendingCategoryChange({ id, parentId, via, kind: "select" });
       return;
     }
     applyCategorySelect(via, id, parentId);
@@ -845,6 +867,7 @@ function NewListingPage() {
     titleExample,
     setCategoryPickerOpen,
     onCategorySelect: (id, parentId) => requestCategorySelect("wizard", id, parentId),
+    onCategoryDeselect: requestCategoryDeselect,
     categorySuggestion,
     categoryTouchedManually,
     applyCategorySuggestion,
@@ -1075,9 +1098,17 @@ function NewListingPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Bytte kategori?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {pendingCategoryChange?.kind === "deselect"
+                ? "Velge annen underkategori?"
+                : "Bytte kategori?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Informasjonen du har fylt ut for denne kategorien går tapt hvis du bytter.
+              Informasjonen du har fylt ut for denne kategorien går tapt hvis du{" "}
+              {pendingCategoryChange?.kind === "deselect"
+                ? "velger en annen underkategori"
+                : "bytter"}
+              .
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1088,7 +1119,9 @@ function NewListingPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={confirmPendingCategoryChange}
             >
-              Ja, bytt kategori
+              {pendingCategoryChange?.kind === "deselect"
+                ? "Ja, velg på nytt"
+                : "Ja, bytt kategori"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

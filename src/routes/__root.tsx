@@ -22,7 +22,7 @@ import {
   initNativePushNavigation,
 } from "@/lib/native-push";
 import { setupNative } from "@/lib/native-setup";
-import { initUniversalLinkNavigation } from "@/lib/native";
+import { initUniversalLinkNavigation, hideNativeBootSplash } from "@/lib/native";
 import { useIsNative } from "@/hooks/use-is-native";
 import { useKeyboardVisible } from "@/hooks/use-keyboard-visible";
 import { AppBottomNav } from "@/components/app-bottom-nav";
@@ -190,8 +190,41 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="nb">
       <head>
         <HeadContent />
+        {/* Runs synchronously during parsing, before anything paints. Only
+            ever true inside the Capacitor WebView — real kaupet.no visitors
+            never see this class or the overlay below. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) document.documentElement.classList.add("native-boot");`,
+          }}
+        />
+        <style>{`
+          #native-boot-splash { display: none; }
+          .native-boot #native-boot-splash {
+            display: flex;
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            background: #fbf9f3;
+            transition: opacity 200ms ease-out;
+          }
+          #native-boot-splash img { width: 64px; height: 64px; animation: native-boot-pulse 1.6s ease-in-out infinite; }
+          @keyframes native-boot-pulse {
+            0%, 100% { opacity: 0.85; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.08); }
+          }
+        `}</style>
       </head>
       <body>
+        {/* Same background/logo as capacitor.config.ts SplashScreen + the
+            iOS/Android launch images — this picks up right where the native
+            splash leaves off and stays until the native layout has actually
+            painted (see useIsNative / hideNativeBootSplash). */}
+        <div id="native-boot-splash">
+          <img src="/native-boot-icon.png" alt="" width={64} height={64} />
+        </div>
         {children}
         <Scripts />
       </body>
@@ -257,6 +290,13 @@ function RootComponent() {
 function RootBody({ native }: { native: boolean }) {
   const isTest = useIsTestEnv();
   const keyboardVisible = useKeyboardVisible();
+
+  useEffect(() => {
+    // Runs after the browser has painted this render — by the time we get
+    // here the native-layout DOM (bottom nav etc.) is already on screen, so
+    // removing the overlay now never re-exposes the web-layout flash.
+    if (native) hideNativeBootSplash();
+  }, [native]);
 
   useEffect(() => {
     if (!isTest) return;

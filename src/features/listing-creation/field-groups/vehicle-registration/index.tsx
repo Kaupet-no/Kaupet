@@ -38,6 +38,7 @@ export function VehicleRegistration(props: WizardSharedProps) {
     vehicleRegNrInput,
     setVehicleRegNrInput,
     onCategorySelect,
+    onCategoryDeselect,
     attributes,
     onAttributesChange,
     attributesTouched,
@@ -129,6 +130,7 @@ export function VehicleRegistration(props: WizardSharedProps) {
             initialParentId={bilOgMcCategoryId ?? undefined}
             selectedId={isManualLeafChosen ? categoryId : ""}
             onSelect={onCategorySelect}
+            onDeselect={onCategoryDeselect}
           />
 
           {isManualLeafChosen && (

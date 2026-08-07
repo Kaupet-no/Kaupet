@@ -175,14 +175,42 @@ function AttributeField({
   const label = filter.unit ? `${filter.label_nb} (${filter.unit})` : filter.label_nb;
 
   if (filter.type === "boolean") {
+    const showRequiredMark = required && !filter.is_optional;
     return (
-      <label className="flex items-center gap-2 text-sm">
-        <Checkbox
-          checked={value === true}
-          onCheckedChange={(c) => onChange(c === true ? true : undefined)}
-        />
-        {filter.label_nb}
-      </label>
+      <div className="space-y-2">
+        <Label>
+          {filter.label_nb} {showRequiredMark && <span className="text-destructive">*</span>}
+        </Label>
+        <div role="radiogroup" aria-label={filter.label_nb} className="flex gap-2">
+          <button
+            type="button"
+            role="radio"
+            aria-checked={value === true}
+            onClick={() => onChange(true)}
+            className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+              value === true
+                ? "border-primary bg-primary/10 text-primary font-medium"
+                : "border-border hover:border-primary/40"
+            }`}
+          >
+            Ja
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={value === false}
+            onClick={() => onChange(false)}
+            className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+              value === false
+                ? "border-primary bg-primary/10 text-primary font-medium"
+                : "border-border hover:border-primary/40"
+            }`}
+          >
+            Nei
+          </button>
+        </div>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+      </div>
     );
   }
 

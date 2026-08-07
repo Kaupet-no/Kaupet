@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { usePushStatus } from "@/hooks/use-push-status";
+import { useIsNative } from "@/hooks/use-is-native";
 import { Button } from "@/components/ui/button";
 import { formatErrorMessage } from "@/lib/errors";
 
@@ -20,6 +21,7 @@ type Props = {
  */
 export function PushEnablePrompt({ variant = "inline", showManageLink = true }: Props) {
   const push = usePushStatus();
+  const native = useIsNative();
   const [busy, setBusy] = useState(false);
 
   if (push.loading || push.savedSearchesActive) return null;
@@ -43,12 +45,17 @@ export function PushEnablePrompt({ variant = "inline", showManageLink = true }: 
   if (!push.supported) {
     body = (
       <p>
-        Push-varsler er ikke tilgjengelig i denne nettleseren. Du kan fortsatt lagre søket og motta
+        Push-varsler er ikke tilgjengelig på denne enheten. Du kan fortsatt lagre søket og motta
         varsler på andre enheter der du er logget inn.
       </p>
     );
   } else if (push.permission === "denied") {
-    body = (
+    body = native ? (
+      <p>
+        Du har blokkert varsler for appen. Endre tillatelsen i enhetens innstillinger for å motta
+        varsler her.
+      </p>
+    ) : (
       <p>
         Du har blokkert varsler for kaupet.no i nettleseren. Endre tillatelsen i
         nettleserinnstillingene for å motta varsler her.

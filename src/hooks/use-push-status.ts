@@ -8,8 +8,19 @@ import {
   pushSupported,
   subscribe as subscribePush,
 } from "@/lib/push";
+import {
+  getCurrentNativeToken,
+  getNativePermissionState,
+  nativePushSupported,
+  subscribeNative,
+} from "@/lib/native-push";
 import { getNotificationPreferences, updateNotificationPreferences } from "@/lib/push.functions";
 import { useAuth } from "@/hooks/use-auth";
+
+// nativePushSupported() reflects Capacitor.isNativePlatform(), which can't
+// change during a session — safe to read once at module scope rather than
+// re-deriving on every render (mirrors NotificationsSection's usage).
+const isNativeApp = nativePushSupported();
 
 export type PushStatus = {
   /** Browser supports push and we're in an allowed environment. */
@@ -54,6 +65,13 @@ export function usePushStatus(): PushStatus {
   const [browserReady, setBrowserReady] = useState(false);
 
   const refreshBrowser = useCallback(async () => {
+    if (isNativeApp) {
+      setSupported(true);
+      setPermission(await getNativePermissionState());
+      setEndpoint(await getCurrentNativeToken());
+      setBrowserReady(true);
+      return;
+    }
     const ok = pushSupported();
     setSupported(ok);
     setPermission(getPermissionState());
@@ -113,7 +131,11 @@ export function usePushStatus(): PushStatus {
   const subscribedHere = !!endpoint && permission === "granted";
 
   const enableOnThisDevice = async (kind?: "messages" | "saved_searches" | "price_drops") => {
-    await subscribePush();
+    if (isNativeApp) {
+      await subscribeNative();
+    } else {
+      await subscribePush();
+    }
     await refreshBrowser();
     if (kind) {
       const next = {

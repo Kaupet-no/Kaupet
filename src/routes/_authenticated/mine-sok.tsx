@@ -48,9 +48,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { PushEnablePrompt } from "@/components/push-enable-prompt";
+import { SwipeToDeleteRow } from "@/components/swipe-to-delete-row";
 import { EmptyState } from "@/components/ui/empty-state";
 import { AdvancedSearchSheet } from "@/components/advanced-search-sheet";
-import { criteriaToValue, valueToCriteria } from "@/components/advanced-search-value";
+import { NativeAdvancedSearch } from "@/components/native-advanced-search";
+import {
+  criteriaToValue,
+  valueToCriteria,
+  type AdvancedSearchValue,
+} from "@/components/advanced-search-value";
 import {
   deleteSavedSearch,
   listSavedSearches,
@@ -112,9 +118,17 @@ function MineSokPage() {
     showSuccessToast(s.notify ? "Varsler slått av" : "Varsler slått på");
     if (turningOn && !push.savedSearchesActive) {
       if (!push.supported) {
-        toast.message("Push-varsler er ikke tilgjengelig i denne nettleseren");
+        toast.message(
+          native
+            ? "Push-varsler støttes ikke på denne enheten"
+            : "Push-varsler er ikke tilgjengelig i denne nettleseren",
+        );
       } else if (push.permission === "denied") {
-        toast.message("Push er blokkert i nettleseren — endre tillatelsen for å motta varsler her");
+        toast.message(
+          native
+            ? "Push er blokkert — endre varseltillatelsen for appen i enhetens innstillinger"
+            : "Push er blokkert i nettleseren — endre tillatelsen for å motta varsler her",
+        );
       } else {
         toast.message("Aktiver push-varsler øverst på siden for å motta dem på denne enheten");
       }
@@ -148,6 +162,18 @@ function MineSokPage() {
       showErrorToast(formatErrorMessage(e, "Kunne ikke endre navn"));
     } finally {
       setRenaming(false);
+    }
+  };
+
+  const applyEditedSearch = async (search: SavedSearch, v: AdvancedSearchValue) => {
+    try {
+      await updateSavedSearch(search.id, { criteria: valueToCriteria(v) });
+      qc.invalidateQueries({ queryKey: ["saved-searches"] });
+      showSuccessToast("Søket er oppdatert");
+    } catch (e) {
+      showErrorToast(formatErrorMessage(e, "Kunne ikke oppdatere søket"));
+    } finally {
+      setEditingSearch(null);
     }
   };
 
@@ -221,8 +247,8 @@ function MineSokPage() {
             <ul className="space-y-3">
               {searches.map((s) => {
                 const unread = unreadCounts?.get(s.id) ?? 0;
-                return (
-                  <li key={s.id} className="rounded-lg border border-border bg-card p-4 shadow-sm">
+                const row = (
+                  <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
@@ -260,34 +286,67 @@ function MineSokPage() {
                         >
                           {s.notify ? <BellOff className="size-4" /> : <Bell className="size-4" />}
                         </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="ghost" aria-label="Flere valg">
-                              <MoreVertical className="size-4" />
+                        {native ? (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setEditingSearch(s)}
+                              aria-label="Rediger filtre"
+                            >
+                              <SlidersHorizontal className="size-4" />
                             </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setEditingSearch(s)}>
-                              <SlidersHorizontal className="size-4" /> Rediger filtre
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
+                            <Button
+                              size="sm"
+                              variant="outline"
                               onClick={() => {
                                 setRenamingSearch(s);
                                 setRenameValue(s.name);
                               }}
+                              aria-label="Endre navn"
                             >
-                              <Pencil className="size-4" /> Endre navn
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={() => setDeleteId(s.id)}
-                            >
-                              <Trash2 className="size-4" /> Slett søk
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                              <Pencil className="size-4" />
+                            </Button>
+                          </>
+                        ) : (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="sm" variant="ghost" aria-label="Flere valg">
+                                <MoreVertical className="size-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setEditingSearch(s)}>
+                                <SlidersHorizontal className="size-4" /> Rediger filtre
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setRenamingSearch(s);
+                                  setRenameValue(s.name);
+                                }}
+                              >
+                                <Pencil className="size-4" /> Endre navn
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => setDeleteId(s.id)}
+                              >
+                                <Trash2 className="size-4" /> Slett søk
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </div>
                     </div>
+                  </div>
+                );
+                return (
+                  <li key={s.id}>
+                    {native ? (
+                      <SwipeToDeleteRow onDelete={() => setDeleteId(s.id)}>{row}</SwipeToDeleteRow>
+                    ) : (
+                      row
+                    )}
                   </li>
                 );
               })}
@@ -335,28 +394,29 @@ function MineSokPage() {
           </DialogContent>
         </Dialog>
 
-        {editingSearch && (
-          <AdvancedSearchSheet
-            open={editingSearch !== null}
-            onOpenChange={(o) => !o && setEditingSearch(null)}
-            initial={criteriaToValue(editingSearch.criteria)}
-            categories={categories ?? []}
-            currentSort={editingSearch.criteria.sort}
-            applyLabel="Lagre endringer"
-            hideSaveAction
-            onApply={async (v) => {
-              try {
-                await updateSavedSearch(editingSearch.id, { criteria: valueToCriteria(v) });
-                qc.invalidateQueries({ queryKey: ["saved-searches"] });
-                showSuccessToast("Søket er oppdatert");
-              } catch (e) {
-                showErrorToast(formatErrorMessage(e, "Kunne ikke oppdatere søket"));
-              } finally {
-                setEditingSearch(null);
-              }
-            }}
-          />
-        )}
+        {editingSearch &&
+          (native ? (
+            <NativeAdvancedSearch
+              open
+              onClose={() => setEditingSearch(null)}
+              initial={criteriaToValue(editingSearch.criteria)}
+              categories={categories ?? []}
+              applyLabel="Lagre endringer"
+              hideSaveAction
+              onApply={(v) => void applyEditedSearch(editingSearch, v)}
+            />
+          ) : (
+            <AdvancedSearchSheet
+              open
+              onOpenChange={(o) => !o && setEditingSearch(null)}
+              initial={criteriaToValue(editingSearch.criteria)}
+              categories={categories ?? []}
+              currentSort={editingSearch.criteria.sort}
+              applyLabel="Lagre endringer"
+              hideSaveAction
+              onApply={(v) => void applyEditedSearch(editingSearch, v)}
+            />
+          ))}
       </div>
     </>
   );

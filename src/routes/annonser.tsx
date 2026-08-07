@@ -13,9 +13,12 @@ import { ActiveFilters } from "@/components/active-filters";
 import type { MapListing } from "@/components/listings-map";
 import { ResultList } from "@/components/result-list";
 import { NativeFilterChips } from "@/components/native-filter-chips";
-import { AttributeFilterChips } from "@/components/attribute-filter-chips";
+import { AttributeFilterChips, secondaryFilterCount } from "@/components/attribute-filter-chips";
 import { NativeSearchOverlay } from "@/components/native-search-overlay";
-import { NativeAdvancedSearch } from "@/components/native-advanced-search";
+import {
+  NativeAdvancedSearch,
+  type NativeAdvancedSearchSection,
+} from "@/components/native-advanced-search";
 import { saveLastSearchContext } from "@/lib/last-search-context";
 import { summarizeCriteria } from "@/lib/saved-searches";
 import { WtbListingCard } from "@/components/wtb-listing-card";
@@ -36,6 +39,7 @@ import {
   vehicleCategoryGroupFor,
   vehicleCategoriesForBrandGroup,
   genericBrandFilterFor,
+  splitPrimaryFilters,
 } from "@/lib/category-filters";
 import { getCategoryBehavior } from "@/lib/category-behavior";
 import { isBilOgMcCategory } from "@/components/advanced-search-value";
@@ -118,6 +122,7 @@ function BrowsePage() {
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
   const [advancedOverlayOpen, setAdvancedOverlayOpen] = useState(false);
+  const [advancedSection, setAdvancedSection] = useState<NativeAdvancedSearchSection>("search");
   const [activeTab, setActiveTab] = useState<"listings" | "wtb">("listings");
   // The original typed phrase behind each auto-applied attribute value, keyed
   // by "filterKey:optionValue" ("filterKey:" for single-value filters) — lets
@@ -141,7 +146,7 @@ function BrowsePage() {
   };
 
   const { refreshing, pullDistance } = usePullToRefresh({
-    enabled: isNative && mounted,
+    enabled: isNative && mounted && !searchOverlayOpen && !advancedOverlayOpen && !saveSearchOpen,
     onRefresh: async () => {
       await queryClient.resetQueries({ queryKey: ["listings"] });
     },
@@ -530,6 +535,8 @@ function BrowsePage() {
 
   return (
     <div>
+      <NativePageHeader title="Annonser" hideBack />
+
       {isNative && (pullDistance > 0 || refreshing) && (
         <div
           className="flex items-center justify-center overflow-hidden transition-all duration-150"
@@ -541,7 +548,6 @@ function BrowsePage() {
           />
         </div>
       )}
-      <NativePageHeader title="Annonser" hideBack />
 
       {/* Hero zone: before a category is picked this shows the always-visible
           main-category chip row; picking one brings in CategoryHero in this
@@ -650,26 +656,48 @@ function BrowsePage() {
             </div>
           )}
           {isNative ? (
-            <NativeFilterChips
-              min={search.min}
-              max={search.max}
-              includeFree={search.includeFree ?? true}
-              onPriceChange={(mn, mx, free) =>
-                updateSearch({ min: mn, max: mx, includeFree: free })
-              }
-              conditions={search.conditions ?? []}
-              onConditionsChange={(c) =>
-                updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
-              }
-              location={location}
-              onLocationChange={handleLocationChange}
-              resultCount={totalCount ?? cards.length}
-              onOpenAdvanced={() => setAdvancedOverlayOpen(true)}
-              advancedFilterCount={
-                (search.extraGroups?.length ?? 0) + (search.qMode === "any" ? 1 : 0)
-              }
-              hideCondition={isBilOgMc}
-            />
+            <>
+              {effectiveCategories.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Velg en kategori for å se flere søkefilter
+                </p>
+              )}
+              {/* One shared scroll row: category-specific chips (Merke, Modell
+                  …) always come first, generic Pris/Sted/Mer chips after —
+                  sekundærfiltrene bak "Mer" ligger i det samlede
+                  NativeAdvancedSearch-panelet. */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <AttributeFilterChips
+                  filters={attrFilters}
+                  values={attrValues}
+                  onChange={handleAttrValueChange}
+                  isNative={isNative}
+                  resultCount={totalCount ?? cards.length}
+                  queryText={qDraft}
+                  hasCategory={effectiveCategories.length > 0}
+                />
+                <NativeFilterChips
+                  min={search.min}
+                  max={search.max}
+                  includeFree={search.includeFree ?? true}
+                  conditions={search.conditions ?? []}
+                  location={location}
+                  onOpenAdvanced={(section) => {
+                    setAdvancedSection(section);
+                    setAdvancedOverlayOpen(true);
+                  }}
+                  advancedFilterCount={
+                    (search.extraGroups?.length ?? 0) +
+                    (search.qMode === "any" ? 1 : 0) +
+                    secondaryFilterCount(attrFilters, attrValues)
+                  }
+                  hideCondition={isBilOgMc}
+                  moreSection={
+                    splitPrimaryFilters(attrFilters).secondary.length > 0 ? "attributes" : "search"
+                  }
+                />
+              </div>
+            </>
           ) : (
             <>
               {effectiveCategories.length === 0 && (
@@ -702,27 +730,6 @@ function BrowsePage() {
                 onLocationChange={handleLocationChange}
                 onReset={resetFilters}
                 moreFilterHref
-              />
-            </>
-          )}
-
-          {/* Category-dependent filter row: the selected category's primary
-            fields stay visible, the rest sit behind "Se flere filter". */}
-          {isNative && (
-            <>
-              {effectiveCategories.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  Velg en kategori for å se flere søkefilter
-                </p>
-              )}
-              <AttributeFilterChips
-                filters={attrFilters}
-                values={attrValues}
-                onChange={handleAttrValueChange}
-                isNative={isNative}
-                resultCount={totalCount ?? cards.length}
-                queryText={qDraft}
-                hasCategory={effectiveCategories.length > 0}
               />
             </>
           )}
@@ -886,6 +893,13 @@ function BrowsePage() {
             initial={advancedInitial}
             categories={categories ?? []}
             onApply={handleApply}
+            location={location}
+            onLocationChange={handleLocationChange}
+            attributeFilters={attrFilters}
+            attributeValues={attrValues}
+            onAttributeChange={handleAttrValueChange}
+            attributeCounts={facetCounts}
+            initialSection={advancedSection}
           />
         )}
       </div>

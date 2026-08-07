@@ -91,6 +91,11 @@ export type WizardSharedProps = {
   titleExample: string | null;
   setCategoryPickerOpen: (open: boolean) => void;
   onCategorySelect: (categoryId: string, parentId: string) => void;
+  /** Fired when the user re-opens an already-collapsed/highlighted category
+   * grid (see CategoryPicker) to pick a different subcategory. Optional —
+   * only wired where a subcategory choice can carry filled-in data that a
+   * change would discard (currently vehicle-registration). */
+  onCategoryDeselect?: (parentId: string) => void;
   categorySuggestion: {
     category_id: string;
     parent_id: string | null;

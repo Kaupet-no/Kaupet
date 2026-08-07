@@ -216,10 +216,9 @@ export function effectiveFiltersForCategory(
 }
 
 /**
- * Returns the effective filters (excluding "range", which is search-only, and
- * "boolean", which a plain checkbox can't distinguish "unanswered" from
- * "false" for) that don't yet have a value in `attributes`. Used to require
- * filter values to be filled in before a listing can be published/saved.
+ * Returns the effective filters (excluding "range", which is search-only)
+ * that don't yet have a value in `attributes`. Used to require filter values
+ * to be filled in before a listing can be published/saved.
  */
 export function getMissingRequiredFilters(
   categoryId: string | null,
@@ -230,13 +229,14 @@ export function getMissingRequiredFilters(
 ): CategoryFilter[] {
   const excluded = excludeKeys ? new Set(excludeKeys) : null;
   const filters = effectiveFiltersForCategory(categoryId, allFilters, categoriesById).filter(
-    // "range" is search-only, "boolean" can't distinguish unanswered from
-    // false, and "registration_number" is set by the vehicle wizard itself
-    // (SVV lookup, or left unset for a manually entered unregistered
-    // vehicle) rather than filled in by the user as a generic attribute.
+    // "range" is search-only, and "registration_number" is set by the
+    // vehicle wizard itself (SVV lookup, or left unset for a manually
+    // entered unregistered vehicle) rather than filled in by the user as a
+    // generic attribute. "boolean" is included — it's rendered as an
+    // explicit Ja/Nei choice (see AttributeField), so `false` is a real
+    // answer distinguishable from unanswered (`undefined`).
     (f) =>
       f.type !== "range" &&
-      f.type !== "boolean" &&
       !f.is_optional &&
       f.key !== "registration_number" &&
       !excluded?.has(f.key) &&

@@ -7,7 +7,11 @@ import type { ListingCardData } from "@/components/listing-card";
 import type { MapListing } from "@/components/listings-map";
 import { ResultList } from "@/components/result-list";
 import { NativeFilterChips } from "@/components/native-filter-chips";
-import { AttributeFilterChips } from "@/components/attribute-filter-chips";
+import {
+  NativeAdvancedSearch,
+  type NativeAdvancedSearchSection,
+} from "@/components/native-advanced-search";
+import { AttributeFilterChips, secondaryFilterCount } from "@/components/attribute-filter-chips";
 import { CategoryHero } from "@/components/category-hero";
 import {
   buildTree,
@@ -20,6 +24,7 @@ import {
   normalizeFilter,
   vehicleCategoryGroupFor,
   genericBrandFilterFor,
+  splitPrimaryFilters,
 } from "@/lib/category-filters";
 import { getCategoryBehavior } from "@/lib/category-behavior";
 import { BIL_OG_MC_SLUG } from "@/components/advanced-search-value";
@@ -74,6 +79,8 @@ export function CategoryLandingPage({
   const isNative = useIsNative();
   const [qDraft, setQDraft] = useState(search.q);
   const [isDesktop, setIsDesktop] = useState(false);
+  const [advancedOverlayOpen, setAdvancedOverlayOpen] = useState(false);
+  const [advancedSection, setAdvancedSection] = useState<NativeAdvancedSearchSection>("search");
   // See annonser.tsx's identical field for why this exists — keyed by
   // "filterKey:optionValue" ("filterKey:" for single-value filters).
   const [autoAppliedText, setAutoAppliedText] = useState<Record<string, string>>({});
@@ -183,6 +190,8 @@ export function CategoryLandingPage({
     updateSearch,
     handleLocationChange,
     resetFilters,
+    advancedInitial,
+    handleApply,
   } = useAnnonserSearchState({
     search: effectiveSearch,
     navigate,
@@ -351,24 +360,37 @@ export function CategoryLandingPage({
             onExtraGroupsChange={(extraGroups) => updateSearch({ extraGroups })}
           />
           {isNative ? (
-            <NativeFilterChips
-              min={search.min}
-              max={search.max}
-              includeFree={search.includeFree ?? true}
-              onPriceChange={(mn, mx, free) =>
-                updateSearch({ min: mn, max: mx, includeFree: free })
-              }
-              conditions={search.conditions ?? []}
-              onConditionsChange={(c) =>
-                updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
-              }
-              location={location}
-              onLocationChange={handleLocationChange}
-              resultCount={totalCount ?? cards.length}
-              onOpenAdvanced={() => {}}
-              advancedFilterCount={0}
-              hideCondition={isBilOgMc}
-            />
+            // One shared scroll row — see the matching comment in annonser.tsx.
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <AttributeFilterChips
+                filters={attrFilters}
+                values={attrValues}
+                onChange={handleAttrValueChange}
+                isNative={isNative}
+                resultCount={totalCount ?? cards.length}
+                queryText={qDraft}
+              />
+              <NativeFilterChips
+                min={search.min}
+                max={search.max}
+                includeFree={search.includeFree ?? true}
+                conditions={search.conditions ?? []}
+                location={location}
+                onOpenAdvanced={(section) => {
+                  setAdvancedSection(section);
+                  setAdvancedOverlayOpen(true);
+                }}
+                advancedFilterCount={
+                  (search.extraGroups?.length ?? 0) +
+                  (search.qMode === "any" ? 1 : 0) +
+                  secondaryFilterCount(attrFilters, attrValues)
+                }
+                hideCondition={isBilOgMc}
+                moreSection={
+                  splitPrimaryFilters(attrFilters).secondary.length > 0 ? "attributes" : "search"
+                }
+              />
+            </div>
           ) : (
             <AttributeFilterChips
               filters={attrFilters}
@@ -393,19 +415,6 @@ export function CategoryLandingPage({
               location={location}
               onLocationChange={handleLocationChange}
               onReset={resetFilters}
-            />
-          )}
-
-          {/* Category-dependent filter row: primary fields stay visible, the
-              rest sit behind "Se flere filter". */}
-          {isNative && (
-            <AttributeFilterChips
-              filters={attrFilters}
-              values={attrValues}
-              onChange={handleAttrValueChange}
-              isNative={isNative}
-              resultCount={totalCount ?? cards.length}
-              queryText={qDraft}
             />
           )}
 
@@ -461,6 +470,23 @@ export function CategoryLandingPage({
           onSortChange={(s) => updateSearch({ sort: s })}
         />
       </div>
+
+      {isNative && (
+        <NativeAdvancedSearch
+          open={advancedOverlayOpen}
+          onClose={() => setAdvancedOverlayOpen(false)}
+          initial={advancedInitial}
+          categories={categories ?? []}
+          onApply={handleApply}
+          location={location}
+          onLocationChange={handleLocationChange}
+          attributeFilters={attrFilters}
+          attributeValues={attrValues}
+          onAttributeChange={handleAttrValueChange}
+          attributeCounts={facetCounts}
+          initialSection={advancedSection}
+        />
+      )}
     </div>
   );
 }

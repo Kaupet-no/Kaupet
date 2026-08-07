@@ -25,6 +25,11 @@ type Props = {
   categories: Category[];
   selectedId: string;
   onSelect: (categoryId: string, parentId: string) => void;
+  /** Called instead of re-expanding locally when the user clicks the
+   * already-selected, collapsed card in the grid. If omitted, clicking that
+   * card just re-reveals the other options (no confirmation, selection
+   * untouched) — the caller owns confirming/clearing when provided. */
+  onDeselect?: (parentId: string) => void;
   trigger?: React.ReactNode;
   /** Renders the drill-down list + search directly in the page flow, with no
    * Dialog/Sheet/Popover wrapper. Used for the category-select field group,
@@ -75,6 +80,7 @@ export function CategoryPicker({
   categories,
   selectedId,
   onSelect,
+  onDeselect,
   trigger,
   inline,
   selectableGroups,
@@ -105,6 +111,17 @@ export function CategoryPicker({
   const filteredCurrentLevel = search.trim()
     ? currentLevel.filter((c) => c.name_nb.toLowerCase().includes(search.toLowerCase()))
     : currentLevel;
+
+  /** Once a category at this level is selected, the grid collapses to just
+   * that card (highlighted) instead of leaving every sibling visible with no
+   * visual confirmation. Clicking the highlighted card again re-expands the
+   * level and clears the highlight — it does not change the selection. */
+  const [manualExpand, setManualExpand] = useState(false);
+  useEffect(() => {
+    setManualExpand(false);
+  }, [currentParentId]);
+  const selectedInLevel = filteredCurrentLevel.find((c) => c.id === selectedId);
+  const gridLevel = !manualExpand && selectedInLevel ? [selectedInLevel] : filteredCurrentLevel;
 
   const searchResults = search.trim()
     ? categories.filter((c) => c.name_nb.toLowerCase().includes(search.toLowerCase()))
@@ -276,37 +293,46 @@ export function CategoryPicker({
           </div>
         ) : showGrid ? (
           <div className="grid grid-cols-2 gap-2 p-1 sm:grid-cols-3">
-            {filteredCurrentLevel.map((cat) => {
+            {gridLevel.map((cat) => {
               const isPending = pendingSelection === cat.id;
+              const isSelected = !manualExpand && selectedId === cat.id;
+              const highlighted = isPending || isSelected;
               const Icon = getCategoryIcon(cat.icon);
               return (
                 <button
                   key={cat.id}
                   type="button"
-                  onClick={() => handleItemClick(cat)}
+                  onClick={() => {
+                    if (isSelected && !isPending) {
+                      if (onDeselect) onDeselect(currentParentId ?? "");
+                      else setManualExpand(true);
+                    } else {
+                      handleItemClick(cat);
+                    }
+                  }}
                   disabled={!!pendingSelection}
                   data-testid="category-tile"
                   data-category-name={cat.name_nb}
                   className={`flex flex-col items-center gap-2 rounded-xl border px-3 py-4 text-center transition-colors ${
-                    isPending
+                    highlighted
                       ? "border-primary bg-primary/10 ring-1 ring-primary/40"
                       : "border-border hover:border-primary/40 hover:bg-muted/50"
                   }`}
                 >
                   <span
                     className={`flex size-11 items-center justify-center rounded-full transition-transform ${
-                      isPending ? "scale-110" : ""
-                    } ${cat.color ? "" : isPending ? "bg-primary/20" : "bg-primary/10"}`}
+                      highlighted ? "scale-110" : ""
+                    } ${cat.color ? "" : highlighted ? "bg-primary/20" : "bg-primary/10"}`}
                     style={{
                       backgroundColor: cat.color
-                        ? isPending
+                        ? highlighted
                           ? cat.color
                           : `color-mix(in oklch, ${cat.color} 16%, transparent)`
                         : undefined,
-                      color: cat.color && isPending ? "white" : cat.color || undefined,
+                      color: cat.color && highlighted ? "white" : cat.color || undefined,
                     }}
                   >
-                    {isPending ? (
+                    {highlighted ? (
                       <Check className={`size-5 ${cat.color ? "" : "text-primary"}`} />
                     ) : (
                       <Icon className={`size-5 ${cat.color ? "" : "text-primary"}`} />

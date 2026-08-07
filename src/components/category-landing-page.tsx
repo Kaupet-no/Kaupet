@@ -24,6 +24,7 @@ import {
   normalizeFilter,
   vehicleCategoryGroupFor,
   genericBrandFilterFor,
+  splitPrimaryFilters,
 } from "@/lib/category-filters";
 import { getCategoryBehavior } from "@/lib/category-behavior";
 import { BIL_OG_MC_SLUG } from "@/components/advanced-search-value";
@@ -361,6 +362,14 @@ export function CategoryLandingPage({
           {isNative ? (
             // One shared scroll row — see the matching comment in annonser.tsx.
             <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <AttributeFilterChips
+                filters={attrFilters}
+                values={attrValues}
+                onChange={handleAttrValueChange}
+                isNative={isNative}
+                resultCount={totalCount ?? cards.length}
+                queryText={qDraft}
+              />
               <NativeFilterChips
                 min={search.min}
                 max={search.max}
@@ -377,14 +386,9 @@ export function CategoryLandingPage({
                   secondaryFilterCount(attrFilters, attrValues)
                 }
                 hideCondition={isBilOgMc}
-              />
-              <AttributeFilterChips
-                filters={attrFilters}
-                values={attrValues}
-                onChange={handleAttrValueChange}
-                isNative={isNative}
-                resultCount={totalCount ?? cards.length}
-                queryText={qDraft}
+                moreSection={
+                  splitPrimaryFilters(attrFilters).secondary.length > 0 ? "attributes" : "search"
+                }
               />
             </div>
           ) : (

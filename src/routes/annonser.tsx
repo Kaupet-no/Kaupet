@@ -39,6 +39,7 @@ import {
   vehicleCategoryGroupFor,
   vehicleCategoriesForBrandGroup,
   genericBrandFilterFor,
+  splitPrimaryFilters,
 } from "@/lib/category-filters";
 import { getCategoryBehavior } from "@/lib/category-behavior";
 import { isBilOgMcCategory } from "@/components/advanced-search-value";
@@ -660,12 +661,20 @@ function BrowsePage() {
                   Velg en kategori for å se flere søkefilter
                 </p>
               )}
-              {/* One shared scroll row: NativeFilterChips' Pris/Sted/Mer chips
-                  and AttributeFilterChips' primary category chips (Merke,
-                  Modell …) read as a single filter bar instead of two stacked
-                  rows — sekundærfiltrene bak "Mer" ligger i det samlede
+              {/* One shared scroll row: category-specific chips (Merke, Modell
+                  …) always come first, generic Pris/Sted/Mer chips after —
+                  sekundærfiltrene bak "Mer" ligger i det samlede
                   NativeAdvancedSearch-panelet. */}
               <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <AttributeFilterChips
+                  filters={attrFilters}
+                  values={attrValues}
+                  onChange={handleAttrValueChange}
+                  isNative={isNative}
+                  resultCount={totalCount ?? cards.length}
+                  queryText={qDraft}
+                  hasCategory={effectiveCategories.length > 0}
+                />
                 <NativeFilterChips
                   min={search.min}
                   max={search.max}
@@ -682,15 +691,9 @@ function BrowsePage() {
                     secondaryFilterCount(attrFilters, attrValues)
                   }
                   hideCondition={isBilOgMc}
-                />
-                <AttributeFilterChips
-                  filters={attrFilters}
-                  values={attrValues}
-                  onChange={handleAttrValueChange}
-                  isNative={isNative}
-                  resultCount={totalCount ?? cards.length}
-                  queryText={qDraft}
-                  hasCategory={effectiveCategories.length > 0}
+                  moreSection={
+                    splitPrimaryFilters(attrFilters).secondary.length > 0 ? "attributes" : "search"
+                  }
                 />
               </div>
             </>

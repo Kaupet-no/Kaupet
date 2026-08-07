@@ -34,20 +34,7 @@ jobs:
         run: bun run build
 
       - name: Audit dependencies (high/critical fails the build)
-        # Known transitive dev/build-only advisories without an upstream fix yet
-        # are ignored explicitly below (none of these ship to the browser or
-        # run in production) — any new high/critical advisory still fails CI.
-        # Re-check with `bun audit --audit-level=high` and drop an ID once its
-        # package is patched upstream.
-        run: |
-          bun audit --audit-level=high \
-            --ignore=GHSA-23hp-3jrh-7fpw \
-            --ignore=GHSA-8x88-c5mf-7j5w \
-            --ignore=GHSA-3jxr-9vmj-r5cp \
-            --ignore=GHSA-mh99-v99m-4gvg \
-            --ignore=GHSA-f88m-g3jw-g9cj \
-            --ignore=GHSA-52cp-r559-cp3m \
-            --ignore=GHSA-5p4m-2wfm-xmqj
+        run: bun audit --audit-level=high
 
       - name: Audit dependencies (full report, informational)
         run: bun audit

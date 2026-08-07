@@ -655,40 +655,44 @@ function BrowsePage() {
           )}
           {isNative ? (
             <>
-              <NativeFilterChips
-                min={search.min}
-                max={search.max}
-                includeFree={search.includeFree ?? true}
-                conditions={search.conditions ?? []}
-                location={location}
-                onOpenAdvanced={(section) => {
-                  setAdvancedSection(section);
-                  setAdvancedOverlayOpen(true);
-                }}
-                advancedFilterCount={
-                  (search.extraGroups?.length ?? 0) +
-                  (search.qMode === "any" ? 1 : 0) +
-                  secondaryFilterCount(attrFilters, attrValues)
-                }
-                hideCondition={isBilOgMc}
-              />
-              {/* Primærfiltrene (Merke, Modell …) for valgt kategori har fortsatt
-                  egen alltid-synlig chip-rad — kun sekundærfiltrene bak "Mer"
-                  ligger nå i det samlede NativeAdvancedSearch-panelet. */}
               {effectiveCategories.length === 0 && (
                 <p className="text-sm text-muted-foreground">
                   Velg en kategori for å se flere søkefilter
                 </p>
               )}
-              <AttributeFilterChips
-                filters={attrFilters}
-                values={attrValues}
-                onChange={handleAttrValueChange}
-                isNative={isNative}
-                resultCount={totalCount ?? cards.length}
-                queryText={qDraft}
-                hasCategory={effectiveCategories.length > 0}
-              />
+              {/* One shared scroll row: NativeFilterChips' Pris/Sted/Mer chips
+                  and AttributeFilterChips' primary category chips (Merke,
+                  Modell …) read as a single filter bar instead of two stacked
+                  rows — sekundærfiltrene bak "Mer" ligger i det samlede
+                  NativeAdvancedSearch-panelet. */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <NativeFilterChips
+                  min={search.min}
+                  max={search.max}
+                  includeFree={search.includeFree ?? true}
+                  conditions={search.conditions ?? []}
+                  location={location}
+                  onOpenAdvanced={(section) => {
+                    setAdvancedSection(section);
+                    setAdvancedOverlayOpen(true);
+                  }}
+                  advancedFilterCount={
+                    (search.extraGroups?.length ?? 0) +
+                    (search.qMode === "any" ? 1 : 0) +
+                    secondaryFilterCount(attrFilters, attrValues)
+                  }
+                  hideCondition={isBilOgMc}
+                />
+                <AttributeFilterChips
+                  filters={attrFilters}
+                  values={attrValues}
+                  onChange={handleAttrValueChange}
+                  isNative={isNative}
+                  resultCount={totalCount ?? cards.length}
+                  queryText={qDraft}
+                  hasCategory={effectiveCategories.length > 0}
+                />
+              </div>
             </>
           ) : (
             <>

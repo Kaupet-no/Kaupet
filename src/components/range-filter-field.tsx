@@ -24,12 +24,16 @@ export function RangeFilterField({
   bounds,
   value,
   onChange,
+  disabled = false,
 }: {
   label: string;
   bounds: RangeBounds;
   value: RangeValue;
   /** Called on commit (slider release / input blur), not per keystroke. */
   onChange: (next: RangeValue) => void;
+  /** Greys out the slider/inputs — for a field that only makes sense once a
+   * sibling toggle is on (e.g. "Tillatt hengervekt" needs "Hengerfeste"). */
+  disabled?: boolean;
 }) {
   const [minDraft, setMinDraft] = useState(value.min != null ? String(value.min) : "");
   const [maxDraft, setMaxDraft] = useState(value.max != null ? String(value.max) : "");
@@ -85,6 +89,7 @@ export function RangeFilterField({
         onValueCommit={([mn, mx]) =>
           commit(mn === bounds.min ? "" : String(mn), mx === bounds.max ? "" : String(mx))
         }
+        disabled={disabled}
       />
       <div className="flex items-center gap-2">
         <Input
@@ -95,6 +100,7 @@ export function RangeFilterField({
           onChange={(e) => setMinDraft(digitsOnlyClamped(e.target.value, bounds.max))}
           onBlur={() => commit(minDraft, maxDraft)}
           onKeyDown={(e) => e.key === "Enter" && commit(minDraft, maxDraft)}
+          disabled={disabled}
         />
         <span className="text-muted-foreground">–</span>
         <Input
@@ -105,6 +111,7 @@ export function RangeFilterField({
           onChange={(e) => setMaxDraft(digitsOnlyClamped(e.target.value, bounds.max))}
           onBlur={() => commit(minDraft, maxDraft)}
           onKeyDown={(e) => e.key === "Enter" && commit(minDraft, maxDraft)}
+          disabled={disabled}
         />
       </div>
     </div>

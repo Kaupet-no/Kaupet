@@ -41,9 +41,23 @@ type Props = {
   initial: AdvancedSearchValue;
   categories: Category[];
   onApply: (v: AdvancedSearchValue) => void;
+  /** Label for the primary footer action (default "Bruk søk"). */
+  applyLabel?: string;
+  /** Hide the internal "Lagre" action — used when this overlay is already
+   * editing the filters of an existing saved search, where "save as new"
+   * doesn't make sense. */
+  hideSaveAction?: boolean;
 };
 
-export function NativeAdvancedSearch({ open, onClose, initial, categories, onApply }: Props) {
+export function NativeAdvancedSearch({
+  open,
+  onClose,
+  initial,
+  categories,
+  onApply,
+  applyLabel = "Bruk søk",
+  hideSaveAction = false,
+}: Props) {
   const { user } = useAuth();
   const [v, setV] = useAdvancedSearchValue(open, initial);
   const [saveOpen, setSaveOpen] = useState(false);
@@ -291,7 +305,7 @@ export function NativeAdvancedSearch({ open, onClose, initial, categories, onApp
 
             {/* Sticky footer */}
             <div className="border-t border-border px-4 py-3 pb-safe flex gap-2">
-              {user && (
+              {user && !hideSaveAction && (
                 <Button
                   type="button"
                   variant="outline"
@@ -303,17 +317,19 @@ export function NativeAdvancedSearch({ open, onClose, initial, categories, onApp
                 </Button>
               )}
               <Button type="button" size="lg" onClick={handleApply} className="flex-1 gap-2">
-                <SearchIcon className="size-4" /> Bruk søk
+                <SearchIcon className="size-4" /> {applyLabel}
               </Button>
             </div>
 
-            <SaveSearchDialog
-              open={saveOpen}
-              onOpenChange={setSaveOpen}
-              defaultName={defaultName}
-              criteria={criteria}
-              onSaved={() => setSaveOpen(false)}
-            />
+            {!hideSaveAction && (
+              <SaveSearchDialog
+                open={saveOpen}
+                onOpenChange={setSaveOpen}
+                defaultName={defaultName}
+                criteria={criteria}
+                onSaved={() => setSaveOpen(false)}
+              />
+            )}
           </div>,
           document.body,
         )}

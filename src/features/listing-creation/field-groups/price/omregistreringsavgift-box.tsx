@@ -46,12 +46,15 @@ export function OmregistreringsavgiftBox({
           <span className="font-medium text-foreground">Fritatt</span>
         ) : editingAvgift ? (
           <Input
-            type="number"
-            min={0}
+            type="text"
+            inputMode="numeric"
             autoFocus
             className="h-7 max-w-[110px] text-xs"
             value={omregistreringsavgiftKr ?? ""}
-            onChange={(e) => onOverrideChange(e.target.value)}
+            onChange={(e) => {
+              const digits = e.target.value.replace(/\D/g, "").slice(0, 5);
+              onOverrideChange(digits);
+            }}
             onBlur={() => setEditingAvgift(false)}
           />
         ) : (

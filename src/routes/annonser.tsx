@@ -146,7 +146,7 @@ function BrowsePage() {
   };
 
   const { refreshing, pullDistance } = usePullToRefresh({
-    enabled: isNative && mounted,
+    enabled: isNative && mounted && !searchOverlayOpen && !advancedOverlayOpen && !saveSearchOpen,
     onRefresh: async () => {
       await queryClient.resetQueries({ queryKey: ["listings"] });
     },
@@ -535,6 +535,8 @@ function BrowsePage() {
 
   return (
     <div>
+      <NativePageHeader title="Annonser" hideBack />
+
       {isNative && (pullDistance > 0 || refreshing) && (
         <div
           className="flex items-center justify-center overflow-hidden transition-all duration-150"
@@ -546,7 +548,6 @@ function BrowsePage() {
           />
         </div>
       )}
-      <NativePageHeader title="Annonser" hideBack />
 
       {/* Hero zone: before a category is picked this shows the always-visible
           main-category chip row; picking one brings in CategoryHero in this

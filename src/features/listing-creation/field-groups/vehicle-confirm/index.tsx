@@ -25,7 +25,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { createVehicleBrand, createVehicleModel } from "@/lib/vehicle/vehicle-brands.functions";
-import { VEHICLE_LEAF_SLUGS, type VehicleLeafSlug } from "@/lib/vehicle/vehicle-classification";
+import {
+  VEHICLE_LEAF_SLUGS,
+  VEHICLE_LEAF_SLUGS_MODEL_FREE_TEXT,
+  type VehicleLeafSlug,
+} from "@/lib/vehicle/vehicle-classification";
 import {
   VehicleBrandField,
   VehicleModelWithClassField,
@@ -134,11 +138,19 @@ export function VehicleConfirm({
         setCategoryGroup(result.categoryGroup);
         setBrandName(result.brandMatch?.name ?? null);
         setBrandId(result.brandMatch?.id ?? null);
-        setModelName(result.modelMatch?.name ?? null);
+        const modelIsFreeText = VEHICLE_LEAF_SLUGS_MODEL_FREE_TEXT.includes(
+          selectedSlug as VehicleLeafSlug,
+        );
+        setModelName(modelIsFreeText ? null : (result.modelMatch?.name ?? null));
         if (vehicleLookupResult?.brand && !result.brandMatch) {
-          setPendingModelName(vehicleLookupResult.model);
+          if (!modelIsFreeText) setPendingModelName(vehicleLookupResult.model);
           setConfirmValue({ kind: "brand", name: vehicleLookupResult.brand });
-        } else if (vehicleLookupResult?.model && !result.modelMatch && result.brandMatch) {
+        } else if (
+          vehicleLookupResult?.model &&
+          !modelIsFreeText &&
+          !result.modelMatch &&
+          result.brandMatch
+        ) {
           setConfirmValue({ kind: "model", name: vehicleLookupResult.model });
         }
       })
@@ -229,6 +241,9 @@ export function VehicleConfirm({
   const lookup = vehicleLookupResult;
   const isTrailer = selectedSlug === "tilhenger-leaf";
   const isCamper = selectedSlug === "bobil" || selectedSlug === "campingvogn";
+  const modelIsFreeText = VEHICLE_LEAF_SLUGS_MODEL_FREE_TEXT.includes(
+    selectedSlug as VehicleLeafSlug,
+  );
   /** Tillatt totalvekt og lengde er særlig relevant for bil, bobil,
    * campingvogn, tilhenger og de tyngre kjøretøykategoriene (nyttelast/
    * kapasitet og parkerings-/garasjeplass er kjøpsrelevant på en måte de
@@ -388,8 +403,9 @@ export function VehicleConfirm({
                   brandName={brandOverride ?? brandName ?? undefined}
                   value={modelOverride ?? modelName ?? lookup.model ?? undefined}
                   onChange={(v) => setModelOverride(v ?? null)}
+                  freeText={modelIsFreeText}
                 />
-                {addingModel ? (
+                {!modelIsFreeText && addingModel ? (
                   <div className="flex gap-2">
                     <Input
                       value={newModelName}
@@ -410,13 +426,15 @@ export function VehicleConfirm({
                     </Button>
                   </div>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => setAddingModel(true)}
-                    className="text-xs text-primary underline-offset-2 hover:underline"
-                  >
-                    Fant du ikke modellen? Legg til ny
-                  </button>
+                  !modelIsFreeText && (
+                    <button
+                      type="button"
+                      onClick={() => setAddingModel(true)}
+                      className="text-xs text-primary underline-offset-2 hover:underline"
+                    >
+                      Fant du ikke modellen? Legg til ny
+                    </button>
+                  )
                 )}
               </div>
               <div className="space-y-1">

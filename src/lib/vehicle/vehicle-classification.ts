@@ -207,6 +207,24 @@ export const VEHICLE_LEAF_SLUGS: VehicleLeafSlug[] = [
   "anleggsmaskiner",
 ];
 
+/** Leaves where the "modell"-felt aldri matches mot `vehicle_models`-tabellen
+ * — SVV-importert modelltekst fylles kun inn som fritekst som brukeren kan
+ * redigere med en gang. Disse leddene mangler enten en `VehicleBrandGroup`
+ * helt (traktor/anleggsmaskiner/lastebil-og-henger/tilhenger-leaf) eller har
+ * en modelldatabase som er for upålitelig til å matche mot (MC/moped/ATV/
+ * snøscooter/campingvogn). */
+export const VEHICLE_LEAF_SLUGS_MODEL_FREE_TEXT: VehicleLeafSlug[] = [
+  "motorsykkel",
+  "moped-og-scooter",
+  "campingvogn",
+  "atv",
+  "snoscooter",
+  "tilhenger-leaf",
+  "lastebil-og-henger",
+  "traktor-og-redskap",
+  "anleggsmaskiner",
+];
+
 /** Vehicle leaves with no odometer — the annonseopprettelse "Kilometerstand"
  * field is hidden (and not required) for these. `campingvogn` and
  * `tilhenger-leaf` are towed, not motorized; every other leaf has an engine.

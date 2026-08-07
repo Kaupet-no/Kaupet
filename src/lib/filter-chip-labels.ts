@@ -1,6 +1,8 @@
+import { format } from "date-fns";
 import { SORT_OPTIONS, type SortValue, type Category } from "@/lib/categories";
 import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
 import { boundsForFilter } from "@/lib/filter-range-bounds";
+import { parseIsoDate } from "@/features/listing-creation/field-groups/vehicle-confirm/spec";
 
 /**
  * Shared label/active-state derivation used by both NativeFilterChips and
@@ -89,6 +91,11 @@ export function getAttributeChipState(
             ? `Fra ${fmt(value.min)}${unit}`
             : `Til ${fmt(value.max!)}${unit}`;
       return { label, active: true };
+    }
+    case "date_min": {
+      if (!value.value) return fallback;
+      const d = parseIsoDate(value.value);
+      return { label: d ? `Fra ${format(d, "dd.MM.yyyy")}` : filter.label_nb, active: true };
     }
   }
   return fallback;

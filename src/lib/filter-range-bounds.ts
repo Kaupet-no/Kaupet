@@ -38,6 +38,18 @@ const BOUNDS_BY_UNIT: Record<string, Omit<RangeBounds, "unit">> = {
   kg: { min: 0, max: 5000, step: 50 },
 };
 
+/** Bounds keyed by label rather than `key` — for filters whose
+ * `category_filters.key` is reused across categories for a differently-scaled
+ * attribute (e.g. "seats"/"capacity" also back "Sitteplasser"/"Kapasitet" on
+ * a buss, which can run well past 16). Checked before `BOUNDS_BY_KEY`, so it
+ * only narrows the specific labeled fields below, not every filter sharing
+ * that key. */
+const BOUNDS_BY_LABEL: Record<string, Omit<RangeBounds, "unit">> = {
+  "Antall seter": { min: 0, max: 16, step: 1 },
+  "Antall sylindre": { min: 0, max: 16, step: 1 },
+  Effekt: { min: 0, max: 1000, step: 5 },
+};
+
 const DEFAULT_BOUNDS: Omit<RangeBounds, "unit"> = { min: 0, max: 10_000, step: 10 };
 
 function currentYear() {
@@ -45,8 +57,11 @@ function currentYear() {
 }
 
 /** Resolves the slider scale for a numeric (`number`/`range`) category filter. */
-export function boundsForFilter(filter: Pick<CategoryFilter, "key" | "unit">): RangeBounds {
+export function boundsForFilter(
+  filter: Pick<CategoryFilter, "key" | "unit" | "label_nb">,
+): RangeBounds {
   const base =
+    BOUNDS_BY_LABEL[filter.label_nb] ??
     BOUNDS_BY_KEY[filter.key] ??
     (filter.unit ? BOUNDS_BY_UNIT[filter.unit] : undefined) ??
     DEFAULT_BOUNDS;

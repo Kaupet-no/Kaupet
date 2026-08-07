@@ -26,7 +26,7 @@ export function useAttributeRangeBounds(categoryId: string | null) {
  * no listings carry the key (or all carry the same value). The top of the
  * dynamic scale renders as "N+" in RangeFilterField, meaning "N or more". */
 export function dynamicBoundsForFilter(
-  filter: Pick<CategoryFilter, "key" | "unit">,
+  filter: Pick<CategoryFilter, "key" | "unit" | "label_nb">,
   dynamic: AttributeRangeBoundsMap | undefined,
 ): RangeBounds {
   const base = boundsForFilter(filter);

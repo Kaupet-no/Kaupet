@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryPicker, SaveSearchDialog } from "@/components/advanced-search-sheet";
 import { TermGroupRow } from "@/components/term-group-editor";
 import { FilterChip } from "@/components/filter-chip";
+import { SecondaryCategoryFilters } from "@/components/attribute-filter-chips";
 import {
   CONDITIONS,
   isBilOgMcCategory,
@@ -28,6 +29,7 @@ import {
 import type { Category } from "@/lib/categories";
 import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/location-filter";
 import { emptyTermGroup, type TermGroup } from "@/lib/term-groups";
+import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
 import { useAuth } from "@/hooks/use-auth";
 import { useAdvancedSearchValue } from "@/hooks/use-advanced-search-value";
 import {
@@ -38,7 +40,8 @@ import {
 import { hapticImpact, hapticNotification } from "@/lib/haptics";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
 
-export type NativeAdvancedSearchSection = "search" | "categories" | "price" | "location";
+export type NativeAdvancedSearchSection =
+  "search" | "categories" | "price" | "location" | "attributes";
 
 type Props = {
   open: boolean;
@@ -53,6 +56,14 @@ type Props = {
    * del av utkastet som committes sammen med resten av kriteriene. */
   location?: LocationValue;
   onLocationChange?: (v: LocationValue) => void;
+  /** Kategoriens attributtfiltre (Merke, Modell, Drivstoff …) — kun de
+   * sekundære (ikke-primære) vises her, i "Mer"-fanen; primærfiltrene har
+   * fortsatt sin egen alltid-synlige chip-rad i AttributeFilterChips.
+   * Utelatt betyr ingen "Mer"-fane (f.eks. ved redigering av lagret søk). */
+  attributeFilters?: CategoryFilter[];
+  attributeValues?: Record<string, AttributeFilterValue>;
+  onAttributeChange?: (key: string, value: AttributeFilterValue | undefined) => void;
+  attributeCounts?: Record<string, Record<string, number>>;
   /** Fanen som er aktiv når panelet åpnes — lar filter-chippene hoppe rett
    * til riktig seksjon i stedet for å åpne separate ark. */
   initialSection?: NativeAdvancedSearchSection;
@@ -72,6 +83,10 @@ export function NativeAdvancedSearch({
   onApply,
   location: locationProp,
   onLocationChange: onLocationChangeProp,
+  attributeFilters,
+  attributeValues,
+  onAttributeChange,
+  attributeCounts,
   initialSection = "search",
   applyLabel = "Bruk søk",
   hideSaveAction = false,
@@ -134,6 +149,8 @@ export function NativeAdvancedSearch({
     onLocationChangeProp ??
     ((next: LocationValue) => setV((prev) => ({ ...prev, location: next })));
   const locationActive = location.lat != null;
+  const hasAttributeFilters =
+    attributeFilters != null && attributeValues != null && onAttributeChange != null;
 
   // The Sheet (editingGroup) is rendered outside the portal so it sits in the
   // normal React tree. Its Radix portal uses z-[10000] and safely appears above
@@ -178,11 +195,26 @@ export function NativeAdvancedSearch({
               onValueChange={(s) => setSection(s as NativeAdvancedSearchSection)}
               className="flex flex-1 flex-col overflow-hidden"
             >
-              <TabsList className="mx-4 mt-3 grid grid-cols-4">
-                <TabsTrigger value="categories">Kategori</TabsTrigger>
-                <TabsTrigger value="price">Pris</TabsTrigger>
-                <TabsTrigger value="location">Sted</TabsTrigger>
-                <TabsTrigger value="search">Søk</TabsTrigger>
+              <TabsList
+                className={`mx-4 mt-3 grid ${hasAttributeFilters ? "grid-cols-5" : "grid-cols-4"}`}
+              >
+                <TabsTrigger value="categories" className="px-1.5 text-xs sm:text-sm">
+                  Kategori
+                </TabsTrigger>
+                <TabsTrigger value="price" className="px-1.5 text-xs sm:text-sm">
+                  Pris
+                </TabsTrigger>
+                <TabsTrigger value="location" className="px-1.5 text-xs sm:text-sm">
+                  Sted
+                </TabsTrigger>
+                {hasAttributeFilters && (
+                  <TabsTrigger value="attributes" className="px-1.5 text-xs sm:text-sm">
+                    Mer
+                  </TabsTrigger>
+                )}
+                <TabsTrigger value="search" className="px-1.5 text-xs sm:text-sm">
+                  Søk
+                </TabsTrigger>
               </TabsList>
 
               <div className="flex-1 overflow-y-auto px-4 py-5 pb-safe">
@@ -291,6 +323,18 @@ export function NativeAdvancedSearch({
                     />
                   )}
                 </TabsContent>
+
+                {hasAttributeFilters && (
+                  <TabsContent value="attributes" className="mt-0">
+                    <SecondaryCategoryFilters
+                      filters={attributeFilters!}
+                      values={attributeValues!}
+                      onChange={onAttributeChange!}
+                      counts={attributeCounts}
+                      isNative
+                    />
+                  </TabsContent>
+                )}
 
                 <TabsContent value="search" className="mt-0">
                   <section className="space-y-3">

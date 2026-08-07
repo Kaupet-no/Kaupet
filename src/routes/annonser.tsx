@@ -13,7 +13,7 @@ import { ActiveFilters } from "@/components/active-filters";
 import type { MapListing } from "@/components/listings-map";
 import { ResultList } from "@/components/result-list";
 import { NativeFilterChips } from "@/components/native-filter-chips";
-import { AttributeFilterChips } from "@/components/attribute-filter-chips";
+import { AttributeFilterChips, secondaryFilterCount } from "@/components/attribute-filter-chips";
 import { NativeSearchOverlay } from "@/components/native-search-overlay";
 import {
   NativeAdvancedSearch,
@@ -654,21 +654,42 @@ function BrowsePage() {
             </div>
           )}
           {isNative ? (
-            <NativeFilterChips
-              min={search.min}
-              max={search.max}
-              includeFree={search.includeFree ?? true}
-              conditions={search.conditions ?? []}
-              location={location}
-              onOpenAdvanced={(section) => {
-                setAdvancedSection(section);
-                setAdvancedOverlayOpen(true);
-              }}
-              advancedFilterCount={
-                (search.extraGroups?.length ?? 0) + (search.qMode === "any" ? 1 : 0)
-              }
-              hideCondition={isBilOgMc}
-            />
+            <>
+              <NativeFilterChips
+                min={search.min}
+                max={search.max}
+                includeFree={search.includeFree ?? true}
+                conditions={search.conditions ?? []}
+                location={location}
+                onOpenAdvanced={(section) => {
+                  setAdvancedSection(section);
+                  setAdvancedOverlayOpen(true);
+                }}
+                advancedFilterCount={
+                  (search.extraGroups?.length ?? 0) +
+                  (search.qMode === "any" ? 1 : 0) +
+                  secondaryFilterCount(attrFilters, attrValues)
+                }
+                hideCondition={isBilOgMc}
+              />
+              {/* Primærfiltrene (Merke, Modell …) for valgt kategori har fortsatt
+                  egen alltid-synlig chip-rad — kun sekundærfiltrene bak "Mer"
+                  ligger nå i det samlede NativeAdvancedSearch-panelet. */}
+              {effectiveCategories.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Velg en kategori for å se flere søkefilter
+                </p>
+              )}
+              <AttributeFilterChips
+                filters={attrFilters}
+                values={attrValues}
+                onChange={handleAttrValueChange}
+                isNative={isNative}
+                resultCount={totalCount ?? cards.length}
+                queryText={qDraft}
+                hasCategory={effectiveCategories.length > 0}
+              />
+            </>
           ) : (
             <>
               {effectiveCategories.length === 0 && (
@@ -701,27 +722,6 @@ function BrowsePage() {
                 onLocationChange={handleLocationChange}
                 onReset={resetFilters}
                 moreFilterHref
-              />
-            </>
-          )}
-
-          {/* Category-dependent filter row: the selected category's primary
-            fields stay visible, the rest sit behind "Se flere filter". */}
-          {isNative && (
-            <>
-              {effectiveCategories.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  Velg en kategori for å se flere søkefilter
-                </p>
-              )}
-              <AttributeFilterChips
-                filters={attrFilters}
-                values={attrValues}
-                onChange={handleAttrValueChange}
-                isNative={isNative}
-                resultCount={totalCount ?? cards.length}
-                queryText={qDraft}
-                hasCategory={effectiveCategories.length > 0}
               />
             </>
           )}
@@ -887,6 +887,10 @@ function BrowsePage() {
             onApply={handleApply}
             location={location}
             onLocationChange={handleLocationChange}
+            attributeFilters={attrFilters}
+            attributeValues={attrValues}
+            onAttributeChange={handleAttrValueChange}
+            attributeCounts={facetCounts}
             initialSection={advancedSection}
           />
         )}

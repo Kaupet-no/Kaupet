@@ -11,7 +11,7 @@ import {
   NativeAdvancedSearch,
   type NativeAdvancedSearchSection,
 } from "@/components/native-advanced-search";
-import { AttributeFilterChips } from "@/components/attribute-filter-chips";
+import { AttributeFilterChips, secondaryFilterCount } from "@/components/attribute-filter-chips";
 import { CategoryHero } from "@/components/category-hero";
 import {
   buildTree,
@@ -359,21 +359,33 @@ export function CategoryLandingPage({
             onExtraGroupsChange={(extraGroups) => updateSearch({ extraGroups })}
           />
           {isNative ? (
-            <NativeFilterChips
-              min={search.min}
-              max={search.max}
-              includeFree={search.includeFree ?? true}
-              conditions={search.conditions ?? []}
-              location={location}
-              onOpenAdvanced={(section) => {
-                setAdvancedSection(section);
-                setAdvancedOverlayOpen(true);
-              }}
-              advancedFilterCount={
-                (search.extraGroups?.length ?? 0) + (search.qMode === "any" ? 1 : 0)
-              }
-              hideCondition={isBilOgMc}
-            />
+            <>
+              <NativeFilterChips
+                min={search.min}
+                max={search.max}
+                includeFree={search.includeFree ?? true}
+                conditions={search.conditions ?? []}
+                location={location}
+                onOpenAdvanced={(section) => {
+                  setAdvancedSection(section);
+                  setAdvancedOverlayOpen(true);
+                }}
+                advancedFilterCount={
+                  (search.extraGroups?.length ?? 0) +
+                  (search.qMode === "any" ? 1 : 0) +
+                  secondaryFilterCount(attrFilters, attrValues)
+                }
+                hideCondition={isBilOgMc}
+              />
+              <AttributeFilterChips
+                filters={attrFilters}
+                values={attrValues}
+                onChange={handleAttrValueChange}
+                isNative={isNative}
+                resultCount={totalCount ?? cards.length}
+                queryText={qDraft}
+              />
+            </>
           ) : (
             <AttributeFilterChips
               filters={attrFilters}
@@ -398,19 +410,6 @@ export function CategoryLandingPage({
               location={location}
               onLocationChange={handleLocationChange}
               onReset={resetFilters}
-            />
-          )}
-
-          {/* Category-dependent filter row: primary fields stay visible, the
-              rest sit behind "Se flere filter". */}
-          {isNative && (
-            <AttributeFilterChips
-              filters={attrFilters}
-              values={attrValues}
-              onChange={handleAttrValueChange}
-              isNative={isNative}
-              resultCount={totalCount ?? cards.length}
-              queryText={qDraft}
             />
           )}
 
@@ -476,6 +475,10 @@ export function CategoryLandingPage({
           onApply={handleApply}
           location={location}
           onLocationChange={handleLocationChange}
+          attributeFilters={attrFilters}
+          attributeValues={attrValues}
+          onAttributeChange={handleAttrValueChange}
+          attributeCounts={facetCounts}
           initialSection={advancedSection}
         />
       )}

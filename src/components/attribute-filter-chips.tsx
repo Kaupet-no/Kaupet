@@ -142,6 +142,93 @@ function relevanceScore(filter: CategoryFilter, words: string[]): number {
 }
 
 /**
+ * The searchable grid of a category's secondary (non-primary) attribute
+ * filters — the content of "Flere filter" on desktop, and of the native
+ * advanced-search panel's "Mer" tab. Extracted so both surfaces share one
+ * implementation of the search-to-filter and relevance-sort behavior instead
+ * of drifting apart.
+ */
+export function SecondaryCategoryFilters({
+  filters,
+  values,
+  onChange,
+  counts,
+  queryText,
+  isNative = false,
+}: {
+  /** Full filter set for the category — split into primary/secondary here,
+   * same as `AttributeFilterChips`. */
+  filters: CategoryFilter[];
+  values: Record<string, AttributeFilterValue>;
+  onChange: (key: string, value: AttributeFilterValue | undefined) => void;
+  counts?: Record<string, Record<string, number>>;
+  /** Same relevance-boost input as `AttributeFilterChips`' `queryText`. */
+  queryText?: string;
+  isNative?: boolean;
+}) {
+  const [search, setSearch] = useState("");
+  const { secondary: secondaryRaw } = splitPrimaryFilters(filters);
+  const queryWords = (queryText ?? "").trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const secondary =
+    queryWords.length === 0
+      ? secondaryRaw
+      : [...secondaryRaw].sort(
+          (a, b) => relevanceScore(b, queryWords) - relevanceScore(a, queryWords),
+        );
+
+  if (secondary.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Ingen flere filter tilgjengelig for denne kategorien.
+      </p>
+    );
+  }
+
+  const searchTrimmed = search.trim();
+  const searchWords = searchTrimmed.toLowerCase().split(/\s+/).filter(Boolean);
+  const visible =
+    searchTrimmed.length < 2
+      ? secondary
+      : secondary.filter((f) => relevanceScore(f, searchWords) > 0);
+
+  return (
+    <div className="space-y-4">
+      {secondary.length > 5 && (
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Søk etter filter…"
+          autoFocus={!isNative}
+        />
+      )}
+      {visible.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Ingen filter matcher «{search}».</p>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <CategoryFilterFields
+            filters={visible}
+            brandLookupFilters={filters}
+            values={values}
+            onChange={onChange}
+            counts={counts}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Count of secondary (non-primary) filters with an active value — shared by
+ * `AttributeFilterChips`' own "Flere filter" badge and the native panel's
+ * "Mer" chip, so the two never show a different number for the same state. */
+export function secondaryFilterCount(
+  filters: CategoryFilter[],
+  values: Record<string, AttributeFilterValue>,
+): number {
+  return splitPrimaryFilters(filters).secondary.filter((f) => values[f.key] !== undefined).length;
+}
+
+/**
  * The category-dependent filter row on the search results page: the category's
  * primary filters (Merke, Modell, Drivstoff, Årsmodell …) each get their own
  * always-visible chip, and everything else sits behind "Se flere filter",
@@ -176,7 +263,6 @@ export function AttributeFilterChips({
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [priceConditionOpen, setPriceConditionOpen] = useState<"price" | "condition" | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [moreSearch, setMoreSearch] = useState("");
   const [locationOpen, setLocationOpen] = useState(false);
   const isCard = layout === "card" && !isNative;
   const fieldProps = isCard ? { variant: "field" as const } : {};
@@ -525,8 +611,13 @@ export function AttributeFilterChips({
   const moreButtonClassName = isCard
     ? "relative gap-1.5 px-0 text-primary hover:bg-transparent"
     : "relative h-9 shrink-0 gap-1.5 rounded-full";
+  // Native has no "Flere filter" trigger of its own — its secondary filters
+  // live in the "Mer" tab of NativeAdvancedSearch (see annonser.tsx), reached
+  // through NativeFilterChips' single "Mer" chip instead of a second button.
   const moreButton =
-    secondary.length > 0 && !isNative && moreFilterHref ? (
+    secondary.length > 0 &&
+    !isNative &&
+    (moreFilterHref ? (
       <Button
         type="button"
         variant={isCard ? "ghost" : "outline"}
@@ -540,21 +631,16 @@ export function AttributeFilterChips({
         </Link>
       </Button>
     ) : (
-      secondary.length > 0 && (
-        <Button
-          type="button"
-          variant={isCard ? "ghost" : "outline"}
-          size="sm"
-          className={moreButtonClassName}
-          onClick={() => {
-            if (isNative) void hapticImpact("light");
-            setMoreOpen(true);
-          }}
-        >
-          {moreButtonContent}
-        </Button>
-      )
-    );
+      <Button
+        type="button"
+        variant={isCard ? "ghost" : "outline"}
+        size="sm"
+        className={moreButtonClassName}
+        onClick={() => setMoreOpen(true)}
+      >
+        {moreButtonContent}
+      </Button>
+    ));
 
   const resetLink = isCard && onReset && (
     <Button
@@ -569,43 +655,16 @@ export function AttributeFilterChips({
     </Button>
   );
 
-  // Live text filter on top of the relevance sort above — the sort alone
-  // still leaves a buyer scanning past unrelated fields to find one by name
-  // in a dialog that can hold 8-12 filters. Same 2-character floor as the
-  // main search box (no results shown for a single typed letter there
-  // either), so a stray first keystroke doesn't blank the whole list.
-  const moreSearchTrimmed = moreSearch.trim();
-  const moreSearchWords = moreSearchTrimmed.toLowerCase().split(/\s+/).filter(Boolean);
-  const visibleSecondary =
-    moreSearchTrimmed.length < 2
-      ? secondary
-      : secondary.filter((f) => relevanceScore(f, moreSearchWords) > 0);
-
+  // Desktop-only now (see moreButton/Dialog below) — no dismiss button needed,
+  // the dialog's own close (X) covers it.
   const overlayBody = (
-    <div className="space-y-4">
-      {secondary.length > 5 && (
-        <Input
-          value={moreSearch}
-          onChange={(e) => setMoreSearch(e.target.value)}
-          placeholder="Søk etter filter…"
-          autoFocus={!isNative}
-        />
-      )}
-      {visibleSecondary.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Ingen filter matcher «{moreSearch}».</p>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <CategoryFilterFields
-            filters={visibleSecondary}
-            brandLookupFilters={filters}
-            values={values}
-            onChange={onChange}
-            counts={counts}
-          />
-        </div>
-      )}
-      {dismissButton(() => setMoreOpen(false))}
-    </div>
+    <SecondaryCategoryFilters
+      filters={filters}
+      values={values}
+      onChange={onChange}
+      counts={counts}
+      queryText={queryText}
+    />
   );
 
   // Card layout: one bordered card, primary fields in a responsive grid with
@@ -668,39 +727,17 @@ export function AttributeFilterChips({
           </Sheet>
         ))}
 
-      {/* "Se flere filter" overlay. */}
-      {secondary.length > 0 &&
-        (isNative ? (
-          <Sheet
-            open={moreOpen}
-            onOpenChange={(o) => {
-              setMoreOpen(o);
-              if (!o) setMoreSearch("");
-            }}
-          >
-            <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl">
-              <SheetHeader>
-                <SheetTitle>Flere filter</SheetTitle>
-              </SheetHeader>
-              <div className="mt-4">{overlayBody}</div>
-            </SheetContent>
-          </Sheet>
-        ) : (
-          <Dialog
-            open={moreOpen}
-            onOpenChange={(o) => {
-              setMoreOpen(o);
-              if (!o) setMoreSearch("");
-            }}
-          >
-            <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Flere filter</DialogTitle>
-              </DialogHeader>
-              {overlayBody}
-            </DialogContent>
-          </Dialog>
-        ))}
+      {/* "Se flere filter" dialog — desktop only, see moreButton comment above. */}
+      {secondary.length > 0 && !isNative && (
+        <Dialog open={moreOpen} onOpenChange={setMoreOpen}>
+          <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Flere filter</DialogTitle>
+            </DialogHeader>
+            {overlayBody}
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 

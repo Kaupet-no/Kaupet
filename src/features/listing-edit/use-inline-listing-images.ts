@@ -7,8 +7,10 @@ import {
   describeImageError,
   LISTING_BUCKET,
   uploadListingImage,
+  uploadListingImageThumb,
   validateImages,
 } from "@/lib/storage";
+import { compressImage } from "@/lib/image-compression";
 import { supabase } from "@/integrations/supabase/client";
 
 export type InlineImageItem = {
@@ -27,9 +29,9 @@ type ListingImageRow = {
 };
 
 /**
- * Autosave variant of `useEditableListingImages` — each action (add/remove/
- * reorder/caption) writes immediately instead of collecting a batch for one
- * big save, mirroring `EditableField`'s per-action autosave for inline
+ * Each action (add/remove/reorder/caption) writes immediately instead of
+ * collecting a batch for one big save, mirroring `EditableField`'s
+ * per-action autosave for inline
  * listing editing.
  */
 export function useInlineListingImages(params: {
@@ -116,12 +118,19 @@ export function useInlineListingImages(params: {
         },
       ]);
       try {
+        const [compressed, thumb] = await Promise.all([
+          compressImage(file, "listing"),
+          compressImage(file, "listing-thumb"),
+        ]);
         const path = await uploadListingImage({
           userId,
           listingId,
           index: Date.now(),
-          file,
+          file: compressed,
         });
+        await uploadListingImageThumb({ path, file: thumb }).catch((err) =>
+          console.warn("Kunne ikke laste opp miniatyrbilde", err),
+        );
         const sortOrder = items.length;
         const { error } = await supabase.from("listing_images").insert({
           listing_id: listingId,

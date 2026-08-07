@@ -51,7 +51,7 @@ export function useAnnonserSearchState(params: {
   // exact route registry and doesn't survive being passed through a plain
   // parameter — accept it loosely at this boundary rather than fight that.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  navigate: (opts: { search: any }) => void;
+  navigate: (opts: { search: any; resetScroll?: boolean }) => void;
   categories: Category[] | undefined;
   allFilters: CategoryFilter[] | undefined;
   setQDraft: (q: string) => void;
@@ -147,6 +147,7 @@ export function useAnnonserSearchState(params: {
 
     navigate({
       search: (prev: z.infer<typeof searchSchema>) => ({ ...prev, attrs: nextAttrs }),
+      resetScroll: false,
     });
   }, [
     attrFilters,
@@ -171,6 +172,7 @@ export function useAnnonserSearchState(params: {
         const next = setAttributeFilterValue(decodeAttrFilters(prev.attrs), key, value);
         return { ...prev, attrs: encodeAttrFilters(next) };
       },
+      resetScroll: false,
     });
   };
 
@@ -229,7 +231,10 @@ export function useAnnonserSearchState(params: {
   );
 
   const updateSearch = (patch: Partial<z.infer<typeof searchSchema>>) => {
-    navigate({ search: (prev: z.infer<typeof searchSchema>) => ({ ...prev, ...patch }) });
+    navigate({
+      search: (prev: z.infer<typeof searchSchema>) => ({ ...prev, ...patch }),
+      resetScroll: false,
+    });
   };
 
   // Applies only the fields owned by the advanced panel (category, price,

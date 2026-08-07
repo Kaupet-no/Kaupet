@@ -34,7 +34,7 @@ const { email, password } = JSON.parse(
 const TEST_CATEGORY_NAME = "E2E-test (ikke bruk)";
 
 test("logger inn og publiserer en annonse", async ({ page }, testInfo) => {
-  await login(page, email, password);
+  await login(page, email, password, testInfo);
   await goToNewListing(page);
 
   // Category must be chosen first — it's always the wizard's first step.
@@ -73,5 +73,5 @@ test("logger inn og publiserer en annonse", async ({ page }, testInfo) => {
     "Automatisk opprettet av en e2e-test. Stol i god stand, lite brukt.",
   );
 
-  await publishAndExpectSuccess(page);
+  await publishAndExpectSuccess(page, testInfo);
 });

@@ -411,13 +411,18 @@ export function VehicleModelMultiComboboxContent({
   values,
   onChange,
   emptyMessage,
+  counts,
 }: {
   categoryGroup: VehicleBrandGroup;
   brandNames: string[];
   values: string[];
   onChange: (values: string[]) => void;
   emptyMessage?: string;
+  /** Result counts keyed by model value, e.g. `{ "3-serie": 61 }`. */
+  counts?: Record<string, number>;
 }) {
+  const countLabel = (value: string, label: string) =>
+    counts?.[value] != null ? `${label} (${counts[value]})` : label;
   const singleBrand = brandNames.length === 1 ? brandNames[0] : undefined;
   const grouped = useVehicleModelOptionsGrouped(categoryGroup, singleBrand, undefined);
   const flatOptions = useVehicleModelOptionsForBrands(categoryGroup, brandNames, values);
@@ -471,7 +476,7 @@ export function VehicleModelMultiComboboxContent({
                           values.includes(o.value) ? "opacity-100" : "opacity-0",
                         )}
                       />
-                      {o.label}
+                      {countLabel(o.value, o.label)}
                     </CommandItem>
                   ))}
                 </CommandGroup>
@@ -487,7 +492,7 @@ export function VehicleModelMultiComboboxContent({
                         values.includes(o.value) ? "opacity-100" : "opacity-0",
                       )}
                     />
-                    {o.label}
+                    {countLabel(o.value, o.label)}
                   </CommandItem>
                 ))}
               </CommandGroup>
@@ -500,7 +505,7 @@ export function VehicleModelMultiComboboxContent({
                 <Check
                   className={cn("size-4", values.includes(o.value) ? "opacity-100" : "opacity-0")}
                 />
-                {o.label}
+                {countLabel(o.value, o.label)}
               </CommandItem>
             ))}
           </CommandGroup>
@@ -520,12 +525,14 @@ export function VehicleModelMultiField({
   values,
   onChange,
   label = "Modell",
+  counts,
 }: {
   categoryGroup: VehicleBrandGroup;
   brandNames: string[];
   values: string[];
   onChange: (values: string[]) => void;
   label?: string;
+  counts?: Record<string, number>;
 }) {
   const [open, setOpen] = useState(false);
   const brandKnown = brandNames.length > 0;
@@ -557,6 +564,7 @@ export function VehicleModelMultiField({
             brandNames={brandNames}
             values={values}
             onChange={onChange}
+            counts={counts}
           />
         </PopoverContent>
       </Popover>

@@ -21,6 +21,7 @@ import { formatErrorMessage } from "@/lib/errors";
 export type PendingImage = {
   id: string;
   file: File;
+  thumbFile: File;
   previewUrl: string;
   caption?: string;
 };
@@ -171,15 +172,19 @@ export function ImageUploader({
     async (files: File[]) => {
       setProcessing(true);
       try {
-        const compressed = await Promise.all(files.map((file) => compressImage(file, "listing")));
+        const [compressed, thumbs] = await Promise.all([
+          Promise.all(files.map((file) => compressImage(file, "listing"))),
+          Promise.all(files.map((file) => compressImage(file, "listing-thumb"))),
+        ]);
         const err = validateImages(compressed);
         if (err) {
           showErrorToast(describeImageError(err));
           return;
         }
-        const next: PendingImage[] = compressed.map((file) => ({
+        const next: PendingImage[] = compressed.map((file, i) => ({
           id: crypto.randomUUID(),
           file,
+          thumbFile: thumbs[i],
           previewUrl: URL.createObjectURL(file),
         }));
         onChange([...images, ...next]);

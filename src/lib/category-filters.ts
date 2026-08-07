@@ -381,6 +381,11 @@ export type AttributeFilterValue =
   | { kind: "boolean"; value: boolean }
   | { kind: "range"; min?: number; max?: number }
   | { kind: "text"; value: string }
+  /** Earliest-acceptable ISO date (`yyyy-MM-dd`) — currently only used by
+   * `next_eu_control` ("Tidligst neste EU-kontroll"), matching listings whose
+   * date is on or after this one. Mirrors WtbDateMinValue's "minDate"
+   * semantics (wtb-criteria-types.ts) for a sell-listing search filter. */
+  | { kind: "date_min"; value: string }
   /** Excludes listings whose attribute equals any of `values` — a listing
    * with no value for this key is kept (e.g. "ikke elbil" shouldn't hide
    * listings that never set `fuel_type`). Currently only produced by the
@@ -417,11 +422,21 @@ export function applyAttributeFilters<T>(
         }
         break;
       case "range":
-        if (typeof f.min === "number") q = q.gte(`attributes->>${key}`, f.min);
-        if (typeof f.max === "number") q = q.lte(`attributes->>${key}`, f.max);
+        // `->>` extracts JSON as text, so PostgREST compares it lexicographically
+        // against the number ("78000" >= "100000" is true as text, since '7' > '1') —
+        // `->` keeps it as jsonb instead, which numeric attribute values are always
+        // stored as, so Postgres compares them numerically like the filter intends.
+        if (typeof f.min === "number") q = q.gte(`attributes->${key}`, f.min);
+        if (typeof f.max === "number") q = q.lte(`attributes->${key}`, f.max);
         break;
       case "text":
         if (f.value) q = q.ilike(`attributes->>${key}`, `%${f.value}%`);
+        break;
+      case "date_min":
+        // `->>` (text) is correct here, unlike the numeric "range" case above —
+        // ISO `yyyy-MM-dd` strings sort chronologically under plain text
+        // comparison, so no jsonb-numeric cast is needed.
+        if (f.value) q = q.gte(`attributes->>${key}`, f.value);
         break;
       case "exclude":
         // Keep listings that never set this attribute — only exclude ones

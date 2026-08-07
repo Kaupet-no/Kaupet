@@ -1,10 +1,12 @@
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 
+import { format } from "date-fns";
 import { TermGroupChips } from "@/components/term-group-editor";
 import type { LocationValue } from "@/components/location-filter";
 import type { TermGroup } from "@/lib/term-groups";
 import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
+import { parseIsoDate } from "@/features/listing-creation/field-groups/vehicle-confirm/spec";
 
 type SearchLike = {
   q: string;
@@ -49,6 +51,10 @@ function describeAttrValue(filter: CategoryFilter, value: AttributeFilterValue):
       if (value.min != null) return `Fra ${value.min}${unit}`;
       if (value.max != null) return `Til ${value.max}${unit}`;
       return filter.label_nb;
+    }
+    case "date_min": {
+      const d = parseIsoDate(value.value);
+      return d ? `Fra ${format(d, "dd.MM.yyyy")}` : filter.label_nb;
     }
     case "multiselect":
     case "exclude":

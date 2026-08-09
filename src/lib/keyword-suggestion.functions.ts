@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 export const suggestKeywordsForListing = createServerFn({ method: "GET" })
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z.object({ title: z.string().max(200), category_id: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data }) => {

@@ -10,7 +10,6 @@ import { republishListing } from "@/lib/listings.functions";
 import { getMyActivePromotions } from "@/lib/promotions.functions";
 import { PromoteListingDialog } from "@/components/promote-listing-dialog";
 import { MarkSoldDialog } from "@/components/listing-detail/mark-sold-dialog";
-import { useIsDemo } from "@/hooks/use-is-demo";
 import { useIsNative } from "@/hooks/use-is-native";
 import { hapticImpact, hapticNotification } from "@/lib/haptics";
 import { Button } from "@/components/ui/button";
@@ -32,6 +31,8 @@ import { formatErrorMessage } from "@/lib/errors";
 import { getMyWtbListings, deleteWtbListing } from "@/lib/wtb-listings.functions";
 import { formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
+import { useAllCategoryFilters } from "@/components/attribute-fields";
+import { isVehicleCategory } from "@/lib/category-filters";
 
 import { NativePageHeader } from "@/components/native-page-header";
 import { ListingRow, type Row } from "@/features/my-listings/listing-row";
@@ -62,8 +63,20 @@ function MyListingsPage() {
   } | null>(null);
   const [promoteId, setPromoteId] = useState<string | null>(null);
   const [markSoldId, setMarkSoldId] = useState<string | null>(null);
-  const { data: isDemo = false } = useIsDemo();
   const native = useIsNative();
+
+  const { data: allFilters } = useAllCategoryFilters();
+  const { data: allCategories } = useQuery({
+    queryKey: ["categories"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("categories").select("id, parent_id");
+      if (error) throw error;
+      return data;
+    },
+  });
+  const categoriesById = new Map((allCategories ?? []).map((c) => [c.id, c]));
+  const isVehicleRow = (categoryId: string | null) =>
+    isVehicleCategory(categoryId, allFilters ?? [], categoriesById);
 
   const fetchPromos = useServerFn(getMyActivePromotions);
   const { data: promos } = useQuery({
@@ -297,7 +310,7 @@ function MyListingsPage() {
                     <ListingRow
                       key={r.id}
                       row={r}
-                      isDemo={isDemo}
+                      isVehicle={isVehicleRow(r.category_id)}
                       activePromotion={activePromoByListing.get(r.id) ?? null}
                       onPromote={() => setPromoteId(r.id)}
                       onMarkSold={() => setMarkSoldId(r.id)}
@@ -391,7 +404,7 @@ function MyListingsPage() {
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
-                      <Link to="/mine-annonser/ok/$id/rediger" params={{ id: w.id }}>
+                      <Link to="/ok/$id" params={{ id: w.id }} search={{ edit: true }}>
                         <Button
                           size="icon"
                           variant="ghost"

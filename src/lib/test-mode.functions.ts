@@ -9,7 +9,7 @@ const schema = z.object({ enabled: z.boolean() });
 
 export const setTestMode = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => schema.parse(i))
+  .validator((i: unknown) => schema.parse(i))
   .handler(async ({ data, context }) => {
     // Authorize: only admin or demo roles may toggle test-modus.
     const { data: rows, error } = await context.supabase

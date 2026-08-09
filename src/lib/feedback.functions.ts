@@ -28,7 +28,7 @@ const feedbackSchema = z.object({
  * valid Supabase bearer token accompanies the request the feedback is
  * attributed to that user, otherwise it's stored anonymously. */
 export const submitFeedback = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => feedbackSchema.parse(input))
+  .validator((input: unknown) => feedbackSchema.parse(input))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 

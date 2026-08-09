@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { MessageSquare, Tag, Calendar } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
@@ -64,7 +64,9 @@ export function WtbListingCard({ listing }: Props) {
     <article className="flex flex-col gap-3 rounded-xl border bg-card p-4 transition hover:border-primary hover:shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h3 className="font-semibold leading-tight">{listing.title}</h3>
+          <Link to="/ok/$id" params={{ id: listing.id }} className="hover:underline">
+            <h3 className="font-semibold leading-tight">{listing.title}</h3>
+          </Link>
           {listing.subtitle && (
             <p className="line-clamp-1 text-sm text-muted-foreground">{listing.subtitle}</p>
           )}

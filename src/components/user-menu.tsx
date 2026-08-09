@@ -12,10 +12,12 @@ import {
   LogOut,
   Shield,
   FlaskConical,
+  Moon,
 } from "lucide-react";
 
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import { useIsDemo } from "@/hooks/use-is-demo";
+import { useTheme } from "@/hooks/use-theme";
 import { useIsTestEnv } from "@/lib/env";
 import { setTestMode } from "@/lib/test-mode.functions";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
@@ -48,6 +50,7 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
   const isTest = useIsTestEnv();
   const [toggling, setToggling] = useState(false);
   const callSetTestMode = useServerFn(setTestMode);
+  const { resolvedTheme, setTheme } = useTheme();
 
   async function handleToggleTest(next: boolean) {
     if (toggling) return;
@@ -132,6 +135,23 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
             <Settings className="size-4" /> Kontoinnstillinger
           </Link>
         </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <div
+          className="flex items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-sm"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          <label htmlFor="dark-mode-toggle" className="flex items-center gap-2 cursor-pointer">
+            <Moon className="size-4" />
+            <span>Mørk modus</span>
+          </label>
+          <Switch
+            id="dark-mode-toggle"
+            checked={resolvedTheme === "dark"}
+            onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+            aria-label="Aktiver mørk modus"
+          />
+        </div>
         {(isAdmin || canToggleTest) && <DropdownMenuSeparator />}
         {isAdmin && (
           <DropdownMenuItem asChild>

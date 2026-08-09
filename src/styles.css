@@ -118,6 +118,13 @@
   --ring: oklch(0.78 0.09 160);
 }
 
+/* CARTO's dark_all tiles are near-black by default (~33/255 avg brightness);
+   lighten slightly so the map doesn't read as a black void against the
+   app's own (lighter) dark surface tones. */
+.dark .leaflet-tile {
+  filter: brightness(1.6) contrast(0.9);
+}
+
 @supports (padding: max(0px)) {
   :root {
     --safe-top: env(safe-area-inset-top);

@@ -16,14 +16,25 @@ export async function login(page: Page, email: string, password: string, testInf
   page.on("console", (msg) => console.log(`[browser:${msg.type()}] ${msg.text()}`));
   page.on("pageerror", (err) => console.log(`[pageerror] ${err.message}`));
 
-  await page.goto("/auth");
+  // "/auth" (no search params) triggers a client-side redirect to
+  // "/auth?mode=signin" — validateSearch's .default("signin") canonicalizes
+  // the URL — which remounts the form and wipes whatever was just filled.
+  // Going straight to the canonical URL avoids that race entirely (it only
+  // surfaced once Turnstile's load time gave the redirect time to land
+  // between fill and click).
+  await page.goto("/auth?mode=signin");
   // Inputs are controlled (SSR-rendered, then hydrated) — filling before
   // hydration finishes gets clobbered when React reconciles to its initial
-  // empty state, so wait for the network to settle first.
+  // empty state, so wait for the network to settle first (proxy for
+  // hydration being done). The retry-fill below is a second line of defense
+  // for the same race (fill + assert can both land inside one JS turn, just
+  // ahead of a hydration reconciliation on the next tick).
   await page.waitForLoadState("networkidle");
-  await page.getByLabel("E-post").fill(email);
-  await page.getByLabel("Passord").fill(password);
-  await expect(page.getByLabel("E-post")).toHaveValue(email);
+  await expect(async () => {
+    await page.getByLabel("E-post").fill(email);
+    await page.getByLabel("Passord").fill(password);
+    await expect(page.getByLabel("E-post")).toHaveValue(email);
+  }).toPass({ timeout: 15_000 });
 
   // Retried for the same reason as clickAndWaitFor's other call sites (see
   // its docstring) — but the "expected" condition here is a URL change, not

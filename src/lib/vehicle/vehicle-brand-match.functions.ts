@@ -110,7 +110,7 @@ export async function matchVehicleBrandAndModel(
  * to the SVV lookup rate limit. */
 export const matchVehicleBrandModel = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         brand: z.string().nullable(),

@@ -5,7 +5,7 @@ const MIN_TOTAL_VOTES = 8;
 const MIN_SHARE = 0.55;
 
 export const suggestCategoryForTitle = createServerFn({ method: "GET" })
-  .inputValidator((input: unknown) => z.object({ title: z.string().min(3).max(200) }).parse(input))
+  .validator((input: unknown) => z.object({ title: z.string().min(3).max(200) }).parse(input))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 

@@ -13,22 +13,23 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatErrorMessage } from "@/lib/errors";
 import { DeleteAccountSection } from "@/components/profil/delete-account-section";
+import { passwordSchema as sharedPasswordSchema } from "@/lib/auth-schemas";
 
 const emailSchema = z.object({
   email: z.string().trim().email("Ugyldig e-postadresse"),
 });
 type EmailForm = z.infer<typeof emailSchema>;
 
-const passwordSchema = z
+const passwordFormSchema = z
   .object({
-    password: z.string().min(8, "Minst 8 tegn"),
+    password: sharedPasswordSchema,
     confirm: z.string(),
   })
   .refine((d) => d.password === d.confirm, {
     message: "Passordene må være like",
     path: ["confirm"],
   });
-type PasswordForm = z.infer<typeof passwordSchema>;
+type PasswordForm = z.infer<typeof passwordFormSchema>;
 
 export function AccountSection() {
   const qc = useQueryClient();
@@ -73,7 +74,7 @@ export function AccountSection() {
 
   const passwordMutation = useMutation({
     mutationFn: async (values: PasswordForm) => {
-      const parsed = passwordSchema.parse(values);
+      const parsed = passwordFormSchema.parse(values);
       const { error } = await supabase.auth.updateUser({ password: parsed.password });
       if (error) throw error;
     },

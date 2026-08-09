@@ -2,13 +2,20 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import type { ConvSummary } from "@/hooks/use-unread";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Send, User as UserIcon } from "lucide-react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { ArrowLeft, Paperclip, Send, User as UserIcon, X } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { signListingImageUrls } from "@/lib/storage";
+import {
+  signListingImageUrls,
+  signMessageAttachmentUrls,
+  uploadMessageAttachment,
+  validateImages,
+  describeImageError,
+} from "@/lib/storage";
+import { compressImage } from "@/lib/image-compression";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { BlockConversationMenu } from "@/components/block-conversation-menu";
@@ -59,6 +66,10 @@ function ConversationPage() {
   const [body, setBody] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [attachment, setAttachment] = useState<File | null>(null);
+  const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
+  const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: myBlocks } = useQuery({
     queryKey: ["my-blocks"],
@@ -119,13 +130,25 @@ function ConversationPage() {
     queryFn: async (): Promise<Message[]> => {
       const { data, error } = await supabase
         .from("messages")
-        .select("id, conversation_id, sender_id, body, created_at, deleted_at")
+        .select("id, conversation_id, sender_id, body, created_at, deleted_at, attachment_path")
         .eq("conversation_id", id)
         .order("created_at", { ascending: true });
       if (error) throw error;
       return data ?? [];
     },
   });
+
+  // Signerte URL-er for meldingsvedlegg (privat bucket, samme mønster som annonsebilder).
+  useEffect(() => {
+    const paths = (messages ?? [])
+      .map((m) => m.attachment_path)
+      .filter((p): p is string => !!p && !attachmentUrls[p]);
+    if (paths.length === 0) return;
+    signMessageAttachmentUrls(paths).then((urls) =>
+      setAttachmentUrls((prev) => ({ ...prev, ...urls })),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages]);
 
   // Bilde av annonsen
   useEffect(() => {
@@ -247,18 +270,24 @@ function ConversationPage() {
   }, [messages, id, conv, user]);
 
   const sendMutation = useMutation({
-    mutationFn: async (text: string) => {
+    mutationFn: async ({ text, file }: { text: string; file: File | null }) => {
       const trimmed = text.trim();
-      if (!trimmed) throw new Error("Tom melding");
+      if (!trimmed && !file) throw new Error("Tom melding");
       if (trimmed.length > 4000) throw new Error("Meldingen er for lang");
+      let attachmentPath: string | null = null;
+      if (file) {
+        const compressed = await compressImage(file, "listing");
+        attachmentPath = await uploadMessageAttachment({ conversationId: id, file: compressed });
+      }
       const { data, error } = await supabase
         .from("messages")
         .insert({
           conversation_id: id,
           sender_id: user!.id,
           body: trimmed,
+          attachment_path: attachmentPath,
         })
-        .select("id, conversation_id, sender_id, body, created_at, deleted_at")
+        .select("id, conversation_id, sender_id, body, created_at, deleted_at, attachment_path")
         .single();
       if (error) throw error;
       // conversations.last_message_at oppdateres nå atomisk av en
@@ -267,9 +296,10 @@ function ConversationPage() {
       return data as Message;
     },
     // Optimistisk: vis meldingen og tøm feltet umiddelbart; rull tilbake ved feil.
-    onMutate: (text: string) => {
+    onMutate: ({ text, file }: { text: string; file: File | null }) => {
       const trimmed = text.trim();
-      if (!trimmed || trimmed.length > 4000) return {};
+      if ((!trimmed && !file) || trimmed.length > 4000) return {};
+      const previewUrl = file ? URL.createObjectURL(file) : undefined;
       const optimistic: Message = {
         id: `optimistic-${crypto.randomUUID()}`,
         conversation_id: id,
@@ -278,32 +308,58 @@ function ConversationPage() {
         created_at: new Date().toISOString(),
         deleted_at: null,
         pending: true,
+        attachmentPreviewUrl: previewUrl,
       };
       queryClient.setQueryData<Message[]>(["messages", id], (prev) =>
         prev ? [...prev, optimistic] : [optimistic],
       );
       setBody("");
-      return { optimisticId: optimistic.id, previousBody: text };
+      clearAttachment();
+      return { optimisticId: optimistic.id, previousBody: text, previewUrl };
     },
-    onSuccess: (m, _text, context) => {
+    onSuccess: (m, _vars, context) => {
       queryClient.setQueryData<Message[]>(["messages", id], (prev) => {
         const withoutOptimistic = (prev ?? []).filter((x) => x.id !== context?.optimisticId);
         if (withoutOptimistic.some((x) => x.id === m.id)) return withoutOptimistic;
         return [...withoutOptimistic, m];
       });
+      if (context?.previewUrl) URL.revokeObjectURL(context.previewUrl);
       queryClient.invalidateQueries({ queryKey: ["my-conversations"] });
       void import("@/lib/haptics").then((m) => m.hapticSelection());
     },
-    onError: (e: Error, _text, context) => {
+    onError: (e: Error, _vars, context) => {
       if (context?.optimisticId) {
         queryClient.setQueryData<Message[]>(["messages", id], (prev) =>
           prev?.filter((x) => x.id !== context.optimisticId),
         );
         setBody((curr) => (curr.trim() ? curr : (context.previousBody ?? "")));
       }
+      if (context?.previewUrl) URL.revokeObjectURL(context.previewUrl);
       showErrorToast(formatErrorMessage(e, "Meldingen ble ikke sendt. Prøv igjen."));
     },
   });
+
+  function clearAttachment() {
+    setAttachment(null);
+    setAttachmentPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function handleAttachmentChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const err = validateImages([file]);
+    if (err) {
+      showErrorToast(describeImageError(err));
+      e.target.value = "";
+      return;
+    }
+    setAttachment(file);
+    setAttachmentPreview(URL.createObjectURL(file));
+  }
 
   const deleteMessageMutation = useMutation({
     mutationFn: async (messageId: string) => {
@@ -587,25 +643,64 @@ function ConversationPage() {
                   ? conv.seller_last_read_at
                   : conv.buyer_last_read_at
                 : null,
+              attachmentUrls,
             )
           )}
         </div>
+
+        {attachmentPreview && (
+          <div className="relative mt-2 w-fit">
+            <img
+              src={attachmentPreview}
+              alt="Vedlegg som skal sendes"
+              className="max-h-24 rounded-lg border border-border object-contain"
+            />
+            <button
+              type="button"
+              aria-label="Fjern vedlegg"
+              onClick={clearAttachment}
+              className="absolute -right-2 -top-2 rounded-full bg-foreground/80 p-1 text-background"
+            >
+              <X className="size-3.5" />
+            </button>
+          </div>
+        )}
 
         <form
           className="mt-3 flex items-stretch gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            if (!sendMutation.isPending && !disabled) sendMutation.mutate(body);
+            if (!sendMutation.isPending && !disabled && (body.trim() || attachment))
+              sendMutation.mutate({ text: body, file: attachment });
           }}
         >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={handleAttachmentChange}
+            disabled={disabled}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            aria-label="Legg ved bilde"
+            disabled={disabled || !!attachment}
+            onClick={() => fileInputRef.current?.click()}
+            className="shrink-0 self-end"
+          >
+            <Paperclip className="size-4" />
+          </Button>
           <Textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                if (!sendMutation.isPending && !disabled) {
-                  sendMutation.mutate(body);
+                if (!sendMutation.isPending && !disabled && (body.trim() || attachment)) {
+                  sendMutation.mutate({ text: body, file: attachment });
                 }
               }
             }}
@@ -617,7 +712,7 @@ function ConversationPage() {
           />
           <Button
             type="submit"
-            disabled={sendMutation.isPending || !body.trim() || disabled}
+            disabled={sendMutation.isPending || (!body.trim() && !attachment) || disabled}
             className="h-auto gap-2 self-stretch"
           >
             <Send className="size-4" /> Send

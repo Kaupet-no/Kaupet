@@ -18,7 +18,13 @@ function VehicleConditionDetails({
   errors,
   knownIssues,
   noKnownIssues,
-}: Pick<WizardSharedProps, "register" | "setValue" | "errors" | "knownIssues" | "noKnownIssues">) {
+  extraFieldError,
+}: Pick<
+  WizardSharedProps,
+  "register" | "setValue" | "errors" | "knownIssues" | "noKnownIssues" | "extraFieldError"
+>) {
+  const knownIssuesExtraError =
+    extraFieldError?.field === "known_issues" ? extraFieldError.message : null;
   return (
     <>
       <section className="space-y-2">
@@ -34,11 +40,14 @@ function VehicleConditionDetails({
           rows={3}
           disabled={noKnownIssues}
           placeholder="Beskriv kjente feil eller mangler ved kjøretøyet."
-          aria-invalid={!!errors.known_issues}
+          aria-invalid={!!errors.known_issues || !!knownIssuesExtraError}
           {...register("known_issues")}
         />
         {errors.known_issues && (
           <p className="text-sm text-destructive">{errors.known_issues.message}</p>
+        )}
+        {!errors.known_issues && knownIssuesExtraError && (
+          <p className="text-sm text-destructive">{knownIssuesExtraError}</p>
         )}
         <label className="flex items-center gap-2 text-sm">
           <Checkbox

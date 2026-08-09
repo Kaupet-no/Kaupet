@@ -116,6 +116,12 @@ export type WizardSharedProps = {
    * from category-attributes so the user isn't asked twice. Undefined/empty
    * outside the vehicle-first flow. */
   vehicleAttributeHiddenKeys: readonly string[] | undefined;
+  /** Field-level error from the current step's `validateExtra`, set when the
+   * user tried to advance and failed a non-RHF-registered field check (e.g.
+   * `mileage_km`, `brand`/`model`, `known_issues`). Cleared on the next
+   * validation attempt. Field groups compare `extraFieldError?.field` to
+   * show an inline message next to the offending input. */
+  extraFieldError: { field: string; message: string } | null;
 
   // vehicle-first flow (vehicle-registration / vehicle-confirm field groups)
   bilOgMcCategoryId: string | null;

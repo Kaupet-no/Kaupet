@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ImageUploader } from "@/components/image-uploader";
 import { Vehicle360QrPanel } from "@/components/vehicle-360-qr-panel";
+import { Vehicle360CaptureLauncher } from "@/components/vehicle-360-capture-launcher";
 import { computeVehicleTitle } from "@/lib/vehicle/vehicle-title";
 
 import type { WizardSharedProps } from "../types";
@@ -124,6 +125,13 @@ export function TitlePhotos(props: WizardSharedProps) {
       <div className="space-y-6">
         {!props.isVehicle && <TitleSection {...props} />}
         <ImagesSection {...props} />
+        {props.isVehicle && (
+          <Vehicle360CaptureLauncher
+            listingId={props.draftId}
+            ensureListingId={props.ensureDraftId}
+            listingTitle={props.title || "kjøretøyet ditt"}
+          />
+        )}
       </div>
     );
   }

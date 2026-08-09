@@ -7,13 +7,8 @@ import { QR_SIZE, generateBrandedQrDataUrl } from "@/lib/qr";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
 
 type Props = {
   open: boolean;
@@ -83,8 +78,8 @@ export function ShareListingDialog({ open, onOpenChange, kaupetCode, title, isNa
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+    <ResponsiveOverlay open={open} onOpenChange={onOpenChange}>
+      <ResponsiveOverlayContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Del annonse</DialogTitle>
           <DialogDescription>Del annonsen med Kaupet-kode, lenke eller QR-kode.</DialogDescription>
@@ -177,7 +172,7 @@ export function ShareListingDialog({ open, onOpenChange, kaupetCode, title, isNa
             </Button>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveOverlayContent>
+    </ResponsiveOverlay>
   );
 }

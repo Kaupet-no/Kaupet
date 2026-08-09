@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, MapPin, Sparkles } from "lucide-react";
+import { Loader2, MapPin } from "lucide-react";
 import { showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -9,14 +9,8 @@ import { signListingImageUrls } from "@/lib/storage";
 import { formatPrice } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
 import { createPromotionCheckout, getPromotionPricing } from "@/lib/promotions.functions";
 import { formatErrorMessage } from "@/lib/errors";
 
@@ -97,12 +91,10 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
   const isPending = checkout.isPending;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+    <ResponsiveOverlay open={open} onOpenChange={onOpenChange}>
+      <ResponsiveOverlayContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="size-5 text-accent" /> Fremhev annonsen
-          </DialogTitle>
+          <DialogTitle>Fremhev annonsen</DialogTitle>
           <DialogDescription>
             Fremhevede annonser vises i en egen seksjon øverst i relevante søk og kategorier. Inntil
             to til tre fremhevede annonser vises om gangen. Dersom et søk genererer flere fremhevede
@@ -113,7 +105,6 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
         {/* Preview card */}
         <div className="rounded-2xl border border-accent/30 bg-accent/5 p-3">
           <div className="mb-2 flex items-center gap-2">
-            <Sparkles className="size-4 text-accent" />
             <p className="font-display text-xs uppercase tracking-wide text-muted-foreground">
               Promoterte annonser
             </p>
@@ -201,7 +192,7 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
             Betal med Vipps
           </Button>
         </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveOverlayContent>
+    </ResponsiveOverlay>
   );
 }

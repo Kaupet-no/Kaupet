@@ -16,9 +16,7 @@ export const adminListVehicleBrandsWithModels = createServerFn({ method: "GET" }
 
 export const adminCreateVehicleBrand = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) =>
-    z.object({ name: z.string().trim().min(1), categoryGroup }).parse(i),
-  )
+  .validator((i: unknown) => z.object({ name: z.string().trim().min(1), categoryGroup }).parse(i))
   .handler(async ({ data, context }) => {
     const { data: row, error } = await context.supabase.rpc("admin_create_vehicle_brand", {
       _name: data.name,
@@ -30,7 +28,7 @@ export const adminCreateVehicleBrand = createServerFn({ method: "POST" })
 
 export const adminUpdateVehicleBrand = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: uuid, name: z.string().trim().min(1) }).parse(i))
+  .validator((i: unknown) => z.object({ id: uuid, name: z.string().trim().min(1) }).parse(i))
   .handler(async ({ data, context }) => {
     const { data: row, error } = await context.supabase.rpc("admin_update_vehicle_brand", {
       _id: data.id,
@@ -42,7 +40,7 @@ export const adminUpdateVehicleBrand = createServerFn({ method: "POST" })
 
 export const adminDeleteVehicleBrand = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: uuid }).parse(i))
+  .validator((i: unknown) => z.object({ id: uuid }).parse(i))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.rpc("admin_delete_vehicle_brand", { _id: data.id });
     if (error) throw new Error(error.message);
@@ -51,7 +49,7 @@ export const adminDeleteVehicleBrand = createServerFn({ method: "POST" })
 
 export const adminCreateVehicleModel = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) =>
+  .validator((i: unknown) =>
     z.object({ brandId: uuid, name: z.string().trim().min(1), classId: uuid.nullish() }).parse(i),
   )
   .handler(async ({ data, context }) => {
@@ -66,7 +64,7 @@ export const adminCreateVehicleModel = createServerFn({ method: "POST" })
 
 export const adminUpdateVehicleModel = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) =>
+  .validator((i: unknown) =>
     z.object({ id: uuid, name: z.string().trim().min(1), classId: uuid.nullish() }).parse(i),
   )
   .handler(async ({ data, context }) => {
@@ -81,7 +79,7 @@ export const adminUpdateVehicleModel = createServerFn({ method: "POST" })
 
 export const adminDeleteVehicleModel = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: uuid }).parse(i))
+  .validator((i: unknown) => z.object({ id: uuid }).parse(i))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.rpc("admin_delete_vehicle_model", { _id: data.id });
     if (error) throw new Error(error.message);
@@ -90,9 +88,7 @@ export const adminDeleteVehicleModel = createServerFn({ method: "POST" })
 
 export const adminCreateVehicleModelClass = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) =>
-    z.object({ brandId: uuid, name: z.string().trim().min(1) }).parse(i),
-  )
+  .validator((i: unknown) => z.object({ brandId: uuid, name: z.string().trim().min(1) }).parse(i))
   .handler(async ({ data, context }) => {
     const { data: row, error } = await context.supabase.rpc("admin_create_vehicle_model_class", {
       _brand_id: data.brandId,
@@ -104,7 +100,7 @@ export const adminCreateVehicleModelClass = createServerFn({ method: "POST" })
 
 export const adminUpdateVehicleModelClass = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: uuid, name: z.string().trim().min(1) }).parse(i))
+  .validator((i: unknown) => z.object({ id: uuid, name: z.string().trim().min(1) }).parse(i))
   .handler(async ({ data, context }) => {
     const { data: row, error } = await context.supabase.rpc("admin_update_vehicle_model_class", {
       _id: data.id,
@@ -116,7 +112,7 @@ export const adminUpdateVehicleModelClass = createServerFn({ method: "POST" })
 
 export const adminDeleteVehicleModelClass = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: uuid }).parse(i))
+  .validator((i: unknown) => z.object({ id: uuid }).parse(i))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.rpc("admin_delete_vehicle_model_class", {
       _id: data.id,
@@ -127,7 +123,7 @@ export const adminDeleteVehicleModelClass = createServerFn({ method: "POST" })
 
 export const adminApproveVehicleModelClass = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: uuid }).parse(i))
+  .validator((i: unknown) => z.object({ id: uuid }).parse(i))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.rpc("admin_approve_vehicle_model_class", {
       _id: data.id,
@@ -138,7 +134,7 @@ export const adminApproveVehicleModelClass = createServerFn({ method: "POST" })
 
 export const adminRejectVehicleModelClass = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: uuid }).parse(i))
+  .validator((i: unknown) => z.object({ id: uuid }).parse(i))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.rpc("admin_reject_vehicle_model_class", {
       _id: data.id,
@@ -157,7 +153,7 @@ export const adminListPendingVehicleEntries = createServerFn({ method: "GET" })
 
 export const adminApproveVehicleBrand = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: uuid }).parse(i))
+  .validator((i: unknown) => z.object({ id: uuid }).parse(i))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.rpc("admin_approve_vehicle_brand", { _id: data.id });
     if (error) throw error;
@@ -166,7 +162,7 @@ export const adminApproveVehicleBrand = createServerFn({ method: "POST" })
 
 export const adminRejectVehicleBrand = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: uuid }).parse(i))
+  .validator((i: unknown) => z.object({ id: uuid }).parse(i))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.rpc("admin_reject_vehicle_brand", { _id: data.id });
     if (error) throw error;
@@ -175,7 +171,7 @@ export const adminRejectVehicleBrand = createServerFn({ method: "POST" })
 
 export const adminApproveVehicleModel = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: uuid }).parse(i))
+  .validator((i: unknown) => z.object({ id: uuid }).parse(i))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.rpc("admin_approve_vehicle_model", { _id: data.id });
     if (error) throw error;
@@ -184,7 +180,7 @@ export const adminApproveVehicleModel = createServerFn({ method: "POST" })
 
 export const adminRejectVehicleModel = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: uuid }).parse(i))
+  .validator((i: unknown) => z.object({ id: uuid }).parse(i))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.rpc("admin_reject_vehicle_model", { _id: data.id });
     if (error) throw error;

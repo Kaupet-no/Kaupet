@@ -41,7 +41,12 @@ export type FieldGroup = {
   fieldsToValidate?: (keyof ListingFormShape)[];
   validateExtra?: (
     ctx: ValidateCtx,
-  ) => "SHOW_NO_IMAGE_DIALOG" | "SHOW_NO_PRICE_DIALOG" | string | null;
+  ) =>
+    | "SHOW_NO_IMAGE_DIALOG"
+    | "SHOW_NO_PRICE_DIALOG"
+    | string
+    | { field: string; message: string }
+    | null;
 };
 
 export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
@@ -130,7 +135,7 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
       if (ctx.showMileage) {
         const km = ctx.attributes.mileage_km;
         if (typeof km !== "number" || !Number.isFinite(km) || km < 0) {
-          return "Fyll inn kilometerstand før du går videre.";
+          return { field: "mileage_km", message: "Fyll inn kilometerstand før du går videre." };
         }
       }
       return null;
@@ -145,11 +150,11 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
       // from category-attributes, so they must be required here instead.
       const brand = ctx.attributes.brand;
       if (typeof brand !== "string" || !brand.trim()) {
-        return "Fyll inn merke før du går videre.";
+        return { field: "brand", message: "Fyll inn merke før du går videre." };
       }
       const model = ctx.attributes.model;
       if (typeof model !== "string" || !model.trim()) {
-        return "Fyll inn modell før du går videre.";
+        return { field: "model", message: "Fyll inn modell før du går videre." };
       }
       return null;
     },
@@ -164,7 +169,10 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
       // atskilt fra vehicle-facts og description-keywords.
       if (ctx.noKnownIssues) return null;
       if ((ctx.knownIssues ?? "").trim().length > 0) return null;
-      return "Beskriv kjente feil og mangler, eller kryss av for at kjøretøyet ikke har noen.";
+      return {
+        field: "known_issues",
+        message: "Beskriv kjente feil og mangler, eller kryss av for at kjøretøyet ikke har noen.",
+      };
     },
   },
   "vehicle-equipment": {

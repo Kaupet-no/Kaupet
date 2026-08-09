@@ -2,8 +2,9 @@
 
 Status: Fase 1 (fiks promotering), fase 2 (delte UI-primitiver, del 1),
 fase 3 (manuell dark mode-bryter), fase 4 (360°-opptak: in-wizard +
-etterpåfølgende tillegg) og fase 5 (WTB-redigeringskonsolidering)
-gjennomført 2026-08-09. Fase 6 er neste.
+etterpåfølgende tillegg), fase 5 (WTB-redigeringskonsolidering), fase 6
+(annonseveiviser: feilhåndtering) og fase 7 (meldinger: bildevedlegg)
+gjennomført 2026-08-09. Fase 8 er neste.
 Sist oppdatert: 2026-08-09.
 
 **Dette dokumentet er levende.** Etter hver fase gjennomføres skal
@@ -795,6 +796,98 @@ faktiske Supabase-miljø, som ikke var tilgjengelig i denne økten).
 
 Ingen nye funn underveis utover selve visningsflate-avklaringen over. Fase 6
 (annonseveiviser: feilhåndtering) er neste anbefalte steg.
+
+### Fase 6 — 2026-08-09
+
+Utvidet `FieldGroup["validateExtra"]`-kontrakten
+(`src/features/listing-creation/field-groups/registry.ts`) til å returnere
+`{ field: string; message: string } | string | ...` — de tre
+enkeltfelt-sjekkene som faktisk peker på ett konkret, ikke-RHF-registrert
+felt (`vehicle-facts` → `mileage_km`, `boat-facts` → `brand`/`model`,
+`vehicle-condition` → `known_issues`) returnerer nå objektformen; de øvrige
+(`missingFilters`-lister, modul-feil i `category-attributes`,
+`vehicle-registration`) beholdes som ren streng (toast only) — disse dekker
+flere/ubestemte felt om gangen og egner seg ikke til én inline-banner.
+`ny-annonse.tsx` setter ny `extraFieldError`-state ved objektresultat (nullstilt
+ved hvert nytt valideringsforsøk), sendt gjennom `WizardSharedProps` til de tre
+berørte field-group-komponentene, som viser en `text-destructive`-melding rett
+ved det aktuelle feltet (samme visuelle mønster som eksisterende RHF-feil) i
+tillegg til den eksisterende toasten — ikke i stedet for, siden toasten alene
+fortsatt er nyttig når feltet er scrollet ut av syne.
+
+`SHOW_NO_IMAGE_DIALOG`/`SHOW_NO_PRICE_DIALOG`-sentinelene er urørt, som planlagt.
+
+Byttet `console.warn` for feilede kort-thumbnail-opplastinger
+(`ny-annonse.tsx`) til å samle feilede filnavn og vise én `showErrorToast`
+etter at alle bildene er lastet opp — fortsatt best-effort (stopper ikke
+publisering), men brukeren ser nå at noe feilet i stedet for at det kun
+havner i konsollen.
+
+Lagt til én ny assertion i `publish-vehicle-listing.spec.ts` som dekker
+`vehicle-condition`s `validateExtra`-feilvei (tidligere udekket, jf. planens
+testpåvirkningsnotat): forsøk på å gå videre uten avkrysning eller utfylt
+tekst blokkeres og viser inline-feilmeldingen. `data-testid`-kontrakten i
+`e2e/pages/listing-wizard.ts` er ikke endret.
+
+`bunx tsc --noEmit` rent. `bun run lint`: 0 feil (135 eksisterende warnings,
+ingen i berørte filer). `bun run test src/features/listing-creation`: 71/71
+grønn.
+
+Ingen nye funn underveis. Fase 7 (meldinger: bildevedlegg) er neste anbefalte
+steg.
+
+### Fase 7 — 2026-08-09
+
+Lagt til migrasjon `supabase/migrations/20260809160000_messages_attachment.sql`:
+ny nullable `attachment_path text`-kolonne på `public.messages`, samt en ny
+privat `message-attachments`-bucket (`storage.buckets`, `public: false`) —
+ingen `storage.objects`-policy trengs, siden ingen eksisterende bucket i
+repoet har det (tilgang styres av signerte URL-er, samme mønster som
+`listing-images`/`listing-360-frames`). **Migrasjonen er ikke pushet/anvendt
+i denne økten** — jf. CLAUDE.md-regelen skal den committes/pushes for seg
+selv og bekreftes anvendt av Supabase sin GitHub-plugin før appkoden som
+avhenger av kolonnen slippes i produksjon.
+
+`src/lib/storage.ts` fikk `MESSAGE_ATTACHMENTS_BUCKET`,
+`uploadMessageAttachment()` og `signMessageAttachmentUrls()` — sistnevnte
+speiler `signVehicle360FrameUrls()` (samme enkle per-kall-cache, ingen
+batching, siden en samtale har få vedlegg om gangen), i tråd med at
+codebasen allerede har to nesten-identiske implementasjoner for de to andre
+bucketene fremfor én generisk versjon.
+
+`src/routes/_authenticated/meldinger.$id.tsx`: `sendMutation` tar nå
+`{ text, file }` i stedet for kun tekst. Ved vedlegg komprimeres bildet med
+eksisterende `compressImage(file, "listing")` (ingen ny preset lagt til, jf.
+planens egen YAGNI-note) og lastes opp før selve meldingsraden settes inn,
+slik at `attachment_path` er satt atomisk med INSERT. Optimistisk sending
+viser en lokal `URL.createObjectURL`-forhåndsvisning
+(`attachmentPreviewUrl` på `Message`), revokes i `onSuccess`/`onError`. Ny
+binders-knapp (`Paperclip`) åpner et skjult filinput
+(`accept="image/jpeg,image/png,image/webp"`), gjenbruker
+`validateImages`/`describeImageError` fra `storage.ts` for
+type-/størrelsesvalidering, med én liten forhåndsvisning + fjern-knapp over
+komponisten. Maks 1 bilde per melding, som planlagt.
+
+`src/components/meldinger/message-list.tsx`: `Message`-typen fikk
+`attachment_path`/`attachmentPreviewUrl`, og bobleren rendrer nå bildet
+(lokal preview eller signert URL fra et nytt `attachmentUrls`-map hentet via
+`signMessageAttachmentUrls` i en effekt i route-filen) over meldingsteksten,
+som skjules helt hvis meldingen kun har et vedlegg og tom body.
+
+Ingen ny e2e-spec lagt til (planens egen testpåvirkningsnotat flagget dette
+som betinget av at Supabase-avhengigheten i `e2e/global-setup.ts` er
+tilgjengelig i CI — ikke reverifisert i denne økten). Ingen ny
+komponenttest for selve opplastingsflyten heller (ingen eksisterende
+meldingstester å bygge videre på, samme situasjon som fase 5 møtte for WTB).
+`bunx tsc --noEmit`, `bun run lint` (0 feil) og `bun run test` (221/221
+grønn) kjørt rent.
+
+**Manuell verifisering ikke gjort i denne økten:** faktisk opplasting mot
+Supabase (krever at migrasjonen er pushet/anvendt og en innlogget testbruker
+mot ekte miljø, som fase 5 også manglet).
+
+Ingen nye funn underveis. Fase 8 (auth-konsistens inkl. Turnstile) er neste
+anbefalte steg.
 
 ## 9. Anbefalte neste steg (utenfor denne planens faser)
 

@@ -111,6 +111,19 @@ test("logger inn og publiserer en kjøretøy-annonse (manuell registrering)", as
   // vehicle-condition: known-issues is required unless "no known issues" is
   // checked. Tilstand keeps its default value.
   await clickNextAndWaitFor(page, wizardStep(page, "vehicle-condition"), testInfo);
+
+  // Covers registry.ts's `validateExtra` field-error path for this step
+  // (previously untested — see UX-AUDIT-PLAN.md fase 6): advancing with
+  // neither the checkbox nor free text filled in should block navigation
+  // and show the inline error next to "Kjente feil og mangler" rather than
+  // silently doing nothing.
+  await page.getByTestId("wizard-next-button").click();
+  await expect(
+    page.getByText(
+      "Beskriv kjente feil og mangler, eller kryss av for at kjøretøyet ikke har noen.",
+    ),
+  ).toBeVisible();
+
   await page.getByRole("checkbox", { name: "Ingen kjente feil eller mangler" }).click();
 
   // Beskrivelse is its own step, identical to the generic flow.

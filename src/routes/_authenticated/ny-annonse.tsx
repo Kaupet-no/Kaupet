@@ -143,6 +143,10 @@ function NewListingPage() {
   const pendingSubmitValuesRef = useRef<ListingForm | null>(null);
   const [showNoImageDialog, setShowNoImageDialog] = useState(false);
   const [showNoPriceDialog, setShowNoPriceDialog] = useState(false);
+  const [extraFieldError, setExtraFieldError] = useState<{
+    field: string;
+    message: string;
+  } | null>(null);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const [hasPreviewed, setHasPreviewed] = useState(false);
@@ -580,6 +584,7 @@ function NewListingPage() {
       noKnownIssues: !!noKnownIssues,
       showMileage,
     };
+    setExtraFieldError(null);
     for (const group of groups) {
       const result = group.validateExtra?.(validateCtx);
       if (result === "SHOW_NO_IMAGE_DIALOG") {
@@ -595,6 +600,12 @@ function NewListingPage() {
       if (typeof result === "string") {
         if (group.key === "category-attributes") setAttributesTouched(true);
         showErrorToast(result);
+        return;
+      }
+      if (result && typeof result === "object") {
+        if (group.key === "category-attributes") setAttributesTouched(true);
+        setExtraFieldError(result);
+        showErrorToast(result.message);
         return;
       }
     }
@@ -652,6 +663,8 @@ function NewListingPage() {
       if (images.length > 0) {
         setUploadProgress({ done: 0, total: images.length });
         let done = 0;
+        const thumbFailures: string[] = [];
+        const thumbPromises: Promise<void>[] = [];
         const results = await Promise.all(
           images.map(async (img, i) => {
             const path = await uploadListingImage({
@@ -662,15 +675,22 @@ function NewListingPage() {
             });
             // Best-effort: kortvisning faller tilbake til fullstørrelsesbildet
             // hvis thumbnailen mangler, så en feil her skal ikke stoppe
-            // publiseringen.
-            uploadListingImageThumb({ path, file: img.thumbFile }).catch((err) =>
-              console.warn("Kunne ikke laste opp kort-thumbnail", err),
+            // publiseringen — men samles opp og vises til brukeren etterpå.
+            thumbPromises.push(
+              uploadListingImageThumb({ path, file: img.thumbFile }).catch((err) => {
+                console.warn("Kunne ikke laste opp kort-thumbnail", err);
+                thumbFailures.push(img.file.name);
+              }),
             );
             done += 1;
             setUploadProgress({ done, total: images.length });
             return { storage_path: path, sort_order: i, caption: img.caption?.trim() || null };
           }),
         );
+        await Promise.all(thumbPromises);
+        if (thumbFailures.length > 0) {
+          showErrorToast(`Kunne ikke laste opp forhåndsvisning for: ${thumbFailures.join(", ")}`);
+        }
         setUploadProgress(null);
         const { error: imgErr } = await supabase.from("listing_images").insert(
           results.map((u) => ({
@@ -879,6 +899,7 @@ function NewListingPage() {
     attributesTouched,
     activeModules,
     vehicleAttributeHiddenKeys,
+    extraFieldError,
 
     bilOgMcCategoryId,
     vehicleRegistered,

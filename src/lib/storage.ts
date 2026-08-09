@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 export const LISTING_BUCKET = "listing-images";
 export const VEHICLE_360_BUCKET = "listing-360-frames";
 export const AVATAR_BUCKET = "avatars";
+export const MESSAGE_ATTACHMENTS_BUCKET = "message-attachments";
 export const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB
 export const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp"] as const;
 
@@ -171,6 +172,58 @@ export async function signListingImageUrls(
     for (const p of need) {
       const cached = signedUrlCache.get(p);
       if (cached) result[p] = cached.url;
+    }
+  }
+  return result;
+}
+
+export async function uploadMessageAttachment(opts: {
+  conversationId: string;
+  file: File;
+}): Promise<string> {
+  const ext = extFromMime(opts.file.type);
+  const path = `${opts.conversationId}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage
+    .from(MESSAGE_ATTACHMENTS_BUCKET)
+    .upload(path, opts.file, {
+      contentType: opts.file.type,
+      cacheControl: "31536000",
+      upsert: false,
+    });
+  if (error) throw error;
+  return path;
+}
+
+const signedMessageAttachmentUrlCache = new Map<string, { url: string; expiresAt: number }>();
+
+export async function signMessageAttachmentUrls(
+  paths: string[],
+  expiresInSeconds = 60 * 60,
+): Promise<Record<string, string>> {
+  const now = Date.now();
+  const result: Record<string, string> = {};
+  const need: string[] = [];
+  for (const p of paths) {
+    const cached = signedMessageAttachmentUrlCache.get(p);
+    if (cached && cached.expiresAt > now + 60_000) {
+      result[p] = cached.url;
+    } else {
+      need.push(p);
+    }
+  }
+  if (need.length > 0) {
+    const { data, error } = await supabase.storage
+      .from(MESSAGE_ATTACHMENTS_BUCKET)
+      .createSignedUrls(need, expiresInSeconds);
+    if (error) throw error;
+    for (const item of data ?? []) {
+      if (item.signedUrl && item.path) {
+        signedMessageAttachmentUrlCache.set(item.path, {
+          url: item.signedUrl,
+          expiresAt: now + expiresInSeconds * 1000,
+        });
+        result[item.path] = item.signedUrl;
+      }
     }
   }
   return result;

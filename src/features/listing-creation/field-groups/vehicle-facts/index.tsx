@@ -22,8 +22,10 @@ const MAX_MILEAGE_KM = 999_999_999;
 function MileageField({
   attributes,
   onAttributesChange,
-}: Pick<WizardSharedProps, "attributes" | "onAttributesChange">) {
+  extraFieldError,
+}: Pick<WizardSharedProps, "attributes" | "onAttributesChange" | "extraFieldError">) {
   const raw = attributes.mileage_km;
+  const fieldError = extraFieldError?.field === "mileage_km" ? extraFieldError.message : null;
   return (
     <section className="space-y-2">
       <Label htmlFor="mileage_km">
@@ -37,6 +39,8 @@ function MileageField({
           inputMode="numeric"
           placeholder="0"
           className="pr-10 text-right"
+          aria-invalid={!!fieldError}
+          aria-describedby={fieldError ? "mileage-error" : undefined}
           value={formatThousands(raw as string | number | undefined, MAX_MILEAGE_KM)}
           onChange={(e) => {
             const digits = digitsOnlyClamped(e.target.value, MAX_MILEAGE_KM);
@@ -50,6 +54,11 @@ function MileageField({
           km
         </span>
       </div>
+      {fieldError && (
+        <p id="mileage-error" className="text-sm text-destructive">
+          {fieldError}
+        </p>
+      )}
     </section>
   );
 }

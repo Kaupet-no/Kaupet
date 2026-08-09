@@ -19,11 +19,14 @@ export async function login(page: Page, email: string, password: string, testInf
   await page.goto("/auth");
   // Inputs are controlled (SSR-rendered, then hydrated) — filling before
   // hydration finishes gets clobbered when React reconciles to its initial
-  // empty state, so wait for the network to settle first.
-  await page.waitForLoadState("networkidle");
-  await page.getByLabel("E-post").fill(email);
-  await page.getByLabel("Passord").fill(password);
-  await expect(page.getByLabel("E-post")).toHaveValue(email);
+  // empty state. Used to wait for networkidle first, but the Turnstile
+  // widget keeps a connection open and networkidle never fires — retry the
+  // fill instead until it sticks.
+  await expect(async () => {
+    await page.getByLabel("E-post").fill(email);
+    await page.getByLabel("Passord").fill(password);
+    await expect(page.getByLabel("E-post")).toHaveValue(email);
+  }).toPass({ timeout: 15_000 });
 
   // Retried for the same reason as clickAndWaitFor's other call sites (see
   // its docstring) — but the "expected" condition here is a URL change, not

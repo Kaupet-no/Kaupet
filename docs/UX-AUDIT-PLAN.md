@@ -1,7 +1,9 @@
 # App-UX-revisjon: funn og implementeringsplan
 
-Status: Fase 1 (fiks promotering), fase 2 (delte UI-primitiver, del 1) og
-fase 3 (manuell dark mode-bryter) gjennomført 2026-08-09. Fase 4 er neste.
+Status: Fase 1 (fiks promotering), fase 2 (delte UI-primitiver, del 1),
+fase 3 (manuell dark mode-bryter), fase 4 (360°-opptak: in-wizard +
+etterpåfølgende tillegg) og fase 5 (WTB-redigeringskonsolidering)
+gjennomført 2026-08-09. Fase 6 er neste.
 Sist oppdatert: 2026-08-09.
 
 **Dette dokumentet er levende.** Etter hver fase gjennomføres skal
@@ -677,6 +679,122 @@ begrensning planen selv flagger for `useIsNative()`-grener).
 
 Ingen nye funn underveis. Fase 4 (ekte in-wizard 360°-opptak) er neste
 anbefalte steg.
+
+### Fase 4 — 2026-08-09
+
+Bekreftet før implementering (per planens egen "viktig teknisk avklaring"):
+`listing_360_capture_sessions.token` er et rent bærer-hemmelighet
+(`token → listing_id`) uten QR-spesifikke egenskaper — gjenbrukbart uendret
+for en native in-app-flyt uten QR/route-navigasjon. `Vehicle360CaptureFlow`
+selv brukte allerede `getUserMedia`/`DeviceOrientationEvent` (ikke
+`@capacitor/camera`), så ingen ny avhengighet var nødvendig.
+
+Bygget `src/components/vehicle-360-capture-launcher.tsx`
+(`Vehicle360CaptureLauncher`) — én delt komponent for alle tre native
+inngangene: minter en økt via `createVehicle360CaptureSession` (oppretter
+draft ved behov via `ensureListingId`, eller bruker en kjent `listingId`
+direkte) og kjører `Vehicle360CaptureFlow` i en full-skjerm-overtakelse
+in-process. `capture-flow.tsx` fikk en ny valgfri `onDone`-prop: når satt
+(alle tre native-inngangene) byttes «Gå tilbake til datamaskinen»-teksten og
+toasten ut med in-app-egnet tekst («360°-bildene er lagt til annonsen») og en
+«Ferdig»-knapp som lukker overtakelsen — QR-handoff-varianten
+(`360-opptak.$token.tsx`) er uendret og fortsatt uten `onDone`.
+
+**(a) In-wizard (native):** `title-photos/index.tsx` — native+`isVehicle`-
+grenen viser nå `Vehicle360CaptureLauncher` under bildeopplastingen, koblet
+til eksisterende `draftId`/`ensureDraftId` fra `use-draft-autosave.ts` (ingen
+ny kladd-opprettingslogikk). Desktop beholder uendret `Vehicle360QrPanel`.
+
+**(b) Etterpåfølgende tillegg:** (1) `$kaupetCode.tsx` — ny
+eier+native+kjøretøy-gate i `ownerStatsSlot` (gjenbruker allerede beregnet
+`vehicleGroup`/`isNative`) med samme launcher for allerede publiserte
+annonser. (2) `src/features/my-listings/listing-row.tsx` — ny
+`isVehicle`-prop, ikonknapp-launcher i native-raden for `draft`/`active`-
+annonser, plassert ved siden av «…»-menyknappen (utenfor `DropdownMenu` for å
+unngå at launcherens tilstand unmountes når menyen lukkes).
+`mine-annonser.index.tsx` beregner `isVehicle` per rad via samme
+`useAllCategoryFilters`/`["categories"]`-mønster som `$kaupetCode.tsx`
+allerede bruker (delt cache, ingen ny query-kostnad).
+
+Ingen ny registry-/`category-flows.ts`-oppføring var nødvendig — planens
+«billigste alternativ» (gren i eksisterende steg fremfor egen wizard-side)
+ble valgt, siden det holdt diffen liten og QR-panelets desktop-gren allerede
+levde i nøyaktig dette steget.
+
+**Testpåvirkning:** `listing-row.test.tsx` oppdatert med den nye påkrevde
+`isVehicle`-propen. `bunx tsc --noEmit`, `bun run lint` (0 nye feil/warnings
+i endrede filer — to eksisterende, urelaterte lint-feil i
+`routes/index.tsx`/`annonser_.filter.tsx` upåvirket) og `bun run test`
+(221/221 grønn) kjørt rent. Ingen ny komponenttest lagt til for
+`Vehicle360CaptureLauncher` selv (kamera-/motion-avhengig, samme begrensning
+som resten av opptaksflyten).
+
+**Ikke gjort, bevisst — som planen selv flagger:** ingen
+simulator-verifisering av kamera-/motion-funksjonaliteten (kun kodenivå og
+manuell type-/lint-/testverifisering). Dette er obligatorisk før fasen kan
+anses fullstendig ferdig verifisert — kun kodenivå-implementering er gjort
+her.
+
+Ingen nye funn underveis. Fase 5 (WTB-redigeringskonsolidering) er neste
+anbefalte steg.
+
+### Fase 5 — 2026-08-09
+
+**Avklart før implementering (bruker spurt eksplisitt, jf. planens egen
+åpning "avklar hvilken visningsflate WTB-annonser faktisk har i dag"):** WTB-
+annonser hadde ingen offentlig detaljside i det hele tatt — kun kort i søk/
+"Mine annonser". Brukeren valgte å bygge en enkel WTB-detaljside
+(`/ok/$id`) fremfor å presse inline-redigering inn i listeraden eller
+beholde et eget skjema. Dette var en forutsetning planens opprinnelige tekst
+ikke hadde tatt stilling til.
+
+Bygget `src/routes/ok.$id.tsx` — offentlig WTB-detaljside (tittel, kategori,
+kriterier, beskrivelse, maks pris, kontakt-knapp for andre brukere). For eier
+
+- `?edit=true`: samme inline klikk-for-å-redigere/autolagre-mønster som
+  `$kaupetCode.tsx`, gjenbrukt via `EditableField`/`EditableRegion`.
+
+**Generalisering nødvendig for gjenbruk:** `EditableField`/`EditableRegion`
+var hardkodet mot `ListingEditContext` (som selv bærer listing-spesifikke
+felt: `behavior`, `openVehicleLookupModal` osv.). Siden begge komponentene
+i praksis kun leser `editMode`/`fieldStatus` fra konteksten, ble dette
+generalisert til et valgfritt `context`-prop (default `ListingEditContext`,
+null-endring for alle eksisterende kallsteder) typet mot et minimalt
+`BaseEditContextValue`. Ny `WtbEditContext`
+(`src/features/wtb/wtb-edit-mode-context.tsx`) og `WtbFieldPatch`/
+`saveWtbListingField` (`src/features/wtb/save-wtb-listing-field.ts`, tynn
+adapter over eksisterende `updateWtbListing`-serverfunksjon, som allerede
+støtter partial-oppdateringer — ingen ny server-funksjon eller migrasjon
+nødvendig) og `useWtbEditMutations`
+(`src/features/wtb/use-wtb-edit-mutations.ts`, speiler
+`useListingEditMutations`) implementerer WTB-siden av det samme mønsteret.
+
+Kriterie-feltene (`WtbCriteriaFields`, range/multiselect) beholdt som egen
+`WtbCriteriaPanel`-underkomponent inni `EditableRegion`s panel — den har
+allerede sin egen "aktivert men ikke utfylt"-avkrysningstilstand
+(`checkedKeys`) som må leve lokalt i panelet (ikke i selve
+`attributes`-verdien), ellers ville autolagring trigget på hver avkrysning
+i stedet for kun på faktiske verdiendringer.
+
+Fjernet `src/routes/_authenticated/mine-annonser.ok.$id.rediger.tsx`
+(gammelt helskjema + `useBlocker`-vakt) helt — ingen `useBlocker` er lenger
+nødvendig siden alle felt autolagrer individuelt, samme som resten av
+inline-redigeringen. `mine-annonser.index.tsx`s "Rediger"-lenke og
+`wtb-listing-card.tsx`s tittel peker nå til `/ok/$id` (sistnevnte lenket
+ingen steder fra før — nytt).
+
+**Testpåvirkning:** `bunx tsc --noEmit` og `bun run lint` kjørt rent (0 feil,
+kun eksisterende warnings). `bun run test`: 221/221 grønn (ingen eksisterende
+tester dekket verken gammel eller ny WTB-redigering, som planen selv
+bemerket — ingen ny komponenttest lagt til denne omgangen, avvik fra planens
+anbefaling). Manuell verifisering i nettleser: `/ok/$id` med en ukjent ID
+viser korrekt "Fant ikke annonsen"-tilstand uten konsollfeil (bekrefter
+routing/rendering fungerer); full eier-redigeringsflyt med ekte data ikke
+verifisert i denne omgangen (krever innlogget testbruker mot appens
+faktiske Supabase-miljø, som ikke var tilgjengelig i denne økten).
+
+Ingen nye funn underveis utover selve visningsflate-avklaringen over. Fase 6
+(annonseveiviser: feilhåndtering) er neste anbefalte steg.
 
 ## 9. Anbefalte neste steg (utenfor denne planens faser)
 

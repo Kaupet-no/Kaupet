@@ -38,6 +38,7 @@ describe("ListingRow", () => {
     const { getAllByText } = render(
       <ListingRow
         row={row}
+        isVehicle={false}
         activePromotion={null}
         onPromote={noop}
         onMarkSold={noop}

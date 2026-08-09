@@ -31,6 +31,8 @@ import { formatErrorMessage } from "@/lib/errors";
 import { getMyWtbListings, deleteWtbListing } from "@/lib/wtb-listings.functions";
 import { formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
+import { useAllCategoryFilters } from "@/components/attribute-fields";
+import { isVehicleCategory } from "@/lib/category-filters";
 
 import { NativePageHeader } from "@/components/native-page-header";
 import { ListingRow, type Row } from "@/features/my-listings/listing-row";
@@ -62,6 +64,19 @@ function MyListingsPage() {
   const [promoteId, setPromoteId] = useState<string | null>(null);
   const [markSoldId, setMarkSoldId] = useState<string | null>(null);
   const native = useIsNative();
+
+  const { data: allFilters } = useAllCategoryFilters();
+  const { data: allCategories } = useQuery({
+    queryKey: ["categories"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("categories").select("id, parent_id");
+      if (error) throw error;
+      return data;
+    },
+  });
+  const categoriesById = new Map((allCategories ?? []).map((c) => [c.id, c]));
+  const isVehicleRow = (categoryId: string | null) =>
+    isVehicleCategory(categoryId, allFilters ?? [], categoriesById);
 
   const fetchPromos = useServerFn(getMyActivePromotions);
   const { data: promos } = useQuery({
@@ -295,6 +310,7 @@ function MyListingsPage() {
                     <ListingRow
                       key={r.id}
                       row={r}
+                      isVehicle={isVehicleRow(r.category_id)}
                       activePromotion={activePromoByListing.get(r.id) ?? null}
                       onPromote={() => setPromoteId(r.id)}
                       onMarkSold={() => setMarkSoldId(r.id)}
@@ -388,7 +404,7 @@ function MyListingsPage() {
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
-                      <Link to="/mine-annonser/ok/$id/rediger" params={{ id: w.id }}>
+                      <Link to="/ok/$id" params={{ id: w.id }} search={{ edit: true }}>
                         <Button
                           size="icon"
                           variant="ghost"

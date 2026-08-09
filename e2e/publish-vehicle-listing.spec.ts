@@ -118,8 +118,11 @@ test("logger inn og publiserer en kjøretøy-annonse (manuell registrering)", as
   // and show the inline error next to "Kjente feil og mangler" rather than
   // silently doing nothing.
   await page.getByTestId("wizard-next-button").click();
+  // Scoped to the wizard step — the same text also briefly shows in a toast
+  // notification (fase 6+7 inline feilvisning), which made the unscoped
+  // getByText ambiguous (strict mode violation, 2 matches).
   await expect(
-    page.getByText(
+    wizardStep(page, "vehicle-condition").getByText(
       "Beskriv kjente feil og mangler, eller kryss av for at kjøretøyet ikke har noen.",
     ),
   ).toBeVisible();

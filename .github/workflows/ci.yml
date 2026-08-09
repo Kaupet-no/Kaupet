@@ -136,6 +136,12 @@ jobs:
           SUPABASE_URL: ${{ vars.STAGING_SUPABASE_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ vars.STAGING_SUPABASE_PUBLISHABLE_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
+          # Cloudflare's public "always passes" Turnstile test site key — logins
+          # in headless CI can't solve a real challenge. The staging Supabase
+          # project's Turnstile secret must be set to the matching test secret
+          # (1x0000000000000000000000000000AA) in its Auth settings for this to
+          # verify; see https://developers.cloudflare.com/turnstile/troubleshooting/testing/
+          VITE_TURNSTILE_SITE_KEY: "1x00000000000000000000AA"
 
       - uses: actions/upload-artifact@v7
         if: always()

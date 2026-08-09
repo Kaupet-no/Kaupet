@@ -39,7 +39,7 @@ async function assertUnderHourlyListingLimit(
 
 export const saveDraftListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         id: z.string().uuid().optional(),
@@ -124,7 +124,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
 
 export const createListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         draftId: z.string().uuid().optional(),
@@ -274,7 +274,7 @@ export const createListing = createServerFn({ method: "POST" })
 
 export const republishListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
@@ -310,7 +310,7 @@ export const republishListing = createServerFn({ method: "POST" })
   });
 
 export const getListingKaupetCodeById = createServerFn({ method: "GET" })
-  .inputValidator((input: unknown) => z.object({ listing_id: z.string().uuid() }).parse(input))
+  .validator((input: unknown) => z.object({ listing_id: z.string().uuid() }).parse(input))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row, error } = await supabaseAdmin

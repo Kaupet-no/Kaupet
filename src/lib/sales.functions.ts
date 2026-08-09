@@ -14,7 +14,7 @@ export type ListingSale = {
 
 export const getSaleForListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ listingId: z.string().uuid() }).parse(input))
+  .validator((input: unknown) => z.object({ listingId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }): Promise<ListingSale | null> => {
     const { supabase } = context;
     const { data: sale, error } = await supabase
@@ -28,7 +28,7 @@ export const getSaleForListing = createServerFn({ method: "POST" })
 
 export const confirmBuyer = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ conversationId: z.string().uuid() }).parse(input))
+  .validator((input: unknown) => z.object({ conversationId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { data: conv, error: convErr } = await supabase
@@ -61,7 +61,7 @@ export const confirmBuyer = createServerFn({ method: "POST" })
 
 export const unconfirmBuyer = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ listingId: z.string().uuid() }).parse(input))
+  .validator((input: unknown) => z.object({ listingId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { data: sale, error: saleErr } = await supabase

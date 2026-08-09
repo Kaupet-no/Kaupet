@@ -56,7 +56,7 @@ const wtbInputSchema = z.object({
 
 export const createWtbListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => wtbInputSchema.parse(input))
+  .validator((input: unknown) => wtbInputSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { userId } = context;
@@ -108,7 +108,7 @@ const wtbUpdateSchema = z.object({
 
 export const updateWtbListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => wtbUpdateSchema.parse(input))
+  .validator((input: unknown) => wtbUpdateSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { userId } = context;
@@ -133,7 +133,7 @@ export const updateWtbListing = createServerFn({ method: "POST" })
 
 export const deleteWtbListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { userId } = context;
@@ -172,7 +172,7 @@ const listWtbSchema = z.object({
 });
 
 export const listWtbListings = createServerFn({ method: "GET" })
-  .inputValidator((input: unknown) => listWtbSchema.parse(input))
+  .validator((input: unknown) => listWtbSchema.parse(input))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     let query = supabaseAdmin
@@ -200,7 +200,7 @@ export const listWtbListings = createServerFn({ method: "GET" })
   });
 
 export const countWtbListings = createServerFn({ method: "GET" })
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z.object({ q: z.string().optional(), categories: z.array(z.string()).optional() }).parse(input),
   )
   .handler(async ({ data }) => {
@@ -232,7 +232,7 @@ export const countWtbListings = createServerFn({ method: "GET" })
  * skriver treffvarsler ved publisering — banneret reflekterer derfor ekte
  * attributt-treff, ikke bare tittel-tekstoverlapp som tidligere. */
 export const matchWtbListingsForListing = createServerFn({ method: "GET" })
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         title: z.string(),

@@ -11,7 +11,7 @@ const message = z.string().trim().min(1, "Melding er påkrevd").max(2000);
 
 export const adminDisableListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: uuid, reason }).parse(i))
+  .validator((i: unknown) => z.object({ id: uuid, reason }).parse(i))
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
     const { error } = await context.supabase.rpc("admin_disable_listing", {
@@ -24,7 +24,7 @@ export const adminDisableListing = createServerFn({ method: "POST" })
 
 export const adminEnableListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: uuid }).parse(i))
+  .validator((i: unknown) => z.object({ id: uuid }).parse(i))
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
     const { error } = await context.supabase.rpc("admin_enable_listing", {
@@ -36,7 +36,7 @@ export const adminEnableListing = createServerFn({ method: "POST" })
 
 export const adminBanUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ userId: uuid, reason }).parse(i))
+  .validator((i: unknown) => z.object({ userId: uuid, reason }).parse(i))
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
     const { error } = await context.supabase.rpc("admin_ban_user", {
@@ -49,7 +49,7 @@ export const adminBanUser = createServerFn({ method: "POST" })
 
 export const adminUnbanUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ userId: uuid }).parse(i))
+  .validator((i: unknown) => z.object({ userId: uuid }).parse(i))
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
     const { error } = await context.supabase.rpc("admin_unban_user", {
@@ -61,7 +61,7 @@ export const adminUnbanUser = createServerFn({ method: "POST" })
 
 export const adminSuspendUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) =>
+  .validator((i: unknown) =>
     z
       .object({
         userId: uuid,
@@ -83,7 +83,7 @@ export const adminSuspendUser = createServerFn({ method: "POST" })
 
 export const adminUnsuspendUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ userId: uuid }).parse(i))
+  .validator((i: unknown) => z.object({ userId: uuid }).parse(i))
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
     const { error } = await context.supabase.rpc("admin_unsuspend_user", {
@@ -98,7 +98,7 @@ const ipv6 = /^[0-9a-fA-F:]+$/;
 
 export const adminBanIp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) =>
+  .validator((i: unknown) =>
     z
       .object({
         ip: z
@@ -125,7 +125,7 @@ export const adminBanIp = createServerFn({ method: "POST" })
 
 export const adminUnbanIp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: uuid }).parse(i))
+  .validator((i: unknown) => z.object({ id: uuid }).parse(i))
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
     const { error } = await context.supabase.rpc("admin_unban_ip", {
@@ -137,7 +137,7 @@ export const adminUnbanIp = createServerFn({ method: "POST" })
 
 export const submitReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) =>
+  .validator((i: unknown) =>
     z
       .object({
         listingId: uuid,
@@ -158,7 +158,7 @@ export const submitReport = createServerFn({ method: "POST" })
 
 export const submitUserReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) =>
+  .validator((i: unknown) =>
     z
       .object({
         reportedUserId: uuid,
@@ -179,7 +179,7 @@ export const submitUserReport = createServerFn({ method: "POST" })
 
 export const adminDisableListingWithMessage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: uuid, reason, message }).parse(i))
+  .validator((i: unknown) => z.object({ id: uuid, reason, message }).parse(i))
   .handler(async ({ data, context }) => {
     await requireAdminOrModeratorRole(context.supabase, context.userId);
     const { error } = await context.supabase.rpc("admin_disable_listing_with_message", {
@@ -193,7 +193,7 @@ export const adminDisableListingWithMessage = createServerFn({ method: "POST" })
 
 export const adminDeleteListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: uuid, message }).parse(i))
+  .validator((i: unknown) => z.object({ id: uuid, message }).parse(i))
   .handler(async ({ data, context }) => {
     await requireAdminOrModeratorRole(context.supabase, context.userId);
     const { error } = await context.supabase.rpc("admin_delete_listing", {
@@ -214,7 +214,7 @@ export const adminListReports = createServerFn({ method: "GET" })
 
 export const adminResolveReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: uuid }).parse(i))
+  .validator((i: unknown) => z.object({ id: uuid }).parse(i))
   .handler(async ({ data, context }) => {
     await requireAdminOrModeratorRole(context.supabase, context.userId);
     const { error } = await context.supabase.rpc("admin_resolve_report", { _id: data.id });
@@ -224,7 +224,7 @@ export const adminResolveReport = createServerFn({ method: "POST" })
 
 export const adminGrantModeratorRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ userId: uuid }).parse(i))
+  .validator((i: unknown) => z.object({ userId: uuid }).parse(i))
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
     const { error } = await context.supabase.rpc("admin_grant_moderator_role", {
@@ -236,7 +236,7 @@ export const adminGrantModeratorRole = createServerFn({ method: "POST" })
 
 export const adminRevokeModeratorRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ userId: uuid }).parse(i))
+  .validator((i: unknown) => z.object({ userId: uuid }).parse(i))
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
     const { error } = await context.supabase.rpc("admin_revoke_moderator_role", {

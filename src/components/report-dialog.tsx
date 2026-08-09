@@ -1,14 +1,8 @@
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -67,8 +61,8 @@ export function ReportDialog({
   pending,
 }: Props) {
   return (
-    <Dialog open={open} onOpenChange={(o) => !pending && onOpenChange(o)}>
-      <DialogContent className="sm:max-w-md">
+    <ResponsiveOverlay open={open} onOpenChange={(o) => !pending && onOpenChange(o)}>
+      <ResponsiveOverlayContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
@@ -110,7 +104,7 @@ export function ReportDialog({
             Send inn rapport
           </Button>
         </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveOverlayContent>
+    </ResponsiveOverlay>
   );
 }

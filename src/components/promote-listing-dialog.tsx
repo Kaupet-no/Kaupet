@@ -9,14 +9,8 @@ import { signListingImageUrls } from "@/lib/storage";
 import { formatPrice } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
 import { createPromotionCheckout, getPromotionPricing } from "@/lib/promotions.functions";
 import { formatErrorMessage } from "@/lib/errors";
 
@@ -97,8 +91,8 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
   const isPending = checkout.isPending;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+    <ResponsiveOverlay open={open} onOpenChange={onOpenChange}>
+      <ResponsiveOverlayContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Fremhev annonsen</DialogTitle>
           <DialogDescription>
@@ -198,7 +192,7 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
             Betal med Vipps
           </Button>
         </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveOverlayContent>
+    </ResponsiveOverlay>
   );
 }

@@ -5,7 +5,20 @@ Kort referanse for konsistente mønstre i Kaupet-frontend. Utledet fra en UI/UX-
 ## Komponenter
 
 - Bruk primitiver fra `src/components/ui/` (shadcn/ui, "new-york"-stil) fremfor egne implementasjoner av dialog, sheet, tabell, skeleton osv.
-- Web bruker `Dialog`, native bruker `Sheet` for tilsvarende flyter (se `app-bottom-nav.tsx` for mønsteret: `!native ? <Dialog> : <Sheet>`).
+- Web bruker `Dialog`, native bruker `Sheet` for tilsvarende flyter. Bruk `ResponsiveOverlay`/`ResponsiveOverlayContent` (`src/components/ui/responsive-overlay.tsx`) i stedet for å grene manuelt på `useIsNative()` — den velger riktig primitiv automatisk:
+
+  ```tsx
+  <ResponsiveOverlay open={open} onOpenChange={setOpen}>
+    <ResponsiveOverlayContent className="sm:max-w-md">
+      <DialogHeader>
+        <DialogTitle>Tittel</DialogTitle>
+      </DialogHeader>
+      …
+    </ResponsiveOverlayContent>
+  </ResponsiveOverlay>
+  ```
+
+  `DialogHeader`/`DialogTitle`/`DialogDescription`/`DialogFooter` fungerer uendret inni begge varianter, siden `Dialog` og `Sheet` er bygget på samme `@radix-ui/react-dialog`-primitiv. `app-bottom-nav.tsx`s "Ny annonse"-velger er fortsatt en manuell `!native ? <Dialog> : <Sheet>`-gren (forhåndsdatert `ResponsiveOverlay`) — nytt overlay-UI bør bruke `ResponsiveOverlay` fra start.
 
 ## Destruktive/irreversible handlinger
 

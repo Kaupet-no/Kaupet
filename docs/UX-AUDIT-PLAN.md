@@ -1,6 +1,7 @@
 # App-UX-revisjon: funn og implementeringsplan
 
-Status: Fase 1 (fiks promotering) gjennomført 2026-08-09. Fase 2 er neste.
+Status: Fase 1 (fiks promotering) og fase 2 (delte UI-primitiver, del 1)
+gjennomført 2026-08-09. Fase 3 er neste.
 Sist oppdatert: 2026-08-09.
 
 **Dette dokumentet er levende.** Etter hver fase gjennomføres skal
@@ -597,6 +598,45 @@ lint kjørt rent på alle endrede/nye filer.
 
 Ingen nye funn underveis. Fase 2 (delte UI-primitiver: touch-targets,
 `ResponsiveOverlay`, favoritter, fjern `vaul`) er neste anbefalte steg.
+
+### Fase 2 — 2026-08-09
+
+Hevet touch-targets i `src/components/ui/button-variants.ts`: `default`
+`h-9`→`h-11`, `sm` `h-8`→`h-10`, `lg` `h-10`→`h-11`, `icon` `h-9 w-9`→`h-11
+w-11` (alle ≥40px, `default`/`lg`/`icon` nå ved 44px-anbefalingen; `xl`
+uendret).
+
+Bygget `src/components/ui/responsive-overlay.tsx` (`ResponsiveOverlay` +
+`ResponsiveOverlayContent`) — speiler `app-bottom-nav.tsx`s manuelle
+`!native ? <Dialog> : <Sheet>`-mønster bak én gjenbrukbar komponent.
+`DialogHeader`/`DialogTitle`/`DialogDescription`/`DialogFooter` gjenbrukes
+uendret inni begge varianter (samme underliggende
+`@radix-ui/react-dialog`-primitiv), så migreringen var kun et bytte av
+rot-/content-komponenten i `report-dialog.tsx`, `share-listing-dialog.tsx`,
+`promote-listing-dialog.tsx` og `published-listing-dialog.tsx`. Lagt til
+`src/components/ui/responsive-overlay.test.tsx` (web→Dialog,
+native→Sheet, speiler mønsteret i `swipe-to-delete-row.test.tsx`).
+`app-bottom-nav.tsx` selv er ikke migrert (forhåndsdatert
+`ResponsiveOverlay` og fungerer identisk) — `UI-GUIDE.md` peker nytt
+overlay-UI mot `ResponsiveOverlay` fra start.
+
+Fjernet det tidlige `if (!user) return null` i `favorite-button.tsx` —
+utloggede brukere ser nå favoritt-knappen og sendes til `/auth` ved klikk
+(den eksisterende redirect-grenen i `handleClick`, tidligere uoppnåelig).
+Lagt til `hapticImpact("light")` på vellykket toggle.
+
+Fjernet ubrukt `vaul`-avhengighet fra `package.json` (`bun install` kjørt,
+lockfile oppdatert).
+
+`e2e/pages/listing-wizard.ts`s `publishAndExpectSuccess` asserter på
+`getByRole("heading", {name: "Annonsen din er publisert, bra jobba!"})` —
+uendret av migreringen siden `DialogTitle` gjenbrukes som before. `bunx tsc
+--noEmit`, `bun run lint` (0 feil, kun eksisterende warnings) og `bun run
+test` (219/219 grønn) kjørt rent. Manuell sjekk mot lokal dev-server
+(konsoll uten feil).
+
+Ingen nye funn underveis. Fase 3 (manuell dark mode-bryter) er neste
+anbefalte steg.
 
 ## 9. Anbefalte neste steg (utenfor denne planens faser)
 

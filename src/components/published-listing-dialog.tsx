@@ -6,13 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { signListingImageUrls } from "@/lib/storage";
 import { formatPrice } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
 import { ShareListingDialog } from "@/components/share-listing-dialog";
 
 type Props = {
@@ -88,14 +83,14 @@ export function PublishedListingDialog({
   }, [listing?.cover_path]);
 
   return (
-    <Dialog
+    <ResponsiveOverlay
       open={open}
       onOpenChange={(o) => {
         onOpenChange(o);
         if (!o) onClose();
       }}
     >
-      <DialogContent className="sm:max-w-lg">
+      <ResponsiveOverlayContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="font-display text-2xl">
             Annonsen din er publisert, bra jobba! 🎉
@@ -161,7 +156,7 @@ export function PublishedListingDialog({
         >
           <X className="size-4" /> Lukk og gå til mine annonser
         </Button>
-      </DialogContent>
+      </ResponsiveOverlayContent>
       {listing?.kaupet_code && (
         <ShareListingDialog
           open={shareOpen}
@@ -170,6 +165,6 @@ export function PublishedListingDialog({
           title={listing.title}
         />
       )}
-    </Dialog>
+    </ResponsiveOverlay>
   );
 }

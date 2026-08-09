@@ -1,7 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Sparkles } from "lucide-react";
-
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
 import { getFeaturedListings } from "@/lib/promotions.functions";
 
@@ -40,7 +38,6 @@ export function FeaturedListingsSection({ categorySlug, limit = 3, allowedIds }:
     <section className="mb-6">
       <div className="rounded-xl border border-border bg-surface p-4">
         <div className="mb-3 flex items-center gap-1.5">
-          <Sparkles className="size-3 text-accent" />
           <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
             Promoterte annonser
           </span>

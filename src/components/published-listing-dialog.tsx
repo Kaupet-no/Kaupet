@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Eye, MapPin, Share2, Sparkles, X } from "lucide-react";
+import { Eye, MapPin, Share2, X } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { signListingImageUrls } from "@/lib/storage";
@@ -146,7 +146,7 @@ export function PublishedListingDialog({
               onClick={onPromote}
               className="flex-1 border-accent/40 text-accent-text hover:bg-accent/10 hover:text-accent-text"
             >
-              <Sparkles className="size-4" /> Fremhev annonse
+              Fremhev annonse
             </Button>
           )}
         </div>

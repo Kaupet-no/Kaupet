@@ -5,30 +5,35 @@ import { isNative, nativePlatform } from "./native";
 
 let initialized = false;
 
+// Status bar style/color — driven by the app's resolved theme (see
+// useTheme), not raw OS preference, so it stays in sync when the user
+// overrides the theme manually instead of following system settings.
+export async function syncStatusBarTheme(dark: boolean): Promise<void> {
+  if (!isNative()) return;
+  try {
+    const { StatusBar, Style } = await import("@capacitor/status-bar");
+    // Style.Dark = dark CONTENT (light text) — used on dark backgrounds.
+    // Style.Light = light CONTENT (dark text) — used on light backgrounds.
+    await StatusBar.setStyle({ style: dark ? Style.Dark : Style.Light });
+    try {
+      await StatusBar.setBackgroundColor({
+        color: dark ? "#1d2a22" : "#fbf9f3",
+      });
+    } catch {
+      /* iOS doesn't support setBackgroundColor */
+    }
+  } catch {
+    /* plugin unavailable */
+  }
+}
+
 export async function setupNative(): Promise<void> {
   if (!isNative() || initialized) return;
   initialized = true;
 
-  // Status bar — match the cream background with dark icons.
   try {
-    const { StatusBar, Style } = await import("@capacitor/status-bar");
-    const apply = async () => {
-      const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      // Style.Dark = dark CONTENT (light text) — used on dark backgrounds.
-      // Style.Light = light CONTENT (dark text) — used on light backgrounds.
-      await StatusBar.setStyle({ style: dark ? Style.Dark : Style.Light });
-      try {
-        await StatusBar.setBackgroundColor({
-          color: dark ? "#1d2a22" : "#fbf9f3",
-        });
-      } catch {
-        /* iOS doesn't support setBackgroundColor */
-      }
-    };
+    const { StatusBar } = await import("@capacitor/status-bar");
     await StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
-    await apply();
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    mq.addEventListener?.("change", () => void apply());
   } catch {
     /* plugin unavailable */
   }

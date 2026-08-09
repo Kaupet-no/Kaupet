@@ -15,6 +15,7 @@ import { ModerationBanner } from "@/components/moderation-banner";
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthProvider } from "@/lib/auth";
+import { ThemeProvider } from "@/hooks/use-theme";
 import { initOfflineWatcher } from "@/lib/native-offline";
 import {
   autoRestoreNativePush,
@@ -198,6 +199,14 @@ function RootShell({ children }: { children: ReactNode }) {
             __html: `if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) document.documentElement.classList.add("native-boot");`,
           }}
         />
+        {/* Runs before paint so there is no light-mode flash for users who
+            have chosen (or whose system prefers) dark mode. Kept in sync
+            with the resolution logic in src/hooks/use-theme.tsx. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("kaupet_theme");var d=t==="dark"||((t==="system"||!t)&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(d)document.documentElement.classList.add("dark");}catch(e){}})();`,
+          }}
+        />
         <style>{`
           #native-boot-splash { display: none; }
           .native-boot #native-boot-splash {
@@ -279,10 +288,12 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <RootBody native={native} />
-        <Toaster />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <RootBody native={native} />
+          <Toaster />
+        </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

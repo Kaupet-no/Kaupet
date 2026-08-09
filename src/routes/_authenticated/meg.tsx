@@ -6,6 +6,7 @@ import {
   ListChecks,
   LogOut,
   MessageSquareHeart,
+  Moon,
   Search,
   Settings,
   Shield,
@@ -19,6 +20,7 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import { useIsDemo } from "@/hooks/use-is-demo";
+import { useTheme } from "@/hooks/use-theme";
 import { useIsTestEnv } from "@/lib/env";
 import { setTestMode } from "@/lib/test-mode.functions";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
@@ -52,6 +54,7 @@ function MegPage() {
   const isTest = useIsTestEnv();
   const [toggling, setToggling] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const { resolvedTheme, setTheme } = useTheme();
   const callSetTestMode = useServerFn(setTestMode);
 
   async function handleToggleTest(next: boolean) {
@@ -157,9 +160,27 @@ function MegPage() {
             <NavRow
               icon={<Settings className="size-5 text-primary" />}
               label="Kontoinnstillinger"
-              last={!canToggleTest}
               onClick={() => void navigate({ to: "/profil", search: { tab: "konto" } })}
             />
+            <div
+              className={`flex items-center justify-between gap-3 px-4 py-3.5 ${
+                canToggleTest ? "border-b border-border" : ""
+              }`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <span className="flex items-center gap-3 text-sm font-medium">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted/60">
+                  <Moon className="size-5 text-primary" />
+                </span>
+                Mørk modus
+              </span>
+              <Switch
+                id="dark-mode-toggle-meg"
+                checked={resolvedTheme === "dark"}
+                onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+                aria-label="Aktiver mørk modus"
+              />
+            </div>
             {canToggleTest && (
               <div
                 className="flex items-center justify-between gap-3 px-4 py-3.5"

@@ -20,7 +20,7 @@ export const getPromotionPricing = createServerFn({ method: "GET" }).handler(asy
 
 export const createPromotionCheckout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         listing_id: z.string().uuid(),
@@ -155,7 +155,7 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
 
 export const getPromotionStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ promotion_id: z.string().uuid() }).parse(input))
+  .validator((input: unknown) => z.object({ promotion_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { data: promo, error } = await supabase
@@ -171,7 +171,7 @@ export const getPromotionStatus = createServerFn({ method: "GET" })
 
 export const getPromotionReceipt = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ promotion_id: z.string().uuid() }).parse(input))
+  .validator((input: unknown) => z.object({ promotion_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { data: promo, error } = await supabase
@@ -204,7 +204,7 @@ export const getPromotionReceipt = createServerFn({ method: "GET" })
 
 export const reconcilePromotionPayment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ promotion_id: z.string().uuid() }).parse(input))
+  .validator((input: unknown) => z.object({ promotion_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { userId } = context;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -317,7 +317,7 @@ export const getMyActivePromotions = createServerFn({ method: "GET" })
   });
 
 export const getFeaturedListings = createServerFn({ method: "GET" })
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         category_slug: z.string().optional(),

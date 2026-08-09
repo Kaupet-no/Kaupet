@@ -21,7 +21,7 @@ function randomToken(): string {
 // rad, slik at koden brukeren evt. allerede har delt/lagret fortsatt virker.
 export const createVehicle360CaptureSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ listingId: z.string().uuid() }).parse(input))
+  .validator((input: unknown) => z.object({ listingId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { userId } = context;
@@ -55,7 +55,7 @@ export const createVehicle360CaptureSession = createServerFn({ method: "POST" })
   });
 
 export const getVehicle360CaptureSession = createServerFn({ method: "GET" })
-  .inputValidator((input: unknown) => z.object({ token: z.string().min(1) }).parse(input))
+  .validator((input: unknown) => z.object({ token: z.string().min(1) }).parse(input))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -96,7 +96,7 @@ function extFrom360Mime(mime: string): string {
 // sendes derfor som base64 til denne server-funksjonen, som validerer token
 // og laster opp med service-role — tokenet er eneste autorisasjon.
 export const uploadVehicle360Frame = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         token: z.string().min(1),
@@ -151,7 +151,7 @@ export const uploadVehicle360Frame = createServerFn({ method: "POST" })
   });
 
 export const completeVehicle360CaptureSession = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => z.object({ token: z.string().min(1) }).parse(input))
+  .validator((input: unknown) => z.object({ token: z.string().min(1) }).parse(input))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin
@@ -164,7 +164,7 @@ export const completeVehicle360CaptureSession = createServerFn({ method: "POST" 
 
 export const getVehicle360FrameCount = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ listingId: z.string().uuid() }).parse(input))
+  .validator((input: unknown) => z.object({ listingId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { userId } = context;
@@ -188,7 +188,7 @@ export const getVehicle360FrameCount = createServerFn({ method: "GET" })
 
 export const getVehicle360Frames = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ listingId: z.string().uuid() }).parse(input))
+  .validator((input: unknown) => z.object({ listingId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { userId } = context;
@@ -213,7 +213,7 @@ export const getVehicle360Frames = createServerFn({ method: "GET" })
 
 export const deleteVehicle360Frames = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ listingId: z.string().uuid() }).parse(input))
+  .validator((input: unknown) => z.object({ listingId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { userId } = context;

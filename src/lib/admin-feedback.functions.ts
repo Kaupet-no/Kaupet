@@ -24,7 +24,7 @@ const listSchema = z.object({
 
 export const adminListFeedback = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => listSchema.parse(i))
+  .validator((i: unknown) => listSchema.parse(i))
   .handler(async ({ data, context }) => {
     await requireAdminRole(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -66,7 +66,7 @@ export const adminListFeedback = createServerFn({ method: "GET" })
 
 export const adminDeleteFeedback = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ ids: z.array(z.string().uuid()).min(1) }).parse(i))
+  .validator((i: unknown) => z.object({ ids: z.array(z.string().uuid()).min(1) }).parse(i))
   .handler(async ({ data, context }) => {
     await requireAdminRole(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

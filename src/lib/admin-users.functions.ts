@@ -12,7 +12,7 @@ const schema = z.object({
 
 export const createDemoUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => schema.parse(i))
+  .validator((i: unknown) => schema.parse(i))
   .handler(async ({ data, context }) => {
     await requireAdminRole(context.supabase, context.userId);
 

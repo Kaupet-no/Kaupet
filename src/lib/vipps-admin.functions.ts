@@ -93,9 +93,7 @@ async function assertAdmin(context: AuthCtx) {
 
 export const listVippsWebhooks = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z.object({ mode: z.enum(["test", "production"]) }).parse(input),
-  )
+  .validator((input: unknown) => z.object({ mode: z.enum(["test", "production"]) }).parse(input))
   .handler(async ({ data, context }) => {
     await assertAdmin(context as unknown as AuthCtx);
     const c = creds(data.mode);
@@ -109,7 +107,7 @@ export const listVippsWebhooks = createServerFn({ method: "POST" })
 
 export const registerVippsWebhook = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         mode: z.enum(["test", "production"]),
@@ -157,7 +155,7 @@ export const registerVippsWebhook = createServerFn({ method: "POST" })
 
 export const deleteVippsWebhook = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z.object({ mode: z.enum(["test", "production"]), id: z.string() }).parse(input),
   )
   .handler(async ({ data, context }) => {

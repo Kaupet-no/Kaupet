@@ -20,7 +20,7 @@ export const adminListPromotionPricing = createServerFn({ method: "GET" })
 
 export const adminUpdatePromotionPricing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         duration_days: z.number().int().positive().max(60),
@@ -46,7 +46,7 @@ export const adminUpdatePromotionPricing = createServerFn({ method: "POST" })
 
 export const adminListPromotions = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         status: z.string().optional(),
@@ -97,7 +97,7 @@ export const adminListPromotions = createServerFn({ method: "GET" })
 
 export const adminGetVippsPaymentStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ promotion_id: z.string().uuid() }).parse(input))
+  .validator((input: unknown) => z.object({ promotion_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -144,7 +144,7 @@ export const adminGetVippsPaymentStatus = createServerFn({ method: "POST" })
 
 export const adminRefundPromotion = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ promotion_id: z.string().uuid() }).parse(input))
+  .validator((input: unknown) => z.object({ promotion_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -191,7 +191,7 @@ export const adminRefundPromotion = createServerFn({ method: "POST" })
 
 export const adminGiftPromotion = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         listing_id: z.string().uuid(),
@@ -255,9 +255,7 @@ export const adminGiftPromotion = createServerFn({ method: "POST" })
 
 export const adminSearchListingsForGift = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z.object({ q: z.string().trim().min(1).max(120) }).parse(input),
-  )
+  .validator((input: unknown) => z.object({ q: z.string().trim().min(1).max(120) }).parse(input))
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

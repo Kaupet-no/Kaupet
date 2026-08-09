@@ -8,7 +8,7 @@ const MAX_LOOKUPS_PER_HOUR = 20;
 
 export const lookupVehicleByRegNumber = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         registrationNumber: z.string().trim().min(2).max(10),

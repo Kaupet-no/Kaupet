@@ -62,7 +62,7 @@ export type MyProfileStats = {
 
 export const createReview = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         listingId: z.string().uuid(),
@@ -113,7 +113,7 @@ export const createReview = createServerFn({ method: "POST" })
 
 export const getMyReviewForListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ listingId: z.string().uuid() }).parse(input))
+  .validator((input: unknown) => z.object({ listingId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { data: row, error } = await supabase
@@ -127,7 +127,7 @@ export const getMyReviewForListing = createServerFn({ method: "POST" })
   });
 
 export const getPublicProfile = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => z.object({ userId: z.string().uuid() }).parse(input))
+  .validator((input: unknown) => z.object({ userId: z.string().uuid() }).parse(input))
   .handler(async ({ data }): Promise<PublicProfile | null> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: profile, error } = await supabaseAdmin
@@ -188,7 +188,7 @@ export const getMyProfileStats = createServerFn({ method: "POST" })
   });
 
 export const listUserReviews = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         userId: z.string().uuid(),

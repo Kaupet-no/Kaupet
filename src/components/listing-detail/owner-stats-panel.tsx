@@ -1,18 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import {
-  Check,
-  ChevronDown,
-  Eye,
-  Heart,
-  Info,
-  Loader2,
-  Pencil,
-  Send,
-  Sparkles,
-  Users,
-} from "lucide-react";
+import { Check, ChevronDown, Eye, Heart, Info, Loader2, Pencil, Send, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -166,7 +155,7 @@ export function OwnerStatsPanel({
             className="mt-2 w-full gap-2"
             onClick={() => onPromoteOpenChange(true)}
           >
-            <Sparkles className="size-4" /> Fremhev annonse
+            Fremhev annonse
           </Button>
         ))}
       <PromoteListingDialog

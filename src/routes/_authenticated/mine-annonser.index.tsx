@@ -10,7 +10,6 @@ import { republishListing } from "@/lib/listings.functions";
 import { getMyActivePromotions } from "@/lib/promotions.functions";
 import { PromoteListingDialog } from "@/components/promote-listing-dialog";
 import { MarkSoldDialog } from "@/components/listing-detail/mark-sold-dialog";
-import { useIsDemo } from "@/hooks/use-is-demo";
 import { useIsNative } from "@/hooks/use-is-native";
 import { hapticImpact, hapticNotification } from "@/lib/haptics";
 import { Button } from "@/components/ui/button";
@@ -62,7 +61,6 @@ function MyListingsPage() {
   } | null>(null);
   const [promoteId, setPromoteId] = useState<string | null>(null);
   const [markSoldId, setMarkSoldId] = useState<string | null>(null);
-  const { data: isDemo = false } = useIsDemo();
   const native = useIsNative();
 
   const fetchPromos = useServerFn(getMyActivePromotions);
@@ -297,7 +295,6 @@ function MyListingsPage() {
                     <ListingRow
                       key={r.id}
                       row={r}
-                      isDemo={isDemo}
                       activePromotion={activePromoByListing.get(r.id) ?? null}
                       onPromote={() => setPromoteId(r.id)}
                       onMarkSold={() => setMarkSoldId(r.id)}

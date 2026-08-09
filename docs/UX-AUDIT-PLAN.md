@@ -3,8 +3,9 @@
 Status: Fase 1 (fiks promotering), fase 2 (delte UI-primitiver, del 1),
 fase 3 (manuell dark mode-bryter), fase 4 (360°-opptak: in-wizard +
 etterpåfølgende tillegg), fase 5 (WTB-redigeringskonsolidering), fase 6
-(annonseveiviser: feilhåndtering) og fase 7 (meldinger: bildevedlegg)
-gjennomført 2026-08-09. Fase 8 er neste.
+(annonseveiviser: feilhåndtering), fase 7 (meldinger: bildevedlegg) og
+fase 8 (auth-konsistens inkl. Turnstile) gjennomført 2026-08-09. Alle faser
+er nå implementert; se seksjon 9 for anbefalte neste steg utenfor planen.
 Sist oppdatert: 2026-08-09.
 
 **Dette dokumentet er levende.** Etter hver fase gjennomføres skal
@@ -888,6 +889,60 @@ mot ekte miljø, som fase 5 også manglet).
 
 Ingen nye funn underveis. Fase 8 (auth-konsistens inkl. Turnstile) er neste
 anbefalte steg.
+
+### Fase 8 — 2026-08-09
+
+**Turnstile på signup og innlogging:** lagt til i `src/routes/auth.tsx`,
+samme `@marsidev/react-turnstile`-widget i usynlig modus og samme
+`turnstileEnabled = !!import.meta.env.VITE_TURNSTILE_SITE_KEY`-mønster som
+`review-publish/index.tsx` allerede bruker. Server-side verifisering skjer
+her via Supabase Auth (GoTrue) sin innebygde captcha-støtte
+(`options.captchaToken` på `signUp`/`signInWithPassword`) i stedet for en ny
+egen server-funksjon rundt Cloudflares `siteverify` — publiseringsflytens
+manuelle verifisering finnes kun fordi den _ikke_ går via Supabase Auth,
+mens signup/innlogging allerede gjør det, så GoTrue sin innebygde støtte er
+riktig verktøy her (krever at Turnstile er skrudd på i Supabase sitt
+Auth-dashbord/`config.toml` med samme site-/secret-nøkkelpar — ikke gjort i
+denne økten, kun app-koden). Innlogging fikk samme friksjon som signup
+(usynlig, ingen synlig utfordring i normaltilfellet) — vurdert som
+tilstrekkelig, ingen egen lavere-friksjon-modus bygget siden usynlig
+Turnstile i praksis ikke er merkbar for legitime brukere.
+
+**Passord:** `src/lib/auth-schemas.ts` er nytt — ett delt
+`passwordSchema = z.string().min(8, ...)`. Brukes nå fra tre steder som før
+hadde egne kopier/avvik: `auth.tsx` (signup, uendret krav), `account-section.tsx`
+(kontoinnstillinger, uendret krav) og `tilbakestill-passord.tsx` (endret fra
+`minLength={6}` til 8, og fra ukontrollert input til `react-hook-form` +
+`zodResolver` med `aria-invalid`/`aria-describedby`, samme mønster som
+`auth.tsx` allerede bruker).
+
+**Logg ut:** `src/routes/_authenticated/meg.tsx` sin «Logg ut»-rad åpner nå
+en `AlertDialog`-bekreftelse (samme komponent-mønster som
+`block-conversation-menu.tsx`) i stedet for å logge ut direkte.
+`src/components/profil/account-section.tsx` (web-siden «Kontoinnstillinger»)
+hadde en egen logg-ut-knapp uten bekreftelse — utenfor planens angitte fil,
+ikke endret i denne økten.
+
+**«Sjekk e-posten din»:** signup går nå til en ny `authMode: "confirm"`-visning
+i stedet for kun en toast, med lenke tilbake til innlogging.
+
+**`authMode`-drift:** de tre deep-linkbare modusene (`signin`/`signup`/`reset`,
+som matcher `searchSchema`) bytter nå via `navigate({search: {mode}})` via en
+ny `goToMode()`-hjelper, slik at URL-en følger visningen. `resend` og
+`confirm` er bevisst holdt som ren lokal state (ikke i `searchSchema`) siden
+de er forbigående og ikke meningsfulle å dype-lenke til.
+
+**Ikke gjort:** Supabase-dashbord/`config.toml`-siden av Turnstile-oppsettet
+(secret key, skru på captcha for prosjektet) — kun app-koden som forventer
+det er på plass. Unit-test for delt passord-schema/logg-ut-bekreftelse
+utelatt (schemaet er ett `z.string().min(8)`, og
+logg-ut-dialogen følger et allerede testet UI-mønster — lav marginalverdi
+jf. ponytail-føringen om å ikke teste trivielle ting). `bunx tsc --noEmit`
+(0 feil), `bun run lint` (0 feil, kun eksisterende warnings) og `bun run
+test` (221/221 grønn) kjørt rent.
+
+Ingen nye funn underveis. Alle åtte faser i denne planen er nå
+implementert.
 
 ## 9. Anbefalte neste steg (utenfor denne planens faser)
 

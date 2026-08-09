@@ -1,5 +1,8 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { Loader2 } from "lucide-react";
 
@@ -9,6 +12,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatErrorMessage } from "@/lib/errors";
 import { passwordStrength } from "@/lib/password-strength";
+import { passwordSchema } from "@/lib/auth-schemas";
+
+const resetSchema = z.object({ password: passwordSchema });
+type ResetForm = z.infer<typeof resetSchema>;
 
 export const Route = createFileRoute("/tilbakestill-passord")({
   ssr: false,
@@ -22,9 +29,18 @@ type SessionState = "checking" | "ready" | "missing";
 
 function ResetPasswordPage() {
   const navigate = useNavigate();
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [sessionState, setSessionState] = useState<SessionState>("checking");
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors },
+  } = useForm<ResetForm>({
+    resolver: zodResolver(resetSchema),
+    defaultValues: { password: "" },
+  });
+  const password = watch("password") ?? "";
 
   // Gjenopprettingslenken gir en midlertidig sesjon via URL-hash; supabase-js
   // plukker den opp asynkront, så vi venter litt før vi konkluderer med utløpt lenke.
@@ -57,11 +73,10 @@ function ResetPasswordPage() {
     };
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (values: ResetForm) => {
     setLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password });
+      const { error } = await supabase.auth.updateUser({ password: values.password });
       if (error) throw error;
       showSuccessToast("Passordet er oppdatert. Du er nå logget inn.");
       navigate({ to: "/", replace: true });
@@ -98,18 +113,22 @@ function ResetPasswordPage() {
         )}
 
         {sessionState === "ready" && (
-          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4" noValidate>
             <div className="space-y-1.5">
               <Label htmlFor="new-password">Nytt passord</Label>
               <Input
                 id="new-password"
                 type="password"
-                required
-                minLength={6}
                 autoFocus
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                aria-invalid={!!errors.password}
+                aria-describedby={errors.password ? "new-password-error" : undefined}
+                {...register("password")}
               />
+              {errors.password && (
+                <p id="new-password-error" className="text-sm text-destructive">
+                  {errors.password.message}
+                </p>
+              )}
               {password.length > 0 && (
                 <div className="space-y-1">
                   <div className="flex gap-1">

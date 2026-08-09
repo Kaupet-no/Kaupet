@@ -11,9 +11,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Turnstile } from "@marsidev/react-turnstile";
 import { isNative } from "@/lib/native";
 import { formatErrorMessage } from "@/lib/errors";
 import { passwordStrength } from "@/lib/password-strength";
+import { passwordSchema } from "@/lib/auth-schemas";
 
 const TERMS_VERSION = "1.0";
 
@@ -32,7 +34,7 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
-type AuthMode = "signin" | "signup" | "reset" | "resend";
+type AuthMode = "signin" | "signup" | "reset" | "resend" | "confirm";
 
 const emailField = z
   .string()
@@ -52,10 +54,7 @@ const signInSchema = z.object({
 
 const signUpSchema = signInSchema.extend({
   displayName: z.string().trim().max(50, "Maks 50 tegn").optional().or(z.literal("")),
-  // Matches the minimum enforced when changing password in Kontoinnstillinger
-  // (see account-section.tsx) — keeping both in sync avoids a signup letting
-  // through a password that account settings would later reject.
-  password: z.string().min(8, "Minst 8 tegn"),
+  password: passwordSchema,
   acceptedTerms: z.boolean().refine((v) => v === true, {
     message: "Du må godta brukervilkårene og personvernerklæringen for å opprette konto.",
   }),
@@ -69,9 +68,17 @@ function AuthPage() {
   const [authMode, setAuthMode] = useState<AuthMode>(mode);
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileEnabled = !!import.meta.env.VITE_TURNSTILE_SITE_KEY;
   const isSignUp = authMode === "signup";
 
   useEffect(() => setAuthMode(mode), [mode]);
+
+  // Signin/signup/reset er deep-linkbare via ?mode= — bytt via navigate slik at
+  // URL-en og nettleserens tilbake-knapp følger den viste modusen. Resend/confirm
+  // er forbigående lokale tilstander uten egen URL.
+  const goToMode = (next: "signin" | "signup" | "reset") =>
+    navigate({ to: "/auth", search: { mode: next } });
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -100,7 +107,10 @@ function AuthPage() {
   const acceptedTerms = watch("acceptedTerms") ?? false;
 
   // Feltkrav endres når modusen byttes; fjern gamle feilmeldinger.
-  useEffect(() => clearErrors(), [authMode, clearErrors]);
+  useEffect(() => {
+    clearErrors();
+    setTurnstileToken(null);
+  }, [authMode, clearErrors]);
 
   const webOrigin = () => (isNative() ? "https://kaupet.no" : window.location.origin);
 
@@ -142,6 +152,10 @@ function AuthPage() {
   };
 
   const onSubmit = async (values: AuthForm) => {
+    if (turnstileEnabled && !turnstileToken) {
+      showErrorToast("Vent til bot-sjekken er fullført, og prøv igjen.");
+      return;
+    }
     setLoading(true);
     try {
       if (isSignUp) {
@@ -150,6 +164,7 @@ function AuthPage() {
           password: values.password,
           options: {
             emailRedirectTo: isNative() ? "https://kaupet.no/" : window.location.origin,
+            captchaToken: turnstileToken ?? undefined,
             data: {
               display_name: values.displayName || values.email.split("@")[0],
               terms_accepted_version: TERMS_VERSION,
@@ -158,11 +173,12 @@ function AuthPage() {
           },
         });
         if (error) throw error;
-        showSuccessToast("Konto opprettet! Sjekk e-posten for å bekrefte adressen.");
+        setAuthMode("confirm");
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email: values.email,
           password: values.password,
+          options: { captchaToken: turnstileToken ?? undefined },
         });
         if (error) throw error;
         showSuccessToast("Velkommen tilbake!");
@@ -170,6 +186,7 @@ function AuthPage() {
       }
     } catch (err: unknown) {
       showErrorToast(formatErrorMessage(err, "Noe gikk galt. Prøv igjen."));
+      setTurnstileToken(null);
     } finally {
       setLoading(false);
     }
@@ -183,21 +200,35 @@ function AuthPage() {
             ? "Glemt passord"
             : authMode === "resend"
               ? "Bekreft e-post"
-              : isSignUp
-                ? "Bli medlem"
-                : "Logg inn"}
+              : authMode === "confirm"
+                ? "Sjekk e-posten din"
+                : isSignUp
+                  ? "Bli medlem"
+                  : "Logg inn"}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {authMode === "reset"
             ? "Skriv inn e-postadressen din, så sender vi deg en lenke for å sette nytt passord."
             : authMode === "resend"
               ? "Skriv inn e-postadressen din, så sender vi deg en ny bekreftelseslenke."
-              : isSignUp
-                ? "Det tar bare et halvt minutt og er helt gratis."
-                : "Velkommen tilbake til Kaupet."}
+              : authMode === "confirm"
+                ? "Vi har sendt en bekreftelseslenke til e-postadressen din. Klikk på lenken for å aktivere kontoen."
+                : isSignUp
+                  ? "Det tar bare et halvt minutt og er helt gratis."
+                  : "Velkommen tilbake til Kaupet."}
         </p>
 
-        {authMode === "reset" ? (
+        {authMode === "confirm" ? (
+          <p className="mt-6 text-center text-sm text-muted-foreground">
+            <button
+              type="button"
+              className="font-medium text-primary hover:underline"
+              onClick={() => goToMode("signin")}
+            >
+              ← Tilbake til innlogging
+            </button>
+          </p>
+        ) : authMode === "reset" ? (
           <>
             <form onSubmit={handlePasswordReset} className="mt-6 space-y-4" noValidate>
               <div className="space-y-1.5">
@@ -225,7 +256,7 @@ function AuthPage() {
               <button
                 type="button"
                 className="font-medium text-primary hover:underline"
-                onClick={() => setAuthMode("signin")}
+                onClick={() => goToMode("signin")}
               >
                 ← Tilbake til innlogging
               </button>
@@ -314,7 +345,7 @@ function AuthPage() {
                   <button
                     type="button"
                     className="text-xs font-medium text-primary hover:underline"
-                    onClick={() => setAuthMode("reset")}
+                    onClick={() => goToMode("reset")}
                   >
                     Glemt passord?
                   </button>
@@ -402,10 +433,20 @@ function AuthPage() {
                 )}
               </div>
             )}
+            {turnstileEnabled && (
+              <Turnstile
+                siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+                onSuccess={(token) => setTurnstileToken(token)}
+                onExpire={() => setTurnstileToken(null)}
+                options={{ size: "invisible" }}
+              />
+            )}
             <Button
               type="submit"
               className="w-full gap-2"
-              disabled={loading || (isSignUp && !acceptedTerms)}
+              disabled={
+                loading || (isSignUp && !acceptedTerms) || (turnstileEnabled && !turnstileToken)
+              }
             >
               {loading && <Loader2 className="size-4 animate-spin" />}
               {isSignUp ? "Opprett konto" : "Logg inn"}
@@ -413,13 +454,13 @@ function AuthPage() {
           </form>
         )}
 
-        {authMode !== "reset" && authMode !== "resend" && (
+        {authMode !== "reset" && authMode !== "resend" && authMode !== "confirm" && (
           <p className="mt-6 text-center text-sm text-muted-foreground">
             {isSignUp ? "Har du allerede en konto? " : "Ny på Kaupet? "}
             <button
               type="button"
               className="font-medium text-primary hover:underline"
-              onClick={() => setAuthMode(isSignUp ? "signin" : "signup")}
+              onClick={() => goToMode(isSignUp ? "signin" : "signup")}
             >
               {isSignUp ? "Logg inn" : "Bli medlem"}
             </button>

@@ -22,11 +22,13 @@ function SuggestingAttributeInput({
   label,
   attributes,
   onAttributesChange,
-}: Pick<WizardSharedProps, "attributes" | "onAttributesChange"> & {
+  extraFieldError,
+}: Pick<WizardSharedProps, "attributes" | "onAttributesChange" | "extraFieldError"> & {
   categoryId: string | null;
   attrKey: string;
   label: string;
 }) {
+  const fieldError = extraFieldError?.field === attrKey ? extraFieldError.message : null;
   const raw = attributes[attrKey];
   const value = typeof raw === "string" ? raw : "";
   const [open, setOpen] = useState(false);
@@ -65,6 +67,8 @@ function SuggestingAttributeInput({
         id={fieldId}
         value={value}
         autoComplete="off"
+        aria-invalid={!!fieldError}
+        aria-describedby={fieldError ? `${fieldId}-error` : undefined}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         onChange={(e) => {
@@ -74,6 +78,11 @@ function SuggestingAttributeInput({
           debounceRef.current = setTimeout(() => setDebounced(q), 250);
         }}
       />
+      {fieldError && (
+        <p id={`${fieldId}-error`} className="text-sm text-destructive">
+          {fieldError}
+        </p>
+      )}
       {open && visibleSuggestions.length > 0 && (
         <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-md">
           {visibleSuggestions.map((s) => (
@@ -137,6 +146,7 @@ export function BoatFactsGroup(props: WizardSharedProps) {
         label="Merke"
         attributes={props.attributes}
         onAttributesChange={props.onAttributesChange}
+        extraFieldError={props.extraFieldError}
       />
       <SuggestingAttributeInput
         categoryId={props.categoryId || null}
@@ -144,6 +154,7 @@ export function BoatFactsGroup(props: WizardSharedProps) {
         label="Modell"
         attributes={props.attributes}
         onAttributesChange={props.onAttributesChange}
+        extraFieldError={props.extraFieldError}
       />
       <SubtitleField register={props.register} errors={props.errors} subtitle={props.subtitle} />
     </section>

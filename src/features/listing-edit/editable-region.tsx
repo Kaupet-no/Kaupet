@@ -1,9 +1,10 @@
-import { useState, type ReactNode } from "react";
+import { useContext, useState, type Context, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
-import { useListingEdit } from "./edit-mode-context";
+import { ListingEditContext } from "./edit-mode-context";
+import type { BaseEditContextValue } from "./editable-field";
 
-export type EditableRegionProps = {
+export type EditableRegionProps<C extends BaseEditContextValue = BaseEditContextValue> = {
   render: () => ReactNode;
   panel: (props: { close: () => void }) => ReactNode;
   className?: string;
@@ -11,6 +12,9 @@ export type EditableRegionProps = {
    * regions that open an external modal instead (category, plate) via
    * `onOpen` rather than an inline panel. */
   onOpen?: () => void;
+  /** Defaults to `ListingEditContext` — pass a different context to reuse
+   * this component outside of listing editing. */
+  context?: Context<C | null>;
 };
 
 /**
@@ -19,8 +23,14 @@ export type EditableRegionProps = {
  * attributes) — same dashed-border/hover styling as `EditableField`, but
  * click opens an inline panel instead of a single input.
  */
-export function EditableRegion({ render, panel, className, onOpen }: EditableRegionProps) {
-  const ctx = useListingEdit();
+export function EditableRegion<C extends BaseEditContextValue = BaseEditContextValue>({
+  render,
+  panel,
+  className,
+  onOpen,
+  context = ListingEditContext as unknown as Context<C | null>,
+}: EditableRegionProps<C>) {
+  const ctx = useContext(context);
   const [open, setOpen] = useState(false);
 
   if (!ctx || !ctx.editMode) {

@@ -4,6 +4,7 @@ import { Heart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
+import { hapticImpact } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 
 type Size = "sm" | "md" | "lg";
@@ -66,6 +67,7 @@ export function FavoriteButton({
     onSuccess: (nowFav) => {
       queryClient.invalidateQueries({ queryKey: ["favorite", listingId, user?.id] });
       queryClient.invalidateQueries({ queryKey: ["user-favorites"] });
+      void hapticImpact("light");
       showSuccessToast(nowFav ? "Lagt til i favoritter" : "Fjernet fra favoritter");
     },
     onError: (e: Error) => {
@@ -74,8 +76,6 @@ export function FavoriteButton({
       }
     },
   });
-
-  if (!user) return null;
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();

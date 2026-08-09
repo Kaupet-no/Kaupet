@@ -8,7 +8,6 @@ import {
   Eye,
   Heart,
   Clock,
-  Sparkles,
   Check,
   Send,
   MoreVertical,
@@ -18,6 +17,7 @@ import { signListingImageUrls } from "@/lib/storage";
 import { useIsNative } from "@/hooks/use-is-native";
 import { hapticImpact } from "@/lib/haptics";
 import { Button } from "@/components/ui/button";
+import { Vehicle360CaptureLauncher } from "@/components/vehicle-360-capture-launcher";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -80,7 +80,7 @@ function daysLeft(expires_at: string | null): number | null {
 
 export function ListingRow({
   row,
-  isDemo,
+  isVehicle,
   activePromotion,
   onPromote,
   onMarkSold,
@@ -91,7 +91,9 @@ export function ListingRow({
   busy,
 }: {
   row: Row;
-  isDemo: boolean;
+  /** Whether the listing's category is under Bil og MC — gates the native-only
+   * "legg til 360°-opptak"-action (draft/active rows only). */
+  isVehicle: boolean;
   activePromotion: { expires_at: string | null; is_gift: boolean } | null;
   onPromote: () => void;
   onMarkSold: () => void;
@@ -145,7 +147,6 @@ export function ListingRow({
       )}
       {activePromotion && (
         <span className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-xs text-accent-text">
-          <Sparkles className="size-3" />
           {activePromotion.is_gift ? "Gratis fremhevet" : "Fremhevet"} til{" "}
           {activePromotion.expires_at
             ? new Date(activePromotion.expires_at).toLocaleDateString("nb-NO", {
@@ -209,6 +210,15 @@ export function ListingRow({
             </span>
           </p>
         </div>
+        {isVehicle && (row.status === "draft" || row.status === "active") && (
+          <Vehicle360CaptureLauncher
+            listingId={row.id}
+            listingTitle={row.title}
+            label="Legg til 360°-opptak"
+            variant="ghost"
+            size="icon"
+          />
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -235,10 +245,8 @@ export function ListingRow({
             </DropdownMenuItem>
             {row.status === "active" && (
               <>
-                {isDemo && !activePromotion && (
-                  <DropdownMenuItem onClick={onPromote}>
-                    <Sparkles className="size-4" /> Fremhev annonse
-                  </DropdownMenuItem>
+                {!activePromotion && (
+                  <DropdownMenuItem onClick={onPromote}>Fremhev annonse</DropdownMenuItem>
                 )}
                 <DropdownMenuItem
                   onClick={() => {
@@ -320,21 +328,20 @@ export function ListingRow({
         </Link>
         {row.status === "active" ? (
           <>
-            {isDemo &&
-              (activePromotion ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled
-                  className="border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-400"
-                >
-                  <Check className="size-4" /> Annonse fremhevet
-                </Button>
-              ) : (
-                <Button size="sm" variant="outline" onClick={onPromote} disabled={busy}>
-                  <Sparkles className="size-4" /> Fremhev annonse
-                </Button>
-              ))}
+            {activePromotion ? (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled
+                className="border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-400"
+              >
+                <Check className="size-4" /> Annonse fremhevet
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" onClick={onPromote} disabled={busy}>
+                Fremhev annonse
+              </Button>
+            )}
             <Button size="sm" variant="outline" onClick={onMarkSold} disabled={busy}>
               <CheckCircle2 className="size-4" /> Marker som solgt
             </Button>

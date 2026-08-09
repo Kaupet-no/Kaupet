@@ -29,7 +29,7 @@ export type BlockRow = {
 
 export const createBlock = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => blockInput.parse(input))
+  .validator((input: unknown) => blockInput.parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     if (data.targetUserId === userId) {
@@ -78,7 +78,7 @@ export const createBlock = createServerFn({ method: "POST" })
 
 export const deleteBlock = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ blockId: z.string().uuid() }).parse(input))
+  .validator((input: unknown) => z.object({ blockId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
       .from("user_blocks")

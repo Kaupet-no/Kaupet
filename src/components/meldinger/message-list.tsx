@@ -20,8 +20,11 @@ export type Message = {
   body: string;
   created_at: string;
   deleted_at: string | null;
+  attachment_path?: string | null;
   /** True for meldinger som er sendt optimistisk og venter på bekreftelse fra serveren. */
   pending?: boolean;
+  /** Lokal `URL.createObjectURL`-forhåndsvisning for et vedlegg som ennå ikke er lastet opp. */
+  attachmentPreviewUrl?: string;
 };
 
 export function renderWithDayDividers(
@@ -29,6 +32,7 @@ export function renderWithDayDividers(
   myId: string,
   onDelete: (messageId: string) => void,
   otherLastReadAt?: string | null,
+  attachmentUrls?: Record<string, string>,
 ) {
   const out: React.ReactElement[] = [];
   let lastDay = "";
@@ -98,7 +102,20 @@ export function renderWithDayDividers(
                 : "bg-card text-foreground"
           } ${m.pending ? "opacity-60" : ""}`}
         >
-          <p className="whitespace-pre-wrap break-words">{deleted ? "Melding slettet" : m.body}</p>
+          {!deleted &&
+            (m.attachmentPreviewUrl ||
+              (m.attachment_path && attachmentUrls?.[m.attachment_path])) && (
+              <img
+                src={m.attachmentPreviewUrl ?? attachmentUrls![m.attachment_path!]}
+                alt="Vedlegg"
+                className="mb-1 max-h-64 max-w-full rounded-lg object-contain"
+              />
+            )}
+          {(deleted || m.body) && (
+            <p className="whitespace-pre-wrap break-words">
+              {deleted ? "Melding slettet" : m.body}
+            </p>
+          )}
           <p
             className={`mt-1 text-xs ${
               mine && !deleted ? "text-primary-foreground/70" : "text-muted-foreground"

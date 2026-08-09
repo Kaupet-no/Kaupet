@@ -120,10 +120,17 @@ export function Vehicle360CaptureFlow({
   token,
   listingTitle,
   startFrameOrder,
+  onDone,
 }: {
   token: string;
   listingTitle: string;
   startFrameOrder: number;
+  /** Set when the capture happens on the same device as the listing (in-wizard
+   * or "add to existing listing" entry points) instead of via QR handoff from
+   * desktop — swaps the completion copy/button accordingly and lets the
+   * caller close its own overlay instead of the user being told to "go back
+   * to your computer". */
+  onDone?: () => void;
 }) {
   const uploadFrame = useServerFn(uploadVehicle360Frame);
   const completeSession = useServerFn(completeVehicle360CaptureSession);
@@ -342,7 +349,11 @@ export function Vehicle360CaptureFlow({
     try {
       await completeSession({ data: { token } });
       setDone(true);
-      showSuccessToast("360°-opptaket er sendt til datamaskinen din");
+      showSuccessToast(
+        onDone
+          ? "360°-bildene er lagt til annonsen"
+          : "360°-opptaket er sendt til datamaskinen din",
+      );
     } catch {
       showErrorToast("Kunne ikke fullføre økten");
     } finally {
@@ -356,8 +367,15 @@ export function Vehicle360CaptureFlow({
         <Check className="size-10 text-primary" />
         <h1 className="font-display text-xl">Ferdig!</h1>
         <p className="text-sm text-muted-foreground">
-          Gå tilbake til datamaskinen — 360°-bildene dukker opp der automatisk.
+          {onDone
+            ? "360°-bildene er lastet opp og lagt til annonsen."
+            : "Gå tilbake til datamaskinen — 360°-bildene dukker opp der automatisk."}
         </p>
+        {onDone && (
+          <Button type="button" onClick={onDone}>
+            Ferdig
+          </Button>
+        )}
       </div>
     );
   }

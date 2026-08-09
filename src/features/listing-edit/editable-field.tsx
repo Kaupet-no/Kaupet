@@ -1,10 +1,19 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useContext, useEffect, useRef, useState, type Context, type ReactNode } from "react";
 import { Loader2, Check, AlertCircle } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { useListingEdit } from "./edit-mode-context";
+import { ListingEditContext, type FieldStatus } from "./edit-mode-context";
 
-export type EditableFieldProps<T> = {
+/** Minimal shape `EditableField`/`EditableRegion` actually need — lets other
+ * inline-edit surfaces (e.g. WTB listings) supply their own context instead
+ * of `ListingEditContext`, which also carries listing-specific fields
+ * (`saveField`, `behavior`, modal openers) these two components never touch. */
+export type BaseEditContextValue = {
+  editMode: boolean;
+  fieldStatus: Record<string, FieldStatus>;
+};
+
+export type EditableFieldProps<T, C extends BaseEditContextValue = BaseEditContextValue> = {
   fieldKey: string;
   value: T;
   render: (value: T) => ReactNode;
@@ -20,6 +29,9 @@ export type EditableFieldProps<T> = {
   onSave: (v: T) => Promise<void>;
   validate?: (v: T) => string | null;
   className?: string;
+  /** Defaults to `ListingEditContext` — pass a different context to reuse
+   * this component outside of listing editing. */
+  context?: Context<C | null>;
 };
 
 /**
@@ -29,7 +41,7 @@ export type EditableFieldProps<T> = {
  * affordance around the read view, click activates `editRender`, blur/
  * confirm validates and autosaves, Escape cancels without saving.
  */
-export function EditableField<T>({
+export function EditableField<T, C extends BaseEditContextValue = BaseEditContextValue>({
   fieldKey,
   value,
   render,
@@ -37,8 +49,9 @@ export function EditableField<T>({
   onSave,
   validate,
   className,
-}: EditableFieldProps<T>) {
-  const ctx = useListingEdit();
+  context = ListingEditContext as unknown as Context<C | null>,
+}: EditableFieldProps<T, C>) {
+  const ctx = useContext(context);
   const [active, setActive] = useState(false);
   const [draft, setDraft] = useState<T>(value);
   const [error, setError] = useState<string | null>(null);

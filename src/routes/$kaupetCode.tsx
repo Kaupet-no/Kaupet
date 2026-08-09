@@ -33,6 +33,7 @@ import { VehiclePlateEditDialog } from "@/features/listing-edit/vehicle-plate-ed
 import { CategoryChangeDialog } from "@/features/listing-edit/category-change-dialog";
 import type { ListingEditContextValue } from "@/features/listing-edit/edit-mode-context";
 import { ListingDetailSkeleton } from "@/components/listing-detail-skeleton";
+import { Vehicle360CaptureLauncher } from "@/components/vehicle-360-capture-launcher";
 
 // crypto.randomUUID() requires a secure context and isn't available in every
 // WebView — fall back to a non-crypto random ID so anonymous view-count
@@ -657,21 +658,32 @@ function ListingDetailPage() {
       }
       ownerStatsSlot={
         isOwner ? (
-          <OwnerStatsPanel
-            listingId={data.id}
-            status={data.status}
-            stats={stats}
-            activePromotion={activePromotion}
-            promoteOpen={promoteOpen}
-            onPromoteOpenChange={setPromoteOpen}
-            statsInfoOpen={statsInfoOpen}
-            onStatsInfoOpenChange={setStatsInfoOpen}
-            editMode={editModeOn}
-            onToggleEditMode={toggleEditMode}
-            hasImages={images.length > 0}
-            isFree={data.is_free}
-            hasPrice={data.price_nok != null}
-          />
+          <>
+            <OwnerStatsPanel
+              listingId={data.id}
+              status={data.status}
+              stats={stats}
+              activePromotion={activePromotion}
+              promoteOpen={promoteOpen}
+              onPromoteOpenChange={setPromoteOpen}
+              statsInfoOpen={statsInfoOpen}
+              onStatsInfoOpenChange={setStatsInfoOpen}
+              editMode={editModeOn}
+              onToggleEditMode={toggleEditMode}
+              hasImages={images.length > 0}
+              isFree={data.is_free}
+              hasPrice={data.price_nok != null}
+            />
+            {isNative && vehicleGroup && listingId && (
+              <div className="mt-3">
+                <Vehicle360CaptureLauncher
+                  listingId={listingId}
+                  listingTitle={data.title}
+                  label="Legg til 360°-opptak"
+                />
+              </div>
+            )}
+          </>
         ) : undefined
       }
       sellerContactSlot={

@@ -136,6 +136,13 @@ jobs:
           SUPABASE_URL: ${{ vars.STAGING_SUPABASE_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ vars.STAGING_SUPABASE_PUBLISHABLE_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
+          # No VITE_TURNSTILE_SITE_KEY here on purpose: even Cloudflare's
+          # "always passes" test key doesn't reliably complete in headless CI
+          # (Cloudflare's bot detection runs before the test-key bypass, and
+          # can stall indefinitely on a datacenter/CI IP). Leaving it unset
+          # keeps turnstileEnabled=false client-side in auth.tsx, which is
+          # fine as long as the staging Supabase project doesn't enforce
+          # captcha server-side.
 
       - uses: actions/upload-artifact@v7
         if: always()

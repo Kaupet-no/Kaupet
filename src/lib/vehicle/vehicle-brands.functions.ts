@@ -18,7 +18,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
  */
 export const createVehicleBrand = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         name: z.string().trim().min(1).max(80),
@@ -52,7 +52,7 @@ export const createVehicleBrand = createServerFn({ method: "POST" })
 
 export const createVehicleModel = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         brandId: z.string().uuid(),

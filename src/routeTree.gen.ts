@@ -31,6 +31,7 @@ import { Route as AuthenticatedVarslerRouteImport } from './routes/_authenticate
 import { Route as AnnonseListingIdRouteImport } from './routes/annonse.$listingId'
 import { Route as AnnonserFilterRouteImport } from './routes/annonser_.filter'
 import { Route as BrukerIdRouteImport } from './routes/bruker.$id'
+import { Route as OkIdRouteImport } from './routes/ok.$id'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedAdminBrukereRouteImport } from './routes/_authenticated/admin/brukere'
 import { Route as AuthenticatedAdminKategorierRouteImport } from './routes/_authenticated/admin/kategorier'
@@ -47,7 +48,6 @@ import { Route as AuthenticatedMeldingerIdRouteImport } from './routes/_authenti
 import { Route as AuthenticatedMineAnnonserIndexRouteImport } from './routes/_authenticated/mine-annonser.index'
 import { Route as ApiPublicPushDispatchRouteImport } from './routes/api/public/push/dispatch'
 import { Route as ApiPublicVippsWebhookRouteImport } from './routes/api/public/vipps/webhook'
-import { Route as AuthenticatedMineAnnonserOkIdRedigerRouteImport } from './routes/_authenticated/mine-annonser.ok.$id.rediger'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -159,6 +159,11 @@ const BrukerIdRoute = BrukerIdRouteImport.update({
   path: '/bruker/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OkIdRoute = OkIdRouteImport.update({
+  id: '/ok/$id',
+  path: '/ok/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -251,12 +256,6 @@ const ApiPublicVippsWebhookRoute = ApiPublicVippsWebhookRouteImport.update({
   path: '/api/public/vipps/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedMineAnnonserOkIdRedigerRoute =
-  AuthenticatedMineAnnonserOkIdRedigerRouteImport.update({
-    id: '/mine-annonser/ok/$id/rediger',
-    path: '/mine-annonser/ok/$id/rediger',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -280,6 +279,7 @@ export interface FileRoutesByFullPath {
   '/annonse/$listingId': typeof AnnonseListingIdRoute
   '/annonser/filter': typeof AnnonserFilterRoute
   '/bruker/$id': typeof BrukerIdRoute
+  '/ok/$id': typeof OkIdRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/admin/kjoretoy': typeof AuthenticatedAdminKjoretoyRoute
@@ -296,7 +296,6 @@ export interface FileRoutesByFullPath {
   '/mine-annonser/': typeof AuthenticatedMineAnnonserIndexRoute
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
   '/api/public/vipps/webhook': typeof ApiPublicVippsWebhookRoute
-  '/mine-annonser/ok/$id/rediger': typeof AuthenticatedMineAnnonserOkIdRedigerRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -319,6 +318,7 @@ export interface FileRoutesByTo {
   '/annonse/$listingId': typeof AnnonseListingIdRoute
   '/annonser/filter': typeof AnnonserFilterRoute
   '/bruker/$id': typeof BrukerIdRoute
+  '/ok/$id': typeof OkIdRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/admin/kjoretoy': typeof AuthenticatedAdminKjoretoyRoute
@@ -335,7 +335,6 @@ export interface FileRoutesByTo {
   '/mine-annonser': typeof AuthenticatedMineAnnonserIndexRoute
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
   '/api/public/vipps/webhook': typeof ApiPublicVippsWebhookRoute
-  '/mine-annonser/ok/$id/rediger': typeof AuthenticatedMineAnnonserOkIdRedigerRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -361,6 +360,7 @@ export interface FileRoutesById {
   '/annonse/$listingId': typeof AnnonseListingIdRoute
   '/annonser_/filter': typeof AnnonserFilterRoute
   '/bruker/$id': typeof BrukerIdRoute
+  '/ok/$id': typeof OkIdRoute
   '/_authenticated/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/_authenticated/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/_authenticated/admin/kjoretoy': typeof AuthenticatedAdminKjoretoyRoute
@@ -377,7 +377,6 @@ export interface FileRoutesById {
   '/_authenticated/mine-annonser/': typeof AuthenticatedMineAnnonserIndexRoute
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
   '/api/public/vipps/webhook': typeof ApiPublicVippsWebhookRoute
-  '/_authenticated/mine-annonser/ok/$id/rediger': typeof AuthenticatedMineAnnonserOkIdRedigerRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -403,6 +402,7 @@ export interface FileRouteTypes {
     | '/annonse/$listingId'
     | '/annonser/filter'
     | '/bruker/$id'
+    | '/ok/$id'
     | '/admin/brukere'
     | '/admin/kategorier'
     | '/admin/kjoretoy'
@@ -419,7 +419,6 @@ export interface FileRouteTypes {
     | '/mine-annonser/'
     | '/api/public/push/dispatch'
     | '/api/public/vipps/webhook'
-    | '/mine-annonser/ok/$id/rediger'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -442,6 +441,7 @@ export interface FileRouteTypes {
     | '/annonse/$listingId'
     | '/annonser/filter'
     | '/bruker/$id'
+    | '/ok/$id'
     | '/admin/brukere'
     | '/admin/kategorier'
     | '/admin/kjoretoy'
@@ -458,7 +458,6 @@ export interface FileRouteTypes {
     | '/mine-annonser'
     | '/api/public/push/dispatch'
     | '/api/public/vipps/webhook'
-    | '/mine-annonser/ok/$id/rediger'
   id:
     | '__root__'
     | '/'
@@ -483,6 +482,7 @@ export interface FileRouteTypes {
     | '/annonse/$listingId'
     | '/annonser_/filter'
     | '/bruker/$id'
+    | '/ok/$id'
     | '/_authenticated/admin/brukere'
     | '/_authenticated/admin/kategorier'
     | '/_authenticated/admin/kjoretoy'
@@ -499,7 +499,6 @@ export interface FileRouteTypes {
     | '/_authenticated/mine-annonser/'
     | '/api/public/push/dispatch'
     | '/api/public/vipps/webhook'
-    | '/_authenticated/mine-annonser/ok/$id/rediger'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -517,6 +516,7 @@ export interface RootRouteChildren {
   AnnonseListingIdRoute: typeof AnnonseListingIdRoute
   AnnonserFilterRoute: typeof AnnonserFilterRoute
   BrukerIdRoute: typeof BrukerIdRoute
+  OkIdRoute: typeof OkIdRoute
   ApiPublicPushDispatchRoute: typeof ApiPublicPushDispatchRoute
   ApiPublicVippsWebhookRoute: typeof ApiPublicVippsWebhookRoute
 }
@@ -677,6 +677,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BrukerIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ok/$id': {
+      id: '/ok/$id'
+      path: '/ok/$id'
+      fullPath: '/ok/$id'
+      preLoaderRoute: typeof OkIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/admin/': {
       id: '/_authenticated/admin/'
       path: '/'
@@ -789,13 +796,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicVippsWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/mine-annonser/ok/$id/rediger': {
-      id: '/_authenticated/mine-annonser/ok/$id/rediger'
-      path: '/mine-annonser/ok/$id/rediger'
-      fullPath: '/mine-annonser/ok/$id/rediger'
-      preLoaderRoute: typeof AuthenticatedMineAnnonserOkIdRedigerRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
   }
 }
 
@@ -844,7 +844,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedMeldingerIdRoute: typeof AuthenticatedMeldingerIdRoute
   AuthenticatedMeldingerIndexRoute: typeof AuthenticatedMeldingerIndexRoute
   AuthenticatedMineAnnonserIndexRoute: typeof AuthenticatedMineAnnonserIndexRoute
-  AuthenticatedMineAnnonserOkIdRedigerRoute: typeof AuthenticatedMineAnnonserOkIdRedigerRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -861,8 +860,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedMeldingerIdRoute: AuthenticatedMeldingerIdRoute,
   AuthenticatedMeldingerIndexRoute: AuthenticatedMeldingerIndexRoute,
   AuthenticatedMineAnnonserIndexRoute: AuthenticatedMineAnnonserIndexRoute,
-  AuthenticatedMineAnnonserOkIdRedigerRoute:
-    AuthenticatedMineAnnonserOkIdRedigerRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -883,6 +880,7 @@ const rootRouteChildren: RootRouteChildren = {
   AnnonseListingIdRoute: AnnonseListingIdRoute,
   AnnonserFilterRoute: AnnonserFilterRoute,
   BrukerIdRoute: BrukerIdRoute,
+  OkIdRoute: OkIdRoute,
   ApiPublicPushDispatchRoute: ApiPublicPushDispatchRoute,
   ApiPublicVippsWebhookRoute: ApiPublicVippsWebhookRoute,
 }

@@ -25,7 +25,7 @@ const SaveSchema = z.discriminatedUnion("platform", [
 
 export const savePushSubscription = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => SaveSchema.parse(data))
+  .validator((data: unknown) => SaveSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     if (data.platform === "web") {
@@ -65,7 +65,7 @@ const DeleteSchema = z.union([
 
 export const deletePushSubscription = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => DeleteSchema.parse(data))
+  .validator((data: unknown) => DeleteSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     let query = supabase.from("push_subscriptions").delete().eq("user_id", userId);
@@ -93,7 +93,7 @@ export const getUserPushSubscriptions = createServerFn({ method: "GET" })
 
 export const deletePushSubscriptionById = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => z.object({ id: z.string().uuid() }).parse(data))
+  .validator((data: unknown) => z.object({ id: z.string().uuid() }).parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { error } = await supabase
@@ -146,7 +146,7 @@ const PrefsSchema = z.object({
 
 export const updateNotificationPreferences = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => PrefsSchema.parse(data))
+  .validator((data: unknown) => PrefsSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { error } = await supabase.from("notification_preferences").upsert(

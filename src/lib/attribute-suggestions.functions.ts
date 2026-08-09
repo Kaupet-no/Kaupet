@@ -5,7 +5,7 @@ import { z } from "zod";
  * Modell): distinct values from active listings in the category subtree,
  * prefix-matched on what the user has typed so far. */
 export const getAttributeValueSuggestions = createServerFn({ method: "GET" })
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         categoryId: z.string().uuid(),

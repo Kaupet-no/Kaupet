@@ -1,7 +1,7 @@
 # App-UX-revisjon: funn og implementeringsplan
 
-Status: Fase 1 (fiks promotering) og fase 2 (delte UI-primitiver, del 1)
-gjennomført 2026-08-09. Fase 3 er neste.
+Status: Fase 1 (fiks promotering), fase 2 (delte UI-primitiver, del 1) og
+fase 3 (manuell dark mode-bryter) gjennomført 2026-08-09. Fase 4 er neste.
 Sist oppdatert: 2026-08-09.
 
 **Dette dokumentet er levende.** Etter hver fase gjennomføres skal
@@ -636,6 +636,46 @@ test` (219/219 grønn) kjørt rent. Manuell sjekk mot lokal dev-server
 (konsoll uten feil).
 
 Ingen nye funn underveis. Fase 3 (manuell dark mode-bryter) er neste
+anbefalte steg.
+
+### Fase 3 — 2026-08-09
+
+Bygget `src/hooks/use-theme.tsx` (`ThemeProvider`/`useTheme`) — liten React
+Context, ingen tredjeparts theme-avhengighet, som planlagt. Verdier
+`"light" | "dark" | "system"`, persistert i `localStorage` under
+`kaupet_theme`, standard `"system"`. Montert én gang i `__root.tsx` rundt
+`AuthProvider`. Lagt til et synkront inline-script i `RootShell` (samme
+mønster som det eksisterende `native-boot`-scriptet) som setter
+`.dark`-klassen på `<html>` før noe males, så det ikke blir noe lysmodus-glimt
+for brukere med mørk modus valgt eller som systempreferanse.
+
+`src/lib/native-setup.ts` delt i to: `setupNative()` (uendret ansvar —
+viewport/tastatur) og en ny eksportert `syncStatusBarTheme(dark)` som
+`ThemeProvider` selv kaller (kun on native) hver gang resolved theme endres —
+statuslinjen følger nå appens faktiske tema, ikke en uavhengig
+`matchMedia`-lytter slik planen påpekte som viktig detalj.
+
+**Web-UI:** lagt til en «Mørk modus»-bryter (`Switch`, samme mønster som
+Test-modus-bryteren) i `UserMenu` (avatar-dropdownen i `site-header.tsx`).
+**Native-UI:** tilsvarende bryter lagt til i `meg.tsx`s «Konto»-seksjon,
+samme `NavRow`-visuelle mønster. Begge brytere er enkle av/på (ikke en
+tredje «system»-meny-oppføring) — resolved theme fra system brukes som
+utgangspunkt inntil brukeren eksplisitt slår bryteren, i tråd med planens
+åpning for en enklere to-tilstands bryter fremfor tre valg.
+
+Lagt til `src/hooks/use-theme.test.tsx` (system-standard følger lys
+OS-preferanse, manuell overstyring persisterer i `localStorage` og setter
+riktig klasse). `bunx tsc --noEmit`, `bun run lint` (0 feil, kun eksisterende
+warnings) og `bun run test` (221/221 grønn) kjørt rent. Manuelt verifisert i
+nettleser: `localStorage.kaupet_theme = "dark"` + reload setter `.dark` på
+`<html>` synkront før maling og løser til korrekt mørk bakgrunnsfarge
+(`oklch(0.18 0.02 150)`), ingen konsollfeil.
+
+**Ikke gjort, bevisst:** ingen simulator-verifisering av
+statuslinje-synkroniseringen på ekte native — kun kodenivå (samme
+begrensning planen selv flagger for `useIsNative()`-grener).
+
+Ingen nye funn underveis. Fase 4 (ekte in-wizard 360°-opptak) er neste
 anbefalte steg.
 
 ## 9. Anbefalte neste steg (utenfor denne planens faser)

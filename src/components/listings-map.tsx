@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { signListingImageUrls } from "@/lib/storage";
 import { useNominatimSearch, type NominatimResult } from "@/hooks/use-nominatim-search";
+import { useTheme } from "@/hooks/use-theme";
 
 const EARTH_RADIUS_KM = 6371;
 
@@ -236,6 +237,7 @@ export function ListingsMap({
   onClearLocation,
   className,
 }: Props) {
+  const { resolvedTheme } = useTheme();
   const initial = center ?? NORWAY_CENTER;
   const zoom = center ? 11 : 5;
   const [previewRadiusKm, setPreviewRadiusKm] = useState(radiusKm);
@@ -285,7 +287,7 @@ export function ListingsMap({
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+          url={`https://{s}.basemaps.cartocdn.com/${resolvedTheme === "dark" ? "dark_all" : "light_all"}/{z}/{x}/{y}{r}.png`}
           subdomains="abcd"
         />
         <CenterUpdater center={center} radiusKm={radiusKm} />

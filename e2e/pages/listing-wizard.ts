@@ -16,7 +16,13 @@ export async function login(page: Page, email: string, password: string, testInf
   page.on("console", (msg) => console.log(`[browser:${msg.type()}] ${msg.text()}`));
   page.on("pageerror", (err) => console.log(`[pageerror] ${err.message}`));
 
-  await page.goto("/auth");
+  // "/auth" (no search params) triggers a client-side redirect to
+  // "/auth?mode=signin" — validateSearch's .default("signin") canonicalizes
+  // the URL — which remounts the form and wipes whatever was just filled.
+  // Going straight to the canonical URL avoids that race entirely (it only
+  // surfaced once Turnstile's load time gave the redirect time to land
+  // between fill and click).
+  await page.goto("/auth?mode=signin");
   // Inputs are controlled (SSR-rendered, then hydrated) — filling before
   // hydration finishes gets clobbered when React reconciles to its initial
   // empty state. Used to wait for networkidle first, but the Turnstile

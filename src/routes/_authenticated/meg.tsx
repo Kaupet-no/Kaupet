@@ -30,6 +30,16 @@ import { Switch } from "@/components/ui/switch";
 import { NativePageHeader } from "@/components/native-page-header";
 import { FeedbackPanel } from "@/components/feedback-tag";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authenticated/meg")({
@@ -54,6 +64,7 @@ function MegPage() {
   const isTest = useIsTestEnv();
   const [toggling, setToggling] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const { resolvedTheme, setTheme } = useTheme();
   const callSetTestMode = useServerFn(setTestMode);
 
@@ -255,11 +266,34 @@ function MegPage() {
               label="Logg ut"
               destructive
               last
-              onClick={() => void handleLogout()}
+              onClick={() => setLogoutConfirmOpen(true)}
             />
           </div>
         </div>
       </div>
+
+      <AlertDialog open={logoutConfirmOpen} onOpenChange={setLogoutConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Logg ut?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Du blir logget ut av Kaupet.no på denne enheten.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault();
+                void handleLogout();
+              }}
+            >
+              Logg ut
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

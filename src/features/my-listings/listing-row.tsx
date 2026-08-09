@@ -17,6 +17,7 @@ import { signListingImageUrls } from "@/lib/storage";
 import { useIsNative } from "@/hooks/use-is-native";
 import { hapticImpact } from "@/lib/haptics";
 import { Button } from "@/components/ui/button";
+import { Vehicle360CaptureLauncher } from "@/components/vehicle-360-capture-launcher";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -79,6 +80,7 @@ function daysLeft(expires_at: string | null): number | null {
 
 export function ListingRow({
   row,
+  isVehicle,
   activePromotion,
   onPromote,
   onMarkSold,
@@ -89,6 +91,9 @@ export function ListingRow({
   busy,
 }: {
   row: Row;
+  /** Whether the listing's category is under Bil og MC — gates the native-only
+   * "legg til 360°-opptak"-action (draft/active rows only). */
+  isVehicle: boolean;
   activePromotion: { expires_at: string | null; is_gift: boolean } | null;
   onPromote: () => void;
   onMarkSold: () => void;
@@ -205,6 +210,15 @@ export function ListingRow({
             </span>
           </p>
         </div>
+        {isVehicle && (row.status === "draft" || row.status === "active") && (
+          <Vehicle360CaptureLauncher
+            listingId={row.id}
+            listingTitle={row.title}
+            label="Legg til 360°-opptak"
+            variant="ghost"
+            size="icon"
+          />
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button

@@ -25,9 +25,11 @@ export async function login(page: Page, email: string, password: string, testInf
   await page.goto("/auth?mode=signin");
   // Inputs are controlled (SSR-rendered, then hydrated) — filling before
   // hydration finishes gets clobbered when React reconciles to its initial
-  // empty state. Used to wait for networkidle first, but the Turnstile
-  // widget keeps a connection open and networkidle never fires — retry the
-  // fill instead until it sticks.
+  // empty state, so wait for the network to settle first (proxy for
+  // hydration being done). The retry-fill below is a second line of defense
+  // for the same race (fill + assert can both land inside one JS turn, just
+  // ahead of a hydration reconciliation on the next tick).
+  await page.waitForLoadState("networkidle");
   await expect(async () => {
     await page.getByLabel("E-post").fill(email);
     await page.getByLabel("Passord").fill(password);

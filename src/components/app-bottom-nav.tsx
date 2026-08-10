@@ -7,8 +7,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { hapticImpact } from "@/lib/haptics";
 import { isNative } from "@/lib/native";
 import { supabase } from "@/integrations/supabase/client";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
+import { DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useQuery } from "@tanstack/react-query";
 import { NotificationsBell } from "@/components/notifications-bell";
@@ -181,47 +181,24 @@ export function AppBottomNav() {
         </div>
       </div>
 
-      {/* Ny annonse-velger: web = Dialog, native = Sheet */}
-      {!native && (
-        <Dialog open={adPickerOpen} onOpenChange={setAdPickerOpen}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Ny annonse</DialogTitle>
-            </DialogHeader>
-            <AdPickerOptions
-              onSell={() => {
-                setAdPickerOpen(false);
-                void navigate({ to: "/ny-annonse", search: { type: "sell" } });
-              }}
-              onBuy={() => {
-                setAdPickerOpen(false);
-                void navigate({ to: "/ny-ok-annonse" });
-              }}
-            />
-          </DialogContent>
-        </Dialog>
-      )}
-      {native && (
-        <Sheet open={adPickerOpen} onOpenChange={setAdPickerOpen}>
-          {/* pb-8 fjernet: håndrullet kompensasjon for home indicator, nå dekket
-              av `side="bottom"` i sheet.tsx. */}
-          <SheetContent side="bottom" className="rounded-t-2xl">
-            <SheetHeader>
-              <SheetTitle>Ny annonse</SheetTitle>
-            </SheetHeader>
-            <AdPickerOptions
-              onSell={() => {
-                setAdPickerOpen(false);
-                void navigate({ to: "/ny-annonse", search: { type: "sell" } });
-              }}
-              onBuy={() => {
-                setAdPickerOpen(false);
-                void navigate({ to: "/ny-ok-annonse" });
-              }}
-            />
-          </SheetContent>
-        </Sheet>
-      )}
+      {/* Ny annonse-velger: telefon = Sheet, nettbrett/web = Dialog. */}
+      <ResponsiveOverlay open={adPickerOpen} onOpenChange={setAdPickerOpen}>
+        <ResponsiveOverlayContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Ny annonse</DialogTitle>
+          </DialogHeader>
+          <AdPickerOptions
+            onSell={() => {
+              setAdPickerOpen(false);
+              void navigate({ to: "/ny-annonse", search: { type: "sell" } });
+            }}
+            onBuy={() => {
+              setAdPickerOpen(false);
+              void navigate({ to: "/ny-ok-annonse" });
+            }}
+          />
+        </ResponsiveOverlayContent>
+      </ResponsiveOverlay>
     </nav>
   );
 }

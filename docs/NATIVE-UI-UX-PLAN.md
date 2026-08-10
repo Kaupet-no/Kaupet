@@ -1,11 +1,11 @@
 # Native-app: UI/UX-revisjon for mobil og nettbrett
 
-Status: **Fase 0, 1, 2 og 3 implementert** 2026-08-10. Analyse gjennomført
+Status: **Fase 0, 1, 2, 3 og 4 implementert** 2026-08-10. Analyse gjennomført
 2026-08-10. Alle fire åpne spørsmål er besvart 2026-08-10 (se seksjon 8) og
-innarbeidet i tiltaksliste og faser. Neste steg: **fase 4** (formatfaktor —
-nettbrett som eget format). Fase 2 og 3 er ikke endelig ferdige før de er
-reverifisert i simulator (safe-area-verdier med notch, iOS-kantsveip,
-Android-tilbakeknapp) — se seksjon 7.
+innarbeidet i tiltaksliste og faser. Neste steg: **fase 5** (orientering —
+portrett-lås med unntak for fullskjermbilde). Fase 2 og 3 er ikke endelig
+ferdige før de er reverifisert i simulator (safe-area-verdier med notch,
+iOS-kantsveip, Android-tilbakeknapp) — se seksjon 7.
 
 Sist oppdatert: 2026-08-10.
 
@@ -807,20 +807,20 @@ Brukeren har bedt eksplisitt om at erstattet kode fjernes fortløpende. Dette
 er hva hver fase skal rydde vekk — det er en del av fasens
 ferdigdefinisjon, ikke en oppfølgingssak:
 
-| Fase | Skal slettes / erstattes                                                                         |
-| ---- | ------------------------------------------------------------------------------------------------ |
-| 2    | ✅ Alle fire `--safe-*`-variablene (alle var døde) — slettet                                     |
-| 2    | ✅ `pb-8`-kompensasjonen i `app-bottom-nav.tsx`s ad-picker-sheet                                 |
-| 2    | ✅ Per-konsument safe-area i de tre overlayene som håndterte det manuelt                         |
-| 3    | ✅ Den lokale historikk-håndteringen i `image-lightbox.tsx` **og** `map-overlay.tsx`             |
-| 3    | ✅ Den dupliserte `<h1>` på annonsedetalj (headertittelen toner inn ved scroll i stedet)         |
-| 4    | Eventuelle manuelle `!native ? Dialog : Sheet`-grener som fortsatt finnes (`app-bottom-nav.tsx`) |
-| 5    | _Ingen_ — plisten beholder alle orienteringer med vilje (se fase 5)                              |
-| 9    | `native-search-overlay.tsx` **hele filen** — erstattes av søkepanelet                            |
-| 9    | `native-advanced-search.tsx` **hele filen** — erstattes av søkepanelet                           |
-| 9    | Søkelinjen + full chip-rad på `/annonser` i native-grenen                                        |
-| 9    | Forsidens separate søkeinndatafelt (blir trigger)                                                |
-| 10   | `max-w-md`-bunnpillen på nettbrett når sidenavigasjonen er på plass                              |
+| Fase | Skal slettes / erstattes                                                                 |
+| ---- | ---------------------------------------------------------------------------------------- |
+| 2    | ✅ Alle fire `--safe-*`-variablene (alle var døde) — slettet                             |
+| 2    | ✅ `pb-8`-kompensasjonen i `app-bottom-nav.tsx`s ad-picker-sheet                         |
+| 2    | ✅ Per-konsument safe-area i de tre overlayene som håndterte det manuelt                 |
+| 3    | ✅ Den lokale historikk-håndteringen i `image-lightbox.tsx` **og** `map-overlay.tsx`     |
+| 3    | ✅ Den dupliserte `<h1>` på annonsedetalj (headertittelen toner inn ved scroll i stedet) |
+| 4    | ✅ Den manuelle `!native ? Dialog : Sheet`-grenen i `app-bottom-nav.tsx`s ad-picker      |
+| 5    | _Ingen_ — plisten beholder alle orienteringer med vilje (se fase 5)                      |
+| 9    | `native-search-overlay.tsx` **hele filen** — erstattes av søkepanelet                    |
+| 9    | `native-advanced-search.tsx` **hele filen** — erstattes av søkepanelet                   |
+| 9    | Søkelinjen + full chip-rad på `/annonser` i native-grenen                                |
+| 9    | Forsidens separate søkeinndatafelt (blir trigger)                                        |
+| 10   | `max-w-md`-bunnpillen på nettbrett når sidenavigasjonen er på plass                      |
 
 Regel for alle faser: hvis en fase innfører en delt primitiv/hook, er fasen
 ikke ferdig før **alle** eksisterende kallsteder er migrert og de lokale
@@ -1171,6 +1171,62 @@ historikk-oppføringen skjer i hooken.
 - Innloggede overlays (annonseveiviserens dialoger, meldingsflatene) er som før
   kun kodegjennomgått.
 
+### Fase 4 — Formatfaktor: nettbrett som eget format (tiltak 10, 11) — ferdig 2026-08-10
+
+**Gjort:**
+
+1. **`useFormFactor(): "phone" | "tablet" | "web"`**
+   (`src/hooks/use-form-factor.ts`) — `isNative()` + `matchMedia("(min-width:
+768px)")`. Returnerer `"web"` på SSR og første render, av samme grunn som
+   `useIsNative()`. Den lytter på `change` slik at iPad-rotasjon og Split View
+   flytter appen mellom formatene uten reload.
+2. `ResponsiveOverlay` **og** `ResponsiveOverlayContent` grener nå på
+   `useFormFactor() === "phone"` i stedet for `useIsNative()`. Målt live på
+   820×1180 med `?forcenative` (Del annonse-dialogen): **426 × 568 px sentrert**
+   (`left: 190` av 820 — symmetrisk), ingen `rounded-t-2xl`. Før fasen var
+   samme overlay en fullbredde bunn-skuff. På 375×812 er den fortsatt en
+   375px-bred bunn-sheet med `rounded-t-2xl` — telefonoppførselen er uendret.
+3. Faktarutenettet: `@sm:grid-cols-4` → `@md:grid-cols-4` i
+   `vehicle/vehicle-info-grid.tsx` **og** `boat/boat-info-grid.tsx` (samme
+   kopi, ikke nevnt i planen — jf. lærdommen i 10.4). Målt på 820px:
+   containeren er 432px, og rutenettet er nå `191,1px × 2` i stedet for fire
+   88px-celler. Kollisjonen i 3.3.2 er borte fordi kolonnene aldri blir
+   trangere enn ~190px.
+   De øvrige `@sm:`-rutenettene i `listing-detail/` er gjennomgått og lar
+   stå: `listing-detail-view.tsx:897` (`@sm:grid-cols-3`) og
+   equipment-listene (`@sm:grid-cols-2`) gir ≥120px celler med kort
+   etikettinnhold — ingen av dem har feilen.
+
+**Pensjonert:** den manuelle `!native ? <Dialog> : <Sheet>`-grenen i
+`app-bottom-nav.tsx`s «Ny annonse»-velger — nå én `ResponsiveOverlay`.
+Samtidig falt `pb-8` ut av `ResponsiveOverlayContent`s sheet-variant: den var
+den siste rest-kompensasjonen for home indicator, og `side="bottom"` i
+`sheet.tsx` har dekket den siden fase 2.
+
+**Avvik fra planen:** ingen i sak. Planen nevnte bare kjøretøy-rutenettet;
+båt-varianten er identisk og er fikset i samme slengen.
+
+**Verifisert:** `bunx tsc --noEmit` rent, `bun run test` 223/223 (én ny sak i
+`responsive-overlay.test.tsx`: native + nettbrettbredde → sentrert `Dialog`,
+ikke sheet), `bun run lint` 0 errors, `bun run test:e2e` 3/3 (kjørt fordi
+`publish-listing.spec.ts` asserter mot `PublishedListingDialog`, som er en
+`ResponsiveOverlay`).
+
+**Ikke verifisert:**
+
+- **At formatbyttet faktisk skjer ved rotasjon/Split View.**
+  `matchMedia`-lytteren kunne ikke bekreftes i nettleserverktøyet: en
+  viewport-endring der oppdaterer `mq.matches` korrekt, men dispatcher aldri
+  `change`-hendelsen (målt: 0 treff på en lytter armet før en 820→375-endring).
+  Grenlogikken er bekreftet ved reload på begge bredder; selve
+  _overgangen_ må ses på enhet. Dette er den enkeltrisikoen i fase 4 jeg er
+  minst trygg på — og den treffer nettopp iPad-rotasjon, som fase 10 bygger på.
+- Ad-picker-sheeten ligger fortsatt bak innlogging og er ikke sett åpen etter
+  omskrivingen — kun kodegjennomgått. Innholdet (`AdPickerOptions`) er
+  uendret; det som er byttet er hvilken primitiv som pakker det.
+- Nettbrett-nedslaget på **innloggede** overlays (veiviserens dialoger,
+  meldingsflatene) er som før kun kodegjennomgått.
+
 ---
 
 ## 10. Funn oppdaget underveis
@@ -1267,3 +1323,29 @@ no-op på første kort.
 **Foreslått som nytt tiltak 29** (Liten, Middels): la `OnboardingFlow` selv
 håndtere `backButton`/`popstate` til kortnavigasjon. Passer inn hvor som helst;
 ingen avhengighet til øvrige faser.
+
+### 10.7 `?forcenative`-verktøyet kan ikke verifisere formatoverganger (fase 4, 2026-08-10)
+
+Nettleserverktøyets viewport-endring oppdaterer `window.matchMedia(...).matches`,
+men dispatcher ikke `change`-hendelsen (målt: en lytter armet før en
+820→375-endring fikk 0 treff, mens `matches` gikk fra `true` til `false`).
+Konsekvensen er at `useFormFactor()`s _grenlogikk_ kan bekreftes ved reload på
+hver bredde, men ikke selve **overgangen** telefon ↔ nettbrett.
+
+Det rammer alt som avhenger av live breddeendring: iPad-rotasjon, Split View
+og Slide Over — altså kjernen i fase 10. Verktøyet fra fase 0 er fortsatt
+riktig valg, men grensen bør være kjent så den ikke antas dekket.
+
+**Ikke et nytt tiltak** — det er en begrensning i verifiseringen, ikke i
+appen. Konkret konsekvens: fase 10 punkt 6 (Split View) må kjøres i simulator,
+og bør også kontrollere at rotasjon faktisk bytter format.
+
+### 10.8 `boat-info-grid.tsx` hadde samme `@sm:grid-cols-4`-feil (fase 4, 2026-08-10)
+
+Funn 3.3.2 pekte kun på kjøretøy-faktarutenettet. `boat/boat-info-grid.tsx`
+er en nesten identisk kopi med samme `grid-cols-2 gap-4 p-4 @sm:grid-cols-4`,
+og hadde derfor nøyaktig samme kollisjonsrisiko på nettbrett-bredder. Begge er
+fikset i fase 4.
+
+Samme lærdom som 10.4, andre gang i denne planen: **tellingen i et funn er et
+utgangspunkt, ikke et fasit — `grep` den opp på nytt ved implementering.**

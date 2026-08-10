@@ -39,6 +39,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["vite", "dev", "--port", "5182"],
       "port": 5182
+    },
+    {
+      "name": "kaupet-dev-verify4",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "dev", "--port", "5183"],
+      "port": 5183
     }
   ]
 }

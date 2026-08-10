@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { getAttributeValueSuggestions } from "@/lib/attribute-suggestions.functions";
 
 import type { WizardSharedProps } from "../types";
@@ -57,50 +58,59 @@ function SuggestingAttributeInput({
   };
 
   const fieldId = `boat-${attrKey}`;
+  const showSuggestions = open && visibleSuggestions.length > 0;
   return (
-    <div className="relative space-y-2">
+    <div className="space-y-2">
       <Label htmlFor={fieldId}>
         {label}
         <RequiredMark />
       </Label>
-      <Input
-        id={fieldId}
-        value={value}
-        autoComplete="off"
-        aria-invalid={!!fieldError}
-        aria-describedby={fieldError ? `${fieldId}-error` : undefined}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
-        onChange={(e) => {
-          set(e.target.value);
-          if (debounceRef.current) clearTimeout(debounceRef.current);
-          const q = e.target.value;
-          debounceRef.current = setTimeout(() => setDebounced(q), 250);
-        }}
-      />
+      <Popover open={showSuggestions}>
+        <PopoverAnchor asChild>
+          <Input
+            id={fieldId}
+            value={value}
+            autoComplete="off"
+            aria-invalid={!!fieldError}
+            aria-describedby={fieldError ? `${fieldId}-error` : undefined}
+            onFocus={() => setOpen(true)}
+            onBlur={() => setOpen(false)}
+            onChange={(e) => {
+              set(e.target.value);
+              if (debounceRef.current) clearTimeout(debounceRef.current);
+              const q = e.target.value;
+              debounceRef.current = setTimeout(() => setDebounced(q), 250);
+            }}
+          />
+        </PopoverAnchor>
+        <PopoverContent
+          className="w-[--radix-popover-trigger-width] p-0"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
+          <ul className="overflow-hidden rounded-md">
+            {visibleSuggestions.map((s) => (
+              <li key={s}>
+                <button
+                  type="button"
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-accent"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    set(s);
+                    setOpen(false);
+                  }}
+                >
+                  {s}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </PopoverContent>
+      </Popover>
       {fieldError && (
         <p id={`${fieldId}-error`} className="text-sm text-destructive">
           {fieldError}
         </p>
-      )}
-      {open && visibleSuggestions.length > 0 && (
-        <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-md">
-          {visibleSuggestions.map((s) => (
-            <li key={s}>
-              <button
-                type="button"
-                className="w-full px-3 py-2 text-left text-sm hover:bg-accent"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  set(s);
-                  setOpen(false);
-                }}
-              >
-                {s}
-              </button>
-            </li>
-          ))}
-        </ul>
       )}
     </div>
   );

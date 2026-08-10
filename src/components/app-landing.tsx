@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
 import { KaupetCodeDialog } from "@/components/kaupet-code-dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { LocationPicker, RadiusPicker } from "@/components/location-filter";
 import { AnimatedSearchPlaceholder } from "@/components/animated-search-placeholder";
@@ -417,10 +418,7 @@ export function AppLanding() {
               <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2 sm:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {rootCategories.length === 0 &&
                   Array.from({ length: 6 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-24 w-20 shrink-0 animate-pulse rounded-2xl bg-muted"
-                    />
+                    <Skeleton key={i} className="h-24 w-20 shrink-0 rounded-2xl" />
                   ))}
                 {rootCategories.map((cat) => {
                   const Icon = getCategoryIcon(cat.icon);
@@ -446,7 +444,7 @@ export function AppLanding() {
               <div className="hidden grid-cols-2 gap-3 sm:grid md:grid-cols-3 lg:grid-cols-4">
                 {rootCategories.length === 0 &&
                   Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="aspect-[5/4] animate-pulse rounded-2xl bg-muted" />
+                    <Skeleton key={i} className="aspect-[5/4] rounded-2xl" />
                   ))}
                 {rootCategories.map((cat) => {
                   const Icon = getCategoryIcon(cat.icon);
@@ -544,10 +542,7 @@ export function AppLanding() {
         ) : (
           <div className="flex gap-3 overflow-hidden pr-5">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div
-                key={i}
-                className="aspect-[4/3] w-[60%] shrink-0 animate-pulse rounded-xl bg-muted"
-              />
+              <Skeleton key={i} className="aspect-[4/3] w-[60%] shrink-0 rounded-xl" />
             ))}
           </div>
         )}

@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Check, ChevronDown, Eye, Heart, Info, Loader2, Pencil, Send, Users } from "lucide-react";
 
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { PromoteListingDialog } from "@/components/promote-listing-dialog";
@@ -81,10 +82,10 @@ export function OwnerStatsPanel({
       </Button>
 
       {status === "draft" && (
-        <div className="mt-3 flex items-center gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-sm">
-          <span className="flex-1 text-amber-800 dark:text-amber-300">
+        <Alert variant="warning" className="mt-3 flex items-center gap-3 px-3 py-2.5">
+          <AlertDescription className="flex-1">
             Dette er et utkast — bare du kan se den.
-          </span>
+          </AlertDescription>
           <Button
             type="button"
             size="sm"
@@ -106,7 +107,7 @@ export function OwnerStatsPanel({
             )}
             Publiser
           </Button>
-        </div>
+        </Alert>
       )}
 
       <AlertDialog open={showPublishWarning} onOpenChange={setShowPublishWarning}>

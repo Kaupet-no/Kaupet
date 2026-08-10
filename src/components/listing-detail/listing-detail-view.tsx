@@ -24,6 +24,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   CONDITION_LABEL,
   VEHICLE_CONDITION_LABEL,
@@ -1045,11 +1046,11 @@ function ListingDetailViewBody({
             className="relative block h-80 w-full cursor-pointer overflow-hidden rounded-2xl border border-border"
           >
             {mounted ? (
-              <Suspense fallback={<div className="h-full w-full animate-pulse bg-muted" />}>
+              <Suspense fallback={<Skeleton className="h-full w-full rounded-none" />}>
                 <ListingDetailMap lat={displayLat} lng={displayLng} interactive={false} />
               </Suspense>
             ) : (
-              <div className="h-full w-full animate-pulse bg-muted" />
+              <Skeleton className="h-full w-full rounded-none" />
             )}
             <span className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium shadow-lg">
               <Maximize2 className="size-3.5" />

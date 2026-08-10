@@ -1,5 +1,6 @@
 import { useEffect, useRef, lazy, Suspense } from "react";
 import { X } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
 
 const ListingDetailMap = lazy(() =>
@@ -68,7 +69,7 @@ export function MapOverlay({ lat, lng, onClose }: Props) {
         </div>
 
         <div className="min-h-0 flex-1 overflow-hidden px-4 pb-4">
-          <Suspense fallback={<div className="h-full w-full animate-pulse rounded-2xl bg-muted" />}>
+          <Suspense fallback={<Skeleton className="h-full w-full rounded-2xl" />}>
             <ListingDetailMap lat={lat} lng={lng} />
           </Suspense>
         </div>

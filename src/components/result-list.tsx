@@ -141,7 +141,7 @@ export function ResultList({
 
   const renderMap = () =>
     mounted ? (
-      <Suspense fallback={<div className="h-full w-full animate-pulse rounded-2xl bg-muted" />}>
+      <Suspense fallback={<Skeleton className="h-full w-full rounded-2xl" />}>
         <ListingsMap
           center={mapCenter}
           radiusKm={radiusKm}
@@ -160,7 +160,7 @@ export function ResultList({
         />
       </Suspense>
     ) : (
-      <div className="h-full w-full animate-pulse rounded-2xl bg-muted" />
+      <Skeleton className="h-full w-full rounded-2xl" />
     );
 
   return (

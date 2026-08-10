@@ -642,7 +642,13 @@ function BrowsePage() {
               inngangen til søkepanelet; ActiveFilters under viser detaljene. */}
           {isNative && (
             <SearchSummaryPill
-              q={search.q}
+              q={qDraft}
+              onQChange={setQDraft}
+              onSubmitQ={() => {
+                void hapticImpact("medium");
+                if (categoryMatch) applyCategoryMatch();
+                else updateSearch({ q: qDraft });
+              }}
               filterCount={activeFilterCount}
               onOpen={() => openPanel("categories")}
             />

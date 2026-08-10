@@ -4,6 +4,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { FullscreenOverlay, FullscreenOverlayContent } from "@/components/ui/fullscreen-overlay";
 import {
   defaultMarkerIcon,
   CARTO_TILE_LAYER,
@@ -55,71 +56,73 @@ export function FullscreenLocationPicker({ lat, lng, onConfirm, onClose }: Props
   );
 
   return (
-    <div
-      className="fixed inset-0 z-[10000] flex flex-col bg-background"
-      style={{
-        paddingTop: "env(safe-area-inset-top)",
-        paddingBottom: "env(safe-area-inset-bottom)",
-      }}
-    >
-      {/* Top bar */}
-      <div className="flex shrink-0 items-center justify-between border-b border-border bg-background px-4 py-3">
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex size-9 items-center justify-center rounded-full text-muted-foreground hover:bg-accent"
-          aria-label="Avbryt"
-        >
-          <X className="size-5" />
-        </button>
-        <span className="text-sm font-medium">Juster posisjon</span>
-        <Button
-          type="button"
-          size="sm"
-          onClick={() => {
-            onConfirm(draft);
-            onClose();
-          }}
-          className="gap-1.5"
-        >
-          <Check className="size-4" />
-          Bekreft
-        </Button>
-      </div>
-
-      {/* Map – fills remaining space */}
-      <div className="relative min-h-0 flex-1">
-        <MapContainer
-          center={[draft.lat, draft.lng]}
-          zoom={13}
-          scrollWheelZoom
-          zoomControl={false}
-          touchZoom
-          className="h-full w-full"
-        >
-          <TileLayer {...CARTO_TILE_LAYER} />
-          <Circle
-            center={[draft.lat, draft.lng]}
-            radius={AREA_RADIUS_M}
-            pathOptions={CIRCLE_STYLE}
-          />
-          <Marker
-            position={[draft.lat, draft.lng]}
-            draggable
-            icon={defaultMarkerIcon}
-            eventHandlers={handlers}
-          />
-          <MapClickHandler onChange={setDraft} />
-          <FitOnMount lat={lat} lng={lng} />
-        </MapContainer>
-
-        {/* Hint overlay */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
-          <span className="rounded-full bg-background/90 px-4 py-1.5 text-xs text-muted-foreground shadow">
-            Trykk på kartet eller dra markøren for å justere
-          </span>
+    <FullscreenOverlay open onOpenChange={(next) => !next && onClose()}>
+      <FullscreenOverlayContent
+        title="Juster posisjon"
+        style={{
+          paddingTop: "env(safe-area-inset-top)",
+          paddingBottom: "env(safe-area-inset-bottom)",
+        }}
+      >
+        {/* Top bar */}
+        <div className="flex shrink-0 items-center justify-between border-b border-border bg-background px-4 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex size-9 items-center justify-center rounded-full text-muted-foreground hover:bg-accent"
+            aria-label="Avbryt"
+          >
+            <X className="size-5" />
+          </button>
+          <span className="text-sm font-medium">Juster posisjon</span>
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => {
+              onConfirm(draft);
+              onClose();
+            }}
+            className="gap-1.5"
+          >
+            <Check className="size-4" />
+            Bekreft
+          </Button>
         </div>
-      </div>
-    </div>
+
+        {/* Map – fills remaining space */}
+        <div className="relative min-h-0 flex-1">
+          <MapContainer
+            center={[draft.lat, draft.lng]}
+            zoom={13}
+            scrollWheelZoom
+            zoomControl={false}
+            touchZoom
+            className="h-full w-full"
+          >
+            <TileLayer {...CARTO_TILE_LAYER} />
+            <Circle
+              center={[draft.lat, draft.lng]}
+              radius={AREA_RADIUS_M}
+              pathOptions={CIRCLE_STYLE}
+            />
+            <Marker
+              position={[draft.lat, draft.lng]}
+              draggable
+              icon={defaultMarkerIcon}
+              eventHandlers={handlers}
+            />
+            <MapClickHandler onChange={setDraft} />
+            <FitOnMount lat={lat} lng={lng} />
+          </MapContainer>
+
+          {/* Hint overlay */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
+            <span className="rounded-full bg-background/90 px-4 py-1.5 text-xs text-muted-foreground shadow">
+              Trykk på kartet eller dra markøren for å justere
+            </span>
+          </div>
+        </div>
+      </FullscreenOverlayContent>
+    </FullscreenOverlay>
   );
 }

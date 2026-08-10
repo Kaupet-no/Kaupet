@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Camera as CameraIcon, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { FullscreenOverlay, FullscreenOverlayContent } from "@/components/ui/fullscreen-overlay";
 import { showErrorToast } from "@/lib/toast";
 import { Vehicle360CaptureFlow } from "@/features/vehicle-360-capture/capture-flow";
 import {
@@ -72,24 +73,31 @@ export function Vehicle360CaptureLauncher({
 
   if (session) {
     return (
-      <div className="fixed inset-0 z-50 overflow-y-auto bg-background">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="absolute right-3 top-3 z-10"
-          aria-label="Lukk"
-          onClick={close}
+      <FullscreenOverlay open onOpenChange={(next) => !next && close()}>
+        <FullscreenOverlayContent
+          title="360°-opptak"
+          className="overflow-y-auto"
+          onEscapeKeyDown={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
         >
-          <X className="size-5" />
-        </Button>
-        <Vehicle360CaptureFlow
-          token={session.token}
-          listingTitle={listingTitle}
-          startFrameOrder={session.startFrameOrder}
-          onDone={close}
-        />
-      </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute right-3 top-3 z-10"
+            aria-label="Lukk"
+            onClick={close}
+          >
+            <X className="size-5" />
+          </Button>
+          <Vehicle360CaptureFlow
+            token={session.token}
+            listingTitle={listingTitle}
+            startFrameOrder={session.startFrameOrder}
+            onDone={close}
+          />
+        </FullscreenOverlayContent>
+      </FullscreenOverlay>
     );
   }
 

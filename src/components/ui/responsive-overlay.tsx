@@ -1,6 +1,7 @@
 import * as React from "react";
 
 import { useIsNative } from "@/hooks/use-is-native";
+import { useOverlayHistory } from "@/hooks/use-overlay-history";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -19,6 +20,9 @@ type Props = {
  */
 export function ResponsiveOverlay({ open, onOpenChange, children }: Props) {
   const native = useIsNative();
+  // Egen historikk-oppføring: Android-tilbake/iOS-sveip lukker overlayet i
+  // stedet for å navigere siden bak det.
+  useOverlayHistory(open, () => onOpenChange(false));
   const Root = native ? Sheet : Dialog;
   return (
     <Root open={open} onOpenChange={onOpenChange}>

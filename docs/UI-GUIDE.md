@@ -56,6 +56,7 @@ Web bruker `Dialog`, native bruker `Sheet` for tilsvarende flyter. Bruk `Respons
 - `app-bottom-nav.tsx`s "Ny annonse"-velger er fortsatt en manuell `!native ? <Dialog> : <Sheet>`-gren (forhåndsdatert `ResponsiveOverlay`) — nytt overlay-UI bør bruke `ResponsiveOverlay` fra start.
 - Bruk `ResponsiveOverlay` for alt brukervendt — en dialog som går rett på `Dialog` mister bottom-sheet-oppførselen native-appen ellers har (se `kaupet-code-dialog.tsx`).
 - Rene admin-flater (`src/routes/_authenticated/admin/**`) er unntaket og kan fortsette å bruke `Dialog` direkte, siden de uansett ikke kjører i native-appen (se `create-demo-user-dialog.tsx`).
+- Begge overlay-rotene (`ResponsiveOverlay` og `FullscreenOverlay`) gir seg selv en egen historikk-oppføring via `useOverlayHistory` (`src/hooks/use-overlay-history.ts`), slik at Android-tilbakeknappen og iOS' kantsveip lukker overlayet i stedet for å navigere siden bak det. Ikke gjenta `history.pushState`/`popstate` i en konsument. Trenger en flate å _ikke_ kunne lukkes med tilbake, sett `historyBack={false}` på `FullscreenOverlay` (kun onboardingen gjør det i dag).
 
 ### Fullskjerm-takeovers
 

@@ -2,7 +2,23 @@ import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 
 import { cn } from "@/lib/utils";
+import { useOverlayHistory } from "@/hooks/use-overlay-history";
 import { Dialog, DialogPortal } from "@/components/ui/dialog";
+
+/**
+ * Som `Dialog`, men med egen historikk-oppføring så Android-tilbake og iOS-
+ * kantsveip lukker takeoveren. `historyBack={false}` for flater som med vilje
+ * ikke skal kunne lukkes med tilbake (onboarding).
+ */
+function FullscreenOverlay({
+  open,
+  onOpenChange,
+  historyBack = true,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof Dialog> & { historyBack?: boolean }) {
+  useOverlayHistory(!!open && historyBack, () => onOpenChange?.(false));
+  return <Dialog open={open} onOpenChange={onOpenChange} {...props} />;
+}
 
 /**
  * Full-bleed takeover on top of Radix Dialog: portal, focus trap and
@@ -42,4 +58,4 @@ const FullscreenOverlayContent = React.forwardRef<
 ));
 FullscreenOverlayContent.displayName = "FullscreenOverlayContent";
 
-export { Dialog as FullscreenOverlay, FullscreenOverlayContent };
+export { FullscreenOverlay, FullscreenOverlayContent };

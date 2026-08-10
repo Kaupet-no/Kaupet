@@ -41,19 +41,13 @@ export function ImageLightbox({
   }, []);
 
   useEffect(() => {
-    history.pushState({ overlay: "image" }, "");
-    const onPop = () => onClose();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft") emblaApi?.scrollPrev();
       else if (e.key === "ArrowRight") emblaApi?.scrollNext();
     };
-    window.addEventListener("popstate", onPop);
     window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("popstate", onPop);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [onClose, emblaApi]);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [emblaApi]);
 
   useEffect(() => {
     if (!emblaApi) return;
@@ -80,11 +74,11 @@ export function ImageLightbox({
   );
 
   return (
-    <FullscreenOverlay open onOpenChange={(next) => !next && history.back()}>
+    <FullscreenOverlay open onOpenChange={(next) => !next && onClose()}>
       {/* Clicking the backdrop (anywhere that isn't a button or thumbnail) closes the lightbox */}
       <FullscreenOverlayContent
         title={`Bildegalleri for ${title}`}
-        onClick={() => history.back()}
+        onClick={onClose}
         // edgeToEdge: bakteppet og bildet skal dekke hele skjermen — padres
         // containeren, får man en stripe av app-bakgrunn langs notchen. Det er
         // chromet under som tar safe area i stedet.
@@ -102,7 +96,7 @@ export function ImageLightbox({
           <button
             ref={closeRef}
             type="button"
-            onClick={() => history.back()}
+            onClick={onClose}
             aria-label="Lukk bildegalleri"
             className="rounded-full p-2 text-white/80 transition-colors hover:bg-white/10 hover:text-white"
           >

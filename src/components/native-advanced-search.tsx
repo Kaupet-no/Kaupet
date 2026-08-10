@@ -120,7 +120,6 @@ export function NativeAdvancedSearch({
           setValue={setV}
           categories={categories}
           section={section}
-          onSectionChange={setSection}
           location={location}
           onLocationChange={onLocationChange}
           attributeFilters={attributeFilters}

@@ -6,36 +6,40 @@ import { Clock, FolderOpen, RotateCcw, Save, Search as SearchIcon, X } from "luc
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SaveSearchDialog } from "@/components/advanced-search-sheet";
-import {
-  buildAdvancedSearchCriteria,
-  mergeAdvancedSearchGroups,
-  resetAdvancedSearchValue,
-} from "@/lib/advanced-search-actions";
 import type { AdvancedSearchValue } from "@/components/advanced-search-value";
 import type { LocationValue } from "@/components/location-filter";
 import { findCategorySuggestion, type Category } from "@/lib/categories";
 import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
-import { hapticImpact, hapticNotification } from "@/lib/haptics";
+import { hapticImpact } from "@/lib/haptics";
 import { useAuth } from "@/hooks/use-auth";
-import { useAdvancedSearchValue } from "@/hooks/use-advanced-search-value";
 import { useFormFactor } from "@/hooks/use-form-factor";
 import { useOverlayHistory } from "@/hooks/use-overlay-history";
 import { resolveTextToFilters } from "@/features/listing-search/resolve-text-to-filters";
 import { encodeAttrFilters } from "@/features/listing-search/search-schema";
+import type { SearchCriteria } from "@/lib/saved-searches";
 import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
 import { SearchFilterSections, type SearchFilterSection } from "./filter-sections";
 import { getSearchHistory, saveSearchToHistory, clearSearchHistory } from "./search-history";
+import type { ActiveFilterItem } from "./active-filter-items";
 
 /** Panelet har to detents: delvis høyde (resultatlisten er fortsatt synlig
  * bak) og fullskjerm. Brukeren drar mellom dem. */
 const SNAP_POINTS = [0.6, 1];
 
 /** Feltene panelet redigerer når det står over en resultatflate. Utelatt på
- * forsiden, der panelet kun er en søkelansering. */
+ * forsiden, der panelet kun er en søkelansering.
+ *
+ * Live i stedet for utkast (fase 12): `value`/`setValue` skriver hver endring
+ * rett til URL-en (se `setLiveValue` i use-annonser-search-state.ts), slik at
+ * listen bak panelet — og treff-telleren i bunnbaren — oppdaterer seg mens
+ * brukeren drar en slider eller sveiper bort en tagg, i stedet for først ved
+ * en «Bruk søk»-commit. */
 export type SearchPanelResultsContext = {
-  /** Utkastverdien fanene starter fra (`advancedInitial`). */
-  initial: AdvancedSearchValue;
-  onApply: (v: AdvancedSearchValue) => void;
+  /** Fritekst slik den står i URL-en akkurat nå — panelets fritekstfelt
+   * synkroniseres mot denne når panelet åpnes. */
+  q: string;
+  value: AdvancedSearchValue;
+  setValue: React.Dispatch<React.SetStateAction<AdvancedSearchValue>>;
   /** Skriver fritekst til URL-en. */
   onSubmitText: (q: string) => void;
   onSelectCategory: (slug: string) => void;
@@ -45,8 +49,16 @@ export type SearchPanelResultsContext = {
   attributeValues?: Record<string, AttributeFilterValue>;
   onAttributeChange?: (key: string, value: AttributeFilterValue | undefined) => void;
   attributeCounts?: Record<string, Record<string, number>>;
-  /** Antall treff med gjeldende (anvendte) kriterier — vises i bunnknappen. */
+  /** Antall treff med gjeldende — levende, ikke bare anvendte — kriterier. */
   resultCount?: number;
+  /** Aktive filtertagger, med swipe-for-å-fjerne i panelet (fase 12). */
+  activeItems: ActiveFilterItem[];
+  onResetAll: () => void;
+  /** Kriteriene «Lagre»-knappen lagrer — allerede bygget av kallstedet
+   * (`currentCriteria`), siden panelet ikke lenger holder et eget utkast å
+   * bygge dem fra. */
+  criteria: SearchCriteria;
+  defaultName: string;
 };
 
 type Props = {
@@ -54,35 +66,33 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   categories: Category[];
   allFilters: CategoryFilter[];
-  /** Fritekst panelet åpner med. */
-  initialQ?: string;
   /** Fanen panelet åpner på — lar sammendrag-pillen hoppe rett til Pris/Sted. */
   initialSection?: SearchFilterSection;
   results?: SearchPanelResultsContext;
 };
 
 /**
- * Ett dratt søkepanel med detents (fase 9). Erstatter de to tidligere native
- * søkeflatene: `NativeSearchOverlay` (fritekst, historikk, kategoriliste) og
- * `NativeAdvancedSearch` sin bruk over resultatlistene (parameterfaner).
+ * Ett dratt søkepanel med detents, montert én gang globalt
+ * (`SearchPanelProvider`, fase 12) i stedet for separat per side (fase 9).
+ * Bunnavigasjonens «Søk»-fane åpner dette panelet direkte istedenfor å
+ * navigere til forsiden.
  *
  * Uten `results` er panelet en ren søkelansering (forsiden): fritekst,
- * historikk og kategorier, og et treff navigerer til `/annonser`. Med
- * `results` står det over en resultatflate og redigerer dens filtre i stedet.
+ * historikk og kategorier, og et treff navigerer til /annonser. Med
+ * `results` står det over en resultatflate og redigerer dens filtre live.
  */
 export function SearchPanel({
   open,
   onOpenChange,
   categories,
   allFilters,
-  initialQ = "",
   initialSection = "categories",
   results,
 }: Props) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { data: vehicleBrands } = useAllVehicleBrands();
-  const [q, setQ] = useState(initialQ);
+  const [q, setQ] = useState(results?.q ?? "");
   const [history, setHistory] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
@@ -94,16 +104,12 @@ export function SearchPanel({
   const isTablet = useFormFactor() === "tablet";
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Utkastet for parameterfanene. Hooken nullstiller det hver gang panelet
-  // åpnes, samme kontrakt som NativeAdvancedSearch hadde.
-  const [v, setV] = useAdvancedSearchValue(open, results?.initial ?? EMPTY_VALUE);
-
   // Android-tilbake og iOS-kantsveip lukker panelet (fase 3).
   useOverlayHistory(open, () => onOpenChange(false));
 
   useEffect(() => {
     if (!open) return;
-    setQ(initialQ);
+    setQ(results?.q ?? "");
     setSection(initialSection);
     setSnap(SNAP_POINTS[0]);
     setHistory(getSearchHistory());
@@ -113,7 +119,7 @@ export function SearchPanel({
     const t = setTimeout(() => inputRef.current?.focus(), 150);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initialQ, initialSection]);
+  }, [open, initialSection]);
 
   const categorySuggestion = useMemo(
     () => (q.length >= 2 ? findCategorySuggestion(categories, q) : null),
@@ -130,7 +136,6 @@ export function SearchPanel({
 
     if (results) {
       results.onSubmitText(trimmed);
-      close();
       return;
     }
 
@@ -164,16 +169,6 @@ export function SearchPanel({
     else navigate({ to: "/annonser", search: { q: "", category: cat.slug, sort: "new" } });
     close();
   };
-
-  const applyFilters = () => {
-    if (!results) return;
-    void hapticNotification("success");
-    results.onApply(mergeAdvancedSearchGroups(v));
-    if (q.trim() !== initialQ.trim()) results.onSubmitText(q.trim());
-    close();
-  };
-
-  const { criteria, defaultName } = buildAdvancedSearchCriteria(v);
 
   return (
     <>
@@ -225,31 +220,31 @@ export function SearchPanel({
                   </button>
                 )}
               </div>
-              {results ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    void hapticImpact("light");
-                    setV(resetAdvancedSearchValue(v));
-                    setQ("");
-                  }}
-                  className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-                >
-                  <RotateCcw className="size-3.5" />
-                  Nullstill
-                </button>
-              ) : (
-                q.trim() && (
-                  <button
-                    type="button"
-                    onClick={() => void submitText(q)}
-                    disabled={submitting}
-                    className="min-h-11 shrink-0 px-2 text-sm font-medium text-primary disabled:opacity-50"
-                  >
-                    {submitting ? "Søker…" : "Søk"}
-                  </button>
-                )
-              )}
+              {results
+                ? results.activeItems.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void hapticImpact("light");
+                        results.onResetAll();
+                        setQ("");
+                      }}
+                      className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                    >
+                      <RotateCcw className="size-3.5" />
+                      Nullstill
+                    </button>
+                  )
+                : q.trim() && (
+                    <button
+                      type="button"
+                      onClick={() => void submitText(q)}
+                      disabled={submitting}
+                      className="min-h-11 shrink-0 px-2 text-sm font-medium text-primary disabled:opacity-50"
+                    >
+                      {submitting ? "Søker…" : "Søk"}
+                    </button>
+                  )}
             </div>
 
             {categorySuggestion && (
@@ -267,39 +262,20 @@ export function SearchPanel({
             )}
 
             {results ? (
-              <>
-                <SearchFilterSections
-                  value={v}
-                  setValue={setV}
-                  categories={categories}
-                  section={section}
-                  onSectionChange={setSection}
-                  location={results.location}
-                  onLocationChange={results.onLocationChange}
-                  attributeFilters={results.attributeFilters}
-                  attributeValues={results.attributeValues}
-                  onAttributeChange={results.onAttributeChange}
-                  attributeCounts={results.attributeCounts}
-                  includePrimary
-                />
-                <div className="flex gap-2 border-t border-border px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-                  {user && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="lg"
-                      onClick={() => setSaveOpen(true)}
-                      className="gap-2"
-                    >
-                      <Save className="size-4" /> Lagre
-                    </Button>
-                  )}
-                  <Button type="button" size="lg" onClick={applyFilters} className="flex-1 gap-2">
-                    <SearchIcon className="size-4" />
-                    {results.resultCount != null ? `Vis ${results.resultCount} treff` : "Vis treff"}
-                  </Button>
-                </div>
-              </>
+              <SearchFilterSections
+                value={results.value}
+                setValue={results.setValue}
+                categories={categories}
+                section={section}
+                location={results.location}
+                onLocationChange={results.onLocationChange}
+                attributeFilters={results.attributeFilters}
+                attributeValues={results.attributeValues}
+                onAttributeChange={results.onAttributeChange}
+                attributeCounts={results.attributeCounts}
+                activeItems={results.activeItems}
+                includePrimary
+              />
             ) : (
               <BrowseContent
                 q={q}
@@ -314,6 +290,38 @@ export function SearchPanel({
               />
             )}
           </Drawer.Content>
+
+          {/* Egen flate, ikke inni Drawer.Content: vaul translaterer HELE
+              innholdet (uansett hvor høyt det faktisk er) ned med
+              (1 − detent) × vindushøyde for å vise bare den brøkdelen —
+              en bunnbar inni den flate-transformerte boksen havner da fysisk
+              under skjermkanten ved 0.6-detenten, uansett CSS på boksen selv
+              (målt: --snap-point-height er den SKJULTE andelen, ikke den
+              synlige — se node_modules/vaul useSnapPoints). Pinnet direkte
+              til skjermbunnen her løser det, uavhengig av snap-punkt. */}
+          {results && (
+            <div
+              className={`fixed inset-x-0 bottom-0 z-[10000] flex gap-2 border-t border-border bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-transform duration-500 ${
+                open ? "translate-y-0" : "translate-y-full"
+              } ${isTablet ? "mx-auto w-full max-w-2xl" : ""}`}
+            >
+              {user && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="lg"
+                  onClick={() => setSaveOpen(true)}
+                  className="gap-2"
+                >
+                  <Save className="size-4" /> Lagre
+                </Button>
+              )}
+              <Button type="button" size="lg" onClick={close} className="flex-1 gap-2">
+                <SearchIcon className="size-4" />
+                {results.resultCount != null ? `Vis ${results.resultCount} treff` : "Vis treff"}
+              </Button>
+            </div>
+          )}
         </Drawer.Portal>
       </Drawer.Root>
 
@@ -321,8 +329,8 @@ export function SearchPanel({
         <SaveSearchDialog
           open={saveOpen}
           onOpenChange={setSaveOpen}
-          defaultName={defaultName}
-          criteria={criteria}
+          defaultName={results.defaultName}
+          criteria={results.criteria}
           onSaved={() => setSaveOpen(false)}
         />
       )}
@@ -400,19 +408,3 @@ function BrowseContent({
     </div>
   );
 }
-
-/** Tomt utkast for lansering-modus, der parameterfanene ikke rendres. Ligger
- * på modulnivå så identiteten er stabil mellom renderinger. */
-const EMPTY_VALUE: AdvancedSearchValue = {
-  terms: [],
-  qMode: "all",
-  extraGroups: [],
-  categories: [],
-  catMode: "any",
-  conditions: [],
-  min: null,
-  max: null,
-  includeFree: true,
-  sort: "new",
-  location: { lat: null, lng: null, radius: 10, label: "" },
-};

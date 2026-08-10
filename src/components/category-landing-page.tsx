@@ -6,12 +6,17 @@ import { ActiveFilters } from "@/components/active-filters";
 import type { ListingCardData } from "@/components/listing-card";
 import type { MapListing } from "@/components/listings-map";
 import { ResultList } from "@/components/result-list";
-import { SearchPanel } from "@/features/listing-search/search-panel/search-panel";
-import type { SearchFilterSection } from "@/features/listing-search/search-panel/filter-sections";
+import {
+  useRegisterSearchPanelResults,
+  useSearchPanel,
+} from "@/features/listing-search/search-panel/search-panel-context";
+import type { SearchPanelResultsContext } from "@/features/listing-search/search-panel/search-panel";
 import {
   SearchSummaryPill,
   countActiveFilters,
 } from "@/features/listing-search/search-panel/search-summary-pill";
+import { buildActiveFilterItems } from "@/features/listing-search/search-panel/active-filter-items";
+import { summarizeCriteria } from "@/lib/saved-searches";
 import { AttributeFilterChips } from "@/components/attribute-filter-chips";
 import { CategoryHero } from "@/components/category-hero";
 import {
@@ -79,8 +84,7 @@ export function CategoryLandingPage({
   const isNative = useIsNative();
   const [qDraft, setQDraft] = useState(search.q);
   const [isDesktop, setIsDesktop] = useState(false);
-  const [searchPanelOpen, setSearchPanelOpen] = useState(false);
-  const [panelSection, setPanelSection] = useState<SearchFilterSection>("price");
+  const { openPanel } = useSearchPanel();
   // See annonser.tsx's identical field for why this exists — keyed by
   // "filterKey:optionValue" ("filterKey:" for single-value filters).
   const [autoAppliedText, setAutoAppliedText] = useState<Record<string, string>>({});
@@ -191,7 +195,8 @@ export function CategoryLandingPage({
     handleLocationChange,
     resetFilters,
     advancedInitial,
-    handleApply,
+    currentCriteria,
+    setLiveValue,
   } = useAnnonserSearchState({
     search: effectiveSearch,
     navigate,
@@ -343,6 +348,41 @@ export function CategoryLandingPage({
     qModeAny: search.qMode === "any",
   });
 
+  const searchPanelResults: SearchPanelResultsContext | null = isNative
+    ? {
+        q: search.q,
+        value: advancedInitial,
+        setValue: setLiveValue,
+        onSubmitText: (q) => {
+          setQDraft(q);
+          updateSearch({ q });
+        },
+        onSelectCategory: (slug) => navigate({ search: { q: "", category: slug, sort: "new" } }),
+        location,
+        onLocationChange: handleLocationChange,
+        attributeFilters: attrFilters,
+        attributeValues: attrValues,
+        onAttributeChange: handleAttrValueChange,
+        attributeCounts: facetCounts,
+        resultCount: totalCount ?? cards.length,
+        activeItems: buildActiveFilterItems({
+          search,
+          terms,
+          onUpdate: (patch) => updateSearch(patch),
+          attrFilters,
+          attrValues,
+          onRemoveAttr: removeAttrWithRestore,
+          location,
+          onRemoveLocation: () =>
+            updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined }),
+        }),
+        onResetAll: resetFilters,
+        criteria: currentCriteria,
+        defaultName: summarizeCriteria(currentCriteria),
+      }
+    : null;
+  useRegisterSearchPanelResults(searchPanelResults);
+
   return (
     <div>
       {/* Entries before this page's own category are real ancestor pages with
@@ -365,10 +405,7 @@ export function CategoryLandingPage({
             <SearchSummaryPill
               q={search.q}
               filterCount={activeFilterCount}
-              onOpen={() => {
-                setPanelSection("price");
-                setSearchPanelOpen(true);
-              }}
+              onOpen={() => openPanel("price")}
             />
           ) : (
             <SearchBar
@@ -409,23 +446,22 @@ export function CategoryLandingPage({
             />
           )}
 
-          {/* Rendered inside the same space-y-2 group as the search bar and
-              filter chips above, rather than as a separately-spaced sibling,
-              so the active-criteria row reads as part of one continuous
-              search-and-filter unit instead of a visually detached block. */}
-          <ActiveFilters
-            search={search}
-            terms={terms}
-            onUpdate={(patch) => updateSearch(patch)}
-            attrFilters={attrFilters}
-            attrValues={attrValues}
-            location={location}
-            onRemoveLocation={() =>
-              updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
-            }
-            onRemoveAttr={removeAttrWithRestore}
-            justCreatedKeys={justCreatedKeys}
-          />
+          {/* Native (fase 12): aktive filtertagger bor i søkepanelet nå. */}
+          {!isNative && (
+            <ActiveFilters
+              search={search}
+              terms={terms}
+              onUpdate={(patch) => updateSearch(patch)}
+              attrFilters={attrFilters}
+              attrValues={attrValues}
+              location={location}
+              onRemoveLocation={() =>
+                updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
+              }
+              onRemoveAttr={removeAttrWithRestore}
+              justCreatedKeys={justCreatedKeys}
+            />
+          )}
         </div>
 
         <ResultList
@@ -461,34 +497,6 @@ export function CategoryLandingPage({
           onSortChange={(s) => updateSearch({ sort: s })}
         />
       </div>
-
-      {isNative && (
-        <SearchPanel
-          open={searchPanelOpen}
-          onOpenChange={setSearchPanelOpen}
-          categories={categories ?? []}
-          allFilters={allFilters ?? []}
-          initialQ={search.q}
-          initialSection={panelSection}
-          results={{
-            initial: advancedInitial,
-            onApply: handleApply,
-            onSubmitText: (q) => {
-              setQDraft(q);
-              updateSearch({ q });
-            },
-            onSelectCategory: (slug) =>
-              navigate({ search: { q: "", category: slug, sort: "new" } }),
-            location,
-            onLocationChange: handleLocationChange,
-            attributeFilters: attrFilters,
-            attributeValues: attrValues,
-            onAttributeChange: handleAttrValueChange,
-            attributeCounts: facetCounts,
-            resultCount: totalCount ?? cards.length,
-          }}
-        />
-      )}
     </div>
   );
 }

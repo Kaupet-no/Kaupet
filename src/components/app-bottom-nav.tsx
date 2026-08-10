@@ -1,18 +1,20 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Bell, MessageCircle, Plus, X, LogIn, Home } from "lucide-react";
+import { Bell, MessageCircle, Plus, X, LogIn, Search } from "lucide-react";
 import { AdPickerOptions } from "@/components/ad-picker-options";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useAuth } from "@/hooks/use-auth";
+import { useFormFactor } from "@/hooks/use-form-factor";
 import { hapticImpact } from "@/lib/haptics";
 import { isNative } from "@/lib/native";
 import { supabase } from "@/integrations/supabase/client";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
+import { DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useQuery } from "@tanstack/react-query";
 import { NotificationsBell } from "@/components/notifications-bell";
 import { MessagesButton } from "@/components/messages-button";
+import { useSearchPanel } from "@/features/listing-search/search-panel/search-panel-context";
 
 function initials(name: string | null | undefined, fallback: string) {
   const source = (name ?? fallback).trim();
@@ -24,9 +26,22 @@ function initials(name: string | null | undefined, fallback: string) {
 export function AppBottomNav() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { open: searchPanelOpen, openPanel } = useSearchPanel();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [adPickerOpen, setAdPickerOpen] = useState(false);
   const native = isNative();
+  // Nettbrett: sidestilt navigasjon i stedet for den flytende bunnpillen
+  // (fase 10). Samme rutedefinisjoner og samme tilstand — kun presentasjonen
+  // skiller, jf. planens «ikke en parallell navigasjonskomponent».
+  const rail = useFormFactor() === "tablet";
+
+  // Innholdet må reservere plass til venstre i stedet for under, se
+  // `.nav-rail` i styles.css.
+  useEffect(() => {
+    if (!rail) return;
+    document.documentElement.classList.add("nav-rail");
+    return () => document.documentElement.classList.remove("nav-rail");
+  }, [rail]);
 
   const isOnNewAdPage =
     native && (pathname.startsWith("/ny-annonse") || pathname.startsWith("/ny-ok-annonse"));
@@ -37,41 +52,56 @@ export function AppBottomNav() {
   const isOnMeldinger = isActive("/meldinger");
   const isOnMeg = isActive("/meg");
 
+  const itemClass = rail
+    ? "flex flex-col items-center gap-0.5"
+    : "flex flex-1 flex-col items-center gap-0.5";
+
   return (
     <nav
-      aria-label="Bunnavigasjon"
-      className="fixed inset-x-0 bottom-0 z-50 px-3 pointer-events-none"
-      style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)" }}
+      aria-label={rail ? "Hovednavigasjon" : "Bunnavigasjon"}
+      className={
+        rail
+          ? "pointer-events-none fixed inset-y-0 left-0 z-50"
+          : "fixed inset-x-0 bottom-0 z-50 px-3 pointer-events-none"
+      }
+      style={rail ? undefined : { paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)" }}
     >
-      <div className="pointer-events-auto mx-auto flex max-w-md items-end justify-around gap-1 rounded-3xl border border-border bg-background/95 px-3 pb-3 pt-3 shadow-xl backdrop-blur">
-        {/* Hjem */}
-        <Link
-          to="/"
-          className="flex flex-1 flex-col items-center gap-0.5"
-          aria-label="Hjem"
-          aria-current={pathname === "/" ? "page" : undefined}
+      <div
+        className={
+          rail
+            ? "pl-safe pointer-events-auto flex h-full w-20 flex-col items-center justify-center gap-7 border-r border-border bg-background/95 backdrop-blur"
+            : "pointer-events-auto mx-auto flex max-w-md items-end justify-around gap-1 rounded-3xl border border-border bg-background/95 px-3 pb-3 pt-3 shadow-xl backdrop-blur"
+        }
+      >
+        {/* Søk — fane 1. Åpner det globale søkepanelet direkte i stedet for å
+            navigere til forsiden (fase 12) — trykk på «Søk» skal la brukeren
+            forfine søket der de allerede står, ikke forlate siden. Fanen var
+            også appens «Hjem»-lenke; det er bevisst forlatt uten erstatning,
+            se plandokumentets steg 1. */}
+        <button
+          type="button"
+          onClick={() => {
+            void hapticImpact("light");
+            openPanel();
+          }}
+          className={itemClass}
+          aria-label="Søk"
+          aria-expanded={searchPanelOpen}
         >
           <span className="flex h-11 w-11 items-center justify-center">
-            {isActive("/") && pathname === "/" ? (
-              <span className="font-display text-2xl font-semibold leading-none text-primary">
-                k<span className="text-accent">.</span>
-              </span>
-            ) : (
-              <Home className="size-6 text-muted-foreground" />
-            )}
+            <Search
+              className={`size-6 ${searchPanelOpen ? "text-primary" : "text-muted-foreground"}`}
+            />
           </span>
           <span
-            className={`text-[11px] ${pathname === "/" ? "font-medium text-primary" : "text-muted-foreground"}`}
+            className={`text-[11px] ${searchPanelOpen ? "font-medium text-primary" : "text-muted-foreground"}`}
           >
-            Hjem
+            Søk
           </span>
-        </Link>
+        </button>
 
         {/* Varsler */}
-        <div
-          className="flex flex-1 flex-col items-center gap-0.5"
-          aria-current={isOnVarsler ? "page" : undefined}
-        >
+        <div className={itemClass} aria-current={isOnVarsler ? "page" : undefined}>
           {user ? (
             <div className="relative flex h-11 w-11 items-center justify-center">
               <NotificationsBell />
@@ -94,7 +124,9 @@ export function AppBottomNav() {
         </div>
 
         {/* Ny annonse (FAB) — midten */}
-        <div className="-mt-7 flex flex-1 flex-col items-center gap-0.5">
+        {/* -mt-7 løfter FAB-en ut av bunnpillen. I railen står den i flyten
+            som de andre — det er ingen kant å stikke opp av. */}
+        <div className={rail ? itemClass : `-mt-7 ${itemClass}`}>
           {user ? (
             <button
               type="button"
@@ -132,10 +164,7 @@ export function AppBottomNav() {
         </div>
 
         {/* Meldinger */}
-        <div
-          className="flex flex-1 flex-col items-center gap-0.5"
-          aria-current={isOnMeldinger ? "page" : undefined}
-        >
+        <div className={itemClass} aria-current={isOnMeldinger ? "page" : undefined}>
           {user ? (
             <div className="relative flex h-11 w-11 items-center justify-center">
               <MessagesButton />
@@ -158,10 +187,7 @@ export function AppBottomNav() {
         </div>
 
         {/* Bruker */}
-        <div
-          className="flex flex-1 flex-col items-center gap-0.5"
-          aria-current={isOnMeg ? "page" : undefined}
-        >
+        <div className={itemClass} aria-current={isOnMeg ? "page" : undefined}>
           {user ? (
             <UserAvatarButton userId={user.id} email={user.email ?? null} />
           ) : (
@@ -181,45 +207,24 @@ export function AppBottomNav() {
         </div>
       </div>
 
-      {/* Ny annonse-velger: web = Dialog, native = Sheet */}
-      {!native && (
-        <Dialog open={adPickerOpen} onOpenChange={setAdPickerOpen}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Ny annonse</DialogTitle>
-            </DialogHeader>
-            <AdPickerOptions
-              onSell={() => {
-                setAdPickerOpen(false);
-                void navigate({ to: "/ny-annonse", search: { type: "sell" } });
-              }}
-              onBuy={() => {
-                setAdPickerOpen(false);
-                void navigate({ to: "/ny-ok-annonse" });
-              }}
-            />
-          </DialogContent>
-        </Dialog>
-      )}
-      {native && (
-        <Sheet open={adPickerOpen} onOpenChange={setAdPickerOpen}>
-          <SheetContent side="bottom" className="rounded-t-2xl pb-8">
-            <SheetHeader>
-              <SheetTitle>Ny annonse</SheetTitle>
-            </SheetHeader>
-            <AdPickerOptions
-              onSell={() => {
-                setAdPickerOpen(false);
-                void navigate({ to: "/ny-annonse", search: { type: "sell" } });
-              }}
-              onBuy={() => {
-                setAdPickerOpen(false);
-                void navigate({ to: "/ny-ok-annonse" });
-              }}
-            />
-          </SheetContent>
-        </Sheet>
-      )}
+      {/* Ny annonse-velger: telefon = Sheet, nettbrett/web = Dialog. */}
+      <ResponsiveOverlay open={adPickerOpen} onOpenChange={setAdPickerOpen}>
+        <ResponsiveOverlayContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Ny annonse</DialogTitle>
+          </DialogHeader>
+          <AdPickerOptions
+            onSell={() => {
+              setAdPickerOpen(false);
+              void navigate({ to: "/ny-annonse", search: { type: "sell" } });
+            }}
+            onBuy={() => {
+              setAdPickerOpen(false);
+              void navigate({ to: "/ny-ok-annonse" });
+            }}
+          />
+        </ResponsiveOverlayContent>
+      </ResponsiveOverlay>
     </nav>
   );
 }

@@ -257,6 +257,29 @@ export function useAnnonserSearchState(params: {
     });
   };
 
+  // Writes every panel edit straight to the URL instead of collecting it in a
+  // draft (fase 12) — same `Dispatch<SetStateAction<AdvancedSearchValue>>`
+  // shape as `useAdvancedSearchValue`'s setter, so `SearchFilterSections` (and
+  // the range/category/condition controls inside it) don't need to know
+  // whether they're editing a draft or the live URL. `mine-sok.tsx` (editing a
+  // saved search, not a live result set) keeps the draft version.
+  const setLiveValue: React.Dispatch<React.SetStateAction<AdvancedSearchValue>> = (upd) => {
+    const next = typeof upd === "function" ? upd(advancedInitial) : upd;
+    const c = valueToCriteria(next);
+    updateSearch({
+      q: next.terms.join(" "),
+      qMode: c.qMode,
+      extraGroups: c.extraGroups,
+      categories: c.categories,
+      catMode: c.catMode,
+      conditions: c.conditions as z.infer<typeof conditionEnum>[] | undefined,
+      includeFree: c.includeFree,
+      min: c.min ?? undefined,
+      max: c.max ?? undefined,
+      category: "",
+    });
+  };
+
   const handleLocationChange = (v: LocationValue) => {
     updateSearch({
       lat: v.lat ?? undefined,
@@ -283,6 +306,7 @@ export function useAnnonserSearchState(params: {
     currentCriteria,
     updateSearch,
     handleApply,
+    setLiveValue,
     handleLocationChange,
     resetFilters,
   };

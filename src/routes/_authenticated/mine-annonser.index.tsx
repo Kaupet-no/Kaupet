@@ -35,6 +35,8 @@ import { useAllCategoryFilters } from "@/components/attribute-fields";
 import { isVehicleCategory } from "@/lib/category-filters";
 
 import { NativePageHeader } from "@/components/native-page-header";
+import { PullToRefreshIndicator } from "@/components/pull-to-refresh-indicator";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { ListingRow, type Row } from "@/features/my-listings/listing-row";
 
 export const Route = createFileRoute("/_authenticated/mine-annonser/")({
@@ -64,6 +66,14 @@ function MyListingsPage() {
   const [promoteId, setPromoteId] = useState<string | null>(null);
   const [markSoldId, setMarkSoldId] = useState<string | null>(null);
   const native = useIsNative();
+
+  const { refreshing, pullDistance } = usePullToRefresh({
+    enabled: native,
+    onRefresh: async () => {
+      await queryClient.resetQueries({ queryKey: ["my-listings"] });
+      await queryClient.resetQueries({ queryKey: ["my-wtb-listings"] });
+    },
+  });
 
   const { data: allFilters } = useAllCategoryFilters();
   const { data: allCategories } = useQuery({
@@ -217,6 +227,7 @@ function MyListingsPage() {
   return (
     <>
       <NativePageHeader title="Mine annonser" backLabel="Meg" backTo="/meg" />
+      {native && <PullToRefreshIndicator pullDistance={pullDistance} refreshing={refreshing} />}
       <div className="mx-auto max-w-5xl px-4 py-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>

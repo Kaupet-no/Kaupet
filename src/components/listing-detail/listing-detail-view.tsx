@@ -509,7 +509,9 @@ function ListingDetailViewBody({
 
   return (
     <div className={`mx-auto max-w-6xl px-4 py-8 ${showStickyContact ? "pb-28 md:pb-8" : ""}`}>
-      <NativePageHeader title={title} />
+      {/* titleFadesIn: siden har allerede tittelen som stor <h1> rett under
+          headeren — headertittelen toner inn først når den er scrollet vekk. */}
+      <NativePageHeader title={title} titleFadesIn />
       {previewBanner}
 
       <header className="mt-4">
@@ -1087,7 +1089,7 @@ function ListingDetailViewBody({
 
       {showStickyContact && (
         <div
-          className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 py-3 backdrop-blur md:hidden"
+          className="px-safe fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 py-3 backdrop-blur md:hidden"
           style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}
         >
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">

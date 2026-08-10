@@ -74,7 +74,9 @@ export function OnboardingFlow({ onComplete }: Props) {
   };
 
   return (
-    <FullscreenOverlay open onOpenChange={() => {}}>
+    // historyBack={false}: onboardingen blokkerer bevisst Escape og klikk
+    // utenfor, og skal heller ikke kunne lukkes med Android-tilbake.
+    <FullscreenOverlay open onOpenChange={() => {}} historyBack={false}>
       <FullscreenOverlayContent
         title="Velkommen til Kaupet.no"
         onEscapeKeyDown={(e) => e.preventDefault()}

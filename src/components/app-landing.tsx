@@ -23,6 +23,8 @@ import { useSavedLocation } from "@/hooks/use-saved-location";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { useDefaultSearchExamples } from "@/hooks/use-default-search-examples";
 import { useIsNative } from "@/hooks/use-is-native";
+import { useFormFactor } from "@/hooks/use-form-factor";
+import { useSearchPanel } from "@/features/listing-search/search-panel/search-panel-context";
 import { AppHeroLogo } from "@/components/app-hero-logo";
 
 type CategoryRow = {
@@ -41,6 +43,12 @@ export function AppLanding() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [location, setLocation] = useSavedLocation();
   const [locOpen, setLocOpen] = useState(false);
+  const { openPanel } = useSearchPanel();
+  const isNative = useIsNative();
+  // Nettbrett (fase 10): heroen får en øvre ramme og «Populært nå» blir et
+  // rutenett. Bevisst formatfaktor og ikke `md:`-breakpoints — de ville truffet
+  // kaupet.no på desktop, som ikke er en del av denne planen.
+  const isTablet = useFormFactor() === "tablet";
 
   const { data: categories } = useQuery({
     queryKey: ["categories"],
@@ -110,7 +118,6 @@ export function AppLanding() {
     });
   };
 
-  const isNative = useIsNative();
   const [activeCategory, setActiveCategory] = useState<CategoryRow | null>(null);
   const [categoriesSheetOpen, setCategoriesSheetOpen] = useState(false);
 
@@ -160,28 +167,48 @@ export function AppLanding() {
 
       {/* Hero — sentrert søkefelt */}
       <section
-        className={`flex flex-col items-center justify-center px-5 ${isNative ? "min-h-[68vh] pt-24" : "min-h-[70vh] pt-8"}`}
+        className={`flex flex-col items-center justify-center px-5 ${
+          isTablet ? "min-h-[40vh] pt-10" : isNative ? "min-h-[68vh] pt-24" : "min-h-[70vh] pt-8"
+        }`}
       >
         <h1 className="mb-6 text-center font-display text-2xl tracking-tight">
           Hva leter du etter i dag?
         </h1>
 
-        <form onSubmit={submitSearch} className="w-full max-w-md">
+        <form onSubmit={submitSearch} className={`w-full ${isTablet ? "max-w-xl" : "max-w-md"}`}>
           <div className="relative">
             <SearchIcon className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
-            <input
-              ref={inputRef}
-              type="search"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
-              placeholder=""
-              aria-label="Søk i annonser"
-              aria-describedby={typewriterWords.length > 0 ? "landing-search-examples" : undefined}
-              className="h-14 w-full rounded-full border border-border bg-card pl-12 pr-4 text-base shadow-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
-            />
-            {typewriterWords.length > 0 && (
+            {/* Native: feltet er en *trigger* for søkepanelet, ikke et eget
+                inndatafelt — ett søkeinngangspunkt, ikke to som oppfører seg
+                ulikt (fase 9b punkt 8). */}
+            {isNative ? (
+              <button
+                type="button"
+                onClick={() => openPanel()}
+                aria-label="Søk i annonser"
+                className="h-14 w-full rounded-full border border-border bg-card pl-12 pr-4 text-left text-base shadow-sm transition active:scale-[0.99]"
+              >
+                <span className="sr-only">
+                  {typewriterWords.length > 0 ? `For eksempel: ${typewriterWords.join(", ")}` : ""}
+                </span>
+              </button>
+            ) : (
+              <input
+                ref={inputRef}
+                type="search"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                placeholder=""
+                aria-label="Søk i annonser"
+                aria-describedby={
+                  typewriterWords.length > 0 ? "landing-search-examples" : undefined
+                }
+                className="h-14 w-full rounded-full border border-border bg-card pl-12 pr-4 text-base shadow-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
+              />
+            )}
+            {!isNative && typewriterWords.length > 0 && (
               // Static (not tied to the rotating animation) so screen reader
               // users get the example searches once, on focus, instead of
               // an aria-live region re-announcing every ~2.7s.
@@ -202,12 +229,21 @@ export function AppLanding() {
           </div>
 
           {/* Lokasjon-chip */}
-          <div className="mt-4 flex justify-center">
+          {/* Krysset ligger som *søsken* til chipen, ikke inni den: et
+              interaktivt element inne i et annet er ugyldig og leses dårlig av
+              skjermlesere (funn 10.2 / tiltak 28). */}
+          <div className="mt-4 flex items-center justify-center gap-1">
             <Dialog open={locOpen} onOpenChange={setLocOpen}>
               <button
                 type="button"
                 onClick={() => setLocOpen(true)}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm transition ${
+                // Eksplisitt navn: uten det leses knappen uten tilgjengelig navn
+                // (verifisert i tilgjengelighetstreet på native forside). Den
+                // synlige teksten er med i navnet, jf. WCAG 2.5.3.
+                aria-label={`Velg lokasjon: ${
+                  hasLocation ? `${location.label} · ${location.radius} km` : "Hvor som helst"
+                }`}
+                className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm transition ${
                   hasLocation
                     ? "border-primary/40 bg-primary/5 text-foreground"
                     : "border-border bg-card text-muted-foreground"
@@ -217,26 +253,19 @@ export function AppLanding() {
                 <span className="truncate max-w-[200px]">
                   {hasLocation ? `${location.label} · ${location.radius} km` : "Hvor som helst"}
                 </span>
-                {hasLocation && (
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    className="ml-1 rounded-full p-0.5 hover:bg-muted"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setLocation({
-                        lat: null,
-                        lng: null,
-                        radius: location.radius,
-                        label: "",
-                      });
-                    }}
-                    aria-label="Fjern lokasjon"
-                  >
-                    <X className="size-3.5" />
-                  </span>
-                )}
               </button>
+              {hasLocation && (
+                <button
+                  type="button"
+                  className="flex size-11 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                  onClick={() =>
+                    setLocation({ lat: null, lng: null, radius: location.radius, label: "" })
+                  }
+                  aria-label="Fjern lokasjon"
+                >
+                  <X className="size-4" />
+                </button>
+              )}
               <DialogContent
                 className="w-[calc(100vw-2rem)] max-w-sm rounded-2xl p-6"
                 tabIndex={-1}
@@ -532,13 +561,22 @@ export function AppLanding() {
           </Link>
         </div>
         {popular && popular.length > 0 ? (
-          <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 pr-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {popular.map((l) => (
-              <div key={l.id} className="w-[60%] shrink-0 snap-start sm:w-[40%]">
-                <ListingCard listing={l} />
-              </div>
-            ))}
-          </div>
+          // Nettbrett har plass til rutenettet karusellen komprimerer bort.
+          isTablet ? (
+            <div className="grid grid-cols-3 gap-4 pb-2 pr-5">
+              {popular.map((l) => (
+                <ListingCard key={l.id} listing={l} />
+              ))}
+            </div>
+          ) : (
+            <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 pr-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {popular.map((l) => (
+                <div key={l.id} className="w-[60%] shrink-0 snap-start sm:w-[40%]">
+                  <ListingCard listing={l} />
+                </div>
+              ))}
+            </div>
+          )
         ) : (
           <div className="flex gap-3 overflow-hidden pr-5">
             {Array.from({ length: 3 }).map((_, i) => (

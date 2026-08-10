@@ -2,6 +2,8 @@
 // Safe to call from any component effect; no-ops on web.
 
 import { isNative, nativePlatform } from "./native";
+import { lockPortraitOnPhone } from "./orientation";
+import { initTextScale } from "./text-scale";
 
 let initialized = false;
 
@@ -30,6 +32,17 @@ export async function syncStatusBarTheme(dark: boolean): Promise<void> {
 export async function setupNative(): Promise<void> {
   if (!isNative() || initialized) return;
   initialized = true;
+
+  // Gate for native-only CSS (tap-highlight, user-select, overscroll —
+  // se .native i styles.css).
+  document.documentElement.classList.add("native");
+
+  // Portrett-lås på telefon; nettbrett roterer fritt. Unntaket (fullskjerm-
+  // bilde) slipper låsen opp midlertidig, se src/lib/orientation.ts.
+  void lockPortraitOnPhone();
+
+  // OS-tekststørrelse (Dynamic Type) → rot-font-size, se src/lib/text-scale.ts.
+  initTextScale();
 
   try {
     const { StatusBar } = await import("@capacitor/status-bar");

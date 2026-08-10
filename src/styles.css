@@ -125,15 +125,6 @@
   filter: brightness(1.6) contrast(0.9);
 }
 
-@supports (padding: max(0px)) {
-  :root {
-    --safe-top: env(safe-area-inset-top);
-    --safe-bottom: env(safe-area-inset-bottom);
-    --safe-left: env(safe-area-inset-left);
-    --safe-right: env(safe-area-inset-right);
-  }
-}
-
 @layer base {
   * {
     border-color: var(--color-border);
@@ -174,6 +165,33 @@
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
 }
 
+/* Horisontal safe area — får betydning i landskap, der notch/dynamic island
+   ligger på siden. Merk at disse *erstatter* padding fra `px-*` på samme
+   element (ulagede regler vinner over Tailwinds utility-lag), akkurat som
+   `.pt-safe` gjør. Derfor to varianter:
+   - `.pl-safe`/`.pr-safe`: null i basis. For chrome som ikke har egen
+     horisontal padding (f.eks. NativePageHeader, der barna har sin egen px-3).
+   - `.px-safe`: 1rem i basis, altså en erstatning for `px-4` på fastlåste
+     bunnlinjer der innholdet faktisk går helt ut i kantene. */
+.pl-safe {
+  padding-left: env(safe-area-inset-left);
+}
+.pr-safe {
+  padding-right: env(safe-area-inset-right);
+}
+.px-safe {
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+
+/* Nøyaktig safe area på alle fire kanter, uten minimumsverdien `.pt-safe` har.
+   Brukes av FullscreenOverlayContent: en fullskjerm-takeover skal ikke få
+   8px luft rundt seg på enheter uten notch, den skal bare unngå systemets UI. */
+.p-safe {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+}
+
 /* Height reserved for the fixed bottom nav in native apps (AppBottomNav),
    plus a margin so scrolled content/floating buttons never sit under it. */
 :root {
@@ -181,6 +199,42 @@
 }
 .pb-bottom-nav {
   padding-bottom: var(--app-bottom-nav-h);
+}
+
+/* Nettbrett (fase 10): bunnpillen erstattes av en sidestilt navigasjon, så
+   plassen skal reserveres til venstre i stedet for under. `.nav-rail` settes
+   på <html> av AppBottomNav når useFormFactor() === "tablet".
+   Må stå etter :root over — samme spesifisitet, siste regel vinner. Nuller
+   --app-bottom-nav-h fordi flere flater regner høyder fra den
+   (meldinger.$id: calc(100vh - var(--app-bottom-nav-h))). */
+.nav-rail {
+  --app-bottom-nav-h: 0px;
+  --app-nav-rail-w: calc(5rem + env(safe-area-inset-left));
+}
+.nav-rail .pb-bottom-nav {
+  padding-bottom: 0;
+  padding-left: var(--app-nav-rail-w);
+}
+
+/* Native polish (fase 7, se docs/NATIVE-UI-UX-PLAN.md). `.native` settes på
+   <html> fra setupNative(), altså kun i Capacitor-WebView-en — web er
+   uberørt. */
+
+/* Androids standard grå/blå trykkrektangel over appens egne aktiv-tilstander. */
+.native {
+  -webkit-tap-highlight-color: transparent;
+  /* Bounce/glow fra indre lister skal ikke forplante seg til dokumentet. */
+  overscroll-behavior: none;
+}
+
+/* Langtrykk på chrome skal ikke gi tekstmarkering eller iOS-kopimeny. Dette
+   er bevisst en liste over *interaktive* elementer, ikke en global av-bryter:
+   brødtekst, annonsebeskrivelser og meldinger skal fortsatt kunne kopieres.
+   Kortoverskrifter ligger inne i <a> og er dekket den veien. */
+.native :is(button, a, [role="button"], [role="tab"], label, nav, header, summary) {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 /* Isoler Leaflet sin interne z-index-stack slik at panene (z-index 400–700)

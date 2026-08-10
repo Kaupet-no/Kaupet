@@ -57,13 +57,8 @@ export function FullscreenLocationPicker({ lat, lng, onConfirm, onClose }: Props
 
   return (
     <FullscreenOverlay open onOpenChange={(next) => !next && onClose()}>
-      <FullscreenOverlayContent
-        title="Juster posisjon"
-        style={{
-          paddingTop: "env(safe-area-inset-top)",
-          paddingBottom: "env(safe-area-inset-bottom)",
-        }}
-      >
+      {/* Safe area kommer nå fra FullscreenOverlayContent selv. */}
+      <FullscreenOverlayContent title="Juster posisjon">
         {/* Top bar */}
         <div className="flex shrink-0 items-center justify-between border-b border-border bg-background px-4 py-3">
           <button

@@ -42,7 +42,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate, MessagingDelegate {
     func applicationWillResignActive(_ application: UIApplication) {}
     func applicationDidEnterBackground(_ application: UIApplication) {}
     func applicationWillEnterForeground(_ application: UIApplication) {}
-    func applicationDidBecomeActive(_ application: UIApplication) {}
+    // WKWebView har kantsveip-navigasjon av som standard, og Capacitor
+    // eksponerer den ikke i capacitor.config.ts. Uten dette har iOS-brukere
+    // ingen sveip-tilbake noe sted i appen. Settes her fordi webView-en ikke
+    // finnes ennå i didFinishLaunching; kallet er idempotent.
+    func applicationDidBecomeActive(_ application: UIApplication) {
+        if let vc = window?.rootViewController as? CAPBridgeViewController {
+            vc.bridge?.webView?.allowsBackForwardNavigationGestures = true
+        }
+    }
     func applicationWillTerminate(_ application: UIApplication) {}
 
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {

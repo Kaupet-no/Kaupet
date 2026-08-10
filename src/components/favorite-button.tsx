@@ -10,7 +10,13 @@ import { cn } from "@/lib/utils";
 type Size = "sm" | "md" | "lg";
 
 const SIZE_CLASSES: Record<Size, { btn: string; icon: string }> = {
-  sm: { btn: "size-8", icon: "size-4" },
+  // `sm` ligger som overlegg på annonsekortets bilde, der en 44px sirkel blir
+  // visuelt dominerende. Sirkelen forblir 32px; trykkflaten utvides usynlig til
+  // 44px med et pseudoelement (before:-inset-1.5 → 32 + 2*6 = 44).
+  sm: {
+    btn: "relative size-8 before:absolute before:-inset-1.5 before:content-['']",
+    icon: "size-4",
+  },
   md: { btn: "size-10", icon: "size-5" },
   lg: { btn: "h-11 px-4 gap-2 w-full", icon: "size-5" },
 };

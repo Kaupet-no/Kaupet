@@ -5,6 +5,12 @@
 import { Capacitor } from "@capacitor/core";
 
 export function isNative(): boolean {
+  // Dev-only: `?forcenative` slår på native-grenene i vanlig nettleser, slik at
+  // de kan verifiseres uten simulator. `import.meta.env.DEV` er false i bygget,
+  // så hele blokken strippes bort i produksjon.
+  if (import.meta.env.DEV && typeof window !== "undefined") {
+    if (window.location.search.includes("forcenative")) return true;
+  }
   try {
     return Capacitor.isNativePlatform();
   } catch {
@@ -18,6 +24,15 @@ export function isNative(): boolean {
  * earlier would re-expose the web-layout flash it exists to cover.
  */
 export function hideNativeBootSplash(): void {
+  // Den *native* splashen henger igjen til den skjules eksplisitt
+  // (launchAutoHide: false, se capacitor.config.ts) — det er nettopp derfor
+  // den kan skjules her, i det appen har malt, i stedet for etter 2s fast.
+  void import("@capacitor/splash-screen")
+    .then(({ SplashScreen }) => SplashScreen.hide())
+    .catch(() => {
+      /* plugin unavailable (web) */
+    });
+
   const el = document.getElementById("native-boot-splash");
   document.documentElement.classList.remove("native-boot");
   if (!el) return;

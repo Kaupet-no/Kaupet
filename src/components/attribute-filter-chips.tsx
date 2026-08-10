@@ -155,6 +155,7 @@ export function SecondaryCategoryFilters({
   counts,
   queryText,
   isNative = false,
+  includePrimary = false,
 }: {
   /** Full filter set for the category — split into primary/secondary here,
    * same as `AttributeFilterChips`. */
@@ -165,9 +166,14 @@ export function SecondaryCategoryFilters({
   /** Same relevance-boost input as `AttributeFilterChips`' `queryText`. */
   queryText?: string;
   isNative?: boolean;
+  /** Ta med primærfiltrene (Merke, Modell …) i stedet for bare de sekundære.
+   * Søkepanelet (fase 9) er eneste vei til kategorifiltrene på native etter at
+   * chip-raden ble erstattet av sammendrag-pillen, så der må hele settet med. */
+  includePrimary?: boolean;
 }) {
   const [search, setSearch] = useState("");
-  const { secondary: secondaryRaw } = splitPrimaryFilters(filters);
+  const { secondary: secondaryOnly } = splitPrimaryFilters(filters);
+  const secondaryRaw = includePrimary ? filters : secondaryOnly;
   const queryWords = (queryText ?? "").trim().toLowerCase().split(/\s+/).filter(Boolean);
   const secondary =
     queryWords.length === 0

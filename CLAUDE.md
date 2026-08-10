@@ -13,6 +13,14 @@ ikke testet i nettleser, antakelser om eksisterende atferd, edge-caser du
 ikke har dekket). Hvis alt er verifisert, si det eksplisitt i én linje i
 stedet for å utelate seksjonen.
 
+## Gjenbruk før nybygg
+
+Før du skriver ny kode: søk gjennom eksisterende `lib/`, `components/` og
+`features/` etter funksjonalitet som allerede løser (eller nesten løser)
+problemet, og gjenbruk/utvid den fremfor å bygge parallell logikk. Dette
+gjelder selv om Ponytail-modus er av — det er en bevisst arbeidsvane, ikke
+bare en automatisk sjekk.
+
 ## Arkitektur
 
 Stack: TanStack Start (Vite + React) på Cloudflare Workers (via nitro/wrangler),

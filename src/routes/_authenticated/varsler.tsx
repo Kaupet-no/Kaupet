@@ -5,6 +5,8 @@ import { useState } from "react";
 import { CheckCheck, ShoppingBag, TrendingDown, X } from "lucide-react";
 
 import { NativePageHeader } from "@/components/native-page-header";
+import { PullToRefreshIndicator } from "@/components/pull-to-refresh-indicator";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
 
@@ -67,6 +69,11 @@ function VarslerPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
+
+  const { refreshing, pullDistance } = usePullToRefresh({
+    enabled: native,
+    onRefresh: () => qc.resetQueries({ queryKey: ["notifications-history"] }),
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ["notifications-history", user?.id, pageSize],
@@ -171,6 +178,7 @@ function VarslerPage() {
   return (
     <>
       <NativePageHeader title="Mine varsler" backLabel="Meg" backTo="/meg" />
+      {native && <PullToRefreshIndicator pullDistance={pullDistance} refreshing={refreshing} />}
       <div className="mx-auto max-w-4xl px-4 py-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>

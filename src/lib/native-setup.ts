@@ -32,6 +32,10 @@ export async function setupNative(): Promise<void> {
   if (!isNative() || initialized) return;
   initialized = true;
 
+  // Gate for native-only CSS (tap-highlight, user-select, overscroll —
+  // se .native i styles.css).
+  document.documentElement.classList.add("native");
+
   // Portrett-lås på telefon; nettbrett roterer fritt. Unntaket (fullskjerm-
   // bilde) slipper låsen opp midlertidig, se src/lib/orientation.ts.
   void lockPortraitOnPhone();

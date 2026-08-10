@@ -1,14 +1,14 @@
 # Native-app: UI/UX-revisjon for mobil og nettbrett
 
-Status: **Fase 0, 1, 2, 3, 4, 5 og 6 implementert** 2026-08-10. Analyse
-gjennomført 2026-08-10. Alle fire åpne spørsmål er besvart 2026-08-10 (se
-seksjon 8) og innarbeidet i tiltaksliste og faser. Neste steg: **fase 7**
-(native polish og gestkonsistens). Avhengigheten fase 6 → fase 8 er **bortfalt**
-— sidenivå-zoom var allerede av på native før fase 6, se funn 10.10; fase 8 er
-fortsatt et reelt tilgjengelighetshull, men blokkerer ikke lenger noe. Fase 2,
-3, 5 og 6 er ikke endelig ferdige før de er reverifisert i simulator
-(safe-area-verdier med notch, iOS-kantsveip, Android-tilbakeknapp, rotasjonslås,
-pinch/sveip på ekte touch) — se seksjon 7.
+Status: **Fase 0–7 implementert** 2026-08-10. Analyse gjennomført 2026-08-10.
+Alle fire åpne spørsmål er besvart 2026-08-10 (se seksjon 8) og innarbeidet i
+tiltaksliste og faser. Neste steg: **fase 8** (Dynamic Type). Avhengigheten
+fase 6 → fase 8 er **bortfalt** — sidenivå-zoom var allerede av på native før
+fase 6, se funn 10.10; fase 8 er fortsatt et reelt tilgjengelighetshull, men
+blokkerer ikke lenger noe. Fase 2, 3, 5, 6 og 7 er ikke endelig ferdige før de
+er reverifisert i simulator (safe-area-verdier med notch, iOS-kantsveip,
+Android-tilbakeknapp, rotasjonslås, pinch/sveip på ekte touch,
+dra-for-å-lukke på ekte touch) — se seksjon 7.
 
 Sist oppdatert: 2026-08-10.
 
@@ -453,6 +453,7 @@ Dette er tre linjer CSS som gir uforholdsmessig stor opplevd gevinst.
 | 27  | ~~Slå av sidenivå-zoom på native~~ — **utgår**, Capacitor gjør det allerede (10.10)            | —        | —           | 8.4, 10.10       |
 | 28  | Løft «fjern lokasjon»-krysset ut av chip-knappen på forsiden + ≥44px                           | Liten    | Middels     | 10.2             |
 | 29  | Tilbake-trykk under onboarding: kortnavigasjon i stedet for å avslutte appen                   | Liten    | Middels     | 10.6             |
+| 30  | Fjern håndrullet `pb-8` i de tre gjenværende bunn-sheetene                                     | Triviell | Lav         | 10.12            |
 
 **Ikke anbefalt:** omskriving av annonseveiviseren, meldingskjernen eller
 `FullscreenOverlay`/`ResponsiveOverlay`-arkitekturen. Alle tre er riktig
@@ -700,6 +701,10 @@ fremdriftsloggen for fase 6.
 3. `usePullToRefresh` på de fire manglende rutene. Hooken finnes og er
    gjenbrukbar som den er.
 
+**Oppdatert etter implementering:** punkt 2 ble gjort her, ikke utsatt til
+etter fase 9 — `vaul` ble vurdert og valgt bort fordi gesten uten detents er
+~45 linjer. Se fremdriftsloggen for fase 7.
+
 ### Fase 8 — Dynamic Type (tiltak 19) — ~~påkrevd før eller sammen med fase 6~~, se 10.10
 
 **Avklares under implementering:** hvilken mekanisme.
@@ -744,9 +749,12 @@ Dette er planens største enkeltleveranse og bør deles i minst to PR-er.
    riktig scroll-låsing per detent er ikke ~40 linjer — det er nøyaktig
    bruksområdet biblioteket finnes for. Det ble fjernet i
    `UX-AUDIT-PLAN.md` fase 2 fordi det var ubrukt, ikke fordi det var feil
-   verktøy. Samme avhengighet dekker da også tiltak 17 (draghåndtak på
+   verktøy. ~~Samme avhengighet dekker da også tiltak 17 (draghåndtak på
    vanlige bunn-sheets), så fase 7 punkt 2 bør gjøres **etter** denne fasen
-   og gjenbruke valget herfra.
+   og gjenbruke valget herfra.~~ **Utgått:** tiltak 17 ble levert håndrullet i
+   fase 7 (~45 linjer, ingen detents). Tas `vaul` inn her, bør `useSheetDrag`
+   i `ui/sheet.tsx` erstattes i samme slengen i stedet for å bli stående ved
+   siden av.
 4. Panelet skal bruke `useOverlayHistory` fra fase 3, slik at Android-tilbake
    og iOS-sveip lukker det.
 5. På nettbrett (`useFormFactor() === "tablet"`) skal panelet **ikke** være en
@@ -824,6 +832,8 @@ ferdigdefinisjon, ikke en oppfølgingssak:
 | 3    | ✅ Den dupliserte `<h1>` på annonsedetalj (headertittelen toner inn ved scroll i stedet) |
 | 4    | ✅ Den manuelle `!native ? Dialog : Sheet`-grenen i `app-bottom-nav.tsx`s ad-picker      |
 | 5    | _Ingen_ — plisten beholder alle orienteringer med vilje (se fase 5)                      |
+| 6    | _Ingen_ — `<img>`-en i lightboxen er erstattet av `ZoomableImage`                        |
+| 7    | ✅ Den innebygde pull-to-refresh-spinneren i `annonser.tsx`                              |
 | 9    | `native-search-overlay.tsx` **hele filen** — erstattes av søkepanelet                    |
 | 9    | `native-advanced-search.tsx` **hele filen** — erstattes av søkepanelet                   |
 | 9    | Søkelinjen + full chip-rad på `/annonser` i native-grenen                                |
@@ -850,6 +860,7 @@ parallelle størrelsesdefinisjoner i utgangspunktet (3.1.2).
 - **Simulator/enhet er obligatorisk for:** fase 2 (safe areas — verdiene er 0
   i nettleser), fase 3 (iOS-gest, Android-tilbake), fase 5 (rotasjonslås og
   unntaket i bildevisning), fase 6 (pinch/sveip + at zoom faktisk er av),
+  fase 7 (dra-for-å-lukke på ekte touch, langtrykk/tap-highlight),
   fase 8 (Dynamic Type), fase 10 (Android nettbrett og Split View). Disse
   fasene skal **ikke** merkes ferdige på kodenivå alene — det er nøyaktig
   forbeholdet `UX-AUDIT-PLAN.md` fase 3 og 4 måtte notere, og som denne
@@ -1361,6 +1372,84 @@ etterpå (målt).
 - Gestlogikken er ikke e2e-dekket; Playwright-touchemulering ble ikke tatt inn
   for dette.
 
+### Fase 7 — Native polish og gestkonsistens (tiltak 16, 17, 18) — kodeferdig 2026-08-10, venter på simulator
+
+**Gjort:**
+
+1. **CSS-polish (tiltak 16).** Ny `.native`-klasse settes på `<html>` fra
+   `setupNative()` — altså kun i Capacitor-WebView-en (og under
+   `?forcenative`), aldri på kaupet.no. Tre regler i `styles.css`:
+   `-webkit-tap-highlight-color: transparent` og `overscroll-behavior: none` på
+   roten, og `user-select: none` + `-webkit-touch-callout: none` på en
+   **liste over interaktive elementer** (`button, a, [role="button"],
+[role="tab"], label, nav, header, summary`), ikke globalt. Brødtekst,
+   annonsebeskrivelser og meldinger er dermed fortsatt markerbare, slik planens
+   punkt 1 krevde. Kortoverskrifter ligger inne i `<a>` og dekkes den veien.
+2. **Draghåndtak + dra-for-å-lukke (tiltak 17).** `useSheetDrag` i
+   `ui/sheet.tsx`, aktiv kun for `side="bottom"`. **`vaul` ble vurdert og valgt
+   bort** (jf. planens eksplisitte bestilling): uten detents er gesten ~45
+   linjer, og biblioteket ble fjernet som ubrukt i `UX-AUDIT-PLAN.md` fase 2.
+   Trenger søkepanelet i fase 9 detents, er det der `vaul` eventuelt kommer
+   tilbake — og da kan denne hooken erstattes.
+   Tre detaljer som ikke var åpenbare i planen:
+   - **Lukkingen går via en Escape-hendelse**, ikke en egen callback.
+     `SheetContent` har ingen tilgang til `onOpenChange` (den ligger på `Root`),
+     og Escape-veien gir gratis at sheets som bevisst blokkerer lukking med
+     `onEscapeKeyDown` også blokkerer dra-gesten. Riktig oppførsel, mindre kode.
+   - **Gesten starter ikke** hvis en scrollbar forelder under fingeren har
+     `scrollTop > 0` — ellers ville dra-for-å-lukke stjålet scrollingen i de
+     høye sheetene (`h-[80vh]`, `max-h-[85vh]`).
+   - **Håndtaket er absolutt plassert** (`absolute left-1/2 top-2`), fordi
+     bunn-sheetene spenner fra `p-0` til `p-6` — et håndtak i flyten ville
+     flyttet innholdet ulikt i hver av dem.
+     Terskel: 96px dratt, eller >0,5 px/ms sluppet.
+3. **Pull-to-refresh (tiltak 18)** på `favoritter`, `varsler`,
+   `meldinger.index` og `mine-annonser.index`. Hooken er brukt som den er.
+   Spinner-markupen er trukket ut av `annonser.tsx` til
+   `components/pull-to-refresh-indicator.tsx` — den var i ferd med å bli
+   kopiert fem steder.
+
+**Avvik fra planen:** planen (fase 9 punkt 3) anbefalte å utsette punkt 2 til
+etter fase 9 og gjenbruke `vaul`-valget derfra. Det er overstyrt: håndrullet
+gest uten detents er liten nok til å stå på egne ben, og den gir gevinsten nå
+i stedet for etter planens største leveranse. Beslutningen er reversibel —
+hooken er ~45 linjer i én fil.
+
+**Pensjonert:** den innebygde spinner-markupen i `annonser.tsx`.
+
+**Verifisert live** med `?forcenative` på 375×812 (målt i DOM):
+
+- `.native` på `<html>`; `webkitTapHighlightColor: rgba(0,0,0,0)`;
+  `overscroll-behavior: none`. `user-select` er `none` på en `<button>` og
+  fortsatt `auto` på en `<p>` — skillet virker.
+- Draghåndtaket måler 40 × 4 px, sentrert, 9px fra sheetens overkant.
+- Dra-gest med syntetiske `TouchEvent`-er: bildet følger fingeren
+  (`translate3d(0, 60px, 0)` → `40px`), et kort drag (40px) fjerner transformen
+  og lar sheeten stå åpen, og et drag på 160px setter `data-state="closed"`.
+- Pull-to-refresh på `/annonser` etter uttrekkingen: 200px dratt gir 48px
+  indikatorhøyde og full opasitet, uendret fra før.
+
+`bunx tsc --noEmit` rent, `bun run test` 237/237, `bun run lint` 0 errors,
+`bun run test:e2e` 3/3.
+
+**Ikke verifisert:**
+
+- **Ekte touch.** Alt over er syntetiske hendelser. Særlig samspillet mellom
+  dra-gesten og scrolling i en høy sheet (fingeren starter i toppen, drar ned,
+  scroller så opp igjen) er ikke prøvd på enhet. Dette er den enkeltrisikoen i
+  fase 7 jeg er minst trygg på.
+- **Om exit-animasjonen faktisk overstyrer den inline-satte transformen** når
+  en dratt sheet lukkes. CSS-animasjoner slår inline `style` i kaskaden, så
+  slide-ut skal spille fra 0 uansett hvor langt brukeren dro — men det kunne
+  ikke observeres, se 10.11.
+- **`-webkit-touch-callout` og tap-highlight** er satt, men effekten (ingen
+  kopimeny ved langtrykk, ingen grå rektangler på Android) kan bare ses på
+  enhet.
+- Innloggede flater (de fire nye pull-to-refresh-rutene) er **ikke** sett
+  kjøre — gesten er verifisert på `/annonser`, som bruker nøyaktig samme hook
+  og komponent, men de fire rutenes egne `resetQueries`-nøkler er kun
+  kodegjennomgått.
+
 ---
 
 ## 10. Funn oppdaget underveis
@@ -1526,3 +1615,35 @@ false` i `capacitor.config.ts` er å konfigurere standardverdien.
 
 Samme lærdom som 10.4 og 10.8, tredje gang: **et funn utledet fra én fil
 (`__root.tsx`) må sjekkes mot laget under før det gjøres til en beslutning.**
+
+### 10.11 `?forcenative`-verktøyet kan ikke observere inn-/ut-animasjoner (fase 7, 2026-08-10)
+
+Når nettleserpanelet er skjult, pauser kompositoren CSS-animasjoner: en åpnet
+bunn-sheet ble målt til `data-state="open"` med `currentTime: 0` på
+`enter`-animasjonen, altså fortsatt i startkeyframen 100px under skjermkanten.
+Det samme gjelder exit-animasjonen — et lukket overlay blir stående montert.
+
+Konsekvensen for fase 7 er konkret: at slide-ut-animasjonen overstyrer den
+inline-satte drag-transformen kunne ikke observeres, bare utledes fra
+kaskaderekkefølgen (animasjoner slår inline `style`). Konsekvensen generelt:
+**alt som avhenger av at en animasjon faktisk spilles, må måles på tilstand
+(`data-state`, klasser), ikke på posisjon.** Posisjonsmålinger av et
+animerende element i dette verktøyet er verdiløse.
+
+**Ikke et nytt tiltak** — en begrensning i verifiseringen, som 10.7.
+
+### 10.12 Tre bunn-sheets har fortsatt håndrullet `pb-8` (fase 7, 2026-08-10)
+
+Fase 2 fjernet `pb-8`-kompensasjonen i `app-bottom-nav.tsx`s ad-picker fordi
+`sheet.tsx` `side="bottom"` nå padrer home indicator-sonen selv. Samme
+kompensasjon står igjen tre steder: `messages-button.tsx:273`,
+`notifications-bell.tsx:356` og `meg.tsx:230`. De er ikke ødelagte — 32px er
+mer enn `max(24px, safe-area)` på alle nåværende enheter — men de overstyrer
+primitiven og er nøyaktig mønsteret seksjon 6 advarer mot.
+
+Fjerde forekomst av samme lærdom (10.4, 10.8, 10.10): **tellingen i et
+funn er et utgangspunkt, ikke en fasit.**
+
+**Foreslått som nytt tiltak 30** (Triviell, Lav): fjern `pb-8` fra de tre.
+Ikke gjort i fase 7 fordi to av tre ligger bak innlogging og dermed ikke kan
+verifiseres i denne runden.

@@ -50,6 +50,7 @@ import { NativePageHeader } from "@/components/native-page-header";
 import { hapticImpact } from "@/lib/haptics";
 import { useScrollDirection } from "@/hooks/use-scroll-direction";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
+import { PullToRefreshIndicator } from "@/components/pull-to-refresh-indicator";
 import { useAnnonserSearchState } from "@/features/listing-search/use-annonser-search-state";
 import { useFilterFacetCounts } from "@/features/listing-search/use-filter-facet-counts";
 import { useHeroCategoryActions } from "@/features/listing-search/use-hero-category-actions";
@@ -537,17 +538,7 @@ function BrowsePage() {
     <div>
       <NativePageHeader title="Annonser" hideBack />
 
-      {isNative && (pullDistance > 0 || refreshing) && (
-        <div
-          className="flex items-center justify-center overflow-hidden transition-all duration-150"
-          style={{ height: refreshing ? 48 : Math.min(pullDistance, 48) }}
-        >
-          <div
-            className={`size-6 rounded-full border-2 border-primary border-t-transparent ${refreshing ? "animate-spin" : ""}`}
-            style={{ opacity: refreshing ? 1 : pullDistance / 64 }}
-          />
-        </div>
-      )}
+      {isNative && <PullToRefreshIndicator pullDistance={pullDistance} refreshing={refreshing} />}
 
       {/* Hero zone: before a category is picked this shows the always-visible
           main-category chip row; picking one brings in CategoryHero in this

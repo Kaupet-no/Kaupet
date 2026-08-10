@@ -3,6 +3,7 @@
 
 import { isNative, nativePlatform } from "./native";
 import { lockPortraitOnPhone } from "./orientation";
+import { initTextScale } from "./text-scale";
 
 let initialized = false;
 
@@ -39,6 +40,9 @@ export async function setupNative(): Promise<void> {
   // Portrett-lås på telefon; nettbrett roterer fritt. Unntaket (fullskjerm-
   // bilde) slipper låsen opp midlertidig, se src/lib/orientation.ts.
   void lockPortraitOnPhone();
+
+  // OS-tekststørrelse (Dynamic Type) → rot-font-size, se src/lib/text-scale.ts.
+  initTextScale();
 
   try {
     const { StatusBar } = await import("@capacitor/status-bar");

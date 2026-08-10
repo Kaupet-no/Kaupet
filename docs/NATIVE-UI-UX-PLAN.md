@@ -1,11 +1,12 @@
 # Native-app: UI/UX-revisjon for mobil og nettbrett
 
-Status: **Fase 0, 1, 2, 3 og 4 implementert** 2026-08-10. Analyse gjennomført
+Status: **Fase 0, 1, 2, 3, 4 og 5 implementert** 2026-08-10. Analyse gjennomført
 2026-08-10. Alle fire åpne spørsmål er besvart 2026-08-10 (se seksjon 8) og
-innarbeidet i tiltaksliste og faser. Neste steg: **fase 5** (orientering —
-portrett-lås med unntak for fullskjermbilde). Fase 2 og 3 er ikke endelig
-ferdige før de er reverifisert i simulator (safe-area-verdier med notch,
-iOS-kantsveip, Android-tilbakeknapp) — se seksjon 7.
+innarbeidet i tiltaksliste og faser. Neste steg: **fase 6** (bildevisning og
+zoom-policy) — men merk avhengigheten: fase 8 (Dynamic Type) må leveres før
+eller sammen med den, se 8.4. Fase 2, 3 og 5 er ikke endelig ferdige før de er
+reverifisert i simulator (safe-area-verdier med notch, iOS-kantsveip,
+Android-tilbakeknapp, rotasjonslås) — se seksjon 7.
 
 Sist oppdatert: 2026-08-10.
 
@@ -1227,6 +1228,53 @@ ikke sheet), `bun run lint` 0 errors, `bun run test:e2e` 3/3 (kjørt fordi
 - Nettbrett-nedslaget på **innloggede** overlays (veiviserens dialoger,
   meldingsflatene) er som før kun kodegjennomgått.
 
+### Fase 5 — Orientering: portrett-lås med unntak (tiltak 13) — kodeferdig 2026-08-10, venter på simulator
+
+**Gjort:**
+
+1. `@capacitor/screen-orientation@8.0.1` tatt inn, `bunx cap sync` kjørt — begge
+   plattformprosjektene ser pluginen (11 plugins for iOS, samme for Android).
+2. Ny `src/lib/orientation.ts` med `lockPortraitOnPhone()` og
+   `unlockOrientation()`. Låsen kalles fra `setupNative()` ved oppstart, altså
+   kun på native.
+3. `ImageLightbox`: `unlockOrientation()` ved mount, `lockPortraitOnPhone()` ved
+   **unmount** (ikke i lukkeknappen), slik at låsen kommer tilbake uansett
+   hvilken vei galleriet forsvinner — X, tilbake-gest eller navigasjon.
+4. `Info.plist` og `AndroidManifest.xml` er **uendret**, som planen forutsatte:
+   plisten har allerede landskap på iPhone og alle fire på iPad, og manifestet
+   setter ikke `android:screenOrientation`.
+
+**Planens forutsetning er verifisert, ikke antatt:** pluginens
+`ScreenOrientation.swift` lagrer `capViewController.supportedOrientations`
+(som Capacitor initialiserer fra `UISupportedInterfaceOrientations`) og
+_gjenoppretter_ nøyaktig den listen i `unlock()`. Fjernes landskap fra plisten,
+gir `unlock()` altså fortsatt bare portrett — hele unntaksmekanismen henger på
+at plisten beholder landskap, slik 8.2 slo fast.
+
+**Avvik fra planen:** telefon/nettbrett-skillet i `orientation.ts` bruker
+**korteste** skjermside mot 768px, ikke `useFormFactor()`s `min-width`. To
+grunner: `setupNative()` og opprydningen i lightboxen er ikke React-kontekst, og
+— viktigere — en telefon i landskap er 844px bred og ville blitt lest som
+nettbrett av breddegrensen, nøyaktig i den tilstanden der vi skal låse tilbake
+til portrett. Se funn 10.9.
+
+**Pensjonert:** ingen, jf. seksjon 6 (plisten beholder alle orienteringer med
+vilje).
+
+**Verifisert:** `bunx tsc --noEmit` rent, `bun run test` 229/229 (seks nye i
+`src/lib/orientation.test.ts`: låser på telefon, ikke på nettbrett, telefon i
+landskap leses som telefon, `unlock` er no-op uten forutgående lås, og alt er
+no-op på web), `bun run lint` 0 errors.
+
+**Ikke verifisert:** **selve rotasjonsatferden — hele fasen.** Pluginen er en
+no-op i nettleser (dynamisk import feiler og fanges), så `?forcenative`-
+verktøyet kan ikke vise noe her; det er bare grenlogikken som er dekket av
+enhetstestene. Simulator-verifiseringen fra planen står i sin helhet igjen:
+roter i appen (skal ikke skje), åpne fullskjermbilde og roter (skal skje), lukk
+(skal snappe tilbake), og gjenta på iPad (skal rotere fritt overalt). I tillegg
+er ikke `requestGeometryUpdate`-veien (iOS 16+) vs. `lockLegacy` under iOS 16
+prøvd — deployment target er iOS 15, så den gamle grenen finnes i praksis.
+
 ---
 
 ## 10. Funn oppdaget underveis
@@ -1349,3 +1397,17 @@ fikset i fase 4.
 
 Samme lærdom som 10.4, andre gang i denne planen: **tellingen i et funn er et
 utgangspunkt, ikke et fasit — `grep` den opp på nytt ved implementering.**
+
+### 10.9 `useFormFactor()`s breddegrense leser telefon i landskap som nettbrett (fase 5, 2026-08-10)
+
+`useFormFactor()` er `min-width: 768px`. En iPhone i landskap er 844px bred og
+returnerer derfor `"tablet"`. For fase 4s bruk (velge dialog vs. bunn-sheet) er
+det forsvarlig — på en 844×390-skjerm _er_ en sentrert dialog riktigere enn en
+fullhøyde skuff. For orienteringslåsen er det direkte feil: den tilstanden er
+nøyaktig der vi skal låse tilbake til portrett.
+
+`orientation.ts` bruker derfor korteste skjermside i stedet. Ikke et nytt
+tiltak, men verdt å kjenne før fase 10: **`useFormFactor()` er en
+_layout_-akse, ikke en enhetsklassifisering.** Trenger fase 10 å vite hva slags
+enhet appen faktisk kjører på (f.eks. for sidenavigasjon), er breddegrensen
+alene ikke svaret.

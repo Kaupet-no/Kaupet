@@ -147,6 +147,12 @@ Tre varianter: `default`, `destructive`, og `warning` (amber, for advarsler som 
 ## Native (Capacitor)
 
 - Sjekk `isNative()` (`@/lib/native`) eller hooken `useIsNative()` for å grene mellom web- og native-UI — ikke dupliser hele komponenter.
+- **Verifisere native-grener i nettleser:** legg til `?forcenative` i URL-en i dev
+  (`http://localhost:3000/?forcenative`), så returnerer `isNative()` true og hele
+  native-grenen rendres. Overstyringen er gated på `import.meta.env.DEV` og finnes
+  ikke i produksjonsbygget. Bruk den til layoutverifisering på 375×812, 844×390,
+  820×1180 og 1024×1366 — safe-area-verdier er alltid 0 i nettleser, så de må
+  fortsatt sjekkes i simulator.
 - Touch-targets skal være minst 44×44px (se `app-bottom-nav.tsx`).
 - Bruk `pt-safe` / `env(safe-area-inset-bottom)` for områder nær systemets UI (status bar, home indicator).
 - Unngå `Tooltip` og andre hover-avhengige mønstre i flater som vises i native-appen.

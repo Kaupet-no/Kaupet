@@ -2,6 +2,7 @@
 // Safe to call from any component effect; no-ops on web.
 
 import { isNative, nativePlatform } from "./native";
+import { lockPortraitOnPhone } from "./orientation";
 
 let initialized = false;
 
@@ -30,6 +31,10 @@ export async function syncStatusBarTheme(dark: boolean): Promise<void> {
 export async function setupNative(): Promise<void> {
   if (!isNative() || initialized) return;
   initialized = true;
+
+  // Portrett-lås på telefon; nettbrett roterer fritt. Unntaket (fullskjerm-
+  // bilde) slipper låsen opp midlertidig, se src/lib/orientation.ts.
+  void lockPortraitOnPhone();
 
   try {
     const { StatusBar } = await import("@capacitor/status-bar");

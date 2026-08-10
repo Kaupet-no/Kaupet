@@ -35,6 +35,11 @@ export function MapOverlay({ lat, lng, onClose }: Props) {
       <FullscreenOverlayContent
         title="Kart for annonse"
         onClick={() => history.back()}
+        // edgeToEdge: bakteppet skal dekke hele skjermen. Kortet innenfor er
+        // allerede trukket 7,5 % inn fra hver kant, som er godt klar av
+        // notch/home indicator i begge orienteringer — det er derfor ingen
+        // egen safe-area-padding trengs på chromet her.
+        edgeToEdge
         className="bg-black/60 px-[7.5%] py-[7.5%] backdrop-blur-sm"
       >
         {/* Card panel — stops propagation so clicks inside don't close the overlay */}

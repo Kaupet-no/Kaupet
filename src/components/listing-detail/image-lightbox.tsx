@@ -85,12 +85,16 @@ export function ImageLightbox({
       <FullscreenOverlayContent
         title={`Bildegalleri for ${title}`}
         onClick={() => history.back()}
+        // edgeToEdge: bakteppet og bildet skal dekke hele skjermen — padres
+        // containeren, får man en stripe av app-bakgrunn langs notchen. Det er
+        // chromet under som tar safe area i stedet.
+        edgeToEdge
         className="bg-black/65 backdrop-blur-sm"
       >
         {/* Top bar */}
         <div
           onClick={(e) => e.stopPropagation()}
-          className="flex items-center justify-between px-4 py-3"
+          className="flex items-center justify-between px-safe pt-safe pb-3"
         >
           <span className="text-sm text-white/60">
             {totalSlides > 1 ? `${currentIndex + 1} / ${totalSlides}` : ""}
@@ -162,7 +166,7 @@ export function ImageLightbox({
         {totalSlides > 1 && (
           <div
             onClick={(e) => e.stopPropagation()}
-            className="flex justify-center gap-2 overflow-x-auto px-4 py-3"
+            className="flex justify-center gap-2 overflow-x-auto px-safe pt-3 pb-safe"
           >
             {has360 && (
               <button

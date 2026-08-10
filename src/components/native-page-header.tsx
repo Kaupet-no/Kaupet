@@ -29,7 +29,9 @@ export function NativePageHeader({
     onBack ?? (backTo ? () => void navigate({ to: backTo as never }) : () => router.history.back());
 
   return (
-    <header className="pt-safe sticky top-0 z-30 flex items-center border-b border-border bg-background/95 backdrop-blur">
+    // pl-safe/pr-safe: i landskap ligger notchen på siden, og headeren har ingen
+    // egen horisontal padding — uten dette havner Tilbake-knappen under den.
+    <header className="pt-safe pl-safe pr-safe sticky top-0 z-30 flex items-center border-b border-border bg-background/95 backdrop-blur">
       {!hideBack ? (
         <button
           type="button"

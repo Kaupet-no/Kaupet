@@ -1,9 +1,10 @@
 # Native-app: UI/UX-revisjon for mobil og nettbrett
 
-Status: **Fase 0 og 1 implementert** 2026-08-10. Analyse gjennomført 2026-08-10.
-Alle fire åpne spørsmål er besvart 2026-08-10 (se seksjon 8) og innarbeidet i
-tiltaksliste og faser. Neste steg: **fase 2** (safe area som egenskap ved
-primitivene).
+Status: **Fase 0, 1 og 2 implementert** 2026-08-10. Analyse gjennomført
+2026-08-10. Alle fire åpne spørsmål er besvart 2026-08-10 (se seksjon 8) og
+innarbeidet i tiltaksliste og faser. Neste steg: **fase 3**
+(navigasjonsgester). Fase 2 er ikke endelig ferdig før den er reverifisert i
+simulator på en enhet med notch — se seksjon 7.
 
 Sist oppdatert: 2026-08-10.
 
@@ -806,9 +807,9 @@ ferdigdefinisjon, ikke en oppfølgingssak:
 
 | Fase | Skal slettes / erstattes                                                                         |
 | ---- | ------------------------------------------------------------------------------------------------ |
-| 2    | `--safe-left`/`--safe-right` (ubrukte) — enten tas i bruk eller slettes                          |
-| 2    | `pb-8`-kompensasjonen i `app-bottom-nav.tsx`s ad-picker-sheet                                    |
-| 2    | Per-konsument `pt-safe` i de tre overlayene som håndterer det manuelt i dag                      |
+| 2    | ✅ Alle fire `--safe-*`-variablene (alle var døde) — slettet                                     |
+| 2    | ✅ `pb-8`-kompensasjonen i `app-bottom-nav.tsx`s ad-picker-sheet                                 |
+| 2    | ✅ Per-konsument safe-area i de tre overlayene som håndterte det manuelt                         |
 | 3    | Den lokale historikk-håndteringen i `image-lightbox.tsx:43-56`                                   |
 | 3    | Den dupliserte `<h1>` på annonsedetalj                                                           |
 | 4    | Eventuelle manuelle `!native ? Dialog : Sheet`-grener som fortsatt finnes (`app-bottom-nav.tsx`) |
@@ -1020,12 +1021,85 @@ skjemafeltene erstatter dem.
 **Verifisert:** `bunx tsc --noEmit` rent, `bun run test` 218/218,
 `bun run lint` 0 errors. Live på 375×812 og 820×1180 med `?forcenative`.
 
-**Ikke verifisert:** simulator/enhet (ingen fase-1-endring avhenger av ekte
+**Ikke verifisert (fase 1):** simulator/enhet (ingen fase-1-endring avhenger av ekte
 WebView-oppførsel, men 16px-inputgrensen mot WKWebViews auto-zoom er utledet
 fra plattformdokumentasjon, ikke observert). Annonseveiviserens tette
 skjemaoppsett (`field-groups/**`) er **ikke** sett med de nye 44px-feltene —
 den ligger bak innlogging, og planen har allerede notert innloggede flater som
 kun kodegjennomgått. Det er den enkeltrisikoen i fase 1 jeg er minst trygg på.
+
+### Fase 2 — Safe area som egenskap ved primitivene (tiltak 5, 6) — kodeferdig 2026-08-10, venter på simulator
+
+**Nye utilities i `styles.css`** (etter samme mønster som `.pt-safe`/`.pb-safe`,
+og med samme forbehold: de er ulagede, så de **erstatter** `padding` fra
+Tailwind-utilities på samme element — derfor er basisverdien bakt inn der
+kallstedet hadde padding fra før):
+
+| Utility               | Verdi                                             | For                                                    |
+| --------------------- | ------------------------------------------------- | ------------------------------------------------------ |
+| `.pl-safe`/`.pr-safe` | `env(safe-area-inset-left/right)`, null i basis   | Chrome uten egen horisontal padding (NativePageHeader) |
+| `.px-safe`            | `max(1rem, env(...))`                             | Erstatning for `px-4` på faste bunnlinjer              |
+| `.p-safe`             | Nøyaktig safe area på alle fire kanter, ingen min | `FullscreenOverlayContent`                             |
+
+`.p-safe` har bevisst **ingen** minimumsverdi (i motsetning til `.pt-safe`s
+0,5rem): en fullskjerm-takeover skal ikke få 8px luft rundt seg på enheter uten
+notch, den skal bare unngå systemets UI.
+
+**Gjort:**
+
+1. `FullscreenOverlayContent` padrer nå safe area på alle fire kanter som
+   standard, med `edgeToEdge`-opt-out. De 8 konsumentene:
+   `fullscreen-location-picker`, `native-search-overlay`,
+   `native-advanced-search`, `onboarding-flow`, `preview-draft-view` og
+   `vehicle-360-capture-launcher` arver standarden (360°-opptaket er et
+   `max-w-md`-kortoppsett, ikke fullbleed video, så standarden er riktig der).
+   `image-lightbox` og `map-overlay` setter `edgeToEdge` — bakteppet og bildet
+   skal dekke hele skjermen; padres containeren, får man en stripe av
+   app-bakgrunn langs notchen.
+2. `image-lightbox`: toppbaren og miniatyrbildelinjen tar safe area selv
+   (`px-safe pt-safe` / `px-safe pb-safe`). `map-overlay` trenger ingenting —
+   kortet er allerede trukket 7,5 % inn fra hver kant, godt klar av notch og
+   home indicator i begge orienteringer.
+3. `sheet.tsx` `side="bottom"`: `pb-[max(1.5rem,env(safe-area-inset-bottom))]`.
+4. `pl-safe pr-safe` på `NativePageHeader`; `px-safe` på annonsedetaljens
+   klebrige CTA og veiviserens faste bunnlinje.
+
+**Pensjonert:**
+
+- `--safe-top`/`--safe-bottom`/`--safe-left`/`--safe-right` i `styles.css` —
+  **alle fire** var døde (`grep` fant null `var(--safe-*)` i `src/`), ikke bare
+  de to horisontale. Kodebasen bruker `env()` direkte overalt, så variablene er
+  slettet i stedet for tatt i bruk.
+- `pb-8`-kompensasjonen i `app-bottom-nav.tsx`s ad-picker-sheet.
+- Per-konsument safe-area i `fullscreen-location-picker` (inline `style`),
+  `native-search-overlay` (`pt-safe`) og `native-advanced-search` (`pt-safe` +
+  to `pb-safe`).
+
+**Avvik fra planen:** `AppBottomNav` fikk **ikke** `pl-safe`/`pr-safe`, selv om
+planen listet den. Pillen er `mx-auto max-w-md` (448px sentrert); i landskap på
+iPhone står den ~198px fra hver kant mens notchen er ~47px. Utilityen ville
+vært en no-op og samtidig overskrevet `px-3`. Utelatt bevisst.
+
+**Verifisert live** med `?forcenative` på 375×812:
+
+- Med safe-area = 0 (nettleser) er **alt pikselidentisk med før**: `px-safe`
+  gir 16px (= `px-4`), sheetens `pb` gir 24px (= `p-6`), `p-safe` og
+  `pl-safe`/`pr-safe` gir 0. Det er den delen som faktisk _kan_ bekreftes i
+  nettleser, og den er bekreftet.
+- Med en **simulert notch** (midlertidig injisert CSS som overstyrte
+  utilitiene med 44/47/34px) ble det bekreftet at paddingen lander riktig
+  sted: søkeoverlayet trekkes inn på alle fire kanter, mens bildegalleriets
+  bakteppe måler fortsatt fulle 375×812 og kun chromet flyttes (lukkeknappen
+  målt til nøyaktig 47px fra høyre kant, miniatyrbildene løftet 34px).
+
+`bunx tsc --noEmit` rent, `bun run test` 218/218, `bun run lint` 0 errors.
+
+**Ikke verifisert:** ekte `env(safe-area-inset-*)`-verdier. Nettleseren
+rapporterer 0, så den simulerte notchen beviser at _layouten reagerer riktig_,
+ikke at iOS/Android faktisk leverer de verdiene vi tror. Fase 2 skal derfor
+**ikke** regnes som ferdig før den er sett i simulator på en enhet med notch,
+jf. seksjon 7. Ad-picker-sheeten (der `pb-8` ble fjernet) ligger bak
+innlogging og er ikke sett åpen — kun `SheetContent`-regelen er målt isolert.
 
 ---
 
@@ -1062,3 +1136,15 @@ igjen. Krysset er dessuten ~18px, altså under 44px.
 **Foreslått som nytt tiltak 28** (Liten, Middels): flytt krysset ut som en
 søsken-`<button>` ved siden av chipen, med ≥44px trykkflate. Passer naturlig
 inn i fase 9, som uansett bygger om forsidens søkeinngang.
+
+### 10.3 Horisontal safe area forverrer tittelbrytingen i `NativePageHeader` (fase 2, 2026-08-10)
+
+Med simulert notch (47px venstre og høyre) ble headerens tittelfelt ~94px
+smalere, og «2021 Volvo V90 cross country» brøt over **fire** linjer i stedet
+for to. Funn 3.2.4 er altså ikke bare et landskapsproblem — `pl-safe`/`pr-safe`
+fra denne fasen gjør det målbart verre i nettopp den orienteringen der begge
+slår inn samtidig.
+
+**Ikke et nytt tiltak** — det er allerede dekket av fase 3 punkt 3
+(`line-clamp-1`). Notert her fordi det hever prioriteten: fase 3 bør ikke
+utsettes bak fase 2 lenge, ellers er landskap dårligere enn før denne fasen.

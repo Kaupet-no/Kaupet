@@ -159,7 +159,7 @@ export function NativeAdvancedSearch({
           className="animate-in slide-in-from-bottom-4 duration-200 data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom-4"
         >
           {/* Header */}
-          <div className="flex items-center gap-2 border-b border-border px-4 pt-safe pb-3">
+          <div className="flex items-center gap-2 border-b border-border px-4 py-3">
             <button
               type="button"
               onClick={() => {
@@ -209,7 +209,7 @@ export function NativeAdvancedSearch({
               </TabsTrigger>
             </TabsList>
 
-            <div className="flex-1 overflow-y-auto px-4 py-5 pb-safe">
+            <div className="flex-1 overflow-y-auto px-4 py-5">
               <TabsContent value="categories" className="mt-0">
                 <CategoryPicker
                   categories={categories}
@@ -393,7 +393,7 @@ export function NativeAdvancedSearch({
           </Tabs>
 
           {/* Sticky footer */}
-          <div className="border-t border-border px-4 py-3 pb-safe flex gap-2">
+          <div className="flex gap-2 border-t border-border px-4 py-3">
             {user && !hideSaveAction && (
               <Button
                 type="button"

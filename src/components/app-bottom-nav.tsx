@@ -203,7 +203,9 @@ export function AppBottomNav() {
       )}
       {native && (
         <Sheet open={adPickerOpen} onOpenChange={setAdPickerOpen}>
-          <SheetContent side="bottom" className="rounded-t-2xl pb-8">
+          {/* pb-8 fjernet: håndrullet kompensasjon for home indicator, nå dekket
+              av `side="bottom"` i sheet.tsx. */}
+          <SheetContent side="bottom" className="rounded-t-2xl">
             <SheetHeader>
               <SheetTitle>Ny annonse</SheetTitle>
             </SheetHeader>

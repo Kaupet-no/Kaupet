@@ -125,15 +125,6 @@
   filter: brightness(1.6) contrast(0.9);
 }
 
-@supports (padding: max(0px)) {
-  :root {
-    --safe-top: env(safe-area-inset-top);
-    --safe-bottom: env(safe-area-inset-bottom);
-    --safe-left: env(safe-area-inset-left);
-    --safe-right: env(safe-area-inset-right);
-  }
-}
-
 @layer base {
   * {
     border-color: var(--color-border);
@@ -172,6 +163,33 @@
 }
 .pb-safe {
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+
+/* Horisontal safe area — får betydning i landskap, der notch/dynamic island
+   ligger på siden. Merk at disse *erstatter* padding fra `px-*` på samme
+   element (ulagede regler vinner over Tailwinds utility-lag), akkurat som
+   `.pt-safe` gjør. Derfor to varianter:
+   - `.pl-safe`/`.pr-safe`: null i basis. For chrome som ikke har egen
+     horisontal padding (f.eks. NativePageHeader, der barna har sin egen px-3).
+   - `.px-safe`: 1rem i basis, altså en erstatning for `px-4` på fastlåste
+     bunnlinjer der innholdet faktisk går helt ut i kantene. */
+.pl-safe {
+  padding-left: env(safe-area-inset-left);
+}
+.pr-safe {
+  padding-right: env(safe-area-inset-right);
+}
+.px-safe {
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+
+/* Nøyaktig safe area på alle fire kanter, uten minimumsverdien `.pt-safe` har.
+   Brukes av FullscreenOverlayContent: en fullskjerm-takeover skal ikke få
+   8px luft rundt seg på enheter uten notch, den skal bare unngå systemets UI. */
+.p-safe {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
 }
 
 /* Height reserved for the fixed bottom nav in native apps (AppBottomNav),

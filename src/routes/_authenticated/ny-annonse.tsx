@@ -1034,7 +1034,7 @@ function NewListingPage() {
               <div
                 className={`${
                   native
-                    ? "fixed inset-x-0 bottom-[var(--app-bottom-nav-h)] z-40 bg-background/95 px-4 pt-3 pb-3 backdrop-blur border-t border-border"
+                    ? "px-safe fixed inset-x-0 bottom-[var(--app-bottom-nav-h)] z-40 bg-background/95 pt-3 pb-3 backdrop-blur border-t border-border"
                     : "border-t border-border pt-6"
                 } flex items-center ${isFirst ? "justify-end" : "justify-between"}`}
               >

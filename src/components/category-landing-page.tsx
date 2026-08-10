@@ -6,12 +6,13 @@ import { ActiveFilters } from "@/components/active-filters";
 import type { ListingCardData } from "@/components/listing-card";
 import type { MapListing } from "@/components/listings-map";
 import { ResultList } from "@/components/result-list";
-import { NativeFilterChips } from "@/components/native-filter-chips";
+import { SearchPanel } from "@/features/listing-search/search-panel/search-panel";
+import type { SearchFilterSection } from "@/features/listing-search/search-panel/filter-sections";
 import {
-  NativeAdvancedSearch,
-  type NativeAdvancedSearchSection,
-} from "@/components/native-advanced-search";
-import { AttributeFilterChips, secondaryFilterCount } from "@/components/attribute-filter-chips";
+  SearchSummaryPill,
+  countActiveFilters,
+} from "@/features/listing-search/search-panel/search-summary-pill";
+import { AttributeFilterChips } from "@/components/attribute-filter-chips";
 import { CategoryHero } from "@/components/category-hero";
 import {
   buildTree,
@@ -24,7 +25,6 @@ import {
   normalizeFilter,
   vehicleCategoryGroupFor,
   genericBrandFilterFor,
-  splitPrimaryFilters,
 } from "@/lib/category-filters";
 import { getCategoryBehavior } from "@/lib/category-behavior";
 import { BIL_OG_MC_SLUG } from "@/components/advanced-search-value";
@@ -79,8 +79,8 @@ export function CategoryLandingPage({
   const isNative = useIsNative();
   const [qDraft, setQDraft] = useState(search.q);
   const [isDesktop, setIsDesktop] = useState(false);
-  const [advancedOverlayOpen, setAdvancedOverlayOpen] = useState(false);
-  const [advancedSection, setAdvancedSection] = useState<NativeAdvancedSearchSection>("search");
+  const [searchPanelOpen, setSearchPanelOpen] = useState(false);
+  const [panelSection, setPanelSection] = useState<SearchFilterSection>("price");
   // See annonser.tsx's identical field for why this exists — keyed by
   // "filterKey:optionValue" ("filterKey:" for single-value filters).
   const [autoAppliedText, setAutoAppliedText] = useState<Record<string, string>>({});
@@ -332,6 +332,17 @@ export function CategoryLandingPage({
   const mapCenter =
     search.lat != null && search.lng != null ? { lat: search.lat, lng: search.lng } : null;
 
+  const activeFilterCount = countActiveFilters({
+    min: search.min,
+    max: search.max,
+    includeFree: search.includeFree,
+    conditions: search.conditions,
+    hasLocation: location.lat != null,
+    attrCount: Object.keys(attrValues).length,
+    extraGroupCount: search.extraGroups?.length ?? 0,
+    qModeAny: search.qMode === "any",
+  });
+
   return (
     <div>
       {/* Entries before this page's own category are real ancestor pages with
@@ -349,49 +360,29 @@ export function CategoryLandingPage({
 
       <div className="mx-auto max-w-7xl px-4 py-8">
         <div className="space-y-2">
-          <SearchBar
-            q={qDraft}
-            onQChange={setQDraft}
-            onSubmitQ={() => updateSearch({ q: qDraft })}
-            qMode={search.qMode}
-            onQModeChange={(m) => updateSearch({ qMode: m })}
-            showQMode={false}
-            extraGroups={search.extraGroups ?? []}
-            onExtraGroupsChange={(extraGroups) => updateSearch({ extraGroups })}
-          />
           {isNative ? (
-            // One shared scroll row — see the matching comment in annonser.tsx.
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <AttributeFilterChips
-                filters={attrFilters}
-                values={attrValues}
-                onChange={handleAttrValueChange}
-                isNative={isNative}
-                resultCount={totalCount ?? cards.length}
-                queryText={qDraft}
-              />
-              <NativeFilterChips
-                min={search.min}
-                max={search.max}
-                includeFree={search.includeFree ?? true}
-                conditions={search.conditions ?? []}
-                location={location}
-                onOpenAdvanced={(section) => {
-                  setAdvancedSection(section);
-                  setAdvancedOverlayOpen(true);
-                }}
-                advancedFilterCount={
-                  (search.extraGroups?.length ?? 0) +
-                  (search.qMode === "any" ? 1 : 0) +
-                  secondaryFilterCount(attrFilters, attrValues)
-                }
-                hideCondition={isBilOgMc}
-                moreSection={
-                  splitPrimaryFilters(attrFilters).secondary.length > 0 ? "attributes" : "search"
-                }
-              />
-            </div>
+            // Samme sammendrag-pille som /annonser (fase 9, tiltak 26).
+            <SearchSummaryPill
+              q={search.q}
+              filterCount={activeFilterCount}
+              onOpen={() => {
+                setPanelSection("price");
+                setSearchPanelOpen(true);
+              }}
+            />
           ) : (
+            <SearchBar
+              q={qDraft}
+              onQChange={setQDraft}
+              onSubmitQ={() => updateSearch({ q: qDraft })}
+              qMode={search.qMode}
+              onQModeChange={(m) => updateSearch({ qMode: m })}
+              showQMode={false}
+              extraGroups={search.extraGroups ?? []}
+              onExtraGroupsChange={(extraGroups) => updateSearch({ extraGroups })}
+            />
+          )}
+          {isNative ? null : (
             <AttributeFilterChips
               filters={attrFilters}
               values={attrValues}
@@ -472,19 +463,30 @@ export function CategoryLandingPage({
       </div>
 
       {isNative && (
-        <NativeAdvancedSearch
-          open={advancedOverlayOpen}
-          onClose={() => setAdvancedOverlayOpen(false)}
-          initial={advancedInitial}
+        <SearchPanel
+          open={searchPanelOpen}
+          onOpenChange={setSearchPanelOpen}
           categories={categories ?? []}
-          onApply={handleApply}
-          location={location}
-          onLocationChange={handleLocationChange}
-          attributeFilters={attrFilters}
-          attributeValues={attrValues}
-          onAttributeChange={handleAttrValueChange}
-          attributeCounts={facetCounts}
-          initialSection={advancedSection}
+          allFilters={allFilters ?? []}
+          initialQ={search.q}
+          initialSection={panelSection}
+          results={{
+            initial: advancedInitial,
+            onApply: handleApply,
+            onSubmitText: (q) => {
+              setQDraft(q);
+              updateSearch({ q });
+            },
+            onSelectCategory: (slug) =>
+              navigate({ search: { q: "", category: slug, sort: "new" } }),
+            location,
+            onLocationChange: handleLocationChange,
+            attributeFilters: attrFilters,
+            attributeValues: attrValues,
+            onAttributeChange: handleAttrValueChange,
+            attributeCounts: facetCounts,
+            resultCount: totalCount ?? cards.length,
+          }}
         />
       )}
     </div>

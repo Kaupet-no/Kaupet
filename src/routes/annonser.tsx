@@ -12,13 +12,13 @@ import { SaveSearchDialog } from "@/components/advanced-search-sheet";
 import { ActiveFilters } from "@/components/active-filters";
 import type { MapListing } from "@/components/listings-map";
 import { ResultList } from "@/components/result-list";
-import { NativeFilterChips } from "@/components/native-filter-chips";
-import { AttributeFilterChips, secondaryFilterCount } from "@/components/attribute-filter-chips";
-import { NativeSearchOverlay } from "@/components/native-search-overlay";
+import { AttributeFilterChips } from "@/components/attribute-filter-chips";
+import { SearchPanel } from "@/features/listing-search/search-panel/search-panel";
+import type { SearchFilterSection } from "@/features/listing-search/search-panel/filter-sections";
 import {
-  NativeAdvancedSearch,
-  type NativeAdvancedSearchSection,
-} from "@/components/native-advanced-search";
+  SearchSummaryPill,
+  countActiveFilters,
+} from "@/features/listing-search/search-panel/search-summary-pill";
 import { saveLastSearchContext } from "@/lib/last-search-context";
 import { summarizeCriteria } from "@/lib/saved-searches";
 import { WtbListingCard } from "@/components/wtb-listing-card";
@@ -39,7 +39,6 @@ import {
   vehicleCategoryGroupFor,
   vehicleCategoriesForBrandGroup,
   genericBrandFilterFor,
-  splitPrimaryFilters,
 } from "@/lib/category-filters";
 import { getCategoryBehavior } from "@/lib/category-behavior";
 import { isBilOgMcCategory } from "@/components/advanced-search-value";
@@ -121,9 +120,8 @@ function BrowsePage() {
   const [mounted, setMounted] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
-  const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
-  const [advancedOverlayOpen, setAdvancedOverlayOpen] = useState(false);
-  const [advancedSection, setAdvancedSection] = useState<NativeAdvancedSearchSection>("search");
+  const [searchPanelOpen, setSearchPanelOpen] = useState(false);
+  const [panelSection, setPanelSection] = useState<SearchFilterSection>("categories");
   const [activeTab, setActiveTab] = useState<"listings" | "wtb">("listings");
   // The original typed phrase behind each auto-applied attribute value, keyed
   // by "filterKey:optionValue" ("filterKey:" for single-value filters) — lets
@@ -147,7 +145,7 @@ function BrowsePage() {
   };
 
   const { refreshing, pullDistance } = usePullToRefresh({
-    enabled: isNative && mounted && !searchOverlayOpen && !advancedOverlayOpen && !saveSearchOpen,
+    enabled: isNative && mounted && !searchPanelOpen && !saveSearchOpen,
     onRefresh: async () => {
       await queryClient.resetQueries({ queryKey: ["listings"] });
     },
@@ -530,6 +528,17 @@ function BrowsePage() {
   const mapCenter =
     search.lat != null && search.lng != null ? { lat: search.lat, lng: search.lng } : null;
 
+  const activeFilterCount = countActiveFilters({
+    min: search.min,
+    max: search.max,
+    includeFree: search.includeFree,
+    conditions: search.conditions,
+    hasLocation: location.lat != null,
+    attrCount: Object.keys(attrValues).length,
+    extraGroupCount: search.extraGroups?.length ?? 0,
+    qModeAny: search.qMode === "any",
+  });
+
   if (!mounted) {
     return <BrowsePageSkeleton />;
   }
@@ -581,30 +590,18 @@ function BrowsePage() {
               : "mt-6 space-y-2"
           }
         >
-          {/* On native: tap on the search bar opens the full-screen search overlay */}
+          {/* Native: én kompakt sammendrag-pille i stedet for søkelinje +
+              chip-rad (fase 9, tiltak 26). Den viser hva som er aktivt og er
+              inngangen til søkepanelet; ActiveFilters under viser detaljene. */}
           {isNative && (
-            <div className="relative">
-              <SearchBar
-                q={qDraft}
-                onQChange={setQDraft}
-                onSubmitQ={() => {
-                  void hapticImpact("medium");
-                  updateSearch({ q: qDraft });
-                }}
-                qMode={search.qMode}
-                onQModeChange={(m) => updateSearch({ qMode: m })}
-                showQMode={false}
-              />
-              <button
-                type="button"
-                className="absolute inset-0 z-10"
-                onClick={() => {
-                  void hapticImpact("light");
-                  setSearchOverlayOpen(true);
-                }}
-                aria-label="Åpne søk"
-              />
-            </div>
+            <SearchSummaryPill
+              q={search.q}
+              filterCount={activeFilterCount}
+              onOpen={() => {
+                setPanelSection("categories");
+                setSearchPanelOpen(true);
+              }}
+            />
           )}
           {!isNative && (
             <SearchBar
@@ -646,50 +643,7 @@ function BrowsePage() {
               </button>
             </div>
           )}
-          {isNative ? (
-            <>
-              {effectiveCategories.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  Velg en kategori for å se flere søkefilter
-                </p>
-              )}
-              {/* One shared scroll row: category-specific chips (Merke, Modell
-                  …) always come first, generic Pris/Sted/Mer chips after —
-                  sekundærfiltrene bak "Mer" ligger i det samlede
-                  NativeAdvancedSearch-panelet. */}
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                <AttributeFilterChips
-                  filters={attrFilters}
-                  values={attrValues}
-                  onChange={handleAttrValueChange}
-                  isNative={isNative}
-                  resultCount={totalCount ?? cards.length}
-                  queryText={qDraft}
-                  hasCategory={effectiveCategories.length > 0}
-                />
-                <NativeFilterChips
-                  min={search.min}
-                  max={search.max}
-                  includeFree={search.includeFree ?? true}
-                  conditions={search.conditions ?? []}
-                  location={location}
-                  onOpenAdvanced={(section) => {
-                    setAdvancedSection(section);
-                    setAdvancedOverlayOpen(true);
-                  }}
-                  advancedFilterCount={
-                    (search.extraGroups?.length ?? 0) +
-                    (search.qMode === "any" ? 1 : 0) +
-                    secondaryFilterCount(attrFilters, attrValues)
-                  }
-                  hideCondition={isBilOgMc}
-                  moreSection={
-                    splitPrimaryFilters(attrFilters).secondary.length > 0 ? "attributes" : "search"
-                  }
-                />
-              </div>
-            </>
-          ) : (
+          {isNative ? null : (
             <>
               {effectiveCategories.length === 0 && (
                 <p className="text-sm text-muted-foreground">
@@ -865,32 +819,32 @@ function BrowsePage() {
           />
         )}
 
-        {/* Native full-screen search overlay */}
+        {/* Søkepanelet — erstatter både søkeoverlayet og det avanserte
+            filteroverlayet på native (fase 9). */}
         {isNative && (
-          <NativeSearchOverlay
-            open={searchOverlayOpen}
-            onClose={() => setSearchOverlayOpen(false)}
-            initialQ={qDraft}
+          <SearchPanel
+            open={searchPanelOpen}
+            onOpenChange={setSearchPanelOpen}
             categories={categories ?? []}
             allFilters={allFilters ?? []}
-          />
-        )}
-
-        {/* Native full-screen advanced search */}
-        {isNative && (
-          <NativeAdvancedSearch
-            open={advancedOverlayOpen}
-            onClose={() => setAdvancedOverlayOpen(false)}
-            initial={advancedInitial}
-            categories={categories ?? []}
-            onApply={handleApply}
-            location={location}
-            onLocationChange={handleLocationChange}
-            attributeFilters={attrFilters}
-            attributeValues={attrValues}
-            onAttributeChange={handleAttrValueChange}
-            attributeCounts={facetCounts}
-            initialSection={advancedSection}
+            initialQ={search.q}
+            initialSection={panelSection}
+            results={{
+              initial: advancedInitial,
+              onApply: handleApply,
+              onSubmitText: (q) => {
+                setQDraft(q);
+                updateSearch({ q });
+              },
+              onSelectCategory: (slug) => updateSearch({ category: slug, categories: [] }),
+              location,
+              onLocationChange: handleLocationChange,
+              attributeFilters: attrFilters,
+              attributeValues: attrValues,
+              onAttributeChange: handleAttrValueChange,
+              attributeCounts: facetCounts,
+              resultCount: totalCount ?? cards.length,
+            }}
           />
         )}
       </div>

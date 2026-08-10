@@ -1,14 +1,14 @@
 # Native-app: UI/UX-revisjon for mobil og nettbrett
 
-Status: **Fase 0–8 implementert** 2026-08-10. Analyse gjennomført 2026-08-10.
+Status: **Fase 0–9 implementert** 2026-08-10. Analyse gjennomført 2026-08-10.
 Alle fire åpne spørsmål er besvart 2026-08-10 (se seksjon 8) og innarbeidet i
-tiltaksliste og faser. Neste steg: **fase 9** (søkepanel og
-navigasjonsomlegging). Avhengigheten fase 6 → fase 8 er **bortfalt** —
-sidenivå-zoom var allerede av på native før fase 6, se funn 10.10. Fase 2, 3,
-5, 6, 7 og 8 er ikke endelig ferdige før de er reverifisert i simulator
-(safe-area-verdier med notch, iOS-kantsveip, Android-tilbakeknapp, rotasjonslås,
-pinch/sveip på ekte touch, dra-for-å-lukke på ekte touch, Dynamic Type) — se
-seksjon 7.
+tiltaksliste og faser. Neste steg: **fase 10** (nettbrettoppsett).
+Avhengigheten fase 6 → fase 8 er **bortfalt** — sidenivå-zoom var allerede av
+på native før fase 6, se funn 10.10. Fase 2, 3, 5, 6, 7, 8 og 9 er ikke
+endelig ferdige før de er reverifisert i simulator (safe-area-verdier med
+notch, iOS-kantsveip, Android-tilbakeknapp, rotasjonslås, pinch/sveip på ekte
+touch, dra-for-å-lukke på ekte touch, Dynamic Type, detent-draging i
+søkepanelet) — se seksjon 7.
 
 Sist oppdatert: 2026-08-10.
 
@@ -447,11 +447,11 @@ Dette er tre linjer CSS som gir uforholdsmessig stor opplevd gevinst.
 | 21  | Splash: `launchAutoHide: false` + skjul ved første maling; rydd `UIRequiredDeviceCapabilities` | Liten    | Lav         | 3.8, 2.2         |
 | 22  | Nettbrettoppsett for meldinger (liste + tråd side om side)                                     | Stor     | Middels     | 3.3.5, 8.1       |
 | 23  | Beslutning: bundle web-bygget i appen for kaldstart/offline                                    | Stor     | Lav         | 2.1              |
-| 24  | **Søkepanel med detents** — erstatter `NativeSearchOverlay` + `NativeAdvancedSearch`           | Stor     | **Høy**     | 8.3              |
-| 25  | Bunnavigasjon: «Hjem» → «Søk» som fane 1, FAB forblir «Ny annonse»                             | Liten    | Høy         | 3.2.3, 8.3       |
-| 26  | Kompakt søkesammendrag-pille på `/annonser` erstatter søkelinje + full chip-rad                | Middels  | Høy         | 8.3              |
+| 24  | ✅ **Søkepanel med detents** — erstattet begge de native søkeflatene (fase 9)                  | Stor     | **Høy**     | 8.3              |
+| 25  | ✅ Bunnavigasjon: «Hjem» → «Søk» som fane 1, FAB forblir «Ny annonse» (fase 9)                 | Liten    | Høy         | 3.2.3, 8.3       |
+| 26  | ✅ Kompakt søkesammendrag-pille erstatter søkelinje + chip-rad (fase 9)                        | Middels  | Høy         | 8.3              |
 | 27  | ~~Slå av sidenivå-zoom på native~~ — **utgår**, Capacitor gjør det allerede (10.10)            | —        | —           | 8.4, 10.10       |
-| 28  | Løft «fjern lokasjon»-krysset ut av chip-knappen på forsiden + ≥44px                           | Liten    | Middels     | 10.2             |
+| 28  | ✅ Løftet «fjern lokasjon»-krysset ut av chip-knappen på forsiden + 44px (fase 9)              | Liten    | Middels     | 10.2             |
 | 29  | Tilbake-trykk under onboarding: kortnavigasjon i stedet for å avslutte appen                   | Liten    | Middels     | 10.6             |
 | 30  | Fjern håndrullet `pb-8` i de tre gjenværende bunn-sheetene                                     | Triviell | Lav         | 10.13            |
 
@@ -723,7 +723,7 @@ og bunnavigasjonen — som etter fase 9 også må romme et søkepanel.
 ikke satt direkte) på iOS, og **ingenting** på Android, som allerede skalerer
 via `textZoom`. Se funn 10.12 og fremdriftsloggen for fase 8.
 
-### Fase 9 — Søkepanel og navigasjonsomlegging (tiltak 24, 25, 26)
+### Fase 9 — Søkepanel og navigasjonsomlegging (tiltak 24, 25, 26) — implementert 2026-08-10
 
 **Besluttet 2026-08-10 (8.3), med én justering fra opprinnelig forslag —
 se 8.3 for begrunnelsen.** Kort: søkepanelet bygges som beskrevet, men
@@ -827,23 +827,24 @@ Brukeren har bedt eksplisitt om at erstattet kode fjernes fortløpende. Dette
 er hva hver fase skal rydde vekk — det er en del av fasens
 ferdigdefinisjon, ikke en oppfølgingssak:
 
-| Fase | Skal slettes / erstattes                                                                 |
-| ---- | ---------------------------------------------------------------------------------------- |
-| 2    | ✅ Alle fire `--safe-*`-variablene (alle var døde) — slettet                             |
-| 2    | ✅ `pb-8`-kompensasjonen i `app-bottom-nav.tsx`s ad-picker-sheet                         |
-| 2    | ✅ Per-konsument safe-area i de tre overlayene som håndterte det manuelt                 |
-| 3    | ✅ Den lokale historikk-håndteringen i `image-lightbox.tsx` **og** `map-overlay.tsx`     |
-| 3    | ✅ Den dupliserte `<h1>` på annonsedetalj (headertittelen toner inn ved scroll i stedet) |
-| 4    | ✅ Den manuelle `!native ? Dialog : Sheet`-grenen i `app-bottom-nav.tsx`s ad-picker      |
-| 5    | _Ingen_ — plisten beholder alle orienteringer med vilje (se fase 5)                      |
-| 6    | _Ingen_ — `<img>`-en i lightboxen er erstattet av `ZoomableImage`                        |
-| 7    | ✅ Den innebygde pull-to-refresh-spinneren i `annonser.tsx`                              |
-| 8    | _Ingen_                                                                                  |
-| 9    | `native-search-overlay.tsx` **hele filen** — erstattes av søkepanelet                    |
-| 9    | `native-advanced-search.tsx` **hele filen** — erstattes av søkepanelet                   |
-| 9    | Søkelinjen + full chip-rad på `/annonser` i native-grenen                                |
-| 9    | Forsidens separate søkeinndatafelt (blir trigger)                                        |
-| 10   | `max-w-md`-bunnpillen på nettbrett når sidenavigasjonen er på plass                      |
+| Fase | Skal slettes / erstattes                                                                  |
+| ---- | ----------------------------------------------------------------------------------------- |
+| 2    | ✅ Alle fire `--safe-*`-variablene (alle var døde) — slettet                              |
+| 2    | ✅ `pb-8`-kompensasjonen i `app-bottom-nav.tsx`s ad-picker-sheet                          |
+| 2    | ✅ Per-konsument safe-area i de tre overlayene som håndterte det manuelt                  |
+| 3    | ✅ Den lokale historikk-håndteringen i `image-lightbox.tsx` **og** `map-overlay.tsx`      |
+| 3    | ✅ Den dupliserte `<h1>` på annonsedetalj (headertittelen toner inn ved scroll i stedet)  |
+| 4    | ✅ Den manuelle `!native ? Dialog : Sheet`-grenen i `app-bottom-nav.tsx`s ad-picker       |
+| 5    | _Ingen_ — plisten beholder alle orienteringer med vilje (se fase 5)                       |
+| 6    | _Ingen_ — `<img>`-en i lightboxen er erstattet av `ZoomableImage`                         |
+| 7    | ✅ Den innebygde pull-to-refresh-spinneren i `annonser.tsx`                               |
+| 8    | _Ingen_                                                                                   |
+| 9    | ✅ `native-search-overlay.tsx` **hele filen** — erstattet av søkepanelet                  |
+| 9    | ✅ `native-filter-chips.tsx` **hele filen** (ikke i planen) — pillen erstatter chip-raden |
+| 9    | ⚠️ `native-advanced-search.tsx` — tømt for seksjonene, men beholdt, se funn 10.14         |
+| 9    | ✅ Søkelinjen + chip-raden på `/annonser` **og** kategorilandingssidene i native-grenen   |
+| 9    | ✅ Forsidens separate søkeinndatafelt (er nå en trigger)                                  |
+| 10   | `max-w-md`-bunnpillen på nettbrett når sidenavigasjonen er på plass                       |
 
 Regel for alle faser: hvis en fase innfører en delt primitiv/hook, er fasen
 ikke ferdig før **alle** eksisterende kallsteder er migrert og de lokale
@@ -1512,6 +1513,114 @@ nytt ved retur til forgrunn uten omstart, og (c) at ingenting brekker ved
 allerede dekkes av `textZoom` er lest ut av plattformdokumentasjonen, ikke
 observert — den bør bekreftes på en Android-enhet før fase 8 regnes som ferdig.
 
+### Fase 9 — Søkepanel og navigasjonsomlegging (tiltak 24, 25, 26, + 28) — kodeferdig 2026-08-10, venter på simulator
+
+**Gjort — 9a (søkepanelet):**
+
+1. **`src/features/listing-search/search-panel/`** med fire filer:
+   `search-panel.tsx` (panelet), `filter-sections.tsx` (parameterfanene),
+   `search-summary-pill.tsx` (pillen + `countActiveFilters`) og
+   `search-history.ts` (nylige søk, flyttet ut av det slettede overlayet med
+   **uendret** localStorage-nøkkel, så brukerens historikk overlever byttet).
+2. **`vaul@1.1.2` tatt inn**, slik planen forutsatte, med `snapPoints={[0.6, 1]}`.
+   Målt live: `--snap-point-height: 324,8px` på 375×812, altså detenten treffer.
+   Bruken er **begrenset til panelet** — se avviket under.
+3. **Sammenslåingen er reell, ikke en tredje flate.** Panelet har to modus i én
+   komponent: uten `results` er det gamle `NativeSearchOverlay` (fritekst,
+   historikk, kategoriliste, `resolveTextToFilters` ved innsending); med
+   `results` er det gamle `NativeAdvancedSearch` over en resultatliste.
+   Fritekstfeltet er felles og ligger øverst i begge. Søkelogikken selv
+   (`resolve-text-to-filters.ts`, `search-schema.ts`, `category-filters.ts`) er
+   urørt, jf. planens punkt 2.
+4. `useOverlayHistory` fra fase 3 er koblet på. Målt: åpning pusher nøyaktig én
+   `{overlay:true}`-oppføring, `history.back()` setter `data-state="closed"` og
+   returnerer historikken til ruterens egen tilstand.
+
+**Gjort — 9b (navigasjon og resultatside):**
+
+5. Bunnavigasjonens fane 1 er **«Søk»** (forstørrelsesglass-ikon, `k.`-merket
+   når man står der). Ruten er fortsatt `/` — forsiden _er_ søkeflaten etter
+   punkt 7, jf. begrunnelsen i 8.3 om at den ikke har selvstendig innhold ved
+   siden av søk. Midtknappen er uendret «Ny annonse».
+6. `/annonser` **og kategorilandingssidene** viser nå én `SearchSummaryPill`
+   («volvo · 1 filter») i stedet for søkelinje + chip-rad. `ActiveFilters`-raden
+   under står igjen, så aktive kriterier er fortsatt synlige _og_ fjernbare uten
+   å åpne panelet — planens advarsel mot å bytte trangt UI mot skjult tilstand.
+7. Forsidens søkefelt er en **trigger** for panelet, ikke et inndatafelt.
+   Den roterende eksempelteksten er beholdt.
+8. **Tiltak 28 (funn 10.2) tatt med her**, som planen foreslo: «fjern
+   lokasjon»-krysset på forsiden er flyttet ut av chip-knappen til en
+   søsken-`<button>` med 44px trykkflate. Den ugyldige nestingen av et
+   interaktivt element i et annet er dermed borte.
+
+**Avvik fra planen:**
+
+- **`native-advanced-search.tsx` er ikke slettet.** Planen (seksjon 6) sa «hele
+  filen». Den brukes også av `mine-sok.tsx` til å redigere et _lagret_ søk, som
+  ikke har noen resultatflate å legge et panel over — se funn 10.14. Filen er i
+  stedet tømt for seksjonene (som nå bor i `filter-sections.tsx` og deles med
+  panelet) og krympet fra 484 til ~155 linjer.
+- **`native-filter-chips.tsx` er slettet**, som planen ikke nevnte — pillen
+  erstatter hele chip-raden, så filen hadde ingen kallsteder igjen.
+- **`useSheetDrag` i `ui/sheet.tsx` er ikke erstattet av `vaul`**, slik planens
+  fase 9 punkt 3 åpnet for. `Sheet` støtter fire sider og er Radix-Dialog-basert;
+  å porte den ville vært en omskriving av ~13 kallsteder for null synlig gevinst
+  (dra-for-å-lukke virker allerede). `vaul` er tatt inn kun der detents faktisk
+  trengs.
+- **Resultattellingen oppdateres ikke live mens man justerer.** Planens 9a
+  punkt 1 ba om det. Panelet beholder utkast-modellen fra
+  `useAdvancedSearchValue`/`handleApply` (endringer committes ved «Vis N treff»),
+  så tellingen i bunnknappen er de _anvendte_ kriterienes. Live telling ville
+  krevd enten en navigering per tastetrykk i prisfeltene eller en egen
+  telle-query mot utkastet — begge er større enn resten av fasen til sammen.
+  Delvis dekket i mellomtiden: `attributeCounts` viser fortsatt treff per
+  alternativ inne i panelet. Merket som kjent forenkling.
+
+**Regresjon som ble unngått underveis:** da chip-raden forsvant, ble
+kategoriens **primærfiltre** (Merke, Modell, Årsmodell, Kilometerstand)
+utilgjengelige — panelets «Mer»-fane rendret `SecondaryCategoryFilters`, som
+per navn dropper dem. Løst med en `includePrimary`-opt-in på den komponenten,
+brukt kun av panelet. Verifisert live på `/annonser?category=bil`: «Mer»-fanen
+lister Merke, Modell, Årsmodell, Kilometerstand, Drivstoff osv.
+
+**Verifisert live** med `?forcenative` på 375×812 (målt i DOM, ikke antatt):
+
+- Forsiden: trykk på søkefeltet åpner panelet på 0,6-detenten med draghåndtak,
+  fritekstfelt og hele kategorilisten.
+- `/annonser?q=volvo&min=1000`: pillen leser «volvo» + «1 filter», og
+  `aria-label` er «Endre søk: volvo, 1 filter».
+- Panelet over resultatlisten: fanene Kategori · Pris · Sted · Mer · Søk,
+  feltet forhåndsutfylt med «volvo», bunnknappen «Vis 1 treff».
+- **Anvendelse ende-til-ende:** Pris → «Fra 50000» → «Vis 1 treff» skrev
+  `min=50000` til URL-en, beholdt kategorien, lukket panelet, og pillen
+  oppdaterte seg til «1 filter».
+- Android-tilbake (`history.back()`): panelet lukkes, brukeren blir stående på
+  `/annonser`.
+
+`bunx tsc --noEmit` rent, `bun run test` 242/242 (fem nye for
+`countActiveFilters`), `bun run lint` 0 errors, `bun run test:e2e` 3/3 — den
+siste kjørt fordi `browse-search.spec.ts` og annonse-wizarden treffer
+søkeflatene, og fordi kategorilandingssidenes web-gren ble flyttet i treet.
+
+**Ikke verifisert:**
+
+- **Selve dragingen mellom detents på ekte touch.** Snap-punktet er bekreftet
+  regnet ut riktig, men gesten — velocity-snap, at panelet ikke stjeler
+  scrollingen i en lang filterliste, og samspillet med iOS-kantsveipen fra
+  fase 3 — er ikke prøvd. Dette er den enkeltrisikoen i fase 9 jeg er minst
+  trygg på.
+- **Native e2e-dekning ble ikke skrevet**, selv om planen eksplisitt anbefalte
+  å bruke fase 0-overstyringen til det _før_ de gamle overlayene ble slettet.
+  Grunnen er at panelet er `vaul`-drevet, og verktøyet kan ikke observere
+  inn-/ut-animasjoner (funn 10.11) — en Playwright-spec ville måttet vente på
+  en transform som aldri settes i den kjøringen. Dette er en reell gjeld fra
+  denne fasen, ikke en bortprioritering: den bør tas når panelet er sett virke
+  på enhet.
+- **Innloggede tilstander i panelet** — «Lagre»-knappen og `SaveSearchDialog`
+  er kun kodegjennomgått, som alle innloggede flater i denne planen.
+- `mine-sok.tsx` sin bruk av den krympede `NativeAdvancedSearch` er
+  typesjekket og kodegjennomgått, men ikke sett kjøre (ligger bak innlogging).
+
 ---
 
 ## 10. Funn oppdaget underveis
@@ -1724,3 +1833,43 @@ funn er et utgangspunkt, ikke en fasit.**
 **Foreslått som nytt tiltak 30** (Triviell, Lav): fjern `pb-8` fra de tre.
 Ikke gjort i fase 7 fordi to av tre ligger bak innlogging og dermed ikke kan
 verifiseres i denne runden.
+
+### 10.14 `native-advanced-search.tsx` kunne ikke slettes — lagrede søk har ingen resultatflate (fase 9, 2026-08-10)
+
+Seksjon 6 slo fast at fase 9 skulle slette **hele** filen. Tellingen var basert
+på funn 8.3, som bare så på de to native søkeflatene over resultatlistene.
+`grep` ved implementering fant en tredje bruker: `mine-sok.tsx` åpner den for å
+redigere kriteriene til et **lagret** søk (`hideSaveAction`, `applyLabel`, og
+`location` som del av utkastet i stedet for eid av søkefeltet).
+
+Det er ikke samme oppgave som panelet løser. Panelets hele premiss er at
+brukeren justerer filtre _mens resultatlisten er synlig bak_ — ved redigering
+av et lagret søk finnes ingen slik liste, og en skuff som dekker 60 % av en
+ellers tom skjerm ville vært verre enn dagens fullskjermflate.
+
+Løsningen ble å dele det som faktisk er felles: seksjonene bor nå i
+`search-panel/filter-sections.tsx` og rendres av begge. `NativeAdvancedSearch`
+er redusert fra 484 til ~155 linjer og er kun header + bunnknapper rundt dem.
+Ingen duplisert filterlogikk står igjen — det var det pensjoneringsregelen i
+seksjon 6 faktisk skulle beskytte mot.
+
+**Ikke et nytt tiltak.** Lærdommen er en variant av 10.4/10.8/10.10/10.13,
+sjette gang: **en pensjoneringsliste skrevet fra et funn må `grep`-es opp på
+nytt ved implementering — «hele filen» var riktig for to av tre kallsteder.**
+
+### 10.15 Panelet gjorde kategoriens primærfiltre uttilgjengelige (fase 9, 2026-08-10)
+
+Da chip-raden ble erstattet av sammendrag-pillen (tiltak 26), forsvant den
+eneste inngangen til kategoriens **primærfiltre** — Merke, Modell, Årsmodell,
+Kilometerstand. Panelets «Mer»-fane rendret `SecondaryCategoryFilters`, som per
+navn og implementering (`splitPrimaryFilters(filters).secondary`) dropper
+nettopp dem. Planen forutsatte implisitt at chip-raden fortsatt fantes ved
+siden av panelet; det gjør den ikke etter tiltak 26.
+
+Fikset i samme fase med en `includePrimary`-opt-in på
+`SecondaryCategoryFilters`, brukt kun av panelet — desktop-flatene beholder
+splitten, siden de fortsatt har sin egen primær-chip-rad.
+
+**Ikke et nytt tiltak** (lukket i fase 9). Notert fordi det generaliserer:
+**når to UI-flater deler ansvar for å eksponere et sett, kan ikke den ene
+fjernes uten å sjekke hva den andre bevisst utelot.**

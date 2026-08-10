@@ -1,14 +1,23 @@
 # Native-app: UI/UX-revisjon for mobil og nettbrett
 
-Status: **Fase 0–9 implementert** 2026-08-10. Analyse gjennomført 2026-08-10.
-Alle fire åpne spørsmål er besvart 2026-08-10 (se seksjon 8) og innarbeidet i
-tiltaksliste og faser. Neste steg: **fase 10** (nettbrettoppsett).
+Status: **Alle faser (0–11) implementert** 2026-08-10. Analyse gjennomført
+2026-08-10. Alle fire åpne spørsmål er besvart 2026-08-10 (se seksjon 8) og
+innarbeidet i tiltaksliste og faser. Neste steg: **simulator-/enhetsrunde** —
+ingen ny kodefase gjenstår i planen.
 Avhengigheten fase 6 → fase 8 er **bortfalt** — sidenivå-zoom var allerede av
-på native før fase 6, se funn 10.10. Fase 2, 3, 5, 6, 7, 8 og 9 er ikke
-endelig ferdige før de er reverifisert i simulator (safe-area-verdier med
+på native før fase 6, se funn 10.10. Fase 2, 3, 5, 6, 7, 8, 9, 10 og 11 er
+ikke endelig ferdige før de er reverifisert i simulator (safe-area-verdier med
 notch, iOS-kantsveip, Android-tilbakeknapp, rotasjonslås, pinch/sveip på ekte
 touch, dra-for-å-lukke på ekte touch, Dynamic Type, detent-draging i
-søkepanelet) — se seksjon 7.
+søkepanelet, iPad-rotasjon/Split View, Android nettbrett, splash-timing) —
+se seksjon 7.
+
+Åpne tiltak som **ikke** er levert: 23 (bundlet web-bygg — egen ADR, se fase
+11), 29 (tilbake under onboarding) og 30 (`pb-8` i tre bunn-sheets).
+
+**Sluttvurdering gjennomført 2026-08-10 — se seksjon 11.** Konklusjon: alle
+faser er levert i tråd med planen, og alle avvik er dokumenterte og begrunnede.
+Restansene er samlet i 11.2.
 
 Sist oppdatert: 2026-08-10.
 
@@ -422,38 +431,43 @@ Dette er tre linjer CSS som gir uforholdsmessig stor opplevd gevinst.
 
 ## 4. Tiltaksplan (prioritert)
 
-| #   | Tiltak                                                                                         | Omfang   | Prioritet   | Funn             |
-| --- | ---------------------------------------------------------------------------------------------- | -------- | ----------- | ---------------- |
-| 1   | Dev-gatet `?forcenative`-overstyring i `isNative()`                                            | Triviell | **Kritisk** | 1.2              |
-| 2   | Lukkeknapp i `Dialog`/`Sheet` → 44px trykkflate                                                | Triviell | **Kritisk** | 3.1.1            |
-| 3   | `input`/`textarea`/`SelectTrigger` → `h-11`; fjern `md:text-sm` i inndatafelt                  | Liten    | Høy         | 3.1.2            |
-| 4   | `FavoriteButton sm` og radene i native søkeoverlay → ≥44px                                     | Liten    | Høy         | 3.1.2            |
-| 5   | Safe area inn i `FullscreenOverlayContent` og `Sheet side="bottom"`                            | Liten    | Høy         | 3.1.3            |
-| 6   | `pl-safe`/`pr-safe`-utilities + bruk på all fast/klebrig chrome                                | Liten    | Høy         | 3.1.4            |
-| 7   | `useOverlayHistory` — hev `image-lightbox`-mønsteret til primitivene                           | Middels  | Høy         | 3.2.2            |
-| 8   | Slå på `allowsBackForwardNavigationGestures` på iOS                                            | Liten    | Høy         | 3.2.1            |
-| 9   | `NativePageHeader`: `line-clamp-1` + fjern duplisert tittel på detaljsider                     | Liten    | Middels     | 3.2.4            |
-| 10  | `useFormFactor()` (phone/tablet) + `ResponsiveOverlay` → sentrert dialog på nettbrett          | Middels  | **Høy**     | 3.3.1            |
-| 11  | Fiks faktarutenettets container-breakpoint (`@sm` → `@md`)                                     | Triviell | Høy         | 3.3.2            |
-| 12  | Nettbrettoppsett: forside, bunnavigasjon → sidenavigasjon, rutenett                            | Stor     | **Høy**     | 3.3.3–3.3.4, 8.1 |
-| 13  | Orienteringsstyring via plugin: portrett-lås på telefon, fri på nettbrett                      | Middels  | Høy         | 3.4, 8.2         |
-| 14  | Pinch-/dobbelttrykk-zoom + sveip-ned-for-å-lukke + landskap i fullskjermbilde                  | Middels  | Høy         | 3.5.1, 8.2, 8.4  |
-| 15  | Fjern `.slice(0, 8)` / legg til «alle kategorier» i søkeoverlayet                              | Triviell | Middels     | 3.5.2            |
-| 16  | Native-CSS-polish (tap-highlight, user-select, overscroll)                                     | Triviell | Middels     | 3.6              |
-| 17  | Draghåndtak + dra-for-å-lukke på bunn-sheet                                                    | Middels  | Middels     | 3.1.5            |
-| 18  | Pull-to-refresh på meldinger, varsler, favoritter, «Mine annonser»                             | Liten    | Middels     | 3.5.3            |
-| 19  | Dynamic Type-støtte                                                                            | Middels  | **Høy**     | 3.7, 8.4         |
-| 20  | Tilgjengelig navn på lokasjonsknappen på native forside                                        | Triviell | Middels     | 3.7              |
-| 21  | Splash: `launchAutoHide: false` + skjul ved første maling; rydd `UIRequiredDeviceCapabilities` | Liten    | Lav         | 3.8, 2.2         |
-| 22  | Nettbrettoppsett for meldinger (liste + tråd side om side)                                     | Stor     | Middels     | 3.3.5, 8.1       |
-| 23  | Beslutning: bundle web-bygget i appen for kaldstart/offline                                    | Stor     | Lav         | 2.1              |
-| 24  | ✅ **Søkepanel med detents** — erstattet begge de native søkeflatene (fase 9)                  | Stor     | **Høy**     | 8.3              |
-| 25  | ✅ Bunnavigasjon: «Hjem» → «Søk» som fane 1, FAB forblir «Ny annonse» (fase 9)                 | Liten    | Høy         | 3.2.3, 8.3       |
-| 26  | ✅ Kompakt søkesammendrag-pille erstatter søkelinje + chip-rad (fase 9)                        | Middels  | Høy         | 8.3              |
-| 27  | ~~Slå av sidenivå-zoom på native~~ — **utgår**, Capacitor gjør det allerede (10.10)            | —        | —           | 8.4, 10.10       |
-| 28  | ✅ Løftet «fjern lokasjon»-krysset ut av chip-knappen på forsiden + 44px (fase 9)              | Liten    | Middels     | 10.2             |
-| 29  | Tilbake-trykk under onboarding: kortnavigasjon i stedet for å avslutte appen                   | Liten    | Middels     | 10.6             |
-| 30  | Fjern håndrullet `pb-8` i de tre gjenværende bunn-sheetene                                     | Triviell | Lav         | 10.13            |
+| #   | Tiltak                                                                                                        | Omfang   | Prioritet   | Funn             |
+| --- | ------------------------------------------------------------------------------------------------------------- | -------- | ----------- | ---------------- |
+| 1   | Dev-gatet `?forcenative`-overstyring i `isNative()`                                                           | Triviell | **Kritisk** | 1.2              |
+| 2   | Lukkeknapp i `Dialog`/`Sheet` → 44px trykkflate                                                               | Triviell | **Kritisk** | 3.1.1            |
+| 3   | `input`/`textarea`/`SelectTrigger` → `h-11`; fjern `md:text-sm` i inndatafelt                                 | Liten    | Høy         | 3.1.2            |
+| 4   | `FavoriteButton sm` og radene i native søkeoverlay → ≥44px                                                    | Liten    | Høy         | 3.1.2            |
+| 5   | Safe area inn i `FullscreenOverlayContent` og `Sheet side="bottom"`                                           | Liten    | Høy         | 3.1.3            |
+| 6   | `pl-safe`/`pr-safe`-utilities + bruk på all fast/klebrig chrome                                               | Liten    | Høy         | 3.1.4            |
+| 7   | `useOverlayHistory` — hev `image-lightbox`-mønsteret til primitivene                                          | Middels  | Høy         | 3.2.2            |
+| 8   | Slå på `allowsBackForwardNavigationGestures` på iOS                                                           | Liten    | Høy         | 3.2.1            |
+| 9   | `NativePageHeader`: `line-clamp-1` + fjern duplisert tittel på detaljsider                                    | Liten    | Middels     | 3.2.4            |
+| 10  | `useFormFactor()` (phone/tablet) + `ResponsiveOverlay` → sentrert dialog på nettbrett                         | Middels  | **Høy**     | 3.3.1            |
+| 11  | Fiks faktarutenettets container-breakpoint (`@sm` → `@md`)                                                    | Triviell | Høy         | 3.3.2            |
+| 12  | ✅ Nettbrettoppsett: forside, bunnavigasjon → sidenavigasjon, rutenett (fase 10)                              | Stor     | **Høy**     | 3.3.3–3.3.4, 8.1 |
+| 13  | Orienteringsstyring via plugin: portrett-lås på telefon, fri på nettbrett                                     | Middels  | Høy         | 3.4, 8.2         |
+| 14  | Pinch-/dobbelttrykk-zoom + sveip-ned-for-å-lukke + landskap i fullskjermbilde                                 | Middels  | Høy         | 3.5.1, 8.2, 8.4  |
+| 15  | Fjern `.slice(0, 8)` / legg til «alle kategorier» i søkeoverlayet                                             | Triviell | Middels     | 3.5.2            |
+| 16  | Native-CSS-polish (tap-highlight, user-select, overscroll)                                                    | Triviell | Middels     | 3.6              |
+| 17  | Draghåndtak + dra-for-å-lukke på bunn-sheet                                                                   | Middels  | Middels     | 3.1.5            |
+| 18  | Pull-to-refresh på meldinger, varsler, favoritter, «Mine annonser»                                            | Liten    | Middels     | 3.5.3            |
+| 19  | Dynamic Type-støtte                                                                                           | Middels  | **Høy**     | 3.7, 8.4         |
+| 20  | Tilgjengelig navn på lokasjonsknappen på native forside                                                       | Triviell | Middels     | 3.7              |
+| 21  | ✅ Splash: `launchAutoHide: false` + skjul ved første maling; ryddet `UIRequiredDeviceCapabilities` (fase 11) | Liten    | Lav         | 3.8, 2.2         |
+| 22  | ✅ Nettbrettoppsett for meldinger (liste + tråd side om side) (fase 10)                                       | Stor     | Middels     | 3.3.5, 8.1       |
+| 23  | ⏸️ Beslutning: bundle web-bygget i appen for kaldstart/offline — **ikke tatt**, egen ADR                      | Stor     | Lav         | 2.1              |
+| 24  | ✅ **Søkepanel med detents** — erstattet begge de native søkeflatene (fase 9)                                 | Stor     | **Høy**     | 8.3              |
+| 25  | ✅ Bunnavigasjon: «Hjem» → «Søk» som fane 1, FAB forblir «Ny annonse» (fase 9)                                | Liten    | Høy         | 3.2.3, 8.3       |
+| 26  | ✅ Kompakt søkesammendrag-pille erstatter søkelinje + chip-rad (fase 9)                                       | Middels  | Høy         | 8.3              |
+| 27  | ~~Slå av sidenivå-zoom på native~~ — **utgår**, Capacitor gjør det allerede (10.10)                           | —        | —           | 8.4, 10.10       |
+| 28  | ✅ Løftet «fjern lokasjon»-krysset ut av chip-knappen på forsiden + 44px (fase 9)                             | Liten    | Middels     | 10.2             |
+| 29  | Tilbake-trykk under onboarding: kortnavigasjon i stedet for å avslutte appen                                  | Liten    | Middels     | 10.6             |
+| 30  | Fjern håndrullet `pb-8` i de tre gjenværende bunn-sheetene                                                    | Triviell | Lav         | 10.13            |
+
+**Status i tabellen over:** ✅ ble kun ført på rader der leveransen avvek fra
+den opprinnelige plasseringen eller omfanget. **Alle rader uten markør er også
+levert** — de eneste ikke-leverte tiltakene er 23, 29 og 30, og 27 utgikk.
+Verifisert mot kode 2026-08-10, se 11.1.
 
 **Ikke anbefalt:** omskriving av annonseveiviseren, meldingskjernen eller
 `FullscreenOverlay`/`ResponsiveOverlay`-arkitekturen. Alle tre er riktig
@@ -844,7 +858,7 @@ ferdigdefinisjon, ikke en oppfølgingssak:
 | 9    | ⚠️ `native-advanced-search.tsx` — tømt for seksjonene, men beholdt, se funn 10.14         |
 | 9    | ✅ Søkelinjen + chip-raden på `/annonser` **og** kategorilandingssidene i native-grenen   |
 | 9    | ✅ Forsidens separate søkeinndatafelt (er nå en trigger)                                  |
-| 10   | `max-w-md`-bunnpillen på nettbrett når sidenavigasjonen er på plass                       |
+| 10   | ✅ `max-w-md`-bunnpillen på nettbrett — erstattet av railen (samme komponent, se fase 10) |
 
 Regel for alle faser: hvis en fase innfører en delt primitiv/hook, er fasen
 ikke ferdig før **alle** eksisterende kallsteder er migrert og de lokale
@@ -1621,6 +1635,119 @@ søkeflatene, og fordi kategorilandingssidenes web-gren ble flyttet i treet.
 - `mine-sok.tsx` sin bruk av den krympede `NativeAdvancedSearch` er
   typesjekket og kodegjennomgått, men ikke sett kjøre (ligger bak innlogging).
 
+### Fase 10 — Nettbrettoppsett (tiltak 12, 22) — kodeferdig 2026-08-10, venter på simulator
+
+**Gjort:**
+
+1. **Sidestilt navigasjon (rail).** `AppBottomNav` grener på
+   `useFormFactor() === "tablet"`: samme fem elementer, samme tilstand, samme
+   ruter — kun containerklassene og `itemClass` skiller (rad → kolonne,
+   flytende pille → 80px full-høyde rail langs venstre kant med `pl-safe`).
+   Ingen parallell navigasjonskomponent, slik planen krevde. FAB-ens `-mt-7`
+   droppes i railen; det er ingen kant å stikke opp av.
+2. **Plassreservasjonen er flyttet, ikke duplisert.** Railen setter
+   `.nav-rail` på `<html>`, og `styles.css` lar den klassen nulle
+   `--app-bottom-nav-h` og gi `.pb-bottom-nav` venstre- i stedet for
+   bunnpadding. Det gjør at alle flatene som allerede regner høyder fra den
+   variabelen (annonseveiviseren, meldingstråden, resultatlistens FAB,
+   toast-offset) følger med uten egne endringer — se funn 10.16.
+3. **Forsiden:** heroen får en øvre ramme på nettbrett (`min-h-[40vh] pt-10`
+   mot telefonens `min-h-[68vh] pt-24`), søkefeltet `max-w-xl`, og «Populært
+   nå» er et `grid-cols-3`-rutenett i stedet for `w-[60%]`-karusellen.
+   Kategorirutenettet er urørt, som planen sa.
+4. **Meldinger side om side:** `InboxPage` er eksportert fra
+   `meldinger.index.tsx` og rendres som en 20rem venstrespalte i
+   `meldinger.$id.tsx` når formatet er `tablet`. Rent layoutgrep over
+   eksisterende komponenter — ingen ny meldingslogikk, ingen ny rute.
+   Trådens `NativePageHeader` får `hideBack` i den modusen; listen ved siden av
+   _er_ tilbakeveien.
+5. **Søkepanelet på nettbrett** (fase 9 punkt 5): `Drawer.Content` får
+   `mx-auto w-full max-w-2xl border-x`. Målt på 1024px: **672px bred, sentrert**,
+   med resultatlisten synlig på begge sider — i stedet for en fullbredde skuff.
+   Primitiven er bevisst _ikke_ byttet: detent-dragingen er hele poenget med
+   panelet og skal virke likt i begge formater.
+
+**Avvik fra planen:** ingen i sak. Ett tillegg planen ikke nevnte:
+annonseveiviserens faste bunnlinje (`fixed inset-x-0`) fikk
+`left-[var(--app-nav-rail-w,0px)]`, ellers havner «Tilbake» under railen
+(`justify-between` legger den helt til venstre). Variabelen er udefinert på
+telefon, så fallbacken gjør regelen til en no-op der.
+
+**Pensjonert:** `max-w-md`-bunnpillen på nettbrett — den finnes fortsatt, men
+kun i telefongrenen. Ingen fil slettet; det er én komponent med to
+presentasjoner, ikke to komponenter.
+
+**Verifisert live** med `?forcenative` (målt i DOM, ikke antatt):
+
+- 820×1180 og 1024×1366: `<html class="native nav-rail">`, railen 80×full
+  høyde med `aria-label="Hovednavigasjon"`, `main` har `padding-left: 80px` og
+  `padding-bottom: 0`. På `/annonser` starter den klebrige headeren riktig
+  etter railen.
+- 375×812 (regresjonssjekk): `<html class="native">` uten `nav-rail`, pillen
+  fortsatt 351×88,5 px, `padding-bottom: 96px`, `padding-left: 0`.
+  Telefonoppsettet er uendret.
+- Søkepanelet på 1024: `672 × …`, sentrert (`left: 66,5` av 805px klientbredde).
+- **320×768 (Split View / Slide Over, planens punkt 6):** første gang appen er
+  sett under 375px. `document.scrollWidth === 320` — ingen horisontal
+  sidescroll. Eneste elementer som stikker utenfor er «Populært nå»-karusellens
+  kort, som er en tiltenkt scrollcontainer. Formatet leses som `phone`, altså
+  bunnpille, som er riktig på 320pt.
+
+`bunx tsc --noEmit` rent, `bun run test` 242/242, `bun run lint` 0 errors,
+`bun run test:e2e` 3/3.
+
+**Ikke verifisert:**
+
+- **At formatbyttet skjer live ved rotasjon/Split View.** Grenlogikken er
+  bekreftet ved reload på hver bredde, men `matchMedia`-lytteren kan ikke
+  observeres i dette verktøyet (funn 10.7) — og fase 10 er nettopp fasen som
+  hviler på den. Dette er den enkeltrisikoen i fase 10 jeg er minst trygg på.
+- **Android nettbrett** (planens punkt 5) — ikke sett. `useFormFactor()` er
+  breddebasert og plattformnøytral, så det _bør_ stemme, men planen sa
+  eksplisitt at det skal verifiseres og ikke antas. Det står igjen.
+- **Meldingsoppsettet** ligger bak innlogging og er kun typesjekket og
+  kodegjennomgått, som alle innloggede flater i denne planen. Aktiv samtale
+  markeres **ikke** i listen — en kjent forenkling, ikke et oversett krav.
+- **Søkepanelets posisjon vertikalt** (om «Vis N treff» er nåbar på 0,6-
+  detenten) kunne ikke måles: drawerens transform står i startkeyframen i dette
+  verktøyet, jf. funn 10.11. Kun bredde/sentrering er målt.
+
+### Fase 11 — Oppstart og opprydding (tiltak 21, 23) — kodeferdig 2026-08-10, venter på simulator
+
+**Gjort:**
+
+1. `launchAutoHide: false` + `launchFadeOutDuration: 200` i
+   `capacitor.config.ts`. `SplashScreen.hide()` kalles nå fra
+   `hideNativeBootSplash()` (`src/lib/native.ts`) — altså **på samme sted som
+   boot-overlayet allerede fjernes**, i effekten som kjører etter at
+   native-layouten faktisk har malt. Den faste 2s-ventetiden fra funn 3.8 er
+   dermed borte. `@capacitor/splash-screen` var allerede en avhengighet, men
+   ubrukt; ingen ny pakke.
+2. **Fallback:** når splashen ikke lenger skjuler seg selv, ville en feilende
+   oppstart låst appen på splash-skjermen. `offline.html` (Capacitors
+   `errorPath`) kaller derfor `SplashScreen.hide()` selv, via
+   `window.Capacitor.Plugins`.
+3. `UIRequiredDeviceCapabilities`-blokken (`armv7`) er fjernet fra
+   `Info.plist` — 32-bit-verdi mot et iOS 15-deployment target (2.2).
+   `plutil -lint` bekrefter at plisten fortsatt er gyldig.
+4. **Tiltak 23 er ikke tatt**, som planen krevde: bundlet web-bygg er en
+   arkitekturbeslutning med egen ADR, ikke et UX-tiltak, og skal ikke smugles
+   inn her.
+
+**Pensjonert:** ingen.
+
+**Verifisert:** `bunx tsc --noEmit` rent, `bun run test` 242/242,
+`bun run lint` 0 errors.
+
+**Ikke verifisert:** **hele fasen på enhet.** Splash-timing finnes ikke i
+nettleser — `?forcenative` kan ikke vise noe her, og
+`import("@capacitor/splash-screen")` er en fanget no-op der. Det som må ses i
+simulator: (a) at appen faktisk starter raskere med varm WebView, (b) at
+splashen **forsvinner** — dette er fasen med størst «app henger på
+splash»-risiko i hele planen hvis `hide()` av en eller annen grunn ikke nås,
+og (c) at offline-fallbacken i punkt 2 virker (slå av nettet, kaldstart).
+Fjerningen av `UIRequiredDeviceCapabilities` er ikke bygget i Xcode.
+
 ---
 
 ## 10. Funn oppdaget underveis
@@ -1873,3 +2000,147 @@ splitten, siden de fortsatt har sin egen primær-chip-rad.
 **Ikke et nytt tiltak** (lukket i fase 9). Notert fordi det generaliserer:
 **når to UI-flater deler ansvar for å eksponere et sett, kan ikke den ene
 fjernes uten å sjekke hva den andre bevisst utelot.**
+
+### 10.16 `--app-bottom-nav-h` er appens de facto layoutkontrakt (fase 10, 2026-08-10)
+
+Planen beskrev fase 10 punkt 1 som «samme rutedefinisjoner, annen
+presentasjon». Det stemmer for selve navigasjonen, men undervurderte hvor mye
+_annet_ som henger på at navigasjonen ligger i bunnen: `grep` fant seks
+flater som regner ut fra `--app-bottom-nav-h` (annonseveiviserens innholds-
+padding, dens faste bunnlinje, dens tekstfelthøyde, meldingstrådens
+`calc(100vh - …)`, resultatlistens flytende knapp og toast-offset).
+
+En rail som bare byttet ut komponenten ville altså etterlatt 96px død plass i
+bunnen på seks flater. Løsningen ble å behandle variabelen som _kontrakten_ og
+overstyre den (`.nav-rail { --app-bottom-nav-h: 0px }`) i stedet for å røre de
+seks kallstedene — men det er verdt å vite at variabelen er mer enn en
+paddingverdi.
+
+To ting variabelen ikke dekker, fordi `position: fixed` er viewport-relativ og
+ikke bryr seg om innholdets padding: annonseveiviserens bunnlinje (fikset med
+`left-[var(--app-nav-rail-w,0px)]`) og annonsedetaljens klebrige CTA (ingen
+fiks nødvendig — den er `md:hidden` og finnes ikke på nettbrettbredder).
+
+**Ikke et nytt tiltak** (løst i fase 10). Sjuende variant av den samme
+lærdommen som 10.4/10.8/10.10/10.13/10.14: `grep` opp omfanget ved
+implementering.
+
+---
+
+## 11. Sluttvurdering (2026-08-10)
+
+Gjennomgang av hele planen mot faktisk kode etter at fase 0–11 er levert.
+Formålet er å svare på to spørsmål: ble alt i den opprinnelige planen
+gjennomført, og hva gjenstår.
+
+### 11.1 Er tiltakene gjennomført? — ja, med tre unntak som er bevisste
+
+Alle 30 tiltak er kontrollert mot kodebasen, ikke bare mot fremdriftsloggen.
+Stikkprøvene som ble kjørt (`grep`/filsjekk):
+
+| Tiltak         | Kontroll                                                                                                           | Status |
+| -------------- | ------------------------------------------------------------------------------------------------------------------ | ------ |
+| 1              | `forcenative`-grenen i `src/lib/native.ts`                                                                         | ✅     |
+| 2–4, 15, 20    | `size-11`/`h-11`/`min-h-11` i primitivene, `.slice(0, 8)` borte                                                    | ✅     |
+| 5, 6           | `.pl-safe`/`.pr-safe`/`.px-safe`/`.p-safe` definert i `styles.css` og i bruk 7 steder; `--safe-*`-variablene borte | ✅     |
+| 7              | `src/hooks/use-overlay-history.ts`, kalt fra begge primitivene                                                     | ✅     |
+| 8              | `allowsBackForwardNavigationGestures` i `AppDelegate.swift:51`                                                     | ✅     |
+| 9              | `line-clamp-1` + `titleFadesIn` i `native-page-header.tsx`                                                         | ✅     |
+| 10, 11         | `src/hooks/use-form-factor.ts`; `@md:grid-cols-4` i begge info-grid-ene                                            | ✅     |
+| 12, 22         | Rail-grenen i `app-bottom-nav.tsx`, `InboxPage` i `meldinger.$id.tsx`                                              | ✅     |
+| 13             | `@capacitor/screen-orientation` i `package.json`, `src/lib/orientation.ts`                                         | ✅     |
+| 14             | `src/components/listing-detail/zoomable-image.tsx`                                                                 | ✅     |
+| 16, 17, 18     | Tre CSS-regler i `styles.css`; `useSheetDrag` i `ui/sheet.tsx`; `usePullToRefresh` i 5 ruter                       | ✅     |
+| 19             | `src/lib/text-scale.ts`                                                                                            | ✅     |
+| 21             | `launchAutoHide: false` + `launchFadeOutDuration`; `UIRequiredDeviceCapabilities` borte fra `Info.plist`           | ✅     |
+| 24, 25, 26, 28 | `search-panel/` (4 filer), `vaul` i `package.json`, `native-filter-chips.tsx` slettet                              | ✅     |
+| 27             | Utgikk — Capacitor slår allerede av zoom (10.10)                                                                   | —      |
+| 23, 29, 30     | Ikke levert, se 11.2                                                                                               | ⏳     |
+
+Pensjoneringslisten i seksjon 6 er også kontrollert: `native-search-overlay.tsx`
+og `native-filter-chips.tsx` finnes ikke lenger, og `native-advanced-search.tsx`
+står igjen krympet, som funn 10.14 forklarer.
+
+Tilstanden ved gjennomgangen: `bunx tsc --noEmit` rent, `bun run test` 242/242.
+
+**Vurdering av avvikene.** Alle avvik fra den opprinnelige planen er
+dokumentert i fremdriftsloggen med begrunnelse, og ingen av dem er en
+utvanning av leveransen. De to som er verdt å merke seg som varige
+konsekvenser er at `useSheetDrag` og `vaul` nå lever side om side (fase 9-
+avviket), og at `native-advanced-search.tsx` overlevde pensjoneringen (10.14).
+Begge er beskrevet der de oppsto; ingen av dem trenger ny beslutning nå.
+
+Ett mønster er verdt å ta med videre ut av denne planen: **sju ganger** (funn
+10.4, 10.8, 10.10, 10.12, 10.13, 10.14, 10.16) viste det seg at en telling
+eller en konklusjon i funnrapporten underrapporterte omfanget, fordi den var
+utledet fra én fil. Ingen av dem førte til feil leveranse, men alle sju kostet
+tid ved implementering. Lærdommen hører hjemme i neste plan, ikke bare i denne.
+
+### 11.2 Hva gjenstår
+
+**A. Simulator-/enhetsrunden er det som faktisk står igjen — og den er stor.**
+Ni av tolv faser er merket «kodeferdig, venter på simulator». Det er ikke en
+formalitet: fase 2 (safe-area-verdier), 5 (rotasjonslås), 6 (ekte multitouch),
+7 (dra-gest på ekte touch), 8 (Dynamic Type — kan per definisjon ikke ses i
+nettleser) og 11 (splash-timing) har **ingen** verifisering utover kodenivå og
+syntetiske hendelser. Prioritert rekkefølge, etter risiko hvis den feiler:
+
+1. **Fase 11 — at splashen faktisk forsvinner.** Størst konsekvens av alle:
+   `launchAutoHide: false` betyr at en oppstart som ikke når `hide()` låser
+   appen på splash-skjermen. Test også offline-kaldstart (fallbacken i
+   `offline.html`).
+2. **Fase 5 + 6 — rotasjonslås og pinch/sveip.** Låsen skal ikke slå inn på
+   nettbrett, og skal snappe tilbake når galleriet lukkes. iOS 15-grenen
+   (`lockLegacy`) er aldri kjørt.
+3. **Fase 3 — iOS-kantsveipen mot Embla-karusellene** og mot en zoomet
+   panorering som starter nær venstre kant (fase 6-restansen).
+4. **Fase 8 — Dynamic Type på iOS, og at Android faktisk allerede skalerer.**
+   Antakelsen om Android er lest ut av plattformdokumentasjon (10.12).
+5. **Fase 10 — Android nettbrett og at formatbyttet skjer live** ved rotasjon
+   og Split View. Verifiseringsverktøyet kunne ikke se `matchMedia`-overgangen
+   (10.7), og fase 10 hviler på den.
+6. Fase 2 (notch-verdier), 7 (tap-highlight, langtrykk) — lavere risiko.
+
+**B. Innloggede flater er aldri sett kjøre.** Dette er den gjennomgående
+begrensningen fra 1.3, og den har fulgt hver eneste fase: annonseveiviserens
+tette skjemaoppsett med 44px-felt (fase 1), ad-picker-sheeten (fase 2/4), de
+fire nye pull-to-refresh-rutene (fase 7), panelets «Lagre»-flyt (fase 9) og
+nettbrettets meldingsoppsett (fase 10). Samlet er dette den nest største
+udekkede flaten etter simulatorrunden, og den løses av én testbruker mot en
+lokal Supabase-stack — ikke av mer kodegjennomgang.
+
+**C. Kjent teknisk gjeld fra leveransen:**
+
+- **Native e2e-dekning for søkepanelet** (fase 9). Planen ba eksplisitt om at
+  den ble skrevet _før_ de gamle overlayene ble slettet. Det skjedde ikke,
+  fordi `vaul`s animasjoner ikke kan observeres i verifiseringsverktøyet
+  (10.11). Reell gjeld, ikke bortprioritering — bør tas når panelet er sett
+  virke på enhet.
+- **Resultattelling oppdateres ikke live** mens man justerer i panelet
+  (fase 9-avvik). Kjent forenkling; krever enten en telle-query mot utkastet
+  eller en navigering per tastetrykk.
+- **Aktiv samtale markeres ikke** i nettbrettets meldingsliste (fase 10).
+- **`useSheetDrag` og `vaul` lever side om side.** Reversibelt, ~45 linjer.
+
+**D. De tre ikke-leverte tiltakene:**
+
+- **Tiltak 29** (tilbake under onboarding avslutter appen, funn 10.6) — Liten,
+  Middels. Ingen avhengighet til noe annet; kan tas når som helst. Dette er
+  det eneste gjenværende tiltaket med reell brukerkonsekvens.
+- **Tiltak 30** (`pb-8` i `messages-button.tsx:273`,
+  `notifications-bell.tsx:356`, `meg.tsx:230`) — Triviell, Lav. Ikke ødelagt,
+  men overstyrer primitiven. Tas naturlig sammen med B, siden alle tre ligger
+  bak innlogging.
+- **Tiltak 23** (bundlet web-bygg) — egen ADR, med vilje ikke tatt her.
+
+**E. Utenfor denne planens omfang, men registrert:** `eslint-plugin-jsx-a11y`
+kjører fortsatt med kun én regel (3.7) — allerede notert som anbefalt neste
+steg i `UX-AUDIT-PLAN.md` seksjon 9, og hører hjemme der.
+
+### 11.3 Merknad om leveringstilstand
+
+Fase 10 og 11 lå ved denne gjennomgangen **ucommittet i arbeidstreet** på
+`staging` (siste commit er `94f1882`, fase 9). Fremdriftsloggen beskriver dem
+som kodeferdige, og koden er det — men de er ikke pushet. Verdt å lukke før
+simulatorrunden, slik at det som testes på enhet er det som faktisk ligger i
+grenen.

@@ -13,12 +13,16 @@ import { ActiveFilters } from "@/components/active-filters";
 import type { MapListing } from "@/components/listings-map";
 import { ResultList } from "@/components/result-list";
 import { AttributeFilterChips } from "@/components/attribute-filter-chips";
-import { SearchPanel } from "@/features/listing-search/search-panel/search-panel";
-import type { SearchFilterSection } from "@/features/listing-search/search-panel/filter-sections";
+import {
+  useRegisterSearchPanelResults,
+  useSearchPanel,
+} from "@/features/listing-search/search-panel/search-panel-context";
+import type { SearchPanelResultsContext } from "@/features/listing-search/search-panel/search-panel";
 import {
   SearchSummaryPill,
   countActiveFilters,
 } from "@/features/listing-search/search-panel/search-summary-pill";
+import { buildActiveFilterItems } from "@/features/listing-search/search-panel/active-filter-items";
 import { saveLastSearchContext } from "@/lib/last-search-context";
 import { summarizeCriteria } from "@/lib/saved-searches";
 import { WtbListingCard } from "@/components/wtb-listing-card";
@@ -53,7 +57,7 @@ import { PullToRefreshIndicator } from "@/components/pull-to-refresh-indicator";
 import { useAnnonserSearchState } from "@/features/listing-search/use-annonser-search-state";
 import { useFilterFacetCounts } from "@/features/listing-search/use-filter-facet-counts";
 import { useHeroCategoryActions } from "@/features/listing-search/use-hero-category-actions";
-import { CategoryHero } from "@/components/category-hero";
+import { CategoryHero, CategoryBreadcrumb } from "@/components/category-hero";
 import { CategoryChipRow } from "@/components/category-chip-row";
 import { BrowsePageSkeleton } from "@/components/browse-page-skeleton";
 import {
@@ -120,8 +124,7 @@ function BrowsePage() {
   const [mounted, setMounted] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
-  const [searchPanelOpen, setSearchPanelOpen] = useState(false);
-  const [panelSection, setPanelSection] = useState<SearchFilterSection>("categories");
+  const { open: searchPanelOpen, openPanel } = useSearchPanel();
   const [activeTab, setActiveTab] = useState<"listings" | "wtb">("listings");
   // The original typed phrase behind each auto-applied attribute value, keyed
   // by "filterKey:optionValue" ("filterKey:" for single-value filters) — lets
@@ -214,7 +217,7 @@ function BrowsePage() {
     advancedInitial,
     currentCriteria,
     updateSearch,
-    handleApply,
+    setLiveValue,
     handleLocationChange,
     resetFilters,
   } = useAnnonserSearchState({ search, navigate, categories, allFilters, setQDraft });
@@ -539,6 +542,45 @@ function BrowsePage() {
     qModeAny: search.qMode === "any",
   });
 
+  // The panel now lives globally (fase 12) — this page just hands it its
+  // live filter state instead of mounting its own instance. `null` on web
+  // (no bottom-nav entry point there) keeps the global panel out of
+  // launch-mode fallback while this page is showing.
+  const searchPanelResults: SearchPanelResultsContext | null = isNative
+    ? {
+        q: search.q,
+        value: advancedInitial,
+        setValue: setLiveValue,
+        onSubmitText: (q) => {
+          setQDraft(q);
+          updateSearch({ q });
+        },
+        onSelectCategory: (slug) => updateSearch({ category: slug, categories: [] }),
+        location,
+        onLocationChange: handleLocationChange,
+        attributeFilters: attrFilters,
+        attributeValues: attrValues,
+        onAttributeChange: handleAttrValueChange,
+        attributeCounts: facetCounts,
+        resultCount: totalCount ?? cards.length,
+        activeItems: buildActiveFilterItems({
+          search,
+          terms,
+          onUpdate: (patch) => updateSearch(patch),
+          attrFilters,
+          attrValues,
+          onRemoveAttr: removeAttrWithRestore,
+          location,
+          onRemoveLocation: () =>
+            updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined }),
+        }),
+        onResetAll: resetFilters,
+        criteria: currentCriteria,
+        defaultName: summarizeCriteria(currentCriteria),
+      }
+    : null;
+  useRegisterSearchPanelResults(searchPanelResults);
+
   if (!mounted) {
     return <BrowsePageSkeleton />;
   }
@@ -549,10 +591,20 @@ function BrowsePage() {
 
       {isNative && <PullToRefreshIndicator pullDistance={pullDistance} refreshing={refreshing} />}
 
-      {/* Hero zone: before a category is picked this shows the always-visible
-          main-category chip row; picking one brings in CategoryHero in this
-          same spot (its own subcategory row takes over narrowing further). */}
-      {hero ? (
+      {/* Native (fase 12): kategorivalg og -filtrering skjer i søkepanelet nå,
+          så den fargede heroen og chip-raden er borte — bare en enkel
+          brødsmule viser hvor brukeren er. Web beholder heroen/chip-raden. */}
+      {isNative ? (
+        hero && (
+          <div className="px-4 pt-2">
+            <CategoryBreadcrumb
+              breadcrumbEntries={heroBreadcrumb}
+              extraSegments={heroExtraSegments}
+              onSelectCategory={selectHeroCategory}
+            />
+          </div>
+        )
+      ) : hero ? (
         <CategoryHero
           selected={hero.main}
           main={hero.main}
@@ -564,17 +616,12 @@ function BrowsePage() {
             isActive: isHeroChildActive,
             onToggle: (c) => toggleChildCategory(hero.main, c),
           }}
-          compact={isNative}
-          headingAs={isNative ? "p" : "h1"}
+          headingAs="h1"
           animateIn={animateHero}
         />
       ) : (
-        <div className={isNative ? "px-4 pt-2" : "mx-auto max-w-7xl px-4 pt-6"}>
-          <CategoryChipRow
-            tree={categoryTree}
-            onSelectRoot={selectRootCategory}
-            isNative={isNative}
-          />
+        <div className="mx-auto max-w-7xl px-4 pt-6">
+          <CategoryChipRow tree={categoryTree} onSelectRoot={selectRootCategory} isNative={false} />
         </div>
       )}
 
@@ -597,10 +644,7 @@ function BrowsePage() {
             <SearchSummaryPill
               q={search.q}
               filterCount={activeFilterCount}
-              onOpen={() => {
-                setPanelSection("categories");
-                setSearchPanelOpen(true);
-              }}
+              onOpen={() => openPanel("categories")}
             />
           )}
           {!isNative && (
@@ -679,23 +723,23 @@ function BrowsePage() {
             </>
           )}
 
-          {/* Rendered inside the same space-y-2 group as the search bar and
-              filter chips above, rather than as a separately-spaced sibling,
-              so the active-criteria row reads as part of one continuous
-              search-and-filter unit instead of a visually detached block. */}
-          <ActiveFilters
-            search={search}
-            terms={terms}
-            onUpdate={(patch) => updateSearch(patch)}
-            attrFilters={attrFilters}
-            attrValues={attrValues}
-            location={location}
-            onRemoveLocation={() =>
-              updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
-            }
-            onRemoveAttr={removeAttrWithRestore}
-            justCreatedKeys={justCreatedKeys}
-          />
+          {/* Native (fase 12): aktive filtertagger bor i søkepanelet nå (med
+              swipe-for-å-fjerne), så denne raden er web-only. */}
+          {!isNative && (
+            <ActiveFilters
+              search={search}
+              terms={terms}
+              onUpdate={(patch) => updateSearch(patch)}
+              attrFilters={attrFilters}
+              attrValues={attrValues}
+              location={location}
+              onRemoveLocation={() =>
+                updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
+              }
+              onRemoveAttr={removeAttrWithRestore}
+              justCreatedKeys={justCreatedKeys}
+            />
+          )}
         </div>
 
         {user && (
@@ -803,8 +847,9 @@ function BrowsePage() {
             }
             sort={search.sort}
             onSortChange={(s) => updateSearch({ sort: s })}
+            // Native (fase 12): "Lagre søk" flyttet inn i søkepanelet.
             toolbarExtra={
-              user ? (
+              user && !isNative ? (
                 <Button
                   type="button"
                   variant="outline"
@@ -816,35 +861,6 @@ function BrowsePage() {
                 </Button>
               ) : undefined
             }
-          />
-        )}
-
-        {/* Søkepanelet — erstatter både søkeoverlayet og det avanserte
-            filteroverlayet på native (fase 9). */}
-        {isNative && (
-          <SearchPanel
-            open={searchPanelOpen}
-            onOpenChange={setSearchPanelOpen}
-            categories={categories ?? []}
-            allFilters={allFilters ?? []}
-            initialQ={search.q}
-            initialSection={panelSection}
-            results={{
-              initial: advancedInitial,
-              onApply: handleApply,
-              onSubmitText: (q) => {
-                setQDraft(q);
-                updateSearch({ q });
-              },
-              onSelectCategory: (slug) => updateSearch({ category: slug, categories: [] }),
-              location,
-              onLocationChange: handleLocationChange,
-              attributeFilters: attrFilters,
-              attributeValues: attrValues,
-              onAttributeChange: handleAttrValueChange,
-              attributeCounts: facetCounts,
-              resultCount: totalCount ?? cards.length,
-            }}
           />
         )}
       </div>

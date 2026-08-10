@@ -87,66 +87,12 @@ export function CategoryHero({
         aria-hidden
       />
       <div className={`relative z-10 mx-auto max-w-7xl px-4 ${compact ? "py-6" : "py-12"}`}>
-        <nav aria-label="Brødsmulesti" className="mb-4 flex flex-wrap items-center gap-1 text-sm">
-          <Link
-            to="/annonser"
-            search={{ q: "", category: "", sort: "new" }}
-            className="text-muted-foreground hover:text-foreground hover:underline"
-          >
-            Alle kategorier
-          </Link>
-          {breadcrumbEntries.map((c, i) => {
-            const isLast = extraSegments.length === 0 && i === breadcrumbEntries.length - 1;
-            return (
-              <span key={c.id} className="flex items-center gap-1">
-                <ChevronRight className="size-3.5 text-muted-foreground" aria-hidden />
-                {isLast ? (
-                  <span className="font-medium">{c.name_nb}</span>
-                ) : i < linkUntilIndex ? (
-                  <Link
-                    to="/$kaupetCode"
-                    params={{ kaupetCode: c.slug }}
-                    className="text-muted-foreground hover:text-foreground hover:underline"
-                  >
-                    {c.name_nb}
-                  </Link>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => onSelectCategory(c)}
-                    className="text-muted-foreground hover:text-foreground hover:underline"
-                  >
-                    {c.name_nb}
-                  </button>
-                )}
-              </span>
-            );
-          })}
-          {extraSegments.map((seg, i) => {
-            const isLast = i === extraSegments.length - 1;
-            return (
-              <span key={`extra-${i}`} className="flex items-center gap-1">
-                <ChevronRight className="size-3.5 text-muted-foreground" aria-hidden />
-                {isLast ? (
-                  <span className="font-medium">{seg.name_nb}</span>
-                ) : (
-                  <Link
-                    to="/annonser"
-                    search={{
-                      q: "",
-                      category: seg.slug ?? "",
-                      sort: "new",
-                      attrs: seg.attrs ? encodeAttrFilters(seg.attrs) : "",
-                    }}
-                    className="text-muted-foreground hover:text-foreground hover:underline"
-                  >
-                    {seg.name_nb}
-                  </Link>
-                )}
-              </span>
-            );
-          })}
-        </nav>
+        <CategoryBreadcrumb
+          breadcrumbEntries={breadcrumbEntries}
+          extraSegments={extraSegments}
+          onSelectCategory={onSelectCategory}
+          linkUntilIndex={linkUntilIndex}
+        />
         <div
           key={selected.id}
           className={`flex items-center gap-3 motion-reduce:animate-none ${anim}`}
@@ -196,5 +142,87 @@ export function CategoryHero({
         )}
       </div>
     </section>
+  );
+}
+
+/**
+ * The breadcrumb chain alone, without the color band/heading/subcategory
+ * chips — extracted so `/annonser` on native (fase 12) can show "where am I"
+ * without the full category hero, which was removed there in favor of the
+ * search panel for actual filtering.
+ */
+export function CategoryBreadcrumb({
+  breadcrumbEntries,
+  extraSegments = [],
+  onSelectCategory,
+  linkUntilIndex = 0,
+  className,
+}: Pick<Props, "breadcrumbEntries" | "extraSegments" | "onSelectCategory" | "linkUntilIndex"> & {
+  className?: string;
+}) {
+  return (
+    <nav
+      aria-label="Brødsmulesti"
+      className={`flex flex-wrap items-center gap-1 text-sm ${className ?? ""}`}
+    >
+      <Link
+        to="/annonser"
+        search={{ q: "", category: "", sort: "new" }}
+        className="text-muted-foreground hover:text-foreground hover:underline"
+      >
+        Alle kategorier
+      </Link>
+      {breadcrumbEntries.map((c, i) => {
+        const isLast = extraSegments.length === 0 && i === breadcrumbEntries.length - 1;
+        return (
+          <span key={c.id} className="flex items-center gap-1">
+            <ChevronRight className="size-3.5 text-muted-foreground" aria-hidden />
+            {isLast ? (
+              <span className="font-medium">{c.name_nb}</span>
+            ) : i < linkUntilIndex ? (
+              <Link
+                to="/$kaupetCode"
+                params={{ kaupetCode: c.slug }}
+                className="text-muted-foreground hover:text-foreground hover:underline"
+              >
+                {c.name_nb}
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onSelectCategory(c)}
+                className="text-muted-foreground hover:text-foreground hover:underline"
+              >
+                {c.name_nb}
+              </button>
+            )}
+          </span>
+        );
+      })}
+      {extraSegments.map((seg, i) => {
+        const isLast = i === extraSegments.length - 1;
+        return (
+          <span key={`extra-${i}`} className="flex items-center gap-1">
+            <ChevronRight className="size-3.5 text-muted-foreground" aria-hidden />
+            {isLast ? (
+              <span className="font-medium">{seg.name_nb}</span>
+            ) : (
+              <Link
+                to="/annonser"
+                search={{
+                  q: "",
+                  category: seg.slug ?? "",
+                  sort: "new",
+                  attrs: seg.attrs ? encodeAttrFilters(seg.attrs) : "",
+                }}
+                className="text-muted-foreground hover:text-foreground hover:underline"
+              >
+                {seg.name_nb}
+              </Link>
+            )}
+          </span>
+        );
+      })}
+    </nav>
   );
 }

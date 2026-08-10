@@ -24,8 +24,7 @@ import { getCategoryIcon } from "@/lib/category-icons";
 import { useDefaultSearchExamples } from "@/hooks/use-default-search-examples";
 import { useIsNative } from "@/hooks/use-is-native";
 import { useFormFactor } from "@/hooks/use-form-factor";
-import { normalizeFilter } from "@/lib/category-filters";
-import { SearchPanel } from "@/features/listing-search/search-panel/search-panel";
+import { useSearchPanel } from "@/features/listing-search/search-panel/search-panel-context";
 import { AppHeroLogo } from "@/components/app-hero-logo";
 
 type CategoryRow = {
@@ -44,7 +43,7 @@ export function AppLanding() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [location, setLocation] = useSavedLocation();
   const [locOpen, setLocOpen] = useState(false);
-  const [searchPanelOpen, setSearchPanelOpen] = useState(false);
+  const { openPanel } = useSearchPanel();
   const isNative = useIsNative();
   // Nettbrett (fase 10): heroen får en øvre ramme og «Populært nå» blir et
   // rutenett. Bevisst formatfaktor og ikke `md:`-breakpoints — de ville truffet
@@ -62,21 +61,6 @@ export function AppLanding() {
         .order("name_nb");
       if (error) throw error;
       return (data ?? []) as CategoryRow[];
-    },
-  });
-
-  // Samme nøkkel som /annonser, så de deler cache. Søkepanelet trenger dem
-  // for tekst-til-filter-oppløsningen ved innsending.
-  const { data: allFilters } = useQuery({
-    queryKey: ["category-filters", "all"],
-    enabled: isNative,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("category_filters")
-        .select("id, category_id, key, label_nb, type, unit, options, sort_order, is_primary")
-        .order("sort_order");
-      if (error) throw error;
-      return (data ?? []).map(normalizeFilter);
     },
   });
 
@@ -200,7 +184,7 @@ export function AppLanding() {
             {isNative ? (
               <button
                 type="button"
-                onClick={() => setSearchPanelOpen(true)}
+                onClick={() => openPanel()}
                 aria-label="Søk i annonser"
                 className="h-14 w-full rounded-full border border-border bg-card pl-12 pr-4 text-left text-base shadow-sm transition active:scale-[0.99]"
               >
@@ -601,15 +585,6 @@ export function AppLanding() {
           </div>
         )}
       </section>
-
-      {isNative && (
-        <SearchPanel
-          open={searchPanelOpen}
-          onOpenChange={setSearchPanelOpen}
-          categories={categories ?? []}
-          allFilters={allFilters ?? []}
-        />
-      )}
     </div>
   );
 }

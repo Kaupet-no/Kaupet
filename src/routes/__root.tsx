@@ -27,6 +27,7 @@ import { initUniversalLinkNavigation, hideNativeBootSplash } from "@/lib/native"
 import { useIsNative } from "@/hooks/use-is-native";
 import { useKeyboardVisible } from "@/hooks/use-keyboard-visible";
 import { AppBottomNav } from "@/components/app-bottom-nav";
+import { SearchPanelProvider } from "@/features/listing-search/search-panel/search-panel-context";
 import { FeedbackTag } from "@/components/feedback-tag";
 import { TestEnvBanner } from "@/components/test-env-banner";
 import { TestEnvGate } from "@/components/test-env-gate";
@@ -331,7 +332,7 @@ function RootBody({ native }: { native: boolean }) {
     };
   }, [isTest]);
 
-  const content = (
+  const body = (
     <div className="flex min-h-screen flex-col bg-background">
       {!native && (
         <a
@@ -397,6 +398,14 @@ function RootBody({ native }: { native: boolean }) {
       <FeedbackTag />
     </div>
   );
+
+  // Panelet lever over rutene (fase 12) — bunnavigasjonens «Søk»-fane åpner
+  // det direkte i stedet for å navigere til en side som mounter sin egen
+  // instans. Montert uansett plattform (ikke bare `native`): /annonser og
+  // søsknene deler komponent mellom web og native og kaller
+  // `useRegisterSearchPanelResults` ubetinget, så providerens context må
+  // finnes uansett — web bruker den bare aldri (ingen bunnavigasjon der).
+  const content = <SearchPanelProvider>{body}</SearchPanelProvider>;
 
   return isTest ? <TestEnvGate>{content}</TestEnvGate> : content;
 }

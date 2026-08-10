@@ -14,6 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useQuery } from "@tanstack/react-query";
 import { NotificationsBell } from "@/components/notifications-bell";
 import { MessagesButton } from "@/components/messages-button";
+import { useSearchPanel } from "@/features/listing-search/search-panel/search-panel-context";
 
 function initials(name: string | null | undefined, fallback: string) {
   const source = (name ?? fallback).trim();
@@ -25,6 +26,7 @@ function initials(name: string | null | undefined, fallback: string) {
 export function AppBottomNav() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { open: searchPanelOpen, openPanel } = useSearchPanel();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [adPickerOpen, setAdPickerOpen] = useState(false);
   const native = isNative();
@@ -71,30 +73,32 @@ export function AppBottomNav() {
             : "pointer-events-auto mx-auto flex max-w-md items-end justify-around gap-1 rounded-3xl border border-border bg-background/95 px-3 pb-3 pt-3 shadow-xl backdrop-blur"
         }
       >
-        {/* Søk — fane 1. Forsiden *er* søkelanseringsflaten (søkefeltet der
-            åpner søkepanelet), så «Hjem» og «Søk» er slått sammen i stedet for
-            å konkurrere om plass. Se NATIVE-UI-UX-PLAN.md 8.3. */}
-        <Link
-          to="/"
+        {/* Søk — fane 1. Åpner det globale søkepanelet direkte i stedet for å
+            navigere til forsiden (fase 12) — trykk på «Søk» skal la brukeren
+            forfine søket der de allerede står, ikke forlate siden. Fanen var
+            også appens «Hjem»-lenke; det er bevisst forlatt uten erstatning,
+            se plandokumentets steg 1. */}
+        <button
+          type="button"
+          onClick={() => {
+            void hapticImpact("light");
+            openPanel();
+          }}
           className={itemClass}
           aria-label="Søk"
-          aria-current={pathname === "/" ? "page" : undefined}
+          aria-expanded={searchPanelOpen}
         >
           <span className="flex h-11 w-11 items-center justify-center">
-            {pathname === "/" ? (
-              <span className="font-display text-2xl font-semibold leading-none text-primary">
-                k<span className="text-accent">.</span>
-              </span>
-            ) : (
-              <Search className="size-6 text-muted-foreground" />
-            )}
+            <Search
+              className={`size-6 ${searchPanelOpen ? "text-primary" : "text-muted-foreground"}`}
+            />
           </span>
           <span
-            className={`text-[11px] ${pathname === "/" ? "font-medium text-primary" : "text-muted-foreground"}`}
+            className={`text-[11px] ${searchPanelOpen ? "font-medium text-primary" : "text-muted-foreground"}`}
           >
             Søk
           </span>
-        </Link>
+        </button>
 
         {/* Varsler */}
         <div className={itemClass} aria-current={isOnVarsler ? "page" : undefined}>

@@ -201,6 +201,21 @@
   padding-bottom: var(--app-bottom-nav-h);
 }
 
+/* Nettbrett (fase 10): bunnpillen erstattes av en sidestilt navigasjon, så
+   plassen skal reserveres til venstre i stedet for under. `.nav-rail` settes
+   på <html> av AppBottomNav når useFormFactor() === "tablet".
+   Må stå etter :root over — samme spesifisitet, siste regel vinner. Nuller
+   --app-bottom-nav-h fordi flere flater regner høyder fra den
+   (meldinger.$id: calc(100vh - var(--app-bottom-nav-h))). */
+.nav-rail {
+  --app-bottom-nav-h: 0px;
+  --app-nav-rail-w: calc(5rem + env(safe-area-inset-left));
+}
+.nav-rail .pb-bottom-nav {
+  padding-bottom: 0;
+  padding-left: var(--app-nav-rail-w);
+}
+
 /* Native polish (fase 7, se docs/NATIVE-UI-UX-PLAN.md). `.native` settes på
    <html> fra setupNative(), altså kun i Capacitor-WebView-en — web er
    uberørt. */

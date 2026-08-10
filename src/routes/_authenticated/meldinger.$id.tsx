@@ -24,6 +24,8 @@ import { confirmBuyer, getSaleForListing, unconfirmBuyer } from "@/lib/sales.fun
 import { createReview, getMyReviewForListing } from "@/lib/reviews.functions";
 import { formatErrorMessage } from "@/lib/errors";
 import { useIsNative } from "@/hooks/use-is-native";
+import { useFormFactor } from "@/hooks/use-form-factor";
+import { InboxPage } from "./meldinger.index";
 import { NativePageHeader } from "@/components/native-page-header";
 import { useKeyboardVisible } from "@/hooks/use-keyboard-visible";
 import { ConversationErrorBoundary } from "@/components/meldinger/conversation-error-boundary";
@@ -51,6 +53,7 @@ export const Route = createFileRoute("/_authenticated/meldinger/$id")({
 
 function ConversationPage() {
   const native = useIsNative();
+  const isTablet = useFormFactor() === "tablet";
   const keyboardVisible = useKeyboardVisible();
   const { id } = Route.useParams();
   const { user } = useAuth();
@@ -464,7 +467,7 @@ function ConversationPage() {
     );
   }
 
-  return (
+  const thread = (
     <div
       className="mx-auto flex max-w-2xl flex-col"
       style={{
@@ -475,7 +478,11 @@ function ConversationPage() {
           : "calc(100vh - 4rem)",
       }}
     >
-      <NativePageHeader title={conv?.listing?.title ?? "Samtale"} backTo="/meldinger" />
+      <NativePageHeader
+        title={conv?.listing?.title ?? "Samtale"}
+        backTo="/meldinger"
+        hideBack={isTablet}
+      />
       <div
         className="flex flex-1 flex-col overflow-hidden px-4"
         style={{
@@ -719,6 +726,21 @@ function ConversationPage() {
           </Button>
         </form>
       </div>
+    </div>
+  );
+
+  // Nettbrett (fase 10 / tiltak 22): liste + tråd side om side. Begge er
+  // eksisterende komponenter — dette er et layoutgrep, ikke ny meldingslogikk.
+  if (!isTablet) return thread;
+  return (
+    <div className="flex">
+      <aside
+        className="w-80 shrink-0 overflow-y-auto border-r border-border"
+        style={{ height: keyboardVisible ? "var(--vvh, 100vh)" : "100vh" }}
+      >
+        <InboxPage />
+      </aside>
+      <div className="min-w-0 flex-1">{thread}</div>
     </div>
   );
 }

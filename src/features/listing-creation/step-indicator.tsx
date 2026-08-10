@@ -1,5 +1,6 @@
 import { type WizardPage } from "@/features/listing-creation/use-listing-steps";
 import { pageLabel } from "@/features/listing-creation/field-groups/registry";
+import { Progress } from "@/components/ui/progress";
 
 /** A page (1-based index into `pages`) whose only group is `vehicle-confirm`
  * doesn't get its own dot in the step indicator — it's the same logical
@@ -55,19 +56,11 @@ export function StepIndicator({
         </span>
         <span className="truncate text-muted-foreground">{current?.label}</span>
       </div>
-      <div
-        role="progressbar"
-        aria-valuenow={currentStepNumber}
-        aria-valuemin={1}
-        aria-valuemax={total}
+      <Progress
+        value={percent}
         aria-label={`Steg ${currentStepNumber} av ${total}: ${current?.label ?? ""}`}
-        className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
-      >
-        <div
-          className="h-full rounded-full bg-primary transition-[width] duration-300"
-          style={{ width: `${percent}%` }}
-        />
-      </div>
+        className="h-1.5 bg-muted"
+      />
     </nav>
   );
 }

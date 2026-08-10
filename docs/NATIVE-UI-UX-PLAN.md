@@ -1,14 +1,14 @@
 # Native-app: UI/UX-revisjon for mobil og nettbrett
 
-Status: **Fase 0–7 implementert** 2026-08-10. Analyse gjennomført 2026-08-10.
+Status: **Fase 0–8 implementert** 2026-08-10. Analyse gjennomført 2026-08-10.
 Alle fire åpne spørsmål er besvart 2026-08-10 (se seksjon 8) og innarbeidet i
-tiltaksliste og faser. Neste steg: **fase 8** (Dynamic Type). Avhengigheten
-fase 6 → fase 8 er **bortfalt** — sidenivå-zoom var allerede av på native før
-fase 6, se funn 10.10; fase 8 er fortsatt et reelt tilgjengelighetshull, men
-blokkerer ikke lenger noe. Fase 2, 3, 5, 6 og 7 er ikke endelig ferdige før de
-er reverifisert i simulator (safe-area-verdier med notch, iOS-kantsveip,
-Android-tilbakeknapp, rotasjonslås, pinch/sveip på ekte touch,
-dra-for-å-lukke på ekte touch) — se seksjon 7.
+tiltaksliste og faser. Neste steg: **fase 9** (søkepanel og
+navigasjonsomlegging). Avhengigheten fase 6 → fase 8 er **bortfalt** —
+sidenivå-zoom var allerede av på native før fase 6, se funn 10.10. Fase 2, 3,
+5, 6, 7 og 8 er ikke endelig ferdige før de er reverifisert i simulator
+(safe-area-verdier med notch, iOS-kantsveip, Android-tilbakeknapp, rotasjonslås,
+pinch/sveip på ekte touch, dra-for-å-lukke på ekte touch, Dynamic Type) — se
+seksjon 7.
 
 Sist oppdatert: 2026-08-10.
 
@@ -453,7 +453,7 @@ Dette er tre linjer CSS som gir uforholdsmessig stor opplevd gevinst.
 | 27  | ~~Slå av sidenivå-zoom på native~~ — **utgår**, Capacitor gjør det allerede (10.10)            | —        | —           | 8.4, 10.10       |
 | 28  | Løft «fjern lokasjon»-krysset ut av chip-knappen på forsiden + ≥44px                           | Liten    | Middels     | 10.2             |
 | 29  | Tilbake-trykk under onboarding: kortnavigasjon i stedet for å avslutte appen                   | Liten    | Middels     | 10.6             |
-| 30  | Fjern håndrullet `pb-8` i de tre gjenværende bunn-sheetene                                     | Triviell | Lav         | 10.12            |
+| 30  | Fjern håndrullet `pb-8` i de tre gjenværende bunn-sheetene                                     | Triviell | Lav         | 10.13            |
 
 **Ikke anbefalt:** omskriving av annonseveiviseren, meldingskjernen eller
 `FullscreenOverlay`/`ResponsiveOverlay`-arkitekturen. Alle tre er riktig
@@ -705,7 +705,7 @@ fremdriftsloggen for fase 6.
 etter fase 9 — `vaul` ble vurdert og valgt bort fordi gesten uten detents er
 ~45 linjer. Se fremdriftsloggen for fase 7.
 
-### Fase 8 — Dynamic Type (tiltak 19) — ~~påkrevd før eller sammen med fase 6~~, se 10.10
+### Fase 8 — Dynamic Type (tiltak 19) — ~~påkrevd før eller sammen med fase 6~~, se 10.10 — implementert 2026-08-10
 
 **Avklares under implementering:** hvilken mekanisme.
 
@@ -718,6 +718,10 @@ ut.
 
 Verifiser at ingenting brekker ved 200 % (WCAG 1.4.4), særlig i veiviseren
 og bunnavigasjonen — som etter fase 9 også må romme et søkepanel.
+
+**Oppdatert etter implementering:** svaret er `font: -apple-system-body` (målt,
+ikke satt direkte) på iOS, og **ingenting** på Android, som allerede skalerer
+via `textZoom`. Se funn 10.12 og fremdriftsloggen for fase 8.
 
 ### Fase 9 — Søkepanel og navigasjonsomlegging (tiltak 24, 25, 26)
 
@@ -834,6 +838,7 @@ ferdigdefinisjon, ikke en oppfølgingssak:
 | 5    | _Ingen_ — plisten beholder alle orienteringer med vilje (se fase 5)                      |
 | 6    | _Ingen_ — `<img>`-en i lightboxen er erstattet av `ZoomableImage`                        |
 | 7    | ✅ Den innebygde pull-to-refresh-spinneren i `annonser.tsx`                              |
+| 8    | _Ingen_                                                                                  |
 | 9    | `native-search-overlay.tsx` **hele filen** — erstattes av søkepanelet                    |
 | 9    | `native-advanced-search.tsx` **hele filen** — erstattes av søkepanelet                   |
 | 9    | Søkelinjen + full chip-rad på `/annonser` i native-grenen                                |
@@ -861,7 +866,8 @@ parallelle størrelsesdefinisjoner i utgangspunktet (3.1.2).
   i nettleser), fase 3 (iOS-gest, Android-tilbake), fase 5 (rotasjonslås og
   unntaket i bildevisning), fase 6 (pinch/sveip + at zoom faktisk er av),
   fase 7 (dra-for-å-lukke på ekte touch, langtrykk/tap-highlight),
-  fase 8 (Dynamic Type), fase 10 (Android nettbrett og Split View). Disse
+  fase 8 (Dynamic Type — kan ikke observeres i nettleser i det hele tatt, se
+  10.12), fase 10 (Android nettbrett og Split View). Disse
   fasene skal **ikke** merkes ferdige på kodenivå alene — det er nøyaktig
   forbeholdet `UX-AUDIT-PLAN.md` fase 3 og 4 måtte notere, og som denne
   planen forsøker å ikke gjenta.
@@ -1450,6 +1456,62 @@ hooken er ~45 linjer i én fil.
   og komponent, men de fire rutenes egne `resetQueries`-nøkler er kun
   kodegjennomgått.
 
+### Fase 8 — Dynamic Type (tiltak 19) — kodeferdig 2026-08-10, venter på simulator
+
+**Mekanisme valgt (planens «stopp ved første som holder»):** planens tre
+kandidater ble gjennomgått i rekkefølge, og svaret er **ulikt per plattform**
+— noe planen ikke forutså (se 10.12).
+
+- **`-webkit-text-size-adjust` — forkastet.** Den styrer WebKits egen
+  autosizing av smale tekstkolonner, ikke Dynamic Type. Å sette den ville ikke
+  koblet noe til brukerens innstilling.
+- **`font: -apple-system-body` — valgt for iOS.** Den systemdefinerte fonten
+  _er_ Dynamic Type: 17px ved standard, og den vokser/krymper med brukerens
+  valg. `src/lib/text-scale.ts` måler den på et skjult element, deler på 17 og
+  setter `html { font-size }` til `16px × skala`. Appen bruker `rem`
+  gjennomgående, så resten følger med.
+  Den settes **ikke** som `:root { font: -apple-system-body }` direkte: det
+  ville også byttet font-family til systemfonten og flyttet baseline fra 16 til
+  17px (hele appen 6 % større ved standardinnstilling). Måling + eksplisitt
+  `font-size` holder typografien uendret ved skala 1.
+- **Native opplesning av tekstskalaen — ikke nødvendig.** Den ville krevd en
+  egen plugin, og dekker ikke noe de to over ikke dekker.
+- **Android er en bevisst no-op.** Android WebView skalerer allerede all tekst
+  etter systemets fontskala (`textZoom` avledes fra `Configuration.fontScale`).
+  Gjør vi noe der, ganges skalaen med seg selv. Se 10.12.
+
+**Detaljer:**
+
+- Skalaen er klampet til **0,8–2,0**. Taket er WCAG 1.4.4s 200 %; iOS' største
+  tilgjengelighetsstørrelser går til ~3,1×, men layouten er ikke verifisert
+  over 200 %. Merket med en `ponytail:`-kommentar i filen.
+- Måler `CSS.supports("font", "-apple-system-body")` først og returnerer `null`
+  ellers. Uten den guarden ville enhver ikke-Apple-nettleser målt 16px mot
+  basis 17 og krympet appen 6 % — «ignorert deklarasjon» lest som et
+  brukervalg.
+- Dynamic Type endres i Innstillinger, altså mens appen er i bakgrunnen. Ingen
+  `resize` fyrer av det, så vi måler på nytt på `appStateChange` (isActive)
+  fra `@capacitor/app`, som allerede er en avhengighet.
+
+**Pensjonert:** ingen.
+
+**Verifisert:** `bunx tsc --noEmit` rent, `bun run test` 237/237 (tre nye i
+`src/lib/text-scale.test.ts`: klampingen, at en ukjent systemfont gir `null`
+i stedet for 0,94, og at 34px leses som skala 2), `bun run lint` 0 errors.
+Live med `?forcenative`: `CSS.supports(...)` er `false` i Chrome, og
+rot-`font-size` står uendret på 16px — altså at guarden gjør jobben sin.
+
+**Ikke verifisert:** **hele mekanismen på enhet.** Chrome kjenner ikke
+`-apple-system-body`, så `?forcenative`-verktøyet kan per definisjon ikke vise
+noe her — det kan bare bekrefte at ingenting skjer på web. Simulator-
+verifiseringen står i sin helhet igjen: sett tekststørrelse til største
+ikke-tilgjengelighetsverdi og deretter til en tilgjengelighetsverdi i iOS-
+innstillingene, og sjekk at (a) appen faktisk skalerer, (b) den skalerer på
+nytt ved retur til forgrunn uten omstart, og (c) at ingenting brekker ved
+200 %, særlig i veiviseren og bunnavigasjonen. Antakelsen om at Android
+allerede dekkes av `textZoom` er lest ut av plattformdokumentasjonen, ikke
+observert — den bør bekreftes på en Android-enhet før fase 8 regnes som ferdig.
+
 ---
 
 ## 10. Funn oppdaget underveis
@@ -1632,7 +1694,22 @@ animerende element i dette verktøyet er verdiløse.
 
 **Ikke et nytt tiltak** — en begrensning i verifiseringen, som 10.7.
 
-### 10.12 Tre bunn-sheets har fortsatt håndrullet `pb-8` (fase 7, 2026-08-10)
+### 10.12 Dynamic Type har to ulike svar, ett per plattform (fase 8, 2026-08-10)
+
+Funn 3.7 slo fast at «WKWebView og Android WebView respekterer ikke systemets
+tekstskala for en webapp». Det stemmer for iOS, men **ikke for Android**:
+Android WebView setter `textZoom` fra `Configuration.fontScale`, altså skalerer
+den all tekst etter systeminnstillingen uten at appen gjør noe.
+
+Konsekvensen er at fase 8 er iOS-only, og at en plattformnøytral
+implementering ville vært aktivt skadelig: skalaen ville blitt ganget med seg
+selv på Android (en bruker på 1,3× ville fått 1,69×).
+
+Lærdommen er den samme som 10.4/10.8/10.10, fjerde gang, men i en ny variant:
+**et funn som slår sammen to plattformer i én setning må splittes før det blir
+en implementering.**
+
+### 10.13 Tre bunn-sheets har fortsatt håndrullet `pb-8` (fase 7, 2026-08-10)
 
 Fase 2 fjernet `pb-8`-kompensasjonen i `app-bottom-nav.tsx`s ad-picker fordi
 `sheet.tsx` `side="bottom"` nå padrer home indicator-sonen selv. Samme
@@ -1641,7 +1718,7 @@ kompensasjon står igjen tre steder: `messages-button.tsx:273`,
 mer enn `max(24px, safe-area)` på alle nåværende enheter — men de overstyrer
 primitiven og er nøyaktig mønsteret seksjon 6 advarer mot.
 
-Fjerde forekomst av samme lærdom (10.4, 10.8, 10.10): **tellingen i et
+Femte forekomst av samme lærdom (10.4, 10.8, 10.10, 10.12): **tellingen i et
 funn er et utgangspunkt, ikke en fasit.**
 
 **Foreslått som nytt tiltak 30** (Triviell, Lav): fjern `pb-8` fra de tre.

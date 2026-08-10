@@ -160,6 +160,7 @@ Tre varianter: `default`, `destructive`, og `warning` (amber, for advarsler som 
 - **Orientering:** telefon er låst til portrett ved oppstart, nettbrett roterer fritt (`src/lib/orientation.ts`). Trenger en flate landskap, kall `unlockOrientation()` ved mount og `lockPortraitOnPhone()` ved unmount — se `image-lightbox.tsx`, som er eneste unntak i dag. Ikke fjern landskap fra `Info.plist`: låsen styres i kjøretid, og plisten er det som gjør unntaket mulig i det hele tatt.
 - **Native-only CSS:** `setupNative()` setter klassen `.native` på `<html>`. Bruk den som gate for regler som kun skal gjelde i appen (tap-highlight, `user-select`, `overscroll-behavior` — se `styles.css`). Merk at `user-select: none` bevisst er begrenset til interaktive elementer: brødtekst, annonsebeskrivelser og meldinger skal fortsatt kunne kopieres.
 - **Bunn-sheets kan dras ned for å lukkes** (`useSheetDrag` i `ui/sheet.tsx`, kun `side="bottom"`). Håndtaket rendres automatisk — ikke legg til ditt eget. Gesten lukker via Escape, så en sheet som blokkerer `onEscapeKeyDown` blokkerer også dra-lukking.
+- **Tekststørrelse:** `src/lib/text-scale.ts` speiler iOS' Dynamic Type inn i `html { font-size }`. Bruk `rem` (Tailwinds standard) for all typografi — `px`-satt tekst skalerer ikke med brukerens innstilling. Android trenger ingenting; WebView-en skalerer allerede selv.
 - Unngå `Tooltip` og andre hover-avhengige mønstre i flater som vises i native-appen.
 
 ## Skjemavalidering

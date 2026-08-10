@@ -18,6 +18,7 @@ import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filter
 import { hapticImpact, hapticNotification } from "@/lib/haptics";
 import { useAuth } from "@/hooks/use-auth";
 import { useAdvancedSearchValue } from "@/hooks/use-advanced-search-value";
+import { useFormFactor } from "@/hooks/use-form-factor";
 import { useOverlayHistory } from "@/hooks/use-overlay-history";
 import { resolveTextToFilters } from "@/features/listing-search/resolve-text-to-filters";
 import { encodeAttrFilters } from "@/features/listing-search/search-schema";
@@ -87,6 +88,10 @@ export function SearchPanel({
   const [saveOpen, setSaveOpen] = useState(false);
   const [section, setSection] = useState<SearchFilterSection>(initialSection);
   const [snap, setSnap] = useState<number | string | null>(SNAP_POINTS[0]);
+  // Nettbrett: ikke en fullbredde skuff (fase 9 punkt 5 / funn 3.3.1). Bredden
+  // kappes i stedet for å bytte primitiv — detent-dragingen er hele poenget med
+  // panelet, og den skal virke likt i begge formater.
+  const isTablet = useFormFactor() === "tablet";
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Utkastet for parameterfanene. Hooken nullstiller det hver gang panelet
@@ -182,7 +187,9 @@ export function SearchPanel({
         <Drawer.Portal>
           <Drawer.Overlay className="fixed inset-0 z-[9998] bg-black/40" />
           <Drawer.Content
-            className="fixed inset-x-0 bottom-0 z-[9999] flex h-full max-h-[97%] flex-col rounded-t-2xl border-t border-border bg-background outline-none"
+            className={`fixed inset-x-0 bottom-0 z-[9999] flex h-full max-h-[97%] flex-col rounded-t-2xl border-t border-border bg-background outline-none ${
+              isTablet ? "mx-auto w-full max-w-2xl border-x" : ""
+            }`}
             aria-describedby={undefined}
           >
             <Drawer.Title className="sr-only">Søk og filtrer</Drawer.Title>

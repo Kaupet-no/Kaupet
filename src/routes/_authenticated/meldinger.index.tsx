@@ -104,7 +104,9 @@ type SystemMessage = {
   read_at: string | null;
 };
 
-function InboxPage() {
+/** Innboksen. Eksportert fordi nettbrettoppsettet i `meldinger.$id` viser den
+ * som venstre spalte ved siden av tråden (fase 10). */
+export function InboxPage() {
   const native = useIsNative();
   const { user } = useAuth();
   const qc = useQueryClient();

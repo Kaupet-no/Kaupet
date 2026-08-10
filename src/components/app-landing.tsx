@@ -23,6 +23,7 @@ import { useSavedLocation } from "@/hooks/use-saved-location";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { useDefaultSearchExamples } from "@/hooks/use-default-search-examples";
 import { useIsNative } from "@/hooks/use-is-native";
+import { useFormFactor } from "@/hooks/use-form-factor";
 import { normalizeFilter } from "@/lib/category-filters";
 import { SearchPanel } from "@/features/listing-search/search-panel/search-panel";
 import { AppHeroLogo } from "@/components/app-hero-logo";
@@ -45,6 +46,10 @@ export function AppLanding() {
   const [locOpen, setLocOpen] = useState(false);
   const [searchPanelOpen, setSearchPanelOpen] = useState(false);
   const isNative = useIsNative();
+  // Nettbrett (fase 10): heroen får en øvre ramme og «Populært nå» blir et
+  // rutenett. Bevisst formatfaktor og ikke `md:`-breakpoints — de ville truffet
+  // kaupet.no på desktop, som ikke er en del av denne planen.
+  const isTablet = useFormFactor() === "tablet";
 
   const { data: categories } = useQuery({
     queryKey: ["categories"],
@@ -178,13 +183,15 @@ export function AppLanding() {
 
       {/* Hero — sentrert søkefelt */}
       <section
-        className={`flex flex-col items-center justify-center px-5 ${isNative ? "min-h-[68vh] pt-24" : "min-h-[70vh] pt-8"}`}
+        className={`flex flex-col items-center justify-center px-5 ${
+          isTablet ? "min-h-[40vh] pt-10" : isNative ? "min-h-[68vh] pt-24" : "min-h-[70vh] pt-8"
+        }`}
       >
         <h1 className="mb-6 text-center font-display text-2xl tracking-tight">
           Hva leter du etter i dag?
         </h1>
 
-        <form onSubmit={submitSearch} className="w-full max-w-md">
+        <form onSubmit={submitSearch} className={`w-full ${isTablet ? "max-w-xl" : "max-w-md"}`}>
           <div className="relative">
             <SearchIcon className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
             {/* Native: feltet er en *trigger* for søkepanelet, ikke et eget
@@ -570,13 +577,22 @@ export function AppLanding() {
           </Link>
         </div>
         {popular && popular.length > 0 ? (
-          <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 pr-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {popular.map((l) => (
-              <div key={l.id} className="w-[60%] shrink-0 snap-start sm:w-[40%]">
-                <ListingCard listing={l} />
-              </div>
-            ))}
-          </div>
+          // Nettbrett har plass til rutenettet karusellen komprimerer bort.
+          isTablet ? (
+            <div className="grid grid-cols-3 gap-4 pb-2 pr-5">
+              {popular.map((l) => (
+                <ListingCard key={l.id} listing={l} />
+              ))}
+            </div>
+          ) : (
+            <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 pr-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {popular.map((l) => (
+                <div key={l.id} className="w-[60%] shrink-0 snap-start sm:w-[40%]">
+                  <ListingCard listing={l} />
+                </div>
+              ))}
+            </div>
+          )
         ) : (
           <div className="flex gap-3 overflow-hidden pr-5">
             {Array.from({ length: 3 }).map((_, i) => (

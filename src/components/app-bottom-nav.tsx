@@ -1,9 +1,10 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Bell, MessageCircle, Plus, X, LogIn, Search } from "lucide-react";
 import { AdPickerOptions } from "@/components/ad-picker-options";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useAuth } from "@/hooks/use-auth";
+import { useFormFactor } from "@/hooks/use-form-factor";
 import { hapticImpact } from "@/lib/haptics";
 import { isNative } from "@/lib/native";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,6 +28,18 @@ export function AppBottomNav() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [adPickerOpen, setAdPickerOpen] = useState(false);
   const native = isNative();
+  // Nettbrett: sidestilt navigasjon i stedet for den flytende bunnpillen
+  // (fase 10). Samme rutedefinisjoner og samme tilstand — kun presentasjonen
+  // skiller, jf. planens «ikke en parallell navigasjonskomponent».
+  const rail = useFormFactor() === "tablet";
+
+  // Innholdet må reservere plass til venstre i stedet for under, se
+  // `.nav-rail` i styles.css.
+  useEffect(() => {
+    if (!rail) return;
+    document.documentElement.classList.add("nav-rail");
+    return () => document.documentElement.classList.remove("nav-rail");
+  }, [rail]);
 
   const isOnNewAdPage =
     native && (pathname.startsWith("/ny-annonse") || pathname.startsWith("/ny-ok-annonse"));
@@ -37,19 +50,33 @@ export function AppBottomNav() {
   const isOnMeldinger = isActive("/meldinger");
   const isOnMeg = isActive("/meg");
 
+  const itemClass = rail
+    ? "flex flex-col items-center gap-0.5"
+    : "flex flex-1 flex-col items-center gap-0.5";
+
   return (
     <nav
-      aria-label="Bunnavigasjon"
-      className="fixed inset-x-0 bottom-0 z-50 px-3 pointer-events-none"
-      style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)" }}
+      aria-label={rail ? "Hovednavigasjon" : "Bunnavigasjon"}
+      className={
+        rail
+          ? "pointer-events-none fixed inset-y-0 left-0 z-50"
+          : "fixed inset-x-0 bottom-0 z-50 px-3 pointer-events-none"
+      }
+      style={rail ? undefined : { paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)" }}
     >
-      <div className="pointer-events-auto mx-auto flex max-w-md items-end justify-around gap-1 rounded-3xl border border-border bg-background/95 px-3 pb-3 pt-3 shadow-xl backdrop-blur">
+      <div
+        className={
+          rail
+            ? "pl-safe pointer-events-auto flex h-full w-20 flex-col items-center justify-center gap-7 border-r border-border bg-background/95 backdrop-blur"
+            : "pointer-events-auto mx-auto flex max-w-md items-end justify-around gap-1 rounded-3xl border border-border bg-background/95 px-3 pb-3 pt-3 shadow-xl backdrop-blur"
+        }
+      >
         {/* Søk — fane 1. Forsiden *er* søkelanseringsflaten (søkefeltet der
             åpner søkepanelet), så «Hjem» og «Søk» er slått sammen i stedet for
             å konkurrere om plass. Se NATIVE-UI-UX-PLAN.md 8.3. */}
         <Link
           to="/"
-          className="flex flex-1 flex-col items-center gap-0.5"
+          className={itemClass}
           aria-label="Søk"
           aria-current={pathname === "/" ? "page" : undefined}
         >
@@ -70,10 +97,7 @@ export function AppBottomNav() {
         </Link>
 
         {/* Varsler */}
-        <div
-          className="flex flex-1 flex-col items-center gap-0.5"
-          aria-current={isOnVarsler ? "page" : undefined}
-        >
+        <div className={itemClass} aria-current={isOnVarsler ? "page" : undefined}>
           {user ? (
             <div className="relative flex h-11 w-11 items-center justify-center">
               <NotificationsBell />
@@ -96,7 +120,9 @@ export function AppBottomNav() {
         </div>
 
         {/* Ny annonse (FAB) — midten */}
-        <div className="-mt-7 flex flex-1 flex-col items-center gap-0.5">
+        {/* -mt-7 løfter FAB-en ut av bunnpillen. I railen står den i flyten
+            som de andre — det er ingen kant å stikke opp av. */}
+        <div className={rail ? itemClass : `-mt-7 ${itemClass}`}>
           {user ? (
             <button
               type="button"
@@ -134,10 +160,7 @@ export function AppBottomNav() {
         </div>
 
         {/* Meldinger */}
-        <div
-          className="flex flex-1 flex-col items-center gap-0.5"
-          aria-current={isOnMeldinger ? "page" : undefined}
-        >
+        <div className={itemClass} aria-current={isOnMeldinger ? "page" : undefined}>
           {user ? (
             <div className="relative flex h-11 w-11 items-center justify-center">
               <MessagesButton />
@@ -160,10 +183,7 @@ export function AppBottomNav() {
         </div>
 
         {/* Bruker */}
-        <div
-          className="flex flex-1 flex-col items-center gap-0.5"
-          aria-current={isOnMeg ? "page" : undefined}
-        >
+        <div className={itemClass} aria-current={isOnMeg ? "page" : undefined}>
           {user ? (
             <UserAvatarButton userId={user.id} email={user.email ?? null} />
           ) : (

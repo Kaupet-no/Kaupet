@@ -24,7 +24,6 @@ import { getCategoryIcon } from "@/lib/category-icons";
 import { useDefaultSearchExamples } from "@/hooks/use-default-search-examples";
 import { useIsNative } from "@/hooks/use-is-native";
 import { useFormFactor } from "@/hooks/use-form-factor";
-import { useSearchPanel } from "@/features/listing-search/search-panel/search-panel-context";
 import { AppHeroLogo } from "@/components/app-hero-logo";
 
 type CategoryRow = {
@@ -43,7 +42,6 @@ export function AppLanding() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [location, setLocation] = useSavedLocation();
   const [locOpen, setLocOpen] = useState(false);
-  const { openPanel } = useSearchPanel();
   const isNative = useIsNative();
   // Nettbrett (fase 10): heroen får en øvre ramme og «Populært nå» blir et
   // rutenett. Bevisst formatfaktor og ikke `md:`-breakpoints — de ville truffet
@@ -178,37 +176,19 @@ export function AppLanding() {
         <form onSubmit={submitSearch} className={`w-full ${isTablet ? "max-w-xl" : "max-w-md"}`}>
           <div className="relative">
             <SearchIcon className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
-            {/* Native: feltet er en *trigger* for søkepanelet, ikke et eget
-                inndatafelt — ett søkeinngangspunkt, ikke to som oppfører seg
-                ulikt (fase 9b punkt 8). */}
-            {isNative ? (
-              <button
-                type="button"
-                onClick={() => openPanel()}
-                aria-label="Søk i annonser"
-                className="h-14 w-full rounded-full border border-border bg-card pl-12 pr-4 text-left text-base shadow-sm transition active:scale-[0.99]"
-              >
-                <span className="sr-only">
-                  {typewriterWords.length > 0 ? `For eksempel: ${typewriterWords.join(", ")}` : ""}
-                </span>
-              </button>
-            ) : (
-              <input
-                ref={inputRef}
-                type="search"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                onFocus={() => setFocused(true)}
-                onBlur={() => setFocused(false)}
-                placeholder=""
-                aria-label="Søk i annonser"
-                aria-describedby={
-                  typewriterWords.length > 0 ? "landing-search-examples" : undefined
-                }
-                className="h-14 w-full rounded-full border border-border bg-card pl-12 pr-4 text-base shadow-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
-              />
-            )}
-            {!isNative && typewriterWords.length > 0 && (
+            <input
+              ref={inputRef}
+              type="search"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              placeholder=""
+              aria-label="Søk i annonser"
+              aria-describedby={typewriterWords.length > 0 ? "landing-search-examples" : undefined}
+              className="h-14 w-full rounded-full border border-border bg-card pl-12 pr-4 text-base shadow-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
+            />
+            {typewriterWords.length > 0 && (
               // Static (not tied to the rotating animation) so screen reader
               // users get the example searches once, on focus, instead of
               // an aria-live region re-announcing every ~2.7s.

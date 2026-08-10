@@ -92,12 +92,12 @@ export function AccountSection() {
       <div className="space-y-6">
         <div className="space-y-4 rounded-xl border border-border bg-card p-6">
           <Skeleton className="h-5 w-40" />
-          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-11 w-full" />
         </div>
         <div className="space-y-4 rounded-xl border border-border bg-card p-6">
           <Skeleton className="h-5 w-40" />
-          <Skeleton className="h-9 w-full" />
-          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-11 w-full" />
+          <Skeleton className="h-11 w-full" />
         </div>
       </div>
     );

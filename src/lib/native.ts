@@ -5,6 +5,12 @@
 import { Capacitor } from "@capacitor/core";
 
 export function isNative(): boolean {
+  // Dev-only: `?forcenative` slår på native-grenene i vanlig nettleser, slik at
+  // de kan verifiseres uten simulator. `import.meta.env.DEV` er false i bygget,
+  // så hele blokken strippes bort i produksjon.
+  if (import.meta.env.DEV && typeof window !== "undefined") {
+    if (window.location.search.includes("forcenative")) return true;
+  }
   try {
     return Capacitor.isNativePlatform();
   } catch {

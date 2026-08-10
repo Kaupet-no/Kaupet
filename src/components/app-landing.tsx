@@ -207,7 +207,13 @@ export function AppLanding() {
               <button
                 type="button"
                 onClick={() => setLocOpen(true)}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm transition ${
+                // Eksplisitt navn: uten det leses knappen uten tilgjengelig navn
+                // (verifisert i tilgjengelighetstreet på native forside). Den
+                // synlige teksten er med i navnet, jf. WCAG 2.5.3.
+                aria-label={`Velg lokasjon: ${
+                  hasLocation ? `${location.label} · ${location.radius} km` : "Hvor som helst"
+                }`}
+                className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm transition ${
                   hasLocation
                     ? "border-primary/40 bg-primary/5 text-foreground"
                     : "border-border bg-card text-muted-foreground"

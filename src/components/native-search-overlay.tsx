@@ -120,7 +120,7 @@ export function NativeSearchOverlay({
               void hapticImpact("light");
               onClose();
             }}
-            className="flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-muted"
+            className="flex size-11 shrink-0 items-center justify-center rounded-full hover:bg-muted"
             aria-label="Lukk søk"
           >
             <ArrowLeft className="size-5" />
@@ -135,14 +135,14 @@ export function NativeSearchOverlay({
                 if (e.key === "Enter") void submit(q);
               }}
               placeholder="Hva leter du etter?"
-              className="h-11 border-0 bg-muted pl-9 pr-8 text-base focus-visible:ring-0"
+              className="h-11 border-0 bg-muted pl-9 pr-11 text-base focus-visible:ring-0"
               aria-label="Søk i annonser"
             />
             {q && (
               <button
                 type="button"
                 onClick={() => setQ("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:text-foreground"
+                className="absolute right-0 top-1/2 flex size-11 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
                 aria-label="Tøm søkefelt"
               >
                 <X className="size-4" />
@@ -220,15 +220,17 @@ export function NativeSearchOverlay({
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Bla etter kategori
               </p>
+              {/* Ingen .slice() — listen var kuttet på åtte uten «se alle»-utgang,
+                  slik at Kunst, Barn og baby, Båt og Annet var unåbare herfra.
+                  Containeren scroller allerede. */}
               {categories
                 .filter((c) => c.parent_id === null)
-                .slice(0, 8)
                 .map((cat) => (
                   <button
                     key={cat.id}
                     type="button"
                     onClick={() => goToCategory(cat)}
-                    className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left transition hover:bg-muted active:bg-muted"
+                    className="flex min-h-11 w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left transition hover:bg-muted active:bg-muted"
                   >
                     <FolderOpen className="size-4 shrink-0 text-muted-foreground" />
                     <span className="text-sm">{cat.name_nb}</span>

@@ -1,12 +1,14 @@
 # Native-app: UI/UX-revisjon for mobil og nettbrett
 
-Status: **Fase 0, 1, 2, 3, 4 og 5 implementert** 2026-08-10. Analyse gjennomført
-2026-08-10. Alle fire åpne spørsmål er besvart 2026-08-10 (se seksjon 8) og
-innarbeidet i tiltaksliste og faser. Neste steg: **fase 6** (bildevisning og
-zoom-policy) — men merk avhengigheten: fase 8 (Dynamic Type) må leveres før
-eller sammen med den, se 8.4. Fase 2, 3 og 5 er ikke endelig ferdige før de er
-reverifisert i simulator (safe-area-verdier med notch, iOS-kantsveip,
-Android-tilbakeknapp, rotasjonslås) — se seksjon 7.
+Status: **Fase 0, 1, 2, 3, 4, 5 og 6 implementert** 2026-08-10. Analyse
+gjennomført 2026-08-10. Alle fire åpne spørsmål er besvart 2026-08-10 (se
+seksjon 8) og innarbeidet i tiltaksliste og faser. Neste steg: **fase 7**
+(native polish og gestkonsistens). Avhengigheten fase 6 → fase 8 er **bortfalt**
+— sidenivå-zoom var allerede av på native før fase 6, se funn 10.10; fase 8 er
+fortsatt et reelt tilgjengelighetshull, men blokkerer ikke lenger noe. Fase 2,
+3, 5 og 6 er ikke endelig ferdige før de er reverifisert i simulator
+(safe-area-verdier med notch, iOS-kantsveip, Android-tilbakeknapp, rotasjonslås,
+pinch/sveip på ekte touch) — se seksjon 7.
 
 Sist oppdatert: 2026-08-10.
 
@@ -448,7 +450,7 @@ Dette er tre linjer CSS som gir uforholdsmessig stor opplevd gevinst.
 | 24  | **Søkepanel med detents** — erstatter `NativeSearchOverlay` + `NativeAdvancedSearch`           | Stor     | **Høy**     | 8.3              |
 | 25  | Bunnavigasjon: «Hjem» → «Søk» som fane 1, FAB forblir «Ny annonse»                             | Liten    | Høy         | 3.2.3, 8.3       |
 | 26  | Kompakt søkesammendrag-pille på `/annonser` erstatter søkelinje + full chip-rad                | Middels  | Høy         | 8.3              |
-| 27  | Slå av sidenivå-zoom på native (`user-scalable=no`) — kun i native, ikke på web                | Triviell | Høy         | 8.4              |
+| 27  | ~~Slå av sidenivå-zoom på native~~ — **utgår**, Capacitor gjør det allerede (10.10)            | —        | —           | 8.4, 10.10       |
 | 28  | Løft «fjern lokasjon»-krysset ut av chip-knappen på forsiden + ≥44px                           | Liten    | Middels     | 10.2             |
 | 29  | Tilbake-trykk under onboarding: kortnavigasjon i stedet for å avslutte appen                   | Liten    | Middels     | 10.6             |
 
@@ -457,10 +459,12 @@ Dette er tre linjer CSS som gir uforholdsmessig stor opplevd gevinst.
 bygget — planen utvider primitivene med én akse (formatfaktor) og én
 egenskap (safe area/historikk), den erstatter dem ikke.
 
-**Merk avhengigheten tiltak 27 → 19:** når sidenivå-zoom fjernes, mister
-brukeren sin eneste nåværende måte å forstørre tekst på. Dynamic Type
-(tiltak 19) går derfor fra «Middels» til **påkrevd**, og må leveres i samme
-runde eller før. Se 8.4.
+**~~Merk avhengigheten tiltak 27 → 19~~ — bortfalt 2026-08-10 (fase 6).**
+Premisset var at sidenivå-zoom er brukerens eneste måte å forstørre tekst på i
+dag. Det stemte ikke: Capacitor slår av zoom i WebView-en som standard på begge
+plattformer, så den var aldri tilgjengelig på native (funn 10.10). Tiltak 19
+(Dynamic Type) er fortsatt **Høy** — det er reelt eneste forstørrelsesmekanisme
+— men det blokkerer ikke fase 6, og fase 6 gjør ingenting verre.
 
 ---
 
@@ -677,6 +681,9 @@ wrapper. Sidenivå-zoom slås av på native; zoom finnes kun i fullskjermbilde.
 Verifiser manuelt på enhet; noter i fremdriftsloggen at det ikke er
 automatisert.
 
+**Oppdatert etter implementering:** punkt 1 og 4 utgikk, se funn 10.10 og
+fremdriftsloggen for fase 6.
+
 ### Fase 7 — Native polish og gestkonsistens (tiltak 16, 17, 18)
 
 **Filer:** `src/styles.css`, `src/components/ui/sheet.tsx`,
@@ -693,7 +700,7 @@ automatisert.
 3. `usePullToRefresh` på de fire manglende rutene. Hooken finnes og er
    gjenbrukbar som den er.
 
-### Fase 8 — Dynamic Type (tiltak 19) — **påkrevd før eller sammen med fase 6**
+### Fase 8 — Dynamic Type (tiltak 19) — ~~påkrevd før eller sammen med fase 6~~, se 10.10
 
 **Avklares under implementering:** hvilken mekanisme.
 
@@ -1275,6 +1282,85 @@ roter i appen (skal ikke skje), åpne fullskjermbilde og roter (skal skje), lukk
 er ikke `requestGeometryUpdate`-veien (iOS 16+) vs. `lockLegacy` under iOS 16
 prøvd — deployment target er iOS 15, så den gamle grenen finnes i praksis.
 
+### Fase 6 — Bildevisning og zoom-policy (tiltak 14, 27) — kodeferdig 2026-08-10, venter på simulator
+
+**Gjort:**
+
+1. **Tiltak 27 utgikk — ingen kode skrevet.** Planen skulle sette
+   `user-scalable=no` fra `setupNative()`. Kildegjennomgang av Capacitor 8 viste
+   at zoom allerede er av: `zoomEnabled` er `false` som standard, og på iOS
+   settes da `scrollView.delegate` til Capacitors egen handler som slår av
+   `pinchGestureRecognizer` (`WebViewDelegationHandler.swift:338`), mens Android
+   får `setBuiltInZoomControls(false)` (`Bridge.java:612`). Se funn 10.10.
+   Konfigen er **ikke** endret heller — å skrive `zoomEnabled: false` er å
+   konfigurere en verdi som allerede er standardverdien.
+2. **Ny `src/components/listing-detail/zoomable-image.tsx`** — pinch-,
+   dobbelttrykk- og panoreringszoom (1×–4×) på det aktive bildet, med
+   sveip-ned-for-å-lukke når bildet ikke er zoomet. Ingen nytt bibliotek:
+   rene `touch`-hendelser og én CSS-transform, slik planen ba om at ble
+   forsøkt først. `ImageLightbox` bytter ut sin `<img>` med komponenten.
+3. **Embla og zoom deler ikke gest.** Karusellen får
+   `watchDrag: () => !zoomedRef.current`, altså dra-gesten slås av mens bildet
+   er zoomet. Ref, ikke state — `reInit` ville hoppet karusellen tilbake til
+   start. I tillegg settes `touch-action: none` på bildet mens det er zoomet.
+4. **Trykk på bildet lukker ikke lenger galleriet på touch.** Det måtte det
+   ikke: ett trykk lukket før, og da er dobbelttrykk-zoom uoppnåelig. Med mus
+   (web) er oppførselen uendret — klikk på bildet lukker fortsatt. Skillet går
+   på om et `touchstart` har vært innom komponenten, ikke på `useIsNative()`,
+   så en touch-laptop på web oppfører seg som en telefon.
+
+**Avvik fra planen:** planens punkt 4 (Dynamic Type som forutsetning) falt bort
+sammen med tiltak 27, se 10.10. Punkt 3s «samspill med landskap-unlock fra fase
+5» krevde ingen kode — `unlockOrientation()` ligger allerede i lightboxens
+mount/unmount fra fase 5, og zoomtilstanden er lokal per bilde.
+
+**Pensjonert:** ingen. `<img>`-en i lightboxen er erstattet av `ZoomableImage`,
+som er den samme `<img>` med en transform rundt.
+
+**Bonusfiks (fase 5-rest):** `orientation.ts` returnerte pluginobjektet fra en
+async-funksjon. Capacitors web-proxy har en `then` som kaster `UNIMPLEMENTED`,
+så auto-await-en ga en ufanget promise-rejection i dev-konsollen ved hver lås.
+Importen er flyttet inn i hver funksjon; konsollen er ren for `ScreenOrientation`
+etterpå (målt).
+
+**Verifisert live** med `?forcenative` på 375×812, med syntetiske
+`TouchEvent`-er mot ekte DOM (målt, ikke antatt):
+
+- Dobbelttrykk i senter → `scale(2.5)`, og `touch-action` går fra `auto` til
+  `none`. Nytt dobbelttrykk nullstiller.
+- Pinch 200px → 400px avstand → `scale(2)`; pinch tilbake til 20px → klampes til
+  `scale(1)` og transformen nullstilles.
+- Panorering 900px ned-til-venstre ved `scale(2)` klampes til nøyaktig
+  `translate3d(-187,5px, 338px)` — som er `(s-1)·bredde/2` og `(s-1)·høyde/2` for
+  en 375×676-container.
+- Sveip ned: bildet følger fingeren (`translate3d(0, 200px, 0)`) med fallende
+  opasitet (0,73 ved 80px, 0,33 ved 200px), og galleriet lukkes ved slipp forbi
+  120px.
+- **Embla-grensen:** horisontal sveip mens bildet er zoomet lot telleren stå på
+  `1 / 9`; samme sveip uzoomet flyttet den til `2 / 9`. `watchDrag` virker.
+- Web (uten `?forcenative`, mus): klikk på bildet lukker fortsatt galleriet.
+
+`bunx tsc --noEmit` rent, `bun run test` 234/234 (fem nye i
+`zoomable-image.test.ts` for de to rene funksjonene `clampToBounds` og
+`scaleAround`), `bun run lint` 0 errors.
+
+**Ikke verifisert:**
+
+- **Ekte multitouch på enhet.** Alt over er syntetiske `TouchEvent`-er. At
+  WKWebView/Android WebView leverer de samme hendelsessekvensene — særlig
+  overgangen to fingre → én finger midt i en pinch, og at `touch-action: none`
+  faktisk stopper systemets egne gester — er ikke sett. Dette er den
+  enkeltrisikoen i fase 6 jeg er minst trygg på.
+- **Samspillet med iOS-kantsveipen fra fase 3.** En zoomet panorering som
+  starter nær venstre kant kan tenkes å trigge tilbake-gesten. Ikke testbart i
+  nettleser, og ikke prøvd.
+- **At sidenivå-zoom faktisk er av på enhet.** Konklusjonen i punkt 1 er lest ut
+  av Capacitors kildekode, ikke observert i simulator. Den bør bekreftes med et
+  pinch-forsøk utenfor bildevisningen, siden hele bortfallet av
+  fase 8-avhengigheten hviler på den.
+- Gestlogikken er ikke e2e-dekket; Playwright-touchemulering ble ikke tatt inn
+  for dette.
+
 ---
 
 ## 10. Funn oppdaget underveis
@@ -1411,3 +1497,32 @@ tiltak, men verdt å kjenne før fase 10: **`useFormFactor()` er en
 _layout_-akse, ikke en enhetsklassifisering.** Trenger fase 10 å vite hva slags
 enhet appen faktisk kjører på (f.eks. for sidenavigasjon), er breddegrensen
 alene ikke svaret.
+
+### 10.10 Sidenivå-zoom var allerede av på native (fase 6, 2026-08-10)
+
+Funn 3.5.1 og beslutning 8.4 bygget på at `viewport`-metaen i `__root.tsx`
+verken setter `maximum-scale` eller `user-scalable=no`, og at WKWebView derfor
+tillater sidenivå-pinch. Metaen stemmer, konklusjonen gjør det ikke: Capacitor
+slår av zoom i WebView-en uavhengig av metaen, og `zoomEnabled` er **`false`
+som standard** (`@capacitor/cli` `declarations.d.ts`, `@default false`).
+
+- iOS: er `zoomingEnabled` falsk, settes `webView.scrollView.delegate` til
+  Capacitors `WebViewDelegationHandler`, som i `scrollViewWillBeginZooming`
+  skrur av `pinchGestureRecognizer` (`WebViewDelegationHandler.swift:338`).
+- Android: `settings.setBuiltInZoomControls(config.isZoomableWebView())`
+  (`Bridge.java:612`) — altså `false`, som også slår av pinch.
+
+Tre konsekvenser:
+
+1. **Tiltak 27 utgår.** Det er ingenting å slå av, og å sette `zoomEnabled:
+false` i `capacitor.config.ts` er å konfigurere standardverdien.
+2. **Avhengigheten 27 → 19 (fase 6 → fase 8) bortfaller.** Fase 6 fjerner ikke
+   noen forstørrelsesmulighet brukeren hadde, og gjør derfor ingenting
+   dårligere tilgjengelig. Fase 6 kunne leveres alene.
+3. **Men tilgjengelighetshullet er større enn planen trodde, ikke mindre.**
+   Appen har aldri hatt zoom på native, og Dynamic Type virker ikke (3.7). WCAG
+   1.4.4 er altså brutt i dag, ikke først etter fase 6. Tiltak 19 beholder
+   prioritet **Høy** av den grunn — begrunnelsen er bare en annen enn 8.4 anga.
+
+Samme lærdom som 10.4 og 10.8, tredje gang: **et funn utledet fra én fil
+(`__root.tsx`) må sjekkes mot laget under før det gjøres til en beslutning.**

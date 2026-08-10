@@ -19,16 +19,15 @@ function isPhone(): boolean {
 
 let locked = false;
 
-async function screenOrientation() {
-  const { ScreenOrientation } = await import("@capacitor/screen-orientation");
-  return ScreenOrientation;
-}
-
+// Merk: pluginobjektet må ikke returneres fra en async-funksjon. Capacitors
+// web-proxy har en `then` som kaster `UNIMPLEMENTED`, så et auto-await av det
+// (som `return ScreenOrientation` ville gitt) blir en ufanget rejection i dev.
 /** Lås til portrett — kun på telefon. No-op på nettbrett og web. */
 export async function lockPortraitOnPhone(): Promise<void> {
   if (!isPhone()) return;
   try {
-    await (await screenOrientation()).lock({ orientation: "portrait" });
+    const { ScreenOrientation } = await import("@capacitor/screen-orientation");
+    await ScreenOrientation.lock({ orientation: "portrait" });
     locked = true;
   } catch {
     /* plugin unavailable */
@@ -39,7 +38,8 @@ export async function lockPortraitOnPhone(): Promise<void> {
 export async function unlockOrientation(): Promise<void> {
   if (!locked) return;
   try {
-    await (await screenOrientation()).unlock();
+    const { ScreenOrientation } = await import("@capacitor/screen-orientation");
+    await ScreenOrientation.unlock();
     locked = false;
   } catch {
     /* plugin unavailable */

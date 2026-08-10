@@ -6,6 +6,8 @@ import {
   type Vehicle360Frame,
 } from "@/components/listing-detail/vehicle/vehicle-360-viewer";
 import { FullscreenOverlay, FullscreenOverlayContent } from "@/components/ui/fullscreen-overlay";
+import { ZoomableImage } from "@/components/listing-detail/zoomable-image";
+import { lockPortraitOnPhone, unlockOrientation } from "@/lib/orientation";
 
 type ListingImage = { storage_path: string; sort_order: number; caption?: string | null };
 
@@ -30,7 +32,18 @@ export function ImageLightbox({
 }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
-  const [emblaRef, emblaApi] = useEmblaCarousel({ startIndex: initialIndex, loop: true });
+  // Zoomet bilde eier gesten selv — Emblas dra-gest slås av mens den varer.
+  // Ref, ikke state: `watchDrag` leses ved pointerdown, og en reInit ville
+  // hoppet karusellen tilbake til start.
+  const zoomedRef = useRef(false);
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    startIndex: initialIndex,
+    loop: true,
+    watchDrag: () => !zoomedRef.current,
+  });
+  const onZoomChange = useCallback((zoomed: boolean) => {
+    zoomedRef.current = zoomed;
+  }, []);
 
   const has360 = !!vehicle360 && vehicle360.frames.length > 0;
   const offset = has360 ? 1 : 0;
@@ -38,6 +51,16 @@ export function ImageLightbox({
 
   useEffect(() => {
     closeRef.current?.focus();
+  }, []);
+
+  // Bildevisning er det eneste stedet telefonen får rotere. Opprydningen
+  // ligger i unmount, ikke i lukkeknappen, så låsen ikke blir stående av om
+  // galleriet forsvinner en annen vei (navigasjon, tilbake-gest).
+  useEffect(() => {
+    void unlockOrientation();
+    return () => {
+      void lockPortraitOnPhone();
+    };
   }, []);
 
   useEffect(() => {
@@ -120,10 +143,11 @@ export function ImageLightbox({
             )}
             {images.map((img, i) => (
               <div key={img.storage_path} className="relative h-full min-w-0 flex-[0_0_100%]">
-                <img
+                <ZoomableImage
                   src={imgUrls[img.storage_path]}
                   alt={i === 0 && !has360 ? title : `${title} – bilde ${i + 1}`}
-                  className="h-full w-full object-contain"
+                  onZoomChange={onZoomChange}
+                  onDismiss={onClose}
                 />
                 {img.caption && (
                   <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-4 py-3 text-center text-sm text-white">

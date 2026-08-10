@@ -1,5 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Bell, MessageCircle, Plus, X, LogIn, Home } from "lucide-react";
+import { Bell, MessageCircle, Plus, X, LogIn, Search } from "lucide-react";
 import { AdPickerOptions } from "@/components/ad-picker-options";
 import { useState } from "react";
 
@@ -44,26 +44,28 @@ export function AppBottomNav() {
       style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)" }}
     >
       <div className="pointer-events-auto mx-auto flex max-w-md items-end justify-around gap-1 rounded-3xl border border-border bg-background/95 px-3 pb-3 pt-3 shadow-xl backdrop-blur">
-        {/* Hjem */}
+        {/* Søk — fane 1. Forsiden *er* søkelanseringsflaten (søkefeltet der
+            åpner søkepanelet), så «Hjem» og «Søk» er slått sammen i stedet for
+            å konkurrere om plass. Se NATIVE-UI-UX-PLAN.md 8.3. */}
         <Link
           to="/"
           className="flex flex-1 flex-col items-center gap-0.5"
-          aria-label="Hjem"
+          aria-label="Søk"
           aria-current={pathname === "/" ? "page" : undefined}
         >
           <span className="flex h-11 w-11 items-center justify-center">
-            {isActive("/") && pathname === "/" ? (
+            {pathname === "/" ? (
               <span className="font-display text-2xl font-semibold leading-none text-primary">
                 k<span className="text-accent">.</span>
               </span>
             ) : (
-              <Home className="size-6 text-muted-foreground" />
+              <Search className="size-6 text-muted-foreground" />
             )}
           </span>
           <span
             className={`text-[11px] ${pathname === "/" ? "font-medium text-primary" : "text-muted-foreground"}`}
           >
-            Hjem
+            Søk
           </span>
         </Link>
 

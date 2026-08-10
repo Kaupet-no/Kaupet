@@ -23,6 +23,8 @@ import { useSavedLocation } from "@/hooks/use-saved-location";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { useDefaultSearchExamples } from "@/hooks/use-default-search-examples";
 import { useIsNative } from "@/hooks/use-is-native";
+import { normalizeFilter } from "@/lib/category-filters";
+import { SearchPanel } from "@/features/listing-search/search-panel/search-panel";
 import { AppHeroLogo } from "@/components/app-hero-logo";
 
 type CategoryRow = {
@@ -41,6 +43,8 @@ export function AppLanding() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [location, setLocation] = useSavedLocation();
   const [locOpen, setLocOpen] = useState(false);
+  const [searchPanelOpen, setSearchPanelOpen] = useState(false);
+  const isNative = useIsNative();
 
   const { data: categories } = useQuery({
     queryKey: ["categories"],
@@ -53,6 +57,21 @@ export function AppLanding() {
         .order("name_nb");
       if (error) throw error;
       return (data ?? []) as CategoryRow[];
+    },
+  });
+
+  // Samme nøkkel som /annonser, så de deler cache. Søkepanelet trenger dem
+  // for tekst-til-filter-oppløsningen ved innsending.
+  const { data: allFilters } = useQuery({
+    queryKey: ["category-filters", "all"],
+    enabled: isNative,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("category_filters")
+        .select("id, category_id, key, label_nb, type, unit, options, sort_order, is_primary")
+        .order("sort_order");
+      if (error) throw error;
+      return (data ?? []).map(normalizeFilter);
     },
   });
 
@@ -110,7 +129,6 @@ export function AppLanding() {
     });
   };
 
-  const isNative = useIsNative();
   const [activeCategory, setActiveCategory] = useState<CategoryRow | null>(null);
   const [categoriesSheetOpen, setCategoriesSheetOpen] = useState(false);
 
@@ -169,19 +187,37 @@ export function AppLanding() {
         <form onSubmit={submitSearch} className="w-full max-w-md">
           <div className="relative">
             <SearchIcon className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
-            <input
-              ref={inputRef}
-              type="search"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
-              placeholder=""
-              aria-label="Søk i annonser"
-              aria-describedby={typewriterWords.length > 0 ? "landing-search-examples" : undefined}
-              className="h-14 w-full rounded-full border border-border bg-card pl-12 pr-4 text-base shadow-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
-            />
-            {typewriterWords.length > 0 && (
+            {/* Native: feltet er en *trigger* for søkepanelet, ikke et eget
+                inndatafelt — ett søkeinngangspunkt, ikke to som oppfører seg
+                ulikt (fase 9b punkt 8). */}
+            {isNative ? (
+              <button
+                type="button"
+                onClick={() => setSearchPanelOpen(true)}
+                aria-label="Søk i annonser"
+                className="h-14 w-full rounded-full border border-border bg-card pl-12 pr-4 text-left text-base shadow-sm transition active:scale-[0.99]"
+              >
+                <span className="sr-only">
+                  {typewriterWords.length > 0 ? `For eksempel: ${typewriterWords.join(", ")}` : ""}
+                </span>
+              </button>
+            ) : (
+              <input
+                ref={inputRef}
+                type="search"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                placeholder=""
+                aria-label="Søk i annonser"
+                aria-describedby={
+                  typewriterWords.length > 0 ? "landing-search-examples" : undefined
+                }
+                className="h-14 w-full rounded-full border border-border bg-card pl-12 pr-4 text-base shadow-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
+              />
+            )}
+            {!isNative && typewriterWords.length > 0 && (
               // Static (not tied to the rotating animation) so screen reader
               // users get the example searches once, on focus, instead of
               // an aria-live region re-announcing every ~2.7s.
@@ -202,7 +238,10 @@ export function AppLanding() {
           </div>
 
           {/* Lokasjon-chip */}
-          <div className="mt-4 flex justify-center">
+          {/* Krysset ligger som *søsken* til chipen, ikke inni den: et
+              interaktivt element inne i et annet er ugyldig og leses dårlig av
+              skjermlesere (funn 10.2 / tiltak 28). */}
+          <div className="mt-4 flex items-center justify-center gap-1">
             <Dialog open={locOpen} onOpenChange={setLocOpen}>
               <button
                 type="button"
@@ -223,26 +262,19 @@ export function AppLanding() {
                 <span className="truncate max-w-[200px]">
                   {hasLocation ? `${location.label} · ${location.radius} km` : "Hvor som helst"}
                 </span>
-                {hasLocation && (
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    className="ml-1 rounded-full p-0.5 hover:bg-muted"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setLocation({
-                        lat: null,
-                        lng: null,
-                        radius: location.radius,
-                        label: "",
-                      });
-                    }}
-                    aria-label="Fjern lokasjon"
-                  >
-                    <X className="size-3.5" />
-                  </span>
-                )}
               </button>
+              {hasLocation && (
+                <button
+                  type="button"
+                  className="flex size-11 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                  onClick={() =>
+                    setLocation({ lat: null, lng: null, radius: location.radius, label: "" })
+                  }
+                  aria-label="Fjern lokasjon"
+                >
+                  <X className="size-4" />
+                </button>
+              )}
               <DialogContent
                 className="w-[calc(100vw-2rem)] max-w-sm rounded-2xl p-6"
                 tabIndex={-1}
@@ -553,6 +585,15 @@ export function AppLanding() {
           </div>
         )}
       </section>
+
+      {isNative && (
+        <SearchPanel
+          open={searchPanelOpen}
+          onOpenChange={setSearchPanelOpen}
+          categories={categories ?? []}
+          allFilters={allFilters ?? []}
+        />
+      )}
     </div>
   );
 }

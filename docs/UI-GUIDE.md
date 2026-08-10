@@ -36,9 +36,9 @@ Tre primitiver dekker det aller meste — velg ut fra hva flyten faktisk trenger
 | Fullskjerm-takeover uten kortet-chrome (galleri, kart, onboarding) | `FullscreenOverlay` |
 | Destruktiv/irreversibel bekreftelse                                | `AlertDialog`       |
 
-### Web/native-responsive dialoger
+### Formatfaktor-responsive dialoger
 
-Web bruker `Dialog`, native bruker `Sheet` for tilsvarende flyter. Bruk `ResponsiveOverlay`/`ResponsiveOverlayContent` (`src/components/ui/responsive-overlay.tsx`) i stedet for å grene manuelt på `useIsNative()` — den velger riktig primitiv automatisk:
+**Telefon** (native, < 768px) bruker `Sheet`; **nettbrett** (native, ≥ 768px) og **web** bruker `Dialog`. Bruk `ResponsiveOverlay`/`ResponsiveOverlayContent` (`src/components/ui/responsive-overlay.tsx`) i stedet for å grene manuelt — den velger riktig primitiv automatisk:
 
 ```tsx
 <ResponsiveOverlay open={open} onOpenChange={setOpen}>
@@ -53,7 +53,7 @@ Web bruker `Dialog`, native bruker `Sheet` for tilsvarende flyter. Bruk `Respons
 
 `DialogHeader`/`DialogTitle`/`DialogDescription`/`DialogFooter` fungerer uendret inni begge varianter, siden `Dialog` og `Sheet` er bygget på samme `@radix-ui/react-dialog`-primitiv.
 
-- `app-bottom-nav.tsx`s "Ny annonse"-velger er fortsatt en manuell `!native ? <Dialog> : <Sheet>`-gren (forhåndsdatert `ResponsiveOverlay`) — nytt overlay-UI bør bruke `ResponsiveOverlay` fra start.
+- Grenen går på `useFormFactor()` (`src/hooks/use-form-factor.ts`), ikke `useIsNative()`: en fullbredde bunn-skuff er riktig på 375px og feil på 1024px. Hooken returnerer `"phone" | "tablet" | "web"` og skal kalles der oppsettet faktisk forgrener — ikke spres som en `isTablet`-boolsk rundt i koden.
 - Bruk `ResponsiveOverlay` for alt brukervendt — en dialog som går rett på `Dialog` mister bottom-sheet-oppførselen native-appen ellers har (se `kaupet-code-dialog.tsx`).
 - Rene admin-flater (`src/routes/_authenticated/admin/**`) er unntaket og kan fortsette å bruke `Dialog` direkte, siden de uansett ikke kjører i native-appen (se `create-demo-user-dialog.tsx`).
 - Begge overlay-rotene (`ResponsiveOverlay` og `FullscreenOverlay`) gir seg selv en egen historikk-oppføring via `useOverlayHistory` (`src/hooks/use-overlay-history.ts`), slik at Android-tilbakeknappen og iOS' kantsveip lukker overlayet i stedet for å navigere siden bak det. Ikke gjenta `history.pushState`/`popstate` i en konsument. Trenger en flate å _ikke_ kunne lukkes med tilbake, sett `historyBack={false}` på `FullscreenOverlay` (kun onboardingen gjør det i dag).

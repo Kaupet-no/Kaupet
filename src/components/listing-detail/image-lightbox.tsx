@@ -5,7 +5,7 @@ import {
   Vehicle360Viewer,
   type Vehicle360Frame,
 } from "@/components/listing-detail/vehicle/vehicle-360-viewer";
-import { useFocusTrap } from "@/hooks/use-focus-trap";
+import { FullscreenOverlay, FullscreenOverlayContent } from "@/components/ui/fullscreen-overlay";
 
 type ListingImage = { storage_path: string; sort_order: number; caption?: string | null };
 
@@ -29,15 +29,12 @@ export function ImageLightbox({
   vehicle360,
 }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [emblaRef, emblaApi] = useEmblaCarousel({ startIndex: initialIndex, loop: true });
 
   const has360 = !!vehicle360 && vehicle360.frames.length > 0;
   const offset = has360 ? 1 : 0;
   const totalSlides = images.length + offset;
-
-  useFocusTrap(dialogRef, true);
 
   useEffect(() => {
     closeRef.current?.focus();
@@ -47,8 +44,7 @@ export function ImageLightbox({
     history.pushState({ overlay: "image" }, "");
     const onPop = () => onClose();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") history.back();
-      else if (e.key === "ArrowLeft") emblaApi?.scrollPrev();
+      if (e.key === "ArrowLeft") emblaApi?.scrollPrev();
       else if (e.key === "ArrowRight") emblaApi?.scrollNext();
     };
     window.addEventListener("popstate", onPop);
@@ -84,124 +80,125 @@ export function ImageLightbox({
   );
 
   return (
-    // Clicking the backdrop (anywhere that isn't a button or thumbnail) closes the lightbox
-    <div
-      ref={dialogRef}
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Bildegalleri for ${title}`}
-      onClick={() => history.back()}
-      className="fixed inset-0 z-[200] flex flex-col bg-black/65 backdrop-blur-sm"
-    >
-      {/* Top bar */}
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="flex items-center justify-between px-4 py-3"
+    <FullscreenOverlay open onOpenChange={(next) => !next && history.back()}>
+      {/* Clicking the backdrop (anywhere that isn't a button or thumbnail) closes the lightbox */}
+      <FullscreenOverlayContent
+        title={`Bildegalleri for ${title}`}
+        onClick={() => history.back()}
+        className="bg-black/65 backdrop-blur-sm"
       >
-        <span className="text-sm text-white/60">
-          {totalSlides > 1 ? `${currentIndex + 1} / ${totalSlides}` : ""}
-        </span>
-        <button
-          ref={closeRef}
-          type="button"
-          onClick={() => history.back()}
-          aria-label="Lukk bildegalleri"
-          className="rounded-full p-2 text-white/80 transition-colors hover:bg-white/10 hover:text-white"
-        >
-          <X className="size-6" />
-        </button>
-      </div>
-
-      {/* Carousel — clicks bubble up to the backdrop and close the lightbox */}
-      <div className="relative min-h-0 flex-1 overflow-hidden" ref={emblaRef}>
-        <div className="flex h-full">
-          {has360 && (
-            <div className="relative flex h-full min-w-0 flex-[0_0_100%] items-center justify-center">
-              <div className="w-full max-w-full" onClick={(e) => e.stopPropagation()}>
-                <Vehicle360Viewer
-                  frames={vehicle360.frames}
-                  imgUrls={vehicle360.imgUrls}
-                  title={title}
-                />
-              </div>
-            </div>
-          )}
-          {images.map((img, i) => (
-            <div key={img.storage_path} className="relative h-full min-w-0 flex-[0_0_100%]">
-              <img
-                src={imgUrls[img.storage_path]}
-                alt={i === 0 && !has360 ? title : `${title} – bilde ${i + 1}`}
-                className="h-full w-full object-contain"
-              />
-              {img.caption && (
-                <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-4 py-3 text-center text-sm text-white">
-                  {img.caption}
-                </p>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {totalSlides > 1 && (
-          <>
-            <button
-              type="button"
-              onClick={scrollPrev}
-              aria-label="Forrige bilde"
-              className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70"
-            >
-              <ChevronLeft className="size-6" />
-            </button>
-            <button
-              type="button"
-              onClick={scrollNext}
-              aria-label="Neste bilde"
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70"
-            >
-              <ChevronRight className="size-6" />
-            </button>
-          </>
-        )}
-      </div>
-
-      {/* Thumbnail bar */}
-      {totalSlides > 1 && (
+        {/* Top bar */}
         <div
           onClick={(e) => e.stopPropagation()}
-          className="flex justify-center gap-2 overflow-x-auto px-4 py-3"
+          className="flex items-center justify-between px-4 py-3"
         >
-          {has360 && (
-            <button
-              type="button"
-              onClick={() => emblaApi?.scrollTo(0)}
-              aria-label="Gå til 360°-visning"
-              aria-pressed={currentIndex === 0}
-              className={`flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-md border-2 bg-white/10 transition-colors ${
-                currentIndex === 0 ? "border-white" : "border-transparent opacity-50"
-              }`}
-            >
-              <RotateCw className="size-5 text-white" />
-            </button>
-          )}
-          {images.map((img, i) => {
-            const absoluteIndex = i + offset;
-            return (
+          <span className="text-sm text-white/60">
+            {totalSlides > 1 ? `${currentIndex + 1} / ${totalSlides}` : ""}
+          </span>
+          <button
+            ref={closeRef}
+            type="button"
+            onClick={() => history.back()}
+            aria-label="Lukk bildegalleri"
+            className="rounded-full p-2 text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <X className="size-6" />
+          </button>
+        </div>
+
+        {/* Carousel — clicks bubble up to the backdrop and close the lightbox */}
+        <div className="relative min-h-0 flex-1 overflow-hidden" ref={emblaRef}>
+          <div className="flex h-full">
+            {has360 && (
+              <div className="relative flex h-full min-w-0 flex-[0_0_100%] items-center justify-center">
+                <div className="w-full max-w-full" onClick={(e) => e.stopPropagation()}>
+                  <Vehicle360Viewer
+                    frames={vehicle360.frames}
+                    imgUrls={vehicle360.imgUrls}
+                    title={title}
+                  />
+                </div>
+              </div>
+            )}
+            {images.map((img, i) => (
+              <div key={img.storage_path} className="relative h-full min-w-0 flex-[0_0_100%]">
+                <img
+                  src={imgUrls[img.storage_path]}
+                  alt={i === 0 && !has360 ? title : `${title} – bilde ${i + 1}`}
+                  className="h-full w-full object-contain"
+                />
+                {img.caption && (
+                  <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-4 py-3 text-center text-sm text-white">
+                    {img.caption}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {totalSlides > 1 && (
+            <>
               <button
-                key={img.storage_path}
                 type="button"
-                onClick={() => emblaApi?.scrollTo(absoluteIndex)}
-                aria-label={`Gå til bilde ${i + 1}`}
-                aria-pressed={absoluteIndex === currentIndex}
-                className={`size-14 shrink-0 overflow-hidden rounded-md border-2 transition-colors ${
-                  absoluteIndex === currentIndex ? "border-white" : "border-transparent opacity-50"
+                onClick={scrollPrev}
+                aria-label="Forrige bilde"
+                className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70"
+              >
+                <ChevronLeft className="size-6" />
+              </button>
+              <button
+                type="button"
+                onClick={scrollNext}
+                aria-label="Neste bilde"
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70"
+              >
+                <ChevronRight className="size-6" />
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Thumbnail bar */}
+        {totalSlides > 1 && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="flex justify-center gap-2 overflow-x-auto px-4 py-3"
+          >
+            {has360 && (
+              <button
+                type="button"
+                onClick={() => emblaApi?.scrollTo(0)}
+                aria-label="Gå til 360°-visning"
+                aria-pressed={currentIndex === 0}
+                className={`flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-md border-2 bg-white/10 transition-colors ${
+                  currentIndex === 0 ? "border-white" : "border-transparent opacity-50"
                 }`}
               >
-                <img src={imgUrls[img.storage_path]} alt="" className="size-full object-cover" />
+                <RotateCw className="size-5 text-white" />
               </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
+            )}
+            {images.map((img, i) => {
+              const absoluteIndex = i + offset;
+              return (
+                <button
+                  key={img.storage_path}
+                  type="button"
+                  onClick={() => emblaApi?.scrollTo(absoluteIndex)}
+                  aria-label={`Gå til bilde ${i + 1}`}
+                  aria-pressed={absoluteIndex === currentIndex}
+                  className={`size-14 shrink-0 overflow-hidden rounded-md border-2 transition-colors ${
+                    absoluteIndex === currentIndex
+                      ? "border-white"
+                      : "border-transparent opacity-50"
+                  }`}
+                >
+                  <img src={imgUrls[img.storage_path]} alt="" className="size-full object-cover" />
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </FullscreenOverlayContent>
+    </FullscreenOverlay>
   );
 }

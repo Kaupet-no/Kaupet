@@ -4,6 +4,8 @@ import { useIsNative } from "@/hooks/use-is-native";
 import { Heart, X } from "lucide-react";
 
 import { NativePageHeader } from "@/components/native-page-header";
+import { PullToRefreshIndicator } from "@/components/pull-to-refresh-indicator";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -32,6 +34,11 @@ function FavoritesPage() {
   const native = useIsNative();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+
+  const { refreshing, pullDistance } = usePullToRefresh({
+    enabled: native,
+    onRefresh: () => queryClient.resetQueries({ queryKey: ["user-favorites"] }),
+  });
 
   const { data: favorites, isLoading } = useQuery({
     queryKey: ["user-favorites", user?.id],
@@ -102,6 +109,7 @@ function FavoritesPage() {
   return (
     <>
       <NativePageHeader title="Mine favoritter" backLabel="Meg" backTo="/meg" />
+      {native && <PullToRefreshIndicator pullDistance={pullDistance} refreshing={refreshing} />}
       <div className="mx-auto max-w-6xl px-4 py-6">
         {!native && (
           <div className="flex items-center gap-3 max-sm:hidden">

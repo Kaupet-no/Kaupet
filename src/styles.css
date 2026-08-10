@@ -201,6 +201,27 @@
   padding-bottom: var(--app-bottom-nav-h);
 }
 
+/* Native polish (fase 7, se docs/NATIVE-UI-UX-PLAN.md). `.native` settes på
+   <html> fra setupNative(), altså kun i Capacitor-WebView-en — web er
+   uberørt. */
+
+/* Androids standard grå/blå trykkrektangel over appens egne aktiv-tilstander. */
+.native {
+  -webkit-tap-highlight-color: transparent;
+  /* Bounce/glow fra indre lister skal ikke forplante seg til dokumentet. */
+  overscroll-behavior: none;
+}
+
+/* Langtrykk på chrome skal ikke gi tekstmarkering eller iOS-kopimeny. Dette
+   er bevisst en liste over *interaktive* elementer, ikke en global av-bryter:
+   brødtekst, annonsebeskrivelser og meldinger skal fortsatt kunne kopieres.
+   Kortoverskrifter ligger inne i <a> og er dekket den veien. */
+.native :is(button, a, [role="button"], [role="tab"], label, nav, header, summary) {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
 /* Isoler Leaflet sin interne z-index-stack slik at panene (z-index 400–700)
    ikke bryter ut over modal-overlays (Radix Dialog bruker z-50). */
 .leaflet-container {

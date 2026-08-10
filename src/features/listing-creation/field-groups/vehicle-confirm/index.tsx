@@ -2,6 +2,7 @@
 import { createPortal } from "react-dom";
 import { format } from "date-fns";
 
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -304,24 +305,28 @@ export function VehicleConfirm({
       </div>
 
       {vehiclePreviousClassificationMismatch && (
-        <div className="rounded-md border border-amber-400/50 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-          Sist du slo opp dette registreringsnummeret fikk du{" "}
-          <span className="font-medium">
-            {vehiclePreviousClassificationMismatch.slug &&
-            vehiclePreviousClassificationMismatch.slug in LEAF_LABELS_NB
-              ? LEAF_LABELS_NB[vehiclePreviousClassificationMismatch.slug as VehicleLeafSlug]
-              : "en annen kjøretøytype"}
-          </span>{" "}
-          — dette kan skje ved eierskifte av personlige kjennemerker. Sjekk at kjøretøytypen under
-          stemmer med kjøretøyet du selger nå.
-        </div>
+        <Alert variant="warning">
+          <AlertDescription>
+            Sist du slo opp dette registreringsnummeret fikk du{" "}
+            <span className="font-medium">
+              {vehiclePreviousClassificationMismatch.slug &&
+              vehiclePreviousClassificationMismatch.slug in LEAF_LABELS_NB
+                ? LEAF_LABELS_NB[vehiclePreviousClassificationMismatch.slug as VehicleLeafSlug]
+                : "en annen kjøretøytype"}
+            </span>{" "}
+            — dette kan skje ved eierskifte av personlige kjennemerker. Sjekk at kjøretøytypen under
+            stemmer med kjøretøyet du selger nå.
+          </AlertDescription>
+        </Alert>
       )}
 
-      <div className="rounded-md border border-amber-400/50 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-        Opplysningene under er hentet fra Statens vegvesen. Du kan endre feltene under dersom noe er
-        feil, men husk at du etter forbrukerkjøpsloven er ansvarlig for at opplysningene om
-        kjøretøyet du oppgir i annonsen er korrekte. Rett kun det som faktisk er feil.
-      </div>
+      <Alert variant="warning">
+        <AlertDescription>
+          Opplysningene under er hentet fra Statens vegvesen. Du kan endre feltene under dersom noe
+          er feil, men husk at du etter forbrukerkjøpsloven er ansvarlig for at opplysningene om
+          kjøretøyet du oppgir i annonsen er korrekte. Rett kun det som faktisk er feil.
+        </AlertDescription>
+      </Alert>
 
       <div className="rounded-md bg-muted/40 p-3 text-sm">
         <div className="flex items-center justify-between gap-2">

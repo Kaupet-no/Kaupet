@@ -509,7 +509,9 @@ function ListingDetailViewBody({
 
   return (
     <div className={`mx-auto max-w-6xl px-4 py-8 ${showStickyContact ? "pb-28 md:pb-8" : ""}`}>
-      <NativePageHeader title={title} />
+      {/* titleFadesIn: siden har allerede tittelen som stor <h1> rett under
+          headeren — headertittelen toner inn først når den er scrollet vekk. */}
+      <NativePageHeader title={title} titleFadesIn />
       {previewBanner}
 
       <header className="mt-4">

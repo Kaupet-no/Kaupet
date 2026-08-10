@@ -1,10 +1,11 @@
 # Native-app: UI/UX-revisjon for mobil og nettbrett
 
-Status: **Fase 0, 1 og 2 implementert** 2026-08-10. Analyse gjennomført
+Status: **Fase 0, 1, 2 og 3 implementert** 2026-08-10. Analyse gjennomført
 2026-08-10. Alle fire åpne spørsmål er besvart 2026-08-10 (se seksjon 8) og
-innarbeidet i tiltaksliste og faser. Neste steg: **fase 3**
-(navigasjonsgester). Fase 2 er ikke endelig ferdig før den er reverifisert i
-simulator på en enhet med notch — se seksjon 7.
+innarbeidet i tiltaksliste og faser. Neste steg: **fase 4** (formatfaktor —
+nettbrett som eget format). Fase 2 og 3 er ikke endelig ferdige før de er
+reverifisert i simulator (safe-area-verdier med notch, iOS-kantsveip,
+Android-tilbakeknapp) — se seksjon 7.
 
 Sist oppdatert: 2026-08-10.
 
@@ -448,6 +449,7 @@ Dette er tre linjer CSS som gir uforholdsmessig stor opplevd gevinst.
 | 26  | Kompakt søkesammendrag-pille på `/annonser` erstatter søkelinje + full chip-rad                | Middels  | Høy         | 8.3              |
 | 27  | Slå av sidenivå-zoom på native (`user-scalable=no`) — kun i native, ikke på web                | Triviell | Høy         | 8.4              |
 | 28  | Løft «fjern lokasjon»-krysset ut av chip-knappen på forsiden + ≥44px                           | Liten    | Middels     | 10.2             |
+| 29  | Tilbake-trykk under onboarding: kortnavigasjon i stedet for å avslutte appen                   | Liten    | Middels     | 10.6             |
 
 **Ikke anbefalt:** omskriving av annonseveiviseren, meldingskjernen eller
 `FullscreenOverlay`/`ResponsiveOverlay`-arkitekturen. Alle tre er riktig
@@ -810,8 +812,8 @@ ferdigdefinisjon, ikke en oppfølgingssak:
 | 2    | ✅ Alle fire `--safe-*`-variablene (alle var døde) — slettet                                     |
 | 2    | ✅ `pb-8`-kompensasjonen i `app-bottom-nav.tsx`s ad-picker-sheet                                 |
 | 2    | ✅ Per-konsument safe-area i de tre overlayene som håndterte det manuelt                         |
-| 3    | Den lokale historikk-håndteringen i `image-lightbox.tsx:43-56`                                   |
-| 3    | Den dupliserte `<h1>` på annonsedetalj                                                           |
+| 3    | ✅ Den lokale historikk-håndteringen i `image-lightbox.tsx` **og** `map-overlay.tsx`             |
+| 3    | ✅ Den dupliserte `<h1>` på annonsedetalj (headertittelen toner inn ved scroll i stedet)         |
 | 4    | Eventuelle manuelle `!native ? Dialog : Sheet`-grener som fortsatt finnes (`app-bottom-nav.tsx`) |
 | 5    | _Ingen_ — plisten beholder alle orienteringer med vilje (se fase 5)                              |
 | 9    | `native-search-overlay.tsx` **hele filen** — erstattes av søkepanelet                            |
@@ -1101,6 +1103,74 @@ ikke at iOS/Android faktisk leverer de verdiene vi tror. Fase 2 skal derfor
 jf. seksjon 7. Ad-picker-sheeten (der `pb-8` ble fjernet) ligger bak
 innlogging og er ikke sett åpen — kun `SheetContent`-regelen er målt isolert.
 
+### Fase 3 — Navigasjonsgester (tiltak 7, 8, 9) — kodeferdig 2026-08-10, venter på simulator
+
+**Gjort:**
+
+1. **`useOverlayHistory(enabled, onClose)`** (`src/hooks/use-overlay-history.ts`)
+   kalles fra `FullscreenOverlay` og `ResponsiveOverlay` — altså fra
+   **rot**-komponentene, ikke fra `*Content`, siden det er der `open` og
+   `onOpenChange` finnes. Alle 13 kallsteder for de to primitivene arver den
+   uten endring. `historyBack={false}` på `FullscreenOverlay` er opt-out-en, og
+   onboardingen er eneste bruker av den (den blokkerer bevisst Escape og klikk
+   utenfor, jf. planens punkt 1).
+2. **iOS sveip-tilbake:** `allowsBackForwardNavigationGestures = true` settes i
+   `AppDelegate.applicationDidBecomeActive`. Capacitor 8 eksponerer den
+   **ikke** i `capacitor.config.ts` (sjekket `@capacitor/cli`s
+   `declarations.d.ts` — `ios` har `zoomEnabled` og `allowsLinkPreview`, men
+   ingen back/forward-gest), så native kode er eneste vei. Den settes ikke i
+   `didFinishLaunching` fordi WebView-en ikke finnes ennå der; kallet er
+   idempotent og tåler å kjøre ved hver aktivering.
+3. **`NativePageHeader`:** `line-clamp-1` på `<h1>`, og ny `titleFadesIn`-
+   egenskap brukt av annonsedetaljen. Dubletten er løst med planens «bedre,
+   men større»-variant i stedet for den minste, fordi den ikke var større:
+   `useScrollFadeOpacity` fantes allerede (brukt av `app-hero-logo.tsx`) og
+   kunne gjenbrukes invertert. Headertittelen er `opacity: 0` (og
+   `aria-hidden`) i toppen der innholdets `<h1>` er synlig, og toner inn når
+   den er scrollet vekk.
+
+**Avvik fra planen:** hooken er ikke en ren «pushState ved åpning, back ved
+lukking»-uttrekking slik planen beskrev — se funn 10.5. Den teller åpne
+overlays på modulnivå og utsetter opprydningen én tick, ellers lekker et
+lazy-lastet overlay en historikk-oppføring.
+
+**Pensjonert:** den lokale historikk-håndteringen i `image-lightbox.tsx` og —
+ikke nevnt i planen, men samme kopi — `map-overlay.tsx`. Begge kaller nå
+`onClose()` direkte i stedet for `history.back()`; oppryddingen av
+historikk-oppføringen skjer i hooken.
+
+**Verifisert live** med `?forcenative` på 375×812 (målt i DOM, ikke antatt):
+
+- `ResponsiveOverlay` (Kaupet-kode-dialogen): åpning pusher nøyaktig én
+  oppføring (`history.state = {overlay:true}`), Escape lukker og popper den
+  tilbake til ruterens egen tilstand — ingen lekket oppføring.
+- `ImageLightbox` (`FullscreenOverlay`, lazy-lastet): `history.back()` lukker
+  galleriet og lar brukeren stå igjen på `/59186707`, `history.length` uendret.
+- Onboarding: ingen oppføring pushes (`historyBack={false}` bekreftet i DOM).
+- Navigasjon mens et overlay er åpent (Del annonse → lenke til `/`): landet på
+  `/` og ble stående — guarden mot å kalle `history.back()` når toppen av
+  stacken er ruterens tilstand virker.
+- `NativePageHeader`: tittelfeltet 24px (én linje, med ellipse) mot to linjer
+  før; tittelen skjult ved scroll 0 og synlig etter scroll.
+
+`bunx tsc --noEmit` rent, `bun run test` 222/222 (fire nye for hooken),
+`bun run lint` 0 errors, `bun run test:e2e` 3/3 — den siste kjørt fordi
+`ResponsiveOverlay` nå pusher historikk **også på web**, og
+`publish-listing.spec.ts` går gjennom `PublishedListingDialog`.
+
+**Ikke verifisert:**
+
+- **iOS-kantsveipen** — kun kodenivå. Den kan ikke observeres i nettleser i det
+  hele tatt, og konflikten planen advarte mot (Embla-karusellene i
+  `image-gallery`/`image-lightbox`, og kategori-chip-radene som starter i
+  venstre kant) er **ikke** testet. Dette er den enkeltrisikoen i fase 3 jeg er
+  minst trygg på.
+- **Android-tilbakeknappen** — hele historikk-mekanismen er verifisert via
+  `history.back()` i nettleser, som er det `native-offline.ts` faktisk kaller,
+  men selve `backButton`-koblingen er ikke sett kjøre på enhet.
+- Innloggede overlays (annonseveiviserens dialoger, meldingsflatene) er som før
+  kun kodegjennomgått.
+
 ---
 
 ## 10. Funn oppdaget underveis
@@ -1148,3 +1218,52 @@ slår inn samtidig.
 **Ikke et nytt tiltak** — det er allerede dekket av fase 3 punkt 3
 (`line-clamp-1`). Notert her fordi det hever prioriteten: fase 3 bør ikke
 utsettes bak fase 2 lenge, ellers er landskap dårligere enn før denne fasen.
+
+**Lukket i fase 3** (`line-clamp-1` er på plass, målt til én linje på 375px).
+
+### 10.4 `map-overlay.tsx` hadde samme lokale historikk-kopi (fase 3, 2026-08-10)
+
+Funn 3.2.2 slo fast at «det er ett sted som gjør det riktig og sju som ikke
+gjør det». Det var to: `map-overlay.tsx:23-30` hadde en nesten identisk kopi av
+`image-lightbox`-mønsteret (uten opprydning ved lukking via X, siden alle
+lukkeveier gikk via `history.back()`). Begge er pensjonert i fase 3.
+
+Poenget generalisert: når en plan teller kallsteder fra ett funn, er tellingen
+verdt å `grep`-e opp på nytt ved implementering — funnet var riktig i sak, men
+underrapporterte omfanget.
+
+### 10.5 Lazy-lastede overlays lekker en historikk-oppføring (fase 3, 2026-08-10)
+
+Planen beskrev `useOverlayHistory` som en ren uttrekking av
+`image-lightbox`-logikken. Det holdt ikke: `ImageLightbox` lastes med
+`React.lazy` bak `Suspense` (`listing-detail-view.tsx:69`), og effekten kjøres
+**to ganger** rundt at chunken løses — montert, avmontert, montert igjen.
+Målt i dev: `push → back → push` ved én åpning, med to `overlay`-oppføringer
+igjen i stacken, altså to tilbake-trykk for å komme forbi galleriet.
+
+`history.back()` er asynkron, så en rent komponentlokal opptelling kan ikke
+løse dette. Hooken teller derfor åpne overlays på **modulnivå** og utsetter
+opprydningen én tick, slik at en umiddelbar remontering overtar den eksisterende
+oppføringen i stedet for å pushe en ny. Målt etter fiksen: nøyaktig én `push`
+ved åpning og én `back` ved lukking.
+
+**Kjent tak** (markert med en `ponytail:`-kommentar i hooken): alle samtidig
+åpne overlays deler én oppføring, så et tilbake-trykk lukker et nøstet overlay
+og forelderen samtidig. Ingen flate i appen har nøstede overlays i dag; telles
+per nivå hvis det endrer seg.
+
+### 10.6 Android-tilbake under onboarding avslutter fortsatt appen (fase 3, 2026-08-10)
+
+Fase 3 bevarer med vilje at onboardingen ikke kan lukkes med tilbake
+(`historyBack={false}`, jf. planens punkt 1). Konsekvensen er den samme som
+funn 3.2.2 beskrev: siden onboardingen ligger på rot-ruten uten egen
+historikk-oppføring, går `backButton` → `window.history.back()` →
+`App.exitApp()` i `native-offline.ts:46-56`, altså **avslutter appen**.
+
+Det er ikke verre enn før fase 3, men det er heller ikke løst. Riktig oppførsel
+er trolig at tilbake-trykk under onboarding går ett kort tilbake, og er en
+no-op på første kort.
+
+**Foreslått som nytt tiltak 29** (Liten, Middels): la `OnboardingFlow` selv
+håndtere `backButton`/`popstate` til kortnavigasjon. Passer inn hvor som helst;
+ingen avhengighet til øvrige faser.

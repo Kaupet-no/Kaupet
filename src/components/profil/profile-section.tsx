@@ -154,7 +154,7 @@ export function ProfileSection() {
           <Skeleton className="size-20 shrink-0 rounded-full" />
           <div className="max-w-xs flex-1 space-y-2">
             <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-11 w-full" />
           </div>
         </CardContent>
       </Card>

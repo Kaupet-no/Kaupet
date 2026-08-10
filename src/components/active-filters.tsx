@@ -35,7 +35,7 @@ type Props = {
   onRemoveLocation?: () => void;
 };
 
-function describeAttrValue(filter: CategoryFilter, value: AttributeFilterValue): string {
+export function describeAttrValue(filter: CategoryFilter, value: AttributeFilterValue): string {
   switch (value.kind) {
     case "select": {
       const opt = filter.options?.find((o) => o.value === value.value);

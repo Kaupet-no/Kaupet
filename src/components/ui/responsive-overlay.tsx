@@ -1,6 +1,7 @@
 import * as React from "react";
 
-import { useIsNative } from "@/hooks/use-is-native";
+import { useFormFactor } from "@/hooks/use-form-factor";
+import { useOverlayHistory } from "@/hooks/use-overlay-history";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -12,14 +13,18 @@ type Props = {
 };
 
 /**
- * Dialog on web, bottom Sheet on native — per UI-GUIDE.md's "native uses
- * Sheet" rule. Both are built on the same @radix-ui/react-dialog primitive,
- * so DialogHeader/DialogTitle/DialogDescription/DialogFooter work as
- * children regardless of which one renders.
+ * Bottom Sheet på telefon, sentrert Dialog på nettbrett og web. En
+ * fullbredde bunn-skuff er riktig på 375px og feil på 1024px — derfor
+ * formatfaktor, ikke bare `isNative()`. Begge bygger på samme
+ * @radix-ui/react-dialog-primitiv, så DialogHeader/DialogTitle/
+ * DialogDescription/DialogFooter virker som barn uansett hvilken som rendres.
  */
 export function ResponsiveOverlay({ open, onOpenChange, children }: Props) {
-  const native = useIsNative();
-  const Root = native ? Sheet : Dialog;
+  const phone = useFormFactor() === "phone";
+  // Egen historikk-oppføring: Android-tilbake/iOS-sveip lukker overlayet i
+  // stedet for å navigere siden bak det.
+  useOverlayHistory(open, () => onOpenChange(false));
+  const Root = phone ? Sheet : Dialog;
   return (
     <Root open={open} onOpenChange={onOpenChange}>
       {children}
@@ -32,10 +37,10 @@ export function ResponsiveOverlayContent({
   children,
   ...props
 }: React.ComponentPropsWithoutRef<typeof DialogContent>) {
-  const native = useIsNative();
-  if (native) {
+  const phone = useFormFactor() === "phone";
+  if (phone) {
     return (
-      <SheetContent side="bottom" className={cn("rounded-t-2xl pb-8", className)} {...props}>
+      <SheetContent side="bottom" className={cn("rounded-t-2xl", className)} {...props}>
         {children}
       </SheetContent>
     );

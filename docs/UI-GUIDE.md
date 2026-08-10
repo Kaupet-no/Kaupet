@@ -36,9 +36,9 @@ Tre primitiver dekker det aller meste — velg ut fra hva flyten faktisk trenger
 | Fullskjerm-takeover uten kortet-chrome (galleri, kart, onboarding) | `FullscreenOverlay` |
 | Destruktiv/irreversibel bekreftelse                                | `AlertDialog`       |
 
-### Web/native-responsive dialoger
+### Formatfaktor-responsive dialoger
 
-Web bruker `Dialog`, native bruker `Sheet` for tilsvarende flyter. Bruk `ResponsiveOverlay`/`ResponsiveOverlayContent` (`src/components/ui/responsive-overlay.tsx`) i stedet for å grene manuelt på `useIsNative()` — den velger riktig primitiv automatisk:
+**Telefon** (native, < 768px) bruker `Sheet`; **nettbrett** (native, ≥ 768px) og **web** bruker `Dialog`. Bruk `ResponsiveOverlay`/`ResponsiveOverlayContent` (`src/components/ui/responsive-overlay.tsx`) i stedet for å grene manuelt — den velger riktig primitiv automatisk:
 
 ```tsx
 <ResponsiveOverlay open={open} onOpenChange={setOpen}>
@@ -53,9 +53,10 @@ Web bruker `Dialog`, native bruker `Sheet` for tilsvarende flyter. Bruk `Respons
 
 `DialogHeader`/`DialogTitle`/`DialogDescription`/`DialogFooter` fungerer uendret inni begge varianter, siden `Dialog` og `Sheet` er bygget på samme `@radix-ui/react-dialog`-primitiv.
 
-- `app-bottom-nav.tsx`s "Ny annonse"-velger er fortsatt en manuell `!native ? <Dialog> : <Sheet>`-gren (forhåndsdatert `ResponsiveOverlay`) — nytt overlay-UI bør bruke `ResponsiveOverlay` fra start.
+- Grenen går på `useFormFactor()` (`src/hooks/use-form-factor.ts`), ikke `useIsNative()`: en fullbredde bunn-skuff er riktig på 375px og feil på 1024px. Hooken returnerer `"phone" | "tablet" | "web"` og skal kalles der oppsettet faktisk forgrener — ikke spres som en `isTablet`-boolsk rundt i koden.
 - Bruk `ResponsiveOverlay` for alt brukervendt — en dialog som går rett på `Dialog` mister bottom-sheet-oppførselen native-appen ellers har (se `kaupet-code-dialog.tsx`).
 - Rene admin-flater (`src/routes/_authenticated/admin/**`) er unntaket og kan fortsette å bruke `Dialog` direkte, siden de uansett ikke kjører i native-appen (se `create-demo-user-dialog.tsx`).
+- Begge overlay-rotene (`ResponsiveOverlay` og `FullscreenOverlay`) gir seg selv en egen historikk-oppføring via `useOverlayHistory` (`src/hooks/use-overlay-history.ts`), slik at Android-tilbakeknappen og iOS' kantsveip lukker overlayet i stedet for å navigere siden bak det. Ikke gjenta `history.pushState`/`popstate` i en konsument. Trenger en flate å _ikke_ kunne lukkes med tilbake, sett `historyBack={false}` på `FullscreenOverlay` (kun onboardingen gjør det i dag).
 
 ### Fullskjerm-takeovers
 
@@ -77,7 +78,7 @@ For manuelt posisjonerte `fixed inset-0`-fullskjermtakeovers (bildegalleri, kart
 >
 ```
 
-**z-index og stabling i `document.body`:** `FullscreenOverlay`/`FullscreenOverlayContent` bruker `z-[10000]` — samme nivå som `Dialog`, `Sheet` og `AlertDialog`. Radix portalerer hver åpne dialog til `document.body` i den rekkefølgen de _monteres_ (ikke i JSX-nøstingsrekkefølge), og ved lik z-index vinner senere DOM-plassering. Det betyr at en `Sheet`/`Dialog` som kun monteres når brukeren eksplisitt åpner den (mens et `FullscreenOverlay` allerede er oppe) automatisk havner over — se `TermGroupSheet` i `native-advanced-search.tsx` for referanse.
+**z-index og stabling i `document.body`:** `FullscreenOverlay`/`FullscreenOverlayContent` bruker `z-[10000]` — samme nivå som `Dialog`, `Sheet` og `AlertDialog`. Radix portalerer hver åpne dialog til `document.body` i den rekkefølgen de _monteres_ (ikke i JSX-nøstingsrekkefølge), og ved lik z-index vinner senere DOM-plassering. Det betyr at en `Sheet`/`Dialog` som kun monteres når brukeren eksplisitt åpner den (mens et `FullscreenOverlay` allerede er oppe) automatisk havner over — se `TermGroupSheet` i `features/listing-search/search-panel/filter-sections.tsx` for referanse.
 
 Ikke løs stablingsrekkefølge ved å sette en vilkårlig lavere `z-[9999]` på det ytre overlayet for å "garantere" det ligger under — det brøt sammen så snart begge lå på samme nivå og skapte en skjør avhengighet av implisitt monteringsrekkefølge fremfor en eksplisitt en. Trenger du en garanti som _ikke_ avhenger av monteringsrekkefølge (f.eks. et overlay som kan være åpent samtidig som et annet, i en rekkefølge du ikke kontrollerer), sett en eksplisitt høyere `z-`-verdi via `className` på den ytre `FullscreenOverlayContent` i stedet for å stole på stabling.
 
@@ -147,8 +148,21 @@ Tre varianter: `default`, `destructive`, og `warning` (amber, for advarsler som 
 ## Native (Capacitor)
 
 - Sjekk `isNative()` (`@/lib/native`) eller hooken `useIsNative()` for å grene mellom web- og native-UI — ikke dupliser hele komponenter.
+- **Verifisere native-grener i nettleser:** legg til `?forcenative` i URL-en i dev
+  (`http://localhost:3000/?forcenative`), så returnerer `isNative()` true og hele
+  native-grenen rendres. Overstyringen er gated på `import.meta.env.DEV` og finnes
+  ikke i produksjonsbygget. Bruk den til layoutverifisering på 375×812, 844×390,
+  820×1180 og 1024×1366 — safe-area-verdier er alltid 0 i nettleser, så de må
+  fortsatt sjekkes i simulator.
 - Touch-targets skal være minst 44×44px (se `app-bottom-nav.tsx`).
-- Bruk `pt-safe` / `env(safe-area-inset-bottom)` for områder nær systemets UI (status bar, home indicator).
+- **Safe area:** `FullscreenOverlayContent` og `Sheet side="bottom"` håndterer det selv — ikke legg til padding på kallstedet. Skal en fullskjermflate gå helt ut i kanten (bilde, kart, kamera), sett `edgeToEdge` og padre ditt eget chrome i stedet, ikke medieinnholdet.
+- Utilities for chrome som ikke går via de primitivene: `.pt-safe`/`.pb-safe` (min. 0,5rem), `.pl-safe`/`.pr-safe` (null i basis — for elementer uten egen horisontal padding), `.px-safe` (1rem i basis — erstatning for `px-4`) og `.p-safe` (alle fire kanter, ingen minimum). Merk at de er ulagede og derfor **erstatter** `padding` fra Tailwind-utilities på samme element — velg varianten hvis basisverdi matcher det kallstedet hadde.
+- **Orientering:** telefon er låst til portrett ved oppstart, nettbrett roterer fritt (`src/lib/orientation.ts`). Trenger en flate landskap, kall `unlockOrientation()` ved mount og `lockPortraitOnPhone()` ved unmount — se `image-lightbox.tsx`, som er eneste unntak i dag. Ikke fjern landskap fra `Info.plist`: låsen styres i kjøretid, og plisten er det som gjør unntaket mulig i det hele tatt.
+- **Native-only CSS:** `setupNative()` setter klassen `.native` på `<html>`. Bruk den som gate for regler som kun skal gjelde i appen (tap-highlight, `user-select`, `overscroll-behavior` — se `styles.css`). Merk at `user-select: none` bevisst er begrenset til interaktive elementer: brødtekst, annonsebeskrivelser og meldinger skal fortsatt kunne kopieres.
+- **Bunn-sheets kan dras ned for å lukkes** (`useSheetDrag` i `ui/sheet.tsx`, kun `side="bottom"`). Håndtaket rendres automatisk — ikke legg til ditt eget. Gesten lukker via Escape, så en sheet som blokkerer `onEscapeKeyDown` blokkerer også dra-lukking.
+- **Søk på native går gjennom ett panel.** `SearchPanel` (`src/features/listing-search/search-panel/`) er den eneste native søkeflaten: et dratt `vaul`-panel med to detents (60 % / fullskjerm). Uten `results`-propen er det en søkelansering (fritekst, historikk, kategorier); med den redigerer det filtrene til resultatflaten det står over. Resultatflatene viser `SearchSummaryPill` i stedet for søkelinje + chip-rad. Ikke legg til en tredje native søkeflate ved siden av — utvid panelet. `NativeAdvancedSearch` er etter dette **kun** redigering av et lagret søk (`mine-sok.tsx`); begge rendrer de samme `SearchFilterSections`.
+- `vaul` brukes **kun** av `SearchPanel` (den trenger detents). Vanlige bunn-sheets blir værende på Radix + `useSheetDrag`.
+- **Tekststørrelse:** `src/lib/text-scale.ts` speiler iOS' Dynamic Type inn i `html { font-size }`. Bruk `rem` (Tailwinds standard) for all typografi — `px`-satt tekst skalerer ikke med brukerens innstilling. Android trenger ingenting; WebView-en skalerer allerede selv.
 - Unngå `Tooltip` og andre hover-avhengige mønstre i flater som vises i native-appen.
 
 ## Skjemavalidering

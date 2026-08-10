@@ -6,6 +6,8 @@ import {
   type Vehicle360Frame,
 } from "@/components/listing-detail/vehicle/vehicle-360-viewer";
 import { FullscreenOverlay, FullscreenOverlayContent } from "@/components/ui/fullscreen-overlay";
+import { ZoomableImage } from "@/components/listing-detail/zoomable-image";
+import { lockPortraitOnPhone, unlockOrientation } from "@/lib/orientation";
 
 type ListingImage = { storage_path: string; sort_order: number; caption?: string | null };
 
@@ -30,7 +32,18 @@ export function ImageLightbox({
 }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
-  const [emblaRef, emblaApi] = useEmblaCarousel({ startIndex: initialIndex, loop: true });
+  // Zoomet bilde eier gesten selv — Emblas dra-gest slås av mens den varer.
+  // Ref, ikke state: `watchDrag` leses ved pointerdown, og en reInit ville
+  // hoppet karusellen tilbake til start.
+  const zoomedRef = useRef(false);
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    startIndex: initialIndex,
+    loop: true,
+    watchDrag: () => !zoomedRef.current,
+  });
+  const onZoomChange = useCallback((zoomed: boolean) => {
+    zoomedRef.current = zoomed;
+  }, []);
 
   const has360 = !!vehicle360 && vehicle360.frames.length > 0;
   const offset = has360 ? 1 : 0;
@@ -40,20 +53,24 @@ export function ImageLightbox({
     closeRef.current?.focus();
   }, []);
 
+  // Bildevisning er det eneste stedet telefonen får rotere. Opprydningen
+  // ligger i unmount, ikke i lukkeknappen, så låsen ikke blir stående av om
+  // galleriet forsvinner en annen vei (navigasjon, tilbake-gest).
   useEffect(() => {
-    history.pushState({ overlay: "image" }, "");
-    const onPop = () => onClose();
+    void unlockOrientation();
+    return () => {
+      void lockPortraitOnPhone();
+    };
+  }, []);
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft") emblaApi?.scrollPrev();
       else if (e.key === "ArrowRight") emblaApi?.scrollNext();
     };
-    window.addEventListener("popstate", onPop);
     window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("popstate", onPop);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [onClose, emblaApi]);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [emblaApi]);
 
   useEffect(() => {
     if (!emblaApi) return;
@@ -80,17 +97,21 @@ export function ImageLightbox({
   );
 
   return (
-    <FullscreenOverlay open onOpenChange={(next) => !next && history.back()}>
+    <FullscreenOverlay open onOpenChange={(next) => !next && onClose()}>
       {/* Clicking the backdrop (anywhere that isn't a button or thumbnail) closes the lightbox */}
       <FullscreenOverlayContent
         title={`Bildegalleri for ${title}`}
-        onClick={() => history.back()}
+        onClick={onClose}
+        // edgeToEdge: bakteppet og bildet skal dekke hele skjermen — padres
+        // containeren, får man en stripe av app-bakgrunn langs notchen. Det er
+        // chromet under som tar safe area i stedet.
+        edgeToEdge
         className="bg-black/65 backdrop-blur-sm"
       >
         {/* Top bar */}
         <div
           onClick={(e) => e.stopPropagation()}
-          className="flex items-center justify-between px-4 py-3"
+          className="flex items-center justify-between px-safe pt-safe pb-3"
         >
           <span className="text-sm text-white/60">
             {totalSlides > 1 ? `${currentIndex + 1} / ${totalSlides}` : ""}
@@ -98,7 +119,7 @@ export function ImageLightbox({
           <button
             ref={closeRef}
             type="button"
-            onClick={() => history.back()}
+            onClick={onClose}
             aria-label="Lukk bildegalleri"
             className="rounded-full p-2 text-white/80 transition-colors hover:bg-white/10 hover:text-white"
           >
@@ -122,10 +143,11 @@ export function ImageLightbox({
             )}
             {images.map((img, i) => (
               <div key={img.storage_path} className="relative h-full min-w-0 flex-[0_0_100%]">
-                <img
+                <ZoomableImage
                   src={imgUrls[img.storage_path]}
                   alt={i === 0 && !has360 ? title : `${title} – bilde ${i + 1}`}
-                  className="h-full w-full object-contain"
+                  onZoomChange={onZoomChange}
+                  onDismiss={onClose}
                 />
                 {img.caption && (
                   <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-4 py-3 text-center text-sm text-white">
@@ -162,7 +184,7 @@ export function ImageLightbox({
         {totalSlides > 1 && (
           <div
             onClick={(e) => e.stopPropagation()}
-            className="flex justify-center gap-2 overflow-x-auto px-4 py-3"
+            className="flex justify-center gap-2 overflow-x-auto px-safe pt-3 pb-safe"
           >
             {has360 && (
               <button

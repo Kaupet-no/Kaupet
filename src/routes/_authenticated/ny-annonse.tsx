@@ -1034,7 +1034,10 @@ function NewListingPage() {
               <div
                 className={`${
                   native
-                    ? "fixed inset-x-0 bottom-[var(--app-bottom-nav-h)] z-40 bg-background/95 px-4 pt-3 pb-3 backdrop-blur border-t border-border"
+                    ? // left-[…rail]: på nettbrett ligger navigasjonen langs
+                      // venstre kant, og «Tilbake» (justify-between) ville havnet
+                      // under den. Variabelen er 0 på telefon (se styles.css).
+                      "px-safe fixed inset-x-0 left-[var(--app-nav-rail-w,0px)] bottom-[var(--app-bottom-nav-h)] z-40 bg-background/95 pt-3 pb-3 backdrop-blur border-t border-border"
                     : "border-t border-border pt-6"
                 } flex items-center ${isFirst ? "justify-end" : "justify-between"}`}
               >

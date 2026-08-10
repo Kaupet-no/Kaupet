@@ -1,5 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { NativePageHeader } from "@/components/native-page-header";
+import { PullToRefreshIndicator } from "@/components/pull-to-refresh-indicator";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { useIsNative } from "@/hooks/use-is-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -102,13 +104,23 @@ type SystemMessage = {
   read_at: string | null;
 };
 
-function InboxPage() {
+/** Innboksen. Eksportert fordi nettbrettoppsettet i `meldinger.$id` viser den
+ * som venstre spalte ved siden av tråden (fase 10). */
+export function InboxPage() {
   const native = useIsNative();
   const { user } = useAuth();
   const qc = useQueryClient();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [imgUrls, setImgUrls] = useState<Record<string, string>>({});
   const [systemOpen, setSystemOpen] = useState(true);
+
+  const { refreshing, pullDistance } = usePullToRefresh({
+    enabled: native,
+    onRefresh: async () => {
+      await qc.resetQueries({ queryKey: ["my-conversations"] });
+      await qc.resetQueries({ queryKey: ["system-messages"] });
+    },
+  });
 
   const { data: conversations, isLoading } = useQuery({
     queryKey: ["my-conversations", user?.id],
@@ -248,6 +260,7 @@ function InboxPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
       <NativePageHeader title="Meldinger" hideBack />
+      {native && <PullToRefreshIndicator pullDistance={pullDistance} refreshing={refreshing} />}
       {!native && (
         <div className="flex items-center gap-3">
           <MessageCircle className="size-6 text-accent" />

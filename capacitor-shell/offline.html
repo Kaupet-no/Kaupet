@@ -576,5 +576,16 @@
       });
     })();
     </script>
+    <!-- Splashen skjules ikke lenger automatisk (launchAutoHide: false i
+         capacitor.config.ts) — uten dette ville den blitt stående over
+         offline-siden når kaupet.no ikke svarer. -->
+    <script>
+      try {
+        window.Capacitor &&
+          window.Capacitor.Plugins &&
+          window.Capacitor.Plugins.SplashScreen &&
+          window.Capacitor.Plugins.SplashScreen.hide();
+      } catch (e) {}
+    </script>
   </body>
 </html>

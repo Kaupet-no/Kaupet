@@ -1087,7 +1087,7 @@ function ListingDetailViewBody({
 
       {showStickyContact && (
         <div
-          className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 py-3 backdrop-blur md:hidden"
+          className="px-safe fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 py-3 backdrop-blur md:hidden"
           style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}
         >
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">

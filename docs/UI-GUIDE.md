@@ -154,7 +154,8 @@ Tre varianter: `default`, `destructive`, og `warning` (amber, for advarsler som 
   820×1180 og 1024×1366 — safe-area-verdier er alltid 0 i nettleser, så de må
   fortsatt sjekkes i simulator.
 - Touch-targets skal være minst 44×44px (se `app-bottom-nav.tsx`).
-- Bruk `pt-safe` / `env(safe-area-inset-bottom)` for områder nær systemets UI (status bar, home indicator).
+- **Safe area:** `FullscreenOverlayContent` og `Sheet side="bottom"` håndterer det selv — ikke legg til padding på kallstedet. Skal en fullskjermflate gå helt ut i kanten (bilde, kart, kamera), sett `edgeToEdge` og padre ditt eget chrome i stedet, ikke medieinnholdet.
+- Utilities for chrome som ikke går via de primitivene: `.pt-safe`/`.pb-safe` (min. 0,5rem), `.pl-safe`/`.pr-safe` (null i basis — for elementer uten egen horisontal padding), `.px-safe` (1rem i basis — erstatning for `px-4`) og `.p-safe` (alle fire kanter, ingen minimum). Merk at de er ulagede og derfor **erstatter** `padding` fra Tailwind-utilities på samme element — velg varianten hvis basisverdi matcher det kallstedet hadde.
 - Unngå `Tooltip` og andre hover-avhengige mønstre i flater som vises i native-appen.
 
 ## Skjemavalidering

@@ -1,4 +1,5 @@
 import { AlertTriangle, ShieldAlert } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useMyModerationStatus } from "@/hooks/use-my-moderation-status";
 
 function formatDate(iso: string) {
@@ -17,42 +18,38 @@ export function ModerationBanner() {
 
   if (data.is_banned) {
     return (
-      <div className="border-b border-destructive/40 bg-destructive/10 text-destructive">
-        <div className="mx-auto flex max-w-6xl items-start gap-3 px-4 py-3 text-sm">
-          <ShieldAlert className="mt-0.5 size-5 shrink-0" />
-          <div>
-            <p className="font-medium">Kontoen din er utestengt</p>
-            <p className="text-destructive/90">
-              {data.ban_reason
-                ? `Begrunnelse: ${data.ban_reason}`
-                : "Du kan ikke opprette annonser, samtaler eller meldinger."}{" "}
-              Ta kontakt på{" "}
-              <a href="mailto:andreas@happypixel.no" className="underline underline-offset-2">
-                andreas@happypixel.no
-              </a>{" "}
-              hvis du mener dette er en feil.
-            </p>
-          </div>
+      <Alert variant="destructive" className="rounded-none border-x-0 border-t-0">
+        <ShieldAlert className="size-5" />
+        <div className="mx-auto max-w-6xl">
+          <AlertTitle>Kontoen din er utestengt</AlertTitle>
+          <AlertDescription>
+            {data.ban_reason
+              ? `Begrunnelse: ${data.ban_reason}`
+              : "Du kan ikke opprette annonser, samtaler eller meldinger."}{" "}
+            Ta kontakt på{" "}
+            <a href="mailto:andreas@happypixel.no" className="underline underline-offset-2">
+              andreas@happypixel.no
+            </a>{" "}
+            hvis du mener dette er en feil.
+          </AlertDescription>
         </div>
-      </div>
+      </Alert>
     );
   }
 
   if (data.is_suspended && data.suspension_expires_at) {
     return (
-      <div className="border-b border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200">
-        <div className="mx-auto flex max-w-6xl items-start gap-3 px-4 py-3 text-sm">
-          <AlertTriangle className="mt-0.5 size-5 shrink-0" />
-          <div>
-            <p className="font-medium">Kontoen din er midlertidig svartelistet</p>
-            <p>
-              Du kan ikke opprette nye annonser eller sende meldinger frem til{" "}
-              <span className="font-medium">{formatDate(data.suspension_expires_at)}</span>.
-              {data.suspension_reason ? ` Begrunnelse: ${data.suspension_reason}` : ""}
-            </p>
-          </div>
+      <Alert variant="warning" className="rounded-none border-x-0 border-t-0">
+        <AlertTriangle className="size-5" />
+        <div className="mx-auto max-w-6xl">
+          <AlertTitle>Kontoen din er midlertidig svartelistet</AlertTitle>
+          <AlertDescription>
+            Du kan ikke opprette nye annonser eller sende meldinger frem til{" "}
+            <span className="font-medium">{formatDate(data.suspension_expires_at)}</span>.
+            {data.suspension_reason ? ` Begrunnelse: ${data.suspension_reason}` : ""}
+          </AlertDescription>
         </div>
-      </div>
+      </Alert>
     );
   }
 

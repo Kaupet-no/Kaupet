@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { ArrowLeft, Clock, FolderOpen, Search as SearchIcon, X } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { Input } from "@/components/ui/input";
@@ -9,7 +8,7 @@ import { resolveTextToFilters } from "@/features/listing-search/resolve-text-to-
 import { encodeAttrFilters } from "@/features/listing-search/search-schema";
 import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
 import type { CategoryFilter } from "@/lib/category-filters";
-import { useFocusTrap } from "@/hooks/use-focus-trap";
+import { FullscreenOverlay, FullscreenOverlayContent } from "@/components/ui/fullscreen-overlay";
 
 const HISTORY_KEY = "kaupet_recent_searches_v1";
 const MAX_HISTORY = 5;
@@ -51,11 +50,8 @@ export function NativeSearchOverlay({
   const [history, setHistory] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { data: vehicleBrands } = useAllVehicleBrands();
-
-  useFocusTrap(dialogRef, open);
 
   useEffect(() => {
     if (open) {
@@ -110,142 +106,138 @@ export function NativeSearchOverlay({
     onClose();
   };
 
-  if (!open) return null;
-
-  return createPortal(
-    <div
-      ref={dialogRef}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Søk"
-      className="fixed inset-0 z-[9999] flex flex-col bg-background animate-in slide-in-from-bottom-4 duration-200"
-    >
-      {/* Header */}
-      <div className="flex items-center gap-2 border-b border-border px-4 pt-safe pb-2">
-        <button
-          type="button"
-          onClick={() => {
-            void hapticImpact("light");
-            onClose();
-          }}
-          className="flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-muted"
-          aria-label="Lukk søk"
-        >
-          <ArrowLeft className="size-5" />
-        </button>
-        <div className="relative flex-1">
-          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            ref={inputRef}
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void submit(q);
+  return (
+    <FullscreenOverlay open={open} onOpenChange={(next) => !next && onClose()}>
+      <FullscreenOverlayContent
+        title="Søk"
+        className="animate-in slide-in-from-bottom-4 duration-200 data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom-4"
+      >
+        {/* Header */}
+        <div className="flex items-center gap-2 border-b border-border px-4 pt-safe pb-2">
+          <button
+            type="button"
+            onClick={() => {
+              void hapticImpact("light");
+              onClose();
             }}
-            placeholder="Hva leter du etter?"
-            className="h-11 border-0 bg-muted pl-9 pr-8 text-base focus-visible:ring-0"
-            aria-label="Søk i annonser"
-          />
-          {q && (
+            className="flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-muted"
+            aria-label="Lukk søk"
+          >
+            <ArrowLeft className="size-5" />
+          </button>
+          <div className="relative flex-1">
+            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              ref={inputRef}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void submit(q);
+              }}
+              placeholder="Hva leter du etter?"
+              className="h-11 border-0 bg-muted pl-9 pr-8 text-base focus-visible:ring-0"
+              aria-label="Søk i annonser"
+            />
+            {q && (
+              <button
+                type="button"
+                onClick={() => setQ("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:text-foreground"
+                aria-label="Tøm søkefelt"
+              >
+                <X className="size-4" />
+              </button>
+            )}
+          </div>
+          {q.trim() && (
             <button
               type="button"
-              onClick={() => setQ("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:text-foreground"
-              aria-label="Tøm søkefelt"
+              onClick={() => void submit(q)}
+              disabled={submitting}
+              className="shrink-0 text-sm font-medium text-primary disabled:opacity-50"
             >
-              <X className="size-4" />
+              {submitting ? "Søker…" : "Søk"}
             </button>
           )}
         </div>
-        {q.trim() && (
-          <button
-            type="button"
-            onClick={() => void submit(q)}
-            disabled={submitting}
-            className="shrink-0 text-sm font-medium text-primary disabled:opacity-50"
-          >
-            {submitting ? "Søker…" : "Søk"}
-          </button>
-        )}
-      </div>
 
-      {/* Results / suggestions */}
-      <div className="flex-1 overflow-y-auto px-4">
-        {/* Category suggestion */}
-        {categorySuggestion && (
-          <button
-            type="button"
-            onClick={() => goToCategory(categorySuggestion)}
-            className="flex w-full items-center gap-3 rounded-xl bg-primary/5 px-4 py-3 text-left transition active:scale-[0.98] mt-3"
-          >
-            <FolderOpen className="size-4 shrink-0 text-primary" />
-            <span className="text-sm">
-              Gå til kategori:{" "}
-              <span className="font-semibold text-primary">{categorySuggestion.name_nb}</span>
-            </span>
-          </button>
-        )}
+        {/* Results / suggestions */}
+        <div className="flex-1 overflow-y-auto px-4">
+          {/* Category suggestion */}
+          {categorySuggestion && (
+            <button
+              type="button"
+              onClick={() => goToCategory(categorySuggestion)}
+              className="flex w-full items-center gap-3 rounded-xl bg-primary/5 px-4 py-3 text-left transition active:scale-[0.98] mt-3"
+            >
+              <FolderOpen className="size-4 shrink-0 text-primary" />
+              <span className="text-sm">
+                Gå til kategori:{" "}
+                <span className="font-semibold text-primary">{categorySuggestion.name_nb}</span>
+              </span>
+            </button>
+          )}
 
-        {/* Søkehistorikk */}
-        {!q && history.length > 0 && (
-          <div className="mt-4">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Nylige søk
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  try {
-                    localStorage.removeItem(HISTORY_KEY);
-                  } catch {
-                    /* ignore */
-                  }
-                  setHistory([]);
-                }}
-                className="text-xs text-muted-foreground hover:text-foreground"
-              >
-                Slett
-              </button>
-            </div>
-            {history.map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => void submit(item)}
-                className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left transition hover:bg-muted active:bg-muted"
-              >
-                <Clock className="size-4 shrink-0 text-muted-foreground" />
-                <span className="text-sm">{item}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Populære kategorier */}
-        {!q && categories.length > 0 && (
-          <div className="mt-4">
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Bla etter kategori
-            </p>
-            {categories
-              .filter((c) => c.parent_id === null)
-              .slice(0, 8)
-              .map((cat) => (
+          {/* Søkehistorikk */}
+          {!q && history.length > 0 && (
+            <div className="mt-4">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Nylige søk
+                </p>
                 <button
-                  key={cat.id}
                   type="button"
-                  onClick={() => goToCategory(cat)}
+                  onClick={() => {
+                    try {
+                      localStorage.removeItem(HISTORY_KEY);
+                    } catch {
+                      /* ignore */
+                    }
+                    setHistory([]);
+                  }}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Slett
+                </button>
+              </div>
+              {history.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => void submit(item)}
                   className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left transition hover:bg-muted active:bg-muted"
                 >
-                  <FolderOpen className="size-4 shrink-0 text-muted-foreground" />
-                  <span className="text-sm">{cat.name_nb}</span>
+                  <Clock className="size-4 shrink-0 text-muted-foreground" />
+                  <span className="text-sm">{item}</span>
                 </button>
               ))}
-          </div>
-        )}
-      </div>
-    </div>,
-    document.body,
+            </div>
+          )}
+
+          {/* Populære kategorier */}
+          {!q && categories.length > 0 && (
+            <div className="mt-4">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Bla etter kategori
+              </p>
+              {categories
+                .filter((c) => c.parent_id === null)
+                .slice(0, 8)
+                .map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => goToCategory(cat)}
+                    className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left transition hover:bg-muted active:bg-muted"
+                  >
+                    <FolderOpen className="size-4 shrink-0 text-muted-foreground" />
+                    <span className="text-sm">{cat.name_nb}</span>
+                  </button>
+                ))}
+            </div>
+          )}
+        </div>
+      </FullscreenOverlayContent>
+    </FullscreenOverlay>
   );
 }

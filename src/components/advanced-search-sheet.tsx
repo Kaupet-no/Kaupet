@@ -3,6 +3,7 @@ import { X, Plus, Save, Search as SearchIcon, RotateCcw } from "lucide-react";
 
 import { PushEnablePrompt } from "@/components/push-enable-prompt";
 
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -536,10 +537,12 @@ export function SaveSearchDialog({
             Varsle meg om nye treff
           </label>
           {hasNoFilters(criteria) && (
-            <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-900 dark:text-amber-200">
-              Dette søket har ingen filtre og vil varsle deg om <strong>alle</strong> nye annonser
-              på Kaupet.
-            </p>
+            <Alert variant="warning" className="p-2">
+              <AlertDescription className="text-xs">
+                Dette søket har ingen filtre og vil varsle deg om <strong>alle</strong> nye annonser
+                på Kaupet.
+              </AlertDescription>
+            </Alert>
           )}
           {notify && <PushEnablePrompt variant="inline" />}
         </div>

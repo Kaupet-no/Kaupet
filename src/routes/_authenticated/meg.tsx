@@ -29,7 +29,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { NativePageHeader } from "@/components/native-page-header";
 import { FeedbackPanel } from "@/components/feedback-tag";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { NativeSheet } from "@/components/ui/native-sheet";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -226,16 +226,17 @@ function MegPage() {
             />
           </div>
         </div>
-        <Sheet open={feedbackOpen} onOpenChange={setFeedbackOpen}>
-          <SheetContent side="bottom" className="pb-8">
-            <SheetHeader>
-              <SheetTitle>Ris og Ros</SheetTitle>
-            </SheetHeader>
-            <div className="px-4">
-              <FeedbackPanel onDone={() => setFeedbackOpen(false)} />
-            </div>
-          </SheetContent>
-        </Sheet>
+        <NativeSheet
+          open={feedbackOpen}
+          onOpenChange={setFeedbackOpen}
+          title="Ris og Ros"
+          titleVisible
+          className="pb-safe"
+        >
+          <div className="px-4">
+            <FeedbackPanel onDone={() => setFeedbackOpen(false)} />
+          </div>
+        </NativeSheet>
 
         {/* Om Kaupet.no — samme personvern-/åpen kildekode-budskap som vises
             i footer på web, som native-brukere ellers aldri ser. */}

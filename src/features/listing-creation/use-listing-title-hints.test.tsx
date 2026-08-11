@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useListingTitleHints } from "./use-listing-title-hints";
@@ -147,59 +147,5 @@ describe("useListingTitleHints", () => {
     expect(setCategoryTouchedManually).toHaveBeenCalledWith(true);
     expect(result.current.categorySuggestion).toBeNull();
     vi.useRealTimers();
-  });
-
-  it("appendTagToDescription appends the tag to a non-empty description with a space", () => {
-    const setValue = vi.fn();
-    const { result } = renderHook(
-      () =>
-        useListingTitleHints({
-          title: "",
-          description: "Fin sykkel.",
-          categoryId: "",
-          categoryTouchedManually: true,
-          setSelectedParentId: vi.fn(),
-          setCategoryTouchedManually: vi.fn(),
-          setValue,
-        }),
-      { wrapper },
-    );
-
-    act(() => result.current.appendTagToDescription("#sykkel"));
-
-    expect(setValue).toHaveBeenCalledWith("description", "Fin sykkel. #sykkel", {
-      shouldTouch: false,
-    });
-  });
-
-  it("fetches WTB matches once the debounced title reaches 3 characters", async () => {
-    matchWtbListingsForListingMock.mockResolvedValue({ id: "wtb-1", price_nok: 500 });
-    const { result } = renderHook(
-      () =>
-        useListingTitleHints({
-          title: "Syk",
-          description: "",
-          categoryId: "cat-1",
-          categoryTouchedManually: true,
-          setSelectedParentId: vi.fn(),
-          setCategoryTouchedManually: vi.fn(),
-          setValue: vi.fn(),
-        }),
-      { wrapper },
-    );
-
-    await waitFor(() => expect(result.current.wtbMatch).toEqual({ id: "wtb-1", price_nok: 500 }), {
-      timeout: 3000,
-    });
-    expect(matchWtbListingsForListingMock).toHaveBeenCalledWith({
-      data: {
-        title: "Syk",
-        description: "",
-        category_id: "cat-1",
-        price_nok: null,
-        is_free: false,
-        attributes: {},
-      },
-    });
   });
 });

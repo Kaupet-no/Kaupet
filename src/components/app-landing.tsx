@@ -14,7 +14,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
 import { KaupetCodeDialog } from "@/components/kaupet-code-dialog";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { NativeSheet } from "@/components/ui/native-sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { LocationPicker, RadiusPicker } from "@/components/location-filter";
@@ -24,7 +24,6 @@ import { getCategoryIcon } from "@/lib/category-icons";
 import { useDefaultSearchExamples } from "@/hooks/use-default-search-examples";
 import { useIsNative } from "@/hooks/use-is-native";
 import { useFormFactor } from "@/hooks/use-form-factor";
-import { useSearchPanel } from "@/features/listing-search/search-panel/search-panel-context";
 import { AppHeroLogo } from "@/components/app-hero-logo";
 
 type CategoryRow = {
@@ -43,7 +42,6 @@ export function AppLanding() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [location, setLocation] = useSavedLocation();
   const [locOpen, setLocOpen] = useState(false);
-  const { openPanel } = useSearchPanel();
   const isNative = useIsNative();
   // Nettbrett (fase 10): heroen får en øvre ramme og «Populært nå» blir et
   // rutenett. Bevisst formatfaktor og ikke `md:`-breakpoints — de ville truffet
@@ -178,37 +176,19 @@ export function AppLanding() {
         <form onSubmit={submitSearch} className={`w-full ${isTablet ? "max-w-xl" : "max-w-md"}`}>
           <div className="relative">
             <SearchIcon className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
-            {/* Native: feltet er en *trigger* for søkepanelet, ikke et eget
-                inndatafelt — ett søkeinngangspunkt, ikke to som oppfører seg
-                ulikt (fase 9b punkt 8). */}
-            {isNative ? (
-              <button
-                type="button"
-                onClick={() => openPanel()}
-                aria-label="Søk i annonser"
-                className="h-14 w-full rounded-full border border-border bg-card pl-12 pr-4 text-left text-base shadow-sm transition active:scale-[0.99]"
-              >
-                <span className="sr-only">
-                  {typewriterWords.length > 0 ? `For eksempel: ${typewriterWords.join(", ")}` : ""}
-                </span>
-              </button>
-            ) : (
-              <input
-                ref={inputRef}
-                type="search"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                onFocus={() => setFocused(true)}
-                onBlur={() => setFocused(false)}
-                placeholder=""
-                aria-label="Søk i annonser"
-                aria-describedby={
-                  typewriterWords.length > 0 ? "landing-search-examples" : undefined
-                }
-                className="h-14 w-full rounded-full border border-border bg-card pl-12 pr-4 text-base shadow-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
-              />
-            )}
-            {!isNative && typewriterWords.length > 0 && (
+            <input
+              ref={inputRef}
+              type="search"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              placeholder=""
+              aria-label="Søk i annonser"
+              aria-describedby={typewriterWords.length > 0 ? "landing-search-examples" : undefined}
+              className="h-14 w-full rounded-full border border-border bg-card pl-12 pr-4 text-base shadow-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
+            />
+            {typewriterWords.length > 0 && (
               // Static (not tied to the rotating animation) so screen reader
               // users get the example searches once, on focus, instead of
               // an aria-live region re-announcing every ~2.7s.
@@ -316,109 +296,108 @@ export function AppLanding() {
               </button>
             }
           />
-          <Sheet
+          <NativeSheet
             open={categoriesSheetOpen}
             onOpenChange={(open) => {
               setCategoriesSheetOpen(open);
               if (!open) setActiveCategory(null);
             }}
-          >
-            <SheetTrigger asChild>
+            trigger={
               <button type="button" className={tileButtonClass}>
                 <span className={tileIconClass}>
                   <LayoutGrid className="size-5" />
                 </span>
                 Alle kategorier
               </button>
-            </SheetTrigger>
-            <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto rounded-t-2xl">
-              <SheetHeader className="text-left">
-                <SheetTitle className="flex items-center gap-3">
-                  {activeCategory ? `/${activeCategory.name_nb}` : "Kategorier"}
-                  {activeCategory && (
-                    <button
-                      type="button"
-                      onClick={() => setActiveCategory(null)}
-                      className="flex shrink-0 items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium transition hover:border-primary hover:text-primary"
-                    >
-                      <ChevronLeft className="size-3.5" />
-                      Tilbake
-                    </button>
-                  )}
-                </SheetTitle>
-              </SheetHeader>
-
-              {!activeCategory ? (
-                <div className="mt-4 flex flex-col gap-2">
-                  {rootCategories.map((cat) => {
-                    const Icon = getCategoryIcon(cat.icon);
-                    return (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        onClick={() => pickCategory(cat)}
-                        className="group flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left transition active:scale-[0.98]"
-                      >
-                        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                          <Icon className="size-5" />
-                        </span>
-                        <span className="truncate font-medium">{cat.name_nb}</span>
-                        <ArrowRight className="ml-auto size-4 shrink-0 text-muted-foreground" />
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                (() => {
-                  const subs = childrenByParent.get(activeCategory.id) ?? [];
-                  const allSlugs = [activeCategory.slug, ...subs.map((s) => s.slug)];
-                  const locationSearch = {
-                    lat: location.lat ?? undefined,
-                    lng: location.lng ?? undefined,
-                    radius: location.lat != null ? location.radius : undefined,
-                    loc: location.label || undefined,
-                  };
+            }
+            titleVisible
+            title={
+              <span className="flex items-center gap-3">
+                {activeCategory ? `/${activeCategory.name_nb}` : "Kategorier"}
+                {activeCategory && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveCategory(null)}
+                    className="flex shrink-0 items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium transition hover:border-primary hover:text-primary"
+                  >
+                    <ChevronLeft className="size-3.5" />
+                    Tilbake
+                  </button>
+                )}
+              </span>
+            }
+            className="max-h-[80vh] overflow-y-auto"
+          >
+            {!activeCategory ? (
+              <div className="mt-4 flex flex-col gap-2">
+                {rootCategories.map((cat) => {
+                  const Icon = getCategoryIcon(cat.icon);
                   return (
-                    <div className="mt-4 flex flex-col gap-2">
-                      <Link
-                        to="/annonser"
-                        search={{
-                          q: "",
-                          category: "",
-                          categories: allSlugs,
-                          catMode: "any",
-                          sort: "new",
-                          ...locationSearch,
-                        }}
-                        onClick={() => setCategoriesSheetOpen(false)}
-                        className="group flex items-center justify-between gap-3 rounded-xl border border-primary bg-primary/5 px-4 py-4 text-left font-medium text-primary transition active:scale-[0.98]"
-                      >
-                        <span className="truncate">Alt i {activeCategory.name_nb}</span>
-                        <ArrowRight className="size-4 shrink-0 transition group-hover:translate-x-0.5" />
-                      </Link>
-                      {subs.map((sub) => (
-                        <Link
-                          key={sub.id}
-                          to="/annonser"
-                          search={{ q: "", category: sub.slug, sort: "new", ...locationSearch }}
-                          onClick={() => setCategoriesSheetOpen(false)}
-                          className="group flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-4 text-left transition active:scale-[0.98]"
-                        >
-                          <span className="truncate font-medium">{sub.name_nb}</span>
-                          <ArrowRight className="size-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
-                        </Link>
-                      ))}
-                      {subs.length === 0 && (
-                        <p className="text-sm text-muted-foreground">
-                          Ingen underkategorier — trykk over for å se alle annonser.
-                        </p>
-                      )}
-                    </div>
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => pickCategory(cat)}
+                      className="group flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left transition active:scale-[0.98]"
+                    >
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <Icon className="size-5" />
+                      </span>
+                      <span className="truncate font-medium">{cat.name_nb}</span>
+                      <ArrowRight className="ml-auto size-4 shrink-0 text-muted-foreground" />
+                    </button>
                   );
-                })()
-              )}
-            </SheetContent>
-          </Sheet>
+                })}
+              </div>
+            ) : (
+              (() => {
+                const subs = childrenByParent.get(activeCategory.id) ?? [];
+                const allSlugs = [activeCategory.slug, ...subs.map((s) => s.slug)];
+                const locationSearch = {
+                  lat: location.lat ?? undefined,
+                  lng: location.lng ?? undefined,
+                  radius: location.lat != null ? location.radius : undefined,
+                  loc: location.label || undefined,
+                };
+                return (
+                  <div className="mt-4 flex flex-col gap-2">
+                    <Link
+                      to="/annonser"
+                      search={{
+                        q: "",
+                        category: "",
+                        categories: allSlugs,
+                        catMode: "any",
+                        sort: "new",
+                        ...locationSearch,
+                      }}
+                      onClick={() => setCategoriesSheetOpen(false)}
+                      className="group flex items-center justify-between gap-3 rounded-xl border border-primary bg-primary/5 px-4 py-4 text-left font-medium text-primary transition active:scale-[0.98]"
+                    >
+                      <span className="truncate">Alt i {activeCategory.name_nb}</span>
+                      <ArrowRight className="size-4 shrink-0 transition group-hover:translate-x-0.5" />
+                    </Link>
+                    {subs.map((sub) => (
+                      <Link
+                        key={sub.id}
+                        to="/annonser"
+                        search={{ q: "", category: sub.slug, sort: "new", ...locationSearch }}
+                        onClick={() => setCategoriesSheetOpen(false)}
+                        className="group flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-4 text-left transition active:scale-[0.98]"
+                      >
+                        <span className="truncate font-medium">{sub.name_nb}</span>
+                        <ArrowRight className="size-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
+                      </Link>
+                    ))}
+                    {subs.length === 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        Ingen underkategorier — trykk over for å se alle annonser.
+                      </p>
+                    )}
+                  </div>
+                );
+              })()
+            )}
+          </NativeSheet>
         </div>
       )}
 

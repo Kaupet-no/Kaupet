@@ -1,4 +1,4 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -56,6 +56,12 @@ export function useListingsQuery({
 }: UseListingsQueryArgs) {
   return useInfiniteQuery({
     queryKey: ["listings", search, radiusIds, effectiveCategories, terms],
+    // Uten dette blankes `totalCount`/listen momentant ved hvert filterbytte
+    // (attrs/pris/tilstand går rett til URL, så hvert trykk er en ny
+    // queryKey) — søkepanelets "Vis X treff" ville da blinket tomt mens nytt
+    // svar hentes i stedet for å oppdateres live. Behold forrige svar til
+    // det nye er klart.
+    placeholderData: keepPreviousData,
     enabled:
       (effectiveCategories.length === 0 || !!categories) &&
       (search.lat == null || search.lng == null || radiusIds != null),

@@ -9,6 +9,17 @@ import { isNative } from "./native";
 
 let initialized = false;
 
+/**
+ * Escape hatch for overlays that intentionally don't push history entries
+ * (onboarding, `historyBack={false}`) but still want the Android hardware
+ * back button to do something other than the default history-back/exitApp
+ * fallback. Return `true` to consume the press, `false` to fall through.
+ */
+let backOverride: (() => boolean) | null = null;
+export function setBackOverride(fn: (() => boolean) | null) {
+  backOverride = fn;
+}
+
 export function initOfflineWatcher(): () => void {
   if (initialized || typeof window === "undefined") {
     return () => {};
@@ -44,6 +55,7 @@ export function initOfflineWatcher(): () => void {
     try {
       const { App } = await import("@capacitor/app");
       const handle = await App.addListener("backButton", ({ canGoBack }) => {
+        if (backOverride?.()) return;
         // canGoBack reflects WebView history; use window.history.length as
         // additional guard since TanStack Router pushes to browser history.
         if (canGoBack && window.history.length > 1) {

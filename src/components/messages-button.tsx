@@ -12,7 +12,7 @@ import { useUnreadConversationsCount } from "@/hooks/use-unread";
 import { isUnread } from "@/lib/unread";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { NativeSheet } from "@/components/ui/native-sheet";
 
 type ConvPreview = {
   id: string;
@@ -268,16 +268,15 @@ export function MessagesButton() {
 
   if (native) {
     return (
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetTrigger asChild>{trigger}</SheetTrigger>
-        <SheetContent side="bottom" className="rounded-t-2xl p-0 pb-8">
-          <div className="mx-auto mb-1 mt-3 h-1 w-10 rounded-full bg-muted-foreground/30" />
-          <SheetHeader className="sr-only">
-            <SheetTitle>Meldinger</SheetTitle>
-          </SheetHeader>
-          {convList}
-        </SheetContent>
-      </Sheet>
+      <NativeSheet
+        open={open}
+        onOpenChange={setOpen}
+        trigger={trigger}
+        title="Meldinger"
+        className="p-0 pb-safe"
+      >
+        {convList}
+      </NativeSheet>
     );
   }
 

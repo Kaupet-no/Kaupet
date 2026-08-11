@@ -2,7 +2,7 @@
 <html lang="nb">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <title>Ingen forbindelse — Kaupet</title>
     <style>
       :root {
@@ -46,6 +46,9 @@
         padding: 24px;
         padding-top: max(24px, env(safe-area-inset-top));
         padding-bottom: max(24px, calc(6rem + env(safe-area-inset-bottom)));
+        touch-action: manipulation;
+        -webkit-user-select: none;
+        user-select: none;
       }
       .card {
         position: relative;
@@ -271,7 +274,7 @@
       const dot = document.querySelector('.wordmark__dot');
 
       const RADIUS = 10;
-      const GRAVITY = 0.45;
+      const GRAVITY = 0.28;
       const RESTITUTION = 0.68;
       const FRICTION = 0.91;
       const IMPULSE = 15;

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { subscribeNative } from "@/lib/native-push";
 import { requestLocationPermission } from "@/lib/native";
 import { hapticImpact } from "@/lib/haptics";
+import { setBackOverride } from "@/lib/native-offline";
 import { FullscreenOverlay, FullscreenOverlayContent } from "@/components/ui/fullscreen-overlay";
 
 type Props = {
@@ -41,6 +42,21 @@ export function OnboardingFlow({ onComplete }: Props) {
       behavior: "smooth",
     });
   };
+
+  // Android-tilbake skal navigere mellom onboarding-kortene i stedet for å
+  // avslutte appen (default i native-offline.ts). Kun på første kort faller
+  // trykket gjennom til default exitApp — samme som å trykke tilbake på
+  // rot-siden.
+  useEffect(() => {
+    setBackOverride(() => {
+      if (currentIndex > 0) {
+        scrollTo(currentIndex - 1);
+        return true;
+      }
+      return false;
+    });
+    return () => setBackOverride(null);
+  }, [currentIndex]);
 
   const next = () => {
     if (currentIndex < CARDS.length - 1) {

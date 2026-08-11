@@ -121,7 +121,14 @@ export function ReviewPublishGroup(props: WizardSharedProps) {
   );
 }
 
-/** Turnstile + "Avbryt" + "Publiser annonse" submit button — shared verbatim. */
+/**
+ * Turnstile + "Avbryt" + "Publiser annonse" submit button — shared verbatim.
+ * Renders as flat siblings (not a wrapping div) so the caller's own
+ * flex-wrap row controls line breaks: "Avbryt" can wrap up onto "Tilbake"s
+ * line, while "Forhåndsvis annonse" + "Publiser annonse" are grouped in one
+ * inner (non-wrapping) div so that pair always moves to a new line together
+ * instead of splitting across two lines.
+ */
 export function PublishActions({
   turnstileEnabled,
   turnstileToken,
@@ -131,29 +138,31 @@ export function PublishActions({
   onPreview,
 }: PublishActionsProps) {
   return (
-    <div className="flex items-center gap-3">
+    <>
       <Button type="button" variant="ghost" onClick={onCancel} disabled={mutationIsPending}>
         Avbryt
       </Button>
-      <Button type="button" variant="outline" onClick={onPreview} disabled={mutationIsPending}>
-        Forhåndsvis annonse
-      </Button>
-      {turnstileEnabled && (
-        <Turnstile
-          siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-          onSuccess={(token) => setTurnstileToken(token)}
-          onExpire={() => setTurnstileToken(null)}
-          options={{ size: "invisible" }}
-        />
-      )}
-      <Button
-        type="submit"
-        data-testid="publish-listing-button"
-        disabled={mutationIsPending || (turnstileEnabled && !turnstileToken)}
-      >
-        {mutationIsPending && <Loader2 className="size-4 animate-spin" />}
-        Publiser annonse
-      </Button>
-    </div>
+      <div className="flex items-center gap-3">
+        <Button type="button" variant="outline" onClick={onPreview} disabled={mutationIsPending}>
+          Forhåndsvis annonse
+        </Button>
+        {turnstileEnabled && (
+          <Turnstile
+            siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+            onSuccess={(token) => setTurnstileToken(token)}
+            onExpire={() => setTurnstileToken(null)}
+            options={{ size: "invisible" }}
+          />
+        )}
+        <Button
+          type="submit"
+          data-testid="publish-listing-button"
+          disabled={mutationIsPending || (turnstileEnabled && !turnstileToken)}
+        >
+          {mutationIsPending && <Loader2 className="size-4 animate-spin" />}
+          Publiser annonse
+        </Button>
+      </div>
+    </>
   );
 }

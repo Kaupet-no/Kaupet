@@ -135,13 +135,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       {
         property: "og:image",
-        content:
-          "https://storage.googleapis.com/gpt-engineer-file-uploads/Zav741ZnKNZxYODrMCRKtvCwST03/social-images/social-1780646011042-Skjermbilde_2026-06-05_kl._09.35.02.webp",
+        content: "https://kaupet.no/og-image.png",
       },
       {
         name: "twitter:image",
-        content:
-          "https://storage.googleapis.com/gpt-engineer-file-uploads/Zav741ZnKNZxYODrMCRKtvCwST03/social-images/social-1780646011042-Skjermbilde_2026-06-05_kl._09.35.02.webp",
+        content: "https://kaupet.no/og-image.png",
       },
     ],
     links: [

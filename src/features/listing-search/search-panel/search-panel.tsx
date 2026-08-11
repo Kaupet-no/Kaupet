@@ -103,9 +103,28 @@ export function SearchPanel({
   // panelet, og den skal virke likt i begge formater.
   const isTablet = useFormFactor() === "tablet";
   const inputRef = useRef<HTMLInputElement>(null);
+  const actionBarRef = useRef<HTMLDivElement>(null);
 
   // Android-tilbake og iOS-kantsveip lukker panelet (fase 3).
   useOverlayHistory(open, () => onOpenChange(false));
+
+  // Radix Dialog (som vaul bygger på) kaller aria-hidden-pakkens hideOthers()
+  // på ALLE søsken til Drawer.Content når dialogen åpnes — inkludert denne
+  // baren, som bevisst ligger utenfor Content (se kommentar ved baren).
+  // Resultatet er en helt usynlig-for-skjermleser, men fullt klikkbar, knapp.
+  // Radix eksponerer ingen måte å ekskludere ekstra noder fra det kallet, så
+  // vi overvåker attributtet selv og fjerner det igjen med det samme.
+  useEffect(() => {
+    const el = actionBarRef.current;
+    if (!open || !results || !el) return;
+    const strip = () => {
+      if (el.getAttribute("aria-hidden") != null) el.removeAttribute("aria-hidden");
+    };
+    strip();
+    const observer = new MutationObserver(strip);
+    observer.observe(el, { attributes: true, attributeFilter: ["aria-hidden"] });
+    return () => observer.disconnect();
+  }, [open, results]);
 
   useEffect(() => {
     if (!open) return;
@@ -178,9 +197,15 @@ export function SearchPanel({
         snapPoints={SNAP_POINTS}
         activeSnapPoint={snap}
         setActiveSnapPoint={setSnap}
+        // Skal kunne dras helt ned for å lukkes (default `dismissible`), men
+        // skal aldri bli STÅENDE i en posisjon under laveste snap-punkt
+        // (0.6): vaul løser alltid en sluppet drag til enten et snap-punkt
+        // eller helt lukket, aldri en vilkårlig hvileposisjon midt imellom —
+        // så draget kan trygt gå under 50% underveis uten at panelet blir
+        // hengende der.
       >
         <Drawer.Portal>
-          <Drawer.Overlay className="fixed inset-0 z-[9998] bg-black/40" />
+          <Drawer.Overlay className="fixed inset-0 z-[9998] bg-black/40" onClick={close} />
           <Drawer.Content
             className={`fixed inset-x-0 bottom-0 z-[9999] flex h-full max-h-[97%] flex-col rounded-t-2xl border-t border-border bg-background outline-none ${
               isTablet ? "mx-auto w-full max-w-2xl border-x" : ""
@@ -193,35 +218,28 @@ export function SearchPanel({
               className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-muted-foreground/30"
             />
 
-            {/* Fritekstfelt — øverst i begge modus */}
-            <div className="flex items-center gap-2 px-4 pb-3 pt-3">
-              <div className="relative flex-1">
-                <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  ref={inputRef}
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  onFocus={() => setSnap(1)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void submitText(q);
-                  }}
-                  placeholder="Hva leter du etter?"
-                  className="h-11 border-0 bg-muted pl-9 pr-11 text-base focus-visible:ring-0"
-                  aria-label="Søk i annonser"
-                />
-                {q && (
-                  <button
-                    type="button"
-                    onClick={() => setQ("")}
-                    className="absolute right-0 top-1/2 flex size-11 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
-                    aria-label="Tøm søkefelt"
-                  >
-                    <X className="size-4" />
-                  </button>
-                )}
-              </div>
-              {results
-                ? results.activeItems.length > 0 && (
+            {/* vaul holder Drawer.Content i konstant full høyde (97dvh) og
+                flytter HELE boksen ned med en transform for å late som bare
+                gjeldende snap-brøk er synlig — resten av boksen henger da
+                fysisk under skjermkanten, klippet av selve viewporten, ikke
+                av en overflow-beholder. Et internt `overflow-y-auto` uten
+                dette ville derfor aldri gjøre den nedre delen nåbar: å
+                scrolle flytter bare INNHOLD innenfor boksens faste
+                skjerm-mapping, ikke boksen selv. Denne wrapperen låser
+                derfor sin egen maks-høyde til akkurat den synlige brøken
+                (samme `--snap-point-height`-variabel vaul selv bruker til
+                transformen), slik at "under fold" innhold faktisk havner
+                inni en scrollbar region i stedet for bak skjermkanten. */}
+            <div
+              className="flex min-h-0 flex-1 flex-col overflow-hidden"
+              style={{ maxHeight: "calc(97dvh - var(--snap-point-height, 0px))" }}
+            >
+              {/* Fritekstfelt — kun i søkelanseringsmodus (forsiden). I
+                filter-panelmodus (over /annonser) har resultatflaten sitt
+                eget søkefelt allerede, så dette ville konkurrert med det. */}
+              {results ? (
+                results.activeItems.length > 0 && (
+                  <div className="flex items-center justify-end px-4 pb-3 pt-3">
                     <button
                       type="button"
                       onClick={() => {
@@ -234,8 +252,36 @@ export function SearchPanel({
                       <RotateCcw className="size-3.5" />
                       Nullstill
                     </button>
-                  )
-                : q.trim() && (
+                  </div>
+                )
+              ) : (
+                <div className="flex items-center gap-2 px-4 pb-3 pt-3">
+                  <div className="relative flex-1">
+                    <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      ref={inputRef}
+                      value={q}
+                      onChange={(e) => setQ(e.target.value)}
+                      onFocus={() => setSnap(1)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") void submitText(q);
+                      }}
+                      placeholder="Hva leter du etter?"
+                      className="h-11 border-0 bg-muted pl-9 pr-11 text-base focus-visible:ring-0"
+                      aria-label="Søk i annonser"
+                    />
+                    {q && (
+                      <button
+                        type="button"
+                        onClick={() => setQ("")}
+                        className="absolute right-0 top-1/2 flex size-11 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
+                        aria-label="Tøm søkefelt"
+                      >
+                        <X className="size-4" />
+                      </button>
+                    )}
+                  </div>
+                  {q.trim() && (
                     <button
                       type="button"
                       onClick={() => void submitText(q)}
@@ -245,50 +291,52 @@ export function SearchPanel({
                       {submitting ? "Søker…" : "Søk"}
                     </button>
                   )}
+                </div>
+              )}
+
+              {categorySuggestion && (
+                <button
+                  type="button"
+                  onClick={() => goToCategory(categorySuggestion)}
+                  className="mx-4 mb-2 flex items-center gap-3 rounded-xl bg-primary/5 px-4 py-3 text-left transition active:scale-[0.98]"
+                >
+                  <FolderOpen className="size-4 shrink-0 text-primary" />
+                  <span className="text-sm">
+                    Gå til kategori:{" "}
+                    <span className="font-semibold text-primary">{categorySuggestion.name_nb}</span>
+                  </span>
+                </button>
+              )}
+
+              {results ? (
+                <SearchFilterSections
+                  value={results.value}
+                  setValue={results.setValue}
+                  categories={categories}
+                  section={section}
+                  location={results.location}
+                  onLocationChange={results.onLocationChange}
+                  attributeFilters={results.attributeFilters}
+                  attributeValues={results.attributeValues}
+                  onAttributeChange={results.onAttributeChange}
+                  attributeCounts={results.attributeCounts}
+                  activeItems={results.activeItems}
+                  includePrimary
+                />
+              ) : (
+                <BrowseContent
+                  q={q}
+                  history={history}
+                  categories={categories}
+                  onPickHistory={(item) => void submitText(item)}
+                  onClearHistory={() => {
+                    clearSearchHistory();
+                    setHistory([]);
+                  }}
+                  onPickCategory={goToCategory}
+                />
+              )}
             </div>
-
-            {categorySuggestion && (
-              <button
-                type="button"
-                onClick={() => goToCategory(categorySuggestion)}
-                className="mx-4 mb-2 flex items-center gap-3 rounded-xl bg-primary/5 px-4 py-3 text-left transition active:scale-[0.98]"
-              >
-                <FolderOpen className="size-4 shrink-0 text-primary" />
-                <span className="text-sm">
-                  Gå til kategori:{" "}
-                  <span className="font-semibold text-primary">{categorySuggestion.name_nb}</span>
-                </span>
-              </button>
-            )}
-
-            {results ? (
-              <SearchFilterSections
-                value={results.value}
-                setValue={results.setValue}
-                categories={categories}
-                section={section}
-                location={results.location}
-                onLocationChange={results.onLocationChange}
-                attributeFilters={results.attributeFilters}
-                attributeValues={results.attributeValues}
-                onAttributeChange={results.onAttributeChange}
-                attributeCounts={results.attributeCounts}
-                activeItems={results.activeItems}
-                includePrimary
-              />
-            ) : (
-              <BrowseContent
-                q={q}
-                history={history}
-                categories={categories}
-                onPickHistory={(item) => void submitText(item)}
-                onClearHistory={() => {
-                  clearSearchHistory();
-                  setHistory([]);
-                }}
-                onPickCategory={goToCategory}
-              />
-            )}
           </Drawer.Content>
 
           {/* Egen flate, ikke inni Drawer.Content: vaul translaterer HELE
@@ -301,7 +349,15 @@ export function SearchPanel({
               til skjermbunnen her løser det, uavhengig av snap-punkt. */}
           {results && (
             <div
-              className={`fixed inset-x-0 bottom-0 z-[10000] flex gap-2 border-t border-border bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-transform duration-500 ${
+              ref={actionBarRef}
+              // Radix sin modal-dialog setter `pointer-events: none` på
+              // <body> mens den er åpen, og gir bare selve Dialog.Content
+              // det tilbake som `auto` — denne baren er en vanlig sibling-
+              // div (ikke Dialog.Content), så uten `pointer-events-auto` her
+              // arves `none` fra <body>: baren tegnes riktig øverst, men tar
+              // ikke imot trykk, som i stedet faller gjennom til filtervalget
+              // som ligger under den.
+              className={`pointer-events-auto fixed inset-x-0 bottom-0 z-[10000] flex gap-2 border-t border-border bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-transform duration-500 ${
                 open ? "translate-y-0" : "translate-y-full"
               } ${isTablet ? "mx-auto w-full max-w-2xl" : ""}`}
             >

@@ -227,6 +227,16 @@
   overscroll-behavior: none;
 }
 
+/* En synlig scrollbar er en web-signal i en native app-wrapper — skjul den
+   overalt i Capacitor-WebView-en (berøringsscroll trenger den ikke). */
+.native * {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.native *::-webkit-scrollbar {
+  display: none;
+}
+
 /* Langtrykk på chrome skal ikke gi tekstmarkering eller iOS-kopimeny. Dette
    er bevisst en liste over *interaktive* elementer, ikke en global av-bryter:
    brødtekst, annonsebeskrivelser og meldinger skal fortsatt kunne kopieres.

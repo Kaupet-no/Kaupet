@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { NativeSheet } from "@/components/ui/native-sheet";
 import { Select, SelectContent, SelectItem, SelectTriggerBare } from "@/components/ui/select";
 import {
   Command,
@@ -720,17 +720,19 @@ export function AttributeFilterChips({
       {/* Native: one bottom sheet per primary field that needs a surface. */}
       {isNative &&
         primary.filter(needsSurface).map((f) => (
-          <Sheet key={f.id} open={openKey === f.key} onOpenChange={(o) => !o && openField(null)}>
-            <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto rounded-t-2xl">
-              <SheetHeader>
-                <SheetTitle>{f.label_nb}</SheetTitle>
-              </SheetHeader>
-              <div className="mt-4 space-y-4">
-                {fieldFor(f)}
-                {dismissButton(() => openField(null))}
-              </div>
-            </SheetContent>
-          </Sheet>
+          <NativeSheet
+            key={f.id}
+            open={openKey === f.key}
+            onOpenChange={(o) => !o && openField(null)}
+            title={f.label_nb}
+            titleVisible
+            className="max-h-[80vh] overflow-y-auto"
+          >
+            <div className="mt-4 space-y-4">
+              {fieldFor(f)}
+              {dismissButton(() => openField(null))}
+            </div>
+          </NativeSheet>
         ))}
 
       {/* "Se flere filter" dialog — desktop only, see moreButton comment above. */}

@@ -396,7 +396,7 @@ export function InboxPage() {
                             <Link
                               to="/meldinger/$id"
                               params={{ id: c.id }}
-                              className={`flex items-center gap-3 p-3 hover:bg-muted/40 ${unread ? "bg-accent/5" : ""}`}
+                              className={`flex items-center gap-3 p-3 hover:bg-muted/40 data-[status=active]:bg-accent/10 ${unread ? "bg-accent/5" : ""}`}
                             >
                               {other?.avatar_url ? (
                                 <img

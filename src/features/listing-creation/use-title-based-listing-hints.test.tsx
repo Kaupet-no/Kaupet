@@ -12,8 +12,9 @@ vi.mock("@/lib/keyword-suggestion.functions", () => ({
   suggestKeywordsForListing: vi.fn(),
 }));
 
+const matchWtbListingsForListingMock = vi.fn();
 vi.mock("@/lib/wtb-listings.functions", () => ({
-  matchWtbListingsForListing: vi.fn(),
+  matchWtbListingsForListing: (...args: unknown[]) => matchWtbListingsForListingMock(...args),
 }));
 
 const neqMock = vi.fn();
@@ -44,6 +45,7 @@ function wrapper({ children }: { children: React.ReactNode }) {
 beforeEach(() => {
   neqMock.mockReset();
   textSearchMock.mockReset().mockReturnValue({ limit: vi.fn().mockResolvedValue({ data: [] }) });
+  matchWtbListingsForListingMock.mockReset();
 });
 
 describe("useTitleBasedListingHints", () => {
@@ -95,5 +97,33 @@ describe("useTitleBasedListingHints", () => {
     act(() => result.current.appendTagToDescription("#sofa"));
 
     expect(setValue).toHaveBeenCalledWith("description", "Fin sofa #sofa", { shouldTouch: false });
+  });
+
+  it("fetches a WTB match once the debounced title reaches 3 characters", async () => {
+    matchWtbListingsForListingMock.mockResolvedValue({ id: "wtb-1" });
+    const { result } = renderHook(
+      () =>
+        useTitleBasedListingHints({
+          title: "Sof",
+          description: "",
+          categoryId: "cat-1",
+          setValue: vi.fn(),
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => expect(result.current.wtbMatch).toEqual({ id: "wtb-1" }), {
+      timeout: 3000,
+    });
+    expect(matchWtbListingsForListingMock).toHaveBeenCalledWith({
+      data: {
+        title: "Sof",
+        description: "",
+        category_id: "cat-1",
+        price_nok: null,
+        is_free: false,
+        attributes: {},
+      },
+    });
   });
 });

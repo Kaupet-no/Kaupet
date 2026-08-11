@@ -4,7 +4,7 @@ import { Eye, EyeOff, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { NativeSheet } from "@/components/ui/native-sheet";
 import { CategoryPicker } from "@/components/advanced-search-sheet";
 import { TermGroupRow } from "@/components/term-group-editor";
 import { FilterChip } from "@/components/filter-chip";
@@ -155,11 +155,14 @@ export function SearchFilterSections({
         )}
 
         <section data-section="categories" className="scroll-mt-2 space-y-3">
-          <Label className="text-base font-medium">Kategori</Label>
+          {/* Ingen egen seksjonstittel her — CategoryPicker rendrer selv en
+              "Kategori"-label, og å ha begge rett over hverandre er bare
+              gjentakelse uten merverdi. */}
           <CategoryPicker
             categories={categories}
             selected={v.categories}
             onChange={(slugs) => setV((prev) => ({ ...prev, categories: slugs, catMode: "any" }))}
+            variant="icons"
           />
         </section>
 
@@ -167,7 +170,8 @@ export function SearchFilterSections({
 
         <section data-section="price" className="scroll-mt-2 space-y-6">
           <div className="space-y-3">
-            <Label className="text-base font-medium">Pris</Label>
+            {/* Ingen egen seksjonstittel — RangeFilterField rendrer selv en
+                "Pris (NOK)"-label rett under. */}
             <RangeFilterField
               label="Pris (NOK)"
               bounds={PRICE_BOUNDS}
@@ -234,7 +238,7 @@ export function SearchFilterSections({
         <div className="my-6 border-t border-border" />
 
         <section data-section="attributes" className="scroll-mt-2 space-y-3">
-          <Label className="text-base font-medium">Mer</Label>
+          <Label className="text-base font-medium">Flere filter</Label>
           {hasAttributeFilters && v.categories.length > 0 ? (
             <SecondaryCategoryFilters
               filters={attributeFilters!}
@@ -352,31 +356,28 @@ function TermGroupSheet({
   };
 
   return (
-    <Sheet
+    <NativeSheet
       open={group !== null}
       onOpenChange={(o) => {
         if (!o) onClose();
       }}
+      title="Søkelinje"
+      titleVisible
+      className="max-h-[85vh] overflow-y-auto"
     >
-      <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Søkelinje</SheetTitle>
-        </SheetHeader>
+      <div className="mt-4">
+        <TermGroupRow group={draft} onChange={updateDraft} />
+      </div>
 
-        <div className="mt-4">
-          <TermGroupRow group={draft} onChange={updateDraft} />
-        </div>
-
-        <Button
-          type="button"
-          size="lg"
-          className="mt-6 w-full"
-          disabled={draft.terms.length === 0}
-          onClick={() => onSave(draft)}
-        >
-          {draft.terms.length === 0 ? "Legg til minst ett ord" : "Lagre søkelinje"}
-        </Button>
-      </SheetContent>
-    </Sheet>
+      <Button
+        type="button"
+        size="lg"
+        className="mt-6 w-full"
+        disabled={draft.terms.length === 0}
+        onClick={() => onSave(draft)}
+      >
+        {draft.terms.length === 0 ? "Legg til minst ett ord" : "Lagre søkelinje"}
+      </Button>
+    </NativeSheet>
   );
 }

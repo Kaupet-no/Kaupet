@@ -403,7 +403,9 @@ export function CategoryLandingPage({
           {isNative ? (
             // Samme sammendrag-pille som /annonser (fase 9, tiltak 26).
             <SearchSummaryPill
-              q={search.q}
+              q={qDraft}
+              onQChange={setQDraft}
+              onSubmitQ={() => updateSearch({ q: qDraft })}
               filterCount={activeFilterCount}
               onOpen={() => openPanel("price")}
             />

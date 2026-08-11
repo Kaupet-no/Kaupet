@@ -1039,7 +1039,7 @@ function NewListingPage() {
                       // under den. Variabelen er 0 på telefon (se styles.css).
                       "px-safe fixed inset-x-0 left-[var(--app-nav-rail-w,0px)] bottom-[var(--app-bottom-nav-h)] z-40 bg-background/95 pt-3 pb-3 backdrop-blur border-t border-border"
                     : "border-t border-border pt-6"
-                } flex items-center ${isFirst ? "justify-end" : "justify-between"}`}
+                } flex flex-wrap items-center gap-3 ${isFirst ? "justify-end" : "justify-between"}`}
               >
                 {!isFirst && (
                   <Button type="button" variant="ghost" onClick={goBack}>

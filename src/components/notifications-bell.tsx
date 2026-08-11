@@ -10,7 +10,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useIsNative } from "@/hooks/use-is-native";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { NativeSheet } from "@/components/ui/native-sheet";
 import {
   listNotifications,
   listPriceDrops,
@@ -351,16 +351,15 @@ export function NotificationsBell() {
 
   if (native) {
     return (
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetTrigger asChild>{bellTrigger}</SheetTrigger>
-        <SheetContent side="bottom" className="rounded-t-2xl p-0 pb-8">
-          <div className="mx-auto mb-1 mt-3 h-1 w-10 rounded-full bg-muted-foreground/30" />
-          <SheetHeader className="sr-only">
-            <SheetTitle>Varsler</SheetTitle>
-          </SheetHeader>
-          {notifList}
-        </SheetContent>
-      </Sheet>
+      <NativeSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        trigger={bellTrigger}
+        title="Varsler"
+        className="p-0 pb-safe"
+      >
+        {notifList}
+      </NativeSheet>
     );
   }
 

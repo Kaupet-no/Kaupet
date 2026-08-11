@@ -5,7 +5,7 @@ import { ListingCard, type ListingCardData } from "@/components/listing-card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { NativeSheet } from "@/components/ui/native-sheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Dialog,
@@ -224,19 +224,20 @@ export function ResultList({
             </PopoverContent>
           </Popover>
           {!isDesktop && !isNative && (
-            <Sheet open={mobileMapOpen} onOpenChange={setMobileMapOpen}>
-              <SheetTrigger asChild>
+            <NativeSheet
+              open={mobileMapOpen}
+              onOpenChange={setMobileMapOpen}
+              title="Kart"
+              titleVisible
+              className="h-[88vh] p-4"
+              trigger={
                 <Button type="button" variant="outline" size="sm" className="gap-1.5">
                   <MapIcon className="size-4" /> Kart
                 </Button>
-              </SheetTrigger>
-              <SheetContent side="bottom" className="h-[88vh] p-4">
-                <SheetHeader>
-                  <SheetTitle>Kart</SheetTitle>
-                </SheetHeader>
-                <div className="mt-3 h-[calc(100%-3rem)]">{mobileMapOpen ? renderMap() : null}</div>
-              </SheetContent>
-            </Sheet>
+              }
+            >
+              <div className="mt-3 h-[calc(100%-3rem)]">{mobileMapOpen ? renderMap() : null}</div>
+            </NativeSheet>
           )}
           {isDesktop && (
             <Button
@@ -385,14 +386,15 @@ export function ResultList({
       {/* Native kart-FAB + Sheet */}
       {isNative && (
         <>
-          <Sheet open={mobileMapOpen} onOpenChange={setMobileMapOpen}>
-            <SheetContent side="bottom" className="h-[88vh] p-4">
-              <SheetHeader>
-                <SheetTitle>Kart</SheetTitle>
-              </SheetHeader>
-              <div className="mt-3 h-[calc(100%-3rem)]">{mobileMapOpen ? renderMap() : null}</div>
-            </SheetContent>
-          </Sheet>
+          <NativeSheet
+            open={mobileMapOpen}
+            onOpenChange={setMobileMapOpen}
+            title="Kart"
+            titleVisible
+            className="h-[88vh] p-4"
+          >
+            <div className="mt-3 h-[calc(100%-3rem)]">{mobileMapOpen ? renderMap() : null}</div>
+          </NativeSheet>
           <button
             type="button"
             onClick={() => {

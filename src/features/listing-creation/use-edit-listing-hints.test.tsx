@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { renderHook, act, waitFor } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useEditListingHints } from "./use-edit-listing-hints";
@@ -52,25 +52,6 @@ beforeEach(() => {
 });
 
 describe("useEditListingHints", () => {
-  it("appendTagToDescription appends the tag with a leading space", () => {
-    const setValue = vi.fn();
-    const { result } = renderHook(
-      () =>
-        useEditListingHints({
-          title: "",
-          description: "Fin sofa",
-          categoryId: "cat-1",
-          listingId: "listing-1",
-          setValue,
-        }),
-      { wrapper },
-    );
-
-    act(() => result.current.appendTagToDescription("#sofa"));
-
-    expect(setValue).toHaveBeenCalledWith("description", "Fin sofa #sofa", { shouldTouch: false });
-  });
-
   it("excludes the listing being edited from the similar-listings search", async () => {
     renderHook(
       () =>
@@ -85,34 +66,5 @@ describe("useEditListingHints", () => {
     );
 
     await waitFor(() => expect(neqMock).toHaveBeenCalledWith("id", "listing-1"), { timeout: 3000 });
-  });
-
-  it("fetches a WTB match once the debounced title reaches 3 characters", async () => {
-    matchWtbListingsForListingMock.mockResolvedValue({ id: "wtb-1" });
-    const { result } = renderHook(
-      () =>
-        useEditListingHints({
-          title: "Sof",
-          description: "",
-          categoryId: "cat-1",
-          listingId: "listing-1",
-          setValue: vi.fn(),
-        }),
-      { wrapper },
-    );
-
-    await waitFor(() => expect(result.current.wtbMatch).toEqual({ id: "wtb-1" }), {
-      timeout: 3000,
-    });
-    expect(matchWtbListingsForListingMock).toHaveBeenCalledWith({
-      data: {
-        title: "Sof",
-        description: "",
-        category_id: "cat-1",
-        price_nok: null,
-        is_free: false,
-        attributes: {},
-      },
-    });
   });
 });

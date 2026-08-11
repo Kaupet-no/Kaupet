@@ -1,5 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Bell, MessageCircle, Plus, X, LogIn, Search } from "lucide-react";
+import { Bell, MessageCircle, Plus, X, LogIn } from "lucide-react";
 import { AdPickerOptions } from "@/components/ad-picker-options";
 import { useEffect, useState } from "react";
 
@@ -14,7 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useQuery } from "@tanstack/react-query";
 import { NotificationsBell } from "@/components/notifications-bell";
 import { MessagesButton } from "@/components/messages-button";
-import { useSearchPanel } from "@/features/listing-search/search-panel/search-panel-context";
+import logoIcon from "@/assets/brand/icon-only-green-letter.png";
 
 function initials(name: string | null | undefined, fallback: string) {
   const source = (name ?? fallback).trim();
@@ -26,7 +26,6 @@ function initials(name: string | null | undefined, fallback: string) {
 export function AppBottomNav() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { open: searchPanelOpen, openPanel } = useSearchPanel();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [adPickerOpen, setAdPickerOpen] = useState(false);
   const native = isNative();
@@ -48,6 +47,7 @@ export function AppBottomNav() {
 
   const isActive = (p: string) => pathname === p || pathname.startsWith(p + "/");
 
+  const isOnHome = pathname === "/";
   const isOnVarsler = isActive("/varsler");
   const isOnMeldinger = isActive("/meldinger");
   const isOnMeg = isActive("/meg");
@@ -73,32 +73,25 @@ export function AppBottomNav() {
             : "pointer-events-auto mx-auto flex max-w-md items-end justify-around gap-1 rounded-3xl border border-border bg-background/95 px-3 pb-3 pt-3 shadow-xl backdrop-blur"
         }
       >
-        {/* Søk — fane 1. Åpner det globale søkepanelet direkte i stedet for å
-            navigere til forsiden (fase 12) — trykk på «Søk» skal la brukeren
-            forfine søket der de allerede står, ikke forlate siden. Fanen var
-            også appens «Hjem»-lenke; det er bevisst forlatt uten erstatning,
-            se plandokumentets steg 1. */}
-        <button
-          type="button"
-          onClick={() => {
-            void hapticImpact("light");
-            openPanel();
-          }}
+        {/* Hjem — fane 1. Filterpanelet har sin egen filter-knapp i
+            søkefeltet på /annonser, så denne fanen trenger ikke lenger åpne
+            søkepanelet direkte. */}
+        <Link
+          to="/"
+          onClick={() => void hapticImpact("light")}
           className={itemClass}
-          aria-label="Søk"
-          aria-expanded={searchPanelOpen}
+          aria-label="Hjem"
+          aria-current={isOnHome ? "page" : undefined}
         >
           <span className="flex h-11 w-11 items-center justify-center">
-            <Search
-              className={`size-6 ${searchPanelOpen ? "text-primary" : "text-muted-foreground"}`}
-            />
+            <img src={logoIcon} alt="" className={`size-6 ${isOnHome ? "" : "opacity-60"}`} />
           </span>
           <span
-            className={`text-[11px] ${searchPanelOpen ? "font-medium text-primary" : "text-muted-foreground"}`}
+            className={`text-[11px] ${isOnHome ? "font-medium text-primary" : "text-muted-foreground"}`}
           >
-            Søk
+            Hjem
           </span>
-        </button>
+        </Link>
 
         {/* Varsler */}
         <div className={itemClass} aria-current={isOnVarsler ? "page" : undefined}>

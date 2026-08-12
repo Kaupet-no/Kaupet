@@ -62,15 +62,12 @@ export default defineConfig(({ command, mode }) => {
     build: {
       rolldownOptions: {
         output: {
-          // Preserve route/interaction-aware automatic splitting, but stop
-          // Rolldown from merging shared dependencies back into monolithic
-          // >500 KiB chunks after a new lazy boundary is introduced.
+          // Keep large third-party packages out of the application entry
+          // without grouping application modules into a circular initial chunk.
           codeSplitting: {
             maxSize: 450 * 1024,
             groups: [
               {
-                // category-icons supports the complete admin icon catalogue.
-                // Keep it out of otherwise unrelated application chunks.
                 name: "lucide-icons",
                 test: /node_modules[\\/]lucide-react/,
                 includeDependenciesRecursively: false,
@@ -78,12 +75,11 @@ export default defineConfig(({ command, mode }) => {
                 priority: 20,
               },
               {
-                name: "initial-app",
-                tags: ["$initial"],
-                entriesAware: true,
+                name: "tanstack-router",
+                test: /node_modules[\\/]@tanstack[\\/](?:react-router|router-core|history)/,
                 includeDependenciesRecursively: false,
-                maxSize: 350 * 1024,
-                priority: 10,
+                maxSize: 450 * 1024,
+                priority: 15,
               },
             ],
           },

@@ -25,6 +25,7 @@ import { SearchFilterSections, type SearchFilterSection } from "./filter-section
 import { getSearchHistory, saveSearchToHistory, clearSearchHistory } from "./search-history";
 import { buildActiveFilterItems } from "./active-filter-items";
 import { trackProductEvent } from "@/lib/product-analytics";
+import { useDraftResultCount } from "@/features/listing-search/use-draft-result-count";
 import { searchDraftMatchesApplied } from "./search-panel-utils";
 
 /** Panelet har to detents: delvis høyde (resultatlisten er fortsatt synlig
@@ -187,6 +188,21 @@ export function SearchPanel({
     searchDraftMatchesApplied(draft, draftAttributes, results.value, results.attributeValues ?? {})
       ? results.resultCount
       : undefined;
+  const draftChanged =
+    !!results &&
+    !searchDraftMatchesApplied(
+      draft,
+      draftAttributes,
+      results.value,
+      results.attributeValues ?? {},
+    );
+  const draftCount = useDraftResultCount({
+    draft,
+    attributes: draftAttributes,
+    categories,
+    enabled: open && draftChanged,
+  });
+  const buttonResultCount = draftChanged ? draftCount.count : visibleResultCount;
 
   const submitText = async (value: string) => {
     const trimmed = value.trim();
@@ -394,6 +410,7 @@ export function SearchPanel({
                 <div className="shrink-0 border-t border-border bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                   <Button
                     type="button"
+                    data-testid="search-filter-apply-button"
                     size="lg"
                     onClick={() => {
                       results.onApply(draft, draftAttributes);
@@ -406,11 +423,13 @@ export function SearchPanel({
                     className="h-14 w-full gap-2 rounded-xl text-base"
                   >
                     <SearchIcon className="size-4" />
-                    {visibleResultCount == null
-                      ? "Vis annonser"
-                      : visibleResultCount === 1
-                        ? "Vis 1 annonse"
-                        : `Vis ${visibleResultCount.toLocaleString("nb-NO")} annonser`}
+                    {draftChanged && draftCount.isPending
+                      ? "Beregner treff …"
+                      : buttonResultCount == null
+                        ? "Vis annonser"
+                        : buttonResultCount === 1
+                          ? "Vis 1 annonse"
+                          : `Vis ${buttonResultCount.toLocaleString("nb-NO")} annonser`}
                   </Button>
                 </div>
               )}

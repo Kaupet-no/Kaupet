@@ -39,3 +39,8 @@ Alle kritiske flyter skal minst sjekkes på:
 
 Native-grener kan røykprøves med `?forcenative` i utvikling, men tillatelser,
 safe area og OS-navigasjon må godkjennes i simulator eller på fysisk enhet.
+
+Automatisert E2E kjører alle generelle spesifikasjoner som både desktop-web og
+mobil-web. Native-spesifikasjoner bruker i tillegg `?forcenative`; OS-spesifikke
+tillatelser og safe area forblir en simulator-/enhetsport. `check:bundle`
+håndhever 650 KiB per JavaScript-fil og 180 KiB per CSS-fil etter bygg.

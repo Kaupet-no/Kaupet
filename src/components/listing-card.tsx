@@ -65,6 +65,8 @@ type Props = {
   /** Pre-signed by a result-list batch. Undefined keeps the standalone-card
    * fallback; null means the batch found no usable image. */
   signedImageUrl?: string | null;
+  knownFavorite?: boolean;
+  favoriteStateReady?: boolean;
 };
 
 function ListingImage({
@@ -108,6 +110,8 @@ export function ListingCard({
   compact = false,
   linkState,
   signedImageUrl,
+  knownFavorite,
+  favoriteStateReady,
 }: Props) {
   const isNative = useIsNative();
   const [imgUrl, setImgUrl] = useState<string | null>(null);
@@ -181,7 +185,13 @@ export function ListingCard({
             {listing.city && <p className="text-xs text-muted-foreground">{listing.city}</p>}
           </div>
         </Link>
-        <FavoriteButton listingId={listing.id} size="sm" className="mr-2 shrink-0" />
+        <FavoriteButton
+          listingId={listing.id}
+          size="sm"
+          className="mr-2 shrink-0"
+          knownFavorite={knownFavorite}
+          favoriteStateReady={favoriteStateReady}
+        />
       </article>
     );
   }
@@ -242,7 +252,13 @@ export function ListingCard({
           )}
         </div>
       </Link>
-      <FavoriteButton listingId={listing.id} size="sm" className="absolute right-2 top-2" />
+      <FavoriteButton
+        listingId={listing.id}
+        size="sm"
+        className="absolute right-2 top-2"
+        knownFavorite={knownFavorite}
+        favoriteStateReady={favoriteStateReady}
+      />
     </article>
   );
 }

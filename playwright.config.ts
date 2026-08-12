@@ -14,7 +14,10 @@ export default defineConfig({
     baseURL,
     trace: "retain-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "desktop-web", use: { ...devices["Desktop Chrome"] } },
+    { name: "mobile-web", use: { ...devices["Pixel 7"] } },
+  ],
   webServer: process.env.PLAYWRIGHT_BASE_URL
     ? undefined
     : {

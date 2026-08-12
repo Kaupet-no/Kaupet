@@ -6,6 +6,8 @@ import { requestLocationPermission } from "@/lib/native";
 import { hapticImpact } from "@/lib/haptics";
 import { setBackOverride } from "@/lib/native-offline";
 import { FullscreenOverlay, FullscreenOverlayContent } from "@/components/ui/fullscreen-overlay";
+import { useAuth } from "@/hooks/use-auth";
+import { trackProductEvent } from "@/lib/product-analytics";
 
 type Props = {
   onComplete: () => void;
@@ -15,9 +17,23 @@ type Card = "welcome" | "notifications" | "location" | "done";
 const CARDS: Card[] = ["welcome", "notifications", "location"];
 
 export function OnboardingFlow({ onComplete }: Props) {
+  const { user } = useAuth();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [finishing, setFinishing] = useState(false);
+  const finishTimer = useRef<number | null>(null);
+  const [reduceMotion] = useState(() =>
+    typeof window !== "undefined"
+      ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      : false,
+  );
+
+  useEffect(
+    () => () => {
+      if (finishTimer.current != null) window.clearTimeout(finishTimer.current);
+    },
+    [],
+  );
 
   // Track scroll position to update dot indicators
   useEffect(() => {
@@ -67,8 +83,16 @@ export function OnboardingFlow({ onComplete }: Props) {
   };
 
   const finish = () => {
+    if (finishing) return;
     setFinishing(true);
-    setTimeout(onComplete, 2200);
+    trackProductEvent("onboarding_completed", { signedIn: !!user });
+    finishTimer.current = window.setTimeout(onComplete, reduceMotion ? 500 : 2200);
+  };
+
+  const completeNow = () => {
+    if (finishTimer.current != null) window.clearTimeout(finishTimer.current);
+    finishTimer.current = null;
+    onComplete();
   };
 
   const handleNotifications = async () => {
@@ -140,8 +164,9 @@ export function OnboardingFlow({ onComplete }: Props) {
                 Ønsker du å motta varslinger?
               </h2>
               <p className="mt-3 max-w-xs text-sm text-muted-foreground">
-                Vi kan varsle deg om ny melding fra en kjøper eller selger, nye treff på lagrede
-                søk, og prisendringer på annonser du følger.
+                {user
+                  ? "Få beskjed om meldinger, nye treff på lagrede søk og prisendringer på favorittene dine — også aktivitet du startet på web."
+                  : "Vi kan varsle om meldinger, nye treff på lagrede søk og prisendringer på favoritter. Tillatelsen følger enheten og kobles til kontoen når du logger inn."}
               </p>
               <div className="mt-10 flex w-full max-w-xs flex-col gap-3">
                 <Button onClick={handleNotifications} className="w-full">
@@ -196,7 +221,12 @@ export function OnboardingFlow({ onComplete }: Props) {
 
         {/* Finishing overlay */}
         {finishing && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-background px-8 text-center duration-500 animate-in fade-in">
+          <button
+            type="button"
+            onClick={completeNow}
+            className={`absolute inset-0 flex w-full flex-col items-center justify-center bg-background px-8 text-center ${reduceMotion ? "" : "duration-500 animate-in fade-in"}`}
+            aria-label="Fortsett til Kaupet"
+          >
             <span className="font-display text-3xl font-bold tracking-tight text-primary">
               Kaupet.no
             </span>
@@ -205,7 +235,8 @@ export function OnboardingFlow({ onComplete }: Props) {
               <br />
               Vi håper du trives!
             </p>
-          </div>
+            <span className="mt-8 text-sm text-muted-foreground">Trykk for å fortsette</span>
+          </button>
         )}
       </FullscreenOverlayContent>
     </FullscreenOverlay>

@@ -36,11 +36,8 @@ type Props = {
    * ikke en tab-valgt tilstand (fase 12 erstattet fanene med én scrollende
    * liste, se komponentkommentaren). */
   section: SearchFilterSection;
-  /** Sted er eid av søkeflaten og oppdateres umiddelbart, i motsetning til
-   * resten som samles i et utkast og committes ved "Bruk søk" — se
-   * kommentaren over handleApply i use-annonser-search-state.ts. Utelates ved
-   * redigering av et lagret søk (mine-sok.tsx), der sted i stedet er en del av
-   * utkastet. */
+  /** Valgfri eksplisitt stedstilstand for eldre kallere. SearchPanel og
+   * lagret-søk-redigering bruker normalt sted fra samme utkast som resten. */
   location?: LocationValue;
   onLocationChange?: (v: LocationValue) => void;
   /** Kategoriens sekundære attributtfiltre. Utelatt betyr ingen egen seksjon. */

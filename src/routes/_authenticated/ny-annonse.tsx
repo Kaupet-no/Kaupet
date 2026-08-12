@@ -859,6 +859,13 @@ function NewListingPage() {
     applyCategorySelect(via, id, parentId);
   };
 
+  const applySuggestedCategory = () => {
+    applyCategorySuggestion();
+    if (currentPage?.groups?.some((group) => group.key === "category-select")) {
+      goToNextPage();
+    }
+  };
+
   const confirmPendingCategoryChange = () => {
     if (!pendingCategoryChange) return;
     setAttributes({});
@@ -906,7 +913,7 @@ function NewListingPage() {
     onCategoryDeselect: requestCategoryDeselect,
     categorySuggestion,
     categoryTouchedManually,
-    applyCategorySuggestion,
+    applyCategorySuggestion: applySuggestedCategory,
     setSuggestionDismissed,
     setCategorySuggestion,
 
@@ -1025,7 +1032,7 @@ function NewListingPage() {
           }
           mutation.mutate(v);
         })}
-        className={`mt-8 ${native ? (isLast ? "overflow-hidden" : "pb-[calc(var(--app-bottom-nav-h)+1.5rem)]") : "pb-24"}`}
+        className={`mt-8 ${native ? "pb-[calc(var(--app-bottom-nav-h)+6rem)]" : "pb-24"}`}
       >
         {(() => {
           const groups = currentPage?.groups ?? [];

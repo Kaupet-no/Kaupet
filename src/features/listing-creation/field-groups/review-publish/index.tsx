@@ -4,6 +4,7 @@ import { Turnstile } from "@marsidev/react-turnstile";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 import type { WizardSharedProps } from "../types";
 
@@ -81,6 +82,7 @@ export function UploadProgress({ mutationIsPending, uploadProgress }: UploadProg
 }
 
 type PublishActionsProps = {
+  native: boolean;
   turnstileEnabled: boolean;
   turnstileToken: string | null;
   setTurnstileToken: (token: string | null) => void;
@@ -96,8 +98,21 @@ type PublishActionsProps = {
  * renders it explicitly on the last page instead of via this wrapper.
  */
 export function ReviewPublishGroup(props: WizardSharedProps) {
+  const missing: string[] = [];
+  if (props.images.length === 0) missing.push("bilde");
+  if (!props.previewPrice) missing.push("pris");
+
   return (
     <>
+      {props.native && missing.length > 0 && (
+        <Alert variant="warning">
+          <AlertTitle>Kan forbedres før publisering</AlertTitle>
+          <AlertDescription>
+            Annonsen mangler {missing.join(" og ")}. Du kan fortsatt publisere, eller gå tilbake og
+            legge det til.
+          </AlertDescription>
+        </Alert>
+      )}
       <ReviewPreview
         images={props.images}
         title={props.title}
@@ -130,6 +145,7 @@ export function ReviewPublishGroup(props: WizardSharedProps) {
  * instead of splitting across two lines.
  */
 export function PublishActions({
+  native,
   turnstileEnabled,
   turnstileToken,
   setTurnstileToken,
@@ -137,6 +153,39 @@ export function PublishActions({
   onCancel,
   onPreview,
 }: PublishActionsProps) {
+  if (native) {
+    return (
+      <div className="flex w-full items-center gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={onPreview}
+          disabled={mutationIsPending}
+          className="shrink-0 px-3"
+        >
+          Forhåndsvis
+        </Button>
+        {turnstileEnabled && (
+          <Turnstile
+            siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+            onSuccess={(token) => setTurnstileToken(token)}
+            onExpire={() => setTurnstileToken(null)}
+            options={{ size: "invisible" }}
+          />
+        )}
+        <Button
+          type="submit"
+          data-testid="publish-listing-button"
+          disabled={mutationIsPending || (turnstileEnabled && !turnstileToken)}
+          className="h-14 flex-1 rounded-xl text-base"
+        >
+          {mutationIsPending && <Loader2 className="size-4 animate-spin" />}
+          Publiser
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <>
       <Button type="button" variant="ghost" onClick={onCancel} disabled={mutationIsPending}>

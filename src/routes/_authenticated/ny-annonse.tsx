@@ -601,11 +601,13 @@ function NewListingPage() {
     for (const group of groups) {
       const result = group.validateExtra?.(validateCtx);
       if (result === "SHOW_NO_IMAGE_DIALOG") {
+        if (native) continue;
         if (options?.skipImageCheck) continue;
         setShowNoImageDialog(true);
         return;
       }
       if (result === "SHOW_NO_PRICE_DIALOG") {
+        if (native) continue;
         if (options?.skipPriceCheck) continue;
         setShowNoPriceDialog(true);
         return;
@@ -972,7 +974,11 @@ function NewListingPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 pt-6 pb-4">
-      <NativePageHeader title="Ny annonse" backTo="/" />
+      <NativePageHeader
+        title="Ny annonse"
+        backLabel={isFirst ? "Avbryt" : "Tilbake"}
+        onBack={isFirst ? () => void navigate({ to: "/" }) : goBack}
+      />
       {!native && <h1 className="font-display text-3xl tracking-tight">Ny annonse</h1>}
 
       {/* Draft restore banner */}
@@ -1012,7 +1018,7 @@ function NewListingPage() {
             showErrorToast("Fyll inn alle obligatoriske egenskaper før du publiserer.");
             return;
           }
-          if (!hasPreviewed) {
+          if (!hasPreviewed && !native) {
             pendingSubmitValuesRef.current = v;
             setPreviewNudgeOpen(true);
             return;
@@ -1055,7 +1061,7 @@ function NewListingPage() {
                     : "border-t border-border pt-6"
                 } flex flex-wrap items-center gap-3 ${isFirst ? "justify-end" : "justify-between"}`}
               >
-                {!isFirst && (
+                {!native && !isFirst && (
                   <Button type="button" variant="ghost" onClick={goBack}>
                     <ChevronLeft className="size-4" /> Tilbake
                   </Button>
@@ -1068,17 +1074,20 @@ function NewListingPage() {
                     data-testid="wizard-next-button"
                     disabled={vehicleLookupLoading}
                     onClick={() => void goToNextPage()}
+                    className={native ? "h-14 w-full rounded-xl text-base" : undefined}
                   >
                     {vehicleLookupLoading ? (
                       "Slår opp kjøretøy…"
                     ) : (
                       <>
-                        Neste: {pageLabel(nextGroups, native)} <ChevronRight className="size-4" />
+                        {native ? "Fortsett" : `Neste: ${pageLabel(nextGroups, native)}`}{" "}
+                        <ChevronRight className="size-4" />
                       </>
                     )}
                   </Button>
                 ) : (
                   <PublishActions
+                    native={native}
                     turnstileEnabled={turnstileEnabled}
                     turnstileToken={turnstileToken}
                     setTurnstileToken={setTurnstileToken}

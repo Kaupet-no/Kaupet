@@ -67,11 +67,10 @@ export default tseslint.config(
         // recognized by the rule's default (native-tag-only) control list.
         { controlComponents: ["Checkbox", "Switch", "RadioGroupItem"] },
       ],
-      // Downgraded from "error" (not "off") pending an incremental cleanup —
-      // there are ~60 pre-existing violations across the codebase that need
-      // per-file review rather than a blind bulk fix. New violations still
-      // surface as lint warnings; tighten back to "error" as files are cleaned up.
-      "react-hooks/set-state-in-effect": "warn",
+      // Existing, audited prop/browser-state synchronization sites are
+      // baselined in eslint-suppressions.json. The rule remains an error so
+      // new sites fail lint instead of silently expanding that baseline.
+      "react-hooks/set-state-in-effect": "error",
       "react-hooks/static-components": "warn",
       "react-hooks/incompatible-library": "warn",
       "react-hooks/refs": "warn",

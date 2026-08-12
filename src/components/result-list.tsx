@@ -22,6 +22,7 @@ import { getAttributeChipState, getSortChipState } from "@/lib/filter-chip-label
 import { SORT_OPTIONS, type SortValue } from "@/lib/categories";
 import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
 import { useListingCardImages } from "@/hooks/use-listing-card-images";
+import { useListingFavorites } from "@/hooks/use-listing-favorites";
 import { trackProductEvent } from "@/lib/product-analytics";
 
 const ListingsMap = lazy(() =>
@@ -124,6 +125,9 @@ export function ResultList({
     }
   });
   const signedImageUrls = useListingCardImages(cards);
+  const { favoriteIds, isReady: favoriteStateReady } = useListingFavorites(
+    cards.map((card) => card.id),
+  );
   const zeroResultKey = `${q}|${effectiveCategories.join(",")}`;
 
   useEffect(() => {
@@ -352,6 +356,8 @@ export function ResultList({
                   compact={isNative && viewMode === "list"}
                   linkState={{ fromSearch: true }}
                   signedImageUrl={signedImageUrls[l.id] ?? null}
+                  knownFavorite={favoriteIds.has(l.id)}
+                  favoriteStateReady={favoriteStateReady}
                 />
               ))}
             </div>

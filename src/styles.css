@@ -1,8 +1,25 @@
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
-@import "@fontsource-variable/newsreader/opsz.css";
-@import "@fontsource-variable/inter/wght.css";
+/* Kaupet ships Norwegian Bokmål UI only. Loading the Latin subsets directly
+   avoids downloading Cyrillic, Greek and Vietnamese variable-font files. */
+@font-face {
+  font-family: "Newsreader Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 800;
+  src: url("@fontsource-variable/newsreader/files/newsreader-latin-opsz-normal.woff2")
+    format("woff2-variations");
+}
+
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("@fontsource-variable/inter/files/inter-latin-wght-normal.woff2")
+    format("woff2-variations");
+}
 
 @custom-variant dark (&:is(.dark *));
 

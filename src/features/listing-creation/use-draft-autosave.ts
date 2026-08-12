@@ -86,7 +86,10 @@ export function useDraftAutosave(fields: DraftFields) {
   const imageStoreReady = useRef(false);
   const restorableImages = useRef<PendingImage[]>([]);
   const latestImages = useRef(images);
-  latestImages.current = images;
+
+  useEffect(() => {
+    latestImages.current = images;
+  }, [images]);
 
   // Load draft from localStorage on mount
   useEffect(() => {

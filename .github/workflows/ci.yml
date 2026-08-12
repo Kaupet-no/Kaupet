@@ -158,21 +158,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Start isolated Supabase
-        run: bunx supabase start
-
-      - name: Configure app for isolated Supabase
-        run: bun run env:local
-
       - name: Install Playwright browsers
         run: bunx playwright install --with-deps chromium
 
       - name: Run e2e tests
-        run: bun --env-file=.env run test:e2e
-
-      - name: Stop isolated Supabase
-        if: always()
-        run: bunx supabase stop
+        run: bun run test:e2e
 
       - uses: actions/upload-artifact@v7
         if: always()

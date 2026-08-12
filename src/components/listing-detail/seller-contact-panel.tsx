@@ -1,4 +1,3 @@
-import { Link } from "@tanstack/react-router";
 import { MessageCircle, Share2, ShieldCheck, User as UserIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -43,15 +42,19 @@ export function SellerContactPanel({
   return (
     <div className="rounded-xl border border-border bg-card p-4">
       <div className="flex items-center gap-3">
-        {isLoggedIn && seller?.avatar_url ? (
-          <img src={seller.avatar_url} alt="" className="size-10 rounded-full object-cover" />
+        {seller?.avatar_url ? (
+          <img
+            src={seller.avatar_url}
+            alt={seller.display_name ? `Profilbilde av ${seller.display_name}` : "Profilbilde"}
+            className="size-10 rounded-full object-cover"
+          />
         ) : (
           <div className="flex size-10 items-center justify-center rounded-full bg-muted">
             <UserIcon className="size-5 text-muted-foreground" />
           </div>
         )}
         <div className="text-sm">
-          {isLoggedIn ? (
+          {seller ? (
             <>
               <div className="flex flex-wrap items-center gap-1.5">
                 <p className="font-medium">{seller?.display_name ?? "Selger"}</p>
@@ -81,17 +84,15 @@ export function SellerContactPanel({
                 </p>
               )}
             </>
-          ) : (
+          ) : !isLoggedIn ? (
             <div className="flex items-start gap-1.5 text-muted-foreground">
               <ShieldCheck className="mt-0.5 size-3.5 shrink-0" />
               <p>
-                Du må være innlogget for å se selgerinformasjon.{" "}
-                <Link to="/auth" className="underline hover:text-foreground">
-                  Logg inn
-                </Link>{" "}
-                for å vise.
+                Selgerprofilen kunne ikke lastes. Du kan fortsatt kontakte selger etter innlogging.
               </p>
             </div>
+          ) : (
+            <p className="font-medium">Selger</p>
           )}
         </div>
       </div>

@@ -2,7 +2,7 @@ import { createFileRoute, Link, notFound, useNavigate, useRouter } from "@tansta
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { reconcilePromotionPayment } from "@/lib/promotions.functions";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
@@ -34,6 +34,9 @@ import { CategoryChangeDialog } from "@/features/listing-edit/category-change-di
 import type { ListingEditContextValue } from "@/features/listing-edit/edit-mode-context";
 import { ListingDetailSkeleton } from "@/components/listing-detail-skeleton";
 import { Vehicle360CaptureLauncher } from "@/components/vehicle-360-capture-launcher";
+import { currentReturnTo } from "@/lib/auth-return";
+import { savePendingAuthIntent, takePendingAuthIntent } from "@/lib/pending-auth-intent";
+import { trackProductEvent } from "@/lib/product-analytics";
 
 // crypto.randomUUID() requires a secure context and isn't available in every
 // WebView — fall back to a non-crypto random ID so anonymous view-count
@@ -470,9 +473,10 @@ function ListingDetailPage() {
   const contactMutation = useMutation({
     mutationFn: async () => {
       if (!user) {
+        if (data) savePendingAuthIntent({ type: "contact", listingId: data.id });
         navigate({
           to: "/auth",
-          search: { mode: "signin" },
+          search: { mode: "signin", returnTo: currentReturnTo() },
         });
         return null;
       }
@@ -499,10 +503,24 @@ function ListingDetailPage() {
     },
     onSuccess: (conversationId) => {
       if (conversationId) {
+        trackProductEvent("contact_started", { listingType: "sell" });
         navigate({ to: "/meldinger/$id", params: { id: conversationId } });
       }
     },
   });
+
+  const replayedContact = useRef(false);
+  useEffect(() => {
+    if (!user || !data || replayedContact.current) return;
+    if (!takePendingAuthIntent({ type: "contact", listingId: data.id })) return;
+    replayedContact.current = true;
+    contactMutation.mutate();
+  }, [contactMutation, data, user]);
+
+  useEffect(() => {
+    if (!data) return;
+    trackProductEvent("listing_opened", { hasImages: (data.listing_images?.length ?? 0) > 0 });
+  }, [data]);
 
   const images = useMemo(
     () => (data?.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order),

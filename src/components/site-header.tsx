@@ -32,14 +32,14 @@ export function SiteHeader() {
             </>
           ) : (
             <>
-              <Link to="/auth">
-                <Button size="sm" variant="ghost">
-                  Logg inn
-                </Button>
-              </Link>
-              <Link to="/auth" search={{ mode: "signup" }}>
-                <Button size="sm">Bli medlem</Button>
-              </Link>
+              <Button asChild size="sm" variant="ghost">
+                <Link to="/auth">Logg inn</Link>
+              </Button>
+              <Button asChild size="sm">
+                <Link to="/auth" search={{ mode: "signup" }}>
+                  Bli medlem
+                </Link>
+              </Button>
             </>
           )}
         </div>
@@ -51,18 +51,18 @@ export function SiteHeader() {
 function MessagesIconLink() {
   const unread = useUnreadConversationsCount();
   return (
-    <Link to="/meldinger" aria-label="Meldinger" className="relative">
-      <Button variant="ghost" size="icon" aria-label="Meldinger">
+    <Button asChild variant="ghost" size="icon">
+      <Link to="/meldinger" aria-label="Meldinger" className="relative">
         <MessageCircle className="size-5" />
-      </Button>
-      {unread > 0 && (
-        <span
-          className="pointer-events-none absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-accent-foreground"
-          aria-label={`${unread} uleste samtaler`}
-        >
-          {unread > 9 ? "9+" : unread}
-        </span>
-      )}
-    </Link>
+        {unread > 0 && (
+          <span
+            className="pointer-events-none absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-accent-foreground"
+            aria-label={`${unread} uleste samtaler`}
+          >
+            {unread > 9 ? "9+" : unread}
+          </span>
+        )}
+      </Link>
+    </Button>
   );
 }

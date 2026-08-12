@@ -3,6 +3,12 @@ import { showSuccessToast } from "@/lib/toast";
 import { saveDraftListing } from "@/lib/listings.functions";
 import { computeVehicleTitle } from "@/lib/vehicle/vehicle-title";
 import type { AttributeMap } from "@/components/attribute-fields";
+import type { PendingImage } from "@/components/image-uploader";
+import {
+  clearDraftImages,
+  loadDraftImages,
+  saveDraftImages,
+} from "@/features/listing-creation/draft-image-store";
 
 const DRAFT_KEY = "kaupet_draft_ny_annonse";
 const DRAFT_ID_KEY = "kaupet_draft_id";
@@ -24,6 +30,11 @@ type DraftFields = {
   coords: { lat: number; lng: number } | null;
   isVehicle: boolean;
   attributes: AttributeMap;
+  images: PendingImage[];
+  setImages: (images: PendingImage[]) => void;
+  knownIssues?: string;
+  noKnownIssues?: boolean;
+  maintenanceHistory?: string;
 };
 
 type RestoreTarget = {
@@ -35,6 +46,7 @@ type RestoreTarget = {
   setSelectedParentId: (id: string) => void;
   setLocationMethod: (method: "gps" | "postal" | null) => void;
   setAttributes: (attributes: AttributeMap) => void;
+  setCoords: (coords: { lat: number; lng: number } | null) => void;
 };
 
 /**
@@ -59,6 +71,11 @@ export function useDraftAutosave(fields: DraftFields) {
     coords,
     isVehicle,
     attributes,
+    images,
+    setImages,
+    knownIssues,
+    noKnownIssues,
+    maintenanceHistory,
   } = fields;
 
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -66,6 +83,10 @@ export function useDraftAutosave(fields: DraftFields) {
   const [hasDraftData, setHasDraftData] = useState<Record<string, unknown> | null>(null);
   const [draftId, setDraftId] = useState<string | null>(null);
   const draftSaveInProgress = useRef(false);
+  const imageStoreReady = useRef(false);
+  const restorableImages = useRef<PendingImage[]>([]);
+  const latestImages = useRef(images);
+  latestImages.current = images;
 
   // Load draft from localStorage on mount
   useEffect(() => {
@@ -77,7 +98,7 @@ export function useDraftAutosave(fields: DraftFields) {
       const data = JSON.parse(saved) as Record<string, unknown>;
       const savedAt = typeof data.saved_at === "number" ? data.saved_at : 0;
       if (Date.now() - savedAt < 7 * 24 * 60 * 60 * 1000) {
-        if (data.title || data.description) setHasDraftData(data);
+        if (data.title || data.description || Number(data.image_count) > 0) setHasDraftData(data);
       } else {
         localStorage.removeItem(DRAFT_KEY);
         localStorage.removeItem(DRAFT_ID_KEY);
@@ -87,11 +108,25 @@ export function useDraftAutosave(fields: DraftFields) {
     }
   }, []);
 
-  // Autosave to localStorage on field changes.
-  // ponytail: images (raw File objects) aren't included here — persisting
-  // them would need IndexedDB/Blob storage instead of localStorage's string
-  // API. Attributes (plain JSON) are the highest-value piece to recover
-  // since they hold the specs/equipment that take longest to fill in.
+  useEffect(() => {
+    let cancelled = false;
+    void loadDraftImages()
+      .then((stored) => {
+        if (cancelled) return;
+        restorableImages.current = stored;
+        imageStoreReady.current = true;
+        if (latestImages.current.length > 0) return saveDraftImages(latestImages.current);
+      })
+      .catch(() => {
+        imageStoreReady.current = true;
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Scalar/JSON fields live in localStorage. Binary image drafts are stored
+  // separately in IndexedDB below.
   useEffect(() => {
     const t = window.setTimeout(() => {
       try {
@@ -109,7 +144,12 @@ export function useDraftAutosave(fields: DraftFields) {
             price_nok: priceNok,
             postal_code: postalCode,
             city,
+            coords,
             attributes,
+            known_issues: knownIssues,
+            no_known_issues: noKnownIssues,
+            maintenance_history: maintenanceHistory,
+            image_count: images.length,
             saved_at: Date.now(),
           }),
         );
@@ -131,8 +171,21 @@ export function useDraftAutosave(fields: DraftFields) {
     priceNok,
     postalCode,
     city,
+    coords,
     attributes,
+    knownIssues,
+    noKnownIssues,
+    maintenanceHistory,
+    images.length,
   ]);
+
+  useEffect(() => {
+    if (!imageStoreReady.current) return;
+    const timeout = window.setTimeout(() => {
+      void saveDraftImages(images).catch(() => setDraftSaveError(true));
+    }, 750);
+    return () => window.clearTimeout(timeout);
+  }, [images]);
 
   async function saveDraftToSupabase(): Promise<string | null> {
     if (draftSaveInProgress.current) return draftId;
@@ -161,6 +214,10 @@ export function useDraftAutosave(fields: DraftFields) {
           lat: coords?.lat ?? null,
           lng: coords?.lng ?? null,
           can_ship: canShip !== "pickup",
+          known_issues: knownIssues?.trim() || null,
+          no_known_issues: !!noKnownIssues,
+          maintenance_history: maintenanceHistory?.trim() || null,
+          attributes,
         },
       });
       setDraftId(result.id);
@@ -228,9 +285,9 @@ export function useDraftAutosave(fields: DraftFields) {
     draftId,
   ]);
 
-  function restoreDraft(target: RestoreTarget) {
+  async function restoreDraft(target: RestoreTarget) {
     if (!hasDraftData) return;
-    const { setValue, setSelectedParentId, setLocationMethod, setAttributes } = target;
+    const { setValue, setSelectedParentId, setLocationMethod, setAttributes, setCoords } = target;
     if (typeof hasDraftData.title === "string") setValue("title", hasDraftData.title);
     if (typeof hasDraftData.subtitle === "string") setValue("subtitle", hasDraftData.subtitle);
     if (typeof hasDraftData.description === "string")
@@ -249,24 +306,48 @@ export function useDraftAutosave(fields: DraftFields) {
       if (hasDraftData.postal_code) setLocationMethod("postal");
     }
     if (typeof hasDraftData.city === "string") setValue("city", hasDraftData.city);
+    if (
+      hasDraftData.coords &&
+      typeof hasDraftData.coords === "object" &&
+      typeof (hasDraftData.coords as { lat?: unknown }).lat === "number" &&
+      typeof (hasDraftData.coords as { lng?: unknown }).lng === "number"
+    ) {
+      setCoords(hasDraftData.coords as { lat: number; lng: number });
+    }
     if (typeof hasDraftData.selectedParentId === "string")
       setSelectedParentId(hasDraftData.selectedParentId);
     if (typeof hasDraftData.category_id === "string")
       setValue("category_id", hasDraftData.category_id);
     if (hasDraftData.attributes && typeof hasDraftData.attributes === "object")
       setAttributes(hasDraftData.attributes as AttributeMap);
+    if (typeof hasDraftData.known_issues === "string")
+      setValue("known_issues", hasDraftData.known_issues);
+    if (typeof hasDraftData.no_known_issues === "boolean")
+      setValue("no_known_issues", hasDraftData.no_known_issues);
+    if (typeof hasDraftData.maintenance_history === "string")
+      setValue("maintenance_history", hasDraftData.maintenance_history);
+    const restoredImages = restorableImages.current.length
+      ? restorableImages.current
+      : await loadDraftImages().catch(() => []);
+    if (restoredImages.length > 0) setImages(restoredImages);
     setHasDraftData(null);
-    showSuccessToast("Utkast gjenopprettet!");
+    showSuccessToast(
+      restoredImages.length > 0
+        ? `Utkast og ${restoredImages.length} bilder gjenopprettet`
+        : "Utkast gjenopprettet",
+    );
   }
 
   function clearDraftStorage() {
     localStorage.removeItem(DRAFT_KEY);
     localStorage.removeItem(DRAFT_ID_KEY);
+    void clearDraftImages();
   }
 
   function discardLocalDraftBanner() {
     localStorage.removeItem(DRAFT_KEY);
     setHasDraftData(null);
+    void clearDraftImages();
   }
 
   return {

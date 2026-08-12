@@ -42,7 +42,7 @@ export function SearchSummaryPill({ q, onQChange, onSubmitQ, filterCount, onOpen
           onOpen();
         }}
         aria-label={filterCount > 0 ? `Filtrer, ${filterText} aktive` : "Filtrer"}
-        className="flex shrink-0 items-center gap-1.5 rounded-full px-1 py-1 text-muted-foreground transition active:scale-[0.9]"
+        className="native-touch-target -mr-2 flex shrink-0 items-center justify-center gap-1.5 rounded-full px-2 py-1 text-muted-foreground transition active:scale-[0.9]"
       >
         {filterCount > 0 ? (
           <span className="flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">

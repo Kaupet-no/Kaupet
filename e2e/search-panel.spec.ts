@@ -38,6 +38,7 @@ test("holder filter som utkast frem til brukeren anvender dem", async ({ page })
 
   await page.getByRole("checkbox", { name: "Inkluder gratis-annonser" }).click();
   await expect(page).not.toHaveURL(/includeFree=false/);
+  await expect(applyButton).toHaveText("Vis annonser");
 
   await applyButton.click();
   await expect(applyButton).not.toBeVisible();

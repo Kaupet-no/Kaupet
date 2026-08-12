@@ -25,6 +25,7 @@ import { SearchFilterSections, type SearchFilterSection } from "./filter-section
 import { getSearchHistory, saveSearchToHistory, clearSearchHistory } from "./search-history";
 import { buildActiveFilterItems } from "./active-filter-items";
 import { trackProductEvent } from "@/lib/product-analytics";
+import { searchDraftMatchesApplied } from "./search-panel-utils";
 
 /** Panelet har to detents: delvis høyde (resultatlisten er fortsatt synlig
  * bak) og fullskjerm. Brukeren drar mellom dem. */
@@ -181,6 +182,11 @@ export function SearchPanel({
     : [];
 
   const draftCriteria = valueToCriteria(draft);
+  const visibleResultCount =
+    results &&
+    searchDraftMatchesApplied(draft, draftAttributes, results.value, results.attributeValues ?? {})
+      ? results.resultCount
+      : undefined;
 
   const submitText = async (value: string) => {
     const trimmed = value.trim();
@@ -400,11 +406,11 @@ export function SearchPanel({
                     className="h-14 w-full gap-2 rounded-xl text-base"
                   >
                     <SearchIcon className="size-4" />
-                    {results.resultCount == null
+                    {visibleResultCount == null
                       ? "Vis annonser"
-                      : results.resultCount === 1
+                      : visibleResultCount === 1
                         ? "Vis 1 annonse"
-                        : `Vis ${results.resultCount.toLocaleString("nb-NO")} annonser`}
+                        : `Vis ${visibleResultCount.toLocaleString("nb-NO")} annonser`}
                   </Button>
                 </div>
               )}

@@ -7,19 +7,20 @@
  */
 import { expect, test } from "@playwright/test";
 
-test("åpner søkepanelet over /annonser, endrer filter og lukker med treff-knappen", async ({
-  page,
-}) => {
+test("holder filter som utkast frem til brukeren anvender dem", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/annonser?forcenative&sort=new");
   await page.waitForLoadState("networkidle");
 
   await page.getByRole("button", { name: /Filtrer/ }).click();
 
-  const showButton = page.getByRole("button", { name: /Vis \d+ treff/ });
-  await expect(showButton).toBeVisible({ timeout: 10_000 });
+  const applyButton = page.getByRole("button", { name: "Bruk filtre" });
+  await expect(applyButton).toBeVisible({ timeout: 10_000 });
 
-  await showButton.click();
-  await expect(showButton).not.toBeVisible();
-  await expect(page).toHaveURL(/\/annonser\?/);
+  await page.getByRole("checkbox", { name: "Inkluder gratis-annonser" }).click();
+  await expect(page).not.toHaveURL(/includeFree=false/);
+
+  await applyButton.click();
+  await expect(applyButton).not.toBeVisible();
+  await expect(page).toHaveURL(/includeFree=false/);
 });

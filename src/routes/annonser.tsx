@@ -22,7 +22,6 @@ import {
   SearchSummaryPill,
   countActiveFilters,
 } from "@/features/listing-search/search-panel/search-summary-pill";
-import { buildActiveFilterItems } from "@/features/listing-search/search-panel/active-filter-items";
 import { saveLastSearchContext } from "@/lib/last-search-context";
 import { summarizeCriteria } from "@/lib/saved-searches";
 import { WtbListingCard } from "@/components/wtb-listing-card";
@@ -203,7 +202,7 @@ function BrowsePage() {
     advancedInitial,
     currentCriteria,
     updateSearch,
-    setLiveValue,
+    applyPanelDraft,
     handleLocationChange,
     resetFilters,
   } = useAnnonserSearchState({ search, navigate, categories, allFilters, setQDraft });
@@ -536,33 +535,14 @@ function BrowsePage() {
     ? {
         q: search.q,
         value: advancedInitial,
-        setValue: setLiveValue,
-        onSubmitText: (q) => {
-          setQDraft(q);
-          updateSearch({ q });
+        onApply: (value, nextAttributes) => {
+          setQDraft(value.terms.join(" "));
+          applyPanelDraft(value, nextAttributes);
         },
-        onSelectCategory: (slug) => updateSearch({ category: slug, categories: [] }),
-        location,
-        onLocationChange: handleLocationChange,
         attributeFilters: attrFilters,
         attributeValues: attrValues,
-        onAttributeChange: handleAttrValueChange,
         attributeCounts: facetCounts,
         resultCount: totalCount ?? cards.length,
-        activeItems: buildActiveFilterItems({
-          search,
-          terms,
-          onUpdate: (patch) => updateSearch(patch),
-          attrFilters,
-          attrValues,
-          onRemoveAttr: removeAttrWithRestore,
-          location,
-          onRemoveLocation: () =>
-            updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined }),
-        }),
-        onResetAll: resetFilters,
-        criteria: currentCriteria,
-        defaultName: summarizeCriteria(currentCriteria),
       }
     : null;
   useRegisterSearchPanelResults(searchPanelResults);

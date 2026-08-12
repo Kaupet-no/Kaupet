@@ -100,6 +100,38 @@ describe("useAnnonserSearchState", () => {
     );
   });
 
+  it("commits the complete panel draft in one navigation", () => {
+    const { result, navigate } = setup();
+
+    act(() =>
+      result.current.applyPanelDraft(
+        {
+          ...result.current.advancedInitial,
+          terms: ["grønn", "sykkel"],
+          categories: ["mobil"],
+          min: 500,
+          location: { lat: 59.91, lng: 10.75, radius: 25, label: "Oslo" },
+        },
+        { color: { kind: "select", value: "green" } },
+      ),
+    );
+
+    expect(navigate).toHaveBeenCalledTimes(1);
+    const next = navigate.mock.calls[0][0].search(baseSearch);
+    expect(next).toEqual(
+      expect.objectContaining({
+        q: "grønn sykkel",
+        categories: ["mobil"],
+        min: 500,
+        lat: 59.91,
+        lng: 10.75,
+        radius: 25,
+        loc: "Oslo",
+      }),
+    );
+    expect(next.attrs).toContain("color");
+  });
+
   it("handleAttrValueChange encodes the updated attribute filters onto the URL", () => {
     const { result, navigate } = setup();
 

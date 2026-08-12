@@ -1,5 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Bell, MessageCircle, Plus, X, LogIn } from "lucide-react";
+import { Search, MessageCircle, Plus, X, LogIn } from "lucide-react";
 import { AdPickerOptions } from "@/components/ad-picker-options";
 import { useEffect, useState } from "react";
 
@@ -12,9 +12,10 @@ import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/res
 import { DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useQuery } from "@tanstack/react-query";
-import { NotificationsBell } from "@/components/notifications-bell";
 import { MessagesButton } from "@/components/messages-button";
 import logoIcon from "@/assets/brand/icon-only-green-letter.png";
+import { useSearchPanel } from "@/features/listing-search/search-panel/search-panel-context";
+import { trackProductEvent } from "@/lib/product-analytics";
 
 function initials(name: string | null | undefined, fallback: string) {
   const source = (name ?? fallback).trim();
@@ -28,6 +29,7 @@ export function AppBottomNav() {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [adPickerOpen, setAdPickerOpen] = useState(false);
+  const { open: searchOpen, openPanel } = useSearchPanel();
   const native = isNative();
   // Nettbrett: sidestilt navigasjon i stedet for den flytende bunnpillen
   // (fase 10). Samme rutedefinisjoner og samme tilstand — kun presentasjonen
@@ -48,7 +50,7 @@ export function AppBottomNav() {
   const isActive = (p: string) => pathname === p || pathname.startsWith(p + "/");
 
   const isOnHome = pathname === "/";
-  const isOnVarsler = isActive("/varsler");
+  const isOnSearch = searchOpen || isActive("/annonser");
   const isOnMeldinger = isActive("/meldinger");
   const isOnMeg = isActive("/meg");
 
@@ -93,26 +95,26 @@ export function AppBottomNav() {
           </span>
         </Link>
 
-        {/* Varsler */}
-        <div className={itemClass} aria-current={isOnVarsler ? "page" : undefined}>
-          {user ? (
-            <div className="relative flex h-11 w-11 items-center justify-center">
-              <NotificationsBell />
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => navigate({ to: "/auth" })}
-              className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground"
-              aria-label="Varsler (logg inn)"
-            >
-              <Bell className="size-6" />
-            </button>
-          )}
-          <span
-            className={`text-[11px] ${isOnVarsler ? "font-medium text-primary" : "text-muted-foreground"}`}
+        {/* Søk er en primær handling og er tilgjengelig uten konto. */}
+        <div className={itemClass} aria-current={isOnSearch ? "page" : undefined}>
+          <button
+            type="button"
+            onClick={() => {
+              void hapticImpact("light");
+              trackProductEvent("search_opened", { source: "bottom_nav" });
+              openPanel("categories");
+            }}
+            className={`flex h-11 w-11 items-center justify-center rounded-full ${
+              isOnSearch ? "text-primary" : "text-muted-foreground"
+            }`}
+            aria-label="Søk"
           >
-            Varsler
+            <Search className="size-6" />
+          </button>
+          <span
+            className={`text-[11px] ${isOnSearch ? "font-medium text-primary" : "text-muted-foreground"}`}
+          >
+            Søk
           </span>
         </div>
 

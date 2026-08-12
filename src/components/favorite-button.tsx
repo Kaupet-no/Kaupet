@@ -1,11 +1,15 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Heart } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { hapticImpact } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
+import { currentReturnTo } from "@/lib/auth-return";
+import { savePendingAuthIntent, takePendingAuthIntent } from "@/lib/pending-auth-intent";
+import { trackProductEvent } from "@/lib/product-analytics";
 
 type Size = "sm" | "md" | "lg";
 
@@ -36,7 +40,7 @@ export function FavoriteButton({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const { data: isFavorite = false } = useQuery({
+  const { data: isFavorite = false, isFetched } = useQuery({
     queryKey: ["favorite", listingId, user?.id],
     enabled: !!user,
     queryFn: async () => {
@@ -75,6 +79,7 @@ export function FavoriteButton({
       queryClient.invalidateQueries({ queryKey: ["user-favorites"] });
       void hapticImpact("light");
       showSuccessToast(nowFav ? "Lagt til i favoritter" : "Fjernet fra favoritter");
+      trackProductEvent("favorite_toggled", { favorite: nowFav });
     },
     onError: (e: Error) => {
       if (e.message !== "not-authenticated") {
@@ -83,11 +88,23 @@ export function FavoriteButton({
     },
   });
 
+  const replayedIntent = useRef(false);
+  useEffect(() => {
+    if (!user || !isFetched || replayedIntent.current) return;
+    if (!takePendingAuthIntent({ type: "favorite", listingId })) return;
+    replayedIntent.current = true;
+    if (!isFavorite) toggle.mutate();
+  }, [isFavorite, isFetched, listingId, toggle, user]);
+
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (!user) {
-      navigate({ to: "/auth", search: { mode: "signin" } });
+      savePendingAuthIntent({ type: "favorite", listingId });
+      navigate({
+        to: "/auth",
+        search: { mode: "signin", returnTo: currentReturnTo() },
+      });
       return;
     }
     toggle.mutate();

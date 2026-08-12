@@ -10,6 +10,8 @@ type Props = {
   title: React.ReactNode;
   titleVisible?: boolean;
   className?: string;
+  expandable?: boolean;
+  initialSnapPoint?: number;
   children: React.ReactNode;
 };
 
@@ -27,12 +29,18 @@ export function NativeSheet({
   title,
   titleVisible = false,
   className,
+  expandable,
+  initialSnapPoint,
   children,
 }: Props) {
   return (
     <ResponsiveOverlay open={open} onOpenChange={onOpenChange}>
       {trigger && <SheetTrigger asChild>{trigger}</SheetTrigger>}
-      <ResponsiveOverlayContent className={className}>
+      <ResponsiveOverlayContent
+        className={className}
+        expandable={expandable}
+        initialSnapPoint={initialSnapPoint}
+      >
         <SheetHeader className={titleVisible ? undefined : "sr-only"}>
           <SheetTitle>{title}</SheetTitle>
         </SheetHeader>

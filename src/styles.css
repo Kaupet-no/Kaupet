@@ -240,8 +240,10 @@
 /* Androids standard grå/blå trykkrektangel over appens egne aktiv-tilstander. */
 .native {
   -webkit-tap-highlight-color: transparent;
-  /* Bounce/glow fra indre lister skal ikke forplante seg til dokumentet. */
-  overscroll-behavior: none;
+  /* Behold WebView-ens plattformegne boundary-feedback: elastisk bounce på
+     iOS og edge-stretch/glow på Android. Overlays som må isolere scroll setter
+     `overscroll-behavior: contain` på sin egen scrollregion. */
+  overscroll-behavior: auto;
 }
 
 /* En synlig scrollbar er en web-signal i en native app-wrapper — skjul den

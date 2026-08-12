@@ -326,7 +326,8 @@ export function AppLanding() {
                 )}
               </span>
             }
-            className="max-h-[80vh] overflow-y-auto"
+            expandable
+            className="overflow-y-auto"
           >
             {!activeCategory ? (
               <div className="mt-4 flex flex-col gap-2">

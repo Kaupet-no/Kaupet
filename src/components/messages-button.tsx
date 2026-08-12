@@ -202,7 +202,7 @@ export function MessagesButton() {
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
         <span className="text-sm font-medium">Meldinger</span>
       </div>
-      <div className="max-h-[400px] overflow-y-auto">
+      <div className={native ? "min-h-0 flex-1 overflow-y-auto" : "max-h-[400px] overflow-y-auto"}>
         {conversations.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-muted-foreground">
             Ingen meldinger ennå.
@@ -273,7 +273,9 @@ export function MessagesButton() {
         onOpenChange={setOpen}
         trigger={trigger}
         title="Meldinger"
-        className="p-0 pb-safe"
+        expandable
+        initialSnapPoint={0.6}
+        className="flex flex-col p-0 pb-safe"
       >
         {convList}
       </NativeSheet>

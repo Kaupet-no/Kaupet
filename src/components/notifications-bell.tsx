@@ -251,7 +251,7 @@ export function NotificationsBell() {
           </button>
         )}
       </div>
-      <div className="max-h-[400px] overflow-y-auto">
+      <div className={native ? "min-h-0 flex-1 overflow-y-auto" : "max-h-[400px] overflow-y-auto"}>
         {notifications.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-muted-foreground">
             Ingen varsler ennå.
@@ -356,7 +356,9 @@ export function NotificationsBell() {
         onOpenChange={setSheetOpen}
         trigger={bellTrigger}
         title="Varsler"
-        className="p-0 pb-safe"
+        expandable
+        initialSnapPoint={0.6}
+        className="flex flex-col p-0 pb-safe"
       >
         {notifList}
       </NativeSheet>

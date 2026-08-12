@@ -726,7 +726,8 @@ export function AttributeFilterChips({
             onOpenChange={(o) => !o && openField(null)}
             title={f.label_nb}
             titleVisible
-            className="max-h-[80vh] overflow-y-auto"
+            expandable
+            className="overflow-y-auto"
           >
             <div className="mt-4 space-y-4">
               {fieldFor(f)}

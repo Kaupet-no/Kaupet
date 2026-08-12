@@ -66,6 +66,7 @@ import { PublishActions } from "@/features/listing-creation/field-groups/review-
 import type { WizardSharedProps } from "@/features/listing-creation/field-groups/types";
 import type { PreviewDraft } from "@/features/listing-creation/preview-draft-store";
 import { PreviewDraftView } from "@/features/listing-creation/preview-draft-view";
+import { trackProductEvent } from "@/lib/product-analytics";
 import { NewListingError } from "@/features/listing-creation/new-listing-error";
 import { StepIndicator } from "@/features/listing-creation/step-indicator";
 
@@ -133,6 +134,7 @@ function NewListingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [images, setImages] = useState<PendingImage[]>([]);
+  useEffect(() => trackProductEvent("listing_creation_started"), []);
   const [publishedId, setPublishedId] = useState<string | null>(null);
   const [publishedCode, setPublishedCode] = useState<string | null>(null);
   const [publishedOpen, setPublishedOpen] = useState(false);
@@ -480,10 +482,21 @@ function NewListingPage() {
     coords,
     isVehicle,
     attributes,
+    images,
+    setImages,
+    knownIssues,
+    noKnownIssues: !!noKnownIssues,
+    maintenanceHistory,
   });
 
   function restoreDraft() {
-    restoreDraftFields({ setValue, setSelectedParentId, setLocationMethod, setAttributes });
+    void restoreDraftFields({
+      setValue,
+      setSelectedParentId,
+      setLocationMethod,
+      setAttributes,
+      setCoords,
+    });
   }
 
   // Pre-fill location from user's last listing (if no draft)
@@ -707,6 +720,7 @@ function NewListingPage() {
     },
     onSuccess: (result) => {
       clearDraftStorage();
+      trackProductEvent("listing_published", { imageCount: images.length, isVehicle });
       void import("@/lib/haptics").then((m) => m.hapticNotification("success"));
       showSuccessToast("Annonsen er publisert");
       setPublishedId(result.id);

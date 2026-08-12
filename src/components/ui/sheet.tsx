@@ -6,6 +6,7 @@ import { Drawer } from "vaul";
 import { cva, type VariantProps } from "class-variance-authority";
 import { X } from "lucide-react";
 
+import { useSheetDragGate } from "@/hooks/use-sheet-drag-gate";
 import { expandSheetBeforeScroll } from "@/lib/sheet-gestures";
 import { cn } from "@/lib/utils";
 
@@ -122,10 +123,12 @@ const SheetContent = React.forwardRef<
     const [activeSnapPoint, setActiveSnapPoint] = React.useState<number | string | null>(
       initialSnapPoint,
     );
-    const snapPoints = React.useMemo(
-      () => (expandable ? [initialSnapPoint, 1] : undefined),
-      [expandable, initialSnapPoint],
-    );
+    const dragGate = useSheetDragGate({
+      activeSnapPoint,
+      initialSnapPoint,
+      setActiveSnapPoint,
+      onClose: () => ctx?.onOpenChange(false),
+    });
 
     // Bunn-sheets kjøres på `vaul` (fase 14): moden, mye brukt gest-håndtering
     // for nøyaktig dette. Korte sheets dras fortsatt bare fra håndtaket. Sheets
@@ -146,10 +149,10 @@ const SheetContent = React.forwardRef<
           open={ctx.open}
           onOpenChange={ctx.onOpenChange}
           handleOnly={!expandable}
-          snapPoints={snapPoints}
+          snapPoints={expandable ? dragGate.snapPoints : undefined}
           activeSnapPoint={expandable ? activeSnapPoint : undefined}
-          setActiveSnapPoint={expandable ? setActiveSnapPoint : undefined}
-          closeThreshold={0.35}
+          setActiveSnapPoint={expandable ? dragGate.setGatedSnapPoint : undefined}
+          snapToSequentialPoint={expandable}
           onAnimationEnd={(open) => {
             if (!open && expandable) setActiveSnapPoint(initialSnapPoint);
           }}
@@ -159,6 +162,7 @@ const SheetContent = React.forwardRef<
             <Drawer.Content
               ref={ref}
               className={cn(drawerContentClass, expandable && "h-[97dvh] max-h-[97dvh]")}
+              {...(expandable ? dragGate.dragCaptureProps : {})}
               {...props}
             >
               <Drawer.Handle className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-muted-foreground/30" />

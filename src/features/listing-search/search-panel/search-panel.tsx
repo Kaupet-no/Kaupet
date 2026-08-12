@@ -17,6 +17,7 @@ import { hapticImpact } from "@/lib/haptics";
 import { useAuth } from "@/hooks/use-auth";
 import { useFormFactor } from "@/hooks/use-form-factor";
 import { useOverlayHistory } from "@/hooks/use-overlay-history";
+import { useSheetDragGate } from "@/hooks/use-sheet-drag-gate";
 import { resolveTextToFilters } from "@/features/listing-search/resolve-text-to-filters";
 import { encodeAttrFilters } from "@/features/listing-search/search-schema";
 import { summarizeCriteria } from "@/lib/saved-searches";
@@ -108,6 +109,13 @@ export function SearchPanel({
   // panelet, og den skal virke likt i begge formater.
   const isTablet = useFormFactor() === "tablet";
   const inputRef = useRef<HTMLInputElement>(null);
+  const close = () => onOpenChange(false);
+  const dragGate = useSheetDragGate({
+    activeSnapPoint: snap,
+    initialSnapPoint: SNAP_POINTS[0],
+    setActiveSnapPoint: setSnap,
+    onClose: close,
+  });
 
   // Android-tilbake og iOS-kantsveip lukker panelet (fase 3).
   useOverlayHistory(open, () => onOpenChange(false));
@@ -134,8 +142,6 @@ export function SearchPanel({
     () => (q.length >= 2 ? findCategorySuggestion(categories, q) : null),
     [q, categories],
   );
-
-  const close = () => onOpenChange(false);
 
   const updateDraftAttribute = (key: string, value: AttributeFilterValue | undefined) => {
     setDraftAttributes((previous) => {
@@ -252,10 +258,10 @@ export function SearchPanel({
       <Drawer.Root
         open={open}
         onOpenChange={onOpenChange}
-        snapPoints={SNAP_POINTS}
+        snapPoints={dragGate.snapPoints}
         activeSnapPoint={snap}
-        setActiveSnapPoint={setSnap}
-        closeThreshold={0.35}
+        setActiveSnapPoint={dragGate.setGatedSnapPoint}
+        snapToSequentialPoint
         // Skal kunne dras helt ned for å lukkes (default `dismissible`), men
         // skal aldri bli STÅENDE i en posisjon under laveste snap-punkt
         // (0.6): vaul løser alltid en sluppet drag til enten et snap-punkt
@@ -270,6 +276,7 @@ export function SearchPanel({
               isTablet ? "mx-auto w-full max-w-2xl border-x" : ""
             }`}
             aria-describedby={undefined}
+            {...dragGate.dragCaptureProps}
           >
             <Drawer.Title className="sr-only">Søk og filtrer</Drawer.Title>
             <div

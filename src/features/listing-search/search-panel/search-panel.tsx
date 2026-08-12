@@ -25,6 +25,7 @@ import { SearchFilterSections, type SearchFilterSection } from "./filter-section
 import { getSearchHistory, saveSearchToHistory, clearSearchHistory } from "./search-history";
 import { buildActiveFilterItems } from "./active-filter-items";
 import { trackProductEvent } from "@/lib/product-analytics";
+import { expandSheetBeforeScroll } from "@/lib/sheet-gestures";
 import { useDraftResultCount } from "@/features/listing-search/use-draft-result-count";
 import { searchDraftMatchesApplied } from "./search-panel-utils";
 
@@ -254,6 +255,7 @@ export function SearchPanel({
         snapPoints={SNAP_POINTS}
         activeSnapPoint={snap}
         setActiveSnapPoint={setSnap}
+        closeThreshold={0.35}
         // Skal kunne dras helt ned for å lukkes (default `dismissible`), men
         // skal aldri bli STÅENDE i en posisjon under laveste snap-punkt
         // (0.6): vaul løser alltid en sluppet drag til enten et snap-punkt
@@ -290,6 +292,9 @@ export function SearchPanel({
             <div
               className="flex min-h-0 flex-1 flex-col overflow-hidden"
               style={{ maxHeight: "calc(97dvh - var(--snap-point-height, 0px))" }}
+              onScrollCapture={(event) =>
+                expandSheetBeforeScroll(event.target as HTMLElement, snap === 1, () => setSnap(1))
+              }
             >
               {/* Fritekstfelt — kun i søkelanseringsmodus (forsiden). I
                 filter-panelmodus (over /annonser) har resultatflaten sitt

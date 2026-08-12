@@ -6,6 +6,7 @@ import { Drawer } from "vaul";
 import { cva, type VariantProps } from "class-variance-authority";
 import { X } from "lucide-react";
 
+import { expandSheetBeforeScroll } from "@/lib/sheet-gestures";
 import { cn } from "@/lib/utils";
 
 /** `open`/`onOpenChange` for kallstedet som ligger nærmest — lar `SheetContent`
@@ -174,11 +175,11 @@ const SheetContent = React.forwardRef<
                   maxHeight: expandable ? "calc(97dvh - var(--snap-point-height, 0px))" : undefined,
                 }}
                 onScrollCapture={(event) => {
-                  if (!expandable || fullHeight) return;
-                  const target = event.target as HTMLElement;
-                  if (target.scrollTop <= 0) return;
-                  target.scrollTop = 0;
-                  setActiveSnapPoint(1);
+                  if (expandable) {
+                    expandSheetBeforeScroll(event.target as HTMLElement, fullHeight, () =>
+                      setActiveSnapPoint(1),
+                    );
+                  }
                 }}
               >
                 {children}

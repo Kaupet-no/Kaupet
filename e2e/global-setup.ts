@@ -13,6 +13,7 @@ import { createClient } from "@supabase/supabase-js";
 
 const AUTH_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), ".auth", "user.json");
 const FILTER_FIXTURE_QUERY = "e2efilterfixture";
+const PUBLISH_PROJECTS = ["desktop-web", "mobile-web"] as const;
 
 export default async function globalSetup() {
   const url = process.env.SUPABASE_URL;
@@ -25,25 +26,42 @@ export default async function globalSetup() {
   }
 
   const admin = createClient(url, serviceRoleKey);
-  const email = `e2e-${Date.now()}@example.com`;
+  const runId = Date.now();
   const password = "e2e-test-password-12345";
+  const userIds: string[] = [];
 
-  const { data, error } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { display_name: "E2E Test" },
-  });
-  if (error) throw error;
+  async function createTestUser(suffix: string, displayName: string, needsDemoRole = false) {
+    const email = `e2e-${runId}-${suffix}@example.com`;
+    const { data, error } = await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { display_name: displayName },
+    });
+    if (error) throw error;
+
+    const userId = data.user!.id;
+    userIds.push(userId);
+    if (needsDemoRole) {
+      const { error: roleError } = await admin
+        .from("user_roles")
+        .insert({ user_id: userId, role: "demo" });
+      if (roleError) throw roleError;
+    }
+
+    return { email, password, userId };
+  }
 
   try {
-    // The publish specs pick the hidden "E2E-test (ikke bruk)" category, which
-    // the creation flow only shows to demo/admin users (see useIsDemo) — so the
-    // test user needs the demo role.
-    const { error: roleError } = await admin
-      .from("user_roles")
-      .insert({ user_id: data.user!.id, role: "demo" });
-    if (roleError) throw roleError;
+    // Search fixtures must not count against the hourly listing quota of the
+    // users that exercise publishing. Each Playwright project gets a separate
+    // publisher as well, so running desktop before mobile cannot exhaust the
+    // second project's quota.
+    const fixtureOwner = await createTestUser("fixtures", "E2E Fixture Owner");
+    const users: Record<string, { email: string; password: string; userId: string }> = {};
+    for (const project of PUBLISH_PROJECTS) {
+      users[project] = await createTestUser(project, `E2E Test ${project}`, true);
+    }
 
     const { data: category, error: categoryError } = await admin
       .from("categories")
@@ -57,7 +75,7 @@ export default async function globalSetup() {
     expiresAt.setDate(expiresAt.getDate() + 30);
     const { error: fixtureError } = await admin.from("listings").insert([
       {
-        seller_id: data.user!.id,
+        seller_id: fixtureOwner.userId,
         category_id: category.id,
         title: `${FILTER_FIXTURE_QUERY} gratis`,
         description: "Deterministisk E2E-filterfixture.",
@@ -69,7 +87,7 @@ export default async function globalSetup() {
         expires_at: expiresAt.toISOString(),
       },
       {
-        seller_id: data.user!.id,
+        seller_id: fixtureOwner.userId,
         category_id: category.id,
         title: `${FILTER_FIXTURE_QUERY} rimelig`,
         description: "Deterministisk E2E-filterfixture.",
@@ -81,7 +99,7 @@ export default async function globalSetup() {
         expires_at: expiresAt.toISOString(),
       },
       {
-        seller_id: data.user!.id,
+        seller_id: fixtureOwner.userId,
         category_id: category.id,
         title: `${FILTER_FIXTURE_QUERY} dyrere`,
         description: "Deterministisk E2E-filterfixture.",
@@ -99,14 +117,13 @@ export default async function globalSetup() {
     writeFileSync(
       AUTH_FILE,
       JSON.stringify({
-        email,
-        password,
-        userId: data.user!.id,
+        users,
+        userIds,
         filterFixture: { query: FILTER_FIXTURE_QUERY, total: 3, paid: 2 },
       }),
     );
   } catch (setupError) {
-    await admin.auth.admin.deleteUser(data.user!.id);
+    for (const userId of userIds) await admin.auth.admin.deleteUser(userId);
     throw setupError;
   }
 }

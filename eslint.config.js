@@ -72,8 +72,10 @@ export default tseslint.config(
       // new sites fail lint instead of silently expanding that baseline.
       "react-hooks/set-state-in-effect": "error",
       "react-hooks/static-components": "warn",
-      "react-hooks/incompatible-library": "warn",
-      "react-hooks/refs": "warn",
+      "react-hooks/incompatible-library": "error",
+      // Remaining findings are React Hook Form callback refs/render-props,
+      // tracked explicitly in eslint-suppressions.json. New ref reads fail.
+      "react-hooks/refs": "error",
       "no-restricted-imports": [
         "error",
         {

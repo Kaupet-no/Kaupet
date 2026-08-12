@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
@@ -99,7 +99,7 @@ function AuthPage() {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     getValues,
     trigger,
@@ -111,8 +111,10 @@ function AuthPage() {
     defaultValues: { displayName: "", email: "", password: "", acceptedTerms: false },
   });
 
-  const password = watch("password") ?? "";
-  const acceptedTerms = watch("acceptedTerms") ?? false;
+  const [password = "", acceptedTerms = false] = useWatch({
+    control,
+    name: ["password", "acceptedTerms"],
+  });
 
   // Feltkrav endres når modusen byttes; fjern gamle feilmeldinger.
   useEffect(() => {

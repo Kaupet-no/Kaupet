@@ -59,6 +59,37 @@ export default defineConfig(({ command, mode }) => {
 
   return {
     define: envDefine,
+    build: {
+      rolldownOptions: {
+        output: {
+          // Preserve route/interaction-aware automatic splitting, but stop
+          // Rolldown from merging shared dependencies back into monolithic
+          // >500 KiB chunks after a new lazy boundary is introduced.
+          codeSplitting: {
+            maxSize: 450 * 1024,
+            groups: [
+              {
+                // category-icons supports the complete admin icon catalogue.
+                // Keep it out of otherwise unrelated application chunks.
+                name: "lucide-icons",
+                test: /node_modules[\\/]lucide-react/,
+                includeDependenciesRecursively: false,
+                maxSize: 450 * 1024,
+                priority: 20,
+              },
+              {
+                name: "initial-app",
+                tags: ["$initial"],
+                entriesAware: true,
+                includeDependenciesRecursively: false,
+                maxSize: 350 * 1024,
+                priority: 10,
+              },
+            ],
+          },
+        },
+      },
+    },
     // Vite uses PostCSS in dev and only runs Lightning CSS at build time;
     // running it in both keeps the dev preview consistent with the built
     // output (e.g. -webkit-backdrop-filter prefixing isn't dropped silently).

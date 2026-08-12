@@ -2,7 +2,7 @@ import { readdirSync, statSync } from "node:fs";
 import path from "node:path";
 
 const CLIENT_DIR = path.resolve("dist/client");
-const JS_LIMIT = 650 * 1024;
+const JS_LIMIT = 450 * 1024;
 const CSS_LIMIT = 180 * 1024;
 
 function walk(directory) {
@@ -13,9 +13,10 @@ function walk(directory) {
 }
 
 function assertBudget(label, files, limit) {
-  const largest = files
+  const measured = files
     .map((file) => ({ file, bytes: statSync(file).size }))
-    .sort((a, b) => b.bytes - a.bytes)[0];
+    .sort((a, b) => b.bytes - a.bytes);
+  const largest = measured[0];
   if (!largest) return;
 
   const relative = path.relative(CLIENT_DIR, largest.file);
@@ -24,6 +25,13 @@ function assertBudget(label, files, limit) {
   );
   if (largest.bytes > limit) {
     throw new Error(`${label}-budsjettet er overskredet av ${relative}`);
+  }
+
+  if (label === "Største JavaScript-fil") {
+    console.log("Fem største JavaScript-filer:");
+    for (const { file, bytes } of measured.slice(0, 5)) {
+      console.log(`  ${path.relative(CLIENT_DIR, file)} (${(bytes / 1024).toFixed(1)} KiB)`);
+    }
   }
 }
 

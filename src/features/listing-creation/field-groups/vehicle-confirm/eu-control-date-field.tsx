@@ -1,12 +1,15 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 import { parseIsoDate, startOfToday } from "./spec";
+
+const Calendar = lazy(() =>
+  import("@/components/ui/calendar").then((module) => ({ default: module.Calendar })),
+);
 
 /** `mode="future"` (default) is for dates like EU-kontroll that must lie
  * ahead of today; `mode="past"` is for dates like førstegangsregistrering
@@ -40,18 +43,26 @@ export function EuControlDateField({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
-        <Calendar
-          mode="single"
-          captionLayout="dropdown"
-          selected={selectedDate}
-          disabled={mode === "future" ? { before: today } : { after: today }}
-          startMonth={mode === "future" ? today : new Date(1970, 0)}
-          endMonth={mode === "future" ? new Date(new Date().getFullYear() + 4, 11) : today}
-          onSelect={(date) => {
-            if (date) onChange(format(date, "yyyy-MM-dd"));
-            setOpen(false);
-          }}
-        />
+        <Suspense
+          fallback={
+            <div className="flex h-80 w-72 items-center justify-center text-sm text-muted-foreground">
+              Laster kalender …
+            </div>
+          }
+        >
+          <Calendar
+            mode="single"
+            captionLayout="dropdown"
+            selected={selectedDate}
+            disabled={mode === "future" ? { before: today } : { after: today }}
+            startMonth={mode === "future" ? today : new Date(1970, 0)}
+            endMonth={mode === "future" ? new Date(new Date().getFullYear() + 4, 11) : today}
+            onSelect={(date) => {
+              if (date) onChange(format(date, "yyyy-MM-dd"));
+              setOpen(false);
+            }}
+          />
+        </Suspense>
       </PopoverContent>
     </Popover>
   );

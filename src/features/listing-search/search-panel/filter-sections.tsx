@@ -299,7 +299,7 @@ export function SearchFilterSections({
                   e.stopPropagation();
                   removeGroup(g.id);
                 }}
-                className="shrink-0 rounded-full p-1.5 text-muted-foreground hover:text-foreground"
+                className="native-hit-area shrink-0 rounded-full p-1.5 text-muted-foreground hover:text-foreground"
                 aria-label="Fjern søkelinje"
               >
                 <Trash2 className="size-4" />

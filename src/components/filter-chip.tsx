@@ -75,7 +75,7 @@ export const FilterChip = React.forwardRef<
         ref={ref}
         type="button"
         {...rest}
-        className={`relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm transition active:scale-[0.97] ${
+        className={`native-touch-target relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm transition active:scale-[0.97] ${
           active
             ? "border-primary bg-primary font-medium text-primary-foreground"
             : "border-border bg-card text-foreground hover:bg-muted"

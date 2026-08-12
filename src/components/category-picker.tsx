@@ -370,7 +370,7 @@ export function CategoryPicker({
             <button
               type="button"
               onClick={handleBack}
-              className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-muted"
+              className="native-hit-area flex h-7 w-7 items-center justify-center rounded-full hover:bg-muted"
               aria-label="Tilbake til kategorier"
             >
               <ChevronLeft className="size-4" />
@@ -392,7 +392,7 @@ export function CategoryPicker({
             <button
               type="button"
               onClick={handleBack}
-              className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-muted"
+              className="native-hit-area flex h-7 w-7 items-center justify-center rounded-full hover:bg-muted"
               aria-label="Tilbake til kategorier"
             >
               <ChevronLeft className="size-4" />
@@ -438,7 +438,7 @@ export function CategoryPicker({
               <button
                 type="button"
                 onClick={handleBack}
-                className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
+                className="native-touch-target flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
                 aria-label="Tilbake til kategorier"
               >
                 <ChevronLeft className="size-5" />

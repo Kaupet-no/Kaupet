@@ -117,12 +117,20 @@ const SheetContent = React.forwardRef<
   // med lukke-draget. Erstatter en håndrullet ~40-linjers variant som var
   // skjør nettopp på det punktet. Søkepanelet (search-panel.tsx) bruker
   // samme bibliotek allerede, for sine egne snap-punkter.
+  //
+  // `[data-vaul-drawer]` (Drawer.Content selv) får `touch-action: none` fra
+  // vauls egen stylesheet, uavhengig av `handleOnly` — det er det som lar
+  // biblioteket avgjøre dra-vs-scroll selv. Innhold som skal kunne
+  // touch-scrolles (som `className="overflow-y-auto"`-callerne her) må derfor
+  // ligge i et eget barn under Drawer.Content, ikke direkte på den, ellers
+  // blokkerer touch-action all touch-scroll i den — musehjul/programmatisk
+  // scroll virker fortsatt, som gjorde dette lett å overse i vanlig nettleser.
   if (side === "bottom" && ctx) {
     return (
       <Drawer.Root open={ctx.open} onOpenChange={ctx.onOpenChange} handleOnly>
         <Drawer.Portal>
           <Drawer.Overlay className="fixed inset-0 z-[10000] bg-black/80" />
-          <Drawer.Content ref={ref} className={cn(drawerContentClass, className)} {...props}>
+          <Drawer.Content ref={ref} className={drawerContentClass} {...props}>
             <Drawer.Handle className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-muted-foreground/30" />
             {/* Se dialog.tsx: 44px trykkflate, 16px ikon, negativ margin for å
               beholde den optiske plasseringen inne i p-6. */}
@@ -130,7 +138,9 @@ const SheetContent = React.forwardRef<
               <X className="h-4 w-4" />
               <span className="sr-only">Lukk</span>
             </SheetPrimitive.Close>
-            {children}
+            <div className={cn("min-h-0 flex-1", className)} style={{ touchAction: "pan-y" }}>
+              {children}
+            </div>
           </Drawer.Content>
         </Drawer.Portal>
       </Drawer.Root>

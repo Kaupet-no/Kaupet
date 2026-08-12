@@ -2,7 +2,7 @@
 import { NativePageHeader } from "@/components/native-page-header";
 import { createFileRoute, useNavigate, useBlocker } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
@@ -66,6 +66,7 @@ import { PublishActions } from "@/features/listing-creation/field-groups/review-
 import type { WizardSharedProps } from "@/features/listing-creation/field-groups/types";
 import type { PreviewDraft } from "@/features/listing-creation/preview-draft-store";
 import { PreviewDraftView } from "@/features/listing-creation/preview-draft-view";
+import { trackProductEvent } from "@/lib/product-analytics";
 import { NewListingError } from "@/features/listing-creation/new-listing-error";
 import { StepIndicator } from "@/features/listing-creation/step-indicator";
 
@@ -133,6 +134,7 @@ function NewListingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [images, setImages] = useState<PendingImage[]>([]);
+  useEffect(() => trackProductEvent("listing_creation_started"), []);
   const [publishedId, setPublishedId] = useState<string | null>(null);
   const [publishedCode, setPublishedCode] = useState<string | null>(null);
   const [publishedOpen, setPublishedOpen] = useState(false);
@@ -208,6 +210,7 @@ function NewListingPage() {
     register,
     handleSubmit,
     setValue,
+    control,
     watch,
     trigger,
     formState: { errors, touchedFields },
@@ -231,19 +234,38 @@ function NewListingPage() {
     },
   });
 
-  const isFree = watch("is_free");
-  const canShip = watch("can_ship");
-  const categoryId = watch("category_id");
-  const condition = watch("condition");
-  const postalCode = watch("postal_code");
-  const city = watch("city");
-  const title = watch("title");
-  const subtitle = watch("subtitle");
-  const description = watch("description");
-  const priceNok = watch("price_nok");
-  const knownIssues = watch("known_issues");
-  const noKnownIssues = watch("no_known_issues");
-  const maintenanceHistory = watch("maintenance_history");
+  const [
+    isFree,
+    canShip,
+    categoryId,
+    condition,
+    postalCode,
+    city,
+    title,
+    subtitle,
+    description,
+    priceNok,
+    knownIssues,
+    noKnownIssues,
+    maintenanceHistory,
+  ] = useWatch({
+    control,
+    name: [
+      "is_free",
+      "can_ship",
+      "category_id",
+      "condition",
+      "postal_code",
+      "city",
+      "title",
+      "subtitle",
+      "description",
+      "price_nok",
+      "known_issues",
+      "no_known_issues",
+      "maintenance_history",
+    ],
+  });
 
   const missingFilters = useMemo(
     () =>
@@ -480,10 +502,21 @@ function NewListingPage() {
     coords,
     isVehicle,
     attributes,
+    images,
+    setImages,
+    knownIssues,
+    noKnownIssues: !!noKnownIssues,
+    maintenanceHistory,
   });
 
   function restoreDraft() {
-    restoreDraftFields({ setValue, setSelectedParentId, setLocationMethod, setAttributes });
+    void restoreDraftFields({
+      setValue,
+      setSelectedParentId,
+      setLocationMethod,
+      setAttributes,
+      setCoords,
+    });
   }
 
   // Pre-fill location from user's last listing (if no draft)
@@ -588,11 +621,13 @@ function NewListingPage() {
     for (const group of groups) {
       const result = group.validateExtra?.(validateCtx);
       if (result === "SHOW_NO_IMAGE_DIALOG") {
+        if (native) continue;
         if (options?.skipImageCheck) continue;
         setShowNoImageDialog(true);
         return;
       }
       if (result === "SHOW_NO_PRICE_DIALOG") {
+        if (native) continue;
         if (options?.skipPriceCheck) continue;
         setShowNoPriceDialog(true);
         return;
@@ -707,6 +742,7 @@ function NewListingPage() {
     },
     onSuccess: (result) => {
       clearDraftStorage();
+      trackProductEvent("listing_published", { imageCount: images.length, isVehicle });
       void import("@/lib/haptics").then((m) => m.hapticNotification("success"));
       showSuccessToast("Annonsen er publisert");
       setPublishedId(result.id);
@@ -843,6 +879,13 @@ function NewListingPage() {
     applyCategorySelect(via, id, parentId);
   };
 
+  const applySuggestedCategory = () => {
+    applyCategorySuggestion();
+    if (currentPage?.groups?.some((group) => group.key === "category-select")) {
+      goToNextPage();
+    }
+  };
+
   const confirmPendingCategoryChange = () => {
     if (!pendingCategoryChange) return;
     setAttributes({});
@@ -890,7 +933,7 @@ function NewListingPage() {
     onCategoryDeselect: requestCategoryDeselect,
     categorySuggestion,
     categoryTouchedManually,
-    applyCategorySuggestion,
+    applyCategorySuggestion: applySuggestedCategory,
     setSuggestionDismissed,
     setCategorySuggestion,
 
@@ -958,7 +1001,11 @@ function NewListingPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 pt-6 pb-4">
-      <NativePageHeader title="Ny annonse" backTo="/" />
+      <NativePageHeader
+        title="Ny annonse"
+        backLabel={isFirst ? "Avbryt" : "Tilbake"}
+        onBack={isFirst ? () => void navigate({ to: "/" }) : goBack}
+      />
       {!native && <h1 className="font-display text-3xl tracking-tight">Ny annonse</h1>}
 
       {/* Draft restore banner */}
@@ -998,14 +1045,14 @@ function NewListingPage() {
             showErrorToast("Fyll inn alle obligatoriske egenskaper før du publiserer.");
             return;
           }
-          if (!hasPreviewed) {
+          if (!hasPreviewed && !native) {
             pendingSubmitValuesRef.current = v;
             setPreviewNudgeOpen(true);
             return;
           }
           mutation.mutate(v);
         })}
-        className={`mt-8 ${native ? (isLast ? "overflow-hidden" : "pb-[calc(var(--app-bottom-nav-h)+1.5rem)]") : "pb-24"}`}
+        className={`mt-8 ${native ? "pb-[calc(var(--app-bottom-nav-h)+6rem)]" : "pb-24"}`}
       >
         {(() => {
           const groups = currentPage?.groups ?? [];
@@ -1041,7 +1088,7 @@ function NewListingPage() {
                     : "border-t border-border pt-6"
                 } flex flex-wrap items-center gap-3 ${isFirst ? "justify-end" : "justify-between"}`}
               >
-                {!isFirst && (
+                {!native && !isFirst && (
                   <Button type="button" variant="ghost" onClick={goBack}>
                     <ChevronLeft className="size-4" /> Tilbake
                   </Button>
@@ -1054,17 +1101,20 @@ function NewListingPage() {
                     data-testid="wizard-next-button"
                     disabled={vehicleLookupLoading}
                     onClick={() => void goToNextPage()}
+                    className={native ? "h-14 w-full rounded-xl text-base" : undefined}
                   >
                     {vehicleLookupLoading ? (
                       "Slår opp kjøretøy…"
                     ) : (
                       <>
-                        Neste: {pageLabel(nextGroups, native)} <ChevronRight className="size-4" />
+                        {native ? "Fortsett" : `Neste: ${pageLabel(nextGroups, native)}`}{" "}
+                        <ChevronRight className="size-4" />
                       </>
                     )}
                   </Button>
                 ) : (
                   <PublishActions
+                    native={native}
                     turnstileEnabled={turnstileEnabled}
                     turnstileToken={turnstileToken}
                     setTurnstileToken={setTurnstileToken}

@@ -605,9 +605,11 @@ function WebLanding() {
                       besøkende skal ta. Kaupet-kode er en sekundær, sjeldnere
                       brukt handling (åpne en spesifikk annonse) og skal derfor
                       ikke konkurrere visuelt med den. */}
-                  <Link to="/auth" search={{ mode: "signup" }}>
-                    <Button size="lg">Kom i gang</Button>
-                  </Link>
+                  <Button asChild size="lg">
+                    <Link to="/auth" search={{ mode: "signup" }}>
+                      Kom i gang
+                    </Link>
+                  </Button>
                   <KaupetCodeDialog
                     trigger={
                       <Button variant="ghost" size="lg" className="gap-2">
@@ -625,11 +627,11 @@ function WebLanding() {
               // kategori utforskes, slik at ikke-innloggede ikke mister
               // registreringsinngangen bak filterpanelet.
               <div className="mt-4 flex justify-center">
-                <Link to="/auth" search={{ mode: "signup" }}>
-                  <Button variant="outline" size="sm">
+                <Button asChild variant="outline" size="sm">
+                  <Link to="/auth" search={{ mode: "signup" }}>
                     Kom i gang på Kaupet
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
               </div>
             )
           )}

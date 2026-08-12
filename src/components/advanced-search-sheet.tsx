@@ -430,7 +430,7 @@ export function CategoryPicker({
             <button
               type="button"
               onClick={() => setExpanded(true)}
-              className="shrink-0 text-sm font-medium text-primary"
+              className="native-touch-target shrink-0 px-2 text-sm font-medium text-primary"
             >
               Endre kategori
             </button>
@@ -522,7 +522,7 @@ export function CategoryPicker({
                         <button
                           type="button"
                           onClick={() => toggleSub(c.slug)}
-                          className="text-muted-foreground hover:text-foreground"
+                          className="native-hit-area text-muted-foreground hover:text-foreground"
                           aria-label={`Fjern ${c.name_nb}`}
                         >
                           <X className="size-3" />
@@ -538,7 +538,7 @@ export function CategoryPicker({
               <button
                 type="button"
                 onClick={() => setExpanded(false)}
-                className="text-sm font-medium text-primary"
+                className="native-touch-target px-2 text-sm font-medium text-primary"
               >
                 Skjul kategorivalg
               </button>

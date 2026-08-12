@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
@@ -34,13 +34,13 @@ function ResetPasswordPage() {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     formState: { errors },
   } = useForm<ResetForm>({
     resolver: zodResolver(resetSchema),
     defaultValues: { password: "" },
   });
-  const password = watch("password") ?? "";
+  const password = useWatch({ control, name: "password" }) ?? "";
 
   // Gjenopprettingslenken gir en midlertidig sesjon via URL-hash; supabase-js
   // plukker den opp asynkront, så vi venter litt før vi konkluderer med utløpt lenke.

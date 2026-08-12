@@ -6,8 +6,11 @@ import { Clock, FolderOpen, RotateCcw, Save, Search as SearchIcon, X } from "luc
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SaveSearchDialog } from "@/components/advanced-search-sheet";
-import type { AdvancedSearchValue } from "@/components/advanced-search-value";
-import type { LocationValue } from "@/components/location-filter";
+import {
+  defaultAdvancedSearchValue,
+  valueToCriteria,
+  type AdvancedSearchValue,
+} from "@/components/advanced-search-value";
 import { findCategorySuggestion, type Category } from "@/lib/categories";
 import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
 import { hapticImpact } from "@/lib/haptics";
@@ -16,50 +19,45 @@ import { useFormFactor } from "@/hooks/use-form-factor";
 import { useOverlayHistory } from "@/hooks/use-overlay-history";
 import { resolveTextToFilters } from "@/features/listing-search/resolve-text-to-filters";
 import { encodeAttrFilters } from "@/features/listing-search/search-schema";
-import type { SearchCriteria } from "@/lib/saved-searches";
+import { summarizeCriteria } from "@/lib/saved-searches";
 import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
 import { SearchFilterSections, type SearchFilterSection } from "./filter-sections";
 import { getSearchHistory, saveSearchToHistory, clearSearchHistory } from "./search-history";
-import type { ActiveFilterItem } from "./active-filter-items";
+import { buildActiveFilterItems } from "./active-filter-items";
+import { trackProductEvent } from "@/lib/product-analytics";
+import { useDraftResultCount } from "@/features/listing-search/use-draft-result-count";
+import { searchDraftMatchesApplied } from "./search-panel-utils";
 
 /** Panelet har to detents: delvis høyde (resultatlisten er fortsatt synlig
  * bak) og fullskjerm. Brukeren drar mellom dem. */
 const SNAP_POINTS = [0.6, 1];
 
-/** Feltene panelet redigerer når det står over en resultatflate. Utelatt på
- * forsiden, der panelet kun er en søkelansering.
- *
- * Live i stedet for utkast (fase 12): `value`/`setValue` skriver hver endring
- * rett til URL-en (se `setLiveValue` i use-annonser-search-state.ts), slik at
- * listen bak panelet — og treff-telleren i bunnbaren — oppdaterer seg mens
- * brukeren drar en slider eller sveiper bort en tagg, i stedet for først ved
- * en «Bruk søk»-commit. */
+/** Applied fields supplied by the result page. SearchPanel owns a local draft
+ * while open and calls `onApply` once, so closing the panel never leaves a
+ * half-applied search behind. */
 export type SearchPanelResultsContext = {
-  /** Fritekst slik den står i URL-en akkurat nå — panelets fritekstfelt
-   * synkroniseres mot denne når panelet åpnes. */
   q: string;
   value: AdvancedSearchValue;
-  setValue: React.Dispatch<React.SetStateAction<AdvancedSearchValue>>;
-  /** Skriver fritekst til URL-en. */
-  onSubmitText: (q: string) => void;
-  onSelectCategory: (slug: string) => void;
-  location: LocationValue;
-  onLocationChange: (v: LocationValue) => void;
+  onApply: (
+    value: AdvancedSearchValue,
+    attributeValues: Record<string, AttributeFilterValue>,
+  ) => void;
   attributeFilters?: CategoryFilter[];
   attributeValues?: Record<string, AttributeFilterValue>;
-  onAttributeChange?: (key: string, value: AttributeFilterValue | undefined) => void;
   attributeCounts?: Record<string, Record<string, number>>;
-  /** Antall treff med gjeldende — levende, ikke bare anvendte — kriterier. */
   resultCount?: number;
-  /** Aktive filtertagger, med swipe-for-å-fjerne i panelet (fase 12). */
-  activeItems: ActiveFilterItem[];
-  onResetAll: () => void;
-  /** Kriteriene «Lagre»-knappen lagrer — allerede bygget av kallstedet
-   * (`currentCriteria`), siden panelet ikke lenger holder et eget utkast å
-   * bygge dem fra. */
-  criteria: SearchCriteria;
-  defaultName: string;
 };
+
+function cloneValue(value: AdvancedSearchValue): AdvancedSearchValue {
+  return {
+    ...value,
+    terms: [...value.terms],
+    categories: [...value.categories],
+    conditions: [...value.conditions],
+    extraGroups: value.extraGroups.map((group) => ({ ...group, terms: [...group.terms] })),
+    location: { ...value.location },
+  };
+}
 
 type Props = {
   open: boolean;
@@ -98,37 +96,28 @@ export function SearchPanel({
   const [saveOpen, setSaveOpen] = useState(false);
   const [section, setSection] = useState<SearchFilterSection>(initialSection);
   const [snap, setSnap] = useState<number | string | null>(SNAP_POINTS[0]);
+  const [draft, setDraft] = useState<AdvancedSearchValue>(() =>
+    cloneValue(results?.value ?? defaultAdvancedSearchValue()),
+  );
+  const [draftAttributes, setDraftAttributes] = useState<Record<string, AttributeFilterValue>>(
+    () => ({ ...(results?.attributeValues ?? {}) }),
+  );
   // Nettbrett: ikke en fullbredde skuff (fase 9 punkt 5 / funn 3.3.1). Bredden
   // kappes i stedet for å bytte primitiv — detent-dragingen er hele poenget med
   // panelet, og den skal virke likt i begge formater.
   const isTablet = useFormFactor() === "tablet";
   const inputRef = useRef<HTMLInputElement>(null);
-  const actionBarRef = useRef<HTMLDivElement>(null);
 
   // Android-tilbake og iOS-kantsveip lukker panelet (fase 3).
   useOverlayHistory(open, () => onOpenChange(false));
 
-  // Radix Dialog (som vaul bygger på) kaller aria-hidden-pakkens hideOthers()
-  // på ALLE søsken til Drawer.Content når dialogen åpnes — inkludert denne
-  // baren, som bevisst ligger utenfor Content (se kommentar ved baren).
-  // Resultatet er en helt usynlig-for-skjermleser, men fullt klikkbar, knapp.
-  // Radix eksponerer ingen måte å ekskludere ekstra noder fra det kallet, så
-  // vi overvåker attributtet selv og fjerner det igjen med det samme.
-  useEffect(() => {
-    const el = actionBarRef.current;
-    if (!open || !results || !el) return;
-    const strip = () => {
-      if (el.getAttribute("aria-hidden") != null) el.removeAttribute("aria-hidden");
-    };
-    strip();
-    const observer = new MutationObserver(strip);
-    observer.observe(el, { attributes: true, attributeFilter: ["aria-hidden"] });
-    return () => observer.disconnect();
-  }, [open, results]);
-
   useEffect(() => {
     if (!open) return;
     setQ(results?.q ?? "");
+    if (results) {
+      setDraft(cloneValue(results.value));
+      setDraftAttributes({ ...(results.attributeValues ?? {}) });
+    }
     setSection(initialSection);
     setSnap(SNAP_POINTS[0]);
     setHistory(getSearchHistory());
@@ -147,6 +136,74 @@ export function SearchPanel({
 
   const close = () => onOpenChange(false);
 
+  const updateDraftAttribute = (key: string, value: AttributeFilterValue | undefined) => {
+    setDraftAttributes((previous) => {
+      const next = { ...previous };
+      if (value === undefined) delete next[key];
+      else next[key] = value;
+      return next;
+    });
+  };
+
+  const removeDraftAttribute = (key: string, option?: string) => {
+    const current = draftAttributes[key];
+    if (!option || !current || (current.kind !== "multiselect" && current.kind !== "exclude")) {
+      updateDraftAttribute(key, undefined);
+      return;
+    }
+    const values = current.values.filter((value) => value !== option);
+    updateDraftAttribute(key, values.length ? { ...current, values } : undefined);
+  };
+
+  const draftItems = results
+    ? buildActiveFilterItems({
+        search: {
+          q: draft.terms.join(" "),
+          qMode: draft.qMode,
+          extraGroups: draft.extraGroups,
+        },
+        terms: draft.terms,
+        onUpdate: (patch) =>
+          setDraft((previous) => ({
+            ...previous,
+            terms: patch.q == null ? previous.terms : patch.q.split(/\s+/).filter(Boolean),
+            qMode: patch.qMode ?? previous.qMode,
+            extraGroups: patch.extraGroups ?? previous.extraGroups,
+          })),
+        attrFilters: results.attributeFilters,
+        attrValues: draftAttributes,
+        onRemoveAttr: removeDraftAttribute,
+        location: draft.location,
+        onRemoveLocation: () =>
+          setDraft((previous) => ({
+            ...previous,
+            location: { lat: null, lng: null, radius: 10, label: "" },
+          })),
+      })
+    : [];
+
+  const draftCriteria = valueToCriteria(draft);
+  const visibleResultCount =
+    results &&
+    searchDraftMatchesApplied(draft, draftAttributes, results.value, results.attributeValues ?? {})
+      ? results.resultCount
+      : undefined;
+  const draftChanged =
+    !!results &&
+    !searchDraftMatchesApplied(
+      draft,
+      draftAttributes,
+      results.value,
+      results.attributeValues ?? {},
+    );
+  const draftCount = useDraftResultCount({
+    draft,
+    attributes: draftAttributes,
+    categories,
+    enabled: open && draftChanged,
+  });
+  const buttonResultCount = draftChanged ? draftCount.count : visibleResultCount;
+
   const submitText = async (value: string) => {
     const trimmed = value.trim();
     if (submitting) return;
@@ -154,7 +211,7 @@ export function SearchPanel({
     saveSearchToHistory(trimmed);
 
     if (results) {
-      results.onSubmitText(trimmed);
+      setDraft((previous) => ({ ...previous, terms: trimmed.split(/\s+/).filter(Boolean) }));
       return;
     }
 
@@ -184,7 +241,7 @@ export function SearchPanel({
 
   const goToCategory = (cat: Category) => {
     void hapticImpact("medium");
-    if (results) results.onSelectCategory(cat.slug);
+    if (results) setDraft((previous) => ({ ...previous, categories: [cat.slug] }));
     else navigate({ to: "/annonser", search: { q: "", category: cat.slug, sort: "new" } });
     close();
   };
@@ -238,20 +295,35 @@ export function SearchPanel({
                 filter-panelmodus (over /annonser) har resultatflaten sitt
                 eget søkefelt allerede, så dette ville konkurrert med det. */}
               {results ? (
-                results.activeItems.length > 0 && (
-                  <div className="flex items-center justify-end px-4 pb-3 pt-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void hapticImpact("light");
-                        results.onResetAll();
-                        setQ("");
-                      }}
-                      className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-                    >
-                      <RotateCcw className="size-3.5" />
-                      Nullstill
-                    </button>
+                (draftItems.length > 0 || user) && (
+                  <div className="flex items-center justify-between gap-2 px-4 pb-3 pt-3">
+                    {user ? (
+                      <button
+                        type="button"
+                        onClick={() => setSaveOpen(true)}
+                        className="native-touch-target flex items-center gap-1.5 rounded-full px-3 text-sm font-medium text-primary hover:bg-muted"
+                      >
+                        <Save className="size-4" />
+                        Lagre søk
+                      </button>
+                    ) : (
+                      <span />
+                    )}
+                    {draftItems.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void hapticImpact("light");
+                          setDraft(defaultAdvancedSearchValue());
+                          setDraftAttributes({});
+                          setQ("");
+                        }}
+                        className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                      >
+                        <RotateCcw className="size-3.5" />
+                        Nullstill
+                      </button>
+                    )}
                   </div>
                 )
               ) : (
@@ -310,17 +382,15 @@ export function SearchPanel({
 
               {results ? (
                 <SearchFilterSections
-                  value={results.value}
-                  setValue={results.setValue}
+                  value={draft}
+                  setValue={setDraft}
                   categories={categories}
                   section={section}
-                  location={results.location}
-                  onLocationChange={results.onLocationChange}
                   attributeFilters={results.attributeFilters}
-                  attributeValues={results.attributeValues}
-                  onAttributeChange={results.onAttributeChange}
+                  attributeValues={draftAttributes}
+                  onAttributeChange={updateDraftAttribute}
                   attributeCounts={results.attributeCounts}
-                  activeItems={results.activeItems}
+                  activeItems={draftItems}
                   includePrimary
                 />
               ) : (
@@ -336,48 +406,35 @@ export function SearchPanel({
                   onPickCategory={goToCategory}
                 />
               )}
+              {results && (
+                <div className="shrink-0 border-t border-border bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                  <Button
+                    type="button"
+                    data-testid="search-filter-apply-button"
+                    size="lg"
+                    onClick={() => {
+                      results.onApply(draft, draftAttributes);
+                      trackProductEvent("search_submitted", {
+                        hasCategory: draft.categories.length > 0,
+                        filterCount: draftItems.length,
+                      });
+                      close();
+                    }}
+                    className="h-14 w-full gap-2 rounded-xl text-base"
+                  >
+                    <SearchIcon className="size-4" />
+                    {draftChanged && draftCount.isPending
+                      ? "Beregner treff …"
+                      : buttonResultCount == null
+                        ? "Vis annonser"
+                        : buttonResultCount === 1
+                          ? "Vis 1 annonse"
+                          : `Vis ${buttonResultCount.toLocaleString("nb-NO")} annonser`}
+                  </Button>
+                </div>
+              )}
             </div>
           </Drawer.Content>
-
-          {/* Egen flate, ikke inni Drawer.Content: vaul translaterer HELE
-              innholdet (uansett hvor høyt det faktisk er) ned med
-              (1 − detent) × vindushøyde for å vise bare den brøkdelen —
-              en bunnbar inni den flate-transformerte boksen havner da fysisk
-              under skjermkanten ved 0.6-detenten, uansett CSS på boksen selv
-              (målt: --snap-point-height er den SKJULTE andelen, ikke den
-              synlige — se node_modules/vaul useSnapPoints). Pinnet direkte
-              til skjermbunnen her løser det, uavhengig av snap-punkt. */}
-          {results && (
-            <div
-              ref={actionBarRef}
-              // Radix sin modal-dialog setter `pointer-events: none` på
-              // <body> mens den er åpen, og gir bare selve Dialog.Content
-              // det tilbake som `auto` — denne baren er en vanlig sibling-
-              // div (ikke Dialog.Content), så uten `pointer-events-auto` her
-              // arves `none` fra <body>: baren tegnes riktig øverst, men tar
-              // ikke imot trykk, som i stedet faller gjennom til filtervalget
-              // som ligger under den.
-              className={`pointer-events-auto fixed inset-x-0 bottom-0 z-[10000] flex gap-2 border-t border-border bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-transform duration-500 ${
-                open ? "translate-y-0" : "translate-y-full"
-              } ${isTablet ? "mx-auto w-full max-w-2xl" : ""}`}
-            >
-              {user && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="lg"
-                  onClick={() => setSaveOpen(true)}
-                  className="gap-2"
-                >
-                  <Save className="size-4" /> Lagre
-                </Button>
-              )}
-              <Button type="button" size="lg" onClick={close} className="flex-1 gap-2">
-                <SearchIcon className="size-4" />
-                {results.resultCount != null ? `Vis ${results.resultCount} treff` : "Vis treff"}
-              </Button>
-            </div>
-          )}
         </Drawer.Portal>
       </Drawer.Root>
 
@@ -385,8 +442,8 @@ export function SearchPanel({
         <SaveSearchDialog
           open={saveOpen}
           onOpenChange={setSaveOpen}
-          defaultName={results.defaultName}
-          criteria={results.criteria}
+          defaultName={summarizeCriteria(draftCriteria)}
+          criteria={draftCriteria}
           onSaved={() => setSaveOpen(false)}
         />
       )}

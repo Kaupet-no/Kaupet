@@ -67,14 +67,15 @@ export default tseslint.config(
         // recognized by the rule's default (native-tag-only) control list.
         { controlComponents: ["Checkbox", "Switch", "RadioGroupItem"] },
       ],
-      // Downgraded from "error" (not "off") pending an incremental cleanup —
-      // there are ~60 pre-existing violations across the codebase that need
-      // per-file review rather than a blind bulk fix. New violations still
-      // surface as lint warnings; tighten back to "error" as files are cleaned up.
-      "react-hooks/set-state-in-effect": "warn",
+      // Existing, audited prop/browser-state synchronization sites are
+      // baselined in eslint-suppressions.json. The rule remains an error so
+      // new sites fail lint instead of silently expanding that baseline.
+      "react-hooks/set-state-in-effect": "error",
       "react-hooks/static-components": "warn",
-      "react-hooks/incompatible-library": "warn",
-      "react-hooks/refs": "warn",
+      "react-hooks/incompatible-library": "error",
+      // Remaining findings are React Hook Form callback refs/render-props,
+      // tracked explicitly in eslint-suppressions.json. New ref reads fail.
+      "react-hooks/refs": "error",
       "no-restricted-imports": [
         "error",
         {
@@ -89,10 +90,45 @@ export default tseslint.config(
       ],
       "react-refresh/only-export-components": [
         "warn",
-        { allowConstantExport: true, allowExportNames: ["Route"] },
+        {
+          allowConstantExport: true,
+          allowExportNames: [
+            "Route",
+            // Stable companion APIs intentionally colocated with their
+            // component/provider. Keep this explicit so new mixed exports
+            // still surface instead of disabling Fast Refresh validation.
+            "describeAttrValue",
+            "useAllCategoryFilters",
+            "secondaryFilterCount",
+            "isBoatAttributes",
+            "clampToBounds",
+            "scaleAround",
+            "defaultMarkerIcon",
+            "CARTO_TILE_LAYER",
+            "CIRCLE_STYLE",
+            "LISTING_REPORT_REASONS",
+            "USER_REPORT_REASONS",
+            "genericAttributesModule",
+            "useVehicleBrandOptions",
+            "useVehicleModelOptionsGrouped",
+            "useVehicleModelOptionsForBrands",
+            "useSearchPanel",
+            "useRegisterSearchPanelResults",
+            "countActiveFilters",
+            "useTheme",
+          ],
+        },
       ],
       "@typescript-eslint/no-unused-vars": "off",
     },
+  },
+  {
+    // TanStack Router route modules export `Route`; their component functions
+    // stay local and are referenced from that route object. The generic React
+    // Refresh rule misclassifies those local functions as missing component
+    // exports, while TanStack's Vite plugin owns route HMR/code splitting.
+    files: ["src/routes/**/*.{ts,tsx}"],
+    rules: { "react-refresh/only-export-components": "off" },
   },
   {
     // Files that are meant to stay vertical-agnostic (no direct knowledge of

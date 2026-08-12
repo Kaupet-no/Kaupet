@@ -13,7 +13,7 @@ Produksjon (`main`) er uberørt av dette — `deploy`-jobben der bruker fortsatt
 ## Testing
 
 - `bun run test` — kjører unittester (Vitest). Inngår i CI.
-- `bun run test:e2e` — kjører Playwright-e2e-tester. Starter selv en lokal dev-server mot Supabase-prosjektet i din `.env` (krever `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`, samme variabler som resten av appen bruker server-side, for å opprette en bekreftet testbruker). I CI startes en isolert lokal Supabase-stack og `.env` genereres med `bun run env:local`; E2E berører derfor ikke delt staging-data eller eksterne secrets.
+- `bun run test:e2e` — kjører Playwright-e2e-tester selvforsynt mot en egen, midlertidig lokal Supabase-stack. Kommandoen leser lokale nøkler uten å overskrive `.env`, oppretter en bekreftet testbruker og deterministiske annonser, og fjerner stacken etterpå. Krever Docker; verken lokal kjøring eller CI berører utviklerens vanlige lokale database, delt staging-data eller eksterne secrets.
 - `bun run test:rls` — kjører RLS-integrasjonstester mot en lokal Supabase-stack. Krever Docker:
   ```bash
   supabase start

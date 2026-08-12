@@ -1,11 +1,15 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Heart } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { hapticImpact } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
+import { currentReturnTo } from "@/lib/auth-return";
+import { savePendingAuthIntent, takePendingAuthIntent } from "@/lib/pending-auth-intent";
+import { trackProductEvent } from "@/lib/product-analytics";
 
 type Size = "sm" | "md" | "lg";
 
@@ -26,19 +30,25 @@ export function FavoriteButton({
   size = "sm",
   variant = "icon",
   className,
+  knownFavorite,
+  favoriteStateReady = true,
 }: {
   listingId: string;
   size?: Size;
   variant?: "icon" | "full";
   className?: string;
+  /** Result lists provide batch-loaded state. Standalone buttons omit it and
+   * use the single-listing fallback query below. */
+  knownFavorite?: boolean;
+  favoriteStateReady?: boolean;
 }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const { data: isFavorite = false } = useQuery({
+  const { data: queriedFavorite = false, isFetched } = useQuery({
     queryKey: ["favorite", listingId, user?.id],
-    enabled: !!user,
+    enabled: !!user && knownFavorite === undefined,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("favorites")
@@ -50,6 +60,8 @@ export function FavoriteButton({
       return !!data;
     },
   });
+  const isFavorite = knownFavorite ?? queriedFavorite;
+  const isFavoriteReady = knownFavorite === undefined ? isFetched : favoriteStateReady;
 
   const toggle = useMutation({
     mutationFn: async () => {
@@ -71,10 +83,20 @@ export function FavoriteButton({
       }
     },
     onSuccess: (nowFav) => {
+      queryClient.setQueriesData<Set<string>>(
+        { queryKey: ["listing-favorites", user?.id] },
+        (current) => {
+          const next = new Set(current ?? []);
+          if (nowFav) next.add(listingId);
+          else next.delete(listingId);
+          return next;
+        },
+      );
       queryClient.invalidateQueries({ queryKey: ["favorite", listingId, user?.id] });
       queryClient.invalidateQueries({ queryKey: ["user-favorites"] });
       void hapticImpact("light");
       showSuccessToast(nowFav ? "Lagt til i favoritter" : "Fjernet fra favoritter");
+      trackProductEvent("favorite_toggled", { favorite: nowFav });
     },
     onError: (e: Error) => {
       if (e.message !== "not-authenticated") {
@@ -83,11 +105,23 @@ export function FavoriteButton({
     },
   });
 
+  const replayedIntent = useRef(false);
+  useEffect(() => {
+    if (!user || !isFavoriteReady || replayedIntent.current) return;
+    if (!takePendingAuthIntent({ type: "favorite", listingId })) return;
+    replayedIntent.current = true;
+    if (!isFavorite) toggle.mutate();
+  }, [isFavorite, isFavoriteReady, listingId, toggle, user]);
+
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (!user) {
-      navigate({ to: "/auth", search: { mode: "signin" } });
+      savePendingAuthIntent({ type: "favorite", listingId });
+      navigate({
+        to: "/auth",
+        search: { mode: "signin", returnTo: currentReturnTo() },
+      });
       return;
     }
     toggle.mutate();
@@ -100,7 +134,7 @@ export function FavoriteButton({
       <button
         type="button"
         onClick={handleClick}
-        disabled={toggle.isPending}
+        disabled={toggle.isPending || (!!user && !isFavoriteReady)}
         className={cn(
           "inline-flex items-center justify-center rounded-md border border-border bg-card text-sm font-medium transition hover:bg-accent/10",
           sizing.btn,
@@ -120,7 +154,7 @@ export function FavoriteButton({
     <button
       type="button"
       onClick={handleClick}
-      disabled={toggle.isPending}
+      disabled={toggle.isPending || (!!user && !isFavoriteReady)}
       className={cn(
         "inline-flex items-center justify-center rounded-full bg-background/85 text-foreground shadow-sm backdrop-blur transition hover:bg-background",
         sizing.btn,

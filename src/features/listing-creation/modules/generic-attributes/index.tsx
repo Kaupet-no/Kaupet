@@ -3,7 +3,7 @@ import { AttributeFields } from "@/components/attribute-fields";
 import type { CategoryModule, CategoryModuleProps } from "../types";
 
 /** Thin wrapper so the existing AttributeFields (also reused by search filters) fits the CategoryModule contract. */
-function GenericAttributesModule(props: CategoryModuleProps) {
+export function GenericAttributesModule(props: CategoryModuleProps) {
   return <AttributeFields {...props} required />;
 }
 

@@ -69,9 +69,9 @@ function prependCategorySelect(flow: CategoryFlow): CategoryFlow {
  * Chunks an ordered list of active field-group keys into wizard "pages" for a
  * given platform: web pages hold more groups per page, native pages hold
  * fewer. `category-select` is always solo first (category must be chosen
- * before anything else, including title); `review-publish` is always solo
- * last on native, and absorbs `delivery-location` as one page on web —
- * reproducing today's exact 3-web/5-native split for the default flow.
+ * before anything else, including the full title/photo step). Location and
+ * review/publish share the final page on both platforms so native users do
+ * not have to advance through a separate confirmation-only step.
  * `title-photos` is no longer forced first — its position is just whatever
  * order it has in `fieldGroupKeys`, so a category flow can put
  * `category-attributes` (and any vehicle lookup it triggers) before it.
@@ -139,15 +139,10 @@ export function resolveWizardPages(
   }
   flush();
 
-  if (options.native) {
-    if (hasDeliveryLocation) pages.push(["delivery-location"]);
-    if (hasReviewPublish) pages.push(["review-publish"]);
-  } else {
-    const lastPage: string[] = [];
-    if (hasDeliveryLocation) lastPage.push("delivery-location");
-    if (hasReviewPublish) lastPage.push("review-publish");
-    if (lastPage.length > 0) pages.push(lastPage);
-  }
+  const lastPage: string[] = [];
+  if (hasDeliveryLocation) lastPage.push("delivery-location");
+  if (hasReviewPublish) lastPage.push("review-publish");
+  if (lastPage.length > 0) pages.push(lastPage);
 
   return pages;
 }

@@ -7,7 +7,7 @@ const AUTH_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), ".auth
 
 /**
  * `listings.seller_id` and `profiles.id` are both `REFERENCES
- * auth.users(id) ON DELETE CASCADE`, so deleting the test user here also
+ * auth.users(id) ON DELETE CASCADE`, so deleting the test users here also
  * removes every listing (and other per-user data) the test run created — no
  * separate cleanup query needed. A failure here is logged rather than
  * swallowed: an auth user left behind also leaves its listings behind
@@ -16,19 +16,27 @@ const AUTH_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), ".auth
  */
 export default async function globalTeardown() {
   if (!existsSync(AUTH_FILE)) return;
-  const { userId } = JSON.parse(readFileSync(AUTH_FILE, "utf-8")) as { userId: string };
+  const { userIds } = JSON.parse(readFileSync(AUTH_FILE, "utf-8")) as { userIds: string[] };
 
   const url = process.env.SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   let cleanupFailure: Error | null = null;
   if (url && serviceRoleKey) {
     const admin = createClient(url, serviceRoleKey);
-    const { error } = await admin.auth.admin.deleteUser(userId);
-    if (error) {
+    const failures = [];
+    for (const userId of userIds) {
+      const { error } = await admin.auth.admin.deleteUser(userId);
+      if (error) failures.push({ userId, error });
+    }
+    if (failures.length > 0) {
       cleanupFailure = new Error(
-        `[e2e global-teardown] Kunne ikke slette testbruker ${userId} (og dermed heller ikke ` +
-          `annonsene den opprettet): status=${error.status} code=${error.code} name=${error.name} ` +
-          `message=${error.message}`,
+        `[e2e global-teardown] Kunne ikke slette ${failures.length} testbruker(e): ` +
+          failures
+            .map(
+              ({ userId, error }) =>
+                `${userId}: status=${error!.status} code=${error!.code} message=${error!.message}`,
+            )
+            .join("; "),
       );
     }
   }

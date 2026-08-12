@@ -5,21 +5,54 @@
  * a plain browser so the panel's native-only entry points render without a
  * simulator.
  */
-import { expect, test } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { expect, test, type Locator } from "@playwright/test";
 
-test("åpner søkepanelet over /annonser, endrer filter og lukker med treff-knappen", async ({
-  page,
-}) => {
+const { filterFixture } = JSON.parse(
+  readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), ".auth", "user.json"),
+    "utf-8",
+  ),
+) as { filterFixture: { query: string; total: number; paid: number } };
+
+async function expectNativeTouchTarget(locator: Locator) {
+  const box = await locator.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.width).toBeGreaterThanOrEqual(48);
+  expect(box!.height).toBeGreaterThanOrEqual(48);
+}
+
+test("holder filter som utkast frem til brukeren anvender dem", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/annonser?forcenative&sort=new");
+  await page.goto(`/annonser?forcenative&q=${filterFixture.query}&sort=new`);
   await page.waitForLoadState("networkidle");
 
-  await page.getByRole("button", { name: /Filtrer/ }).click();
+  const filterButton = page.getByRole("button", { name: /Filtrer/ });
+  await expectNativeTouchTarget(filterButton);
+  await filterButton.click();
 
-  const showButton = page.getByRole("button", { name: /Vis \d+ treff/ });
-  await expect(showButton).toBeVisible({ timeout: 10_000 });
+  const applyButton = page.getByTestId("search-filter-apply-button");
+  await expect(applyButton).toBeVisible({ timeout: 10_000 });
+  await expect(applyButton).toHaveText(`Vis ${filterFixture.total} annonser`);
+  await expectNativeTouchTarget(page.getByRole("button", { name: "Helt ny" }));
 
-  await showButton.click();
-  await expect(showButton).not.toBeVisible();
-  await expect(page).toHaveURL(/\/annonser\?/);
+  await expect(page.getByRole("button", { name: /Alle kategorier/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Bil og MC" })).not.toBeVisible();
+  await page.getByRole("button", { name: /Alle kategorier/ }).click();
+  await expect(page.getByRole("heading", { name: "Velg kategori" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Bil og MC" })).toBeVisible();
+  await page.getByRole("button", { name: "Ferdig" }).click();
+
+  await expect(page.getByRole("button", { name: /Flere filtre/ })).toBeVisible();
+
+  await page.getByRole("checkbox", { name: "Inkluder gratis-annonser" }).click();
+  await expect(page).not.toHaveURL(/includeFree=false/);
+  await expect(applyButton).toHaveText("Beregner treff …");
+  await expect(applyButton).toHaveText(`Vis ${filterFixture.paid} annonser`, { timeout: 10_000 });
+
+  await applyButton.click();
+  await expect(applyButton).not.toBeVisible();
+  await expect(page).toHaveURL(/includeFree=false/);
 });

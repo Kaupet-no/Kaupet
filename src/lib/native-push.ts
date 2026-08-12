@@ -114,10 +114,12 @@ export async function getCurrentNativeToken(): Promise<string | null> {
 }
 
 /**
- * Call once at app startup on Android. If the user has already granted
+ * Call at app startup and again after sign-in. If the user has already granted
  * notification permission (e.g. via onboarding), silently re-registers with
  * FCM and saves the subscription so the user never has to visit the profile
- * page to "activate" push notifications again after an app restart.
+ * page to "activate" push notifications again after an app restart. The
+ * post-sign-in retry also binds permission granted during anonymous
+ * onboarding to the account without showing a second OS prompt.
  */
 export async function autoRestoreNativePush(): Promise<void> {
   if (!nativePushSupported()) return;

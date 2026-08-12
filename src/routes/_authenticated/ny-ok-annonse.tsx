@@ -3,7 +3,7 @@ import { useIsNative } from "@/hooks/use-is-native";
 import { createFileRoute, useNavigate, useBlocker, useRouter, Link } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
@@ -151,7 +151,7 @@ function NewWtbPage() {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     formState: { errors, touchedFields },
   } = useForm<WtbForm>({
@@ -164,10 +164,11 @@ function NewWtbPage() {
     },
   });
 
-  const categoryId = watch("category_id");
-  const title = watch("title");
+  const [categoryId, title, description] = useWatch({
+    control,
+    name: ["category_id", "title", "description"],
+  });
   const titleLength = title.length;
-  const description = watch("description");
   const descriptionLength = (description ?? "").length;
 
   const vehicleGroup = useMemo(

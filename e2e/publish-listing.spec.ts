@@ -16,12 +16,12 @@ import {
   wizardStep,
 } from "./pages/listing-wizard";
 
-const { email, password } = JSON.parse(
+const { users } = JSON.parse(
   readFileSync(
     path.join(path.dirname(fileURLToPath(import.meta.url)), ".auth", "user.json"),
     "utf-8",
   ),
-) as { email: string; password: string };
+) as { users: Record<string, { email: string; password: string }> };
 
 // Dedicated e2e-only category (see the
 // 20260802210000_e2e_test_category.sql migration) — a root-level leaf with
@@ -34,6 +34,9 @@ const { email, password } = JSON.parse(
 const TEST_CATEGORY_NAME = "E2E-test (ikke bruk)";
 
 test("logger inn og publiserer en annonse", async ({ page }, testInfo) => {
+  const credentials = users[testInfo.project.name];
+  if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);
+  const { email, password } = credentials;
   await login(page, email, password);
   await goToNewListing(page);
 

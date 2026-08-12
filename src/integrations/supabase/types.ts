@@ -1813,6 +1813,17 @@ export type Database = {
         Args: { _key_hash: string; _query: string; _result_count: number }
         Returns: undefined
       }
+      log_product_event_rate_limited: {
+        Args: {
+          _event_name: string
+          _key_hash: string
+          _path: string
+          _platform: string
+          _properties?: Json
+          _session_id: string
+        }
+        Returns: undefined
+      }
       listing_matches_attribute_filters: {
         Args: { _attributes: Json; _filters: Json }
         Returns: boolean

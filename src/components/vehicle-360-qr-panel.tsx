@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, RefreshCw, Smartphone, Trash2 } from "lucide-react";
@@ -17,9 +17,8 @@ import {
  * Desktop-only panel on the bildeopplastning-steget for Bil/MC-annonser:
  * genererer automatisk en QR-kode brukeren *kan* skanne med Kaupet-appen for
  * å ta opptak av en 360°-bildesekvens av kjøretøyet — helt valgfritt, ingen
- * knapp å trykke for å be om koden. Koden er permanent for annonseutkastet
- * (samme token gjenbrukes, se createVehicle360CaptureSession) — ikke en
- * tidsbegrenset engangskode brukeren må be om på nytt. Krever en persistert
+ * knapp å trykke for å be om koden. QR-koden er en kortlivet capability og
+ * roteres automatisk når den er utløpt eller brukt. Krever en persistert
  * draft, siden mobilopptaket knyttes til en ekte listing_id. `ensureDraftId`
  * løser dette automatisk for kjøretøy — tittelen genereres av
  * kjøretøysoppslaget (Årsmodell/Merke/Modell), ikke skrevet inn av brukeren
@@ -52,7 +51,7 @@ export function Vehicle360QrPanel({
     },
   });
 
-  const frames = framesQuery.data ?? [];
+  const frames = useMemo(() => framesQuery.data ?? [], [framesQuery.data]);
   const [imgUrls, setImgUrls] = useState<Record<string, string>>({});
 
   useEffect(() => {

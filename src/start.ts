@@ -3,6 +3,7 @@ import { getRequest } from "@tanstack/react-start/server";
 
 import { renderErrorPage } from "./lib/error-page";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
+import { requestBodyExceedsLimit } from "@/lib/request-size.server";
 
 const errorMiddleware = createMiddleware().server(async ({ next }) => {
   try {
@@ -36,6 +37,19 @@ function extractIp(headers: Headers): string | null {
 // Only block write/auth requests. Read-only requests (GET/HEAD/OPTIONS) are
 // always allowed so banned IPs can still browse the site.
 const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const requestSizeMiddleware = createMiddleware().server(async ({ next }) => {
+  const request = getRequest();
+  if (!request || !WRITE_METHODS.has(request.method.toUpperCase())) return next();
+
+  if (await requestBodyExceedsLimit(request)) {
+    return new Response("Forespørselen er for stor.", {
+      status: 413,
+      headers: { "content-type": "text/plain; charset=utf-8" },
+    });
+  }
+
+  return next();
+});
 
 const ipBanMiddleware = createMiddleware().server(async ({ next }) => {
   try {
@@ -78,5 +92,5 @@ const ipBanMiddleware = createMiddleware().server(async ({ next }) => {
 
 export const startInstance = createStart(() => ({
   functionMiddleware: [attachSupabaseAuth],
-  requestMiddleware: [errorMiddleware, ipBanMiddleware],
+  requestMiddleware: [errorMiddleware, requestSizeMiddleware, ipBanMiddleware],
 }));

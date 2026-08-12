@@ -11,7 +11,7 @@ import {
   Workflow,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getCategoryIcon } from "@/lib/category-icons";
+import { CategoryIcon } from "@/lib/category-icons";
 import { MAX_CATEGORY_DEPTH } from "@/lib/category-admin-tree";
 import { INDENT_WIDTH, type Category } from "./shared";
 
@@ -43,7 +43,6 @@ export function SortableCategoryRow({
   /** Produksjon: kategorier redigeres kun i staging og synkroniseres hit. */
   readOnly?: boolean;
 }) {
-  const Icon = getCategoryIcon(category.icon);
   const listingCount = countsById.get(category.id) ?? 0;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: category.id,
@@ -90,7 +89,10 @@ export function SortableCategoryRow({
           ) : (
             <span className="inline-block size-3.5" aria-hidden />
           )}
-          <Icon className="size-4 shrink-0 text-muted-foreground" />
+          <CategoryIcon
+            iconName={category.icon}
+            className="size-4 shrink-0 text-muted-foreground"
+          />
           <span className="truncate font-medium">{category.name_nb}</span>
           <span className="truncate text-xs text-muted-foreground">/{category.slug}</span>
           <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">

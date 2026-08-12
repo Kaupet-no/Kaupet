@@ -192,20 +192,6 @@ function BrowsePage() {
     },
   });
 
-  const { data: radiusIds } = useQuery({
-    queryKey: ["listings-radius", search.lat, search.lng, search.radius],
-    enabled: search.lat != null && search.lng != null,
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("listings_within_radius", {
-        center_lat: search.lat!,
-        center_lng: search.lng!,
-        radius_km: search.radius ?? 10,
-      });
-      if (error) throw error;
-      return (data ?? []).map((r: { id: string }) => r.id);
-    },
-  });
-
   const {
     location,
     effectiveCategories,
@@ -484,7 +470,7 @@ function BrowsePage() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useListingsQuery({ search, categories, effectiveCategories, terms, radiusIds });
+  } = useListingsQuery({ search, categories, effectiveCategories, terms });
 
   const listings = useMemo(() => listingsData?.pages.flatMap((p) => p.rows), [listingsData]);
   const totalCount = listingsData?.pages[0]?.totalCount ?? null;

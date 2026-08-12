@@ -6,7 +6,7 @@
  */
 import { expect, type Locator, type Page, type TestInfo } from "@playwright/test";
 
-export async function login(page: Page, email: string, password: string, testInfo: TestInfo) {
+export async function login(page: Page, email: string, password: string) {
   // Permanent (not error-triggered) console/pageerror capture — a login
   // flake was observed a few times across CI runs (never reproduced or
   // root-caused beyond "click completed, page stayed on /auth"), so this
@@ -23,37 +23,10 @@ export async function login(page: Page, email: string, password: string, testInf
   // surfaced once Turnstile's load time gave the redirect time to land
   // between fill and click).
   await page.goto("/auth?mode=signin");
-  // Inputs are controlled (SSR-rendered, then hydrated) — filling before
-  // hydration finishes gets clobbered when React reconciles to its initial
-  // empty state, so wait for the network to settle first (proxy for
-  // hydration being done). The retry-fill below is a second line of defense
-  // for the same race (fill + assert can both land inside one JS turn, just
-  // ahead of a hydration reconciliation on the next tick).
-  await page.waitForLoadState("networkidle");
-  await expect(async () => {
-    await page.getByLabel("E-post").fill(email);
-    await page.getByLabel("Passord").fill(password);
-    await expect(page.getByLabel("E-post")).toHaveValue(email);
-  }).toPass({ timeout: 15_000 });
-
-  // Retried for the same reason as clickAndWaitFor's other call sites (see
-  // its docstring) — but the "expected" condition here is a URL change, not
-  // an element appearing, so this doesn't go through clickAndWaitFor itself.
-  const attempts = 3;
-  for (let i = 0; i < attempts; i++) {
-    await page.getByRole("main").getByRole("button", { name: "Logg inn" }).click();
-    const loggedIn = await page
-      .waitForURL("/", { timeout: 8_000 })
-      .then(() => true)
-      .catch(() => false);
-    if (loggedIn) return;
-    if (i < attempts - 1) {
-      await testInfo.attach(`no-progress-after-login-click-attempt-${i + 1}`, {
-        body: await page.screenshot(),
-        contentType: "image/png",
-      });
-    }
-  }
+  await page.locator("html[data-kaupet-hydrated='true']").waitFor();
+  await page.getByLabel("E-post").fill(email);
+  await page.getByLabel("Passord").fill(password);
+  await page.getByRole("main").getByRole("button", { name: "Logg inn" }).click();
   await expect(page).toHaveURL("/", { timeout: 10_000 });
 }
 

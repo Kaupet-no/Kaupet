@@ -56,6 +56,8 @@
  * helt — ingen av stiene er bekreftet på et forbrenningsmotor-payload ennå.
  */
 
+import type { VehicleLookupResult } from "./vehicle-lookup.types";
+
 function assertVehicleLookupConfigured() {
   if (!process.env.STATENS_VEGVESEN_API_KEY) {
     throw new Error(
@@ -63,82 +65,6 @@ function assertVehicleLookupConfigured() {
     );
   }
 }
-
-export type VehicleLookupResult = {
-  registrationNumber: string;
-  brand: string | null;
-  model: string | null;
-  year: number | null;
-  fuel_type: string | null;
-  transmission: string | null;
-  color: string | null;
-  weight_kg: number | null;
-  /** Tillatt totalvekt ("gross vehicle weight") — distinct from `weight_kg`
-   * (egenvekt, the vehicle's own empty weight). Most relevant for bil,
-   * bobil, campingvogn and tilhenger, where the margin between the two
-   * (nyttelast/payload) matters to a buyer. */
-  max_total_weight_kg: number | null;
-  /** Vehicle length in meters — same unit as the pre-existing `length_m`
-   * category_filter (bobil/campingvogn already had a manual "Lengde" field;
-   * this makes it SVV-sourced like the rest of the spec instead). */
-  length_m: number | null;
-  vin: string | null;
-  next_eu_control: string | null;
-  power_hk: number | null;
-  drive_type: string | null;
-  tow_hitch: boolean | null;
-  max_tow_weight_kg: number | null;
-  seats: number | null;
-  imported_used: boolean | null;
-  first_registration_date: string | null;
-  cylinders: number | null;
-  engine_displacement_cc: number | null;
-  engine_code: string | null;
-  sleeping_places: number | null;
-  classification_code: string | null;
-  avgiftsklasse_code: string | null;
-  avgiftsklasse_name: string | null;
-  body_type_code: string | null;
-  body_type_hint: string | null;
-};
-
-/** category_filters keys that vehicle-confirm lets the user review/edit
- * directly right after a lookup — suppressed from re-appearing as editable
- * inputs in the later category-attributes ("Detaljer") step so the user
- * isn't asked to fill in the same field twice. */
-export const VEHICLE_LOOKUP_FILTER_KEYS = [
-  "fuel_type",
-  "transmission",
-  "drive_type",
-  "weight_kg",
-  "max_total_weight_kg",
-  "length_m",
-  "power_hk",
-  "tow_hitch",
-  "max_tow_weight_kg",
-  "seats",
-  "color",
-  "next_eu_control",
-  "eu_control_exempt",
-  "sleeping_places",
-] as const;
-
-/** Registration status/number are set by the wizard itself (SVV lookup, or
- * the manual "kjøretøyet er ikke registrert" flow) rather than filled in by
- * the user as a generic attribute, so they're always hidden from the
- * category-attributes step regardless of which vehicle path was taken.
- *
- * `first_registration_year` belongs here for the same reason: it's derived
- * from the exact date SVV returned (see confirmVehicleData) purely so the year
- * is searchable as a range, never typed in. For an unregistered vehicle it
- * stays unset — a vehicle that has never been registered shouldn't turn up in
- * a "registrert mellom 2015 og 2020" search. Årsmodell (`year`) is the year
- * the seller fills in there, and being a `number` filter it's required. */
-export const VEHICLE_WIZARD_MANAGED_KEYS = [
-  "is_registered",
-  "registration_number",
-  "first_registration_year",
-] as const;
 
 const SVV_BASE_URL = "https://akfell-datautlevering.atlas.vegvesen.no/enkeltoppslag/kjoretoydata";
 

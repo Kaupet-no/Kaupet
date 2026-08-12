@@ -48,18 +48,21 @@ const e2eRoot = mkdtempSync(path.join(tmpdir(), "kaupet-e2e-"));
 const e2eSupabaseDir = path.join(e2eRoot, "supabase");
 cpSync(path.join(root, "supabase"), e2eSupabaseDir, { recursive: true });
 const configPath = path.join(e2eSupabaseDir, "config.toml");
+const portOffset = 1000 + Math.floor(Math.random() * 7000);
+const port = (original) => String(original + portOffset);
+const projectId = `kaupet-e2e-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
 const isolatedConfig = readFileSync(configPath, "utf8")
-  .replace('project_id = "Kaupet"', 'project_id = "KaupetE2E"')
-  .replaceAll("54320", "56320")
-  .replaceAll("54321", "56321")
-  .replaceAll("54322", "56322")
-  .replaceAll("54323", "56323")
-  .replaceAll("54324", "56324")
-  .replaceAll("54325", "56325")
-  .replaceAll("54326", "56326")
-  .replaceAll("54327", "56327")
-  .replaceAll("54329", "56329")
-  .replace("inspector_port = 8083", "inspector_port = 8183")
+  .replace('project_id = "Kaupet"', `project_id = "${projectId}"`)
+  .replaceAll("54320", port(54320))
+  .replaceAll("54321", port(54321))
+  .replaceAll("54322", port(54322))
+  .replaceAll("54323", port(54323))
+  .replaceAll("54324", port(54324))
+  .replaceAll("54325", port(54325))
+  .replaceAll("54326", port(54326))
+  .replaceAll("54327", port(54327))
+  .replaceAll("54329", port(54329))
+  .replace("inspector_port = 8083", `inspector_port = ${port(8083)}`)
   .replace("[auth.email.smtp]\nenabled = true", "[auth.email.smtp]\nenabled = false");
 writeFileSync(configPath, isolatedConfig);
 
@@ -89,17 +92,18 @@ try {
 
   const env = {
     ...process.env,
-    SUPABASE_PROJECT_ID: "Kaupet",
+    SUPABASE_PROJECT_ID: projectId,
     SUPABASE_URL: apiUrl,
     SUPABASE_PUBLISHABLE_KEY: publishableKey,
     SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey,
-    VITE_SUPABASE_PROJECT_ID: "Kaupet",
+    VITE_SUPABASE_PROJECT_ID: projectId,
     VITE_SUPABASE_URL: apiUrl,
     VITE_SUPABASE_PUBLISHABLE_KEY: publishableKey,
     VITE_ENVIRONMENT: "development",
     TURNSTILE_SECRET_KEY: "1x0000000000000000000000000000000AA",
     VITE_TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
-    PUBLIC_SITE_URL: "http://localhost:8080",
+    PLAYWRIGHT_PORT: port(18080),
+    PUBLIC_SITE_URL: `http://localhost:${port(18080)}`,
   };
 
   const playwright = run("bun", ["run", "test:e2e:playwright", ...process.argv.slice(2)], {

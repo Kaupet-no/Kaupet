@@ -5,7 +5,17 @@
  * a plain browser so the panel's native-only entry points render without a
  * simulator.
  */
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { expect, test, type Locator } from "@playwright/test";
+
+const { filterFixture } = JSON.parse(
+  readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), ".auth", "user.json"),
+    "utf-8",
+  ),
+) as { filterFixture: { query: string; total: number; paid: number } };
 
 async function expectNativeTouchTarget(locator: Locator) {
   const box = await locator.boundingBox();
@@ -16,15 +26,16 @@ async function expectNativeTouchTarget(locator: Locator) {
 
 test("holder filter som utkast frem til brukeren anvender dem", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/annonser?forcenative&sort=new");
+  await page.goto(`/annonser?forcenative&q=${filterFixture.query}&sort=new`);
   await page.waitForLoadState("networkidle");
 
   const filterButton = page.getByRole("button", { name: /Filtrer/ });
   await expectNativeTouchTarget(filterButton);
   await filterButton.click();
 
-  const applyButton = page.getByRole("button", { name: /Vis (\d+ )?annonser?/ });
+  const applyButton = page.getByTestId("search-filter-apply-button");
   await expect(applyButton).toBeVisible({ timeout: 10_000 });
+  await expect(applyButton).toHaveText(`Vis ${filterFixture.total} annonser`);
   await expectNativeTouchTarget(page.getByRole("button", { name: "Helt ny" }));
 
   await expect(page.getByRole("button", { name: /Alle kategorier/ })).toBeVisible();
@@ -38,7 +49,8 @@ test("holder filter som utkast frem til brukeren anvender dem", async ({ page })
 
   await page.getByRole("checkbox", { name: "Inkluder gratis-annonser" }).click();
   await expect(page).not.toHaveURL(/includeFree=false/);
-  await expect(applyButton).toHaveText("Vis annonser");
+  await expect(applyButton).toHaveText("Beregner treff …");
+  await expect(applyButton).toHaveText(`Vis ${filterFixture.paid} annonser`, { timeout: 10_000 });
 
   await applyButton.click();
   await expect(applyButton).not.toBeVisible();

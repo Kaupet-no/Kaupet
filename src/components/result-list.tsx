@@ -21,6 +21,8 @@ import { hapticImpact } from "@/lib/haptics";
 import { getAttributeChipState, getSortChipState } from "@/lib/filter-chip-labels";
 import { SORT_OPTIONS, type SortValue } from "@/lib/categories";
 import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
+import { useListingCardImages } from "@/hooks/use-listing-card-images";
+import { trackProductEvent } from "@/lib/product-analytics";
 
 const ListingsMap = lazy(() =>
   import("@/components/listings-map").then((m) => ({ default: m.ListingsMap })),
@@ -121,6 +123,16 @@ export function ResultList({
       return "grid";
     }
   });
+  const signedImageUrls = useListingCardImages(cards);
+  const zeroResultKey = `${q}|${effectiveCategories.join(",")}`;
+
+  useEffect(() => {
+    if (isLoading || cards.length > 0) return;
+    trackProductEvent("search_zero_results", {
+      hasQuery: q.trim().length > 0,
+      hasCategory: effectiveCategories.length > 0,
+    });
+  }, [cards.length, effectiveCategories.length, isLoading, q, zeroResultKey]);
 
   useEffect(() => setMounted(true), []);
 
@@ -339,6 +351,7 @@ export function ResultList({
                   onHoverChange={setHoveredId}
                   compact={isNative && viewMode === "list"}
                   linkState={{ fromSearch: true }}
+                  signedImageUrl={signedImageUrls[l.id] ?? null}
                 />
               ))}
             </div>

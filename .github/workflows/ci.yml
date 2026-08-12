@@ -168,7 +168,7 @@ jobs:
         run: bunx playwright install --with-deps chromium
 
       - name: Run e2e tests
-        run: bun run test:e2e
+        run: bun --env-file=.env run test:e2e
 
       - name: Stop isolated Supabase
         if: always()

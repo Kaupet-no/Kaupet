@@ -23,7 +23,7 @@ test("holder filter som utkast frem til brukeren anvender dem", async ({ page })
   await expectNativeTouchTarget(filterButton);
   await filterButton.click();
 
-  const applyButton = page.getByRole("button", { name: "Bruk filtre" });
+  const applyButton = page.getByRole("button", { name: /Vis (\d+ )?annonser?/ });
   await expect(applyButton).toBeVisible({ timeout: 10_000 });
   await expectNativeTouchTarget(page.getByRole("button", { name: "Helt ny" }));
 

@@ -151,7 +151,10 @@ export function SearchFilterSections({
           </section>
         )}
 
-        <section data-section="categories" className="scroll-mt-2 space-y-3">
+        <section
+          data-section="categories"
+          className="scroll-mt-2 space-y-3 rounded-2xl border border-border bg-card p-4"
+        >
           {/* Ingen egen seksjonstittel her — CategoryPicker rendrer selv en
               "Kategori"-label, og å ha begge rett over hverandre er bare
               gjentakelse uten merverdi. */}
@@ -163,9 +166,24 @@ export function SearchFilterSections({
           />
         </section>
 
-        <div className="my-6 border-t border-border" />
+        <section
+          data-section="location"
+          className="mt-4 scroll-mt-2 space-y-4 rounded-2xl border border-border bg-card p-4"
+        >
+          <Label className="text-base font-medium">Sted</Label>
+          <LocationPicker value={location} onChange={onLocationChange} autoFocus={false} />
+          {locationActive && (
+            <RadiusPicker
+              value={location.radius}
+              onChange={(r) => onLocationChange({ ...location, radius: r })}
+            />
+          )}
+        </section>
 
-        <section data-section="price" className="scroll-mt-2 space-y-6">
+        <section
+          data-section="price"
+          className="mt-4 scroll-mt-2 space-y-6 rounded-2xl border border-border bg-card p-4"
+        >
           <div className="space-y-3">
             {/* Ingen egen seksjonstittel — RangeFilterField rendrer selv en
                 "Pris (NOK)"-label rett under. */}
@@ -219,22 +237,10 @@ export function SearchFilterSections({
           )}
         </section>
 
-        <div className="my-6 border-t border-border" />
-
-        <section data-section="location" className="scroll-mt-2 space-y-4">
-          <Label className="text-base font-medium">Sted</Label>
-          <LocationPicker value={location} onChange={onLocationChange} autoFocus={false} />
-          {locationActive && (
-            <RadiusPicker
-              value={location.radius}
-              onChange={(r) => onLocationChange({ ...location, radius: r })}
-            />
-          )}
-        </section>
-
-        <div className="my-6 border-t border-border" />
-
-        <section data-section="attributes" className="scroll-mt-2 space-y-3">
+        <section
+          data-section="attributes"
+          className="mt-4 scroll-mt-2 space-y-3 rounded-2xl border border-border bg-card p-4"
+        >
           <Label className="text-base font-medium">Flere filter</Label>
           {hasAttributeFilters && v.categories.length > 0 ? (
             <SecondaryCategoryFilters
@@ -260,9 +266,10 @@ export function SearchFilterSections({
           )}
         </section>
 
-        <div className="my-6 border-t border-border" />
-
-        <section data-section="search" className="scroll-mt-2 space-y-3">
+        <section
+          data-section="search"
+          className="mt-4 scroll-mt-2 space-y-3 rounded-2xl border border-border bg-card p-4"
+        >
           <Label className="text-base font-medium">Flere søkelinjer</Label>
 
           {v.extraGroups.map((g) => (

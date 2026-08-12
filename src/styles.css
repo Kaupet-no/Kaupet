@@ -1,8 +1,25 @@
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
-@import "@fontsource-variable/newsreader/opsz.css";
-@import "@fontsource-variable/inter/wght.css";
+/* Kaupet ships Norwegian Bokmål UI only. Loading the Latin subsets directly
+   avoids downloading Cyrillic, Greek and Vietnamese variable-font files. */
+@font-face {
+  font-family: "Newsreader Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 800;
+  src: url("@fontsource-variable/newsreader/files/newsreader-latin-opsz-normal.woff2")
+    format("woff2-variations");
+}
+
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("@fontsource-variable/inter/files/inter-latin-wght-normal.woff2")
+    format("woff2-variations");
+}
 
 @custom-variant dark (&:is(.dark *));
 
@@ -245,6 +262,30 @@
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
+}
+
+/* Android anbefaler 48dp treffområder, mens iOS bruker 44pt. Disse to
+   utility-klassene lar native-flater oppfylle det strengeste kravet uten å
+   gjøre den tilsvarende web-kontrollen unødvendig stor:
+   - native-touch-target: vanlige kontroller kan vokse i layouten.
+   - native-hit-area: kompakt chrome beholder visuell størrelse, men får et
+     usynlig 48x48 treffområde. Bruk den siste bare når det er nok luft rundt. */
+.native .native-touch-target {
+  min-width: 3rem;
+  min-height: 3rem;
+}
+
+.native .native-hit-area {
+  position: relative;
+}
+.native .native-hit-area::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 3rem;
+  height: 3rem;
+  content: "";
+  transform: translate(-50%, -50%);
 }
 
 /* Isoler Leaflet sin interne z-index-stack slik at panene (z-index 400–700)

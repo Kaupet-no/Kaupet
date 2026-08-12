@@ -237,37 +237,17 @@ export function useAnnonserSearchState(params: {
     });
   };
 
-  // Applies only the fields owned by the advanced panel (category, price,
-  // condition, extra search lines). Query text, qMode, location and sort are
-  // owned by the search bar and already applied directly to the URL as the
-  // user edits them, so re-patching them here from the panel's draft would
-  // clobber any bar edits made while the panel was open.
-  const handleApply = (v: AdvancedSearchValue) => {
+  /** Commits the complete panel draft in one URL transition. Keeping draft
+   * changes out of the URL prevents expensive result refetches for every
+   * slider tick and makes Avbryt behave as users expect. */
+  const applyPanelDraft = (
+    v: AdvancedSearchValue,
+    nextAttrValues: Record<string, AttributeFilterValue>,
+  ) => {
     void hapticNotification("success");
     const c = valueToCriteria(v);
     updateSearch({
-      extraGroups: c.extraGroups,
-      categories: c.categories,
-      catMode: c.catMode,
-      conditions: c.conditions as z.infer<typeof conditionEnum>[] | undefined,
-      includeFree: c.includeFree,
-      min: c.min ?? undefined,
-      max: c.max ?? undefined,
-      category: "",
-    });
-  };
-
-  // Writes every panel edit straight to the URL instead of collecting it in a
-  // draft (fase 12) — same `Dispatch<SetStateAction<AdvancedSearchValue>>`
-  // shape as `useAdvancedSearchValue`'s setter, so `SearchFilterSections` (and
-  // the range/category/condition controls inside it) don't need to know
-  // whether they're editing a draft or the live URL. `mine-sok.tsx` (editing a
-  // saved search, not a live result set) keeps the draft version.
-  const setLiveValue: React.Dispatch<React.SetStateAction<AdvancedSearchValue>> = (upd) => {
-    const next = typeof upd === "function" ? upd(advancedInitial) : upd;
-    const c = valueToCriteria(next);
-    updateSearch({
-      q: next.terms.join(" "),
+      q: v.terms.join(" "),
       qMode: c.qMode,
       extraGroups: c.extraGroups,
       categories: c.categories,
@@ -277,6 +257,11 @@ export function useAnnonserSearchState(params: {
       min: c.min ?? undefined,
       max: c.max ?? undefined,
       category: "",
+      attrs: encodeAttrFilters(nextAttrValues),
+      lat: v.location.lat ?? undefined,
+      lng: v.location.lng ?? undefined,
+      radius: v.location.lat != null ? v.location.radius : undefined,
+      loc: v.location.label || undefined,
     });
   };
 
@@ -305,8 +290,7 @@ export function useAnnonserSearchState(params: {
     advancedInitial,
     currentCriteria,
     updateSearch,
-    handleApply,
-    setLiveValue,
+    applyPanelDraft,
     handleLocationChange,
     resetFilters,
   };

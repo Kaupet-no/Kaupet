@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
@@ -16,11 +16,14 @@ import { isNative } from "@/lib/native";
 import { formatErrorMessage } from "@/lib/errors";
 import { passwordStrength } from "@/lib/password-strength";
 import { passwordSchema } from "@/lib/auth-schemas";
+import { safeReturnTo } from "@/lib/auth-return";
+import { trackProductEvent } from "@/lib/product-analytics";
 
 const TERMS_VERSION = "1.0";
 
 const searchSchema = z.object({
   mode: z.enum(["signin", "signup", "reset"]).optional().default("signin"),
+  returnTo: z.unknown().transform(safeReturnTo).optional(),
 });
 
 export const Route = createFileRoute("/auth")({
@@ -63,7 +66,7 @@ const signUpSchema = signInSchema.extend({
 type AuthForm = z.infer<typeof signInSchema>;
 
 function AuthPage() {
-  const { mode } = Route.useSearch();
+  const { mode, returnTo } = Route.useSearch();
   const navigate = useNavigate();
   const [authMode, setAuthMode] = useState<AuthMode>(mode);
   const [loading, setLoading] = useState(false);
@@ -78,20 +81,25 @@ function AuthPage() {
   // URL-en og nettleserens tilbake-knapp følger den viste modusen. Resend/confirm
   // er forbigående lokale tilstander uten egen URL.
   const goToMode = (next: "signin" | "signup" | "reset") =>
-    navigate({ to: "/auth", search: { mode: next } });
+    navigate({ to: "/auth", search: { mode: next, returnTo } });
+
+  const finishAuth = useCallback(
+    () => navigate({ href: returnTo ?? "/", replace: true }),
+    [navigate, returnTo],
+  );
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user) navigate({ to: "/", replace: true });
+      if (data.user) finishAuth();
     });
-  }, [navigate]);
+  }, [finishAuth]);
 
   const resolver = useMemo(() => zodResolver(isSignUp ? signUpSchema : signInSchema), [isSignUp]);
 
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     getValues,
     trigger,
@@ -103,8 +111,10 @@ function AuthPage() {
     defaultValues: { displayName: "", email: "", password: "", acceptedTerms: false },
   });
 
-  const password = watch("password") ?? "";
-  const acceptedTerms = watch("acceptedTerms") ?? false;
+  const [password = "", acceptedTerms = false] = useWatch({
+    control,
+    name: ["password", "acceptedTerms"],
+  });
 
   // Feltkrav endres når modusen byttes; fjern gamle feilmeldinger.
   useEffect(() => {
@@ -157,6 +167,7 @@ function AuthPage() {
       return;
     }
     setLoading(true);
+    trackProductEvent("auth_started", { mode: isSignUp ? "signup" : "signin" });
     try {
       if (isSignUp) {
         const { error } = await supabase.auth.signUp({
@@ -173,6 +184,7 @@ function AuthPage() {
           },
         });
         if (error) throw error;
+        trackProductEvent("auth_completed", { mode: "signup" });
         setAuthMode("confirm");
       } else {
         const { error } = await supabase.auth.signInWithPassword({
@@ -181,8 +193,9 @@ function AuthPage() {
           options: { captchaToken: turnstileToken ?? undefined },
         });
         if (error) throw error;
+        trackProductEvent("auth_completed", { mode: "signin" });
         showSuccessToast("Velkommen tilbake!");
-        navigate({ to: "/", replace: true });
+        finishAuth();
       }
     } catch (err: unknown) {
       showErrorToast(formatErrorMessage(err, "Noe gikk galt. Prøv igjen."));

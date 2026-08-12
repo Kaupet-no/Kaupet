@@ -263,6 +263,9 @@ function RootComponent() {
         queryClient.invalidateQueries();
       }
       if (event === "SIGNED_IN") {
+        // Onboarding can grant OS permission before the user signs in. Retry
+        // the account-bound subscription now without showing another prompt.
+        void autoRestoreNativePush();
         // Cancel pending account deletion if the user signs back in
         void (async () => {
           try {

@@ -22,12 +22,12 @@ import {
   wizardStep,
 } from "./pages/listing-wizard";
 
-const { email, password } = JSON.parse(
+const { users } = JSON.parse(
   readFileSync(
     path.join(path.dirname(fileURLToPath(import.meta.url)), ".auth", "user.json"),
     "utf-8",
   ),
-) as { email: string; password: string };
+) as { users: Record<string, { email: string; password: string }> };
 
 // Dedicated e2e-only leaf under "Bil og MC" (see the
 // 20260803090000_e2e_test_vehicle_category.sql and
@@ -50,6 +50,9 @@ const TEST_MODEL = "XC60";
 test("logger inn og publiserer en kjøretøy-annonse (manuell registrering)", async ({
   page,
 }, testInfo) => {
+  const credentials = users[testInfo.project.name];
+  if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);
+  const { email, password } = credentials;
   // Permanent console/pageerror capture is wired up inside login() (see
   // listing-wizard.ts) — originally added here to investigate the silent
   // "Neste"-klikk issue below, moved so both specs get it, including

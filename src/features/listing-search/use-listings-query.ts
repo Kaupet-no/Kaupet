@@ -1,24 +1,18 @@
 import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { z } from "zod";
-
-import { supabase } from "@/integrations/supabase/client";
-import type { Json } from "@/integrations/supabase/types";
-import { resolveCategoryIds, type Category } from "@/lib/categories";
-import { expandBodyTypeSearchValues } from "@/lib/vehicle/body-type-search-expansion";
+import type { Category } from "@/lib/categories";
 import { logSearchQueryEvent } from "@/lib/search-logging.functions";
+import type { ListingsPage } from "@/features/listing-search/search-schema";
 import {
-  decodeAttrFilters,
-  searchSchema,
-  type ListingsPage,
-} from "@/features/listing-search/search-schema";
+  buildListingsSearchRpcArgs,
+  runListingsSearch,
+  type ListingsSearchParams,
+} from "@/features/listing-search/listing-search-query";
 
 const PAGE_SIZE = 20;
 
-type SearchParams = z.infer<typeof searchSchema>;
-
 type UseListingsQueryArgs = {
-  search: SearchParams;
+  search: ListingsSearchParams;
   categories: Pick<Category, "id" | "slug" | "parent_id">[] | undefined;
   effectiveCategories: string[];
   terms: string[];
@@ -49,19 +43,7 @@ export function useListingsQuery({
     enabled: effectiveCategories.length === 0 || !!categories,
     initialPageParam: 0,
     getNextPageParam: (lastPage: ListingsPage) => lastPage.nextOffset ?? undefined,
-    queryFn: async ({ pageParam }): Promise<ListingsPage> => {
-      const extraGroups = search.extraGroups ?? [];
-      const includeGroups = [
-        { mode: search.qMode ?? "all", terms },
-        ...extraGroups.filter((g) => !g.exclude),
-      ].filter((g) => g.terms.length > 0);
-      const excludeAnyTerms = extraGroups
-        .filter((g) => g.exclude && g.mode === "any")
-        .flatMap((g) => g.terms);
-      const excludeAllGroups = extraGroups
-        .filter((g) => g.exclude && g.mode === "all")
-        .map((g) => g.terms)
-        .filter((terms) => terms.length > 0);
+    queryFn: async ({ pageParam, signal }): Promise<ListingsPage> => {
       const emptyPage: ListingsPage = { rows: [], totalCount: 0, nextOffset: null };
 
       // Aggregated, fire-and-forget logging of the free-text query and its
@@ -74,45 +56,16 @@ export function useListingsQuery({
         }
       };
 
-      const categoryIds =
-        effectiveCategories.length > 0 && categories
-          ? (resolveCategoryIds(effectiveCategories, categories) ?? [])
-          : null;
-      if (categoryIds?.length === 0) return emptyPage;
-
-      const attrFilters = decodeAttrFilters(search.attrs);
-      // Widen a "SUV" body_type search to also include "Kombi" — many SUVs
-      // are misclassified as Kombi — without changing what appears checked
-      // in the search UI (URL state stays untouched).
-      const bodyType = attrFilters.body_type;
-      const queryAttrFilters =
-        bodyType?.kind === "multiselect"
-          ? {
-              ...attrFilters,
-              body_type: {
-                kind: "multiselect" as const,
-                values: expandBodyTypeSearchValues(bodyType.values),
-              },
-            }
-          : attrFilters;
-      const { data, error } = await supabase.rpc("search_listings_page", {
-        _include_groups: includeGroups as Json,
-        _exclude_any_terms: excludeAnyTerms.length > 0 ? excludeAnyTerms : null,
-        _exclude_all_groups: excludeAllGroups as Json,
-        _category_ids: categoryIds,
-        _conditions: search.conditions.length > 0 ? search.conditions : null,
-        _include_free: search.includeFree ?? true,
-        _min_price: search.min ?? null,
-        _max_price: search.max ?? null,
-        _attribute_filters: queryAttrFilters as Json,
-        _center_lat: search.lat ?? null,
-        _center_lng: search.lng ?? null,
-        _radius_km: search.radius ?? 10,
-        _sort: search.sort,
-        _limit: PAGE_SIZE,
-        _offset: pageParam,
+      const args = buildListingsSearchRpcArgs({
+        search,
+        categories,
+        effectiveCategories,
+        terms,
+        limit: PAGE_SIZE,
+        offset: pageParam,
       });
-      if (error) throw error;
+      if (!args) return emptyPage;
+      const data = await runListingsSearch(args, signal);
 
       const raw = data ?? [];
       const totalCount = raw[0]?.total_count ?? 0;

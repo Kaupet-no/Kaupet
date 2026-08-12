@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { NativePageHeader } from "@/components/native-page-header";
 import { useMutation } from "@tanstack/react-query";
@@ -29,6 +29,7 @@ function ConfirmPage() {
 
   const attemptsRef = useRef(0);
   const navigatedRef = useRef(false);
+  const [hardFailed, setHardFailed] = useState(false);
 
   const mutation = useMutation({
     mutationFn: () => reconcile({ data: { promotion_id: promoId } }),
@@ -68,7 +69,10 @@ function ConfirmPage() {
         timer = setTimeout(() => void tick(), 2000);
       } catch {
         if (cancelled) return;
-        if (attemptsRef.current >= MAX_ATTEMPTS) return;
+        if (attemptsRef.current >= MAX_ATTEMPTS) {
+          setHardFailed(true);
+          return;
+        }
         timer = setTimeout(() => void tick(), 2000);
       }
     };
@@ -81,8 +85,6 @@ function ConfirmPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [promoId]);
-
-  const hardFailed = mutation.isError && attemptsRef.current >= MAX_ATTEMPTS;
 
   if (hardFailed) {
     return (
@@ -97,6 +99,7 @@ function ConfirmPage() {
             variant="outline"
             onClick={() => {
               attemptsRef.current = 0;
+              setHardFailed(false);
               mutation.reset();
               void router.invalidate();
             }}

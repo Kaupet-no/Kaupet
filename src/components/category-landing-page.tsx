@@ -15,8 +15,6 @@ import {
   SearchSummaryPill,
   countActiveFilters,
 } from "@/features/listing-search/search-panel/search-summary-pill";
-import { buildActiveFilterItems } from "@/features/listing-search/search-panel/active-filter-items";
-import { summarizeCriteria } from "@/lib/saved-searches";
 import { AttributeFilterChips } from "@/components/attribute-filter-chips";
 import { CategoryHero } from "@/components/category-hero";
 import {
@@ -195,8 +193,7 @@ export function CategoryLandingPage({
     handleLocationChange,
     resetFilters,
     advancedInitial,
-    currentCriteria,
-    setLiveValue,
+    applyPanelDraft,
   } = useAnnonserSearchState({
     search: effectiveSearch,
     navigate,
@@ -337,33 +334,14 @@ export function CategoryLandingPage({
     ? {
         q: search.q,
         value: advancedInitial,
-        setValue: setLiveValue,
-        onSubmitText: (q) => {
-          setQDraft(q);
-          updateSearch({ q });
+        onApply: (value, nextAttributes) => {
+          setQDraft(value.terms.join(" "));
+          applyPanelDraft(value, nextAttributes);
         },
-        onSelectCategory: (slug) => navigate({ search: { q: "", category: slug, sort: "new" } }),
-        location,
-        onLocationChange: handleLocationChange,
         attributeFilters: attrFilters,
         attributeValues: attrValues,
-        onAttributeChange: handleAttrValueChange,
         attributeCounts: facetCounts,
         resultCount: totalCount ?? cards.length,
-        activeItems: buildActiveFilterItems({
-          search,
-          terms,
-          onUpdate: (patch) => updateSearch(patch),
-          attrFilters,
-          attrValues,
-          onRemoveAttr: removeAttrWithRestore,
-          location,
-          onRemoveLocation: () =>
-            updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined }),
-        }),
-        onResetAll: resetFilters,
-        criteria: currentCriteria,
-        defaultName: summarizeCriteria(currentCriteria),
       }
     : null;
   useRegisterSearchPanelResults(searchPanelResults);

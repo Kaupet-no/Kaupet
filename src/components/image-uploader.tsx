@@ -188,6 +188,8 @@ export function ImageUploader({
           previewUrl: URL.createObjectURL(file),
         }));
         onChange([...images, ...next]);
+      } catch (error) {
+        showErrorToast(formatErrorMessage(error, "Kunne ikke behandle bildene. Prøv igjen."));
       } finally {
         setProcessing(false);
       }
@@ -286,7 +288,7 @@ export function ImageUploader({
               onClick={async () => {
                 try {
                   const file = await pickNativePhoto();
-                  if (file) addFiles([file]);
+                  if (file) await addFiles([file]);
                 } catch (e: unknown) {
                   showErrorToast(formatErrorMessage(e, "Kunne ikke åpne kameraet"));
                 }

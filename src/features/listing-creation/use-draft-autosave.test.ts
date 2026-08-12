@@ -16,6 +16,15 @@ vi.mock("@/lib/vehicle/vehicle-title", () => ({
   computeVehicleTitle: () => "",
 }));
 
+const loadDraftImagesMock = vi.fn().mockResolvedValue([]);
+const saveDraftImagesMock = vi.fn().mockResolvedValue(undefined);
+const clearDraftImagesMock = vi.fn().mockResolvedValue(undefined);
+vi.mock("./draft-image-store", () => ({
+  loadDraftImages: (...args: unknown[]) => loadDraftImagesMock(...args),
+  saveDraftImages: (...args: unknown[]) => saveDraftImagesMock(...args),
+  clearDraftImages: (...args: unknown[]) => clearDraftImagesMock(...args),
+}));
+
 const DRAFT_KEY = "kaupet_draft_ny_annonse";
 const DRAFT_ID_KEY = "kaupet_draft_id";
 
@@ -34,11 +43,16 @@ const baseFields = {
   coords: null,
   isVehicle: false,
   attributes: {},
+  images: [],
+  setImages: vi.fn(),
 };
 
 beforeEach(() => {
   localStorage.clear();
   saveDraftListingMock.mockReset();
+  loadDraftImagesMock.mockReset().mockResolvedValue([]);
+  saveDraftImagesMock.mockClear();
+  clearDraftImagesMock.mockClear();
 });
 
 afterEach(() => {
@@ -160,7 +174,7 @@ describe("useDraftAutosave", () => {
     expect(localStorage.getItem(DRAFT_ID_KEY)).toBe("keep-me");
   });
 
-  it("restoreDraft applies saved fields onto the form and clears hasDraftData", () => {
+  it("restoreDraft applies saved fields onto the form and clears hasDraftData", async () => {
     localStorage.setItem(
       DRAFT_KEY,
       JSON.stringify({
@@ -177,12 +191,13 @@ describe("useDraftAutosave", () => {
     const setLocationMethod = vi.fn();
     const setAttributes = vi.fn();
 
-    act(() =>
+    await act(() =>
       result.current.restoreDraft({
         setValue,
         setSelectedParentId,
         setLocationMethod,
         setAttributes,
+        setCoords: vi.fn(),
       }),
     );
 
@@ -193,7 +208,7 @@ describe("useDraftAutosave", () => {
     expect(result.current.hasDraftData).toBeNull();
   });
 
-  it("restoreDraft also restores saved attributes", () => {
+  it("restoreDraft also restores saved attributes", async () => {
     localStorage.setItem(
       DRAFT_KEY,
       JSON.stringify({
@@ -209,16 +224,40 @@ describe("useDraftAutosave", () => {
     const setLocationMethod = vi.fn();
     const setAttributes = vi.fn();
 
-    act(() =>
+    await act(() =>
       result.current.restoreDraft({
         setValue,
         setSelectedParentId,
         setLocationMethod,
         setAttributes,
+        setCoords: vi.fn(),
       }),
     );
 
     expect(setAttributes).toHaveBeenCalledWith({ brand: "Volvo", year: 2020 });
+  });
+
+  it("restores locally persisted images with the rest of the draft", async () => {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({ title: "Restored title", saved_at: Date.now() }),
+    );
+    const restored = [{ id: "image-1" }];
+    loadDraftImagesMock.mockResolvedValue(restored);
+    const setImages = vi.fn();
+    const { result } = renderHook(() => useDraftAutosave({ ...baseFields, setImages }));
+
+    await act(() =>
+      result.current.restoreDraft({
+        setValue: vi.fn(),
+        setSelectedParentId: vi.fn(),
+        setLocationMethod: vi.fn(),
+        setAttributes: vi.fn(),
+        setCoords: vi.fn(),
+      }),
+    );
+
+    expect(setImages).toHaveBeenCalledWith(restored);
   });
 
   it("persists attributes into the localStorage draft", () => {

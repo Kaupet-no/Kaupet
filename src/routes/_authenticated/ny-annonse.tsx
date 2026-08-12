@@ -2,7 +2,7 @@
 import { NativePageHeader } from "@/components/native-page-header";
 import { createFileRoute, useNavigate, useBlocker } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
@@ -210,6 +210,7 @@ function NewListingPage() {
     register,
     handleSubmit,
     setValue,
+    control,
     watch,
     trigger,
     formState: { errors, touchedFields },
@@ -233,19 +234,38 @@ function NewListingPage() {
     },
   });
 
-  const isFree = watch("is_free");
-  const canShip = watch("can_ship");
-  const categoryId = watch("category_id");
-  const condition = watch("condition");
-  const postalCode = watch("postal_code");
-  const city = watch("city");
-  const title = watch("title");
-  const subtitle = watch("subtitle");
-  const description = watch("description");
-  const priceNok = watch("price_nok");
-  const knownIssues = watch("known_issues");
-  const noKnownIssues = watch("no_known_issues");
-  const maintenanceHistory = watch("maintenance_history");
+  const [
+    isFree,
+    canShip,
+    categoryId,
+    condition,
+    postalCode,
+    city,
+    title,
+    subtitle,
+    description,
+    priceNok,
+    knownIssues,
+    noKnownIssues,
+    maintenanceHistory,
+  ] = useWatch({
+    control,
+    name: [
+      "is_free",
+      "can_ship",
+      "category_id",
+      "condition",
+      "postal_code",
+      "city",
+      "title",
+      "subtitle",
+      "description",
+      "price_nok",
+      "known_issues",
+      "no_known_issues",
+      "maintenance_history",
+    ],
+  });
 
   const missingFilters = useMemo(
     () =>

@@ -94,6 +94,16 @@
       "count": 1
     }
   },
+  "src/features/listing-creation/field-groups/delivery-location/index.tsx": {
+    "react-hooks/refs": {
+      "count": 1
+    }
+  },
+  "src/features/listing-creation/field-groups/price/index.tsx": {
+    "react-hooks/refs": {
+      "count": 2
+    }
+  },
   "src/features/listing-creation/field-groups/vehicle-confirm/index.tsx": {
     "react-hooks/set-state-in-effect": {
       "count": 1
@@ -115,6 +125,9 @@
     }
   },
   "src/features/listing-edit/editable-field.tsx": {
+    "react-hooks/refs": {
+      "count": 1
+    },
     "react-hooks/set-state-in-effect": {
       "count": 1
     }
@@ -177,6 +190,11 @@
   "src/routes/annonser.tsx": {
     "react-hooks/set-state-in-effect": {
       "count": 3
+    }
+  },
+  "src/routes/auth.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 2
     }
   },
   "src/routes/index.tsx": {

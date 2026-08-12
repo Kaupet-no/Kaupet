@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Eye, EyeOff, Plus, Trash2 } from "lucide-react";
+import { ChevronRight, Eye, EyeOff, Plus, SlidersHorizontal, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { NativeSheet } from "@/components/ui/native-sheet";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { CategoryPicker } from "@/components/advanced-search-sheet";
 import { TermGroupRow } from "@/components/term-group-editor";
 import { FilterChip } from "@/components/filter-chip";
@@ -77,6 +78,7 @@ export function SearchFilterSections({
   activeItems,
 }: Props) {
   const [editingGroup, setEditingGroup] = useState<TermGroup | null>(null);
+  const [categoryOpen, setCategoryOpen] = useState(false);
   // A single container ref + `data-section` attributes instead of one ref
   // callback per section — the compiler flags per-render ref-callback
   // factories as a potential read-during-render, and `querySelector` scoped
@@ -103,6 +105,15 @@ export function SearchFilterSections({
   const locationActive = location.lat != null;
   const hasAttributeFilters =
     attributeFilters != null && attributeValues != null && onAttributeChange != null;
+  const selectedCategories = categories.filter((category) => v.categories.includes(category.slug));
+  const categorySummary =
+    selectedCategories.length === 0
+      ? "Alle kategorier"
+      : selectedCategories.length === 1
+        ? selectedCategories[0].name_nb
+        : `${selectedCategories[0].name_nb} +${selectedCategories.length - 1}`;
+  const advancedFilterCount =
+    Object.keys(attributeValues ?? {}).length + v.extraGroups.length + (v.qMode === "any" ? 1 : 0);
 
   const saveGroup = (group: TermGroup) => {
     if (group.terms.length === 0) {
@@ -155,15 +166,18 @@ export function SearchFilterSections({
           data-section="categories"
           className="scroll-mt-2 space-y-3 rounded-2xl border border-border bg-card p-4"
         >
-          {/* Ingen egen seksjonstittel her — CategoryPicker rendrer selv en
-              "Kategori"-label, og å ha begge rett over hverandre er bare
-              gjentakelse uten merverdi. */}
-          <CategoryPicker
-            categories={categories}
-            selected={v.categories}
-            onChange={(slugs) => setV((prev) => ({ ...prev, categories: slugs, catMode: "any" }))}
-            variant="icons"
-          />
+          <Label className="text-base font-medium">Kategori</Label>
+          <button
+            type="button"
+            onClick={() => setCategoryOpen(true)}
+            className="native-touch-target flex w-full items-center gap-3 rounded-xl bg-muted px-4 py-3 text-left transition active:scale-[0.99]"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-base font-medium">{categorySummary}</span>
+              <span className="block text-sm text-muted-foreground">Velg eller endre kategori</span>
+            </span>
+            <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+          </button>
         </section>
 
         <section
@@ -237,96 +251,112 @@ export function SearchFilterSections({
           )}
         </section>
 
-        <section
-          data-section="attributes"
-          className="mt-4 scroll-mt-2 space-y-3 rounded-2xl border border-border bg-card p-4"
+        <AdvancedFilterSections
+          key={section === "attributes" || section === "search" ? section : "advanced"}
+          defaultOpen={advancedFilterCount > 0 || section === "attributes" || section === "search"}
+          count={advancedFilterCount}
         >
-          <Label className="text-base font-medium">Flere filter</Label>
-          {hasAttributeFilters && v.categories.length > 0 ? (
-            <SecondaryCategoryFilters
-              filters={attributeFilters!}
-              values={attributeValues!}
-              onChange={onAttributeChange!}
-              counts={attributeCounts}
-              isNative
-              includePrimary={includePrimary}
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={() =>
-                listRef.current
-                  ?.querySelector('[data-section="categories"]')
-                  ?.scrollIntoView({ block: "start" })
-              }
-              className="flex min-h-11 w-full items-center rounded-xl border border-dashed border-border bg-card px-4 py-3 text-left text-sm text-muted-foreground"
-            >
-              Velg kategori for å låse opp kategorispesifikke filtre
-            </button>
-          )}
-        </section>
+          <section data-section="attributes" className="scroll-mt-2 space-y-3">
+            <Label className="text-sm font-medium">Kategorifiltre</Label>
+            {hasAttributeFilters && v.categories.length > 0 ? (
+              <SecondaryCategoryFilters
+                filters={attributeFilters!}
+                values={attributeValues!}
+                onChange={onAttributeChange!}
+                counts={attributeCounts}
+                isNative
+                includePrimary={includePrimary}
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setCategoryOpen(true)}
+                className="native-touch-target flex w-full items-center rounded-xl border border-dashed border-border px-4 py-3 text-left text-sm text-muted-foreground"
+              >
+                Velg kategori for å se kategorispesifikke filtre
+              </button>
+            )}
+          </section>
 
-        <section
-          data-section="search"
-          className="mt-4 scroll-mt-2 space-y-3 rounded-2xl border border-border bg-card p-4"
-        >
-          <Label className="text-base font-medium">Flere søkelinjer</Label>
+          <section data-section="search" className="scroll-mt-2 space-y-3 border-t pt-4">
+            <Label className="text-sm font-medium">Flere søkelinjer</Label>
 
-          {v.extraGroups.map((g) => (
+            {v.extraGroups.map((g) => (
+              <button
+                key={g.id}
+                type="button"
+                onClick={() => {
+                  void hapticImpact("light");
+                  setEditingGroup(g);
+                }}
+                className={`flex min-h-11 w-full items-start gap-3 rounded-xl border px-4 py-3 text-left transition active:scale-[0.98] ${
+                  g.exclude ? "border-destructive/40 bg-destructive/5" : "border-border bg-card"
+                }`}
+              >
+                <span
+                  className={`mt-0.5 shrink-0 ${g.exclude ? "text-destructive" : "text-muted-foreground"}`}
+                >
+                  {g.exclude ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span
+                    className={`block text-sm font-medium ${g.exclude ? "text-destructive" : ""}`}
+                  >
+                    {g.exclude ? "Ekskluder" : "Inkluder"} —{" "}
+                    {g.mode === "all" ? "alle ord" : "minst ett ord"}
+                  </span>
+                  <span className="block truncate text-sm text-muted-foreground">
+                    {g.terms.length > 0 ? g.terms.join(", ") : "Ingen ord lagt til"}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeGroup(g.id);
+                  }}
+                  className="native-hit-area shrink-0 rounded-full p-1.5 text-muted-foreground hover:text-foreground"
+                  aria-label="Fjern søkelinje"
+                >
+                  <Trash2 className="size-4" />
+                </button>
+              </button>
+            ))}
+
             <button
-              key={g.id}
               type="button"
               onClick={() => {
                 void hapticImpact("light");
-                setEditingGroup(g);
+                setEditingGroup(emptyTermGroup());
               }}
-              className={`flex min-h-11 w-full items-start gap-3 rounded-xl border px-4 py-3 text-left transition active:scale-[0.98] ${
-                g.exclude ? "border-destructive/40 bg-destructive/5" : "border-border bg-card"
-              }`}
+              className="native-touch-target flex w-full items-center gap-2 rounded-xl border border-dashed border-border px-4 py-3 text-sm text-muted-foreground transition active:scale-[0.98] hover:border-primary hover:text-primary"
             >
-              <span
-                className={`mt-0.5 shrink-0 ${g.exclude ? "text-destructive" : "text-muted-foreground"}`}
-              >
-                {g.exclude ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-              </span>
-              <span className="flex-1 min-w-0">
-                <span
-                  className={`block text-sm font-medium ${g.exclude ? "text-destructive" : ""}`}
-                >
-                  {g.exclude ? "Ekskluder" : "Inkluder"} —{" "}
-                  {g.mode === "all" ? "alle ord" : "minst ett ord"}
-                </span>
-                <span className="block truncate text-sm text-muted-foreground">
-                  {g.terms.length > 0 ? g.terms.join(", ") : "Ingen ord lagt til"}
-                </span>
-              </span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removeGroup(g.id);
-                }}
-                className="native-hit-area shrink-0 rounded-full p-1.5 text-muted-foreground hover:text-foreground"
-                aria-label="Fjern søkelinje"
-              >
-                <Trash2 className="size-4" />
-              </button>
+              <Plus className="size-4" />
+              Legg til søkelinje
             </button>
-          ))}
-
-          <button
-            type="button"
-            onClick={() => {
-              void hapticImpact("light");
-              setEditingGroup(emptyTermGroup());
-            }}
-            className="flex min-h-11 w-full items-center gap-2 rounded-xl border border-dashed border-border bg-card px-4 py-3 text-sm text-muted-foreground transition active:scale-[0.98] hover:border-primary hover:text-primary"
-          >
-            <Plus className="size-4" />
-            Legg til søkelinje
-          </button>
-        </section>
+          </section>
+        </AdvancedFilterSections>
       </div>
+
+      <NativeSheet
+        open={categoryOpen}
+        onOpenChange={setCategoryOpen}
+        title="Velg kategori"
+        titleVisible
+        className="h-[85vh] overflow-y-auto"
+      >
+        <div className="mt-4">
+          <CategoryPicker
+            categories={categories}
+            selected={v.categories}
+            onChange={(slugs) => setV((prev) => ({ ...prev, categories: slugs, catMode: "any" }))}
+            variant="icons"
+          />
+        </div>
+        <Button type="button" className="mt-6 w-full" onClick={() => setCategoryOpen(false)}>
+          Ferdig
+        </Button>
+      </NativeSheet>
 
       {/* Term group sheet — its own Radix Dialog, stacks above the panel since
           it only mounts (and portals) once the user opens it */}
@@ -336,6 +366,37 @@ export function SearchFilterSections({
         onSave={saveGroup}
       />
     </>
+  );
+}
+
+function AdvancedFilterSections({
+  defaultOpen,
+  count,
+  children,
+}: {
+  defaultOpen: boolean;
+  count: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <Collapsible
+      defaultOpen={defaultOpen}
+      className="mt-4 rounded-2xl border border-border bg-card"
+    >
+      <CollapsibleTrigger className="group native-touch-target flex w-full items-center gap-3 px-4 py-3 text-left">
+        <SlidersHorizontal className="size-5 shrink-0 text-primary" aria-hidden />
+        <span className="flex-1 text-base font-medium">Flere filtre</span>
+        {count > 0 && (
+          <span className="flex size-6 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+            {count}
+          </span>
+        )}
+        <ChevronRight className="size-5 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="space-y-4 border-t border-border px-4 py-4">
+        {children}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 

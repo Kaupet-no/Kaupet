@@ -273,21 +273,35 @@ export function SearchPanel({
                 filter-panelmodus (over /annonser) har resultatflaten sitt
                 eget søkefelt allerede, så dette ville konkurrert med det. */}
               {results ? (
-                draftItems.length > 0 && (
-                  <div className="flex items-center justify-end px-4 pb-3 pt-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void hapticImpact("light");
-                        setDraft(defaultAdvancedSearchValue());
-                        setDraftAttributes({});
-                        setQ("");
-                      }}
-                      className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-                    >
-                      <RotateCcw className="size-3.5" />
-                      Nullstill
-                    </button>
+                (draftItems.length > 0 || user) && (
+                  <div className="flex items-center justify-between gap-2 px-4 pb-3 pt-3">
+                    {user ? (
+                      <button
+                        type="button"
+                        onClick={() => setSaveOpen(true)}
+                        className="native-touch-target flex items-center gap-1.5 rounded-full px-3 text-sm font-medium text-primary hover:bg-muted"
+                      >
+                        <Save className="size-4" />
+                        Lagre søk
+                      </button>
+                    ) : (
+                      <span />
+                    )}
+                    {draftItems.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void hapticImpact("light");
+                          setDraft(defaultAdvancedSearchValue());
+                          setDraftAttributes({});
+                          setQ("");
+                        }}
+                        className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                      >
+                        <RotateCcw className="size-3.5" />
+                        Nullstill
+                      </button>
+                    )}
                   </div>
                 )
               ) : (
@@ -371,18 +385,7 @@ export function SearchPanel({
                 />
               )}
               {results && (
-                <div className="flex shrink-0 gap-2 border-t border-border bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-                  {user && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="lg"
-                      onClick={() => setSaveOpen(true)}
-                      className="gap-2"
-                    >
-                      <Save className="size-4" /> Lagre
-                    </Button>
-                  )}
+                <div className="shrink-0 border-t border-border bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                   <Button
                     type="button"
                     size="lg"
@@ -394,9 +397,14 @@ export function SearchPanel({
                       });
                       close();
                     }}
-                    className="flex-1 gap-2"
+                    className="h-14 w-full gap-2 rounded-xl text-base"
                   >
-                    <SearchIcon className="size-4" /> Bruk filtre
+                    <SearchIcon className="size-4" />
+                    {results.resultCount == null
+                      ? "Vis annonser"
+                      : results.resultCount === 1
+                        ? "Vis 1 annonse"
+                        : `Vis ${results.resultCount.toLocaleString("nb-NO")} annonser`}
                   </Button>
                 </div>
               )}

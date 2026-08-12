@@ -59,6 +59,33 @@ export default defineConfig(({ command, mode }) => {
 
   return {
     define: envDefine,
+    build: {
+      rolldownOptions: {
+        output: {
+          // Keep large third-party packages out of the application entry
+          // without grouping application modules into a circular initial chunk.
+          codeSplitting: {
+            maxSize: 450 * 1024,
+            groups: [
+              {
+                name: "lucide-icons",
+                test: /node_modules[\\/]lucide-react/,
+                includeDependenciesRecursively: false,
+                maxSize: 450 * 1024,
+                priority: 20,
+              },
+              {
+                name: "tanstack-router",
+                test: /node_modules[\\/]@tanstack[\\/](?:react-router|router-core|history)/,
+                includeDependenciesRecursively: false,
+                maxSize: 450 * 1024,
+                priority: 15,
+              },
+            ],
+          },
+        },
+      },
+    },
     // Vite uses PostCSS in dev and only runs Lightning CSS at build time;
     // running it in both keeps the dev preview consistent with the built
     // output (e.g. -webkit-backdrop-filter prefixing isn't dropped silently).

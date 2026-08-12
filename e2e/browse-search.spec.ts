@@ -12,8 +12,9 @@ test("søker fra forsiden og lander på annonser-siden med treff", async ({ page
   await page.goto("/");
   await page.locator("html[data-kaupet-hydrated='true']").waitFor();
 
-  await page.getByLabel("Søk i annonser").fill("sykkel");
-  await page.getByRole("button", { name: "Søk", exact: true }).click();
+  const main = page.getByRole("main");
+  await main.getByRole("textbox", { name: "Søk i annonser" }).fill("sykkel");
+  await main.getByRole("button", { name: "Søk", exact: true }).click();
   await expect(page).toHaveURL(/\/annonser\?/);
 
   await expect(page.getByPlaceholder("Hva leter du etter?")).toHaveValue("sykkel");

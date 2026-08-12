@@ -28,10 +28,10 @@ test("holder filter som utkast frem til brukeren anvender dem", async ({ page })
   await expectNativeTouchTarget(page.getByRole("button", { name: "Helt ny" }));
 
   await expect(page.getByRole("button", { name: /Alle kategorier/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Elektronikk" })).not.toBeVisible();
+  await expect(page.getByRole("button", { name: "Bil og MC" })).not.toBeVisible();
   await page.getByRole("button", { name: /Alle kategorier/ }).click();
   await expect(page.getByRole("heading", { name: "Velg kategori" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Elektronikk" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Bil og MC" })).toBeVisible();
   await page.getByRole("button", { name: "Ferdig" }).click();
 
   await expect(page.getByRole("button", { name: /Flere filtre/ })).toBeVisible();

@@ -23,7 +23,6 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
 -- PostgreSQL database dump
 --
 
-\restrict UeQbsD1DttdUoaFAQg5euKsMGKEZJ9M10ukV4CvbGctqqmtprW4B9tg4lx0bfJQ
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -6720,7 +6719,6 @@ ALTER TABLE public.wtb_listings ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict UeQbsD1DttdUoaFAQg5euKsMGKEZJ9M10ukV4CvbGctqqmtprW4B9tg4lx0bfJQ
 
 
 -- Non-public objects created by migrations that pg_dump --schema=public

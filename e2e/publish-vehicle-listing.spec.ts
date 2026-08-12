@@ -54,7 +54,7 @@ test("logger inn og publiserer en kjøretøy-annonse (manuell registrering)", as
   // listing-wizard.ts) — originally added here to investigate the silent
   // "Neste"-klikk issue below, moved so both specs get it, including
   // publish-listing.spec.ts's own unrelated, never-reproduced login flake.
-  await login(page, email, password, testInfo);
+  await login(page, email, password);
   await goToNewListing(page);
 
   // Top-level category-select step: "Bil og MC" is directly selectable

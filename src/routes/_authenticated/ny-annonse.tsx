@@ -42,7 +42,7 @@ import { VEHICLE_LEAF_SLUGS_WITHOUT_MILEAGE } from "@/lib/vehicle/vehicle-classi
 import {
   VEHICLE_LOOKUP_FILTER_KEYS,
   VEHICLE_WIZARD_MANAGED_KEYS,
-} from "@/lib/vehicle/vehicle-lookup.server";
+} from "@/lib/vehicle/vehicle-lookup.types";
 import type { VehicleLeafSlug } from "@/lib/vehicle/vehicle-classification";
 
 import { useIsDemo } from "@/hooks/use-is-demo";

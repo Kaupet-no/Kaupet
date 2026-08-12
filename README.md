@@ -60,7 +60,7 @@ VITE_SUPABASE_PROJECT_ID=...
 
 ## Teknologi
 
-- [TanStack Start](https://tanstack.com/start) (React 19, SSR) + Vite 7
+- [TanStack Start](https://tanstack.com/start) (React 19, SSR) + Vite 8
 - [Tailwind CSS v4](https://tailwindcss.com)
 - [shadcn/ui](https://ui.shadcn.com) komponenter
 - [Supabase](https://supabase.com) — database, auth, storage

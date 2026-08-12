@@ -8,3 +8,7 @@ bun.lock
 routeTree.gen.ts
 src/routeTree.gen.ts
 src/integrations/supabase/types.ts
+android/app/src/main/assets/
+android/capacitor-cordova-android-plugins/build/
+ios/App/App/capacitor.config.json
+ios/App/App/public/

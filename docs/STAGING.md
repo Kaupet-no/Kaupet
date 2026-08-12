@@ -13,14 +13,10 @@ Produksjon (`main`) er uberørt av dette — `deploy`-jobben der bruker fortsatt
 ## Testing
 
 - `bun run test` — kjører unittester (Vitest). Inngår i CI.
-- `bun run test:e2e` — kjører Playwright-e2e-tester. Starter selv en lokal dev-server mot Supabase-prosjektet i din `.env` (krever `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`, samme variabler som resten av appen bruker server-side, for å opprette en bekreftet testbruker). Kjører automatisk i CI på PR mot `main` (i tillegg til manuell `workflow_dispatch`) via `e2e`-jobben i `ci.yml`, mot staging-Supabase-prosjektet. Jobben bruker `secrets.SUPABASE_SERVICE_ROLE_KEY` fra GitHub Environment `staging`.
+- `bun run test:e2e` — kjører Playwright-e2e-tester. Starter selv en lokal dev-server mot Supabase-prosjektet i din `.env` (krever `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`, samme variabler som resten av appen bruker server-side, for å opprette en bekreftet testbruker). I CI startes en isolert lokal Supabase-stack og `.env` genereres med `bun run env:local`; E2E berører derfor ikke delt staging-data eller eksterne secrets.
 - `bun run test:rls` — kjører RLS-integrasjonstester mot en lokal Supabase-stack. Krever Docker:
   ```bash
   supabase start
-  supabase status   # gir API URL, anon key og service_role key
-  LOCAL_SUPABASE_URL=http://127.0.0.1:54321 \
-  LOCAL_SUPABASE_ANON_KEY=... \
-  LOCAL_SUPABASE_SERVICE_ROLE_KEY=... \
-  bun run test:rls
+  bun run test:rls  # leser lokale nøkler automatisk fra `supabase status`
   ```
   `src/lib/rls.integration.test.ts` dekker ~35 RLS-aktiverte tabeller/scenarioer (96 tester) — bruk samme mønster (service-role-oppsett, flere innloggede klienter, verifiser hvem som kan/ikke kan se og endre hva) for å utvide dekningen videre.

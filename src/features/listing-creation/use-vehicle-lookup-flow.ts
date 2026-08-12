@@ -15,7 +15,7 @@ import type {
   AvgiftskodeGruppe,
   VehicleClassification,
 } from "@/lib/vehicle/vehicle-classification";
-import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.server";
+import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.types";
 import type { AttributeMap } from "@/components/attribute-fields";
 
 type VehicleSpecOverrides = Partial<{

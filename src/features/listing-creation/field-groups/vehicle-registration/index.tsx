@@ -1,7 +1,7 @@
 ﻿import { Label } from "@/components/ui/label";
 import { CategoryPicker } from "@/components/category-picker";
 import { AttributeFields } from "@/components/attribute-fields";
-import { VEHICLE_WIZARD_MANAGED_KEYS } from "@/lib/vehicle/vehicle-lookup.server";
+import { VEHICLE_WIZARD_MANAGED_KEYS } from "@/lib/vehicle/vehicle-lookup.types";
 
 import type { WizardSharedProps } from "../types";
 import { RequiredMark } from "../required-mark";

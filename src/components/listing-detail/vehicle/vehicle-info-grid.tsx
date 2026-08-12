@@ -11,7 +11,7 @@
   Palette,
 } from "lucide-react";
 
-import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.server";
+import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.types";
 import { DRIVE_TYPE_LABEL_NB, FUEL_LABEL_NB, TRANSMISSION_LABEL_NB } from "./vehicle-labels";
 
 function formatMileage(mileageKm: number): string {

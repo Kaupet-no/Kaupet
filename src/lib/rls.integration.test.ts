@@ -23,6 +23,16 @@ const SERVICE_ROLE_KEY = process.env.LOCAL_SUPABASE_SERVICE_ROLE_KEY;
 const canRun = Boolean(URL && ANON_KEY && SERVICE_ROLE_KEY);
 const PASSWORD = "test-password-12345";
 
+async function createTestCategory(admin: SupabaseClient, suffix: number | string) {
+  const { data, error } = await admin
+    .from("categories")
+    .insert({ slug: `rls-category-${suffix}`, name_nb: "RLS testkategori" })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data.id;
+}
+
 /** With ~14 test groups each signing in 2-4 users, a full run does 60+
  * password sign-ins in well under a minute — enough to trip Supabase auth's
  * per-project rate limit on staging. Retries with backoff on a rate-limit
@@ -253,6 +263,7 @@ describe.skipIf(!canRun)(
     const userIds: string[] = [];
     let sellerId: string;
     let listingId: string;
+    let categoryId: string;
 
     async function signIn(email: string) {
       return signInWithRetry(email);
@@ -268,12 +279,7 @@ describe.skipIf(!canRun)(
       sellerId = userData.user!.id;
       userIds.push(sellerId);
 
-      const { data: category, error: catErr } = await admin
-        .from("categories")
-        .select("id")
-        .limit(1)
-        .single();
-      if (catErr) throw catErr;
+      categoryId = await createTestCategory(admin, `delete-${suffix}`);
 
       const { data: listing, error: listingErr } = await admin
         .from("listings")
@@ -282,7 +288,7 @@ describe.skipIf(!canRun)(
           title: "RLS delete-regression annonse med ord",
           price_nok: 100,
           status: "active",
-          category_id: category.id,
+          category_id: categoryId,
         })
         .select("id")
         .single();
@@ -293,6 +299,7 @@ describe.skipIf(!canRun)(
     afterAll(async () => {
       if (!canRun) return;
       await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+      await admin.from("categories").delete().eq("id", categoryId);
     });
 
     it("lets the owner delete their own active, categorized listing without a trigger permission/RLS error", async () => {
@@ -2354,7 +2361,7 @@ describe.skipIf(!canRun)(
         .from("listing_360_capture_sessions")
         .insert({
           listing_id: listing.id,
-          token: `rls-test-token-${suffix}`,
+          token: `rls-test-token-${suffix}-long-enough`,
           created_by: userId,
           expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
         })
@@ -2582,13 +2589,7 @@ describe.skipIf(!canRun)(
       if (error) throw error;
       userIds.push(data.user!.id);
 
-      const { data: category, error: catErr } = await admin
-        .from("categories")
-        .select("id")
-        .limit(1)
-        .single();
-      if (catErr) throw catErr;
-      categoryId = category.id;
+      categoryId = await createTestCategory(admin, `wordstats-${suffix}`);
 
       const { error: wordErr } = await admin
         .from("listing_category_word_stats")
@@ -2613,6 +2614,7 @@ describe.skipIf(!canRun)(
         .delete()
         .eq("word", lexeme)
         .eq("category_id", categoryId);
+      await admin.from("categories").delete().eq("id", categoryId);
       await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
     });
 
@@ -2732,17 +2734,12 @@ describe.skipIf(!canRun)(
       await mkUser(emails.other);
       await grantAdmin(admin, adminId);
 
-      const { data: category, error } = await admin
-        .from("categories")
-        .select("id")
-        .limit(1)
-        .single();
-      if (error) throw error;
-      categoryId = category.id;
+      categoryId = await createTestCategory(admin, `taxonomy-${suffix}`);
     });
 
     afterAll(async () => {
       if (!canRun) return;
+      await admin.from("categories").delete().eq("id", categoryId);
       await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
     });
 
@@ -2817,6 +2814,7 @@ describe.skipIf(!canRun)(
     };
     const userIds: string[] = [];
     let originalDefaultSearchExamples: string[];
+    let createdSiteSettings = false;
 
     async function signIn(email: string) {
       return signInWithRetry(email);
@@ -2845,17 +2843,30 @@ describe.skipIf(!canRun)(
         .from("site_settings")
         .select("default_search_examples")
         .eq("id", true)
-        .single();
+        .maybeSingle();
       if (currentErr) throw currentErr;
-      originalDefaultSearchExamples = current.default_search_examples;
+      if (current) {
+        originalDefaultSearchExamples = current.default_search_examples;
+      } else {
+        originalDefaultSearchExamples = [];
+        const { error: insertErr } = await admin
+          .from("site_settings")
+          .insert({ id: true, default_search_examples: [] });
+        if (insertErr) throw insertErr;
+        createdSiteSettings = true;
+      }
     });
 
     afterAll(async () => {
       if (!canRun) return;
-      await admin
-        .from("site_settings")
-        .update({ default_search_examples: originalDefaultSearchExamples })
-        .eq("id", true);
+      if (createdSiteSettings) {
+        await admin.from("site_settings").delete().eq("id", true);
+      } else {
+        await admin
+          .from("site_settings")
+          .update({ default_search_examples: originalDefaultSearchExamples })
+          .eq("id", true);
+      }
       await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
     });
 
@@ -2928,6 +2939,113 @@ describe.skipIf(!canRun)(
     });
   },
 );
+
+describe.skipIf(!canRun)("Search RPC: filters and paginates in the database", () => {
+  const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+  const suffix = Date.now();
+  const userIds: string[] = [];
+  let categoryId: string;
+  const listingIds: string[] = [];
+
+  beforeAll(async () => {
+    const { data: user, error: userError } = await admin.auth.admin.createUser({
+      email: `rls-search-page-${suffix}@example.com`,
+      password: PASSWORD,
+      email_confirm: true,
+    });
+    if (userError) throw userError;
+    userIds.push(user.user!.id);
+    categoryId = await createTestCategory(admin, `search-page-${suffix}`);
+
+    const { data, error } = await admin
+      .from("listings")
+      .insert([
+        {
+          seller_id: user.user!.id,
+          category_id: categoryId,
+          title: "Volvo rimelig testbil",
+          price_nok: 100_000,
+          status: "active",
+          condition: "good",
+          lat: 59.91,
+          lng: 10.75,
+          attributes: { horsepower: 120 },
+        },
+        {
+          seller_id: user.user!.id,
+          category_id: categoryId,
+          title: "Volvo kraftig testbil",
+          price_nok: 200_000,
+          status: "active",
+          condition: "good",
+          lat: 59.92,
+          lng: 10.76,
+          attributes: { horsepower: 220 },
+        },
+        {
+          seller_id: user.user!.id,
+          category_id: categoryId,
+          title: "Toyota utenfor søket",
+          price_nok: 50_000,
+          status: "active",
+          condition: "good",
+          lat: 59.91,
+          lng: 10.75,
+          attributes: { horsepower: 90 },
+        },
+      ])
+      .select("id");
+    if (error) throw error;
+    listingIds.push(...data.map((listing) => listing.id));
+  });
+
+  afterAll(async () => {
+    if (!canRun) return;
+    await admin.from("listings").delete().in("id", listingIds);
+    await admin.from("categories").delete().eq("id", categoryId);
+    await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+  });
+
+  it("returns bounded pages with the total count after text, category and radius filtering", async () => {
+    const anon = createClient(URL!, ANON_KEY!);
+    const args = {
+      _include_groups: [{ mode: "all", terms: ["Volvo"] }],
+      _category_ids: [categoryId],
+      _conditions: ["good" as const],
+      _include_free: false,
+      _attribute_filters: {},
+      _center_lat: 59.91,
+      _center_lng: 10.75,
+      _radius_km: 10,
+      _sort: "price_asc",
+      _limit: 1,
+    };
+
+    const first = await anon.rpc("search_listings_page", { ...args, _offset: 0 });
+    expect(first.error).toBeNull();
+    expect(first.data).toHaveLength(1);
+    expect(first.data?.[0]?.price_nok).toBe(100_000);
+    expect(first.data?.[0]?.total_count).toBe(2);
+
+    const second = await anon.rpc("search_listings_page", { ...args, _offset: 1 });
+    expect(second.error).toBeNull();
+    expect(second.data).toHaveLength(1);
+    expect(second.data?.[0]?.price_nok).toBe(200_000);
+  });
+
+  it("applies numeric JSON attribute ranges before pagination", async () => {
+    const anon = createClient(URL!, ANON_KEY!);
+    const { data, error } = await anon.rpc("search_listings_page", {
+      _include_groups: [{ mode: "all", terms: ["Volvo"] }],
+      _category_ids: [categoryId],
+      _attribute_filters: { horsepower: { kind: "range", min: 200 } },
+      _sort: "new",
+    });
+    expect(error).toBeNull();
+    expect(data).toHaveLength(1);
+    expect(data?.[0]?.price_nok).toBe(200_000);
+  });
+});
 
 describe.skipIf(!canRun)("RLS: error_log / push_dispatch_failures are fully server-only", () => {
   const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;

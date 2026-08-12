@@ -1,4 +1,4 @@
-import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.server";
+import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.types";
 
 /** `attributes.vehicle_lookup` is stored as a JSON string (see
  * `use-vehicle-lookup-flow.ts`'s `JSON.stringify(lookup)`), not an object —

@@ -1805,6 +1805,54 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      consume_vehicle_360_upload_slot: {
+        Args: { _ip_hash: string; _token: string }
+        Returns: string | null
+      }
+      log_search_query_rate_limited: {
+        Args: { _key_hash: string; _query: string; _result_count: number }
+        Returns: undefined
+      }
+      listing_matches_attribute_filters: {
+        Args: { _attributes: Json; _filters: Json }
+        Returns: boolean
+      }
+      search_listings_page: {
+        Args: {
+          _attribute_filters?: Json
+          _category_ids?: string[] | null
+          _center_lat?: number | null
+          _center_lng?: number | null
+          _conditions?: Database["public"]["Enums"]["listing_condition"][] | null
+          _exclude_all_groups?: Json
+          _exclude_any_terms?: string[] | null
+          _include_free?: boolean
+          _include_groups?: Json
+          _limit?: number
+          _max_price?: number | null
+          _min_price?: number | null
+          _offset?: number
+          _radius_km?: number
+          _sort?: string
+        }
+        Returns: {
+          attributes: Json
+          category_slug: string | null
+          city: string | null
+          cover_path: string | null
+          created_at: string
+          display_lat: number | null
+          display_lng: number | null
+          id: string
+          is_free: boolean
+          kaupet_code: string
+          price_nok: number | null
+          relevance: number
+          subtitle: string | null
+          title: string
+          total_count: number
+        }[]
+      }
       admin_approve_vehicle_brand: { Args: { _id: string }; Returns: undefined }
       admin_approve_vehicle_model: { Args: { _id: string }; Returns: undefined }
       admin_approve_vehicle_model_class: {
@@ -2271,10 +2319,6 @@ export type Database = {
       }
       log_listing_view: {
         Args: { _listing_id: string; _visitor_key: string }
-        Returns: undefined
-      }
-      log_search_query: {
-        Args: { _query: string; _result_count: number }
         Returns: undefined
       }
       match_listing_to_saved_searches: {

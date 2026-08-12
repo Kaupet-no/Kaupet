@@ -38,6 +38,7 @@ import {
   Layers,
   Lightbulb,
   type LucideIcon,
+  type LucideProps,
   Milk,
   Mountain,
   MountainSnow,
@@ -82,6 +83,7 @@ import {
   createLucideIcon,
   icons as LUCIDE_ICONS,
 } from "lucide-react";
+import { createElement } from "react";
 
 // Lucide har verken en dressjakke eller en kjole, så disse to er bygget for
 // hånd — som strøk-ikoner i nøyaktig samme stil som resten av settet (samme
@@ -255,4 +257,11 @@ export function getCategoryIcon(iconName: string | null | undefined): LucideIcon
   return (
     CATEGORY_ICON_MAP[iconName] ?? (LUCIDE_ICONS as Record<string, LucideIcon>)[iconName] ?? Package
   );
+}
+
+export function CategoryIcon({
+  iconName,
+  ...props
+}: LucideProps & { iconName: string | null | undefined }) {
+  return createElement(getCategoryIcon(iconName), props);
 }

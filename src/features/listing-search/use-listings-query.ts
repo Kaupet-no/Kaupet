@@ -1,11 +1,12 @@
 import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { resolveCategoryIds, type Category } from "@/lib/categories";
-import { applyAttributeFilters } from "@/lib/category-filters";
 import { expandBodyTypeSearchValues } from "@/lib/vehicle/body-type-search-expansion";
+import { logSearchQueryEvent } from "@/lib/search-logging.functions";
 import {
   decodeAttrFilters,
   searchSchema,
@@ -14,22 +15,6 @@ import {
 
 const PAGE_SIZE = 20;
 
-type SelectedListingRow = {
-  id: string;
-  kaupet_code: string;
-  title: string;
-  subtitle: string | null;
-  price_nok: number | null;
-  is_free: boolean;
-  city: string | null;
-  display_lat: number | null;
-  display_lng: number | null;
-  created_at: string;
-  listing_images: { storage_path: string; sort_order: number }[] | null;
-  attributes: Json;
-  categories: { slug: string } | { slug: string }[] | null;
-};
-
 type SearchParams = z.infer<typeof searchSchema>;
 
 type UseListingsQueryArgs = {
@@ -37,34 +22,31 @@ type UseListingsQueryArgs = {
   categories: Pick<Category, "id" | "slug" | "parent_id">[] | undefined;
   effectiveCategories: string[];
   terms: string[];
-  radiusIds: string[] | undefined;
 };
 
 /**
  * Encapsulates the /annonser listings search: the infinite-scroll Supabase
- * query, category/price/condition filters, and — when there's a text query
- * or extra search lines — the `search_listing_ids` RPC, which resolves
- * matching ids and relevance rank against `listings.search_vector` (a
- * Postgres full-text index) instead of ILIKE scans.
+ * query and all text/category/radius/attribute filters. The database RPC
+ * applies the filters and pagination together, so the browser only receives
+ * one result page rather than transporting large intermediate ID lists.
  */
 export function useListingsQuery({
   search,
   categories,
   effectiveCategories,
   terms,
-  radiusIds,
 }: UseListingsQueryArgs) {
+  const logSearchQuery = useServerFn(logSearchQueryEvent);
+
   return useInfiniteQuery({
-    queryKey: ["listings", search, radiusIds, effectiveCategories, terms],
+    queryKey: ["listings", search, effectiveCategories, terms],
     // Uten dette blankes `totalCount`/listen momentant ved hvert filterbytte
     // (attrs/pris/tilstand går rett til URL, så hvert trykk er en ny
     // queryKey) — søkepanelets "Vis X treff" ville da blinket tomt mens nytt
     // svar hentes i stedet for å oppdateres live. Behold forrige svar til
     // det nye er klart.
     placeholderData: keepPreviousData,
-    enabled:
-      (effectiveCategories.length === 0 || !!categories) &&
-      (search.lat == null || search.lng == null || radiusIds != null),
+    enabled: effectiveCategories.length === 0 || !!categories,
     initialPageParam: 0,
     getNextPageParam: (lastPage: ListingsPage) => lastPage.nextOffset ?? undefined,
     queryFn: async ({ pageParam }): Promise<ListingsPage> => {
@@ -80,8 +62,6 @@ export function useListingsQuery({
         .filter((g) => g.exclude && g.mode === "all")
         .map((g) => g.terms)
         .filter((terms) => terms.length > 0);
-      const hasSearch =
-        includeGroups.length > 0 || excludeAnyTerms.length > 0 || excludeAllGroups.length > 0;
       const emptyPage: ListingsPage = { rows: [], totalCount: 0, nextOffset: null };
 
       // Aggregated, fire-and-forget logging of the free-text query and its
@@ -90,57 +70,16 @@ export function useListingsQuery({
       const rawQuery = (search.q ?? "").trim();
       const logSearch = (resultCount: number) => {
         if (pageParam === 0 && rawQuery) {
-          void supabase.rpc("log_search_query", { _query: rawQuery, _result_count: resultCount });
+          void logSearchQuery({ data: { query: rawQuery, resultCount } });
         }
       };
 
-      // Rank of matching ids, keyed by id — used to sort by relevance and to
-      // constrain the main query to matching rows. Resolved server-side via
-      // the listings.search_vector GIN index instead of ILIKE scans.
-      let searchRank: Map<string, number> | null = null;
-      if (hasSearch) {
-        const { data: matches, error: searchError } = await supabase.rpc("search_listing_ids", {
-          include_groups: includeGroups,
-          exclude_any_terms: excludeAnyTerms.length > 0 ? excludeAnyTerms : undefined,
-          exclude_all_groups: excludeAllGroups,
-        });
-        if (searchError) throw searchError;
-        if (!matches || matches.length === 0) {
-          logSearch(0);
-          return emptyPage;
-        }
-        searchRank = new Map(matches.map((m) => [m.id, m.rank]));
-      }
+      const categoryIds =
+        effectiveCategories.length > 0 && categories
+          ? (resolveCategoryIds(effectiveCategories, categories) ?? [])
+          : null;
+      if (categoryIds?.length === 0) return emptyPage;
 
-      let qb = supabase
-        .from("listings")
-        .select(
-          "id, kaupet_code, title, subtitle, description, price_nok, is_free, city, display_lat, display_lng, created_at, listing_images(storage_path, sort_order), attributes, categories(slug)",
-          { count: pageParam === 0 ? "exact" : undefined },
-        )
-        .eq("status", "active");
-
-      if (searchRank) qb = qb.in("id", Array.from(searchRank.keys()));
-
-      if (search.lat != null && search.lng != null) {
-        const ids = radiusIds ?? [];
-        if (ids.length === 0) return emptyPage;
-        qb = qb.in("id", ids);
-      }
-
-      // Categories — single selection; if a parent is chosen, include all children
-      if (effectiveCategories.length > 0 && categories) {
-        const ids = resolveCategoryIds(effectiveCategories, categories) ?? [];
-        if (ids.length === 0) return emptyPage;
-        qb = qb.in("category_id", ids);
-      }
-
-      // Conditions
-      if (search.conditions && search.conditions.length > 0) {
-        qb = qb.in("condition", search.conditions);
-      }
-
-      // Category-specific attribute filters (e.g. Bil's "hestekrefter")
       const attrFilters = decodeAttrFilters(search.attrs);
       // Widen a "SUV" body_type search to also include "Kombi" — many SUVs
       // are misclassified as Kombi — without changing what appears checked
@@ -156,32 +95,31 @@ export function useListingsQuery({
               },
             }
           : attrFilters;
-      qb = applyAttributeFilters(qb, queryAttrFilters);
+      const { data, error } = await supabase.rpc("search_listings_page", {
+        _include_groups: includeGroups as Json,
+        _exclude_any_terms: excludeAnyTerms.length > 0 ? excludeAnyTerms : null,
+        _exclude_all_groups: excludeAllGroups as Json,
+        _category_ids: categoryIds,
+        _conditions: search.conditions.length > 0 ? search.conditions : null,
+        _include_free: search.includeFree ?? true,
+        _min_price: search.min ?? null,
+        _max_price: search.max ?? null,
+        _attribute_filters: queryAttrFilters as Json,
+        _center_lat: search.lat ?? null,
+        _center_lng: search.lng ?? null,
+        _radius_km: search.radius ?? 10,
+        _sort: search.sort,
+        _limit: PAGE_SIZE,
+        _offset: pageParam,
+      });
+      if (error) throw error;
 
-      // Price
-      const includeFree = search.includeFree ?? true;
-      if (!includeFree) qb = qb.eq("is_free", false);
-      if (typeof search.min === "number") {
-        if (includeFree) {
-          qb = qb.or(`is_free.eq.true,price_nok.gte.${search.min}`);
-        } else {
-          qb = qb.gte("price_nok", search.min);
-        }
-      }
-      if (typeof search.max === "number") {
-        if (includeFree) {
-          qb = qb.or(`is_free.eq.true,price_nok.lte.${search.max}`);
-        } else {
-          qb = qb.lte("price_nok", search.max);
-        }
-      }
-
-      const mapRow = (l: SelectedListingRow) => {
-        const imgs = (l.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
+      const raw = data ?? [];
+      const totalCount = raw[0]?.total_count ?? 0;
+      const rows = raw.map((l) => {
         const attrs = l.attributes as Record<string, unknown> | null;
         const mileageRaw = attrs?.mileage_km;
         const engineHoursRaw = attrs?.engine_hours;
-        const category = Array.isArray(l.categories) ? l.categories[0] : l.categories;
         return {
           id: l.id,
           kaupet_code: l.kaupet_code,
@@ -193,51 +131,18 @@ export function useListingsQuery({
           lat: l.display_lat as number | null,
           lng: l.display_lng as number | null,
           created_at: l.created_at,
-          cover_path: imgs[0]?.storage_path ?? null,
+          cover_path: l.cover_path,
           mileage_km: typeof mileageRaw === "number" ? mileageRaw : null,
           engine_hours: typeof engineHoursRaw === "number" ? engineHoursRaw : null,
-          category_slug: category?.slug ?? null,
+          category_slug: l.category_slug,
           attributes: attrs,
         };
-      };
-
-      // Relevance sort can't be expressed as a DB ORDER BY (rank lives only
-      // in the RPC result, not a table column), so we paginate over the
-      // rank-sorted id list ourselves and re-sort the fetched rows to match.
-      if (search.sort === "relevance" && searchRank) {
-        const rankedIds = Array.from(searchRank.keys());
-        const pageIds = rankedIds.slice(pageParam, pageParam + PAGE_SIZE);
-        if (pageIds.length === 0) return emptyPage;
-        const { data, error } = await qb.in("id", pageIds);
-        if (error) throw error;
-        const byId = new Map((data ?? []).map((l) => [l.id, l]));
-        const rows = pageIds
-          .map((id) => byId.get(id))
-          .filter((l): l is NonNullable<typeof l> => l != null)
-          .map(mapRow);
-        logSearch(rankedIds.length);
-        return {
-          rows,
-          totalCount: rankedIds.length,
-          nextOffset: pageParam + PAGE_SIZE < rankedIds.length ? pageParam + PAGE_SIZE : null,
-        };
-      }
-
-      if (search.sort === "price_asc")
-        qb = qb.order("price_nok", { ascending: true, nullsFirst: false });
-      else if (search.sort === "price_desc")
-        qb = qb.order("price_nok", { ascending: false, nullsFirst: false });
-      else qb = qb.order("created_at", { ascending: false });
-
-      const { data, error, count } = await qb.range(pageParam, pageParam + PAGE_SIZE - 1);
-      if (error) throw error;
-
-      const raw = data ?? [];
-      logSearch(count ?? raw.length);
+      });
+      logSearch(totalCount);
       return {
-        rows: raw.map(mapRow),
-        totalCount: count ?? null,
-        nextOffset: raw.length === PAGE_SIZE ? pageParam + PAGE_SIZE : null,
+        rows,
+        totalCount,
+        nextOffset: pageParam + rows.length < totalCount ? pageParam + PAGE_SIZE : null,
       };
     },
   });

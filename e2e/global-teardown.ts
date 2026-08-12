@@ -20,11 +20,12 @@ export default async function globalTeardown() {
 
   const url = process.env.SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  let cleanupFailure: Error | null = null;
   if (url && serviceRoleKey) {
     const admin = createClient(url, serviceRoleKey);
     const { error } = await admin.auth.admin.deleteUser(userId);
     if (error) {
-      console.warn(
+      cleanupFailure = new Error(
         `[e2e global-teardown] Kunne ikke slette testbruker ${userId} (og dermed heller ikke ` +
           `annonsene den opprettet): status=${error.status} code=${error.code} name=${error.name} ` +
           `message=${error.message}`,
@@ -33,4 +34,5 @@ export default async function globalTeardown() {
   }
 
   rmSync(path.dirname(AUTH_FILE), { recursive: true, force: true });
+  if (cleanupFailure) throw cleanupFailure;
 }

@@ -8,6 +8,30 @@ import { nitro } from "nitro/vite";
 // Change `preset` here if Kaupet moves to a different host later.
 const NITRO_PRESET = "cloudflare-module";
 
+const SECURITY_HEADERS = {
+  "x-content-type-options": "nosniff",
+  "x-frame-options": "SAMEORIGIN",
+  "referrer-policy": "strict-origin-when-cross-origin",
+  "permissions-policy": "camera=(self), geolocation=(self), microphone=()",
+  // Report-only first: the app has intentional inline bootstrap/JSON-LD and
+  // third-party Turnstile/map/Supabase traffic. Promote to enforcement after
+  // production reports confirm this source inventory is complete.
+  "content-security-policy-report-only": [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'self'",
+    "form-action 'self'",
+    "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
+    "style-src 'self' 'unsafe-inline'",
+    "font-src 'self' data:",
+    "img-src 'self' data: blob: https://*.supabase.co https://*.tile.openstreetmap.org",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://nominatim.openstreetmap.org https://challenges.cloudflare.com",
+    "frame-src https://challenges.cloudflare.com",
+    "worker-src 'self' blob:",
+  ].join("; "),
+};
+
 // Server-only secrets that features silently need at runtime. Warn early in
 // dev so a missing key surfaces at `bun run dev` instead of mid-wizard when a
 // user hits the feature that needs it (e.g. STATENS_VEGVESEN_API_KEY only
@@ -57,7 +81,10 @@ export default defineConfig(({ command, mode }) => {
       tanstackStart({
         importProtection: {
           behavior: "error",
-          client: { files: ["**/server/**"], specifiers: ["server-only"] },
+          client: {
+            files: ["**/server/**", "**/*.server.ts", "**/*.server.tsx"],
+            specifiers: ["server-only"],
+          },
         },
         // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
         server: { entry: "server" },
@@ -72,6 +99,7 @@ export default defineConfig(({ command, mode }) => {
               // static asset serving would otherwise guess a generic content
               // type from the missing file extension.
               routeRules: {
+                "/**": { headers: SECURITY_HEADERS },
                 "/.well-known/apple-app-site-association": {
                   headers: { "content-type": "application/json" },
                 },

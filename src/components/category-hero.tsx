@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ChevronRight } from "lucide-react";
 
-import { getCategoryIcon } from "@/lib/category-icons";
+import { CategoryIcon } from "@/lib/category-icons";
 import { categoryHeadingFontStack } from "@/lib/category-fonts";
 import type { Category } from "@/lib/categories";
 import type { BreadcrumbSegment } from "@/lib/category-behavior";
@@ -69,7 +69,6 @@ export function CategoryHero({
   headingAs: Heading = "h1",
   animateIn = false,
 }: Props) {
-  const Icon = getCategoryIcon(selected.icon ?? null);
   const accent = main?.color ?? undefined;
   const anim = animateIn ? "duration-500 animate-in fade-in slide-in-from-right-4" : "";
 
@@ -101,7 +100,7 @@ export function CategoryHero({
             className="flex size-12 items-center justify-center rounded-full text-white"
             style={{ background: accent ?? "var(--primary)" }}
           >
-            <Icon className="size-6" />
+            <CategoryIcon iconName={selected.icon} className="size-6" />
           </span>
           <Heading
             className={`tracking-tight ${compact ? "text-3xl" : "text-4xl"}`}

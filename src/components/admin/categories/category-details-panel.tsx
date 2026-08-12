@@ -28,7 +28,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { formatErrorMessage } from "@/lib/errors";
-import { ALL_ICON_OPTIONS, getCategoryIcon } from "@/lib/category-icons";
+import { ALL_ICON_OPTIONS, CategoryIcon } from "@/lib/category-icons";
 import { CATEGORY_HEADING_FONTS, DEFAULT_CATEGORY_HEADING_FONT } from "@/lib/category-fonts";
 import { collectDescendantIds, depthOf, MAX_CATEGORY_DEPTH } from "@/lib/category-admin-tree";
 import { MAIN_CATEGORY_COLOR_PRESETS, slugify, type Category } from "./shared";
@@ -200,10 +200,7 @@ export function CategoryDetailsPanel({
                 className="w-full justify-between"
               >
                 <span className="flex items-center gap-2">
-                  {(() => {
-                    const SelectedIcon = getCategoryIcon(icon);
-                    return <SelectedIcon className="size-4" />;
-                  })()}
+                  <CategoryIcon iconName={icon} className="size-4" />
                   {icon ?? "Velg ikon"}
                 </span>
                 <ChevronsUpDown className="size-4 opacity-50" />

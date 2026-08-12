@@ -245,6 +245,13 @@ function RootComponent() {
   const router = useRouter();
 
   useEffect(() => {
+    document.documentElement.dataset.kaupetHydrated = "true";
+    return () => {
+      delete document.documentElement.dataset.kaupetHydrated;
+    };
+  }, []);
+
+  useEffect(() => {
     // Only invalidate on real sign-in / sign-out — NOT on INITIAL_SESSION or
     // TOKEN_REFRESHED, which fire on every mount/tab-focus and would refetch
     // every query in the app, causing the UI to feel slow and unstable.

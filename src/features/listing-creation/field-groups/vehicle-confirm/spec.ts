@@ -4,7 +4,7 @@ import {
   avgiftskodeGruppeFromCode,
   type AvgiftskodeGruppe,
 } from "@/lib/vehicle/vehicle-classification";
-import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.server";
+import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.types";
 
 /** SVV returns color as free text (e.g. "SORT", "SØLV METALLIC") — best-effort
  * maps it onto the fixed color list as a preselected suggestion the user can

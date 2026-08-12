@@ -21,10 +21,10 @@ export default defineConfig({
       // Starting point measured against the current codebase — ratchet up as
       // routes/components gain coverage (see Fase 3, punkt 9 i code-assessment-planen).
       thresholds: {
-        statements: 7,
-        branches: 5,
-        functions: 4,
-        lines: 8,
+        statements: 9,
+        branches: 6,
+        functions: 5,
+        lines: 9,
       },
     },
   },

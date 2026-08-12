@@ -276,20 +276,6 @@ export function CategoryLandingPage({
     });
   }, [attrValues, allFilters, tree, selected, breadcrumb, category]);
 
-  const { data: radiusIds } = useQuery({
-    queryKey: ["listings-radius", search.lat, search.lng, search.radius],
-    enabled: search.lat != null && search.lng != null,
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("listings_within_radius", {
-        center_lat: search.lat!,
-        center_lng: search.lng!,
-        radius_km: search.radius ?? 10,
-      });
-      if (error) throw error;
-      return (data ?? []).map((r: { id: string }) => r.id);
-    },
-  });
-
   const {
     data: listingsData,
     isLoading,
@@ -301,7 +287,6 @@ export function CategoryLandingPage({
     categories: categories ?? undefined,
     effectiveCategories,
     terms,
-    radiusIds,
   });
 
   const listings = useMemo(() => listingsData?.pages.flatMap((p) => p.rows), [listingsData]);

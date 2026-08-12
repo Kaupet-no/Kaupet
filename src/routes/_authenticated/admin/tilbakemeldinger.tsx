@@ -48,6 +48,15 @@ export const Route = createFileRoute("/_authenticated/admin/tilbakemeldinger")({
 
 type SortBy = "created_at" | "type";
 
+function SortIcon({ col, sortBy, ascending }: { col: SortBy; sortBy: SortBy; ascending: boolean }) {
+  if (sortBy !== col) return null;
+  return ascending ? (
+    <ArrowUp className="ml-1 inline size-3.5" />
+  ) : (
+    <ArrowDown className="ml-1 inline size-3.5" />
+  );
+}
+
 function formatFeedbackPagePath(url: string): string {
   try {
     const { pathname, search } = new URL(url);
@@ -112,13 +121,6 @@ function FeedbackAdminPage() {
     }
   };
 
-  const SortIcon = ({ col }: { col: SortBy }) =>
-    sortBy !== col ? null : ascending ? (
-      <ArrowUp className="ml-1 inline size-3.5" />
-    ) : (
-      <ArrowDown className="ml-1 inline size-3.5" />
-    );
-
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -166,7 +168,7 @@ function FeedbackAdminPage() {
                 <TableHead>
                   <button type="button" onClick={() => toggleSort("type")} className="font-medium">
                     Type
-                    <SortIcon col="type" />
+                    <SortIcon col="type" sortBy={sortBy} ascending={ascending} />
                   </button>
                 </TableHead>
                 <TableHead>Melding</TableHead>
@@ -179,7 +181,7 @@ function FeedbackAdminPage() {
                     className="font-medium"
                   >
                     Dato
-                    <SortIcon col="created_at" />
+                    <SortIcon col="created_at" sortBy={sortBy} ascending={ascending} />
                   </button>
                 </TableHead>
               </TableRow>

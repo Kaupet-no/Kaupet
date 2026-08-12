@@ -10,7 +10,7 @@ import type { AttributeMap } from "@/components/attribute-fields";
 import type { CategoryNode } from "@/lib/category-filters";
 import type { CategoryModule } from "@/features/listing-creation/modules/registry";
 import type { PendingImage } from "@/components/image-uploader";
-import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.server";
+import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.types";
 import type { VehicleClassification } from "@/lib/vehicle/vehicle-classification";
 import type { CategoryBehavior } from "@/lib/category-behavior";
 

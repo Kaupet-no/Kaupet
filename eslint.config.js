@@ -20,6 +20,34 @@ export default tseslint.config(
     ],
   },
   {
+    files: [
+      "src/routes/**/*.{ts,tsx}",
+      "src/components/**/*.{ts,tsx}",
+      "src/features/**/*.{ts,tsx}",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "server-only",
+              message:
+                "TanStack Start does not use the Next.js `server-only` package. Use a *.server.ts module and keep it behind a server function.",
+            },
+          ],
+          patterns: [
+            {
+              group: ["@/**/*.server", "@/**/*.server.*", "**/*.server", "**/*.server.*"],
+              message:
+                "Client-reachable code must not import *.server modules. Move shared types/constants to a neutral module and import that instead.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
     languageOptions: {
@@ -59,7 +87,10 @@ export default tseslint.config(
           ],
         },
       ],
-      "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
+      "react-refresh/only-export-components": [
+        "warn",
+        { allowConstantExport: true, allowExportNames: ["Route"] },
+      ],
       "@typescript-eslint/no-unused-vars": "off",
     },
   },

@@ -2,6 +2,7 @@ import { Sparkles } from "lucide-react";
 
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { CategoryPicker } from "@/components/category-picker";
 
 import type { WizardSharedProps } from "../types";
@@ -16,6 +17,9 @@ import { RequiredMark } from "../required-mark";
  */
 export function CategorySelect({
   errors,
+  native,
+  register,
+  title,
   categories,
   categoryId,
   onCategorySelect,
@@ -28,6 +32,25 @@ export function CategorySelect({
 }: WizardSharedProps) {
   return (
     <section className="space-y-3">
+      {native && (
+        <div className="space-y-2 rounded-2xl bg-primary/5 p-4">
+          <div className="space-y-1">
+            <Label htmlFor="listing-start-title">Hva selger du?</Label>
+            <p className="text-sm text-muted-foreground">
+              Skriv en kort tittel, så hjelper vi deg med å finne riktig kategori.
+            </p>
+          </div>
+          <Input
+            id="listing-start-title"
+            data-testid="listing-title-input"
+            value={title ?? ""}
+            placeholder="F.eks. Trek Marlin 5 sykkel"
+            autoComplete="off"
+            {...register("title")}
+          />
+        </div>
+      )}
+
       <Label>
         Kategori
         <RequiredMark />

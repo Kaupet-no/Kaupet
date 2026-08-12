@@ -101,13 +101,12 @@ describe("resolveWizardPages", () => {
     ]);
   });
 
-  it("reproduces today's native split for the default flow (chunks of 3, ends pinned)", () => {
+  it("keeps location and publishing together on native to avoid a confirmation-only step", () => {
     expect(resolveWizardPages(flowWithCategorySelect, { native: true })).toEqual([
       ["category-select"],
       ["title-photos", "category-attributes", "condition"],
       ["price", "description-keywords"],
-      ["delivery-location"],
-      ["review-publish"],
+      ["delivery-location", "review-publish"],
     ]);
   });
 
@@ -155,8 +154,7 @@ describe("resolveWizardPages", () => {
       ["vehicle-confirm"],
       ["category-attributes", "title-photos", "condition"],
       ["price", "description-keywords"],
-      ["delivery-location"],
-      ["review-publish"],
+      ["delivery-location", "review-publish"],
     ]);
   });
 });

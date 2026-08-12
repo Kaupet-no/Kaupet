@@ -431,7 +431,7 @@ export function CategoryPicker({
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
       {trigger}
-      <SheetContent side="bottom" className="h-[80vh] rounded-t-2xl flex flex-col p-0">
+      <SheetContent side="bottom" expandable className="rounded-t-2xl flex flex-col p-0">
         <SheetHeader className="px-4 pt-4 pb-2 shrink-0">
           <div className="flex items-center gap-2">
             {path.length > initialPath.length && (

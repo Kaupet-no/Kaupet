@@ -93,6 +93,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Sync Android project
+        run: bunx cap sync android
+
       - name: Run Android tests
         working-directory: android
         run: ./gradlew test

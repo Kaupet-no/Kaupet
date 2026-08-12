@@ -507,6 +507,7 @@ function ListingDetailPage() {
         navigate({ to: "/meldinger/$id", params: { id: conversationId } });
       }
     },
+    onError: () => showErrorToast("Kunne ikke åpne samtalen. Prøv igjen."),
   });
 
   const replayedContact = useRef(false);

@@ -100,7 +100,11 @@ export function SellerContactPanel({
       {!isOwner && (
         <Button className="mt-4 w-full gap-2" onClick={onContact} disabled={contacting}>
           <MessageCircle className="size-4" />
-          {contacting ? "Åpner samtale…" : "Send melding til selger"}
+          {contacting
+            ? "Åpner samtale…"
+            : isLoggedIn
+              ? "Send melding til selger"
+              : "Logg inn for å sende melding"}
         </Button>
       )}
       <div className="mt-2 flex flex-col gap-2">

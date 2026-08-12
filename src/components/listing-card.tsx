@@ -62,6 +62,9 @@ type Props = {
   onHoverChange?: (id: string | null) => void;
   compact?: boolean;
   linkState?: Record<string, unknown>;
+  /** Pre-signed by a result-list batch. Undefined keeps the standalone-card
+   * fallback; null means the batch found no usable image. */
+  signedImageUrl?: string | null;
 };
 
 function ListingImage({
@@ -104,12 +107,14 @@ export function ListingCard({
   onHoverChange,
   compact = false,
   linkState,
+  signedImageUrl,
 }: Props) {
   const isNative = useIsNative();
   const [imgUrl, setImgUrl] = useState<string | null>(null);
   const priceLabel = formatPrice({ price_nok: displayPriceNok(listing), is_free: listing.is_free });
 
   useEffect(() => {
+    if (signedImageUrl !== undefined) return;
     const coverPath = listing.cover_path;
     if (!coverPath) return;
     let cancelled = false;
@@ -128,7 +133,9 @@ export function ListingCard({
     return () => {
       cancelled = true;
     };
-  }, [listing.cover_path]);
+  }, [listing.cover_path, signedImageUrl]);
+
+  const effectiveImageUrl = signedImageUrl !== undefined ? signedImageUrl : imgUrl;
 
   const cardClass = `group relative overflow-hidden rounded-xl border bg-card transition hover:shadow-md ${
     highlighted
@@ -152,7 +159,7 @@ export function ListingCard({
             style={{ width: "5rem", height: "5rem" }}
           >
             <ListingImage
-              imgUrl={imgUrl}
+              imgUrl={effectiveImageUrl}
               hasCoverPath={!!listing.cover_path}
               alt={`${listing.title} — ${priceLabel}`}
               compact
@@ -193,7 +200,7 @@ export function ListingCard({
       >
         <div className="relative aspect-[4/3] bg-muted" style={{ aspectRatio: "4 / 3" }}>
           <ListingImage
-            imgUrl={imgUrl}
+            imgUrl={effectiveImageUrl}
             hasCoverPath={!!listing.cover_path}
             alt={`${listing.title} — ${priceLabel}`}
             compact={false}

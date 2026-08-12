@@ -113,6 +113,22 @@ export default async function globalSetup() {
     ]);
     if (fixtureError) throw fixtureError;
 
+    const { data: fixtureRows, error: fixtureSearchError } = await admin.rpc(
+      "search_listings_page",
+      {
+        _include_groups: [{ mode: "all", terms: [FILTER_FIXTURE_QUERY] }],
+        _sort: "new",
+        _limit: 1,
+        _offset: 0,
+      },
+    );
+    if (fixtureSearchError) throw fixtureSearchError;
+    if (fixtureRows?.[0]?.total_count !== 3) {
+      throw new Error(
+        `E2E-filterfixturen ga ${fixtureRows?.[0]?.total_count ?? 0} treff; forventet 3.`,
+      );
+    }
+
     mkdirSync(path.dirname(AUTH_FILE), { recursive: true });
     writeFileSync(
       AUTH_FILE,

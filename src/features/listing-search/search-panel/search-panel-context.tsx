@@ -1,5 +1,7 @@
 import {
   createContext,
+  lazy,
+  Suspense,
   useCallback,
   useContext,
   useEffect,
@@ -13,8 +15,12 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeFilter } from "@/lib/category-filters";
 import type { Category } from "@/lib/categories";
-import { SearchPanel, type SearchPanelResultsContext } from "./search-panel";
+import type { SearchPanelResultsContext } from "./search-panel";
 import type { SearchFilterSection } from "./filter-sections";
+
+const SearchPanel = lazy(() =>
+  import("./search-panel").then((module) => ({ default: module.SearchPanel })),
+);
 
 type Ctx = {
   open: boolean;
@@ -38,6 +44,7 @@ export function SearchPanelProvider({ children }: { children: React.ReactNode })
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [open, setOpen] = useState(false);
+  const [panelRequested, setPanelRequested] = useState(false);
   const [section, setSection] = useState<SearchFilterSection>("categories");
   const [results, setResults] = useState<SearchPanelResultsContext | null>(null);
   // Mirrors `results` for `openPanel`'s "is a page already showing results"
@@ -81,6 +88,7 @@ export function SearchPanelProvider({ children }: { children: React.ReactNode })
   const openPanel = useCallback(
     (s?: SearchFilterSection) => {
       if (s) setSection(s);
+      setPanelRequested(true);
       if (!hasResultsRef.current && pathname !== "/annonser") {
         void navigate({ to: "/annonser", search: { q: "", category: "", sort: "new" } });
       }
@@ -102,14 +110,18 @@ export function SearchPanelProvider({ children }: { children: React.ReactNode })
   return (
     <SearchPanelCtx.Provider value={value}>
       {children}
-      <SearchPanel
-        open={open}
-        onOpenChange={setOpen}
-        categories={categories ?? []}
-        allFilters={allFilters ?? []}
-        initialSection={section}
-        results={results ?? undefined}
-      />
+      {panelRequested && (
+        <Suspense fallback={null}>
+          <SearchPanel
+            open={open}
+            onOpenChange={setOpen}
+            categories={categories ?? []}
+            allFilters={allFilters ?? []}
+            initialSection={section}
+            results={results ?? undefined}
+          />
+        </Suspense>
+      )}
     </SearchPanelCtx.Provider>
   );
 }

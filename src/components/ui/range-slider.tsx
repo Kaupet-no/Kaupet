@@ -18,6 +18,7 @@ const RangeSlider = React.forwardRef<
 >(({ className, value, thumbLabels, ...props }, ref) => (
   <SliderPrimitive.Root
     ref={ref}
+    data-vaul-no-drag
     value={value}
     minStepsBetweenThumbs={0}
     className={cn("relative flex w-full touch-none select-none items-center py-2", className)}

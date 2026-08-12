@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { cleanup, render, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ResponsiveOverlay, ResponsiveOverlayContent } from "./responsive-overlay";
+import { SheetTitle } from "./sheet";
 
 afterEach(cleanup);
 
@@ -65,5 +66,30 @@ describe("ResponsiveOverlay", () => {
       expect(baseElement.querySelector('[class*="top-\\[50%\\]"]')).not.toBeNull();
     });
     expect(baseElement.querySelector('[class*="rounded-t-2xl"]')).toBeNull();
+  });
+
+  it("expands an expandable phone sheet before scrolling its content", async () => {
+    isNativeMock.mockReturnValue(true);
+    setViewportWidth(375);
+    const { findByText, baseElement } = render(
+      <ResponsiveOverlay open onOpenChange={() => {}}>
+        <ResponsiveOverlayContent expandable initialSnapPoint={0.8}>
+          <SheetTitle className="sr-only">Testpanel</SheetTitle>
+          <div>innhold</div>
+        </ResponsiveOverlayContent>
+      </ResponsiveOverlay>,
+    );
+
+    const content = (await findByText("innhold")).closest(".overscroll-contain") as HTMLElement;
+    const drawer = baseElement.querySelector<HTMLElement>("[data-vaul-drawer]");
+    expect(drawer).not.toBeNull();
+
+    content.scrollTop = 12;
+    fireEvent.scroll(content);
+
+    await waitFor(() => {
+      expect(content.scrollTop).toBe(0);
+      expect(drawer?.style.getPropertyValue("--snap-point-height")).toBe("0px");
+    });
   });
 });

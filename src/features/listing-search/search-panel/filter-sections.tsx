@@ -343,7 +343,8 @@ export function SearchFilterSections({
         onOpenChange={setCategoryOpen}
         title="Velg kategori"
         titleVisible
-        className="h-[85vh] overflow-y-auto"
+        expandable
+        className="overflow-y-auto"
       >
         <div className="mt-4">
           <CategoryPicker
@@ -428,7 +429,8 @@ function TermGroupSheet({
       }}
       title="Søkelinje"
       titleVisible
-      className="max-h-[85vh] overflow-y-auto"
+      expandable
+      className="overflow-y-auto"
     >
       <div className="mt-4">
         <TermGroupRow group={draft} onChange={updateDraft} />

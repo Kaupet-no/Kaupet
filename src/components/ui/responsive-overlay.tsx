@@ -4,7 +4,7 @@ import { useFormFactor } from "@/hooks/use-form-factor";
 import { useOverlayHistory } from "@/hooks/use-overlay-history";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetContent, type SheetContentProps } from "@/components/ui/sheet";
 
 type Props = {
   open: boolean;
@@ -35,12 +35,21 @@ export function ResponsiveOverlay({ open, onOpenChange, children }: Props) {
 export function ResponsiveOverlayContent({
   className,
   children,
+  expandable,
+  initialSnapPoint,
   ...props
-}: React.ComponentPropsWithoutRef<typeof DialogContent>) {
+}: React.ComponentPropsWithoutRef<typeof DialogContent> &
+  Pick<SheetContentProps, "expandable" | "initialSnapPoint">) {
   const phone = useFormFactor() === "phone";
   if (phone) {
     return (
-      <SheetContent side="bottom" className={cn("rounded-t-2xl", className)} {...props}>
+      <SheetContent
+        side="bottom"
+        className={cn("rounded-t-2xl", className)}
+        expandable={expandable}
+        initialSnapPoint={initialSnapPoint}
+        {...props}
+      >
         {children}
       </SheetContent>
     );

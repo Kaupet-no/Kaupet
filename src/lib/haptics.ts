@@ -12,41 +12,25 @@ async function load() {
 }
 
 export async function hapticImpact(style: Impact = "light"): Promise<void> {
-  if (!isNative()) return;
-  try {
-    const { Haptics, ImpactStyle } = await load();
-    const map: Record<Impact, (typeof ImpactStyle)[keyof typeof ImpactStyle]> = {
-      light: ImpactStyle.Light,
-      medium: ImpactStyle.Medium,
-      heavy: ImpactStyle.Heavy,
-    };
-    await Haptics.impact({ style: map[style] });
-  } catch {
-    /* ignore */
-  }
+  void style;
+  await lightTouch();
 }
 
 export async function hapticSelection(): Promise<void> {
-  if (!isNative()) return;
-  try {
-    const { Haptics } = await load();
-    await Haptics.selectionStart();
-    await Haptics.selectionEnd();
-  } catch {
-    /* ignore */
-  }
+  await lightTouch();
 }
 
 export async function hapticNotification(type: Notification = "success"): Promise<void> {
+  void type;
+  await lightTouch();
+}
+
+/** One short platform-native touch; avoid Android's longer notification patterns. */
+async function lightTouch(): Promise<void> {
   if (!isNative()) return;
   try {
-    const { Haptics, NotificationType } = await load();
-    const map: Record<Notification, (typeof NotificationType)[keyof typeof NotificationType]> = {
-      success: NotificationType.Success,
-      warning: NotificationType.Warning,
-      error: NotificationType.Error,
-    };
-    await Haptics.notification({ type: map[type] });
+    const { Haptics, ImpactStyle } = await load();
+    await Haptics.impact({ style: ImpactStyle.Light });
   } catch {
     /* ignore */
   }

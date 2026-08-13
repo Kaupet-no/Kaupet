@@ -1691,6 +1691,7 @@ describe.skipIf(!canRun)(
     let draftId: string;
     let activatableDraftId: string;
     let deletableDraftId: string;
+    let matchingListingId: string;
 
     async function signIn(email: string) {
       return signInWithRetry(email);
@@ -1731,17 +1732,33 @@ describe.skipIf(!canRun)(
       activatableDraftId = await mkWtb("draft");
       deletableDraftId = await mkWtb("draft");
 
-      const { error: listingError } = await admin.from("listings").insert({
-        seller_id: otherId,
-        title: "Matching listing for WTB notification preference",
-        price_nok: 100,
-        status: "active",
-      });
+      const { data: listing, error: listingError } = await admin
+        .from("listings")
+        .insert({
+          seller_id: otherId,
+          title: "Matching listing for WTB notification preference",
+          price_nok: 100,
+          status: "active",
+        })
+        .select("id")
+        .single();
       if (listingError) throw listingError;
+      matchingListingId = listing.id;
     });
 
     afterAll(async () => {
       if (!canRun) return;
+      const wtbIds = [
+        activeId,
+        notifiedActiveId,
+        fulfilledId,
+        draftId,
+        activatableDraftId,
+        deletableDraftId,
+      ];
+      await admin.from("wtb_match_notifications").delete().in("wtb_listing_id", wtbIds);
+      await admin.from("listings").delete().eq("id", matchingListingId);
+      await admin.from("wtb_listings").delete().in("id", wtbIds);
       await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
     });
 

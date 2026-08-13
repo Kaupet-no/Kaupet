@@ -700,7 +700,9 @@ Kopier denne malen ved avslutning av hver fase:
   beholder «Se annonsen» som primærhandling.
 - Nye funn: WTB-motoren oppretter allerede dedupliserte varsler og matcher
   strukturerte attributter. Et ekstra lagret søk ville både brukt feil
-  kategori-format og kunne gitt dobbeltvarsel.
+  kategori-format og kunne gitt dobbeltvarsel. CI avdekket også at Fase
+  4-migrasjonen overskrev eksisterende feilisolering i matchfunksjonen. En
+  foreldreløs WTB-rad kunne dermed blokkere publisering av alle nye annonser.
 - Avvik fra plan og begrunnelse: Den planlagte orkestreringen mot
   `saved_searches` ble fjernet før deploy. `notify_matches` lagres atomisk på
   kjøpsønsket og filtreres i WTB-motoren. Varsling er av som standard fordi
@@ -712,3 +714,15 @@ Kopier denne malen ved avslutning av hver fase:
 - Ikke verifisert / risiko: Ny migrasjon er ikke anvendt lokalt eller staging.
   Varslingspreferansen og skjermleserannonsering inngår i fase 6.
 - Commit/PR: Ikke opprettet.
+
+#### Teknisk oppfølging etter CI
+
+- Status: Implementert; database- og staging-verifisering gjenstår
+- Endret: Gjeninnførte feilisolering per WTB-match uten å fjerne det nye
+  `notify_matches`-filteret. Foreldreløse WTB-rader ryddes av migrasjonen, og
+  RLS-testen sletter egne varsler, annonser og kjøpsønsker før testbrukerne.
+- Identifisert gap: Senere migrasjoner som erstatter databasefunksjoner må
+  bevare tidligere hardening. Dette bør kontrolleres eksplisitt i migrasjonsreview.
+- Verifisering: `git diff --check`, full ESLint, TypeScript og full
+  Vitest-suite (307 tester) er grønne. Lokal RLS-suite kunne ikke kjøres fordi
+  Supabase-stacken ikke var startet; database- og staging-CI gjenstår.

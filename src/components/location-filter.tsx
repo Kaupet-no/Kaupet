@@ -121,7 +121,7 @@ export function LocationPicker({ value, onChange, onDone, autoFocus = true }: Lo
         <Locate className="size-4" />
         {locationPermission === "denied" ? "Posisjon ikke tillatt" : "Bruk min posisjon"}
       </Button>
-      <div>
+      <div className="max-h-[260px] overflow-y-auto">
         {loading && <div className="px-2 py-2 text-sm text-muted-foreground">Søker…</div>}
         {!loading && results.length === 0 && query.length >= 2 && (
           <div className="px-2 py-2 text-sm text-muted-foreground">Ingen treff</div>

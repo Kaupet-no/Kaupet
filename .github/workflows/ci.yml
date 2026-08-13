@@ -142,8 +142,7 @@ jobs:
         run: |
           name=$(grep -oP 'versionName\s+"\K[^"]+' build.gradle)
           code=$(grep -oP 'versionCode\s+\K[0-9]+' build.gradle)
-          echo "name=$name" >> "$GITHUB_OUTPUT"
-          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "full=$name.$(printf '%02d' "$code")" >> "$GITHUB_OUTPUT"
           echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - name: Publish APK as GitHub release preview
@@ -153,9 +152,8 @@ jobs:
           tag_name: android-preview-${{ github.ref_name }}
           name: >-
             Android preview (${{ github.ref_name }}) —
-            v${{ steps.app_version.outputs.name }}
-            (build ${{ steps.app_version.outputs.code }},
-            ${{ steps.app_version.outputs.sha }})
+            v${{ steps.app_version.outputs.full }}
+            (${{ steps.app_version.outputs.sha }})
           prerelease: true
           files: android/app/build/outputs/apk/debug/app-debug.apk
 

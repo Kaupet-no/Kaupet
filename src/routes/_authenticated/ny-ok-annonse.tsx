@@ -3,7 +3,7 @@ import { useIsNative } from "@/hooks/use-is-native";
 import { createFileRoute, useNavigate, useBlocker, useRouter, Link } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useForm, useWatch } from "react-hook-form";
+import { useForm, useWatch, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { showErrorToast } from "@/lib/toast";
@@ -73,7 +73,7 @@ function NewWtbError({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
   return (
     <div className="mx-auto max-w-md px-4 py-16 text-center">
-      <AlertCircle className="mx-auto size-10 text-destructive" />
+      <AlertCircle className="mx-auto size-10 text-destructive" aria-hidden />
       <h1 className="mt-4 font-display text-2xl">Noe gikk galt</h1>
       <p className="mt-2 text-muted-foreground">{formatErrorMessage(error, "Ukjent feil")}</p>
       <div className="mt-6 flex justify-center gap-3">
@@ -135,6 +135,7 @@ function NewWtbPage() {
   const [notifyOnMatch, setNotifyOnMatch] = useState(false);
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [published, setPublished] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [attributes, setAttributes] = useState<WtbAttributeMap>({});
   const [checkedKeys, setCheckedKeys] = useState<string[]>([]);
   const [titleManualOverride, setTitleManualOverride] = useState(false);
@@ -186,6 +187,7 @@ function NewWtbPage() {
     formState: { errors, touchedFields },
   } = useForm<WtbForm>({
     resolver: zodResolver(wtbSchema),
+    mode: "onTouched",
     defaultValues: {
       title: "",
       description: "",
@@ -312,6 +314,7 @@ function NewWtbPage() {
   });
 
   function goNext() {
+    setValidationError(null);
     trackProductEvent("listing_creation_step_completed", {
       kind: "want",
       action: "completed",
@@ -319,9 +322,10 @@ function NewWtbPage() {
       stepNumber: stepIndex + 1,
     });
     setStepIndex((i) => Math.min(i + 1, STEPS.length - 1));
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0 });
   }
   function goBack() {
+    setValidationError(null);
     trackProductEvent("listing_creation_step_completed", {
       kind: "want",
       action: "back",
@@ -331,6 +335,16 @@ function NewWtbPage() {
     setStepIndex((i) => Math.max(i - 1, 0));
   }
   useComposerHistoryBack(stepIndex === 0, goBack);
+
+  function handleInvalid(fields: FieldErrors<WtbForm>) {
+    const targetStep = fields.title
+      ? 0
+      : fields.description || fields.max_price_nok
+        ? 2
+        : stepIndex;
+    setStepIndex(targetStep);
+    setValidationError("Rett feltene som er markert før du fortsetter.");
+  }
 
   function restoreDraft() {
     if (!restorableDraft) return;
@@ -356,7 +370,7 @@ function NewWtbPage() {
         aria-live="polite"
       >
         <div className="flex size-16 items-center justify-center rounded-full bg-primary/10">
-          <Check className="size-8 text-primary" />
+          <Check className="size-8 text-primary" aria-hidden />
         </div>
         <div className="flex flex-col gap-2">
           <h1 className="text-xl font-bold">Ønskes kjøpt-annonse publisert!</h1>
@@ -367,7 +381,7 @@ function NewWtbPage() {
 
         {notifyOnMatch && (
           <div className="flex items-center gap-2 text-sm text-primary">
-            <Bell className="size-4" />
+            <Bell className="size-4" aria-hidden />
             Du varsles når Kaupet finner et treff.
           </div>
         )}
@@ -392,21 +406,25 @@ function NewWtbPage() {
     <>
       {!native && stepIndex > 0 && (
         <Button type="button" variant="ghost" onClick={goBack}>
-          <ChevronLeft className="size-4" /> Tilbake
+          <ChevronLeft className="size-4" aria-hidden /> Tilbake
         </Button>
       )}
       {step !== "review" ? (
         <Button
           type="button"
           onClick={() => {
-            if (step === "details") void trigger().then((valid) => valid && goNext());
+            if (step === "details")
+              void trigger(undefined, { shouldFocus: true }).then((valid) => {
+                if (valid) goNext();
+                else setValidationError("Rett feltene som er markert før du fortsetter.");
+              });
             else goNext();
           }}
           disabled={step === "attributes" && !vehicleGroup && !title.trim()}
           className={native ? "h-14 w-full rounded-xl text-base" : undefined}
         >
           {native ? "Fortsett" : `Neste: ${STEP_META[STEPS[stepIndex + 1]].title}`}{" "}
-          <ChevronRight className="size-4" />
+          <ChevronRight className="size-4" aria-hidden />
         </Button>
       ) : (
         <Button
@@ -420,18 +438,20 @@ function NewWtbPage() {
               });
               publish(values);
             },
-            () =>
+            (fields) => {
+              handleInvalid(fields);
               trackProductEvent("listing_creation_step_completed", {
                 kind: "want",
                 action: "validation_failed",
                 step,
                 reason: "publish_form",
-              }),
+              });
+            },
           )}
           disabled={isPending}
           className={native ? "h-14 w-full rounded-xl text-base" : "gap-2"}
         >
-          {isPending && <Loader2 className="size-4 animate-spin" />}
+          {isPending && <Loader2 className="size-4 animate-spin" aria-hidden />}
           {native ? "Publiser" : "Publiser ønskes kjøpt"}
         </Button>
       )}
@@ -481,6 +501,7 @@ function NewWtbPage() {
             </p>
           ) : undefined
         }
+        errorSummary={validationError}
         footer={footer}
         firstStep={stepIndex === 0}
         contentClassName="flex flex-col gap-6"
@@ -537,7 +558,7 @@ function NewWtbPage() {
                 goNext();
               }}
             />
-            <Button type="button" size="sm" variant="ghost" onClick={goNext}>
+            <Button type="button" size="sm" variant="ghost" className="min-h-12" onClick={goNext}>
               Jeg er usikker – fortsett uten kategori
             </Button>
           </section>

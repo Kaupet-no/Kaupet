@@ -221,7 +221,7 @@ export function useVehicleLookupFlow(params: {
     // har rukket å oppdateres i state — og dermed feilaktig blokkert
     // fremgangen på første klikk (måtte klikkes to ganger for å virke).
     goNext();
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0 });
   }
 
   /** Called from the post-lookup confirm overlay's "Juster registreringsnummer"

@@ -1,7 +1,7 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, useNavigate, useBlocker } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useForm, useWatch } from "react-hook-form";
+import { useForm, useWatch, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
@@ -150,6 +150,7 @@ function NewListingPage() {
     field: string;
     message: string;
   } | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const [hasPreviewed, setHasPreviewed] = useState(false);
@@ -451,6 +452,7 @@ function NewListingPage() {
     p.groups.some((g) => g.key === "category-attributes"),
   );
   const editReviewSection = (section: "category" | "content" | "details" | "location") => {
+    setValidationError(null);
     const groupKeys: Record<typeof section, string[]> = {
       category: ["category-select"],
       content: ["title-photos"],
@@ -462,7 +464,7 @@ function NewListingPage() {
     );
     if (pageIndex < 0) return;
     setStep(pageIndex + 1);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0 });
   };
 
   const shouldBlockNav =
@@ -589,6 +591,7 @@ function NewListingPage() {
   }
 
   async function goToNextPage(options?: { skipImageCheck?: boolean; skipPriceCheck?: boolean }) {
+    setValidationError(null);
     const groups = currentPage?.groups ?? [];
 
     // "Slå opp"-knappen er fjernet — oppslaget kjøres nå fra selve
@@ -609,7 +612,7 @@ function NewListingPage() {
           step: currentStepKey,
           reason: "registration_number",
         });
-        showErrorToast("Skriv inn registreringsnummer.");
+        setValidationError("Skriv inn registreringsnummer før du fortsetter.");
         return;
       }
       await runVehicleLookup(vehicleRegNrInput);
@@ -623,8 +626,9 @@ function NewListingPage() {
     const fields = groups
       .flatMap((g) => g.fieldsToValidate ?? [])
       .filter((f) => !(isVehicle && f === "title"));
-    const valid = fields.length > 0 ? await trigger(fields) : true;
+    const valid = fields.length > 0 ? await trigger(fields, { shouldFocus: true }) : true;
     if (!valid) {
+      setValidationError("Rett feltene som er markert før du fortsetter.");
       trackProductEvent("listing_creation_step_completed", {
         kind: "sell",
         action: "validation_failed",
@@ -683,7 +687,7 @@ function NewListingPage() {
           reason: group.key,
         });
         if (group.key === "category-attributes") setAttributesTouched(true);
-        showErrorToast(result);
+        setValidationError(result);
         return;
       }
       if (result && typeof result === "object") {
@@ -695,7 +699,7 @@ function NewListingPage() {
         });
         if (group.key === "category-attributes") setAttributesTouched(true);
         setExtraFieldError(result);
-        showErrorToast(result.message);
+        setValidationError(result.message);
         return;
       }
     }
@@ -706,7 +710,7 @@ function NewListingPage() {
       stepNumber: step,
     });
     goNext();
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0 });
   }
 
   const mutation = useMutation({
@@ -1075,6 +1079,16 @@ function NewListingPage() {
     native && groups.length === 1 && groups[0].key === "description-keywords";
   const isVehicleConfirmPage = groups.length === 1 && groups[0].key === "vehicle-confirm";
   const nextGroups = pages[step]?.groups ?? [];
+  function handleInvalidSubmit(fields: FieldErrors<ListingForm>) {
+    const firstField = Object.keys(fields)[0] as keyof ListingForm | undefined;
+    const pageIndex = firstField
+      ? pages.findIndex((page) =>
+          page.groups.some((group) => group.fieldsToValidate?.includes(firstField)),
+        )
+      : -1;
+    if (pageIndex >= 0) setStep(pageIndex + 1);
+    setValidationError("Rett feltene som er markert før du publiserer.");
+  }
   const submitComposer = handleSubmit(
     (v) => {
       if (missingFilters.length > 0) {
@@ -1086,7 +1100,7 @@ function NewListingPage() {
         });
         setAttributesTouched(true);
         if (categoryAttributesPageIndex >= 0) setStep(categoryAttributesPageIndex + 1);
-        showErrorToast("Fyll inn alle obligatoriske egenskaper før du publiserer.");
+        setValidationError("Fyll inn alle obligatoriske egenskaper før du publiserer.");
         return;
       }
       if (!hasPreviewed && !native) {
@@ -1101,19 +1115,21 @@ function NewListingPage() {
       });
       mutation.mutate(v);
     },
-    () =>
+    (fields) => {
+      handleInvalidSubmit(fields);
       trackProductEvent("listing_creation_step_completed", {
         kind: "sell",
         action: "validation_failed",
         step: currentStepKey,
         reason: "publish_form",
-      }),
+      });
+    },
   );
   const composerFooter = (
     <>
       {!native && !isFirst && (
         <Button type="button" variant="ghost" onClick={goBack}>
-          <ChevronLeft className="size-4" /> Tilbake
+          <ChevronLeft className="size-4" aria-hidden /> Tilbake
         </Button>
       )}
       {isVehicleConfirmPage ? (
@@ -1131,7 +1147,7 @@ function NewListingPage() {
           ) : (
             <>
               {native ? "Fortsett" : `Neste: ${pageLabel(nextGroups, native)}`}{" "}
-              <ChevronRight className="size-4" />
+              <ChevronRight className="size-4" aria-hidden />
             </>
           )}
         </Button>
@@ -1184,6 +1200,7 @@ function NewListingPage() {
               <p className="mt-1 text-right text-xs text-muted-foreground">{savedTimeLabel}</p>
             ) : undefined
           }
+          errorSummary={validationError}
           footer={composerFooter}
           firstStep={isFirst}
         >

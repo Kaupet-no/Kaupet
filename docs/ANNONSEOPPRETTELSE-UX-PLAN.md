@@ -457,7 +457,7 @@ lagres atomisk med kjøpsønsket og gir høyst ett varsel per treff.
 
 ### Fase 5 — Validering, tilgjengelighet og robusthet
 
-Status: **Ikke startet**
+Status: **Teknisk fullført – QA flyttet til fase 6**
 
 1. Sett begge skjemaer til `mode: "onTouched"` og felles feilkontrakt.
 2. Flytt domenevalidering fra toast til felt eller feiloppsummering; behold
@@ -711,18 +711,40 @@ Kopier denne malen ved avslutning av hver fase:
   tester, inkludert ny review-regresjon) og `git diff --check`. RLS-suiten har
   et nytt scenario for inn-/utmeldt WTB-varsling, men krever lokal Supabase.
 - Manuelt verifisert på: Flyttet til samlet fase 6 etter produktbeslutning.
-- Ikke verifisert / risiko: Ny migrasjon er ikke anvendt lokalt eller staging.
-  Varslingspreferansen og skjermleserannonsering inngår i fase 6.
-- Commit/PR: Ikke opprettet.
+- Ikke verifisert / risiko: Varslingspreferansen og skjermleserannonsering
+  inngår i fase 6. Migrasjonen, RLS-suiten og staging-deploy er grønne.
+- Commit/PR: `753a3dc` på `staging` inkluderer teknisk hardening etter CI.
 
 #### Teknisk oppfølging etter CI
 
-- Status: Implementert; database- og staging-verifisering gjenstår
+- Status: Implementert og verifisert i database-/staging-CI
 - Endret: Gjeninnførte feilisolering per WTB-match uten å fjerne det nye
   `notify_matches`-filteret. Foreldreløse WTB-rader ryddes av migrasjonen, og
   RLS-testen sletter egne varsler, annonser og kjøpsønsker før testbrukerne.
 - Identifisert gap: Senere migrasjoner som erstatter databasefunksjoner må
   bevare tidligere hardening. Dette bør kontrolleres eksplisitt i migrasjonsreview.
 - Verifisering: `git diff --check`, full ESLint, TypeScript og full
-  Vitest-suite (307 tester) er grønne. Lokal RLS-suite kunne ikke kjøres fordi
-  Supabase-stacken ikke var startet; database- og staging-CI gjenstår.
+  Vitest-suite (307 tester) var grønne lokalt. Supabase-migrasjon, RLS-suite og
+  staging-deploy ble deretter bekreftet grønne i CI.
+
+### Fase 5 — 2026-08-13
+
+- Status: Teknisk fullført; samlet manuell tilgjengelighets-QA gjenstår i fase 6
+- Endret: Begge flyter validerer nå `onTouched` og bruker en delt, fokusert
+  feiloppsummering med `role="alert"`. Feltvalidering fokuserer synlige felt,
+  og publisering sender brukeren til steget med første ugyldige felt.
+  Domenevalidering er flyttet fra toast til felt/oppsummering; nettverks- og
+  systemfeil beholder toast.
+- Nye funn: Salgsflyten hadde allerede `onTouched` og mye korrekt feltsemantikk,
+  men manglet en samlet feilkontrakt. Kjøpsønsket hadde feltkoblinger, men brukte
+  standard valideringsmodus. Flere kjøretøyfelt manglet `aria-describedby`.
+- Avvik fra plan og begrunnelse: Visuell kontroll av høy kontrast, tema,
+  tekstskalering og fysiske hjelpemidler er fortsatt samlet i fase 6. Teknisk
+  støtte er ivaretatt med semantiske tokens, rem-basert typografi, 48 px
+  handlinger og navigasjon uten tvungen glatt scrolling.
+- Kontroller kjørt: Prettier, `git diff --check`, full ESLint, TypeScript og
+  full Vitest-suite (308 tester, inkludert fokus/annonsering av feiloppsummering).
+- Manuelt verifisert på: Flyttet til samlet fase 6 etter produktbeslutning.
+- Ikke verifisert / risiko: VoiceOver, TalkBack, Switch Access, 200 % tekst,
+  høy kontrast og lys/mørk modus inngår i fase 6.
+- Commit/PR: Ikke opprettet.

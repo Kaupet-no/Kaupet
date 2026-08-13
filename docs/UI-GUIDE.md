@@ -247,6 +247,16 @@ lokal variant av valgflaten per filter.
 ## Skjemavalidering
 
 - `react-hook-form` + `zod` via `zodResolver`. Se `src/routes/auth.tsx` for standardoppsett med `mode: "onTouched"`.
+- Flerstegs-composere bruker `mode: "onTouched"` og den delte
+  `ComposerErrorSummary`. Feltfeil vises ved feltet med `aria-invalid` og
+  `aria-describedby`; oppsummeringen har `role="alert"` og mottar fokus når
+  brukeren forsøker å gå videre. Ved publiseringsfeil navigerer flyten til
+  steget med første ugyldige felt.
+- Domene-/valideringsfeil vises ved feltet eller i feiloppsummeringen. Toast er
+  forbeholdt nettverks-, tillatelses- og systemfeil som ikke tilhører ett felt.
+- Programmatisk stegnavigasjon skal ikke tvinge glatt scrolling. Bruk
+  `window.scrollTo({ top: 0 })`, slik at flyten ikke introduserer bevegelse som
+  strider mot brukerens tilgjengelighetsinnstillinger.
 
 ## Flerstegs opprettelsesflyter
 

@@ -2,6 +2,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 
 import { NativePageHeader } from "@/components/native-page-header";
 import { cn } from "@/lib/utils";
+import { ComposerErrorSummary } from "./composer-error-summary";
 
 export function ListingComposerShell({
   title,
@@ -13,6 +14,7 @@ export function ListingComposerShell({
   progress,
   notice,
   status,
+  errorSummary,
   children,
   footer,
   firstStep,
@@ -27,6 +29,7 @@ export function ListingComposerShell({
   progress?: ReactNode;
   notice?: ReactNode;
   status?: ReactNode;
+  errorSummary?: string | null;
   children: ReactNode;
   footer: ReactNode;
   firstStep: boolean;
@@ -38,7 +41,7 @@ export function ListingComposerShell({
   useEffect(() => {
     if (previousPageRef.current === pageKey) return;
     previousPageRef.current = pageKey;
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0 });
     requestAnimationFrame(() => pageHeadingRef.current?.focus());
   }, [pageKey]);
 
@@ -54,6 +57,8 @@ export function ListingComposerShell({
           {status}
         </div>
       )}
+
+      <ComposerErrorSummary message={errorSummary ?? null} />
 
       <div
         data-testid={`composer-page-${pageKey}`}

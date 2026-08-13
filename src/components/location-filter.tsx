@@ -121,7 +121,7 @@ export function LocationPicker({ value, onChange, onDone, autoFocus = true }: Lo
         <Locate className="size-4" />
         {locationPermission === "denied" ? "Posisjon ikke tillatt" : "Bruk min posisjon"}
       </Button>
-      <div className="max-h-[260px] overflow-y-auto">
+      <div>
         {loading && <div className="px-2 py-2 text-sm text-muted-foreground">Søker…</div>}
         {!loading && results.length === 0 && query.length >= 2 && (
           <div className="px-2 py-2 text-sm text-muted-foreground">Ingen treff</div>
@@ -131,7 +131,7 @@ export function LocationPicker({ value, onChange, onDone, autoFocus = true }: Lo
             key={r.place_id}
             type="button"
             onClick={() => pick(r)}
-            className="flex w-full items-start gap-2 rounded px-2 py-3 text-left text-sm hover:bg-muted"
+            className="native-touch-target flex min-h-14 w-full items-start gap-2 rounded-lg px-3 py-3 text-left text-sm hover:bg-muted"
           >
             <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             <span className="line-clamp-2">{r.display_name}</span>
@@ -157,6 +157,21 @@ export function RadiusPicker({
       <div className="flex items-baseline justify-between">
         <span className="text-sm font-medium">Radius / omkrets</span>
         <span className="font-display text-sm">{value} km</span>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {[5, 10, 25, 50, 100].map((radius) => (
+          <Button
+            key={radius}
+            type="button"
+            size="default"
+            variant={value === radius ? "default" : "outline"}
+            className="min-h-13 px-2"
+            disabled={disabled}
+            onClick={() => onChange(radius)}
+          >
+            {radius} km
+          </Button>
+        ))}
       </div>
       <Slider
         value={[value]}

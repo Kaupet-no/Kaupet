@@ -82,7 +82,7 @@ export function SearchFilterSections({
   activeItems,
 }: Props) {
   const [editingGroup, setEditingGroup] = useState<TermGroup | null>(null);
-  const [categoryOpen, setCategoryOpen] = useState(section === "categories");
+  const [categoryOpen, setCategoryOpen] = useState(false);
   const [conditionsOpen, setConditionsOpen] = useState(false);
   const [overviewOpen, setOverviewOpen] = useState(section === "categories");
   const [activeSection, setActiveSection] = useState<SearchFilterSection>(section);
@@ -205,7 +205,13 @@ export function SearchFilterSections({
         />
         <FilterOverviewRow
           label="Avanserte søkeord"
-          value={v.extraGroups.length ? `${v.extraGroups.length} regler` : "Ingen"}
+          value={
+            v.extraGroups.length
+              ? `${v.extraGroups.length} regler`
+              : v.qMode === "any"
+                ? "Minst ett ord"
+                : "Ingen"
+          }
           onClick={() => openSection("search")}
         />
       </div>
@@ -262,10 +268,10 @@ export function SearchFilterSections({
                     <Button
                       key={max}
                       type="button"
-                      variant={v.max === max && v.min == null ? "default" : "outline"}
+                      variant={v.max === max ? "default" : "outline"}
                       size="default"
                       className="min-h-13 px-2 text-xs"
-                      onClick={() => setV((previous) => ({ ...previous, min: null, max }))}
+                      onClick={() => setV((previous) => ({ ...previous, max }))}
                     >
                       Inntil {max.toLocaleString("nb-NO")}
                     </Button>

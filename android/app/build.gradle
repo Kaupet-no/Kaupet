@@ -17,7 +17,8 @@ android {
         // native-android-jobben i .github/workflows/ci.yml) slik at hver
         // publiserte release faktisk får et nytt versjonsnummer. Lokale
         // bygg uten env-variabelen faller tilbake til 1.
-        versionCode (System.getenv("ANDROID_VERSION_CODE") ?: "1").toInteger()
+        def resolvedVersionCode = (System.getenv("ANDROID_VERSION_CODE") ?: "1").toInteger()
+        versionCode resolvedVersionCode
         versionName "0.2"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

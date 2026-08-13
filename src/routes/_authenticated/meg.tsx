@@ -28,6 +28,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { NativePageHeader } from "@/components/native-page-header";
+import { DevServerSwitch } from "@/components/dev-server-switch";
+import { useShouldShowDevServerSwitch } from "@/hooks/use-should-show-dev-server-switch";
 import { FeedbackPanel } from "@/components/feedback-tag";
 import { NativeSheet } from "@/components/ui/native-sheet";
 import {
@@ -67,6 +69,7 @@ function MegPage() {
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const { resolvedTheme, setTheme } = useTheme();
   const callSetTestMode = useServerFn(setTestMode);
+  const showDevServerSwitch = useShouldShowDevServerSwitch();
 
   async function handleToggleTest(next: boolean) {
     if (toggling) return;
@@ -258,6 +261,8 @@ function MegPage() {
             </div>
           </div>
         </div>
+
+        {showDevServerSwitch && <DevServerSwitch />}
 
         {/* Logg ut */}
         <div className="mt-6">

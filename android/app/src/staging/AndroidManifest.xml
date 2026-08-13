@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- Kun staging: lar DevServerSwitch (Meg-siden) navigere WebViewen til
+         http://<lokal-ip> for test mot en lokal dev-server. Slås aldri på
+         for produksjons-flavoren. -->
+    <application android:usesCleartextTraffic="true" tools:replace="android:usesCleartextTraffic" />
+</manifest>

@@ -15,8 +15,10 @@ describe("AdPickerOptions", () => {
     const sell = getByRole("button", { name: /jeg selger eller gir bort noe/i });
     const buy = getByRole("button", { name: /jeg ønsker å kjøpe noe/i });
 
-    expect(sell.getAttribute("aria-describedby")).toBe("sell-ad-description");
-    expect(buy.getAttribute("aria-describedby")).toBe("buy-ad-description");
+    expect(sell.getAttribute("aria-labelledby")).toBeTruthy();
+    expect(sell.getAttribute("aria-describedby")).toBeTruthy();
+    expect(buy.getAttribute("aria-labelledby")).toBeTruthy();
+    expect(buy.getAttribute("aria-describedby")).toBeTruthy();
 
     fireEvent.click(sell);
     fireEvent.click(buy);

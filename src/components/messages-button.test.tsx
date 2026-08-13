@@ -20,7 +20,7 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: { id: "user-1" } }) }));
 vi.mock("@/hooks/use-is-native", () => ({ useIsNative: () => true }));
-vi.mock("@/hooks/use-unread", () => ({ useUnreadConversationsCount: () => 0 }));
+vi.mock("@/hooks/use-unread", () => ({ useUnreadConversationsCount: () => 3 }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     channel: () => ({ on: () => ({ subscribe: () => ({}) }) }),
@@ -31,13 +31,16 @@ vi.mock("@/components/ui/native-sheet", () => ({
   NativeSheet: ({
     open,
     onOpenChange,
+    trigger,
     children,
   }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    trigger: React.ReactNode;
     children: React.ReactNode;
   }) => (
     <>
+      {trigger}
       <button type="button" onClick={() => onOpenChange(true)}>
         Åpne meldinger
       </button>
@@ -93,9 +96,12 @@ describe("MessagesButton", () => {
     const { getByRole, getByText } = render(<MessagesButton />);
     fireEvent.click(getByText("Åpne meldinger"));
 
-    expect(getByRole("link", { name: /ulest melding fra ola nordmann/i }).className).toContain(
-      "min-h-16",
-    );
+    const conversation = getByRole("link", {
+      name: /ulest.*ola nordmann.*sykkel.*er den fortsatt tilgjengelig/i,
+    });
+    expect(conversation.className).toContain("min-h-16");
+    expect(conversation.querySelector(".line-clamp-2")).toBeTruthy();
+    expect(getByRole("button", { name: "Meldinger, 3 uleste" })).toBeTruthy();
     expect(getByRole("link", { name: "Se alle meldinger" }).className).toContain("h-14");
     expect(getByRole("status").textContent).toBe("Oppdaterer meldinger");
   });

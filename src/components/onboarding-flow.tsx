@@ -53,6 +53,12 @@ export function OnboardingFlow({ onComplete }: Props) {
   }, []);
 
   const scrollTo = (index: number) => {
+    // Ikke stol på scroll-eventet alene for å oppdatere prikkene: en
+    // programmatisk smooth-scroll avfyrer ikke pålitelig et avsluttende
+    // "scroll"-event i alle WebViews, så indikatoren kunne bli stående på
+    // steg 1 selv om kortet skiftet. Sett indeksen direkte her siden vi selv
+    // vet hvor vi scroller — lytteren under dekker fortsatt ekte fingersveip.
+    setCurrentIndex(index);
     scrollRef.current?.scrollTo({
       left: index * scrollRef.current.clientWidth,
       behavior: "smooth",
@@ -121,6 +127,7 @@ export function OnboardingFlow({ onComplete }: Props) {
         title="Velkommen til Kaupet.no"
         onEscapeKeyDown={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}
+        onOpenAutoFocus={(e) => e.preventDefault()}
       >
         {/* Cards container */}
         <div
@@ -133,17 +140,21 @@ export function OnboardingFlow({ onComplete }: Props) {
           >
             {/* Card 1: Welcome */}
             <div className="flex h-full w-full flex-none snap-center flex-col items-center justify-center px-8 text-center">
-              <div className="mb-8 flex items-center gap-2">
+              <div className="mb-8 flex items-baseline gap-1">
                 <span className="font-display text-4xl font-bold tracking-tight text-primary">
-                  Kaupet.no
+                  kaupet
+                </span>
+                <span className="font-display text-4xl font-bold tracking-tight text-accent">
+                  .
+                </span>
+                <span className="font-display text-3xl font-bold tracking-tight text-muted-foreground">
+                  no
                 </span>
               </div>
-              <h1 className="font-display text-3xl font-semibold tracking-tight">
-                Velkommen til Kaupet.no
-              </h1>
+              <h1 className="font-display text-3xl font-semibold tracking-tight">Velkommen!</h1>
               <p className="mt-4 max-w-xs text-base text-muted-foreground">
-                Norges åpne markedsplass for brukte ting mellom privatpersoner. Ingen mellomledd,
-                ingen reklame.
+                Kaupet er bygget for å være en litt annerledes markedsplass. Ingen unødvendig
+                datainnsamling om deg, ingen reklame og 100% fri kildekode.
               </p>
               <button
                 type="button"
@@ -161,16 +172,16 @@ export function OnboardingFlow({ onComplete }: Props) {
                 <Bell className="size-10" />
               </div>
               <h2 className="font-display text-2xl font-semibold tracking-tight">
-                Ønsker du å motta varslinger?
+                Ønsker du å motta varsler?
               </h2>
               <p className="mt-3 max-w-xs text-sm text-muted-foreground">
                 {user
-                  ? "Få beskjed om meldinger, nye treff på lagrede søk og prisendringer på favorittene dine — også aktivitet du startet på web."
-                  : "Vi kan varsle om meldinger, nye treff på lagrede søk og prisendringer på favoritter. Tillatelsen følger enheten og kobles til kontoen når du logger inn."}
+                  ? "Få beskjed om nye meldinger, nye treff på lagrede søk og prisendringer på favorittene dine."
+                  : "Vi kan varsle om nye meldinger, nye treff på lagrede søk og prisendringer på favoritter. Du kan justere hva du ønsker å varsles om på profilsiden din."}
               </p>
               <div className="mt-10 flex w-full max-w-xs flex-col gap-3">
                 <Button onClick={handleNotifications} className="w-full">
-                  Slå på varslinger
+                  Slå på varsler
                 </Button>
                 <Button variant="ghost" onClick={next} className="w-full text-muted-foreground">
                   Hopp over
@@ -227,8 +238,14 @@ export function OnboardingFlow({ onComplete }: Props) {
             className={`absolute inset-0 flex w-full flex-col items-center justify-center bg-background px-8 text-center ${reduceMotion ? "" : "duration-500 animate-in fade-in"}`}
             aria-label="Fortsett til Kaupet"
           >
-            <span className="font-display text-3xl font-bold tracking-tight text-primary">
-              Kaupet.no
+            <span className="flex items-baseline gap-1">
+              <span className="font-display text-3xl font-bold tracking-tight text-primary">
+                kaupet
+              </span>
+              <span className="font-display text-3xl font-bold tracking-tight text-accent">.</span>
+              <span className="font-display text-2xl font-bold tracking-tight text-muted-foreground">
+                no
+              </span>
             </span>
             <p className="mt-6 text-lg text-muted-foreground">
               Takk for at du vil være en del av Kaupet.no.

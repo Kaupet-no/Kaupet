@@ -394,8 +394,8 @@ native simulator/enhet er ikke kjørt og hører til fase 7.
 
 ### Fase 3 – ny filteroversikt og intern navigasjon
 
-Status: **Ikke startet**  
-Ansvarlig: –  
+Status: **Ferdig i kode**  
+Ansvarlig: Codex  
 Sist oppdatert: 2026-08-13
 
 Arbeid:
@@ -419,7 +419,10 @@ Akseptansekriterier:
 - Lukk uten apply forkaster utkast på samme måte som før.
 - Apply, cancel, nullstill og system-tilbake har automatiserte tester.
 
-Verifisering/statusnotat: _Fylles ut av agenten._
+Verifisering/statusnotat: Oversikten og tilbakeflyten er implementert uten
+endring av utkast- eller søkemodell. Lint og typecheck passerer. Komponenttest
+for apply/cancel/system-tilbake og native gest-/fokusverifisering gjenstår til
+fase 7.
 
 ### Fase 4 – kategori, sted, pris og tilstand
 
@@ -602,6 +605,7 @@ oppføring.
 
 | Dato       | Agent | Fase/punkt | Status        | Endring og resultat                                              | Verifisering                                             |
 | ---------- | ----- | ---------- | ------------- | ---------------------------------------------------------------- | -------------------------------------------------------- |
+| 2026-08-13 | Codex | Fase 3     | Ferdig i kode | Innførte filteroversikt med sammendrag og intern tilbakeflyt.    | Lint og typecheck passerer; native QA gjenstår.          |
 | 2026-08-13 | Codex | Fase 2     | Ferdig i kode | La til delt native valgflate og komfortable slider-/knappemål.   | Komponenttest, lint og typecheck passerer.               |
 | 2026-08-13 | Codex | Fase 1     | Ferdig i kode | La til normative native filterkontrakter i UI-guiden.            | Dokumentgjennomgang; enhets-QA er utsatt til fase 7.     |
 | 2026-08-13 | Codex | Fase 0     | Ferdig i kode | Kartla eksisterende flyt, filterkontrakt og lavdetalj-prototype. | Kodegjennomgang; native enheter og produktdata gjenstår. |
@@ -657,6 +661,7 @@ tilstrekkelig.
 
 | Dato       | Fase | Kontroll/miljø                                                                                        | Resultat                                                | Ikke dekket / merknad                                                                         |
 | ---------- | ---- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| 2026-08-13 | 3    | `bun run lint`; `bunx tsc --noEmit`                                                                   | Lint og typecheck passerer.                             | Ingen komponenttest for apply/cancel/system-tilbake eller native gest/fokus-QA.               |
 | 2026-08-13 | 2    | `bun run test -- src/components/ui/native-choice-sheet.test.tsx`; `bun run lint`; `bunx tsc --noEmit` | 2 komponenttester, lint og typecheck passerer.          | Ingen 100+-liste, stor tekst eller native simulator/enhet.                                    |
 | 2026-08-13 | 1    | Dokumentgjennomgang av `docs/UI-GUIDE.md` mot eksisterende UI-primitiver                              | Kontrolltyper, mål og tilgjengelighetskrav dokumentert. | Ingen nettleser-, simulator- eller enhetskontroll; fase 7 eier QA.                            |
 | 2026-08-13 | 0    | Kodegjennomgang av `SearchPanel`, `SearchFilterSections`, filterkontrakten og telemetry               | Baseline, filtertyper og prototype dokumentert.         | Ingen simulator/enhet, skjermbilder/video, stagingdata eller UX-godkjenning i arbeidsmiljøet. |

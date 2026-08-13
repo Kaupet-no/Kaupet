@@ -567,8 +567,8 @@ skjermleser-, simulator- og enhetsmatrise er ikke utført.
 
 ### Fase 8 – utrulling og produktmåling
 
-Status: **Ikke startet**  
-Ansvarlig: –  
+Status: **Utsatt**  
+Ansvarlig: Produkt/UX  
 Sist oppdatert: 2026-08-13
 
 Arbeid:
@@ -590,7 +590,11 @@ Målhypoteser, som må tallfestes etter baseline:
 - ingen økning i nulltreff eller umiddelbar filterfjerning;
 - økt bruk av avanserte søkeord uten økt frafall.
 
-Verifisering/statusnotat: _Fylles ut av agenten._
+Verifisering/statusnotat: Det er ikke bygget feature flagg: eksisterende kode
+har ingen etablert flagginfrastruktur, og det ville økt omfanget uten
+observasjon av faktisk risiko. Eksisterende privacy-safe events dekker åpning,
+submit og nulltreff, men ikke hele funnel-en. Staging og representativ trafikk
+må godkjennes og gjennomføres av Produkt/UX før fasen kan verifiseres.
 
 ## 6. Kryssgående akseptansekriterier
 
@@ -614,29 +618,31 @@ Initiativet er ikke ferdig før alle punktene er oppfylt:
 Legg til nyeste oppføring øverst. Ikke slett historikk; korriger med en ny
 oppføring.
 
-| Dato       | Agent | Fase/punkt | Status        | Endring og resultat                                              | Verifisering                                             |
-| ---------- | ----- | ---------- | ------------- | ---------------------------------------------------------------- | -------------------------------------------------------- |
-| 2026-08-13 | Codex | Fase 7     | Ferdig i kode | Kjørte automatiske kontroller og dokumenterte QA-avgrensninger.  | Lint, typecheck, test, bygg og bundlebudsjett passerer.  |
-| 2026-08-13 | Codex | Fase 6     | Ferdig i kode | Forenklet avanserte søkeord og synlige regelhandlinger.          | Lint, typecheck og komponenttest passerer.               |
-| 2026-08-13 | Codex | Fase 5     | Ferdig i kode | Viste primærfiltre og flyttet standardvalg til native valgflate. | Lint og typecheck passerer; kategori-QA gjenstår.        |
-| 2026-08-13 | Codex | Fase 4     | Ferdig i kode | La til separate valgflater, radius- og prishurtigvalg.           | Lint og typecheck passerer; native QA gjenstår.          |
-| 2026-08-13 | Codex | Fase 3     | Ferdig i kode | Innførte filteroversikt med sammendrag og intern tilbakeflyt.    | Lint og typecheck passerer; native QA gjenstår.          |
-| 2026-08-13 | Codex | Fase 2     | Ferdig i kode | La til delt native valgflate og komfortable slider-/knappemål.   | Komponenttest, lint og typecheck passerer.               |
-| 2026-08-13 | Codex | Fase 1     | Ferdig i kode | La til normative native filterkontrakter i UI-guiden.            | Dokumentgjennomgang; enhets-QA er utsatt til fase 7.     |
-| 2026-08-13 | Codex | Fase 0     | Ferdig i kode | Kartla eksisterende flyt, filterkontrakt og lavdetalj-prototype. | Kodegjennomgang; native enheter og produktdata gjenstår. |
-| 2026-08-13 | Codex | Plan       | Ferdig        | Opprettet designkontrakt og faseplan                             | Dokumentgjennomgang                                      |
+| Dato       | Agent | Fase/punkt | Status        | Endring og resultat                                                | Verifisering                                             |
+| ---------- | ----- | ---------- | ------------- | ------------------------------------------------------------------ | -------------------------------------------------------- |
+| 2026-08-13 | Codex | Fase 8     | Utsatt        | Avklarte utrullings- og målebeslutning uten ny flagginfrastruktur. | Krever staging og representativ trafikk.                 |
+| 2026-08-13 | Codex | Fase 7     | Ferdig i kode | Kjørte automatiske kontroller og dokumenterte QA-avgrensninger.    | Lint, typecheck, test, bygg og bundlebudsjett passerer.  |
+| 2026-08-13 | Codex | Fase 6     | Ferdig i kode | Forenklet avanserte søkeord og synlige regelhandlinger.            | Lint, typecheck og komponenttest passerer.               |
+| 2026-08-13 | Codex | Fase 5     | Ferdig i kode | Viste primærfiltre og flyttet standardvalg til native valgflate.   | Lint og typecheck passerer; kategori-QA gjenstår.        |
+| 2026-08-13 | Codex | Fase 4     | Ferdig i kode | La til separate valgflater, radius- og prishurtigvalg.             | Lint og typecheck passerer; native QA gjenstår.          |
+| 2026-08-13 | Codex | Fase 3     | Ferdig i kode | Innførte filteroversikt med sammendrag og intern tilbakeflyt.      | Lint og typecheck passerer; native QA gjenstår.          |
+| 2026-08-13 | Codex | Fase 2     | Ferdig i kode | La til delt native valgflate og komfortable slider-/knappemål.     | Komponenttest, lint og typecheck passerer.               |
+| 2026-08-13 | Codex | Fase 1     | Ferdig i kode | La til normative native filterkontrakter i UI-guiden.              | Dokumentgjennomgang; enhets-QA er utsatt til fase 7.     |
+| 2026-08-13 | Codex | Fase 0     | Ferdig i kode | Kartla eksisterende flyt, filterkontrakt og lavdetalj-prototype.   | Kodegjennomgang; native enheter og produktdata gjenstår. |
+| 2026-08-13 | Codex | Plan       | Ferdig        | Opprettet designkontrakt og faseplan                               | Dokumentgjennomgang                                      |
 
 ## 8. Funn og beslutningslogg
 
 Alle funn som påvirker design, arkitektur, omfang eller rekkefølge registreres
 her. Bruk stabil ID slik at arbeidspunkter kan referere til funnet.
 
-| ID    | Dato       | Funn/beslutning                                                                                      | Konsekvens                                                   | Besluttet tiltak                                                         | Status/eier          |
-| ----- | ---------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------ | -------------------- |
-| F-001 | 2026-08-13 | SearchPanel er allerede én delt native søkeflate med 60 %/full detent.                               | Ny parallell flate ville duplisere state og navigasjon.      | Videreutvikle SearchPanel med oversikt og undersider.                    | Besluttet            |
-| F-002 | 2026-08-13 | `SelectItem` og flere små segment-/checkboxkontroller er for kompakte for native filterbruk.         | Feiltrykk og høy visuell tetthet.                            | Bruk adaptiv native valgflate og hel tappbar rad; behold desktop Select. | Planlagt, fase 2/5   |
-| F-003 | 2026-08-13 | `RangeFilterField` viser dobbel slider og to felt for alle numeriske områder.                        | Unødvendig høyde og motorisk belastning for presise verdier. | Velg kontroll etter datatype; tekstfelt/hurtigvalg er primært.           | Planlagt, fase 2/4/5 |
-| F-004 | 2026-08-13 | Fast bunnhandling har tidligere hatt risiko for å havne utenfor Radix-dialogens tilgjengelighetstre. | Skjermleser kan miste viktigste handling.                    | Verifiser og løs som eksplisitt akseptansekriterium i fase 3/7.          | Åpen                 |
+| ID    | Dato       | Funn/beslutning                                                                                      | Konsekvens                                                   | Besluttet tiltak                                                                 | Status/eier          |
+| ----- | ---------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------- | -------------------- |
+| F-001 | 2026-08-13 | SearchPanel er allerede én delt native søkeflate med 60 %/full detent.                               | Ny parallell flate ville duplisere state og navigasjon.      | Videreutvikle SearchPanel med oversikt og undersider.                            | Besluttet            |
+| F-002 | 2026-08-13 | `SelectItem` og flere små segment-/checkboxkontroller er for kompakte for native filterbruk.         | Feiltrykk og høy visuell tetthet.                            | Bruk adaptiv native valgflate og hel tappbar rad; behold desktop Select.         | Planlagt, fase 2/5   |
+| F-003 | 2026-08-13 | `RangeFilterField` viser dobbel slider og to felt for alle numeriske områder.                        | Unødvendig høyde og motorisk belastning for presise verdier. | Velg kontroll etter datatype; tekstfelt/hurtigvalg er primært.                   | Planlagt, fase 2/4/5 |
+| F-004 | 2026-08-13 | Fast bunnhandling har tidligere hatt risiko for å havne utenfor Radix-dialogens tilgjengelighetstre. | Skjermleser kan miste viktigste handling.                    | Verifiser og løs som eksplisitt akseptansekriterium i fase 3/7.                  | Åpen                 |
+| F-005 | 2026-08-13 | Produkttelemetri er privacy-safe, men har bare åpning, submit og nulltreff for denne flyten.         | Full funnel kan ikke måles uten flere aggregerte hendelser.  | Ikke utvid telemetry før staging-baseline viser at beslutningsgrunnlaget trengs. | Utsatt, Produkt/UX   |
 
 ## 9. Avvik og blokkeringer
 
@@ -653,11 +659,12 @@ Agenter skal legge til anbefalinger her når et funn er verdifullt, men ikke
 inngår i aktiv fase. Hvert punkt skal ha en tydelig utløsende betingelse; ikke
 lag en ønskeliste med spekulativt arbeid.
 
-| ID    | Kilde/funn                                                            | Anbefalt steg                                                                 | Når bør det gjøres?                                                       | Prioritet/status |
-| ----- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ---------------- |
-| V-001 | Bruksdata for filtrene er foreløpig ikke kartlagt.                    | Ranger primærfiltre med aggregert, personvernvennlig bruk etter `is_primary`. | Når redesignets baseline har nok representativ trafikk.                   | Senere           |
-| V-002 | Tematisk gruppemetadata finnes ikke nødvendigvis for alle kategorier. | Vurder adminfelt for filtergruppe og hjelpetekst.                             | Kun hvis fase 5 viser at eksisterende sortering gir uforståelige grupper. | Betinget         |
-| V-003 | Nulltreff kan ofte løses ved å løsne ett filter.                      | Vurder forklarbare forslag basert på facet-/treffdata.                        | Etter at grunnflyten er målt og nulltreff er et dokumentert problem.      | Betinget         |
+| ID    | Kilde/funn                                                            | Anbefalt steg                                                                                              | Når bør det gjøres?                                                       | Prioritet/status |
+| ----- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ---------------- |
+| V-004 | F-005                                                                 | Vurder aggregerte hendelser for filtervalg, nullstilling og avbrudd uten søketekst eller rå filterverdier. | Når staging-baseline ikke gir tilstrekkelig funnel-innsikt.               | Betinget         |
+| V-001 | Bruksdata for filtrene er foreløpig ikke kartlagt.                    | Ranger primærfiltre med aggregert, personvernvennlig bruk etter `is_primary`.                              | Når redesignets baseline har nok representativ trafikk.                   | Senere           |
+| V-002 | Tematisk gruppemetadata finnes ikke nødvendigvis for alle kategorier. | Vurder adminfelt for filtergruppe og hjelpetekst.                                                          | Kun hvis fase 5 viser at eksisterende sortering gir uforståelige grupper. | Betinget         |
+| V-003 | Nulltreff kan ofte løses ved å løsne ett filter.                      | Vurder forklarbare forslag basert på facet-/treffdata.                                                     | Etter at grunnflyten er målt og nulltreff er et dokumentert problem.      | Betinget         |
 
 ## 11. Tiltak utenfor arbeidets omfang
 
@@ -674,17 +681,18 @@ blandes inn i dette initiativet. Oppgi begrunnelse og foreslå eget arbeid.
 Før nøyaktig kommando, miljø og resultat. «Testet» uten miljø/størrelse er ikke
 tilstrekkelig.
 
-| Dato       | Fase | Kontroll/miljø                                                                                        | Resultat                                                      | Ikke dekket / merknad                                                                         |
-| ---------- | ---- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| 2026-08-13 | 7    | `bun run lint`; `bunx tsc --noEmit`; `bun run test`; `bun run build`; `bun run check:bundle`          | 279 tester, lint, typecheck, bygg og bundlebudsjett passerer. | E2E mangler sluttrapport; manuell native-/skjermleser-QA er ikke utført.                      |
-| 2026-08-13 | 6    | `bun run lint`; `bunx tsc --noEmit`; `bun run test -- src/components/ui/native-choice-sheet.test.tsx` | Lint, typecheck og 2 komponenttester passerer.                | Ingen round-trip- eller native enhets-QA.                                                     |
-| 2026-08-13 | 5    | `bun run lint`; `bunx tsc --noEmit`                                                                   | Lint og typecheck passerer.                                   | Ingen Bil/MC/generisk-kategori eller 100+-liste manuelt verifisert.                           |
-| 2026-08-13 | 4    | `bun run lint`; `bunx tsc --noEmit`                                                                   | Lint og typecheck passerer.                                   | Ingen tastatur-/skjermleser- eller native enhets-QA.                                          |
-| 2026-08-13 | 3    | `bun run lint`; `bunx tsc --noEmit`                                                                   | Lint og typecheck passerer.                                   | Ingen komponenttest for apply/cancel/system-tilbake eller native gest/fokus-QA.               |
-| 2026-08-13 | 2    | `bun run test -- src/components/ui/native-choice-sheet.test.tsx`; `bun run lint`; `bunx tsc --noEmit` | 2 komponenttester, lint og typecheck passerer.                | Ingen 100+-liste, stor tekst eller native simulator/enhet.                                    |
-| 2026-08-13 | 1    | Dokumentgjennomgang av `docs/UI-GUIDE.md` mot eksisterende UI-primitiver                              | Kontrolltyper, mål og tilgjengelighetskrav dokumentert.       | Ingen nettleser-, simulator- eller enhetskontroll; fase 7 eier QA.                            |
-| 2026-08-13 | 0    | Kodegjennomgang av `SearchPanel`, `SearchFilterSections`, filterkontrakten og telemetry               | Baseline, filtertyper og prototype dokumentert.               | Ingen simulator/enhet, skjermbilder/video, stagingdata eller UX-godkjenning i arbeidsmiljøet. |
-| –          | –    | –                                                                                                     | Ingen implementeringskontroller kjørt ennå                    | Planfase                                                                                      |
+| Dato       | Fase | Kontroll/miljø                                                                                        | Resultat                                                        | Ikke dekket / merknad                                                                         |
+| ---------- | ---- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| 2026-08-13 | 8    | Utrullings- og telemetrigjennomgang mot eksisterende product analytics                                | Ingen ny flagg-/telemetry-infrastruktur nødvendig før baseline. | Staging, produktgodkjenning og representativ trafikk gjenstår.                                |
+| 2026-08-13 | 7    | `bun run lint`; `bunx tsc --noEmit`; `bun run test`; `bun run build`; `bun run check:bundle`          | 279 tester, lint, typecheck, bygg og bundlebudsjett passerer.   | E2E mangler sluttrapport; manuell native-/skjermleser-QA er ikke utført.                      |
+| 2026-08-13 | 6    | `bun run lint`; `bunx tsc --noEmit`; `bun run test -- src/components/ui/native-choice-sheet.test.tsx` | Lint, typecheck og 2 komponenttester passerer.                  | Ingen round-trip- eller native enhets-QA.                                                     |
+| 2026-08-13 | 5    | `bun run lint`; `bunx tsc --noEmit`                                                                   | Lint og typecheck passerer.                                     | Ingen Bil/MC/generisk-kategori eller 100+-liste manuelt verifisert.                           |
+| 2026-08-13 | 4    | `bun run lint`; `bunx tsc --noEmit`                                                                   | Lint og typecheck passerer.                                     | Ingen tastatur-/skjermleser- eller native enhets-QA.                                          |
+| 2026-08-13 | 3    | `bun run lint`; `bunx tsc --noEmit`                                                                   | Lint og typecheck passerer.                                     | Ingen komponenttest for apply/cancel/system-tilbake eller native gest/fokus-QA.               |
+| 2026-08-13 | 2    | `bun run test -- src/components/ui/native-choice-sheet.test.tsx`; `bun run lint`; `bunx tsc --noEmit` | 2 komponenttester, lint og typecheck passerer.                  | Ingen 100+-liste, stor tekst eller native simulator/enhet.                                    |
+| 2026-08-13 | 1    | Dokumentgjennomgang av `docs/UI-GUIDE.md` mot eksisterende UI-primitiver                              | Kontrolltyper, mål og tilgjengelighetskrav dokumentert.         | Ingen nettleser-, simulator- eller enhetskontroll; fase 7 eier QA.                            |
+| 2026-08-13 | 0    | Kodegjennomgang av `SearchPanel`, `SearchFilterSections`, filterkontrakten og telemetry               | Baseline, filtertyper og prototype dokumentert.                 | Ingen simulator/enhet, skjermbilder/video, stagingdata eller UX-godkjenning i arbeidsmiljøet. |
+| –          | –    | –                                                                                                     | Ingen implementeringskontroller kjørt ennå                      | Planfase                                                                                      |
 
 ## 13. Ferdigdefinisjon for hvert arbeidspunkt
 

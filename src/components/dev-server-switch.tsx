@@ -17,11 +17,15 @@ export function DevServerSwitch() {
       setError("Bruk localhost eller en privat IP-adresse med port.");
       return;
     }
-    window.location.assign(url);
+    // Via skallet (capacitor-shell/index.html, servert på androidScheme
+    // "https://localhost/") i stedet for direkte navigering, slik at
+    // valget lagres og brukes igjen på neste kaldstart — se STORAGE_KEY
+    // der.
+    window.location.assign(`https://localhost/index.html?target=${url.host}`);
   };
 
   const backToStaging = () => {
-    window.location.href = `https://${STAGING_HOST}`;
+    window.location.assign("https://localhost/index.html?target=staging");
   };
 
   return (

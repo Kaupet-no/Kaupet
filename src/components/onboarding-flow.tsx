@@ -250,7 +250,7 @@ export function OnboardingFlow({ onComplete }: Props) {
             <p className="mt-6 text-lg text-muted-foreground">
               Takk for at du vil være en del av Kaupet.no.
               <br />
-              Vi håper du trives!
+              Vi håper du vil trives!
             </p>
           </button>
         )}

@@ -380,48 +380,52 @@ export function SearchFilterSections({
           </section>
 
           <section data-section="search" className="scroll-mt-2 space-y-3 border-t pt-4">
-            <Label className="text-sm font-medium">Flere søkelinjer</Label>
+            <Label className="text-base font-medium">Avanserte søkeord</Label>
 
             {v.extraGroups.map((g) => (
-              <button
+              <div
                 key={g.id}
-                type="button"
-                onClick={() => {
-                  void hapticImpact("light");
-                  setEditingGroup(g);
-                }}
-                className={`flex min-h-11 w-full items-start gap-3 rounded-xl border px-4 py-3 text-left transition active:scale-[0.98] ${
+                className={`flex min-h-14 w-full items-start gap-3 rounded-xl border px-4 py-3 text-left ${
                   g.exclude ? "border-destructive/40 bg-destructive/5" : "border-border bg-card"
                 }`}
               >
-                <span
-                  className={`mt-0.5 shrink-0 ${g.exclude ? "text-destructive" : "text-muted-foreground"}`}
-                >
-                  {g.exclude ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span
-                    className={`block text-sm font-medium ${g.exclude ? "text-destructive" : ""}`}
-                  >
-                    {g.exclude ? "Ekskluder" : "Inkluder"} —{" "}
-                    {g.mode === "all" ? "alle ord" : "minst ett ord"}
-                  </span>
-                  <span className="block truncate text-sm text-muted-foreground">
-                    {g.terms.length > 0 ? g.terms.join(", ") : "Ingen ord lagt til"}
-                  </span>
-                </span>
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeGroup(g.id);
+                  onClick={() => {
+                    void hapticImpact("light");
+                    setEditingGroup(g);
                   }}
+                  className="flex min-w-0 flex-1 items-start gap-3 text-left"
+                >
+                  <span
+                    className={`mt-0.5 shrink-0 ${g.exclude ? "text-destructive" : "text-muted-foreground"}`}
+                  >
+                    {g.exclude ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span
+                      className={`block text-sm font-medium ${g.exclude ? "text-destructive" : ""}`}
+                    >
+                      {g.exclude
+                        ? "Skal ikke inneholde"
+                        : g.mode === "all"
+                          ? "Må inneholde"
+                          : "Kan inneholde"}
+                    </span>
+                    <span className="block truncate text-sm text-muted-foreground">
+                      {g.terms.length > 0 ? g.terms.join(", ") : "Ingen ord lagt til"}
+                    </span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeGroup(g.id)}
                   className="native-hit-area shrink-0 rounded-full p-1.5 text-muted-foreground hover:text-foreground"
-                  aria-label="Fjern søkelinje"
+                  aria-label="Fjern regel"
                 >
                   <Trash2 className="size-4" />
                 </button>
-              </button>
+              </div>
             ))}
 
             <button
@@ -433,7 +437,7 @@ export function SearchFilterSections({
               className="native-touch-target flex w-full items-center gap-2 rounded-xl border border-dashed border-border px-4 py-3 text-sm text-muted-foreground transition active:scale-[0.98] hover:border-primary hover:text-primary"
             >
               <Plus className="size-4" />
-              Legg til søkelinje
+              Legg til regel
             </button>
           </section>
         </AdvancedFilterSections>
@@ -566,7 +570,7 @@ function TermGroupSheet({
       onOpenChange={(o) => {
         if (!o) onClose();
       }}
-      title="Søkelinje"
+      title="Avanserte søkeord"
       titleVisible
       expandable
       className="overflow-y-auto"
@@ -582,7 +586,7 @@ function TermGroupSheet({
         disabled={draft.terms.length === 0}
         onClick={() => onSave(draft)}
       >
-        {draft.terms.length === 0 ? "Legg til minst ett ord" : "Lagre søkelinje"}
+        {draft.terms.length === 0 ? "Legg til minst ett ord" : "Bruk regel"}
       </Button>
     </NativeSheet>
   );

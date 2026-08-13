@@ -53,8 +53,11 @@ const fuelFilter: CategoryFilter = {
   is_optional: false,
 };
 
-function setup(section: "price" | "location" | "attributes" = "price") {
-  const value = { ...defaultAdvancedSearchValue(), categories: ["mobler"] };
+function setup(
+  section: "price" | "location" | "attributes" = "price",
+  overrides: Partial<ReturnType<typeof defaultAdvancedSearchValue>> = {},
+) {
+  const value = { ...defaultAdvancedSearchValue(), categories: ["mobler"], ...overrides };
   return render(
     <SearchFilterSections
       value={value}
@@ -96,5 +99,30 @@ describe("SearchFilterSections", () => {
 
     expect(getByText("1 valgt")).toBeTruthy();
     expect(queryByText("Pris (NOK)")).toBeNull();
+  });
+
+  it("summarizes both extra rules and any-word mode", () => {
+    const { getByText } = setup("price", {
+      qMode: "any",
+      extraGroups: [{ id: "rule", mode: "all", exclude: false, terms: ["hybrid"] }],
+    });
+
+    fireEvent.click(getByText("Tilbake til filteroversikt"));
+
+    expect(getByText("1 regel · Minst ett ord")).toBeTruthy();
+  });
+
+  it("disables price presets below the active minimum", () => {
+    const { getByRole } = setup("price", { min: 120_000 });
+
+    expect((getByRole("button", { name: /Inntil 50.000/ }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    expect((getByRole("button", { name: /Inntil 100.000/ }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    expect((getByRole("button", { name: /Inntil 250.000/ }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
   });
 });

@@ -217,6 +217,7 @@ export function SecondaryCategoryFilters({
             values={values}
             onChange={onChange}
             counts={counts}
+            isNative={isNative}
           />
         </div>
       )}

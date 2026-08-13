@@ -1,18 +1,17 @@
-import { useEffect, useRef, useState } from "react";
-import { ChevronRight, Eye, EyeOff, Plus, SlidersHorizontal, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { ChevronRight, Eye, EyeOff, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { NativeSheet } from "@/components/ui/native-sheet";
 import { NativeChoiceSheet } from "@/components/ui/native-choice-sheet";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { CategoryPicker } from "@/components/advanced-search-sheet";
 import { TermGroupRow } from "@/components/term-group-editor";
-import { FilterChip } from "@/components/filter-chip";
 import { SecondaryCategoryFilters } from "@/components/attribute-filter-chips";
+import { CategoryFilterFields } from "@/components/category-filter-fields";
+import { describeAttrValue } from "@/components/active-filters";
 import { RangeFilterField } from "@/components/range-filter-field";
-import { SwipeToDeleteRow } from "@/components/swipe-to-delete-row";
 import { PRICE_BOUNDS } from "@/lib/filter-range-bounds";
 import {
   CONDITIONS,
@@ -83,24 +82,11 @@ export function SearchFilterSections({
   activeItems,
 }: Props) {
   const [editingGroup, setEditingGroup] = useState<TermGroup | null>(null);
-  const [categoryOpen, setCategoryOpen] = useState(false);
+  const [categoryOpen, setCategoryOpen] = useState(section === "categories");
   const [conditionsOpen, setConditionsOpen] = useState(false);
-  const [overviewOpen, setOverviewOpen] = useState(true);
+  const [overviewOpen, setOverviewOpen] = useState(section === "categories");
   const [activeSection, setActiveSection] = useState<SearchFilterSection>(section);
-  // A single container ref + `data-section` attributes instead of one ref
-  // callback per section — the compiler flags per-render ref-callback
-  // factories as a potential read-during-render, and `querySelector` scoped
-  // to this list sidesteps that without losing the "jump to section" scroll.
-  const listRef = useRef<HTMLDivElement>(null);
-
-  // `section` is a scroll target here, not a tab selection — jumping to it
-  // (e.g. the summary pill opening straight on "Pris") scrolls the list
-  // instead of switching a panel.
-  useEffect(() => {
-    listRef.current
-      ?.querySelector(`[data-section="${activeSection}"]`)
-      ?.scrollIntoView({ block: "start", behavior: "smooth" });
-  }, [activeSection, overviewOpen]);
+  const [activeAttributeKey, setActiveAttributeKey] = useState<string | null>(null);
 
   const showCondition = !isBilOgMcCategory(categories, v.categories);
   // Falls back to editing the draft's own location when no live location is
@@ -120,8 +106,7 @@ export function SearchFilterSections({
       : selectedCategories.length === 1
         ? selectedCategories[0].name_nb
         : `${selectedCategories[0].name_nb} +${selectedCategories.length - 1}`;
-  const advancedFilterCount =
-    Object.keys(attributeValues ?? {}).length + v.extraGroups.length + (v.qMode === "any" ? 1 : 0);
+  const advancedFilterCount = Object.keys(attributeValues ?? {}).length;
   const primaryFilters = attributeFilters
     ? splitPrimaryFilters(attributeFilters).primary.slice(0, 6)
     : [];
@@ -132,6 +117,19 @@ export function SearchFilterSections({
   const locationSummary = locationActive
     ? `${location.label || "Valgt sted"} · ${location.radius} km`
     : "Hele Norge";
+  const attributeSummary = (filter: CategoryFilter) => {
+    const value = attributeValues?.[filter.key];
+    if (!value) return "Alle";
+    if (value.kind === "multiselect" || value.kind === "exclude") {
+      const labels = value.values.map(
+        (entry) => filter.options?.find((option) => option.value === entry)?.label_nb ?? entry,
+      );
+      return labels.length > 2
+        ? `${labels.slice(0, 2).join(", ")} +${labels.length - 2}`
+        : labels.join(", ");
+    }
+    return describeAttrValue(filter, value);
+  };
 
   const saveGroup = (group: TermGroup) => {
     if (group.terms.length === 0) {
@@ -156,292 +154,252 @@ export function SearchFilterSections({
     setV((prev) => ({ ...prev, extraGroups: prev.extraGroups.filter((g) => g.id !== id) }));
   };
 
-  if (overviewOpen) {
-    const openSection = (next: SearchFilterSection) => {
-      if (next === "categories") {
-        setCategoryOpen(true);
-        return;
-      }
-      setActiveSection(next);
-      setOverviewOpen(false);
-    };
-    return (
-      <div className="flex-1 overflow-y-auto px-4 py-5 pb-[calc(6rem+env(safe-area-inset-bottom))]">
-        {activeItems && activeItems.length > 0 && (
-          <p className="mb-6 text-sm text-muted-foreground">{activeItems.length} filtre valgt</p>
+  const openSection = (next: SearchFilterSection, attributeKey?: string) => {
+    if (next === "categories") {
+      setCategoryOpen(true);
+      return;
+    }
+    setActiveAttributeKey(attributeKey ?? null);
+    setActiveSection(next);
+    setOverviewOpen(false);
+  };
+
+  const overview = (
+    <div className="flex-1 overflow-y-auto px-4 py-5 pb-[calc(6rem+env(safe-area-inset-bottom))]">
+      {activeItems && activeItems.length > 0 && (
+        <p className="mb-6 text-sm text-muted-foreground">{activeItems.length} filtre valgt</p>
+      )}
+      <div className="space-y-2">
+        <FilterOverviewRow
+          label="Kategori"
+          value={categorySummary}
+          onClick={() => openSection("categories")}
+        />
+        <FilterOverviewRow
+          label="Sted"
+          value={locationSummary}
+          onClick={() => openSection("location")}
+        />
+        <FilterOverviewRow label="Pris" value={priceSummary} onClick={() => openSection("price")} />
+        {showCondition && (
+          <FilterOverviewRow
+            label="Tilstand"
+            value={v.conditions.length ? `${v.conditions.length} valgt` : "Alle"}
+            onClick={() => setConditionsOpen(true)}
+          />
         )}
-        <div className="space-y-2">
-          <FilterOverviewRow
-            label="Kategori"
-            value={categorySummary}
-            onClick={() => openSection("categories")}
-          />
-          <FilterOverviewRow
-            label="Sted"
-            value={locationSummary}
-            onClick={() => openSection("location")}
-          />
-          <FilterOverviewRow
-            label="Pris"
-            value={priceSummary}
-            onClick={() => openSection("price")}
-          />
-          {showCondition && (
-            <FilterOverviewRow
-              label="Tilstand"
-              value={v.conditions.length ? `${v.conditions.length} valgt` : "Alle"}
-              onClick={() => setConditionsOpen(true)}
-            />
-          )}
-        </div>
-        <div className="mt-6 space-y-2">
-          {primaryFilters.map((filter) => (
-            <FilterOverviewRow
-              key={filter.id}
-              label={filter.label_nb}
-              value={attributeValues?.[filter.key] ? "Valgt" : "Alle"}
-              onClick={() => openSection("attributes")}
-            />
-          ))}
-          <FilterOverviewRow
-            label="Alle filtre"
-            value={advancedFilterCount ? `${advancedFilterCount} aktive` : "Ingen"}
-            onClick={() => openSection("attributes")}
-          />
-          <FilterOverviewRow
-            label="Avanserte søkeord"
-            value={v.extraGroups.length ? `${v.extraGroups.length} regler` : "Ingen"}
-            onClick={() => openSection("search")}
-          />
-        </div>
       </div>
-    );
-  }
+      <div className="mt-6 space-y-2">
+        {primaryFilters.map((filter) => (
+          <FilterOverviewRow
+            key={filter.id}
+            label={filter.label_nb}
+            value={attributeSummary(filter)}
+            onClick={() => openSection("attributes", filter.key)}
+          />
+        ))}
+        <FilterOverviewRow
+          label="Alle filtre"
+          value={advancedFilterCount ? `${advancedFilterCount} aktive` : "Ingen"}
+          onClick={() => openSection("attributes")}
+        />
+        <FilterOverviewRow
+          label="Avanserte søkeord"
+          value={v.extraGroups.length ? `${v.extraGroups.length} regler` : "Ingen"}
+          onClick={() => openSection("search")}
+        />
+      </div>
+    </div>
+  );
 
   return (
     <>
-      {/* pb: rom til bunnbaren, som nå er en egen skjermbunn-pinnet flate
-          (se search-panel.tsx) i stedet for siste rad i denne listen —
-          uten dette ville "Legg til søkelinje" ligge skjult bak den. */}
-      <div
-        ref={listRef}
-        className="flex-1 overflow-y-auto px-4 py-5 pb-[calc(6rem+env(safe-area-inset-bottom))]"
-      >
-        <button
-          type="button"
-          onClick={() => setOverviewOpen(true)}
-          className="native-touch-target mb-4 flex items-center px-1 text-sm font-medium text-primary"
-        >
-          Tilbake til filteroversikt
-        </button>
-        {activeItems && activeItems.length > 0 && (
-          <section className="mb-6 space-y-2">
-            <Label className="text-base font-medium">Aktive filter</Label>
-            <div className="space-y-2">
-              {activeItems.map((item) => (
-                <SwipeToDeleteRow key={item.key} onDelete={item.onRemove} deleteLabel="Fjern">
-                  <div className="flex min-h-11 items-center rounded-lg border border-border bg-card px-4 py-2.5 text-sm">
-                    {item.label}
-                  </div>
-                </SwipeToDeleteRow>
-              ))}
-            </div>
-          </section>
-        )}
-
-        <section
-          data-section="categories"
-          className="scroll-mt-2 space-y-3 rounded-2xl border border-border bg-card p-4"
-        >
-          <Label className="text-base font-medium">Kategori</Label>
+      {overviewOpen ? (
+        overview
+      ) : (
+        <div className="flex-1 overflow-y-auto px-4 py-5 pb-[calc(6rem+env(safe-area-inset-bottom))]">
           <button
             type="button"
-            onClick={() => setCategoryOpen(true)}
-            className="native-touch-target flex w-full items-center gap-3 rounded-xl bg-muted px-4 py-3 text-left transition active:scale-[0.99]"
+            onClick={() => setOverviewOpen(true)}
+            className="native-touch-target mb-4 flex items-center px-1 text-sm font-medium text-primary"
           >
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-base font-medium">{categorySummary}</span>
-              <span className="block text-sm text-muted-foreground">Velg eller endre kategori</span>
-            </span>
-            <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+            Tilbake til filteroversikt
           </button>
-        </section>
-
-        <section
-          data-section="location"
-          className="mt-4 scroll-mt-2 space-y-4 rounded-2xl border border-border bg-card p-4"
-        >
-          <Label className="text-base font-medium">Sted</Label>
-          <LocationPicker value={location} onChange={onLocationChange} autoFocus={false} />
-          {locationActive && (
-            <RadiusPicker
-              value={location.radius}
-              onChange={(r) => onLocationChange({ ...location, radius: r })}
-            />
+          {activeSection === "location" && (
+            <section
+              data-section="location"
+              className="mt-4 scroll-mt-2 space-y-4 rounded-2xl border border-border bg-card p-4"
+            >
+              <Label className="text-base font-medium">Sted</Label>
+              <LocationPicker value={location} onChange={onLocationChange} autoFocus={false} />
+              {locationActive && (
+                <RadiusPicker
+                  value={location.radius}
+                  onChange={(r) => onLocationChange({ ...location, radius: r })}
+                />
+              )}
+            </section>
           )}
-        </section>
 
-        <section
-          data-section="price"
-          className="mt-4 scroll-mt-2 space-y-6 rounded-2xl border border-border bg-card p-4"
-        >
-          <div className="space-y-3">
-            {/* Ingen egen seksjonstittel — RangeFilterField rendrer selv en
+          {activeSection === "price" && (
+            <section
+              data-section="price"
+              className="mt-4 scroll-mt-2 space-y-6 rounded-2xl border border-border bg-card p-4"
+            >
+              <div className="space-y-3">
+                {/* Ingen egen seksjonstittel — RangeFilterField rendrer selv en
                 "Pris (NOK)"-label rett under. */}
-            <RangeFilterField
-              label="Pris (NOK)"
-              bounds={PRICE_BOUNDS}
-              value={{ min: v.min ?? undefined, max: v.max ?? undefined }}
-              onChange={({ min, max }) =>
-                setV((prev) => ({ ...prev, min: min ?? null, max: max ?? null }))
-              }
-            />
-            <div className="grid grid-cols-3 gap-2">
-              {[50_000, 100_000, 250_000].map((max) => (
-                <Button
-                  key={max}
-                  type="button"
-                  variant={v.max === max && v.min == null ? "default" : "outline"}
-                  size="default"
-                  className="min-h-13 px-2 text-xs"
-                  onClick={() => setV((previous) => ({ ...previous, min: null, max }))}
-                >
-                  Inntil {max.toLocaleString("nb-NO")}
-                </Button>
-              ))}
-            </div>
-            <label className="flex min-h-11 cursor-pointer items-center gap-3">
-              <Checkbox
-                checked={v.includeFree}
-                onCheckedChange={(c) => {
-                  void hapticImpact("light");
-                  setV((prev) => ({ ...prev, includeFree: c === true }));
-                }}
-                id="adv-free"
-              />
-              <Label htmlFor="adv-free" className="cursor-pointer text-base">
-                Inkluder gratis-annonser
-              </Label>
-            </label>
-          </div>
+                <RangeFilterField
+                  label="Pris (NOK)"
+                  bounds={PRICE_BOUNDS}
+                  value={{ min: v.min ?? undefined, max: v.max ?? undefined }}
+                  onChange={({ min, max }) =>
+                    setV((prev) => ({ ...prev, min: min ?? null, max: max ?? null }))
+                  }
+                />
+                <div className="grid grid-cols-3 gap-2">
+                  {[50_000, 100_000, 250_000].map((max) => (
+                    <Button
+                      key={max}
+                      type="button"
+                      variant={v.max === max && v.min == null ? "default" : "outline"}
+                      size="default"
+                      className="min-h-13 px-2 text-xs"
+                      onClick={() => setV((previous) => ({ ...previous, min: null, max }))}
+                    >
+                      Inntil {max.toLocaleString("nb-NO")}
+                    </Button>
+                  ))}
+                </div>
+                <label className="flex min-h-11 cursor-pointer items-center gap-3">
+                  <Checkbox
+                    checked={v.includeFree}
+                    onCheckedChange={(c) => {
+                      void hapticImpact("light");
+                      setV((prev) => ({ ...prev, includeFree: c === true }));
+                    }}
+                    id="adv-free"
+                  />
+                  <Label htmlFor="adv-free" className="cursor-pointer text-base">
+                    Inkluder gratis-annonser
+                  </Label>
+                </label>
+              </div>
+            </section>
+          )}
 
-          {showCondition && (
-            <div className="space-y-3">
-              <Label className="text-base font-medium">Tilstand</Label>
-              <div className="flex flex-wrap gap-2">
-                {CONDITIONS.map((c) => (
-                  <FilterChip
-                    key={c.value}
-                    label={c.label}
-                    active={v.conditions.includes(c.value)}
-                    hideChevron
-                    className="min-h-11"
+          {activeSection === "attributes" && (
+            <section
+              data-section="attributes"
+              className="space-y-4 rounded-2xl border border-border bg-card p-4"
+            >
+              <Label className="text-base font-medium">
+                {activeAttributeKey
+                  ? attributeFilters?.find((filter) => filter.key === activeAttributeKey)?.label_nb
+                  : "Alle filtre"}
+              </Label>
+              {hasAttributeFilters && v.categories.length > 0 ? (
+                activeAttributeKey ? (
+                  <CategoryFilterFields
+                    filters={attributeFilters!.filter(
+                      (filter) => filter.key === activeAttributeKey,
+                    )}
+                    brandLookupFilters={attributeFilters}
+                    values={attributeValues!}
+                    onChange={onAttributeChange!}
+                    counts={attributeCounts}
+                    isNative
+                  />
+                ) : (
+                  <SecondaryCategoryFilters
+                    filters={attributeFilters!}
+                    values={attributeValues!}
+                    onChange={onAttributeChange!}
+                    counts={attributeCounts}
+                    isNative
+                    includePrimary={includePrimary}
+                  />
+                )
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setCategoryOpen(true)}
+                  className="native-touch-target flex w-full items-center rounded-xl border border-dashed border-border px-4 py-3 text-left text-sm text-muted-foreground"
+                >
+                  Velg kategori for å se kategorispesifikke filtre
+                </button>
+              )}
+            </section>
+          )}
+
+          {activeSection === "search" && (
+            <section
+              data-section="search"
+              className="space-y-3 rounded-2xl border border-border bg-card p-4"
+            >
+              <Label className="text-base font-medium">Avanserte søkeord</Label>
+
+              {v.extraGroups.map((g) => (
+                <div
+                  key={g.id}
+                  className={`flex min-h-14 w-full items-start gap-3 rounded-xl border px-4 py-3 text-left ${
+                    g.exclude ? "border-destructive/40 bg-destructive/5" : "border-border bg-card"
+                  }`}
+                >
+                  <button
+                    type="button"
                     onClick={() => {
                       void hapticImpact("light");
-                      setV((prev) => ({
-                        ...prev,
-                        conditions: prev.conditions.includes(c.value)
-                          ? prev.conditions.filter((x) => x !== c.value)
-                          : [...prev.conditions, c.value],
-                      }));
+                      setEditingGroup(g);
                     }}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-        </section>
+                    className="flex min-w-0 flex-1 items-start gap-3 text-left"
+                  >
+                    <span
+                      className={`mt-0.5 shrink-0 ${g.exclude ? "text-destructive" : "text-muted-foreground"}`}
+                    >
+                      {g.exclude ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span
+                        className={`block text-sm font-medium ${g.exclude ? "text-destructive" : ""}`}
+                      >
+                        {g.exclude
+                          ? "Skal ikke inneholde"
+                          : g.mode === "all"
+                            ? "Må inneholde"
+                            : "Kan inneholde"}
+                      </span>
+                      <span className="block truncate text-sm text-muted-foreground">
+                        {g.terms.length > 0 ? g.terms.join(", ") : "Ingen ord lagt til"}
+                      </span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeGroup(g.id)}
+                    className="native-hit-area shrink-0 rounded-full p-1.5 text-muted-foreground hover:text-foreground"
+                    aria-label="Fjern regel"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </div>
+              ))}
 
-        <AdvancedFilterSections
-          key={section === "attributes" || section === "search" ? section : "advanced"}
-          defaultOpen={advancedFilterCount > 0 || section === "attributes" || section === "search"}
-          count={advancedFilterCount}
-        >
-          <section data-section="attributes" className="scroll-mt-2 space-y-3">
-            <Label className="text-sm font-medium">Kategorifiltre</Label>
-            {hasAttributeFilters && v.categories.length > 0 ? (
-              <SecondaryCategoryFilters
-                filters={attributeFilters!}
-                values={attributeValues!}
-                onChange={onAttributeChange!}
-                counts={attributeCounts}
-                isNative
-                includePrimary={includePrimary}
-              />
-            ) : (
               <button
                 type="button"
-                onClick={() => setCategoryOpen(true)}
-                className="native-touch-target flex w-full items-center rounded-xl border border-dashed border-border px-4 py-3 text-left text-sm text-muted-foreground"
+                onClick={() => {
+                  void hapticImpact("light");
+                  setEditingGroup(emptyTermGroup());
+                }}
+                className="native-touch-target flex w-full items-center gap-2 rounded-xl border border-dashed border-border px-4 py-3 text-sm text-muted-foreground transition active:scale-[0.98] hover:border-primary hover:text-primary"
               >
-                Velg kategori for å se kategorispesifikke filtre
+                <Plus className="size-4" />
+                Legg til regel
               </button>
-            )}
-          </section>
-
-          <section data-section="search" className="scroll-mt-2 space-y-3 border-t pt-4">
-            <Label className="text-base font-medium">Avanserte søkeord</Label>
-
-            {v.extraGroups.map((g) => (
-              <div
-                key={g.id}
-                className={`flex min-h-14 w-full items-start gap-3 rounded-xl border px-4 py-3 text-left ${
-                  g.exclude ? "border-destructive/40 bg-destructive/5" : "border-border bg-card"
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => {
-                    void hapticImpact("light");
-                    setEditingGroup(g);
-                  }}
-                  className="flex min-w-0 flex-1 items-start gap-3 text-left"
-                >
-                  <span
-                    className={`mt-0.5 shrink-0 ${g.exclude ? "text-destructive" : "text-muted-foreground"}`}
-                  >
-                    {g.exclude ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span
-                      className={`block text-sm font-medium ${g.exclude ? "text-destructive" : ""}`}
-                    >
-                      {g.exclude
-                        ? "Skal ikke inneholde"
-                        : g.mode === "all"
-                          ? "Må inneholde"
-                          : "Kan inneholde"}
-                    </span>
-                    <span className="block truncate text-sm text-muted-foreground">
-                      {g.terms.length > 0 ? g.terms.join(", ") : "Ingen ord lagt til"}
-                    </span>
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => removeGroup(g.id)}
-                  className="native-hit-area shrink-0 rounded-full p-1.5 text-muted-foreground hover:text-foreground"
-                  aria-label="Fjern regel"
-                >
-                  <Trash2 className="size-4" />
-                </button>
-              </div>
-            ))}
-
-            <button
-              type="button"
-              onClick={() => {
-                void hapticImpact("light");
-                setEditingGroup(emptyTermGroup());
-              }}
-              className="native-touch-target flex w-full items-center gap-2 rounded-xl border border-dashed border-border px-4 py-3 text-sm text-muted-foreground transition active:scale-[0.98] hover:border-primary hover:text-primary"
-            >
-              <Plus className="size-4" />
-              Legg til regel
-            </button>
-          </section>
-        </AdvancedFilterSections>
-      </div>
+            </section>
+          )}
+        </div>
+      )}
 
       <NativeSheet
         open={categoryOpen}
@@ -489,37 +447,6 @@ export function SearchFilterSections({
   );
 }
 
-function AdvancedFilterSections({
-  defaultOpen,
-  count,
-  children,
-}: {
-  defaultOpen: boolean;
-  count: number;
-  children: React.ReactNode;
-}) {
-  return (
-    <Collapsible
-      defaultOpen={defaultOpen}
-      className="mt-4 rounded-2xl border border-border bg-card"
-    >
-      <CollapsibleTrigger className="group native-touch-target flex w-full items-center gap-3 px-4 py-3 text-left">
-        <SlidersHorizontal className="size-5 shrink-0 text-primary" aria-hidden />
-        <span className="flex-1 text-base font-medium">Flere filtre</span>
-        {count > 0 && (
-          <span className="flex size-6 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
-            {count}
-          </span>
-        )}
-        <ChevronRight className="size-5 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
-      </CollapsibleTrigger>
-      <CollapsibleContent className="space-y-4 border-t border-border px-4 py-4">
-        {children}
-      </CollapsibleContent>
-    </Collapsible>
-  );
-}
-
 function FilterOverviewRow({
   label,
   value,
@@ -553,11 +480,20 @@ function TermGroupSheet({
   onClose: () => void;
   onSave: (g: TermGroup) => void;
 }) {
-  const [draft, setDraft] = useState<TermGroup>(group ?? emptyTermGroup());
+  if (!group) return null;
+  return <OpenTermGroupSheet key={group.id} group={group} onClose={onClose} onSave={onSave} />;
+}
 
-  useEffect(() => {
-    if (group) setDraft(group);
-  }, [group]);
+function OpenTermGroupSheet({
+  group,
+  onClose,
+  onSave,
+}: {
+  group: TermGroup;
+  onClose: () => void;
+  onSave: (g: TermGroup) => void;
+}) {
+  const [draft, setDraft] = useState<TermGroup>(group);
 
   const updateDraft = (next: TermGroup) => {
     void hapticImpact("light");
@@ -566,7 +502,7 @@ function TermGroupSheet({
 
   return (
     <NativeSheet
-      open={group !== null}
+      open
       onOpenChange={(o) => {
         if (!o) onClose();
       }}

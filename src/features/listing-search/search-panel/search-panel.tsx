@@ -394,6 +394,7 @@ export function SearchPanel({
 
               {results ? (
                 <SearchFilterSections
+                  key={`${open}-${section}`}
                   value={draft}
                   setValue={setDraft}
                   categories={categories}

@@ -116,6 +116,7 @@ export function NativeAdvancedSearch({
         </div>
 
         <SearchFilterSections
+          key={`${open}-${section}`}
           value={v}
           setValue={setV}
           categories={categories}

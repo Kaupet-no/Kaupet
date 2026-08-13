@@ -6,6 +6,7 @@ export function AdPickerOptions({ onSell, onBuy }: { onSell: () => void; onBuy: 
       <button
         type="button"
         onClick={onSell}
+        aria-describedby="sell-ad-description"
         className="flex items-center gap-4 rounded-xl border bg-card p-5 text-left transition hover:border-primary hover:shadow-sm"
       >
         <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary/10">
@@ -13,12 +14,15 @@ export function AdPickerOptions({ onSell, onBuy }: { onSell: () => void; onBuy: 
         </div>
         <div>
           <p className="font-semibold">Jeg selger eller gir bort noe</p>
-          <p className="text-sm text-muted-foreground">Legg ut en annonse med bilder og pris</p>
+          <p id="sell-ad-description" className="text-sm text-muted-foreground">
+            Legg ut en annonse med bilder og pris
+          </p>
         </div>
       </button>
       <button
         type="button"
         onClick={onBuy}
+        aria-describedby="buy-ad-description"
         className="flex items-center gap-4 rounded-xl border bg-card p-5 text-left transition hover:border-primary hover:shadow-sm"
       >
         <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-secondary">
@@ -26,7 +30,9 @@ export function AdPickerOptions({ onSell, onBuy }: { onSell: () => void; onBuy: 
         </div>
         <div>
           <p className="font-semibold">Jeg ønsker å kjøpe noe</p>
-          <p className="text-sm text-muted-foreground">Legg ut en ønskes kjøpt-annonse</p>
+          <p id="buy-ad-description" className="text-sm text-muted-foreground">
+            Legg ut en annonse om noe du vil kjøpe
+          </p>
         </div>
       </button>
     </div>

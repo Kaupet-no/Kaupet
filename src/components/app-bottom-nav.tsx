@@ -210,7 +210,7 @@ export function AppBottomNav() {
       <ResponsiveOverlay open={adPickerOpen} onOpenChange={setAdPickerOpen}>
         <ResponsiveOverlayContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Ny annonse</DialogTitle>
+            <DialogTitle>Hva vil du annonsere?</DialogTitle>
           </DialogHeader>
           <AdPickerOptions
             onSell={() => {

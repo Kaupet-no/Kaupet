@@ -137,11 +137,6 @@
       "count": 1
     }
   },
-  "src/features/listing-search/search-panel/filter-sections.tsx": {
-    "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
-  },
   "src/features/listing-search/search-panel/search-panel.tsx": {
     "react-hooks/set-state-in-effect": {
       "count": 1

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Check } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,18 @@ type Props = {
 };
 
 /** Shared phone-sized choice surface for search filters. Desktop keeps Select. */
-export function NativeChoiceSheet({
+export function NativeChoiceSheet({ open, value, ...props }: Props) {
+  return (
+    <NativeChoiceSheetInner
+      key={`${open}-${value.join("\u0000")}`}
+      open={open}
+      value={value}
+      {...props}
+    />
+  );
+}
+
+function NativeChoiceSheetInner({
   open,
   onOpenChange,
   title,
@@ -44,17 +56,25 @@ export function NativeChoiceSheet({
   searchable = options.length > 12,
   onApply,
 }: Props) {
-  const selected = new Set(value);
+  const [draft, setDraft] = useState(value);
+
+  const usesDraft = multiple || onApply != null;
+  const current = usesDraft ? draft : value;
+  const selected = new Set(current);
   const toggle = (next: string) => {
     const values = multiple
       ? selected.has(next)
-        ? value.filter((item) => item !== next)
-        : [...value, next]
+        ? current.filter((item) => item !== next)
+        : [...current, next]
       : selected.has(next)
         ? []
         : [next];
+    if (usesDraft) {
+      setDraft(values);
+      return;
+    }
     onChange(values);
-    if (!multiple && !onApply) onOpenChange(false);
+    onOpenChange(false);
   };
   const content = (
     <Command shouldFilter={searchable} className="bg-transparent">
@@ -70,6 +90,7 @@ export function NativeChoiceSheet({
                 value={option.label}
                 disabled={option.disabled}
                 onSelect={() => toggle(option.value)}
+                aria-selected={isSelected}
                 className="native-touch-target min-h-14 rounded-lg px-3 text-base"
               >
                 {multiple ? (
@@ -101,7 +122,15 @@ export function NativeChoiceSheet({
     <NativeSheet open={open} onOpenChange={onOpenChange} title={title} titleVisible expandable>
       <div className="mt-3 min-h-0">{content}</div>
       {onApply && (
-        <Button type="button" size="native" className="mt-4 w-full" onClick={onApply}>
+        <Button
+          type="button"
+          size="native"
+          className="mt-4 w-full"
+          onClick={() => {
+            onChange(draft);
+            onApply();
+          }}
+        >
           Bruk valg
         </Button>
       )}

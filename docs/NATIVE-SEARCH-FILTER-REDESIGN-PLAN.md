@@ -322,8 +322,8 @@ kategorifiltre og søkeord følger samme oversikt → fullhøyde-undernivå-møn
 
 ### Fase 1 – oppdater UI-guiden og komponentkontraktene
 
-Status: **Ikke startet**  
-Ansvarlig: –  
+Status: **Ferdig i kode**  
+Ansvarlig: Codex  
 Sist oppdatert: 2026-08-13
 
 Arbeid:
@@ -348,7 +348,10 @@ Akseptansekriterier:
 - Apple 44 pt og Android 48 dp er dekket av Kaupets 48 × 48-minimum.
 - Guiden forbyr kompakte dropdown/popover-mønstre i native filterflyt.
 
-Verifisering/statusnotat: _Fylles ut av agenten._
+Verifisering/statusnotat: UI-guiden er oppdatert med kontrakter som bruker
+eksisterende `NativeSheet`, `ResponsiveOverlay`, `Button`, `Checkbox` og
+slider-primitivene. Visuell og native enhetsverifisering hører til fase 7 og
+er ikke kjørt i denne dokumentasjonsfasen.
 
 ### Fase 2 – delte native primitiver
 
@@ -596,6 +599,7 @@ oppføring.
 
 | Dato       | Agent | Fase/punkt | Status        | Endring og resultat                                              | Verifisering                                             |
 | ---------- | ----- | ---------- | ------------- | ---------------------------------------------------------------- | -------------------------------------------------------- |
+| 2026-08-13 | Codex | Fase 1     | Ferdig i kode | La til normative native filterkontrakter i UI-guiden.            | Dokumentgjennomgang; enhets-QA er utsatt til fase 7.     |
 | 2026-08-13 | Codex | Fase 0     | Ferdig i kode | Kartla eksisterende flyt, filterkontrakt og lavdetalj-prototype. | Kodegjennomgang; native enheter og produktdata gjenstår. |
 | 2026-08-13 | Codex | Plan       | Ferdig        | Opprettet designkontrakt og faseplan                             | Dokumentgjennomgang                                      |
 
@@ -647,10 +651,11 @@ blandes inn i dette initiativet. Oppgi begrunnelse og foreslå eget arbeid.
 Før nøyaktig kommando, miljø og resultat. «Testet» uten miljø/størrelse er ikke
 tilstrekkelig.
 
-| Dato       | Fase | Kontroll/miljø                                                                          | Resultat                                        | Ikke dekket / merknad                                                                         |
-| ---------- | ---- | --------------------------------------------------------------------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| 2026-08-13 | 0    | Kodegjennomgang av `SearchPanel`, `SearchFilterSections`, filterkontrakten og telemetry | Baseline, filtertyper og prototype dokumentert. | Ingen simulator/enhet, skjermbilder/video, stagingdata eller UX-godkjenning i arbeidsmiljøet. |
-| –          | –    | –                                                                                       | Ingen implementeringskontroller kjørt ennå      | Planfase                                                                                      |
+| Dato       | Fase | Kontroll/miljø                                                                          | Resultat                                                | Ikke dekket / merknad                                                                         |
+| ---------- | ---- | --------------------------------------------------------------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| 2026-08-13 | 1    | Dokumentgjennomgang av `docs/UI-GUIDE.md` mot eksisterende UI-primitiver                | Kontrolltyper, mål og tilgjengelighetskrav dokumentert. | Ingen nettleser-, simulator- eller enhetskontroll; fase 7 eier QA.                            |
+| 2026-08-13 | 0    | Kodegjennomgang av `SearchPanel`, `SearchFilterSections`, filterkontrakten og telemetry | Baseline, filtertyper og prototype dokumentert.         | Ingen simulator/enhet, skjermbilder/video, stagingdata eller UX-godkjenning i arbeidsmiljøet. |
+| –          | –    | –                                                                                       | Ingen implementeringskontroller kjørt ennå              | Planfase                                                                                      |
 
 ## 13. Ferdigdefinisjon for hvert arbeidspunkt
 

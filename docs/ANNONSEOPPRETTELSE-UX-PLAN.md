@@ -6,7 +6,7 @@
 > verifisering i dette dokumentet i samme commit som hver fase.
 
 Opprettet: 2026-08-13  
-Status: **Fase 4 teknisk fullført – all manuell test og QA er samlet i fase 6**
+Status: **Fase 5 teknisk fullført – tekniske restgap vurderes før samlet fase 6-QA**
 Primær målflate: iOS- og Android-appene  
 Sekundær målflate: responsiv web og nettbrett
 
@@ -571,15 +571,20 @@ per nytt funn, også når funnet løses i samme fase.
 
 Før opp arbeid som oppdages, men som ikke bør snikes inn i aktiv fase.
 
-| Gap / tiltak                                                         | Hvorfor utenfor                         | Anbefalt eier/tidspunkt         | Status |
-| -------------------------------------------------------------------- | --------------------------------------- | ------------------------------- | ------ |
-| Modererte brukertester med faktiske markedsplassbrukere              | Krever rekruttering                     | Samlet QA i fase 6              | Åpen   |
-| Juridisk vurdering av forhåndsvalgt varsling                         | Samtykke/personvern                     | Produkt/juridisk før fase 4     | Åpen   |
-| Samlet informasjonsarkitektur for «Mine annonser» etter publisering  | Egen flate                              | UX etter fase 4                 | Åpen   |
-| Android-enhetstest av system-tilbake og tastatur                     | Kan ikke bevises ved kodegjennomgang    | Samlet QA i fase 6              | Åpen   |
-| Analyse av bilderåd og bildegjenkjenning                             | Krever produkt/ML-scope                 | Egen discovery                  | Åpen   |
-| Gjør `?forcenative` trygg for Keyboard-pluginen i web                | Separat feil i native emuleringsverktøy | Plattform før fase 1-visuell QA | Løst   |
-| Avklar og implementer CSRF-beskyttelse for TanStack-serverfunksjoner | Sikkerhetsarkitektur utenfor annonse-UX | Plattform/sikkerhet snarest     | Åpen   |
+| Gap / tiltak                                                         | Hvorfor utenfor                          | Anbefalt eier/tidspunkt         | Status |
+| -------------------------------------------------------------------- | ---------------------------------------- | ------------------------------- | ------ |
+| Modererte brukertester med faktiske markedsplassbrukere              | Krever rekruttering                      | Samlet QA i fase 6              | Åpen   |
+| Juridisk vurdering av forhåndsvalgt varsling                         | Samtykke/personvern                      | Produkt/juridisk før fase 4     | Åpen   |
+| Samlet informasjonsarkitektur for «Mine annonser» etter publisering  | Egen flate                               | UX etter fase 4                 | Åpen   |
+| Android-enhetstest av system-tilbake og tastatur                     | Kan ikke bevises ved kodegjennomgang     | Samlet QA i fase 6              | Åpen   |
+| Analyse av bilderåd og bildegjenkjenning                             | Krever produkt/ML-scope                  | Egen discovery                  | Åpen   |
+| Gjør `?forcenative` trygg for Keyboard-pluginen i web                | Separat feil i native emuleringsverktøy  | Plattform før fase 1-visuell QA | Løst   |
+| Avklar og implementer CSRF-beskyttelse for TanStack-serverfunksjoner | Sikkerhetsarkitektur utenfor annonse-UX  | Plattform/sikkerhet snarest     | Åpen   |
+| Returner fra «Endre» til review etter lagring/fortsett               | Oppdaget ved ny kontraktgjennomgang      | Teknisk oppfølging før fase 6   | Åpen   |
+| Forklar blokkert «Fortsett» i kjøpsønskets kriteriesteg              | Akseptanse krever synlig årsak           | Teknisk oppfølging før fase 6   | Åpen   |
+| Fullfør 48 px treffflater i composerens sekundærhandlinger           | Kodegjennomgang fant små `sm`-kontroller | Teknisk oppfølging før fase 6   | Åpen   |
+| Diskré haptikk ved stegskifte                                        | Forbedring, ikke nødvendig feedback      | Produktpolish etter fase 6      | Vurder |
+| Sticky reviewkolonne på bred web                                     | P2-optimalisering; samme flyt virker nå  | Web-optimalisering ved behov    | Vurder |
 
 ## 12. Fasejournal
 
@@ -747,4 +752,17 @@ Kopier denne malen ved avslutning av hver fase:
 - Manuelt verifisert på: Flyttet til samlet fase 6 etter produktbeslutning.
 - Ikke verifisert / risiko: VoiceOver, TalkBack, Switch Access, 200 % tekst,
   høy kontrast og lys/mørk modus inngår i fase 6.
-- Commit/PR: Ikke opprettet.
+- Commit/PR: `25a4e5f` på `staging`.
+
+#### Ny teknisk gap-gjennomgang etter fase 5
+
+- Må gjennomføres før fase 6: «Endre» fra review må huske returpunktet og
+  føre brukeren tilbake til review etter neste gyldige «Fortsett»; blokkert
+  «Fortsett» i kjøpsønskets kriteriesteg må ha en synlig forklaring; alle
+  sekundærhandlinger som brukes på native composerflater må ha minst 48 px
+  effektiv trefflate.
+- Kan avventes: Steghaptikk er polish fordi fokus, overskrift og progresjon
+  allerede gir tilstrekkelig feedback. Sticky reviewkolonne på bred web er en
+  P2-effektivisering, ikke nødvendig for gjenkjennelighet eller fullføring.
+- Utenfor denne planen: CSRF-hardening er fortsatt et separat
+  plattform-/sikkerhetstiltak og bør ikke skjules i UX-implementeringen.

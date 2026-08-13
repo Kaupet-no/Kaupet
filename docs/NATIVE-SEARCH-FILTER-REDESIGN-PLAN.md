@@ -426,8 +426,8 @@ fase 7.
 
 ### Fase 4 – kategori, sted, pris og tilstand
 
-Status: **Ikke startet**  
-Ansvarlig: –  
+Status: **Ferdig i kode**  
+Ansvarlig: Codex  
 Sist oppdatert: 2026-08-13
 
 Arbeid:
@@ -450,7 +450,9 @@ Akseptansekriterier:
 - Pris kan fylles ut uten slider.
 - Alle handlinger fungerer med tastatur og skjermleser.
 
-Verifisering/statusnotat: _Fylles ut av agenten._
+Verifisering/statusnotat: Kategori og tilstand åpner nå egne valgflater;
+stedstreff har hel tappbar rad uten egen nestet scroll, radius har hurtigvalg,
+og pris har Fra/Til med hurtigvalg. Lint/typecheck og visuell native QA gjenstår.
 
 ### Fase 5 – kategorifiltre og «Alle filtre»
 
@@ -605,6 +607,7 @@ oppføring.
 
 | Dato       | Agent | Fase/punkt | Status        | Endring og resultat                                              | Verifisering                                             |
 | ---------- | ----- | ---------- | ------------- | ---------------------------------------------------------------- | -------------------------------------------------------- |
+| 2026-08-13 | Codex | Fase 4     | Ferdig i kode | La til separate valgflater, radius- og prishurtigvalg.           | Lint og typecheck passerer; native QA gjenstår.          |
 | 2026-08-13 | Codex | Fase 3     | Ferdig i kode | Innførte filteroversikt med sammendrag og intern tilbakeflyt.    | Lint og typecheck passerer; native QA gjenstår.          |
 | 2026-08-13 | Codex | Fase 2     | Ferdig i kode | La til delt native valgflate og komfortable slider-/knappemål.   | Komponenttest, lint og typecheck passerer.               |
 | 2026-08-13 | Codex | Fase 1     | Ferdig i kode | La til normative native filterkontrakter i UI-guiden.            | Dokumentgjennomgang; enhets-QA er utsatt til fase 7.     |
@@ -661,6 +664,7 @@ tilstrekkelig.
 
 | Dato       | Fase | Kontroll/miljø                                                                                        | Resultat                                                | Ikke dekket / merknad                                                                         |
 | ---------- | ---- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| 2026-08-13 | 4    | `bun run lint`; `bunx tsc --noEmit`                                                                   | Lint og typecheck passerer.                             | Ingen tastatur-/skjermleser- eller native enhets-QA.                                          |
 | 2026-08-13 | 3    | `bun run lint`; `bunx tsc --noEmit`                                                                   | Lint og typecheck passerer.                             | Ingen komponenttest for apply/cancel/system-tilbake eller native gest/fokus-QA.               |
 | 2026-08-13 | 2    | `bun run test -- src/components/ui/native-choice-sheet.test.tsx`; `bun run lint`; `bunx tsc --noEmit` | 2 komponenttester, lint og typecheck passerer.          | Ingen 100+-liste, stor tekst eller native simulator/enhet.                                    |
 | 2026-08-13 | 1    | Dokumentgjennomgang av `docs/UI-GUIDE.md` mot eksisterende UI-primitiver                              | Kontrolltyper, mål og tilgjengelighetskrav dokumentert. | Ingen nettleser-, simulator- eller enhetskontroll; fase 7 eier QA.                            |

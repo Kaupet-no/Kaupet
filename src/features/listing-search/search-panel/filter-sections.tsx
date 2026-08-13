@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { NativeSheet } from "@/components/ui/native-sheet";
+import { NativeChoiceSheet } from "@/components/ui/native-choice-sheet";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { CategoryPicker } from "@/components/advanced-search-sheet";
 import { TermGroupRow } from "@/components/term-group-editor";
@@ -79,6 +80,7 @@ export function SearchFilterSections({
 }: Props) {
   const [editingGroup, setEditingGroup] = useState<TermGroup | null>(null);
   const [categoryOpen, setCategoryOpen] = useState(false);
+  const [conditionsOpen, setConditionsOpen] = useState(false);
   const [overviewOpen, setOverviewOpen] = useState(true);
   const [activeSection, setActiveSection] = useState<SearchFilterSection>(section);
   // A single container ref + `data-section` attributes instead of one ref
@@ -149,6 +151,10 @@ export function SearchFilterSections({
 
   if (overviewOpen) {
     const openSection = (next: SearchFilterSection) => {
+      if (next === "categories") {
+        setCategoryOpen(true);
+        return;
+      }
       setActiveSection(next);
       setOverviewOpen(false);
     };
@@ -177,7 +183,7 @@ export function SearchFilterSections({
             <FilterOverviewRow
               label="Tilstand"
               value={v.conditions.length ? `${v.conditions.length} valgt` : "Alle"}
-              onClick={() => openSection("price")}
+              onClick={() => setConditionsOpen(true)}
             />
           )}
         </div>
@@ -275,6 +281,20 @@ export function SearchFilterSections({
                 setV((prev) => ({ ...prev, min: min ?? null, max: max ?? null }))
               }
             />
+            <div className="grid grid-cols-3 gap-2">
+              {[50_000, 100_000, 250_000].map((max) => (
+                <Button
+                  key={max}
+                  type="button"
+                  variant={v.max === max && v.min == null ? "default" : "outline"}
+                  size="default"
+                  className="min-h-13 px-2 text-xs"
+                  onClick={() => setV((previous) => ({ ...previous, min: null, max }))}
+                >
+                  Inntil {max.toLocaleString("nb-NO")}
+                </Button>
+              ))}
+            </div>
             <label className="flex min-h-11 cursor-pointer items-center gap-3">
               <Checkbox
                 checked={v.includeFree}
@@ -424,6 +444,20 @@ export function SearchFilterSections({
           Ferdig
         </Button>
       </NativeSheet>
+
+      <NativeChoiceSheet
+        open={conditionsOpen}
+        onOpenChange={setConditionsOpen}
+        title="Tilstand"
+        options={CONDITIONS.map((condition) => ({
+          value: condition.value,
+          label: condition.label,
+        }))}
+        value={v.conditions}
+        multiple
+        onChange={(conditions) => setV((previous) => ({ ...previous, conditions }))}
+        onApply={() => setConditionsOpen(false)}
+      />
 
       {/* Term group sheet — its own Radix Dialog, stacks above the panel since
           it only mounts (and portals) once the user opens it */}

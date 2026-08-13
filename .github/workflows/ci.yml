@@ -144,6 +144,11 @@ jobs:
         if: steps.filter.outputs.android == 'true'
         working-directory: android
         run: ./gradlew assemble${{ steps.env.outputs.flavorCap }}Debug
+        env:
+          # Gir hver publiserte APK et unikt, økende versionCode — se
+          # android/app/build.gradle. github.run_number øker for hver
+          # workflow-kjøring, uten behov for egen tellerstate.
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
 
       - uses: actions/upload-artifact@v7
         if: steps.filter.outputs.android == 'true'
@@ -158,9 +163,19 @@ jobs:
         working-directory: android/app
         run: |
           name=$(grep -oP 'versionName\s+"\K[^"]+' build.gradle)
-          code=$(grep -oP 'versionCode\s+\K[0-9]+' build.gradle)
-          echo "full=$name.$(printf '%02d' "$code")" >> "$GITHUB_OUTPUT"
+          echo "full=$name.$(printf '%03d' "$GITHUB_RUN_NUMBER")" >> "$GITHUB_OUTPUT"
           echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Fjern gamle APK-assets fra releasen
+        if: steps.filter.outputs.android == 'true' && github.event_name == 'push'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "android-preview-${{ github.ref_name }}" --json assets \
+            --jq '.assets[].name' | while read -r name; do
+            gh release delete-asset "android-preview-${{ github.ref_name }}" "$name" -y
+          done
 
       - name: Publish APK as GitHub release preview
         if: steps.filter.outputs.android == 'true' && github.event_name == 'push'

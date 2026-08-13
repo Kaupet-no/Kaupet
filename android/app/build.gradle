@@ -13,7 +13,11 @@ android {
         applicationId "no.kaupet.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
+        // versionCode overstyres i CI med GITHUB_RUN_NUMBER (se
+        // native-android-jobben i .github/workflows/ci.yml) slik at hver
+        // publiserte release faktisk får et nytt versjonsnummer. Lokale
+        // bygg uten env-variabelen faller tilbake til 1.
+        versionCode (System.getenv("ANDROID_VERSION_CODE") ?: "1").toInteger()
         versionName "0.2"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

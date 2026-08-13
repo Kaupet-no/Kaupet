@@ -186,12 +186,17 @@ export function MessagesButton() {
   const conversations = data ?? [];
 
   const trigger = (
-    <Button variant="ghost" size="icon" aria-label="Meldinger" className="relative">
+    <Button
+      variant="ghost"
+      size="icon"
+      aria-label={unreadCount > 0 ? `Meldinger, ${unreadCount} uleste` : "Meldinger"}
+      className="relative"
+    >
       <MessageCircle className="size-5" />
       {unreadCount > 0 && (
         <span
           className="pointer-events-none absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-accent-foreground"
-          aria-label={`${unreadCount} uleste meldinger`}
+          aria-hidden="true"
         >
           {unreadCount > 9 ? "9+" : unreadCount}
         </span>
@@ -247,26 +252,30 @@ export function MessagesButton() {
                     to="/meldinger/$id"
                     params={{ id: c.id }}
                     onClick={() => setOpen(false)}
-                    aria-label={`${unread ? "Ulest melding fra " : "Melding fra "}${c.other_name ?? "ukjent bruker"}`}
                     className={
                       native
                         ? "block min-h-16 px-4 py-3 hover:bg-muted"
                         : "block min-h-12 px-3 py-2.5 hover:bg-muted"
                     }
                   >
-                    <div className="flex items-start gap-2">
+                    {unread && <span className="sr-only">Ulest. </span>}
+                    <div
+                      className={
+                        native
+                          ? "flex flex-wrap items-start gap-x-2 gap-y-1"
+                          : "flex items-start gap-2"
+                      }
+                    >
                       {unread && (
                         <span
                           className="mt-2 size-2 shrink-0 rounded-full bg-accent"
                           aria-hidden="true"
                         />
                       )}
-                      <div className="min-w-0 flex-1">
+                      <div className={native ? "min-w-0 basis-48 flex-1" : "min-w-0 flex-1"}>
                         <p
                           className={
-                            native
-                              ? "line-clamp-1 text-base font-medium"
-                              : "line-clamp-1 text-sm font-medium"
+                            native ? "text-base font-medium" : "line-clamp-1 text-sm font-medium"
                           }
                         >
                           {c.other_name ?? "Ukjent bruker"}
@@ -274,7 +283,7 @@ export function MessagesButton() {
                         <p
                           className={
                             native
-                              ? "line-clamp-1 text-sm text-muted-foreground"
+                              ? "line-clamp-2 text-sm text-muted-foreground"
                               : "line-clamp-1 text-xs text-muted-foreground"
                           }
                         >
@@ -287,7 +296,7 @@ export function MessagesButton() {
                       <span
                         className={
                           native
-                            ? "shrink-0 text-sm text-muted-foreground"
+                            ? "text-sm text-muted-foreground"
                             : "shrink-0 text-xs text-muted-foreground"
                         }
                       >

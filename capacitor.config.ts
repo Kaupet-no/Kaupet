@@ -14,13 +14,20 @@ const config: CapacitorConfig = {
   // the iOS/Android overscroll bounce when scrolling past the top/bottom.
   backgroundColor: "#fbf9f3",
   server: {
-    url: isStaging ? "https://staging.kaupet.no" : "https://kaupet.no",
+    // Produksjon peker rett på kaupet.no. Staging setter IKKE url her —
+    // staging.kaupet.no ligger bak Cloudflare Access, så appen ville aldri
+    // kommet forbi access-veggen ved kaldstart. I stedet lastes den lokale
+    // capacitor-shell/index.html først, som lar brukeren velge
+    // staging.kaupet.no eller en lokal IP før WebViewen navigerer dit.
+    url: isStaging ? undefined : "https://kaupet.no",
     errorPath: "offline.html",
-    // Kun staging: lar "Meg"-siden sin dev-server-bryter (DevServerSwitch)
-    // navigere WebViewen til en http://-adresse på lokalt nettverk.
-    // allowNavigation må matche siden vertsnavnet ikke er kjent på
-    // forhånd — usesCleartextTraffic er satt tilsvarende kun for
-    // staging-flavoren, se android/app/src/staging/AndroidManifest.xml.
+    // Kun staging: lar kaldstart-velgeren (capacitor-shell/index.html) og
+    // "Meg"-siden sin dev-server-bryter (DevServerSwitch) navigere
+    // WebViewen til staging.kaupet.no, Cloudflare Access sin login-side,
+    // eller en http://-adresse på lokalt nettverk. allowNavigation må
+    // matche siden vertsnavnet ikke er kjent på forhånd —
+    // usesCleartextTraffic er satt tilsvarende kun for staging-flavoren,
+    // se android/app/src/staging/AndroidManifest.xml.
     cleartext: isStaging,
     allowNavigation: isStaging ? ["*"] : undefined,
     androidScheme: "https",

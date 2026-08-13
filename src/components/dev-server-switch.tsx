@@ -3,16 +3,21 @@ import { Laptop } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { STAGING_HOST } from "@/hooks/use-should-show-dev-server-switch";
+import { localDevServerUrl } from "@/lib/dev-server-url";
 
 export function DevServerSwitch() {
   const currentHost = window.location.host;
   const onStaging = currentHost === STAGING_HOST;
   const [address, setAddress] = useState("");
+  const [error, setError] = useState("");
 
   const connectToLocal = () => {
-    const trimmed = address.trim();
-    if (!trimmed) return;
-    window.location.href = `http://${trimmed}`;
+    const url = localDevServerUrl(address);
+    if (!url) {
+      setError("Bruk localhost eller en privat IP-adresse med port.");
+      return;
+    }
+    window.location.assign(url);
   };
 
   const backToStaging = () => {
@@ -37,13 +42,27 @@ export function DevServerSwitch() {
               <div className="mt-3 flex flex-col gap-2">
                 <Input
                   value={address}
-                  onChange={(e) => setAddress(e.target.value)}
+                  onChange={(e) => {
+                    setAddress(e.target.value);
+                    setError("");
+                  }}
                   placeholder="192.168.1.23:3000"
                   aria-label="IP-adresse og port til lokal dev-server"
                   inputMode="url"
                   autoCapitalize="off"
                   autoCorrect="off"
+                  aria-invalid={!!error}
+                  aria-describedby={error ? "dev-server-address-error" : undefined}
                 />
+                {error && (
+                  <p
+                    id="dev-server-address-error"
+                    className="text-sm text-destructive"
+                    role="alert"
+                  >
+                    {error}
+                  </p>
+                )}
                 <Button
                   type="button"
                   variant="secondary"

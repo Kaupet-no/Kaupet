@@ -518,8 +518,8 @@ ikke manuelt verifisert.
 
 ### Fase 7 – responsivitet, tilgjengelighet og native QA
 
-Status: **Ikke startet**  
-Ansvarlig: –  
+Status: **Ferdig i kode**  
+Ansvarlig: Codex  
 Sist oppdatert: 2026-08-13
 
 Automatisert kontroll:
@@ -560,7 +560,10 @@ Akseptansekriterier:
 - Alle treffområder er manuelt eller automatisk bekreftet mot kontrakten.
 - Avvik er dokumentert med eier og oppfølgingspunkt.
 
-Verifisering/statusnotat: _Fylles ut av agenten._
+Verifisering/statusnotat: Lint, typecheck, 279 Vitest-tester, produksjonsbygg
+og bundlebudsjett passerer. Native-preview-E2E ble startet gjennom lokal
+Supabase, men mangler sluttrapport i denne kjøringen. Manuell viewport-,
+skjermleser-, simulator- og enhetsmatrise er ikke utført.
 
 ### Fase 8 – utrulling og produktmåling
 
@@ -613,6 +616,7 @@ oppføring.
 
 | Dato       | Agent | Fase/punkt | Status        | Endring og resultat                                              | Verifisering                                             |
 | ---------- | ----- | ---------- | ------------- | ---------------------------------------------------------------- | -------------------------------------------------------- |
+| 2026-08-13 | Codex | Fase 7     | Ferdig i kode | Kjørte automatiske kontroller og dokumenterte QA-avgrensninger.  | Lint, typecheck, test, bygg og bundlebudsjett passerer.  |
 | 2026-08-13 | Codex | Fase 6     | Ferdig i kode | Forenklet avanserte søkeord og synlige regelhandlinger.          | Lint, typecheck og komponenttest passerer.               |
 | 2026-08-13 | Codex | Fase 5     | Ferdig i kode | Viste primærfiltre og flyttet standardvalg til native valgflate. | Lint og typecheck passerer; kategori-QA gjenstår.        |
 | 2026-08-13 | Codex | Fase 4     | Ferdig i kode | La til separate valgflater, radius- og prishurtigvalg.           | Lint og typecheck passerer; native QA gjenstår.          |
@@ -670,16 +674,17 @@ blandes inn i dette initiativet. Oppgi begrunnelse og foreslå eget arbeid.
 Før nøyaktig kommando, miljø og resultat. «Testet» uten miljø/størrelse er ikke
 tilstrekkelig.
 
-| Dato       | Fase | Kontroll/miljø                                                                                        | Resultat                                                | Ikke dekket / merknad                                                                         |
-| ---------- | ---- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| 2026-08-13 | 6    | `bun run lint`; `bunx tsc --noEmit`; `bun run test -- src/components/ui/native-choice-sheet.test.tsx` | Lint, typecheck og 2 komponenttester passerer.          | Ingen round-trip- eller native enhets-QA.                                                     |
-| 2026-08-13 | 5    | `bun run lint`; `bunx tsc --noEmit`                                                                   | Lint og typecheck passerer.                             | Ingen Bil/MC/generisk-kategori eller 100+-liste manuelt verifisert.                           |
-| 2026-08-13 | 4    | `bun run lint`; `bunx tsc --noEmit`                                                                   | Lint og typecheck passerer.                             | Ingen tastatur-/skjermleser- eller native enhets-QA.                                          |
-| 2026-08-13 | 3    | `bun run lint`; `bunx tsc --noEmit`                                                                   | Lint og typecheck passerer.                             | Ingen komponenttest for apply/cancel/system-tilbake eller native gest/fokus-QA.               |
-| 2026-08-13 | 2    | `bun run test -- src/components/ui/native-choice-sheet.test.tsx`; `bun run lint`; `bunx tsc --noEmit` | 2 komponenttester, lint og typecheck passerer.          | Ingen 100+-liste, stor tekst eller native simulator/enhet.                                    |
-| 2026-08-13 | 1    | Dokumentgjennomgang av `docs/UI-GUIDE.md` mot eksisterende UI-primitiver                              | Kontrolltyper, mål og tilgjengelighetskrav dokumentert. | Ingen nettleser-, simulator- eller enhetskontroll; fase 7 eier QA.                            |
-| 2026-08-13 | 0    | Kodegjennomgang av `SearchPanel`, `SearchFilterSections`, filterkontrakten og telemetry               | Baseline, filtertyper og prototype dokumentert.         | Ingen simulator/enhet, skjermbilder/video, stagingdata eller UX-godkjenning i arbeidsmiljøet. |
-| –          | –    | –                                                                                                     | Ingen implementeringskontroller kjørt ennå              | Planfase                                                                                      |
+| Dato       | Fase | Kontroll/miljø                                                                                        | Resultat                                                      | Ikke dekket / merknad                                                                         |
+| ---------- | ---- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| 2026-08-13 | 7    | `bun run lint`; `bunx tsc --noEmit`; `bun run test`; `bun run build`; `bun run check:bundle`          | 279 tester, lint, typecheck, bygg og bundlebudsjett passerer. | E2E mangler sluttrapport; manuell native-/skjermleser-QA er ikke utført.                      |
+| 2026-08-13 | 6    | `bun run lint`; `bunx tsc --noEmit`; `bun run test -- src/components/ui/native-choice-sheet.test.tsx` | Lint, typecheck og 2 komponenttester passerer.                | Ingen round-trip- eller native enhets-QA.                                                     |
+| 2026-08-13 | 5    | `bun run lint`; `bunx tsc --noEmit`                                                                   | Lint og typecheck passerer.                                   | Ingen Bil/MC/generisk-kategori eller 100+-liste manuelt verifisert.                           |
+| 2026-08-13 | 4    | `bun run lint`; `bunx tsc --noEmit`                                                                   | Lint og typecheck passerer.                                   | Ingen tastatur-/skjermleser- eller native enhets-QA.                                          |
+| 2026-08-13 | 3    | `bun run lint`; `bunx tsc --noEmit`                                                                   | Lint og typecheck passerer.                                   | Ingen komponenttest for apply/cancel/system-tilbake eller native gest/fokus-QA.               |
+| 2026-08-13 | 2    | `bun run test -- src/components/ui/native-choice-sheet.test.tsx`; `bun run lint`; `bunx tsc --noEmit` | 2 komponenttester, lint og typecheck passerer.                | Ingen 100+-liste, stor tekst eller native simulator/enhet.                                    |
+| 2026-08-13 | 1    | Dokumentgjennomgang av `docs/UI-GUIDE.md` mot eksisterende UI-primitiver                              | Kontrolltyper, mål og tilgjengelighetskrav dokumentert.       | Ingen nettleser-, simulator- eller enhetskontroll; fase 7 eier QA.                            |
+| 2026-08-13 | 0    | Kodegjennomgang av `SearchPanel`, `SearchFilterSections`, filterkontrakten og telemetry               | Baseline, filtertyper og prototype dokumentert.               | Ingen simulator/enhet, skjermbilder/video, stagingdata eller UX-godkjenning i arbeidsmiljøet. |
+| –          | –    | –                                                                                                     | Ingen implementeringskontroller kjørt ennå                    | Planfase                                                                                      |
 
 ## 13. Ferdigdefinisjon for hvert arbeidspunkt
 

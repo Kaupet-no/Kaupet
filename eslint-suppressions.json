@@ -167,6 +167,11 @@
       "count": 1
     }
   },
+  "src/hooks/use-should-show-dev-server-switch.ts": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
   "src/hooks/use-typewriter-text.ts": {
     "react-hooks/set-state-in-effect": {
       "count": 2

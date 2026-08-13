@@ -16,7 +16,13 @@ const config: CapacitorConfig = {
   server: {
     url: isStaging ? "https://staging.kaupet.no" : "https://kaupet.no",
     errorPath: "offline.html",
-    cleartext: false,
+    // Kun staging: lar "Meg"-siden sin dev-server-bryter (DevServerSwitch)
+    // navigere WebViewen til en http://-adresse på lokalt nettverk.
+    // allowNavigation må matche siden vertsnavnet ikke er kjent på
+    // forhånd — usesCleartextTraffic er satt tilsvarende kun for
+    // staging-flavoren, se android/app/src/staging/AndroidManifest.xml.
+    cleartext: isStaging,
+    allowNavigation: isStaging ? ["*"] : undefined,
     androidScheme: "https",
   },
   ios: {

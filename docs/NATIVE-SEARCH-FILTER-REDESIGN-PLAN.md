@@ -489,8 +489,8 @@ Bil, MC, generisk kategori og 100+-liste er ikke manuelt verifisert.
 
 ### Fase 6 – aktive filtre og avanserte søkeord
 
-Status: **Ikke startet**  
-Ansvarlig: –  
+Status: **Ferdig i kode**  
+Ansvarlig: Codex  
 Sist oppdatert: 2026-08-13
 
 Arbeid:
@@ -511,7 +511,10 @@ Akseptansekriterier:
   før regelen kan settes opp.
 - Eksisterende søkegrupper round-tripper uten datatap.
 
-Verifisering/statusnotat: _Fylles ut av agenten._
+Verifisering/statusnotat: Regelbyggeren bruker forståelig ordlyd, har synlig
+rediger- og fjernhandling og beholder `TermGroup`-semantikken. Lint, typecheck
+og den relevante valgflatetesten passerer. Round-trip og native enhets-QA er
+ikke manuelt verifisert.
 
 ### Fase 7 – responsivitet, tilgjengelighet og native QA
 
@@ -610,6 +613,7 @@ oppføring.
 
 | Dato       | Agent | Fase/punkt | Status        | Endring og resultat                                              | Verifisering                                             |
 | ---------- | ----- | ---------- | ------------- | ---------------------------------------------------------------- | -------------------------------------------------------- |
+| 2026-08-13 | Codex | Fase 6     | Ferdig i kode | Forenklet avanserte søkeord og synlige regelhandlinger.          | Lint, typecheck og komponenttest passerer.               |
 | 2026-08-13 | Codex | Fase 5     | Ferdig i kode | Viste primærfiltre og flyttet standardvalg til native valgflate. | Lint og typecheck passerer; kategori-QA gjenstår.        |
 | 2026-08-13 | Codex | Fase 4     | Ferdig i kode | La til separate valgflater, radius- og prishurtigvalg.           | Lint og typecheck passerer; native QA gjenstår.          |
 | 2026-08-13 | Codex | Fase 3     | Ferdig i kode | Innførte filteroversikt med sammendrag og intern tilbakeflyt.    | Lint og typecheck passerer; native QA gjenstår.          |
@@ -668,6 +672,7 @@ tilstrekkelig.
 
 | Dato       | Fase | Kontroll/miljø                                                                                        | Resultat                                                | Ikke dekket / merknad                                                                         |
 | ---------- | ---- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| 2026-08-13 | 6    | `bun run lint`; `bunx tsc --noEmit`; `bun run test -- src/components/ui/native-choice-sheet.test.tsx` | Lint, typecheck og 2 komponenttester passerer.          | Ingen round-trip- eller native enhets-QA.                                                     |
 | 2026-08-13 | 5    | `bun run lint`; `bunx tsc --noEmit`                                                                   | Lint og typecheck passerer.                             | Ingen Bil/MC/generisk-kategori eller 100+-liste manuelt verifisert.                           |
 | 2026-08-13 | 4    | `bun run lint`; `bunx tsc --noEmit`                                                                   | Lint og typecheck passerer.                             | Ingen tastatur-/skjermleser- eller native enhets-QA.                                          |
 | 2026-08-13 | 3    | `bun run lint`; `bunx tsc --noEmit`                                                                   | Lint og typecheck passerer.                             | Ingen komponenttest for apply/cancel/system-tilbake eller native gest/fokus-QA.               |

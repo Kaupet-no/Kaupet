@@ -2,8 +2,206 @@
 <html lang="nb">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
     <title>Kaupet</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #fbf9f3;
+        --surface: #ffffff;
+        --fg: #1a1a1a;
+        --muted: #6b6b6b;
+        --primary: #2f5d44;
+        --primary-fg: #fbf9f3;
+        --border: #e5e1d6;
+        --danger: #b3261e;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          color-scheme: dark;
+          --bg: #0f0f0f;
+          --surface: #1a1a1a;
+          --fg: #f5f5f5;
+          --muted: #a3a3a3;
+          --border: #2a2a2a;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+      }
+      body {
+        background: var(--bg);
+        color: var(--fg);
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        padding-top: max(24px, env(safe-area-inset-top));
+        padding-bottom: max(24px, env(safe-area-inset-bottom));
+      }
+      .card {
+        width: 100%;
+        max-width: 360px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 24px;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 4px;
+      }
+      p {
+        font-size: 14px;
+        color: var(--muted);
+        margin: 0 0 20px;
+        line-height: 1.4;
+      }
+      button {
+        display: block;
+        width: 100%;
+        font-size: 15px;
+        font-weight: 500;
+        border-radius: 12px;
+        padding: 13px 16px;
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--fg);
+        cursor: pointer;
+      }
+      button.primary {
+        background: var(--primary);
+        color: var(--primary-fg);
+        border-color: var(--primary);
+        margin-bottom: 10px;
+      }
+      input {
+        display: block;
+        width: 100%;
+        font-size: 15px;
+        border-radius: 12px;
+        padding: 12px 14px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        color: var(--fg);
+        margin: 12px 0;
+      }
+      .error {
+        font-size: 13px;
+        color: var(--danger);
+        margin: -6px 0 12px;
+        display: none;
+      }
+    </style>
   </head>
-  <body></body>
+  <body>
+    <div class="card">
+      <h1>Velg server</h1>
+      <p>
+        staging.kaupet.no ligger bak Cloudflare Access. Bruk lokal IP hvis du tester mot en
+        dev-server på samme nettverk.
+      </p>
+      <button class="primary" id="staging-btn" type="button">Gå til staging.kaupet.no</button>
+      <input
+        id="ip-input"
+        placeholder="192.168.1.23:3000"
+        inputmode="url"
+        autocapitalize="off"
+        autocorrect="off"
+      />
+      <div class="error" id="ip-error">Bruk localhost eller en privat IP-adresse med port.</div>
+      <button id="ip-btn" type="button">Koble til lokal server</button>
+    </div>
+    <script>
+      var STORAGE_KEY = "kaupet_backend_target";
+
+      function localDevServerUrl(address) {
+        var match = address.trim().match(/^(localhost|\d{1,3}(?:\.\d{1,3}){3}):(\d{1,5})$/);
+        if (!match) return null;
+        var port = Number(match[2]);
+        if (port < 1 || port > 65535) return null;
+
+        var url;
+        try {
+          url = new URL("http://" + match[1] + ":" + port);
+        } catch (e) {
+          return null;
+        }
+        // Bygg opp navigasjonsmålet fra én egen URL-instans med sjekket
+        // protokoll/vertsnavn, ikke fra den rå adressen — det er mønsteret
+        // CodeQL sine js/xss-through-dom og
+        // js/client-side-unvalidated-url-redirection-spørringer godtar som
+        // sanering av en brukerstyrt navigasjons-URL.
+        if (url.protocol !== "http:") return null;
+        if (url.hostname !== "localhost") {
+          var octets = url.hostname.split(".").map(Number);
+          if (
+            octets.length !== 4 ||
+            octets.some(function (o) {
+              return !(o >= 0 && o <= 255);
+            })
+          )
+            return null;
+          var a = octets[0];
+          var b = octets[1];
+          var privateAddress =
+            a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+          if (!privateAddress) return null;
+        }
+        return url;
+      }
+
+      function goToStaging() {
+        localStorage.setItem(STORAGE_KEY, "staging");
+        window.location.replace("https://staging.kaupet.no");
+      }
+
+      function goToLocal(url) {
+        localStorage.setItem(STORAGE_KEY, url.href);
+        window.location.replace(url.href);
+      }
+
+      // DevServerSwitch (Meg-panelet) navigerer hit igjen med ?target=
+      // for å oppdatere det lagrede valget før den fortsetter videre dit.
+      var params = new URLSearchParams(window.location.search);
+      var target = params.get("target");
+      if (target === "staging") {
+        goToStaging();
+      } else if (target) {
+        var url = localDevServerUrl(target);
+        if (url) goToLocal(url);
+      } else {
+        var saved = localStorage.getItem(STORAGE_KEY);
+        if (saved === "staging") {
+          goToStaging();
+        } else if (saved) {
+          window.location.replace(saved);
+        } else {
+          document.getElementById("staging-btn").addEventListener("click", goToStaging);
+          document.getElementById("ip-btn").addEventListener("click", function () {
+            var input = document.getElementById("ip-input");
+            var url = localDevServerUrl(input.value);
+            var error = document.getElementById("ip-error");
+            if (!url) {
+              error.style.display = "block";
+              return;
+            }
+            error.style.display = "none";
+            goToLocal(url);
+          });
+        }
+      }
+    </script>
+  </body>
 </html>

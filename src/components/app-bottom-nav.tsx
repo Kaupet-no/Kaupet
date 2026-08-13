@@ -86,7 +86,11 @@ export function AppBottomNav() {
           aria-current={isOnHome ? "page" : undefined}
         >
           <span className="flex h-11 w-11 items-center justify-center">
-            <img src={logoIcon} alt="" className={`size-6 ${isOnHome ? "" : "opacity-60"}`} />
+            <img
+              src={logoIcon}
+              alt=""
+              className={`size-6 dark:brightness-125 ${isOnHome ? "" : "opacity-60"}`}
+            />
           </span>
           <span
             className={`text-[11px] ${isOnHome ? "font-medium text-primary" : "text-muted-foreground"}`}
@@ -206,7 +210,7 @@ export function AppBottomNav() {
       <ResponsiveOverlay open={adPickerOpen} onOpenChange={setAdPickerOpen}>
         <ResponsiveOverlayContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Ny annonse</DialogTitle>
+            <DialogTitle>Hva vil du annonsere?</DialogTitle>
           </DialogHeader>
           <AdPickerOptions
             onSell={() => {

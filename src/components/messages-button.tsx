@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, MessagesSquare } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
 
@@ -13,6 +13,8 @@ import { isUnread } from "@/lib/unread";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { NativeSheet } from "@/components/ui/native-sheet";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type ConvPreview = {
   id: string;
@@ -135,7 +137,7 @@ export function MessagesButton() {
   const native = useIsNative();
   const [open, setOpen] = useState(false);
 
-  const { data, refetch } = useQuery({
+  const { data, refetch, isLoading, isError, isFetching } = useQuery({
     queryKey: ["messages-preview", user?.id],
     enabled: !!user,
     queryFn: () => fetchConversationPreviews(user!.id),
@@ -184,12 +186,17 @@ export function MessagesButton() {
   const conversations = data ?? [];
 
   const trigger = (
-    <Button variant="ghost" size="icon" aria-label="Meldinger" className="relative">
+    <Button
+      variant="ghost"
+      size="icon"
+      aria-label={unreadCount > 0 ? `Meldinger, ${unreadCount} uleste` : "Meldinger"}
+      className="relative"
+    >
       <MessageCircle className="size-5" />
       {unreadCount > 0 && (
         <span
           className="pointer-events-none absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-accent-foreground"
-          aria-label={`${unreadCount} uleste meldinger`}
+          aria-hidden="true"
         >
           {unreadCount > 9 ? "9+" : unreadCount}
         </span>
@@ -199,14 +206,34 @@ export function MessagesButton() {
 
   const convList = (
     <>
-      <div className="flex items-center justify-between border-b border-border px-3 py-2">
-        <span className="text-sm font-medium">Meldinger</span>
-      </div>
+      {!native && (
+        <div className="border-b border-border px-3 py-2 text-sm font-medium">Meldinger</div>
+      )}
       <div className={native ? "min-h-0 flex-1 overflow-y-auto" : "max-h-[400px] overflow-y-auto"}>
-        {conversations.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-            Ingen meldinger ennå.
+        {isLoading ? (
+          <div className="space-y-3 px-4 py-4" aria-label="Laster meldinger">
+            {[0, 1, 2].map((index) => (
+              <div key={index} className="space-y-2">
+                <Skeleton className="h-5 w-2/5" />
+                <Skeleton className="h-4 w-4/5" />
+              </div>
+            ))}
           </div>
+        ) : isError ? (
+          <EmptyState
+            icon={MessagesSquare}
+            title="Kunne ikke laste meldinger"
+            description="Prøv igjen om et øyeblikk."
+            action={<Button onClick={() => void refetch()}>Prøv igjen</Button>}
+            className="m-4 p-6"
+          />
+        ) : conversations.length === 0 ? (
+          <EmptyState
+            icon={MessagesSquare}
+            title="Ingen meldinger ennå"
+            description="Samtalene dine vises her."
+            className="m-4 p-6"
+          />
         ) : (
           <ul className="divide-y divide-border">
             {conversations.map((c) => {
@@ -225,22 +252,54 @@ export function MessagesButton() {
                     to="/meldinger/$id"
                     params={{ id: c.id }}
                     onClick={() => setOpen(false)}
-                    className="block px-3 py-2.5 hover:bg-muted"
+                    className={
+                      native
+                        ? "block min-h-16 px-4 py-3 hover:bg-muted"
+                        : "block min-h-12 px-3 py-2.5 hover:bg-muted"
+                    }
                   >
-                    <div className="flex items-start gap-2">
-                      {unread && <span className="mt-1.5 size-2 shrink-0 rounded-full bg-accent" />}
-                      <div className="min-w-0 flex-1">
-                        <p className="line-clamp-1 text-sm font-medium">
+                    {unread && <span className="sr-only">Ulest. </span>}
+                    <div
+                      className={
+                        native
+                          ? "flex flex-wrap items-start gap-x-2 gap-y-1"
+                          : "flex items-start gap-2"
+                      }
+                    >
+                      {unread && (
+                        <span
+                          className="mt-2 size-2 shrink-0 rounded-full bg-accent"
+                          aria-hidden="true"
+                        />
+                      )}
+                      <div className={native ? "min-w-0 basis-48 flex-1" : "min-w-0 flex-1"}>
+                        <p
+                          className={
+                            native ? "text-base font-medium" : "line-clamp-1 text-sm font-medium"
+                          }
+                        >
                           {c.other_name ?? "Ukjent bruker"}
                         </p>
-                        <p className="line-clamp-1 text-xs text-muted-foreground">
+                        <p
+                          className={
+                            native
+                              ? "line-clamp-2 text-sm text-muted-foreground"
+                              : "line-clamp-1 text-xs text-muted-foreground"
+                          }
+                        >
                           {c.listing_title && <span className="mr-1">{c.listing_title} ·</span>}
                           {c.last_message_body
                             ? `${lastFromMe ? "Du: " : ""}${c.last_message_body}`
                             : "Ingen meldinger enda"}
                         </p>
                       </div>
-                      <span className="shrink-0 text-xs text-muted-foreground">
+                      <span
+                        className={
+                          native
+                            ? "text-sm text-muted-foreground"
+                            : "shrink-0 text-xs text-muted-foreground"
+                        }
+                      >
                         {formatDistanceToNow(new Date(c.last_message_at), {
                           addSuffix: false,
                           locale: nb,
@@ -254,11 +313,20 @@ export function MessagesButton() {
           </ul>
         )}
       </div>
-      <div className="border-t border-border">
+      {isFetching && !isLoading && (
+        <div role="status" aria-live="polite" className="sr-only">
+          Oppdaterer meldinger
+        </div>
+      )}
+      <div className={native ? "mt-4 border-t border-border px-4 pt-3" : "border-t border-border"}>
         <Link
           to="/meldinger"
           onClick={() => setOpen(false)}
-          className="block rounded px-2 py-2 text-center text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+          className={
+            native
+              ? "flex h-14 items-center justify-center rounded-md text-base font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+              : "flex min-h-12 items-center justify-center rounded px-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+          }
         >
           Se alle meldinger
         </Link>
@@ -272,7 +340,8 @@ export function MessagesButton() {
         open={open}
         onOpenChange={setOpen}
         trigger={trigger}
-        title="Meldinger"
+        title={<span className="block px-4 pb-3 pt-4">Meldinger</span>}
+        titleVisible
         expandable
         initialSnapPoint={0.6}
         className="flex flex-col p-0 pb-safe"

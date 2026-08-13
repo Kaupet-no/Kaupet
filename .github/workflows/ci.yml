@@ -103,6 +103,21 @@ jobs:
           java-version: 21
           cache: gradle
 
+      # main peker mot produksjon (kaupet.no), alt annet (staging,
+      # workflow_dispatch fra andre branches) peker mot staging.kaupet.no —
+      # se product flavors i android/app/build.gradle og CAPACITOR_ENV-
+      # bruken i capacitor.config.ts.
+      - name: Bestem miljø
+        id: env
+        run: |
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "flavor=production" >> "$GITHUB_OUTPUT"
+            echo "flavorCap=Production" >> "$GITHUB_OUTPUT"
+          else
+            echo "flavor=staging" >> "$GITHUB_OUTPUT"
+            echo "flavorCap=Staging" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
@@ -118,21 +133,23 @@ jobs:
 
       - name: Sync Android project
         run: bunx cap sync android
+        env:
+          CAPACITOR_ENV: ${{ steps.env.outputs.flavor }}
 
       - name: Run Android tests
         working-directory: android
-        run: ./gradlew test
+        run: ./gradlew test${{ steps.env.outputs.flavorCap }}DebugUnitTest
 
       - name: Build debug APK
         if: steps.filter.outputs.android == 'true'
         working-directory: android
-        run: ./gradlew assembleDebug
+        run: ./gradlew assemble${{ steps.env.outputs.flavorCap }}Debug
 
       - uses: actions/upload-artifact@v7
         if: steps.filter.outputs.android == 'true'
         with:
-          name: android-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: android-debug-apk-${{ steps.env.outputs.flavor }}
+          path: android/app/build/outputs/apk/${{ steps.env.outputs.flavor }}/debug/app-${{ steps.env.outputs.flavor }}-debug.apk
           retention-days: 14
 
       - name: Les app-versjon
@@ -151,11 +168,12 @@ jobs:
         with:
           tag_name: android-preview-${{ github.ref_name }}
           name: >-
-            Android preview (${{ github.ref_name }}) —
+            Kaupet${{ steps.env.outputs.flavor == 'staging' && ' Staging' || '' }}
+            (${{ github.ref_name }}) —
             v${{ steps.app_version.outputs.full }}
             (${{ steps.app_version.outputs.sha }})
           prerelease: true
-          files: android/app/build/outputs/apk/debug/app-debug.apk
+          files: android/app/build/outputs/apk/${{ steps.env.outputs.flavor }}/debug/app-${{ steps.env.outputs.flavor }}-debug.apk
 
   deploy:
     name: Deploy to Cloudflare Workers

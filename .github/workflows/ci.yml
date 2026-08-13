@@ -106,6 +106,16 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # google-services.json er gitignoret (Firebase-nøkler for push).
+      # android/app/build.gradle hopper stille over google-services-pluginet
+      # hvis filen mangler — bygget lykkes, men APK-en mangler Firebase-
+      # oppsett og appen krasjer så snart push-varslinger aktiveres.
+      - name: Skriv google-services.json fra secret
+        working-directory: android/app
+        run: echo "$GOOGLE_SERVICES_JSON" > google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON }}
+
       - name: Sync Android project
         run: bunx cap sync android
 

@@ -89,6 +89,7 @@ jobs:
             android:
               - 'android/**'
               - 'capacitor.config.*'
+              - 'capacitor-shell/**'
               - 'src/**'
               - 'package.json'
 

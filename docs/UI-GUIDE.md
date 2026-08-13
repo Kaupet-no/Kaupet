@@ -10,7 +10,8 @@ Kort referanse for konsistente mønstre i Kaupet-frontend.
 6. [Loading/empty/error-states](#loadingemptyerror-states)
 7. [Tilgjengelighet](#tilgjengelighet)
 8. [Native (Capacitor)](#native-capacitor)
-9. [Skjemavalidering](#skjemavalidering)
+9. [Native søk og filtre](#native-søk-og-filtre)
+10. [Skjemavalidering](#skjemavalidering)
 
 ## shadcn/ui-primitiver
 
@@ -154,7 +155,8 @@ Tre varianter: `default`, `destructive`, og `warning` (amber, for advarsler som 
   ikke i produksjonsbygget. Bruk den til layoutverifisering på 375×812, 844×390,
   820×1180 og 1024×1366 — safe-area-verdier er alltid 0 i nettleser, så de må
   fortsatt sjekkes i simulator.
-- Touch-targets skal være minst 44×44px (se `app-bottom-nav.tsx`).
+- Touch-targets skal være minst 48×48px (dekker både Apples 44 pt og Androids
+  48 dp; se `app-bottom-nav.tsx`).
 - **Safe area:** `FullscreenOverlayContent` og `Sheet side="bottom"` håndterer det selv — ikke legg til padding på kallstedet. Skal en fullskjermflate gå helt ut i kanten (bilde, kart, kamera), sett `edgeToEdge` og padre ditt eget chrome i stedet, ikke medieinnholdet.
 - Utilities for chrome som ikke går via de primitivene: `.pt-safe`/`.pb-safe` (min. 0,5rem), `.pl-safe`/`.pr-safe` (null i basis — for elementer uten egen horisontal padding), `.px-safe` (1rem i basis — erstatning for `px-4`) og `.p-safe` (alle fire kanter, ingen minimum). Merk at de er ulagede og derfor **erstatter** `padding` fra Tailwind-utilities på samme element — velg varianten hvis basisverdi matcher det kallstedet hadde.
 - **Orientering:** telefon er låst til portrett ved oppstart, nettbrett roterer fritt (`src/lib/orientation.ts`). Trenger en flate landskap, kall `unlockOrientation()` ved mount og `lockPortraitOnPhone()` ved unmount — se `image-lightbox.tsx`, som er eneste unntak i dag. Ikke fjern landskap fra `Info.plist`: låsen styres i kjøretid, og plisten er det som gjør unntaket mulig i det hele tatt.
@@ -165,6 +167,81 @@ Tre varianter: `default`, `destructive`, og `warning` (amber, for advarsler som 
 - **Haptikk:** kall bare wrapperne i `src/lib/haptics.ts`, aldri Capacitor-pluginen direkte. Wrapperne normaliserer impact, selection og notification til én lett touch slik at handlinger ikke gir lange vibrasjonsmønstre på Android.
 - **Tekststørrelse:** `src/lib/text-scale.ts` speiler iOS' Dynamic Type inn i `html { font-size }`. Bruk `rem` (Tailwinds standard) for all typografi — `px`-satt tekst skalerer ikke med brukerens innstilling. Android trenger ingenting; WebView-en skalerer allerede selv.
 - Unngå `Tooltip` og andre hover-avhengige mønstre i flater som vises i native-appen.
+
+## Native søk og filtre
+
+Native søk og filtrering bruker én `SearchPanel`-flyt. Første nivå er alltid
+en oversikt over valgt tilstand; en detaljkontroll åpnes på egen flate. Ikke
+legg søketreff, flere dropdown-lister, checkboksmatriser eller flere slidere i
+oversikten samtidig.
+
+### Tetthet, rader og handlinger
+
+- Bruk `px-4` (16 px) som horisontal sidemarg på telefon, `gap-6` mellom
+  hovedgrupper og `gap-2` eller `gap-3` mellom relaterte rader.
+- En filterrad er minst 56 px høy, har minst 16 px horisontal og 12 px
+  vertikal padding, og hele raden er tappbar. La raden vokse for lang eller
+  skalert tekst; ikke bruk fast høyde eller `truncate` på eneste verdi.
+- Interaktive elementer er minst 48×48 px effektivt. Bruk
+  `native-touch-target` når selve kontrollen kan vokse, og `native-hit-area`
+  for kompakt ikon-chrome med separat, ikke-overlappende treffområde.
+- Primær bunnhandling er én fullbredde `Button size="lg"` med `h-14`; den
+  ligger i panellets dialogtre og viser live treffantall. Nullstilling er en
+  sekundær teksthandling og er bare synlig når et filter er aktivt.
+- Bruk semantiske tokens, luft og typografi før ekstra rammer. Ikke lag kort
+  inni kort eller flere fylte primærknapper i samme viewportseksjon.
+
+### Valgflater
+
+På telefon skal filterflyten ikke bruke ankret `SelectContent` eller popover
+for valg. `Select` er fortsatt riktig på web og desktop. Velg flate etter
+innholdet:
+
+| Innhold                    | Telefon                                                | Nettbrett/web                    |
+| -------------------------- | ------------------------------------------------------ | -------------------------------- |
+| 2–5 korte enkeltvalg       | Store, hele tappbare valgknapper/radiokontroller       | `Select` eller radiokontroller   |
+| 6–12 valg                  | `NativeSheet` med fullbreddsrader                      | `Select` eller dialog            |
+| Mer enn 12/lange etiketter | Fullhøyde `NativeSheet` med søk                        | Dialog med søk ved behov         |
+| Flervalg                   | Søkbar sjekkliste, valgte verdier først og fast «Bruk» | Samme semantikk, passende dialog |
+| Hierarki                   | Drill-down med breadcrumb og tilbake                   | Dialog eller sidepanel           |
+
+Valgraden skal være minst 52–56 px høy. Gjør hele checkbox-/radio-/switchraden
+tappbar, uttrykk valgt tilstand visuelt og semantisk, og tilby eksplisitt
+«Alle»/«Ingen begrensning». Bevar valgte verdier mens listen søkes. Bruk
+eksisterende `NativeSheet`/`ResponsiveOverlay` og `Checkbox`; ikke opprett en
+lokal variant av valgflaten per filter.
+
+```tsx
+<NativeSheet open={open} onOpenChange={setOpen} title="Velg tilstand" titleVisible expandable>
+  <button
+    type="button"
+    className="native-touch-target flex min-h-14 w-full items-center px-4 text-left"
+  >
+    Brukt
+  </button>
+  <Button type="button" size="lg" className="mt-6 h-14 w-full" onClick={apply}>
+    Bruk valg
+  </Button>
+</NativeSheet>
+```
+
+### Tall, tilgjengelighet og navigasjon
+
+- Pris, årstall og ekspertverdier prioriterer romslige Fra/Til-felt og
+  relevante hurtigvalg. Slider er sekundær og brukes bare når relativ
+  justering hjelper mer enn presis inntasting.
+- `Slider`/`RangeSlider` skal beholde `data-vaul-no-drag`, synlig tekstverdi,
+  tastaturtilgang og minst 24 px synlig thumb / 48×48 px effektivt treffområde.
+  Gi sliderregionen minst 24 px luft over og under sporet.
+- En filterunderside åpnes i full høyde på telefon. Tilbake går ett nivå opp,
+  gjenoppretter fokus og scroll til raden som åpnet undersiden, og lar
+  overlay-primitiven eie Android-tilbake/iOS-kantsveip.
+- Fast bunnhandling skal ikke portaleres utenfor det aktive dialogtreet.
+  Ved ny opptelling beholdes forrige treffantall med en kort statusmelding
+  (`role="status"`, `aria-live="polite"`).
+- Tekst og verdier bruker `rem`; verifiser 200 % tekst og eksternt tastatur.
+  En gesture, inkludert swipe for fjerning, er aldri eneste måte å gjøre en
+  handling på.
 
 ## Skjemavalidering
 

@@ -153,7 +153,7 @@ export function OnboardingFlow({ onComplete }: Props) {
               </div>
               <h1 className="font-display text-3xl font-semibold tracking-tight">Velkommen!</h1>
               <p className="mt-4 max-w-xs text-base text-muted-foreground">
-                Kaupet er bygget for å være en litt annerledes markedsplass. Ingen unødvendig
+                Kaupet er bygget for å være en litt annerledes markedsplass. Minst mulig
                 datainnsamling om deg, ingen reklame og 100% fri kildekode.
               </p>
               <button
@@ -250,9 +250,8 @@ export function OnboardingFlow({ onComplete }: Props) {
             <p className="mt-6 text-lg text-muted-foreground">
               Takk for at du vil være en del av Kaupet.no.
               <br />
-              Vi håper du trives!
+              Vi håper du vil trives!
             </p>
-            <span className="mt-8 text-sm text-muted-foreground">Trykk for å fortsette</span>
           </button>
         )}
       </FullscreenOverlayContent>

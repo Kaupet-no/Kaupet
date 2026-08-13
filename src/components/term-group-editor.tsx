@@ -66,7 +66,7 @@ export function TermGroupRow({
       }`}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
+        <div className="grid w-full gap-2">
           <InclusionToggle
             value={group.exclude}
             onChange={(exclude) => onChange({ ...group, exclude })}
@@ -74,7 +74,9 @@ export function TermGroupRow({
           <ModeToggle
             value={group.mode}
             onChange={(mode) => onChange({ ...group, mode })}
-            labels={["Alle ord", "Minst ett"]}
+            labels={
+              group.exclude ? ["Alle ordene", "Minst ett ord"] : ["Må inneholde", "Kan inneholde"]
+            }
           />
         </div>
         {onRemove && (
@@ -112,7 +114,7 @@ export function TermGroupRow({
               addTerm();
             }
           }}
-          placeholder="f.eks. rød"
+          placeholder="Legg til ord"
         />
         <Button type="button" size="sm" variant="outline" onClick={addTerm}>
           <Plus className="size-4" /> Legg til
@@ -137,7 +139,11 @@ export function TermGroupChips({
       <span
         className={`text-xs font-medium ${group.exclude ? "text-destructive" : "text-foreground"}`}
       >
-        {group.exclude ? "Skjul:" : "Vis:"}
+        {group.exclude
+          ? "Skal ikke inneholde:"
+          : group.mode === "all"
+            ? "Må inneholde:"
+            : "Kan inneholde:"}
       </span>
       {group.terms.map((t, i) => (
         <Fragment key={t}>
@@ -179,24 +185,24 @@ function InclusionToggle({
   onChange: (exclude: boolean) => void;
 }) {
   return (
-    <div className="inline-flex rounded-full border border-border bg-card p-0.5 text-xs">
+    <div className="flex w-full rounded-xl border border-border bg-card p-1 text-sm">
       <button
         type="button"
         onClick={() => onChange(false)}
-        className={`rounded-full px-2.5 py-1 transition ${
+        className={`native-touch-target flex-1 rounded-lg px-3 py-2 transition ${
           !value ? "bg-primary text-primary-foreground" : "text-muted-foreground"
         }`}
       >
-        Vis
+        Inkluder
       </button>
       <button
         type="button"
         onClick={() => onChange(true)}
-        className={`rounded-full px-2.5 py-1 transition ${
+        className={`native-touch-target flex-1 rounded-lg px-3 py-2 transition ${
           value ? "bg-destructive text-destructive-foreground" : "text-muted-foreground"
         }`}
       >
-        Ekskluder
+        Skal ikke inneholde
       </button>
     </div>
   );

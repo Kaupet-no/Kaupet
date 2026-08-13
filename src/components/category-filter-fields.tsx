@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ChevronDown, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +28,7 @@ import { ComboboxMultiContent } from "@/components/combobox-field";
 import { EuControlDateField } from "@/features/listing-creation/field-groups/vehicle-confirm/eu-control-date-field";
 import { EU_CONTROL_KEY } from "@/features/wtb/wtb-criteria-types";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { NativeChoiceSheet } from "@/components/ui/native-choice-sheet";
 
 /** "Tillatt hengervekt" only makes sense once "Hengerfeste" is on, so the two
  * are grouped into one field with the weight range disabled until then. */
@@ -70,6 +72,7 @@ export function CategoryFilterFields({
   onChange,
   brandLookupFilters,
   counts,
+  isNative = false,
 }: {
   filters: CategoryFilter[];
   values: Record<string, AttributeFilterValue>;
@@ -83,6 +86,8 @@ export function CategoryFilterFields({
    * shown next to select/multiselect option labels when supplied. Omit to
    * render without counts (e.g. the listing wizard, which has no result set). */
   counts?: Record<string, Record<string, number>>;
+  /** Search-panel-only: selection lists open in the shared native sheet. */
+  isNative?: boolean;
 }) {
   const brandScope = brandLookupFilters ?? filters;
   // Shared by the plain range fallback below and the grouped fields
@@ -286,6 +291,19 @@ export function CategoryFilterFields({
           );
         }
         if (f.type === "select" && !SEARCH_MULTISELECT_KEYS.includes(f.key)) {
+          if (isNative) {
+            return (
+              <NativeOptionFilter
+                key={f.id}
+                filter={f}
+                value={current?.kind === "select" ? [current.value] : []}
+                counts={counts?.[f.key]}
+                onChange={(next) =>
+                  onChange(f.key, next[0] ? { kind: "select", value: next[0] } : undefined)
+                }
+              />
+            );
+          }
           return (
             <div key={f.id} className="space-y-2">
               <Label>{f.label_nb}</Label>
@@ -312,6 +330,20 @@ export function CategoryFilterFields({
         }
         if (f.type === "multiselect" || SEARCH_MULTISELECT_KEYS.includes(f.key)) {
           const selected = current?.kind === "multiselect" ? current.values : [];
+          if (isNative) {
+            return (
+              <NativeOptionFilter
+                key={f.id}
+                filter={f}
+                value={selected}
+                multiple
+                counts={counts?.[f.key]}
+                onChange={(next) =>
+                  onChange(f.key, next.length ? { kind: "multiselect", values: next } : undefined)
+                }
+              />
+            );
+          }
           const toggle = (optionValue: string) => {
             const next = selected.includes(optionValue)
               ? selected.filter((v) => v !== optionValue)
@@ -367,6 +399,51 @@ export function CategoryFilterFields({
         }
         return rangeField(f);
       })}
+    </>
+  );
+}
+
+function NativeOptionFilter({
+  filter,
+  value,
+  multiple = false,
+  counts,
+  onChange,
+}: {
+  filter: CategoryFilter;
+  value: string[];
+  multiple?: boolean;
+  counts?: Record<string, number>;
+  onChange: (value: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const summary = value.length ? `${value.length} valgt` : "Alle";
+  return (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="native"
+        className="w-full justify-between"
+        onClick={() => setOpen(true)}
+      >
+        {filter.label_nb}
+        <span className="text-muted-foreground">{summary}</span>
+      </Button>
+      <NativeChoiceSheet
+        open={open}
+        onOpenChange={setOpen}
+        title={filter.label_nb}
+        options={(filter.options ?? []).map((option) => ({
+          ...option,
+          label: option.label_nb,
+          count: counts?.[option.value],
+        }))}
+        value={value}
+        multiple={multiple}
+        onChange={onChange}
+        onApply={() => setOpen(false)}
+      />
     </>
   );
 }

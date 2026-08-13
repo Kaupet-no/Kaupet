@@ -30,7 +30,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { formatErrorMessage } from "@/lib/errors";
-import { NativePageHeader } from "@/components/native-page-header";
+import { trackProductEvent } from "@/lib/product-analytics";
+import { ListingComposerShell } from "@/features/listing-creation/listing-composer-shell";
+import { ComposerStepIndicator } from "@/features/listing-creation/step-indicator";
+import { useComposerHistoryBack } from "@/features/listing-creation/use-composer-history";
+import { useWtbDraftAutosave } from "@/features/wtb/use-wtb-draft-autosave";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -128,6 +132,18 @@ function NewWtbPage() {
 
   const step = STEPS[stepIndex];
 
+  useEffect(() => {
+    trackProductEvent("listing_creation_started", { kind: "want" });
+  }, []);
+  useEffect(() => {
+    trackProductEvent("listing_creation_step_completed", {
+      kind: "want",
+      action: "viewed",
+      step,
+      stepNumber: stepIndex + 1,
+    });
+  }, [step, stepIndex]);
+
   const { data: categories = [] } = useQuery({
     queryKey: ["categories", "with-color"],
     queryFn: async () => {
@@ -164,12 +180,34 @@ function NewWtbPage() {
     },
   });
 
-  const [categoryId, title, description] = useWatch({
+  const [categoryId, title, description, maxPriceNok] = useWatch({
     control,
-    name: ["category_id", "title", "description"],
+    name: ["category_id", "title", "description", "max_price_nok"],
   });
   const titleLength = title.length;
   const descriptionLength = (description ?? "").length;
+  const draftFields = useMemo(
+    () => ({
+      title,
+      description: description ?? "",
+      category_id: categoryId ?? null,
+      max_price_nok: maxPriceNok,
+      attributes,
+      checked_keys: checkedKeys,
+    }),
+    [title, description, categoryId, maxPriceNok, attributes, checkedKeys],
+  );
+  const {
+    draftId,
+    restorableDraft,
+    lastSaved,
+    draftSaveError,
+    isSaving,
+    saveToServer,
+    dismissRestore,
+    discardDraft,
+    clearAfterPublish,
+  } = useWtbDraftAutosave(draftFields);
 
   const vehicleGroup = useMemo(
     () => vehicleCategoryGroupFor(categoryId ?? null, allFilters ?? [], categoriesById),
@@ -218,6 +256,7 @@ function NewWtbPage() {
     mutationFn: async (values: WtbForm) => {
       const result = await createFn({
         data: {
+          ...(draftId ? { draftId } : {}),
           title: values.title,
           subtitle: null,
           description: values.description || undefined,
@@ -229,11 +268,19 @@ function NewWtbPage() {
       return result.id;
     },
     onSuccess: (id) => {
+      clearAfterPublish();
+      trackProductEvent("listing_published", { kind: "want" });
       setCreatedId(id);
       setPublished(true);
     },
-    onError: (err) =>
-      showErrorToast(formatErrorMessage(err, "Kunne ikke publisere annonsen. Prøv igjen.")),
+    onError: (err) => {
+      trackProductEvent("listing_creation_step_completed", {
+        kind: "want",
+        action: "publish_failed",
+        step,
+      });
+      showErrorToast(formatErrorMessage(err, "Kunne ikke publisere annonsen. Prøv igjen."));
+    },
   });
 
   const handleSaveSearch = async () => {
@@ -258,14 +305,49 @@ function NewWtbPage() {
   function goNext() {
     // A checked-but-empty criterion is required before moving on.
     if (step === "attributes" && wtbInvalidCheckedKeys(checkedKeys, attributes).length > 0) {
+      trackProductEvent("listing_creation_step_completed", {
+        kind: "want",
+        action: "validation_failed",
+        step,
+        reason: "criteria",
+      });
       setShowCriteriaErrors(true);
       return;
     }
+    trackProductEvent("listing_creation_step_completed", {
+      kind: "want",
+      action: "completed",
+      step,
+      stepNumber: stepIndex + 1,
+    });
     setStepIndex((i) => Math.min(i + 1, STEPS.length - 1));
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
   function goBack() {
+    trackProductEvent("listing_creation_step_completed", {
+      kind: "want",
+      action: "back",
+      step,
+      stepNumber: stepIndex + 1,
+    });
     setStepIndex((i) => Math.max(i - 1, 0));
+  }
+  useComposerHistoryBack(stepIndex === 0, goBack);
+
+  function restoreDraft() {
+    if (!restorableDraft) return;
+    setValue("title", restorableDraft.title);
+    setValue("description", restorableDraft.description);
+    setValue("category_id", restorableDraft.category_id);
+    setValue("max_price_nok", restorableDraft.max_price_nok);
+    setAttributes(restorableDraft.attributes);
+    setCheckedKeys(restorableDraft.checked_keys);
+    dismissRestore();
+    trackProductEvent("listing_creation_step_completed", {
+      kind: "want",
+      action: "draft_restored",
+      step,
+    });
   }
 
   if (published) {
@@ -320,46 +402,102 @@ function NewWtbPage() {
     );
   }
 
+  const footer = (
+    <>
+      {!native && stepIndex > 0 && (
+        <Button type="button" variant="ghost" onClick={goBack}>
+          <ChevronLeft className="size-4" /> Tilbake
+        </Button>
+      )}
+      {step !== "details" ? (
+        <Button
+          type="button"
+          onClick={goNext}
+          disabled={step === "attributes" && !vehicleGroup && !title.trim()}
+          className={native ? "h-14 w-full rounded-xl text-base" : undefined}
+        >
+          {native ? "Fortsett" : `Neste: ${STEP_LABELS[STEPS[stepIndex + 1]]}`}{" "}
+          <ChevronRight className="size-4" />
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          onClick={handleSubmit(
+            (values) => {
+              trackProductEvent("listing_creation_step_completed", {
+                kind: "want",
+                action: "publish_started",
+                step,
+              });
+              publish(values);
+            },
+            () =>
+              trackProductEvent("listing_creation_step_completed", {
+                kind: "want",
+                action: "validation_failed",
+                step,
+                reason: "publish_form",
+              }),
+          )}
+          disabled={isPending}
+          className={native ? "h-14 w-full rounded-xl text-base" : "gap-2"}
+        >
+          {isPending && <Loader2 className="size-4 animate-spin" />}
+          {native ? "Publiser" : "Publiser ønskes kjøpt"}
+        </Button>
+      )}
+    </>
+  );
+
   return (
-    <div className="mx-auto max-w-3xl px-4 pt-6 pb-4">
-      <NativePageHeader title="Ønskes kjøpt" backTo="/" />
-      {!native && <h1 className="font-display text-3xl tracking-tight">Ønskes kjøpt</h1>}
-
-      {/* Step indicator */}
-      <nav aria-label="Fremdrift i skjema" className="mt-4 flex items-center gap-2">
-        {STEPS.map((s, i) => {
-          const n = i + 1;
-          return (
-            <div key={s} className="flex items-center gap-2">
-              <div
-                className={`flex size-7 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
-                  n < stepIndex + 1
-                    ? "bg-primary text-primary-foreground"
-                    : n === stepIndex + 1
-                      ? "bg-primary text-primary-foreground ring-2 ring-primary/30"
-                      : "bg-muted text-muted-foreground"
-                }`}
-              >
-                {n < stepIndex + 1 ? <Check className="size-3.5" /> : n}
-              </div>
-              <span
-                className={`text-xs ${
-                  n === stepIndex + 1
-                    ? "inline font-medium text-foreground"
-                    : "hidden text-muted-foreground sm:inline"
-                }`}
-              >
-                {STEP_LABELS[s]}
+    <>
+      <ListingComposerShell
+        title="Ønskes kjøpt"
+        pageKey={step}
+        pageTitle={STEP_LABELS[step]}
+        native={native}
+        backLabel={stepIndex === 0 ? "Avbryt" : "Tilbake"}
+        onBack={stepIndex === 0 ? () => void navigate({ to: "/" }) : goBack}
+        notice={
+          restorableDraft ? (
+            <div className="mt-4 flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
+              <span className="flex-1">
+                Du har et lagret utkast. Vil du fortsette der du slapp?
               </span>
-              {n < STEPS.length && <div className="h-px w-6 shrink-0 bg-border" />}
+              <Button type="button" size="sm" variant="secondary" onClick={restoreDraft}>
+                Gjenopprett
+              </Button>
+              <Button type="button" size="sm" variant="ghost" onClick={discardDraft}>
+                Forkast
+              </Button>
             </div>
-          );
-        })}
-      </nav>
-
-      {/* Ingen <form>: publisering skjer kun via eksplisitt klikk på publiser-knappen,
+          ) : undefined
+        }
+        progress={
+          <ComposerStepIndicator
+            current={stepIndex + 1}
+            total={STEPS.length}
+            label={STEP_LABELS[step]}
+          />
+        }
+        status={
+          isSaving ? (
+            <p className="mt-1 text-right text-xs text-muted-foreground">Lagrer utkast …</p>
+          ) : draftSaveError ? (
+            <p className="mt-1 text-right text-xs text-destructive">Utkast ble ikke lagret</p>
+          ) : lastSaved ? (
+            <p className="mt-1 text-right text-xs text-muted-foreground">
+              Utkast lagret kl.{" "}
+              {lastSaved.toLocaleTimeString("nb-NO", { hour: "2-digit", minute: "2-digit" })}
+            </p>
+          ) : undefined
+        }
+        footer={footer}
+        firstStep={stepIndex === 0}
+        contentClassName="flex flex-col gap-6"
+      >
+        {/* Ingen <form>: publisering skjer kun via eksplisitt klikk på publiser-knappen,
           slik at verken Enter i input-felter eller knappe-bytte i footeren kan utløse den. */}
-      <div className="mt-8 flex flex-col gap-6 pb-24">
         {step === "category" && (
           <section className="space-y-3">
             <div className="flex items-center justify-between">
@@ -539,38 +677,7 @@ function NewWtbPage() {
             </section>
           </>
         )}
-
-        <div
-          className={`flex items-center border-t border-border pt-6 ${
-            stepIndex === 0 ? "justify-end" : "justify-between"
-          }`}
-        >
-          {stepIndex > 0 && (
-            <Button type="button" variant="ghost" onClick={goBack}>
-              <ChevronLeft className="size-4" /> Tilbake
-            </Button>
-          )}
-          {step !== "details" ? (
-            <Button
-              type="button"
-              onClick={goNext}
-              disabled={step === "attributes" && !vehicleGroup && !title.trim()}
-            >
-              Neste: {STEP_LABELS[STEPS[stepIndex + 1]]} <ChevronRight className="size-4" />
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              onClick={handleSubmit((values) => publish(values))}
-              disabled={isPending}
-              className="gap-2"
-            >
-              {isPending && <Loader2 className="size-4 animate-spin" />}
-              Publiser ønskes kjøpt
-            </Button>
-          )}
-        </div>
-      </div>
+      </ListingComposerShell>
 
       <AlertDialog
         open={blocker.status === "blocked"}
@@ -582,7 +689,7 @@ function NewWtbPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Avbryte annonsen?</AlertDialogTitle>
             <AlertDialogDescription>
-              Du er i ferd med å forlate siden. Endringene dine vil gå tapt.
+              Du kan lagre arbeidet som utkast, fortsette å redigere eller forkaste det.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -590,14 +697,25 @@ function NewWtbPage() {
               Fortsett å redigere
             </AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => blocker.proceed?.()}
+              onClick={async () => {
+                await saveToServer();
+                blocker.proceed?.();
+              }}
             >
-              Ja, avbryt
+              Lagre som utkast
+            </AlertDialogAction>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                await discardDraft();
+                blocker.proceed?.();
+              }}
+            >
+              Forkast annonse
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   );
 }

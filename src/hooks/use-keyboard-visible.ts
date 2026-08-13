@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { isNative } from "@/lib/native";
+import { nativePlatform } from "@/lib/native";
 
 export function useKeyboardVisible(): boolean {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (!isNative()) return;
+    // `?forcenative` exercises native layout in a regular browser, but the
+    // Capacitor Keyboard plugin only exists in a real iOS/Android runtime.
+    if (nativePlatform() === "web") return;
 
     let cleanup: (() => void) | undefined;
 

@@ -99,6 +99,14 @@ export function useDraftAutosave(fields: DraftFields) {
       const saved = localStorage.getItem(DRAFT_KEY);
       if (!saved) return;
       const data = JSON.parse(saved) as Record<string, unknown>;
+      if (
+        (data.draft_kind !== undefined && data.draft_kind !== "sell") ||
+        (typeof data.draft_version === "number" && data.draft_version > 1)
+      ) {
+        localStorage.removeItem(DRAFT_KEY);
+        localStorage.removeItem(DRAFT_ID_KEY);
+        return;
+      }
       const savedAt = typeof data.saved_at === "number" ? data.saved_at : 0;
       if (Date.now() - savedAt < 7 * 24 * 60 * 60 * 1000) {
         if (data.title || data.description || Number(data.image_count) > 0) setHasDraftData(data);
@@ -136,6 +144,8 @@ export function useDraftAutosave(fields: DraftFields) {
         localStorage.setItem(
           DRAFT_KEY,
           JSON.stringify({
+            draft_kind: "sell",
+            draft_version: 1,
             title,
             subtitle,
             description,

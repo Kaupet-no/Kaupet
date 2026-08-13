@@ -33,7 +33,7 @@ export type WtbListing = {
   description: string | null;
   category_id: string | null;
   max_price_nok: number | null;
-  status: "active" | "fulfilled" | "expired" | "archived";
+  status: "draft" | "active" | "fulfilled" | "expired" | "archived";
   created_at: string;
   updated_at: string;
   expires_at: string;
@@ -45,6 +45,7 @@ export type WtbListingWithProfile = WtbListing & {
 };
 
 const wtbInputSchema = z.object({
+  draftId: z.string().uuid().optional(),
   title: z.string().trim().min(3, "Tittelen må være minst 3 tegn").max(120, "Maks 120 tegn"),
   subtitle: z.string().trim().max(80, "Maks 80 tegn").nullable().optional(),
   description: z.string().trim().max(2000, "Maks 2000 tegn").optional(),
@@ -60,6 +61,28 @@ export const createWtbListing = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { userId } = context;
+
+    const fields = {
+      title: data.title,
+      subtitle: data.subtitle ?? null,
+      description: data.description ?? null,
+      category_id: data.category_id ?? null,
+      max_price_nok: data.max_price_nok ?? null,
+      attributes: data.attributes ?? {},
+    };
+
+    if (data.draftId) {
+      const { data: row, error } = await supabaseAdmin
+        .from("wtb_listings")
+        .update({ ...fields, status: "active" })
+        .eq("id", data.draftId)
+        .eq("user_id", userId)
+        .eq("status", "draft")
+        .select("id")
+        .single();
+      if (error) throw error;
+      return { id: row.id as string };
+    }
 
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const { count } = await supabaseAdmin
@@ -77,17 +100,94 @@ export const createWtbListing = createServerFn({ method: "POST" })
       .from("wtb_listings")
       .insert({
         user_id: userId,
-        title: data.title,
-        subtitle: data.subtitle ?? null,
-        description: data.description ?? null,
-        category_id: data.category_id ?? null,
-        max_price_nok: data.max_price_nok ?? null,
-        attributes: data.attributes ?? {},
+        ...fields,
       })
       .select("id")
       .single();
     if (error) throw error;
     return { id: row.id as string };
+  });
+
+export const saveWtbDraft = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) =>
+    wtbInputSchema
+      .omit({ draftId: true })
+      .extend({
+        id: z.string().uuid().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const fields = {
+      title: data.title,
+      subtitle: data.subtitle ?? null,
+      description: data.description ?? null,
+      category_id: data.category_id ?? null,
+      max_price_nok: data.max_price_nok ?? null,
+      attributes: data.attributes ?? {},
+    };
+
+    if (data.id) {
+      const { data: row, error } = await supabaseAdmin
+        .from("wtb_listings")
+        .update(fields)
+        .eq("id", data.id)
+        .eq("user_id", context.userId)
+        .eq("status", "draft")
+        .select("id")
+        .single();
+      if (error) throw error;
+      return { id: row.id as string };
+    }
+
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const { count } = await supabaseAdmin
+      .from("wtb_listings")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", context.userId)
+      .eq("status", "draft")
+      .gte("created_at", oneHourAgo);
+    if ((count ?? 0) >= 10) throw new Error("For mange utkast. Prøv igjen senere.");
+
+    const { data: row, error } = await supabaseAdmin
+      .from("wtb_listings")
+      .insert({ user_id: context.userId, status: "draft", ...fields })
+      .select("id")
+      .single();
+    if (error) throw error;
+    return { id: row.id as string };
+  });
+
+export const getLatestWtbDraft = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("wtb_listings")
+      .select("id, title, description, category_id, max_price_nok, attributes, updated_at")
+      .eq("user_id", context.userId)
+      .eq("status", "draft")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  });
+
+export const discardWtbDraft = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("wtb_listings")
+      .delete()
+      .eq("id", data.id)
+      .eq("user_id", context.userId)
+      .eq("status", "draft");
+    if (error) throw error;
   });
 
 const wtbUpdateSchema = z.object({

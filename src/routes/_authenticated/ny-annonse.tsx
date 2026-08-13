@@ -1,5 +1,4 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
-import { NativePageHeader } from "@/components/native-page-header";
 import { createFileRoute, useNavigate, useBlocker } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm, useWatch } from "react-hook-form";
@@ -69,6 +68,8 @@ import { PreviewDraftView } from "@/features/listing-creation/preview-draft-view
 import { trackProductEvent } from "@/lib/product-analytics";
 import { NewListingError } from "@/features/listing-creation/new-listing-error";
 import { StepIndicator } from "@/features/listing-creation/step-indicator";
+import { ListingComposerShell } from "@/features/listing-creation/listing-composer-shell";
+import { useComposerHistoryBack } from "@/features/listing-creation/use-composer-history";
 
 const listingSchema = z.object({
   title: z.string().trim().min(5, "Tittelen må være minst 5 tegn").max(120, "Maks 120 tegn"),
@@ -134,7 +135,7 @@ function NewListingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [images, setImages] = useState<PendingImage[]>([]);
-  useEffect(() => trackProductEvent("listing_creation_started"), []);
+  useEffect(() => trackProductEvent("listing_creation_started", { kind: "sell" }), []);
   const [publishedId, setPublishedId] = useState<string | null>(null);
   const [publishedCode, setPublishedCode] = useState<string | null>(null);
   const [publishedOpen, setPublishedOpen] = useState(false);
@@ -398,40 +399,37 @@ function NewListingPage() {
     [fieldGroupKeys, native, isVehicleFlow],
   );
 
-  const { step, setStep, currentPage, goNext, goBack, isFirst, isLast } = useListingSteps(pages);
+  const {
+    step,
+    setStep,
+    currentPage,
+    goNext,
+    goBack: goBackStep,
+    isFirst,
+    isLast,
+  } = useListingSteps(pages);
   goNextRef.current = goNext;
 
-  /** The in-page "Tilbake" button calls `goBack()` directly (see the footer
-   * button below) — it steps the wizard's own `pages` array backward and is
-   * unaffected by how many pages currently exist, so it stays correct even
-   * when `pages` changes shape at runtime (e.g. the vehicle-confirm page
-   * being inserted/removed for Bil og MC, see the effect below).
-   *
-   * The physical browser back button (and mobile swipe-back) should behave
-   * the same way instead of leaving the route entirely. We push a single
-   * guard entry on mount and, on every popstate while the wizard isn't on
-   * its first step, call the same `goBack()` and immediately re-push the
-   * guard so the browser history stack can never run out mid-wizard. There
-   * is no stored step number to go stale — `goBack` always acts on the live
-   * `pages` array, so this can't desync the way a stored step index could. */
+  const currentStepKey = currentPage?.groups[0]?.key ?? "unknown";
   useEffect(() => {
-    window.history.pushState({ wizardGuard: true }, "");
-  }, []);
+    trackProductEvent("listing_creation_step_completed", {
+      kind: "sell",
+      action: "viewed",
+      step: currentStepKey,
+      stepNumber: step,
+    });
+  }, [currentStepKey, step]);
 
-  const isFirstRef = useRef(isFirst);
-  isFirstRef.current = isFirst;
-  const goBackRef = useRef(goBack);
-  goBackRef.current = goBack;
-  useEffect(() => {
-    function onPopState() {
-      if (!isFirstRef.current) {
-        goBackRef.current();
-        window.history.pushState({ wizardGuard: true }, "");
-      }
-    }
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
-  }, []);
+  function goBack() {
+    trackProductEvent("listing_creation_step_completed", {
+      kind: "sell",
+      action: "back",
+      step: currentStepKey,
+      stepNumber: step,
+    });
+    goBackStep();
+  }
+  useComposerHistoryBack(isFirst, goBack);
 
   /** Stepping back from vehicle-confirm to vehicle-registration (via
    * "Tilbake") is the only way to reach vehicle-registration a second time —
@@ -510,6 +508,11 @@ function NewListingPage() {
   });
 
   function restoreDraft() {
+    trackProductEvent("listing_creation_step_completed", {
+      kind: "sell",
+      action: "draft_restored",
+      step: currentStepKey,
+    });
     void restoreDraftFields({
       setValue,
       setSelectedParentId,
@@ -586,6 +589,12 @@ function NewListingPage() {
       !vehicleLookupResult
     ) {
       if (!vehicleRegNrInput.trim()) {
+        trackProductEvent("listing_creation_step_completed", {
+          kind: "sell",
+          action: "validation_failed",
+          step: currentStepKey,
+          reason: "registration_number",
+        });
         showErrorToast("Skriv inn registreringsnummer.");
         return;
       }
@@ -601,7 +610,15 @@ function NewListingPage() {
       .flatMap((g) => g.fieldsToValidate ?? [])
       .filter((f) => !(isVehicle && f === "title"));
     const valid = fields.length > 0 ? await trigger(fields) : true;
-    if (!valid) return;
+    if (!valid) {
+      trackProductEvent("listing_creation_step_completed", {
+        kind: "sell",
+        action: "validation_failed",
+        step: currentStepKey,
+        reason: "form",
+      });
+      return;
+    }
     const validateCtx = {
       images,
       attributes,
@@ -623,27 +640,57 @@ function NewListingPage() {
       if (result === "SHOW_NO_IMAGE_DIALOG") {
         if (native) continue;
         if (options?.skipImageCheck) continue;
+        trackProductEvent("listing_creation_step_completed", {
+          kind: "sell",
+          action: "validation_prompt",
+          step: currentStepKey,
+          reason: "image",
+        });
         setShowNoImageDialog(true);
         return;
       }
       if (result === "SHOW_NO_PRICE_DIALOG") {
         if (native) continue;
         if (options?.skipPriceCheck) continue;
+        trackProductEvent("listing_creation_step_completed", {
+          kind: "sell",
+          action: "validation_prompt",
+          step: currentStepKey,
+          reason: "price",
+        });
         setShowNoPriceDialog(true);
         return;
       }
       if (typeof result === "string") {
+        trackProductEvent("listing_creation_step_completed", {
+          kind: "sell",
+          action: "validation_failed",
+          step: currentStepKey,
+          reason: group.key,
+        });
         if (group.key === "category-attributes") setAttributesTouched(true);
         showErrorToast(result);
         return;
       }
       if (result && typeof result === "object") {
+        trackProductEvent("listing_creation_step_completed", {
+          kind: "sell",
+          action: "validation_failed",
+          step: currentStepKey,
+          reason: group.key,
+        });
         if (group.key === "category-attributes") setAttributesTouched(true);
         setExtraFieldError(result);
         showErrorToast(result.message);
         return;
       }
     }
+    trackProductEvent("listing_creation_step_completed", {
+      kind: "sell",
+      action: "completed",
+      step: currentStepKey,
+      stepNumber: step,
+    });
     goNext();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -742,7 +789,11 @@ function NewListingPage() {
     },
     onSuccess: (result) => {
       clearDraftStorage();
-      trackProductEvent("listing_published", { imageCount: images.length, isVehicle });
+      trackProductEvent("listing_published", {
+        kind: "sell",
+        imageCount: images.length,
+        isVehicle,
+      });
       void import("@/lib/haptics").then((m) => m.hapticNotification("success"));
       showSuccessToast("Annonsen er publisert");
       setPublishedId(result.id);
@@ -750,6 +801,11 @@ function NewListingPage() {
       setPublishedOpen(true);
     },
     onError: (err: Error) => {
+      trackProductEvent("listing_creation_step_completed", {
+        kind: "sell",
+        action: "publish_failed",
+        step: currentStepKey,
+      });
       setUploadProgress(null);
       void import("@/lib/haptics").then((m) => m.hapticNotification("error"));
       showErrorToast(formatErrorMessage(err, "Kunne ikke publisere annonsen"));
@@ -999,134 +1055,137 @@ function NewListingPage() {
     onCancel: () => navigate({ to: "/" }),
   };
 
-  return (
-    <div className="mx-auto max-w-3xl px-4 pt-6 pb-4">
-      <NativePageHeader
-        title="Ny annonse"
-        backLabel={isFirst ? "Avbryt" : "Tilbake"}
-        onBack={isFirst ? () => void navigate({ to: "/" }) : goBack}
-      />
-      {!native && <h1 className="font-display text-3xl tracking-tight">Ny annonse</h1>}
-
-      {/* Draft restore banner */}
-      {hasDraftData && (
-        <div className="mt-4 flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
-          <span className="flex-1">Du har et ulagret utkast. Vil du fortsette der du slapp?</span>
-          <Button type="button" size="sm" variant="secondary" onClick={restoreDraft}>
-            Gjenopprett
-          </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={discardLocalDraftBanner}>
-            Forkast
-          </Button>
-        </div>
+  const groups = currentPage?.groups ?? [];
+  const isNativeDescriptionSoloPage =
+    native && groups.length === 1 && groups[0].key === "description-keywords";
+  const isVehicleConfirmPage = groups.length === 1 && groups[0].key === "vehicle-confirm";
+  const nextGroups = pages[step]?.groups ?? [];
+  const submitComposer = handleSubmit(
+    (v) => {
+      if (missingFilters.length > 0) {
+        trackProductEvent("listing_creation_step_completed", {
+          kind: "sell",
+          action: "validation_failed",
+          step: currentStepKey,
+          reason: "required_attributes",
+        });
+        setAttributesTouched(true);
+        if (categoryAttributesPageIndex >= 0) setStep(categoryAttributesPageIndex + 1);
+        showErrorToast("Fyll inn alle obligatoriske egenskaper før du publiserer.");
+        return;
+      }
+      if (!hasPreviewed && !native) {
+        pendingSubmitValuesRef.current = v;
+        setPreviewNudgeOpen(true);
+        return;
+      }
+      trackProductEvent("listing_creation_step_completed", {
+        kind: "sell",
+        action: "publish_started",
+        step: currentStepKey,
+      });
+      mutation.mutate(v);
+    },
+    () =>
+      trackProductEvent("listing_creation_step_completed", {
+        kind: "sell",
+        action: "validation_failed",
+        step: currentStepKey,
+        reason: "publish_form",
+      }),
+  );
+  const composerFooter = (
+    <>
+      {!native && !isFirst && (
+        <Button type="button" variant="ghost" onClick={goBack}>
+          <ChevronLeft className="size-4" /> Tilbake
+        </Button>
       )}
+      {isVehicleConfirmPage ? (
+        <div ref={setVehicleConfirmFooterSlot} className="contents" />
+      ) : !isLast ? (
+        <Button
+          type="button"
+          data-testid="wizard-next-button"
+          disabled={vehicleLookupLoading}
+          onClick={() => void goToNextPage()}
+          className={native ? "h-14 w-full rounded-xl text-base" : undefined}
+        >
+          {vehicleLookupLoading ? (
+            "Slår opp kjøretøy…"
+          ) : (
+            <>
+              {native ? "Fortsett" : `Neste: ${pageLabel(nextGroups, native)}`}{" "}
+              <ChevronRight className="size-4" />
+            </>
+          )}
+        </Button>
+      ) : (
+        <PublishActions
+          native={native}
+          turnstileEnabled={turnstileEnabled}
+          turnstileToken={turnstileToken}
+          setTurnstileToken={setTurnstileToken}
+          mutationIsPending={mutation.isPending}
+          onCancel={() => navigate({ to: "/" })}
+          onPreview={openPreview}
+        />
+      )}
+    </>
+  );
 
-      {/* Sticky step indicator — hidden until a category is chosen: each
-          category can have a different flow length (see category_flows),
-          so showing a page-count/progress-fill before that's known would
-          either lie (wrong total) or force a flash-of-wrong-content once
-          the real per-category total resolves. */}
-      <div className="sticky top-0 z-10 -mx-4 bg-background/95 px-4 py-3 backdrop-blur border-b border-border mt-4">
-        {categoryId && <StepIndicator step={step} pages={pages} native={native} />}
-        {draftSaveError ? (
-          <p className="mt-1 text-right text-xs text-destructive">Utkast ble ikke lagret</p>
-        ) : (
-          savedTimeLabel && (
-            <p className="mt-1 text-right text-xs text-muted-foreground">{savedTimeLabel}</p>
-          )
-        )}
-      </div>
-
-      <form
-        onSubmit={handleSubmit((v) => {
-          if (missingFilters.length > 0) {
-            setAttributesTouched(true);
-            if (categoryAttributesPageIndex >= 0) setStep(categoryAttributesPageIndex + 1);
-            showErrorToast("Fyll inn alle obligatoriske egenskaper før du publiserer.");
-            return;
-          }
-          if (!hasPreviewed && !native) {
-            pendingSubmitValuesRef.current = v;
-            setPreviewNudgeOpen(true);
-            return;
-          }
-          mutation.mutate(v);
-        })}
-        className={`mt-8 ${native ? "pb-[calc(var(--app-bottom-nav-h)+6rem)]" : "pb-24"}`}
-      >
-        {(() => {
-          const groups = currentPage?.groups ?? [];
-          const isNativeDescriptionSoloPage =
-            native && groups.length === 1 && groups[0].key === "description-keywords";
-          // vehicle-confirm has its own "Bekreft og fortsett" button that
-          // commits the data and advances the wizard itself — the generic
-          // footer "Neste" button would be a redundant second way to do the
-          // same thing, so it's suppressed on this page.
-          const isVehicleConfirmPage = groups.length === 1 && groups[0].key === "vehicle-confirm";
-          const nextGroups = pages[step]?.groups ?? [];
-          return (
-            <div
-              data-testid={groups[0] ? `wizard-step-${groups[0].key}` : undefined}
-              className={isNativeDescriptionSoloPage ? "flex flex-col" : "space-y-6"}
-              style={
-                isNativeDescriptionSoloPage
-                  ? { height: "calc(var(--vvh, 100dvh) - var(--app-bottom-nav-h) - 13.75rem)" }
-                  : undefined
-              }
-            >
-              {groups.map((g) => (
-                <g.Component key={g.key} {...sharedProps} />
-              ))}
-
-              <div
-                className={`${
-                  native
-                    ? // left-[…rail]: på nettbrett ligger navigasjonen langs
-                      // venstre kant, og «Tilbake» (justify-between) ville havnet
-                      // under den. Variabelen er 0 på telefon (se styles.css).
-                      "px-safe fixed inset-x-0 left-[var(--app-nav-rail-w,0px)] bottom-[var(--app-bottom-nav-h)] z-40 bg-background/95 pt-3 pb-3 backdrop-blur border-t border-border"
-                    : "border-t border-border pt-6"
-                } flex flex-wrap items-center gap-3 ${isFirst ? "justify-end" : "justify-between"}`}
-              >
-                {!native && !isFirst && (
-                  <Button type="button" variant="ghost" onClick={goBack}>
-                    <ChevronLeft className="size-4" /> Tilbake
-                  </Button>
-                )}
-                {isVehicleConfirmPage ? (
-                  <div ref={setVehicleConfirmFooterSlot} className="contents" />
-                ) : !isLast ? (
-                  <Button
-                    type="button"
-                    data-testid="wizard-next-button"
-                    disabled={vehicleLookupLoading}
-                    onClick={() => void goToNextPage()}
-                    className={native ? "h-14 w-full rounded-xl text-base" : undefined}
-                  >
-                    {vehicleLookupLoading ? (
-                      "Slår opp kjøretøy…"
-                    ) : (
-                      <>
-                        {native ? "Fortsett" : `Neste: ${pageLabel(nextGroups, native)}`}{" "}
-                        <ChevronRight className="size-4" />
-                      </>
-                    )}
-                  </Button>
-                ) : (
-                  <PublishActions
-                    native={native}
-                    turnstileEnabled={turnstileEnabled}
-                    turnstileToken={turnstileToken}
-                    setTurnstileToken={setTurnstileToken}
-                    mutationIsPending={mutation.isPending}
-                    onCancel={() => navigate({ to: "/" })}
-                    onPreview={openPreview}
-                  />
-                )}
+  return (
+    <>
+      <form onSubmit={submitComposer}>
+        <ListingComposerShell
+          title="Ny annonse"
+          pageKey={currentStepKey}
+          pageTitle={pageLabel(groups, native)}
+          native={native}
+          backLabel={isFirst ? "Avbryt" : "Tilbake"}
+          onBack={isFirst ? () => void navigate({ to: "/" }) : goBack}
+          notice={
+            hasDraftData ? (
+              <div className="mt-4 flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
+                <span className="flex-1">
+                  Du har et ulagret utkast. Vil du fortsette der du slapp?
+                </span>
+                <Button type="button" size="sm" variant="secondary" onClick={restoreDraft}>
+                  Gjenopprett
+                </Button>
+                <Button type="button" size="sm" variant="ghost" onClick={discardLocalDraftBanner}>
+                  Forkast
+                </Button>
               </div>
-            </div>
-          );
-        })()}
+            ) : undefined
+          }
+          progress={
+            categoryId ? <StepIndicator step={step} pages={pages} native={native} /> : undefined
+          }
+          status={
+            draftSaveError ? (
+              <p className="mt-1 text-right text-xs text-destructive">Utkast ble ikke lagret</p>
+            ) : savedTimeLabel ? (
+              <p className="mt-1 text-right text-xs text-muted-foreground">{savedTimeLabel}</p>
+            ) : undefined
+          }
+          footer={composerFooter}
+          firstStep={isFirst}
+        >
+          <div
+            data-testid={groups[0] ? `wizard-step-${groups[0].key}` : undefined}
+            className={isNativeDescriptionSoloPage ? "flex flex-col" : "space-y-6"}
+            style={
+              isNativeDescriptionSoloPage
+                ? { height: "calc(var(--vvh, 100dvh) - var(--app-bottom-nav-h) - 13.75rem)" }
+                : undefined
+            }
+          >
+            {groups.map((g) => (
+              <g.Component key={g.key} {...sharedProps} />
+            ))}
+          </div>
+        </ListingComposerShell>
       </form>
 
       <AlertDialog open={previewNudgeOpen} onOpenChange={setPreviewNudgeOpen}>
@@ -1143,7 +1202,14 @@ function NewListingPage() {
               data-testid="publish-anyway-button"
               onClick={() => {
                 setPreviewNudgeOpen(false);
-                if (pendingSubmitValuesRef.current) mutation.mutate(pendingSubmitValuesRef.current);
+                if (pendingSubmitValuesRef.current) {
+                  trackProductEvent("listing_creation_step_completed", {
+                    kind: "sell",
+                    action: "publish_started",
+                    step: currentStepKey,
+                  });
+                  mutation.mutate(pendingSubmitValuesRef.current);
+                }
               }}
               className="bg-secondary text-secondary-foreground hover:bg-secondary/80"
             >
@@ -1371,6 +1437,6 @@ function NewListingPage() {
           }}
         />
       )}
-    </div>
+    </>
   );
 }

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ComposerReview } from "@/features/listing-creation/composer-review";
 
 import type { WizardSharedProps } from "../types";
 
@@ -113,6 +114,35 @@ export function ReviewPublishGroup(props: WizardSharedProps) {
           </AlertDescription>
         </Alert>
       )}
+      <ComposerReview
+        items={[
+          {
+            key: "category",
+            label: "Kategori",
+            value: props.categoryLabel || "Ikke valgt",
+            onEdit: () => props.onEditReviewSection("category"),
+          },
+          {
+            key: "content",
+            label: "Tittel og bilder",
+            value: `${props.title || "Ingen tittel"} · ${props.images.length} ${props.images.length === 1 ? "bilde" : "bilder"}`,
+            onEdit: () => props.onEditReviewSection("content"),
+          },
+          {
+            key: "details",
+            label: "Pris og detaljer",
+            value:
+              [props.previewPrice, props.subtitle].filter(Boolean).join(" · ") || "Ikke oppgitt",
+            onEdit: () => props.onEditReviewSection("details"),
+          },
+          {
+            key: "location",
+            label: "Sted",
+            value: [props.postalCode, props.city].filter(Boolean).join(" ") || "Ikke oppgitt",
+            onEdit: () => props.onEditReviewSection("location"),
+          },
+        ]}
+      />
       <ReviewPreview
         images={props.images}
         title={props.title}

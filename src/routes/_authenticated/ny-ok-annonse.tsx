@@ -6,20 +6,16 @@ import { useServerFn } from "@tanstack/react-start";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { showSuccessToast, showErrorToast } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast";
 import { AlertCircle, ChevronLeft, ChevronRight, Loader2, Check, Bell } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { createWtbListing } from "@/lib/wtb-listings.functions";
-import { createSavedSearch, summarizeCriteria } from "@/lib/saved-searches";
+import { suggestCategoryForTitle } from "@/lib/category-suggestion.functions";
 import { CategoryPicker } from "@/components/category-picker";
 import { useAllCategoryFilters } from "@/components/attribute-fields";
 import { WtbCriteriaFields } from "@/features/wtb/wtb-criteria-fields";
-import {
-  isWtbRangeValue,
-  wtbInvalidCheckedKeys,
-  type WtbAttributeMap,
-} from "@/features/wtb/wtb-criteria-types";
+import { isWtbRangeValue, type WtbAttributeMap } from "@/features/wtb/wtb-criteria-types";
 import {
   categoryBreadcrumb,
   vehicleCategoryGroupFor,
@@ -33,6 +29,7 @@ import { formatErrorMessage } from "@/lib/errors";
 import { trackProductEvent } from "@/lib/product-analytics";
 import { ListingComposerShell } from "@/features/listing-creation/listing-composer-shell";
 import { ComposerStepIndicator } from "@/features/listing-creation/step-indicator";
+import { ComposerReview } from "@/features/listing-creation/composer-review";
 import { useComposerHistoryBack } from "@/features/listing-creation/use-composer-history";
 import { useWtbDraftAutosave } from "@/features/wtb/use-wtb-draft-autosave";
 import {
@@ -45,6 +42,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const wtbSchema = z.object({
   title: z.string().trim().min(3, "Tittelen må være minst 3 tegn").max(120, "Maks 120 tegn"),
@@ -109,26 +107,41 @@ function capitalizeWord(value: unknown): string | null {
   return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
 }
 
-type WtbStep = "category" | "attributes" | "details";
-const STEPS: WtbStep[] = ["category", "attributes", "details"];
-const STEP_LABELS: Record<WtbStep, string> = {
-  category: "Kategori",
-  attributes: "Søkekriterier",
-  details: "Detaljer",
+type WtbStep = "category" | "attributes" | "details" | "review";
+const STEPS: WtbStep[] = ["category", "attributes", "details", "review"];
+const STEP_META: Record<WtbStep, { title: string; help: string }> = {
+  category: {
+    title: "Hva leter du etter?",
+    help: "Beskriv det kort, og velg kategorien som passer best.",
+  },
+  attributes: {
+    title: "Hva er viktig for deg?",
+    help: "Legg bare til begrensninger som faktisk betyr noe.",
+  },
+  details: {
+    title: "Siste detaljer",
+    help: "Gjør kjøpsønsket tydelig før du publiserer.",
+  },
+  review: {
+    title: "Se over",
+    help: "Kontroller opplysningene og velg om du vil varsles om treff.",
+  },
 };
 
 function NewWtbPage() {
   const native = useIsNative();
   const navigate = useNavigate();
   const [stepIndex, setStepIndex] = useState(0);
-  const [savingSearch, setSavingSearch] = useState(false);
-  const [savedSearch, setSavedSearch] = useState(false);
+  const [notifyOnMatch, setNotifyOnMatch] = useState(false);
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [published, setPublished] = useState(false);
   const [attributes, setAttributes] = useState<WtbAttributeMap>({});
   const [checkedKeys, setCheckedKeys] = useState<string[]>([]);
-  const [showCriteriaErrors, setShowCriteriaErrors] = useState(false);
   const [titleManualOverride, setTitleManualOverride] = useState(false);
+  const [categorySuggestion, setCategorySuggestion] = useState<{
+    category_id: string;
+    name_nb: string;
+  } | null>(null);
 
   const step = STEPS[stepIndex];
 
@@ -167,6 +180,7 @@ function NewWtbPage() {
   const {
     register,
     handleSubmit,
+    trigger,
     control,
     setValue,
     formState: { errors, touchedFields },
@@ -244,6 +258,16 @@ function NewWtbPage() {
 
   const categoryLabel = categoryId ? categoryBreadcrumb(categoryId, categoriesById) || null : null;
 
+  useEffect(() => {
+    if (categoryId || title.trim().length < 5) return;
+    const timeout = window.setTimeout(() => {
+      void suggestCategoryForTitle({ data: { title: title.trim() } })
+        .then((result) => setCategorySuggestion(result.suggestion))
+        .catch(() => setCategorySuggestion(null));
+    }, 400);
+    return () => window.clearTimeout(timeout);
+  }, [categoryId, title]);
+
   const shouldBlockNav = !published && (title.trim().length > 0 || stepIndex > 0);
   const blocker = useBlocker({
     shouldBlockFn: () => shouldBlockNav,
@@ -254,14 +278,16 @@ function NewWtbPage() {
   const createFn = useServerFn(createWtbListing);
   const { mutate: publish, isPending } = useMutation({
     mutationFn: async (values: WtbForm) => {
+      const ensuredDraftId = draftId ?? (await saveToServer());
       const result = await createFn({
         data: {
-          ...(draftId ? { draftId } : {}),
+          ...(ensuredDraftId ? { draftId: ensuredDraftId } : {}),
           title: values.title,
           subtitle: null,
           description: values.description || undefined,
           category_id: values.category_id ?? null,
           max_price_nok: typeof values.max_price_nok === "number" ? values.max_price_nok : null,
+          notify_matches: notifyOnMatch,
           attributes,
         },
       });
@@ -270,6 +296,7 @@ function NewWtbPage() {
     onSuccess: (id) => {
       clearAfterPublish();
       trackProductEvent("listing_published", { kind: "want" });
+      void import("@/lib/haptics").then((module) => module.hapticNotification("success"));
       setCreatedId(id);
       setPublished(true);
     },
@@ -279,41 +306,12 @@ function NewWtbPage() {
         action: "publish_failed",
         step,
       });
+      void import("@/lib/haptics").then((module) => module.hapticNotification("error"));
       showErrorToast(formatErrorMessage(err, "Kunne ikke publisere annonsen. Prøv igjen."));
     },
   });
 
-  const handleSaveSearch = async () => {
-    if (!createdId) return;
-    setSavingSearch(true);
-    try {
-      const criteria = {
-        q: title.trim() || undefined,
-        categories: categoryId ? [categoryId] : undefined,
-      };
-      const name = summarizeCriteria(criteria) || title.trim();
-      await createSavedSearch(name, criteria, true);
-      setSavedSearch(true);
-      showSuccessToast("Søk lagret! Du varsles når noen legger ut en matching annonse.");
-    } catch {
-      showErrorToast("Kunne ikke lagre søket. Prøv igjen.");
-    } finally {
-      setSavingSearch(false);
-    }
-  };
-
   function goNext() {
-    // A checked-but-empty criterion is required before moving on.
-    if (step === "attributes" && wtbInvalidCheckedKeys(checkedKeys, attributes).length > 0) {
-      trackProductEvent("listing_creation_step_completed", {
-        kind: "want",
-        action: "validation_failed",
-        step,
-        reason: "criteria",
-      });
-      setShowCriteriaErrors(true);
-      return;
-    }
     trackProductEvent("listing_creation_step_completed", {
       kind: "want",
       action: "completed",
@@ -352,7 +350,11 @@ function NewWtbPage() {
 
   if (published) {
     return (
-      <div className="mx-auto flex min-h-[60vh] max-w-lg flex-col items-center justify-center gap-6 px-4 py-12 text-center">
+      <div
+        className="mx-auto flex min-h-[60vh] max-w-lg flex-col items-center justify-center gap-6 px-4 py-12 text-center"
+        role="status"
+        aria-live="polite"
+      >
         <div className="flex size-16 items-center justify-center rounded-full bg-primary/10">
           <Check className="size-8 text-primary" />
         </div>
@@ -363,37 +365,21 @@ function NewWtbPage() {
           </p>
         </div>
 
-        {!savedSearch && (
-          <div className="w-full rounded-xl border bg-muted/40 p-4 text-left">
-            <div className="mb-3 flex items-start gap-3">
-              <Bell className="mt-0.5 size-5 shrink-0 text-primary" />
-              <div>
-                <p className="font-medium">Vil du varsles om matchende annonser?</p>
-                <p className="text-sm text-muted-foreground">
-                  Vi sender deg et varsel når noen legger ut noe som treffer søket ditt.
-                </p>
-              </div>
-            </div>
-            <Button
-              className="mt-1 w-full gap-2"
-              onClick={handleSaveSearch}
-              disabled={savingSearch}
-            >
-              <Bell className="size-4" />
-              {savingSearch ? "Lagrer..." : "Aktiver varsler for dette søket"}
-            </Button>
-          </div>
-        )}
-
-        {savedSearch && (
-          <div className="flex items-center gap-2 text-sm text-green-600">
-            <Check className="size-4" />
-            Søk lagret — du varsles ved treff!
+        {notifyOnMatch && (
+          <div className="flex items-center gap-2 text-sm text-primary">
+            <Bell className="size-4" />
+            Du varsles når Kaupet finner et treff.
           </div>
         )}
 
         <div className="flex w-full flex-col gap-2">
-          <Button onClick={() => navigate({ to: "/annonser" })}>Se alle annonser</Button>
+          <Button
+            onClick={() =>
+              createdId && navigate({ to: "/ok/$id", params: { id: createdId }, search: {} })
+            }
+          >
+            Se kjøpsønsket
+          </Button>
           <Button variant="outline" onClick={() => navigate({ to: "/mine-annonser" })}>
             Mine annonser
           </Button>
@@ -409,14 +395,17 @@ function NewWtbPage() {
           <ChevronLeft className="size-4" /> Tilbake
         </Button>
       )}
-      {step !== "details" ? (
+      {step !== "review" ? (
         <Button
           type="button"
-          onClick={goNext}
+          onClick={() => {
+            if (step === "details") void trigger().then((valid) => valid && goNext());
+            else goNext();
+          }}
           disabled={step === "attributes" && !vehicleGroup && !title.trim()}
           className={native ? "h-14 w-full rounded-xl text-base" : undefined}
         >
-          {native ? "Fortsett" : `Neste: ${STEP_LABELS[STEPS[stepIndex + 1]]}`}{" "}
+          {native ? "Fortsett" : `Neste: ${STEP_META[STEPS[stepIndex + 1]].title}`}{" "}
           <ChevronRight className="size-4" />
         </Button>
       ) : (
@@ -454,7 +443,7 @@ function NewWtbPage() {
       <ListingComposerShell
         title="Ønskes kjøpt"
         pageKey={step}
-        pageTitle={STEP_LABELS[step]}
+        pageTitle={STEP_META[step].title}
         native={native}
         backLabel={stepIndex === 0 ? "Avbryt" : "Tilbake"}
         onBack={stepIndex === 0 ? () => void navigate({ to: "/" }) : goBack}
@@ -477,7 +466,7 @@ function NewWtbPage() {
           <ComposerStepIndicator
             current={stepIndex + 1}
             total={STEPS.length}
-            label={STEP_LABELS[step]}
+            label={STEP_META[step].title}
           />
         }
         status={
@@ -496,16 +485,47 @@ function NewWtbPage() {
         firstStep={stepIndex === 0}
         contentClassName="flex flex-col gap-6"
       >
+        <p className="text-sm text-muted-foreground">{STEP_META[step].help}</p>
         {/* Ingen <form>: publisering skjer kun via eksplisitt klikk på publiser-knappen,
           slik at verken Enter i input-felter eller knappe-bytte i footeren kan utløse den. */}
         {step === "category" && (
           <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label>Kategori (valgfritt)</Label>
-              <Button type="button" size="sm" variant="ghost" onClick={goNext}>
-                Hopp over — jeg leter etter hva som helst
-              </Button>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="title">Kort beskrivelse</Label>
+                <span className="text-xs text-muted-foreground">{titleLength}/120</span>
+              </div>
+              <Input
+                id="title"
+                placeholder="f.eks. PlayStation 5, Trek sykkel eller iPhone 14"
+                autoFocus
+                aria-invalid={!!errors.title}
+                aria-describedby={errors.title ? "title-error" : undefined}
+                {...register("title")}
+              />
+              {errors.title && (
+                <p id="title-error" className="text-sm text-destructive">
+                  {errors.title.message}
+                </p>
+              )}
             </div>
+            {!categoryId && categorySuggestion && (
+              <button
+                type="button"
+                className="flex min-h-14 w-full items-center justify-between rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-left"
+                onClick={() => {
+                  setValue("category_id", categorySuggestion.category_id, { shouldValidate: true });
+                  setCategorySuggestion(null);
+                }}
+              >
+                <span>
+                  <span className="block text-sm text-muted-foreground">Foreslått kategori</span>
+                  <span className="font-medium">{categorySuggestion.name_nb}</span>
+                </span>
+                <ChevronRight className="size-5 text-muted-foreground" aria-hidden />
+              </button>
+            )}
+            <Label>Velg kategori</Label>
             <CategoryPicker
               inline
               open={false}
@@ -517,6 +537,9 @@ function NewWtbPage() {
                 goNext();
               }}
             />
+            <Button type="button" size="sm" variant="ghost" onClick={goNext}>
+              Jeg er usikker – fortsett uten kategori
+            </Button>
           </section>
         )}
 
@@ -527,36 +550,6 @@ function NewWtbPage() {
                 Kategori: <span className="font-medium text-foreground">{categoryLabel}</span>
               </p>
             )}
-            {!vehicleGroup && (
-              <div className="mb-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="title">
-                    Hva leter du etter? <span className="text-destructive">*</span>
-                  </Label>
-                  <div className="flex items-center gap-1.5">
-                    <FieldValid show={!!touchedFields.title && !errors.title} />
-                    <span
-                      className={`text-xs ${titleLength > 100 ? "text-destructive" : "text-muted-foreground"}`}
-                    >
-                      {titleLength}/120
-                    </span>
-                  </div>
-                </div>
-                <Input
-                  id="title"
-                  placeholder="f.eks. PlayStation 5, Trek sykkel, iPhone 14..."
-                  autoFocus
-                  aria-invalid={!!errors.title}
-                  aria-describedby={errors.title ? "title-error" : undefined}
-                  {...register("title")}
-                />
-                {errors.title && (
-                  <p id="title-error" className="text-sm text-destructive">
-                    {errors.title.message}
-                  </p>
-                )}
-              </div>
-            )}
             <WtbCriteriaFields
               categoryId={categoryId ?? null}
               categories={categories}
@@ -564,7 +557,7 @@ function NewWtbPage() {
               onChange={setAttributes}
               checkedKeys={checkedKeys}
               onCheckedKeysChange={setCheckedKeys}
-              showErrors={showCriteriaErrors}
+              native={native}
             />
             <div className="space-y-2 pt-4">
               <Label htmlFor="wtb-freetext">
@@ -676,6 +669,77 @@ function NewWtbPage() {
               )}
             </section>
           </>
+        )}
+
+        {step === "review" && (
+          <div className="space-y-6">
+            <ComposerReview
+              items={[
+                {
+                  key: "category",
+                  label: "Kategori",
+                  value: categoryLabel || "Ikke valgt",
+                  onEdit: () => setStepIndex(0),
+                },
+                {
+                  key: "criteria",
+                  label: "Kriterier",
+                  value:
+                    Object.keys(attributes).length > 0
+                      ? `${Object.keys(attributes).length} valgt`
+                      : "Ingen begrensninger",
+                  onEdit: () => setStepIndex(1),
+                },
+                {
+                  key: "title",
+                  label: "Hva du leter etter",
+                  value: title,
+                  onEdit: () => setStepIndex(0),
+                },
+                {
+                  key: "details",
+                  label: "Detaljer",
+                  value:
+                    [
+                      description || null,
+                      typeof maxPriceNok === "number"
+                        ? `Maks ${maxPriceNok.toLocaleString("nb-NO")} kr`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || "Ingen ekstra detaljer",
+                  onEdit: () => setStepIndex(2),
+                },
+              ]}
+            />
+            <label
+              htmlFor="notify-on-match"
+              aria-label="Varsle meg om matchende annonser"
+              className="flex min-h-14 cursor-pointer items-start gap-3 rounded-xl border border-border bg-card p-4 text-left"
+            >
+              <Checkbox
+                id="notify-on-match"
+                checked={notifyOnMatch}
+                onCheckedChange={(checked) => setNotifyOnMatch(checked === true)}
+                aria-describedby="notify-on-match-help"
+              />
+              <span>
+                <span className="block font-medium">Varsle meg om matchende annonser</span>
+                <span
+                  id="notify-on-match-help"
+                  className="mt-1 block text-sm text-muted-foreground"
+                >
+                  Kaupet varsler deg når en ny annonse matcher kategorien og kriteriene du har
+                  valgt.
+                </span>
+              </span>
+            </label>
+            {isPending && (
+              <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
+                Publiserer kjøpsønsket …
+              </p>
+            )}
+          </div>
         )}
       </ListingComposerShell>
 

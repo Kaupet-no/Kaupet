@@ -279,6 +279,13 @@ annonser ligger i [ANNONSEOPPRETTELSE-UX-PLAN.md](ANNONSEOPPRETTELSE-UX-PLAN.md)
   inni kort for å skille hvert enkelt felt.
 - Valgrader er minst 56 px høye og hele raden er tappbar. Alle interaktive
   treffområder er minst 48×48 px.
+- Valgfrie søkekriterier skal ikke kreve en separat aktiverings-checkbox før
+  feltet kan brukes. En satt verdi aktiverer kriteriet; tom verdi vises som
+  «Ingen begrensning». På telefon brukes oversiktsrader med verdissammendrag
+  og en fokusert `NativeSheet`; web kan beholde effektive inline-kontroller.
+- I kategoribaserte flyter kan en kort tittel/fritekst brukes til å foreslå
+  kategori før brukeren velger manuelt. Forslaget er en tydelig handling, ikke
+  en skjult automatisk overskriving, og «Jeg er usikker» er sekundær vei.
 - Fast native footer ligger over `--app-bottom-nav-h`, håndterer safe area og
   har én fullbredde `Button size="lg"`/`h-14` som primærhandling. Tilbake er i
   native header; web kan vise tilbake i footer.
@@ -327,6 +334,10 @@ annonser ligger i [ANNONSEOPPRETTELSE-UX-PLAN.md](ANNONSEOPPRETTELSE-UX-PLAN.md)
   med forståelige verdier og «Endre» som går til riktig steg. Visuell
   fullforhåndsvisning kan være sekundær; ikke tving alle annonsetyper inn i
   samme kortpresentasjon.
+- Varslingsvalg tas på «Se over»-siden, før publisering, med en konkret
+  forklaring av hva som lagres og når brukeren varsles. Bruk én domenetilpasset
+  varslingsmotor per innholdstype; ikke opprett et parallelt lagret søk når
+  kjøpsønskets egen matchmotor allerede dekker kriteriene.
 - Vis hvem som kan se informasjon og hva publisering/varsling gjør der
   beslutningen tas. Konkret status skaper mer tillit enn dekorative
   sikkerhetsmerker.

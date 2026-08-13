@@ -33,6 +33,7 @@ export type WtbListing = {
   description: string | null;
   category_id: string | null;
   max_price_nok: number | null;
+  notify_matches: boolean;
   status: "draft" | "active" | "fulfilled" | "expired" | "archived";
   created_at: string;
   updated_at: string;
@@ -51,6 +52,7 @@ const wtbInputSchema = z.object({
   description: z.string().trim().max(2000, "Maks 2000 tegn").optional(),
   category_id: z.string().uuid().nullable().optional(),
   max_price_nok: z.number().int().min(0).max(10_000_000).nullable().optional(),
+  notify_matches: z.boolean().optional(),
   // Filters are always optional for WTB listings — never enforced server-side.
   attributes: wtbAttributesSchema.optional(),
 });
@@ -68,6 +70,7 @@ export const createWtbListing = createServerFn({ method: "POST" })
       description: data.description ?? null,
       category_id: data.category_id ?? null,
       max_price_nok: data.max_price_nok ?? null,
+      notify_matches: data.notify_matches ?? false,
       attributes: data.attributes ?? {},
     };
 
@@ -257,11 +260,18 @@ export const getMyWtbListings = createServerFn({ method: "GET" })
       .from("wtb_listings")
       .select("*, categories(name_nb, slug)")
       .eq("user_id", user!.id)
-      .order("created_at", { ascending: false });
+      .order("updated_at", { ascending: false });
     if (error) throw error;
-    return (data ?? []) as (WtbListing & {
+    const rows = (data ?? []) as (WtbListing & {
       categories: { name_nb: string; slug: string } | null;
     })[];
+    let hasDraft = false;
+    return rows.filter((row) => {
+      if (row.status !== "draft") return true;
+      if (hasDraft) return false;
+      hasDraft = true;
+      return true;
+    });
   });
 
 const listWtbSchema = z.object({

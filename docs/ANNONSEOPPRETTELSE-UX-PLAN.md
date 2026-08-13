@@ -6,7 +6,7 @@
 > verifisering i dette dokumentet i samme commit som hver fase.
 
 Opprettet: 2026-08-13  
-Status: **Fase 2 teknisk fullført – all manuell test og QA er samlet i fase 6**  
+Status: **Fase 4 teknisk fullført – all manuell test og QA er samlet i fase 6**
 Primær målflate: iOS- og Android-appene  
 Sekundær målflate: responsiv web og nettbrett
 
@@ -421,7 +421,7 @@ utkast og aldri den andre annonsetypen.
 
 ### Fase 3 — Ny informasjonsarkitektur og språk
 
-Status: **Ikke startet**
+Status: **Teknisk fullført – QA flyttet til fase 6**
 
 1. Innfør felles sidemetadata med oppgaveorienterte titler og hjelpetekster.
 2. Endre kjøpsønskets kriterier til oversiktsrader + detaljflater på telefon.
@@ -439,21 +439,21 @@ handlinger kan utføres uten gest.
 
 ### Fase 4 — Felles «Se over», varsling og publisering
 
-Status: **Ikke startet**
+Status: **Teknisk fullført – QA flyttet til fase 6**
 
 1. Legg til `ComposerReview` i begge flyter.
 2. Hver seksjon viser forståelig verdi og «Endre» med retur til review.
 3. Flytt varslingsvalg for kjøpsønske inn i review og gjør konsekvensen klar.
-4. Lag idempotent serverorkestrering eller eksplisitt kompensasjon for
-   kjøpsønske + lagret søk. Ikke skjul delvis feil.
+4. Lagre varslingsvalget atomisk med kjøpsønsket og bruk WTB-motorens
+   idempotente varsler. Ikke opprett et parallelt lagret søk.
 5. Standardiser pending/success/error og haptikk.
 6. Ferdigflaten har én anbefalt handling: «Se annonsen»/«Se kjøpsønsket»;
    «Mine annonser» er sekundær. Ikke send brukeren til generisk annonseoversikt
    som primærhandling.
 
 Akseptanse: bruker kan endre hver seksjon uten datatap; dobbelttrykk gir ikke
-duplikat; skjermleser annonserer publiseringsstatus; delvis varslingsfeil kan
-prøves igjen.
+duplikat; skjermleser annonserer publiseringsstatus; varslingspreferansen
+lagres atomisk med kjøpsønsket og gir høyst ett varsel per treff.
 
 ### Fase 5 — Validering, tilgjengelighet og robusthet
 
@@ -528,28 +528,44 @@ databaseregelendringer `bun run test:rls` med lokal Supabase.
 Denne delen skal aldri slettes eller «ryddes» ved ferdigstilling. Legg én rad
 per nytt funn, også når funnet løses i samme fase.
 
-| Dato       | Fase       | Flate      | Funn / evidens                                                           | Beslutning                                                           | Status / lenke    |
-| ---------- | ---------- | ---------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------- | ----------------- |
-| 2026-08-13 | Evaluering | Begge      | Skall, fremdrift, utkast og ferdigtilstand er ulike                      | Konsolider struktur, behold domeneinnhold                            | Planlagt          |
-| 2026-08-13 | Evaluering | Kjøpsønske | Ingen autolagring; navigasjon kan gi datatap                             | Inkludert i fase 2                                                   | Planlagt          |
-| 2026-08-13 | Evaluering | Kjøpsønske | Kriterier bruker checkbox + felt i mange kort                            | Oversiktsrad + detaljflate i fase 3                                  | Planlagt          |
-| 2026-08-13 | Evaluering | Test       | E2E dekker salg, ikke kjøpsønske                                         | Inkludert i fase 6                                                   | Planlagt          |
-| 2026-08-13 | Fase 0     | Analyse    | Personvernvennlig kanal og eventnavn finnes allerede                     | Gjenbruk kanalen; ingen migrasjon/tredjepart                         | Implementert      |
-| 2026-08-13 | Fase 0     | Baseline   | Autentiserte lokalruter krevde testinnlogging                            | Bruk autorisert demokonto kun lokalt                                 | Løst              |
-| 2026-08-13 | Fase 0     | Kjøpsønske | Flyten hadde ingen traktmåling                                           | Bruk samme målevokabular som salg                                    | Implementert      |
-| 2026-08-13 | Fase 0     | Native-web | `?forcenative` ga ubehandlet «Keyboard plugin is not implemented on web» | Skill ut layout-emulering fra native plugin-kall                     | Åpen              |
-| 2026-08-13 | Fase 0     | Kjøpsønske | Native «Neste» lå 228 px under første viewport                           | Fast felles native footer i fase 1                                   | Målt lokalt       |
-| 2026-08-13 | Fase 0     | Salg       | Fast handling, fremdrift og lagringsstatus fungerte i 375×812            | Bruk salgsflyten som strukturell baseline                            | Målt lokalt       |
-| 2026-08-13 | Fase 0     | Server     | TanStack Start advarte om manglende CSRF-middleware for serverfunksjoner | Egen sikkerhetsoppgave; ikke blandes inn i UX-fasen                  | Åpen              |
-| 2026-08-13 | Fase 1     | Begge      | Samme skall kunne gjenbrukes uten å samle domeneskjemaene                | Del kun chrome, fremdrift og footer                                  | Implementert      |
-| 2026-08-13 | Fase 1     | Kjøpsønske | Fast footer flyttet «Fortsett» fra y=1040 til y=648 i 375×812            | Behold felles native footer                                          | Verifisert lokalt |
-| 2026-08-13 | Fase 1     | Native-web | Layoutflagget ble tolket som ekte Capacitor-runtime                      | Gate plugin på `nativePlatform()`                                    | Løst              |
-| 2026-08-13 | Fase 1     | Navigasjon | Salg hadde lokal historikkvakt; kjøpsønske manglet stegvakt              | Delt `useComposerHistoryBack` med regresjonstester                   | Implementert      |
-| 2026-08-13 | Fase 1     | A11y/Test  | Steg manglet felles fokusmål og stabil composer-sideidentitet            | Fokusoverskrift + `composer-page-<key>`                              | Implementert      |
-| 2026-08-13 | Fase 2     | Kjøpsønske | Datamodellen manglet en privat utkaststatus                              | Utvid WTB-status med `draft`; eksisterende RLS skjuler den for andre | Implementert      |
-| 2026-08-13 | Fase 2     | Utkast     | Samlet hook ville koblet salgets bilde-store til WTB uten reell gevinst  | Del kontrakt/type/versjon, behold små domenehooks                    | Implementert      |
-| 2026-08-13 | Fase 2     | Konflikt   | Lokal nyere kopi kunne ellers opprette enda et serverutkast              | Behold server-ID, men la nyeste gyldige innhold vinne                | Implementert      |
-| 2026-08-13 | Fase 2     | Forkasting | Lokal sletting alene ville hentet serverutkastet tilbake ved neste besøk | Slett både lokal og eid serverrad med `draft`-vakt                   | Implementert      |
+| Dato       | Fase       | Flate          | Funn / evidens                                                            | Beslutning                                                           | Status / lenke    |
+| ---------- | ---------- | -------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------- | ----------------- |
+| 2026-08-13 | Evaluering | Begge          | Skall, fremdrift, utkast og ferdigtilstand er ulike                       | Konsolider struktur, behold domeneinnhold                            | Planlagt          |
+| 2026-08-13 | Evaluering | Kjøpsønske     | Ingen autolagring; navigasjon kan gi datatap                              | Inkludert i fase 2                                                   | Planlagt          |
+| 2026-08-13 | Evaluering | Kjøpsønske     | Kriterier bruker checkbox + felt i mange kort                             | Oversiktsrad + detaljflate i fase 3                                  | Planlagt          |
+| 2026-08-13 | Evaluering | Test           | E2E dekker salg, ikke kjøpsønske                                          | Inkludert i fase 6                                                   | Planlagt          |
+| 2026-08-13 | Fase 0     | Analyse        | Personvernvennlig kanal og eventnavn finnes allerede                      | Gjenbruk kanalen; ingen migrasjon/tredjepart                         | Implementert      |
+| 2026-08-13 | Fase 0     | Baseline       | Autentiserte lokalruter krevde testinnlogging                             | Bruk autorisert demokonto kun lokalt                                 | Løst              |
+| 2026-08-13 | Fase 0     | Kjøpsønske     | Flyten hadde ingen traktmåling                                            | Bruk samme målevokabular som salg                                    | Implementert      |
+| 2026-08-13 | Fase 0     | Native-web     | `?forcenative` ga ubehandlet «Keyboard plugin is not implemented on web»  | Skill ut layout-emulering fra native plugin-kall                     | Åpen              |
+| 2026-08-13 | Fase 0     | Kjøpsønske     | Native «Neste» lå 228 px under første viewport                            | Fast felles native footer i fase 1                                   | Målt lokalt       |
+| 2026-08-13 | Fase 0     | Salg           | Fast handling, fremdrift og lagringsstatus fungerte i 375×812             | Bruk salgsflyten som strukturell baseline                            | Målt lokalt       |
+| 2026-08-13 | Fase 0     | Server         | TanStack Start advarte om manglende CSRF-middleware for serverfunksjoner  | Egen sikkerhetsoppgave; ikke blandes inn i UX-fasen                  | Åpen              |
+| 2026-08-13 | Fase 1     | Begge          | Samme skall kunne gjenbrukes uten å samle domeneskjemaene                 | Del kun chrome, fremdrift og footer                                  | Implementert      |
+| 2026-08-13 | Fase 1     | Kjøpsønske     | Fast footer flyttet «Fortsett» fra y=1040 til y=648 i 375×812             | Behold felles native footer                                          | Verifisert lokalt |
+| 2026-08-13 | Fase 1     | Native-web     | Layoutflagget ble tolket som ekte Capacitor-runtime                       | Gate plugin på `nativePlatform()`                                    | Løst              |
+| 2026-08-13 | Fase 1     | Navigasjon     | Salg hadde lokal historikkvakt; kjøpsønske manglet stegvakt               | Delt `useComposerHistoryBack` med regresjonstester                   | Implementert      |
+| 2026-08-13 | Fase 1     | A11y/Test      | Steg manglet felles fokusmål og stabil composer-sideidentitet             | Fokusoverskrift + `composer-page-<key>`                              | Implementert      |
+| 2026-08-13 | Fase 2     | Kjøpsønske     | Datamodellen manglet en privat utkaststatus                               | Utvid WTB-status med `draft`; eksisterende RLS skjuler den for andre | Implementert      |
+| 2026-08-13 | Fase 2     | Utkast         | Samlet hook ville koblet salgets bilde-store til WTB uten reell gevinst   | Del kontrakt/type/versjon, behold små domenehooks                    | Implementert      |
+| 2026-08-13 | Fase 2     | Konflikt       | Lokal nyere kopi kunne ellers opprette enda et serverutkast               | Behold server-ID, men la nyeste gyldige innhold vinne                | Implementert      |
+| 2026-08-13 | Fase 2     | Forkasting     | Lokal sletting alene ville hentet serverutkastet tilbake ved neste besøk  | Slett både lokal og eid serverrad med `draft`-vakt                   | Implementert      |
+| 2026-08-13 | Fase 2     | Mine annonser  | Eierens WTB-spørring inkluderer private utkast                            | Vis tydelig «Utkast» og åpne composer via «Fortsett»                 | Implementert      |
+| 2026-08-13 | Fase 2     | RLS            | Eksisterende WTB-test beviste ikke privat behandling av `draft`           | Dekk eier, annen bruker, anonym, aktivering og sletting              | Implementert      |
+| 2026-08-13 | Fase 2     | Flere enheter  | Flere serverutkast kunne gitt en «Fortsett»-rad som åpnet et annet utkast | Vis kun sist oppdaterte WTB-utkast; behold publiserte rader          | Implementert      |
+| 2026-08-13 | Fase 3     | Kriterier      | Checkbox + felt krevde to handlinger og skapte tomme «aktive» kriterier   | Verdi aktiverer kriteriet; tomt betyr «Ingen begrensning»            | Implementert      |
+| 2026-08-13 | Fase 3     | Native         | Alle kriteriefelt samtidig ga lange kortstabler og høy skannebelastning   | Oversiktsrader, valgte først og fokusert `NativeSheet`               | Implementert      |
+| 2026-08-13 | Fase 3     | Web            | Web har plass og nytte av direkte feltredigering                          | Behold inline-kontroller med samme state og språk                    | Implementert      |
+| 2026-08-13 | Fase 3     | Kategori       | Tittel kom etter kategori og kunne ikke hjelpe kategorivalget             | Kort beskrivelse først, kategori-forslag og rolig «usikker»-vei      | Implementert      |
+| 2026-08-13 | Fase 3     | Redigering     | Publiserte WTB-annonser brukte fortsatt gammel inline kriteriekontrakt    | Bruk samme native oversikt/detaljflate i opprettelse og redigering   | Implementert      |
+| 2026-08-13 | Fase 3     | Salg           | Salgsflyten har allerede kategoriavhengige titler i flow-registryen       | Behold registry som metadatakilde; ikke lag parallell stegmodell     | Implementert      |
+| 2026-08-13 | Fase 4     | Begge          | Salg hadde preview, men ingen felles seksjonsvis review-kontrakt          | Delt `ComposerReview` med forståelige verdier og «Endre»             | Implementert      |
+| 2026-08-13 | Fase 4     | Kjøpsønske     | Varsling ble først tilbudt etter at annonsen var publisert                | Flytt valget til review og lagre det med kjøpsønsket                 | Implementert      |
+| 2026-08-13 | Fase 4     | Varslingskilde | WTB-motor og lagret søk kunne varsle om samme nye annonse                 | Bruk bare attributtbevisst WTB-motor                                 | Implementert      |
+| 2026-08-13 | Fase 4     | Kriterieformat | Lagrede søk forventer slug, mens gammel WTB-flyt sendte kategori-ID       | Fjern parallelt søk; WTB-motor sammenligner kategori-ID korrekt      | Implementert      |
+| 2026-08-13 | Fase 4     | Idempotens     | Varslingsretry via lagret søk kunne opprette duplikater                   | Atomisk `notify_matches` og eksisterende unik varselkonflikt         | Implementert      |
+| 2026-08-13 | Fase 4     | Ferdigflate    | Kjøpsønske sendte primært til generisk annonseoversikt                    | «Se kjøpsønsket» primær; «Mine annonser» sekundær                    | Implementert      |
+| 2026-08-13 | Fase 4     | Samtykke       | Forhåndsvalgt varsling er ikke juridisk avklart                           | Varsling er av som standard frem til produkt/juridisk beslutning     | Implementert      |
 
 ## 11. Gap og anbefalte videre tiltak
 
@@ -636,7 +652,8 @@ Kopier denne malen ved avslutning av hver fase:
 - Status: Teknisk fullført; samlet manuell QA gjenstår i fase 6
 - Endret: Versjonerte salgsutkast med eksplisitt type og innførte lokal og
   konto-basert autolagring, gjenoppretting, forkasting og lagringsstatus for
-  kjøpsønsker. Publisering aktiverer samme private serverutkast atomisk.
+  kjøpsønsker. Publisering aktiverer samme private serverutkast atomisk. «Mine
+  annonser» viser siste private WTB-utkast med en trygg «Fortsett»-handling.
 - Nye funn: WTB-tabellen hadde allerede passende eier-RLS, men statusreglen
   manglet `draft`. Nyeste-kopi-regelen må bevare server-ID selv når lokalt
   innhold vinner, ellers kan en konflikt skape duplikatutkast.
@@ -645,9 +662,53 @@ Kopier denne malen ved avslutning av hver fase:
   ulike domenefelt gjør én generisk hook større og mer risikabel uten å fjerne
   meningsfull duplisering.
 - Kontroller kjørt: Prettier, TypeScript, målrettet ESLint, fire målrettede
-  Vitest-regresjoner og `git diff --check`.
+  Vitest-regresjoner og `git diff --check`. WTB-RLS-suiten er utvidet med eier,
+  annen bruker, anonym, aktivering og sletting; lokal kjøring krever Supabase.
 - Manuelt verifisert på: Flyttet til samlet fase 6 etter produktbeslutning.
-- Ikke verifisert / risiko: Migrasjonen er ikke anvendt i lokal Supabase eller
-  staging; RLS-integrasjon, offline/suspend/kill/reload og fysisk iOS/Android
-  inngår i fase 6. Migrasjonen må deployes og bekreftes før avhengig appkode.
+- Ikke verifisert / risiko: Lokal Supabase-stack kjører ikke, så de nye
+  RLS-scenarioene er ikke kjørt lokalt. Offline/suspend/kill/reload og fysisk
+  iOS/Android inngår i fase 6. Migrasjonen er bekreftet anvendt på staging.
+- Commit/PR: `add3fc9`, `099b017`; etterkontrollen er ikke committet.
+
+### Fase 3 — 2026-08-13
+
+- Status: Teknisk fullført; samlet manuell QA gjenstår i fase 6
+- Endret: Flyttet kort beskrivelse foran kategorivalget, la til eksplisitt
+  kategoriforslag og en rolig «usikker»-vei. Erstattet checkbox + felt med
+  verdidrevet kriterietilstand. Native bruker oversiktsrader, valgte først og
+  fokusert `NativeSheet`; web beholder inline-kontroller. Samme kontrakt brukes
+  når et publisert kjøpsønske redigeres.
+- Nye funn: Salgsflytens flow-registry er allerede riktig kilde for dynamiske
+  sidetitler. En ny felles metadataabstraksjon ville duplisert denne uten å
+  gjøre kjøpsønsket enklere.
+- Avvik fra plan og begrunnelse: Det eksisterende `NativeSheet`-mønsteret fra
+  søkefiltrene ble gjenbrukt direkte. Kriteriefeltene deles fortsatt med web,
+  mens bare presentasjonen varierer per plattform.
+- Kontroller kjørt: Prettier, TypeScript, målrettet ESLint og fire målrettede
+  Vitest-tester for kriteriepresentasjon og utkast, samt `git diff --check`.
+- Manuelt verifisert på: Flyttet til samlet fase 6 etter produktbeslutning.
+- Ikke verifisert / risiko: Visuelt hierarki, sheet-høyde, skjermleserfokus,
+  lange kategorinavn og fysisk iOS/Android inngår i fase 6.
+- Commit/PR: Ikke opprettet.
+
+### Fase 4 — 2026-08-13
+
+- Status: Teknisk fullført; samlet manuell QA gjenstår i fase 6
+- Endret: La til delt `ComposerReview` i begge opprettelsesflyter med
+  seksjonsverdier og «Endre». Kjøpsønsket har et eget review-steg med
+  varslingsvalg. Ferdigflaten prioriterer «Se kjøpsønsket», og salgsflyten
+  beholder «Se annonsen» som primærhandling.
+- Nye funn: WTB-motoren oppretter allerede dedupliserte varsler og matcher
+  strukturerte attributter. Et ekstra lagret søk ville både brukt feil
+  kategori-format og kunne gitt dobbeltvarsel.
+- Avvik fra plan og begrunnelse: Den planlagte orkestreringen mot
+  `saved_searches` ble fjernet før deploy. `notify_matches` lagres atomisk på
+  kjøpsønsket og filtreres i WTB-motoren. Varsling er av som standard fordi
+  forhåndsvalg ikke er juridisk avklart.
+- Kontroller kjørt: Prettier, full ESLint, TypeScript, full Vitest-suite (307
+  tester, inkludert ny review-regresjon) og `git diff --check`. RLS-suiten har
+  et nytt scenario for inn-/utmeldt WTB-varsling, men krever lokal Supabase.
+- Manuelt verifisert på: Flyttet til samlet fase 6 etter produktbeslutning.
+- Ikke verifisert / risiko: Ny migrasjon er ikke anvendt lokalt eller staging.
+  Varslingspreferansen og skjermleserannonsering inngår i fase 6.
 - Commit/PR: Ikke opprettet.

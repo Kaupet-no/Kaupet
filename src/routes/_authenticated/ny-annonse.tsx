@@ -450,6 +450,20 @@ function NewListingPage() {
   const categoryAttributesPageIndex = pages.findIndex((p) =>
     p.groups.some((g) => g.key === "category-attributes"),
   );
+  const editReviewSection = (section: "category" | "content" | "details" | "location") => {
+    const groupKeys: Record<typeof section, string[]> = {
+      category: ["category-select"],
+      content: ["title-photos"],
+      details: ["category-attributes", "description-keywords", "price"],
+      location: ["delivery-location"],
+    };
+    const pageIndex = pages.findIndex((page) =>
+      page.groups.some((group) => groupKeys[section].includes(group.key)),
+    );
+    if (pageIndex < 0) return;
+    setStep(pageIndex + 1);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const shouldBlockNav =
     publishedId === null &&
@@ -1053,6 +1067,7 @@ function NewListingPage() {
     turnstileToken,
     setTurnstileToken,
     onCancel: () => navigate({ to: "/" }),
+    onEditReviewSection: editReviewSection,
   };
 
   const groups = currentPage?.groups ?? [];

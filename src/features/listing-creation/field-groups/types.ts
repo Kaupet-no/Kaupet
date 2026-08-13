@@ -256,4 +256,5 @@ export type WizardSharedProps = {
   turnstileToken: string | null;
   setTurnstileToken: (token: string | null) => void;
   onCancel: () => void;
+  onEditReviewSection: (section: "category" | "content" | "details" | "location") => void;
 };

@@ -1,11 +1,13 @@
-import { useMemo } from "react";
-import { Info } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ChevronRight, Info } from "lucide-react";
 
 import { useAllCategoryFilters } from "@/components/attribute-fields";
 import { RangeFilterField } from "@/components/range-filter-field";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSheet } from "@/components/ui/native-sheet";
 import { EuControlDateField } from "@/features/listing-creation/field-groups/vehicle-confirm/eu-control-date-field";
 import {
   VehicleBrandField,
@@ -27,15 +29,15 @@ import {
   type WtbAttributeMap,
   type WtbAttributeValue,
 } from "./wtb-criteria-types";
+import { criterionSummary, orderWtbCriteria } from "./wtb-criteria-presentation";
 
 /**
  * Renders the search-criteria form for an Ønskes kjøpt listing: one row per
- * effective category filter, each with an activate-checkbox. Unchecked
- * (default) = the criterion is inactive and ignored; filling the field
- * auto-checks it; checking it makes it required before "Neste" (the parent
- * gates on `wtbInvalidCheckedKeys`). Unlike the sell flow's AttributeFields,
- * nothing here is inherently required, selects allow several values, and
- * numerics are from–to sliders scaled by what exists on Kaupet.
+ * effective category filter. On native, filters are overview rows opening a
+ * focused detail surface; web keeps efficient inline controls. Empty means
+ * «Ingen begrensning» on both platforms. Unlike the sell flow's
+ * AttributeFields, nothing here is required, selects allow several values,
+ * and numerics are from–to sliders scaled by what exists on Kaupet.
  */
 export function WtbCriteriaFields({
   categoryId,
@@ -44,7 +46,7 @@ export function WtbCriteriaFields({
   onChange,
   checkedKeys,
   onCheckedKeysChange,
-  showErrors,
+  native = false,
 }: {
   categoryId: string | null;
   categories: CategoryNode[];
@@ -53,9 +55,11 @@ export function WtbCriteriaFields({
   /** Keys the user has activated; a key with a value is always checked. */
   checkedKeys: readonly string[];
   onCheckedKeysChange: (next: string[]) => void;
-  /** Shows "fill or deactivate" errors on checked-but-empty criteria. */
-  showErrors: boolean;
+  native?: boolean;
+  /** Legacy edit-flow prop; empty criteria no longer produce an error. */
+  showErrors?: boolean;
 }) {
+  const [activeFilterKey, setActiveFilterKey] = useState<string | null>(null);
   const { data: allFilters } = useAllCategoryFilters();
   const { data: dynamicBounds } = useAttributeRangeBounds(categoryId);
 
@@ -75,8 +79,6 @@ export function WtbCriteriaFields({
 
   if (!categoryId || filters.length === 0) return null;
 
-  const checked = new Set(checkedKeys);
-
   const setValue = (key: string, v: WtbAttributeValue | undefined) => {
     const empty =
       v === undefined ||
@@ -87,22 +89,18 @@ export function WtbCriteriaFields({
     if (empty) delete next[key];
     else next[key] = v;
     onChange(next);
-    // Typing/selecting a value activates the criterion; clearing it does not
-    // deactivate (the user may be mid-edit) — unchecking does that explicitly.
-    if (!empty && !checked.has(key)) onCheckedKeysChange([...checkedKeys, key]);
+    onCheckedKeysChange(
+      empty
+        ? checkedKeys.filter((checkedKey) => checkedKey !== key)
+        : [...new Set([...checkedKeys, key])],
+    );
   };
 
-  const toggleChecked = (key: string, on: boolean) => {
-    if (on) {
-      onCheckedKeysChange([...new Set([...checkedKeys, key])]);
-    } else {
-      onCheckedKeysChange(checkedKeys.filter((k) => k !== key));
-      if (key in value) {
-        const next = { ...value };
-        delete next[key];
-        onChange(next);
-      }
-    }
+  const clearValue = (key: string) => {
+    const next = { ...value };
+    delete next[key];
+    onChange(next);
+    onCheckedKeysChange(checkedKeys.filter((checkedKey) => checkedKey !== key));
   };
 
   const brandFilter = filters.find((f) => f.type === "brand_select");
@@ -111,87 +109,94 @@ export function WtbCriteriaFields({
       ? (value[brandFilter.key] as string)
       : undefined;
 
-  return (
-    <div className="space-y-3 rounded-xl border border-border p-4">
-      <p className="text-sm font-medium">Søkekriterier</p>
-      <p className="text-sm text-muted-foreground">
-        Kryss av eller fyll ut kun det som betyr noe for deg — alt er valgfritt.
-      </p>
-      {filters.map((f) => (
-        <WtbCriterionRow
-          key={f.id}
-          filter={f}
-          checked={checked.has(f.key)}
-          onCheckedChange={(on) => toggleChecked(f.key, on)}
-          invalid={showErrors && checked.has(f.key) && !(f.key in value)}
-          hideRowLabel={
-            f.type === "brand_select" ||
-            f.type === "model_select" ||
-            ((f.type === "number" || f.type === "range") && f.key !== EU_CONTROL_KEY)
-          }
+  const sortedFilters = orderWtbCriteria(filters, value);
+  const activeFilter = filters.find((filter) => filter.key === activeFilterKey) ?? null;
+  const field = (filter: CategoryFilter) => (
+    <WtbCriterionField
+      filter={filter}
+      value={value[filter.key]}
+      onChange={(next) => setValue(filter.key, next)}
+      brandGroup={(brandFilter?.unit ?? "bil") as VehicleBrandGroup}
+      brandName={brandName}
+      bounds={dynamicBounds}
+    />
+  );
+
+  if (native) {
+    return (
+      <div className="space-y-3">
+        <p className="text-sm text-muted-foreground">
+          Velg bare begrensningene som er viktige. Resten kan være åpne.
+        </p>
+        {sortedFilters.map((filter) => (
+          <button
+            key={filter.id}
+            type="button"
+            onClick={() => setActiveFilterKey(filter.key)}
+            className="native-touch-target flex min-h-14 w-full items-center gap-3 rounded-xl bg-muted px-4 py-3 text-left"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block text-base font-medium">{criterionLabel(filter)}</span>
+              <span className="block text-sm text-muted-foreground">
+                {criterionSummary(filter, value[filter.key])}
+              </span>
+            </span>
+            <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+          </button>
+        ))}
+        <NativeSheet
+          open={activeFilter !== null}
+          onOpenChange={(open) => !open && setActiveFilterKey(null)}
+          title={activeFilter ? criterionLabel(activeFilter) : "Søkekriterium"}
+          titleVisible
+          expandable
+          className="overflow-y-auto"
         >
-          <WtbCriterionField
-            filter={f}
-            value={value[f.key]}
-            onChange={(v) => setValue(f.key, v)}
-            brandGroup={(brandFilter?.unit ?? "bil") as VehicleBrandGroup}
-            brandName={brandName}
-            bounds={dynamicBounds}
-          />
-        </WtbCriterionRow>
+          {activeFilter && (
+            <div className="mt-4 space-y-5">
+              {field(activeFilter)}
+              <div className="flex gap-2">
+                {activeFilter.key in value && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => clearValue(activeFilter.key)}
+                  >
+                    Ingen begrensning
+                  </Button>
+                )}
+                <Button type="button" className="flex-1" onClick={() => setActiveFilterKey(null)}>
+                  Ferdig
+                </Button>
+              </div>
+            </div>
+          )}
+        </NativeSheet>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 rounded-xl border border-border p-4">
+      <p className="text-sm text-muted-foreground">
+        Fyll ut bare begrensningene som er viktige. Tomme felt betyr ingen begrensning.
+      </p>
+      {sortedFilters.map((filter) => (
+        <section key={filter.id} className="space-y-2">
+          <Label>{criterionLabel(filter)}</Label>
+          {field(filter)}
+        </section>
       ))}
     </div>
   );
 }
 
-function WtbCriterionRow({
-  filter,
-  checked,
-  onCheckedChange,
-  invalid,
-  hideRowLabel,
-  children,
-}: {
-  filter: CategoryFilter;
-  checked: boolean;
-  onCheckedChange: (on: boolean) => void;
-  invalid: boolean;
-  /** Brand/model and slider fields render their own label — skip the row's
-   * to avoid a doubled heading. */
-  hideRowLabel: boolean;
-  children: React.ReactNode;
-}) {
-  const label =
-    filter.key === EU_CONTROL_KEY
-      ? "Neste EU-kontroll (tidligst)"
-      : filter.unit && filter.type !== "brand_select"
-        ? `${filter.label_nb} (${filter.unit})`
-        : filter.label_nb;
-  return (
-    <div
-      className={`space-y-2 rounded-lg border p-3 ${
-        checked ? "border-primary/40 bg-primary/5" : "border-border"
-      }`}
-    >
-      <label className="flex items-center gap-2">
-        <Checkbox
-          checked={checked}
-          onCheckedChange={(c) => onCheckedChange(c === true)}
-          aria-label={`Bruk ${label} i søket`}
-        />
-        {!hideRowLabel && <span className="text-sm font-medium">{label}</span>}
-        {hideRowLabel && (
-          <span className="text-sm text-muted-foreground">Bruk {label.toLowerCase()} i søket</span>
-        )}
-      </label>
-      {children}
-      {invalid && (
-        <p className="text-sm text-destructive">
-          Fyll ut feltet, eller fjern avkrysningen for å hoppe over det.
-        </p>
-      )}
-    </div>
-  );
+function criterionLabel(filter: CategoryFilter) {
+  if (filter.key === EU_CONTROL_KEY) return "Neste EU-kontroll (tidligst)";
+  return filter.unit && filter.type !== "brand_select"
+    ? `${filter.label_nb} (${filter.unit})`
+    : filter.label_nb;
 }
 
 function WtbCriterionField({

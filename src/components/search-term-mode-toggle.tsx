@@ -8,11 +8,11 @@ export function ModeToggle({
   labels: [string, string];
 }) {
   return (
-    <div className="inline-flex rounded-full border border-border bg-card p-0.5 text-xs">
+    <div className="flex w-full rounded-xl border border-border bg-card p-1 text-sm">
       <button
         type="button"
         onClick={() => onChange("all")}
-        className={`rounded-full px-2.5 py-1 transition ${
+        className={`native-touch-target min-h-12 flex-1 rounded-lg px-3 py-2 transition ${
           value === "all" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
         }`}
       >
@@ -21,7 +21,7 @@ export function ModeToggle({
       <button
         type="button"
         onClick={() => onChange("any")}
-        className={`rounded-full px-2.5 py-1 transition ${
+        className={`native-touch-target min-h-12 flex-1 rounded-lg px-3 py-2 transition ${
           value === "any" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
         }`}
       >

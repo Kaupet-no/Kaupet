@@ -22,6 +22,23 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Samme applicationId for begge — appen krasjer ikke og lar seg
+    // installere over den andre, men de kan ikke stå installert side ved
+    // side samtidig. Et eget applicationId for staging (for sidestilt
+    // installasjon) krever en egen Firebase Android-app registrert for
+    // den id-en, siden google-services-pluginet feiler bygget hvis
+    // package_name ikke finnes i google-services.json.
+    flavorDimensions "env"
+    productFlavors {
+        production {
+            dimension "env"
+            resValue "string", "app_name", "Kaupet"
+        }
+        staging {
+            dimension "env"
+            resValue "string", "app_name", "Kaupet Staging"
+        }
+    }
     signingConfigs {
         release {
             if (keystorePropertiesFile.exists()) {

@@ -137,11 +137,6 @@
       "count": 1
     }
   },
-  "src/features/listing-search/search-panel/filter-sections.tsx": {
-    "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
-  },
   "src/features/listing-search/search-panel/search-panel.tsx": {
     "react-hooks/set-state-in-effect": {
       "count": 1
@@ -163,6 +158,11 @@
     }
   },
   "src/hooks/use-saved-location.ts": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/hooks/use-should-show-dev-server-switch.ts": {
     "react-hooks/set-state-in-effect": {
       "count": 1
     }

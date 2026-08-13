@@ -1,5 +1,10 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
+// Satt av CI (CAPACITOR_ENV=staging|production) før `cap sync` — se
+// android-jobben i .github/workflows/ci.yml. Lokal `cap sync` uten
+// variabelen faller tilbake til produksjon.
+const isStaging = process.env.CAPACITOR_ENV === "staging";
+
 const config: CapacitorConfig = {
   appId: "no.kaupet.app",
   appName: "Kaupet",
@@ -9,9 +14,15 @@ const config: CapacitorConfig = {
   // the iOS/Android overscroll bounce when scrolling past the top/bottom.
   backgroundColor: "#fbf9f3",
   server: {
-    url: "https://kaupet.no",
+    url: isStaging ? "https://staging.kaupet.no" : "https://kaupet.no",
     errorPath: "offline.html",
-    cleartext: false,
+    // Kun staging: lar "Meg"-siden sin dev-server-bryter (DevServerSwitch)
+    // navigere WebViewen til en http://-adresse på lokalt nettverk.
+    // allowNavigation må matche siden vertsnavnet ikke er kjent på
+    // forhånd — usesCleartextTraffic er satt tilsvarende kun for
+    // staging-flavoren, se android/app/src/staging/AndroidManifest.xml.
+    cleartext: isStaging,
+    allowNavigation: isStaging ? ["*"] : undefined,
     androidScheme: "https",
   },
   ios: {

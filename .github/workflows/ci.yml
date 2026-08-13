@@ -77,8 +77,20 @@ jobs:
     name: Android unit tests
     needs: verify
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            android:
+              - 'android/**'
+              - 'capacitor.config.*'
+              - 'src/**'
+              - 'package.json'
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -99,6 +111,27 @@ jobs:
       - name: Run Android tests
         working-directory: android
         run: ./gradlew test
+
+      - name: Build debug APK
+        if: steps.filter.outputs.android == 'true'
+        working-directory: android
+        run: ./gradlew assembleDebug
+
+      - uses: actions/upload-artifact@v7
+        if: steps.filter.outputs.android == 'true'
+        with:
+          name: android-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+
+      - name: Publish APK as GitHub release preview
+        if: steps.filter.outputs.android == 'true' && github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-preview-${{ github.ref_name }}
+          name: Android preview (${{ github.ref_name }})
+          prerelease: true
+          files: android/app/build/outputs/apk/debug/app-debug.apk
 
   deploy:
     name: Deploy to Cloudflare Workers

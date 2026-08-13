@@ -456,8 +456,8 @@ og pris har Fra/Til med hurtigvalg. Lint/typecheck og visuell native QA gjenstå
 
 ### Fase 5 – kategorifiltre og «Alle filtre»
 
-Status: **Ikke startet**  
-Ansvarlig: –  
+Status: **Ferdig i kode**  
+Ansvarlig: Codex  
 Sist oppdatert: 2026-08-13
 
 Arbeid:
@@ -482,7 +482,10 @@ Akseptansekriterier:
 - Generisk annonsekjerne importerer ikke kjøretøyspesifikk logikk.
 - Søking i lange valglister mister ikke allerede valgte verdier.
 
-Verifisering/statusnotat: _Fylles ut av agenten._
+Verifisering/statusnotat: `is_primary` brukes direkte i oversikten, og vanlige
+select/multiselect-felt bruker den delte native valgflaten. Koblet merke/modell
+og øvrige avhengigheter beholder sine etablerte felt. Lint/typecheck passerer;
+Bil, MC, generisk kategori og 100+-liste er ikke manuelt verifisert.
 
 ### Fase 6 – aktive filtre og avanserte søkeord
 
@@ -607,6 +610,7 @@ oppføring.
 
 | Dato       | Agent | Fase/punkt | Status        | Endring og resultat                                              | Verifisering                                             |
 | ---------- | ----- | ---------- | ------------- | ---------------------------------------------------------------- | -------------------------------------------------------- |
+| 2026-08-13 | Codex | Fase 5     | Ferdig i kode | Viste primærfiltre og flyttet standardvalg til native valgflate. | Lint og typecheck passerer; kategori-QA gjenstår.        |
 | 2026-08-13 | Codex | Fase 4     | Ferdig i kode | La til separate valgflater, radius- og prishurtigvalg.           | Lint og typecheck passerer; native QA gjenstår.          |
 | 2026-08-13 | Codex | Fase 3     | Ferdig i kode | Innførte filteroversikt med sammendrag og intern tilbakeflyt.    | Lint og typecheck passerer; native QA gjenstår.          |
 | 2026-08-13 | Codex | Fase 2     | Ferdig i kode | La til delt native valgflate og komfortable slider-/knappemål.   | Komponenttest, lint og typecheck passerer.               |
@@ -664,6 +668,7 @@ tilstrekkelig.
 
 | Dato       | Fase | Kontroll/miljø                                                                                        | Resultat                                                | Ikke dekket / merknad                                                                         |
 | ---------- | ---- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| 2026-08-13 | 5    | `bun run lint`; `bunx tsc --noEmit`                                                                   | Lint og typecheck passerer.                             | Ingen Bil/MC/generisk-kategori eller 100+-liste manuelt verifisert.                           |
 | 2026-08-13 | 4    | `bun run lint`; `bunx tsc --noEmit`                                                                   | Lint og typecheck passerer.                             | Ingen tastatur-/skjermleser- eller native enhets-QA.                                          |
 | 2026-08-13 | 3    | `bun run lint`; `bunx tsc --noEmit`                                                                   | Lint og typecheck passerer.                             | Ingen komponenttest for apply/cancel/system-tilbake eller native gest/fokus-QA.               |
 | 2026-08-13 | 2    | `bun run test -- src/components/ui/native-choice-sheet.test.tsx`; `bun run lint`; `bunx tsc --noEmit` | 2 komponenttester, lint og typecheck passerer.          | Ingen 100+-liste, stor tekst eller native simulator/enhet.                                    |

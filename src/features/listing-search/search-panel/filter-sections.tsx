@@ -22,7 +22,11 @@ import {
 import type { Category } from "@/lib/categories";
 import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/location-filter";
 import { emptyTermGroup, type TermGroup } from "@/lib/term-groups";
-import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
+import {
+  splitPrimaryFilters,
+  type AttributeFilterValue,
+  type CategoryFilter,
+} from "@/lib/category-filters";
 import { hapticImpact } from "@/lib/haptics";
 import type { ActiveFilterItem } from "./active-filter-items";
 
@@ -118,6 +122,9 @@ export function SearchFilterSections({
         : `${selectedCategories[0].name_nb} +${selectedCategories.length - 1}`;
   const advancedFilterCount =
     Object.keys(attributeValues ?? {}).length + v.extraGroups.length + (v.qMode === "any" ? 1 : 0);
+  const primaryFilters = attributeFilters
+    ? splitPrimaryFilters(attributeFilters).primary.slice(0, 6)
+    : [];
   const priceSummary =
     v.min != null || v.max != null
       ? `${v.min?.toLocaleString("nb-NO") ?? "0"}–${v.max?.toLocaleString("nb-NO") ?? "∞"} kr`
@@ -188,6 +195,14 @@ export function SearchFilterSections({
           )}
         </div>
         <div className="mt-6 space-y-2">
+          {primaryFilters.map((filter) => (
+            <FilterOverviewRow
+              key={filter.id}
+              label={filter.label_nb}
+              value={attributeValues?.[filter.key] ? "Valgt" : "Alle"}
+              onClick={() => openSection("attributes")}
+            />
+          ))}
           <FilterOverviewRow
             label="Alle filtre"
             value={advancedFilterCount ? `${advancedFilterCount} aktive` : "Ingen"}

@@ -134,10 +134,16 @@
         if (port < 1 || port > 65535) return null;
         if (host !== "localhost") {
           var octets = host.split(".").map(Number);
-          if (octets.some(function (o) { return o > 255; })) return null;
+          if (
+            octets.some(function (o) {
+              return o > 255;
+            })
+          )
+            return null;
           var a = octets[0];
           var b = octets[1];
-          var privateAddress = a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+          var privateAddress =
+            a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
           if (!privateAddress) return null;
         }
         return "http://" + host + ":" + port;

@@ -117,6 +117,14 @@ export function SearchFilterSections({
   const locationSummary = locationActive
     ? `${location.label || "Valgt sted"} · ${location.radius} km`
     : "Hele Norge";
+  const advancedSearchSummary = [
+    v.extraGroups.length
+      ? `${v.extraGroups.length} ${v.extraGroups.length === 1 ? "regel" : "regler"}`
+      : null,
+    v.qMode === "any" ? "Minst ett ord" : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const attributeSummary = (filter: CategoryFilter) => {
     const value = attributeValues?.[filter.key];
     if (!value) return "Alle";
@@ -205,13 +213,7 @@ export function SearchFilterSections({
         />
         <FilterOverviewRow
           label="Avanserte søkeord"
-          value={
-            v.extraGroups.length
-              ? `${v.extraGroups.length} regler`
-              : v.qMode === "any"
-                ? "Minst ett ord"
-                : "Ingen"
-          }
+          value={advancedSearchSummary || "Ingen"}
           onClick={() => openSection("search")}
         />
       </div>
@@ -271,6 +273,7 @@ export function SearchFilterSections({
                       variant={v.max === max ? "default" : "outline"}
                       size="default"
                       className="min-h-13 px-2 text-xs"
+                      disabled={v.min != null && max < v.min}
                       onClick={() => setV((previous) => ({ ...previous, max }))}
                     >
                       Inntil {max.toLocaleString("nb-NO")}

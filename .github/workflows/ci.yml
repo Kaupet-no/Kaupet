@@ -77,8 +77,21 @@ jobs:
     name: Android unit tests
     needs: verify
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7
+
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            android:
+              - 'android/**'
+              - 'capacitor.config.*'
+              - 'capacitor-shell/**'
+              - 'src/**'
+              - 'package.json'
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -93,12 +106,56 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # google-services.json er gitignoret (Firebase-nøkler for push).
+      # android/app/build.gradle hopper stille over google-services-pluginet
+      # hvis filen mangler — bygget lykkes, men APK-en mangler Firebase-
+      # oppsett og appen krasjer så snart push-varslinger aktiveres.
+      - name: Skriv google-services.json fra secret
+        working-directory: android/app
+        run: echo "$GOOGLE_SERVICES_JSON" > google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON }}
+
       - name: Sync Android project
         run: bunx cap sync android
 
       - name: Run Android tests
         working-directory: android
         run: ./gradlew test
+
+      - name: Build debug APK
+        if: steps.filter.outputs.android == 'true'
+        working-directory: android
+        run: ./gradlew assembleDebug
+
+      - uses: actions/upload-artifact@v7
+        if: steps.filter.outputs.android == 'true'
+        with:
+          name: android-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+
+      - name: Les app-versjon
+        if: steps.filter.outputs.android == 'true' && github.event_name == 'push'
+        id: app_version
+        working-directory: android/app
+        run: |
+          name=$(grep -oP 'versionName\s+"\K[^"]+' build.gradle)
+          code=$(grep -oP 'versionCode\s+\K[0-9]+' build.gradle)
+          echo "full=$name.$(printf '%02d' "$code")" >> "$GITHUB_OUTPUT"
+          echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish APK as GitHub release preview
+        if: steps.filter.outputs.android == 'true' && github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-preview-${{ github.ref_name }}
+          name: >-
+            Android preview (${{ github.ref_name }}) —
+            v${{ steps.app_version.outputs.full }}
+            (${{ steps.app_version.outputs.sha }})
+          prerelease: true
+          files: android/app/build/outputs/apk/debug/app-debug.apk
 
   deploy:
     name: Deploy to Cloudflare Workers

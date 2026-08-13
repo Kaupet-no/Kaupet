@@ -410,7 +410,9 @@ export function ResultList({
             onOpenChange={setMobileMapOpen}
             title="Kart"
             titleVisible
-            className="h-[88vh] p-4"
+            expandable
+            initialSnapPoint={1}
+            className="h-full p-4"
           >
             <div className="mt-3 h-[calc(100%-3rem)]">{mobileMapOpen ? renderMap() : null}</div>
           </NativeSheet>

@@ -13,11 +13,16 @@ export function nativePushSupported(): boolean {
 
 export async function getNativePermissionState(): Promise<NotificationPermission | "unsupported"> {
   if (!nativePushSupported()) return "unsupported";
-  const { PushNotifications } = await import("@capacitor/push-notifications");
-  const status = await PushNotifications.checkPermissions();
-  if (status.receive === "granted") return "granted";
-  if (status.receive === "denied") return "denied";
-  return "default";
+  try {
+    const { PushNotifications } = await import("@capacitor/push-notifications");
+    const status = await PushNotifications.checkPermissions();
+    if (status.receive === "granted") return "granted";
+    if (status.receive === "denied") return "denied";
+    return "default";
+  } catch (error) {
+    console.error("Kunne ikke lese native push-tillatelse", error);
+    return "unsupported";
+  }
 }
 
 let registeredToken: string | null = null;

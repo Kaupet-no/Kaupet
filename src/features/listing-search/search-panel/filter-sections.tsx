@@ -79,6 +79,8 @@ export function SearchFilterSections({
 }: Props) {
   const [editingGroup, setEditingGroup] = useState<TermGroup | null>(null);
   const [categoryOpen, setCategoryOpen] = useState(false);
+  const [overviewOpen, setOverviewOpen] = useState(true);
+  const [activeSection, setActiveSection] = useState<SearchFilterSection>(section);
   // A single container ref + `data-section` attributes instead of one ref
   // callback per section — the compiler flags per-render ref-callback
   // factories as a potential read-during-render, and `querySelector` scoped
@@ -90,9 +92,9 @@ export function SearchFilterSections({
   // instead of switching a panel.
   useEffect(() => {
     listRef.current
-      ?.querySelector(`[data-section="${section}"]`)
+      ?.querySelector(`[data-section="${activeSection}"]`)
       ?.scrollIntoView({ block: "start", behavior: "smooth" });
-  }, [section]);
+  }, [activeSection, overviewOpen]);
 
   const showCondition = !isBilOgMcCategory(categories, v.categories);
   // Falls back to editing the draft's own location when no live location is
@@ -114,6 +116,13 @@ export function SearchFilterSections({
         : `${selectedCategories[0].name_nb} +${selectedCategories.length - 1}`;
   const advancedFilterCount =
     Object.keys(attributeValues ?? {}).length + v.extraGroups.length + (v.qMode === "any" ? 1 : 0);
+  const priceSummary =
+    v.min != null || v.max != null
+      ? `${v.min?.toLocaleString("nb-NO") ?? "0"}–${v.max?.toLocaleString("nb-NO") ?? "∞"} kr`
+      : "Alle priser";
+  const locationSummary = locationActive
+    ? `${location.label || "Valgt sted"} · ${location.radius} km`
+    : "Hele Norge";
 
   const saveGroup = (group: TermGroup) => {
     if (group.terms.length === 0) {
@@ -138,6 +147,56 @@ export function SearchFilterSections({
     setV((prev) => ({ ...prev, extraGroups: prev.extraGroups.filter((g) => g.id !== id) }));
   };
 
+  if (overviewOpen) {
+    const openSection = (next: SearchFilterSection) => {
+      setActiveSection(next);
+      setOverviewOpen(false);
+    };
+    return (
+      <div className="flex-1 overflow-y-auto px-4 py-5 pb-[calc(6rem+env(safe-area-inset-bottom))]">
+        {activeItems && activeItems.length > 0 && (
+          <p className="mb-6 text-sm text-muted-foreground">{activeItems.length} filtre valgt</p>
+        )}
+        <div className="space-y-2">
+          <FilterOverviewRow
+            label="Kategori"
+            value={categorySummary}
+            onClick={() => openSection("categories")}
+          />
+          <FilterOverviewRow
+            label="Sted"
+            value={locationSummary}
+            onClick={() => openSection("location")}
+          />
+          <FilterOverviewRow
+            label="Pris"
+            value={priceSummary}
+            onClick={() => openSection("price")}
+          />
+          {showCondition && (
+            <FilterOverviewRow
+              label="Tilstand"
+              value={v.conditions.length ? `${v.conditions.length} valgt` : "Alle"}
+              onClick={() => openSection("price")}
+            />
+          )}
+        </div>
+        <div className="mt-6 space-y-2">
+          <FilterOverviewRow
+            label="Alle filtre"
+            value={advancedFilterCount ? `${advancedFilterCount} aktive` : "Ingen"}
+            onClick={() => openSection("attributes")}
+          />
+          <FilterOverviewRow
+            label="Avanserte søkeord"
+            value={v.extraGroups.length ? `${v.extraGroups.length} regler` : "Ingen"}
+            onClick={() => openSection("search")}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       {/* pb: rom til bunnbaren, som nå er en egen skjermbunn-pinnet flate
@@ -147,6 +206,13 @@ export function SearchFilterSections({
         ref={listRef}
         className="flex-1 overflow-y-auto px-4 py-5 pb-[calc(6rem+env(safe-area-inset-bottom))]"
       >
+        <button
+          type="button"
+          onClick={() => setOverviewOpen(true)}
+          className="native-touch-target mb-4 flex items-center px-1 text-sm font-medium text-primary"
+        >
+          Tilbake til filteroversikt
+        </button>
         {activeItems && activeItems.length > 0 && (
           <section className="mb-6 space-y-2">
             <Label className="text-base font-medium">Aktive filter</Label>
@@ -398,6 +464,30 @@ function AdvancedFilterSections({
         {children}
       </CollapsibleContent>
     </Collapsible>
+  );
+}
+
+function FilterOverviewRow({
+  label,
+  value,
+  onClick,
+}: {
+  label: string;
+  value: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="native-touch-target flex min-h-14 w-full items-center gap-3 rounded-xl bg-muted px-4 py-3 text-left"
+    >
+      <span className="min-w-0 flex-1">
+        <span className="block text-base font-medium">{label}</span>
+        <span className="block text-sm text-muted-foreground">{value}</span>
+      </span>
+      <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+    </button>
   );
 }
 

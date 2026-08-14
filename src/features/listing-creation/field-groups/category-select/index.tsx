@@ -64,13 +64,19 @@ export function CategorySelect({
               ? `${categorySuggestion.parent_name_nb} › ${categorySuggestion.name_nb}`
               : categorySuggestion.name_nb}
           </span>
-          <Button type="button" size="sm" onClick={applyCategorySuggestion} className="ml-auto">
+          <Button
+            type="button"
+            size="sm"
+            onClick={applyCategorySuggestion}
+            className="native-touch-target ml-auto"
+          >
             Bruk forslag
           </Button>
           <Button
             type="button"
             size="sm"
             variant="ghost"
+            className="native-touch-target"
             aria-label="Lukk kategoriforslag"
             onClick={() => {
               setSuggestionDismissed(true);

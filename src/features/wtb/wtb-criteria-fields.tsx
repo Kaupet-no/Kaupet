@@ -160,13 +160,17 @@ export function WtbCriteriaFields({
                   <Button
                     type="button"
                     variant="outline"
-                    className="flex-1"
+                    className="native-touch-target flex-1"
                     onClick={() => clearValue(activeFilter.key)}
                   >
                     Ingen begrensning
                   </Button>
                 )}
-                <Button type="button" className="flex-1" onClick={() => setActiveFilterKey(null)}>
+                <Button
+                  type="button"
+                  className="native-touch-target flex-1"
+                  onClick={() => setActiveFilterKey(null)}
+                >
                   Ferdig
                 </Button>
               </div>
@@ -265,7 +269,7 @@ function WtbCriterionField({
     return (
       <div className="flex flex-wrap gap-3">
         {options.map((o) => (
-          <label key={o.value} className="flex items-center gap-2 text-sm">
+          <label key={o.value} className="native-touch-target flex items-center gap-2 text-sm">
             <Checkbox
               checked={selected.includes(o.value)}
               onCheckedChange={() => toggle(o.value)}
@@ -291,7 +295,7 @@ function WtbCriterionField({
 
   if (filter.type === "boolean") {
     return (
-      <label className="flex items-center gap-2 text-sm">
+      <label className="native-touch-target flex items-center gap-2 text-sm">
         <Checkbox
           checked={value === true}
           onCheckedChange={(c) => onChange(c === true ? true : undefined)}

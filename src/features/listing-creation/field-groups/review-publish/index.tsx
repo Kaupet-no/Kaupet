@@ -191,7 +191,7 @@ export function PublishActions({
           variant="ghost"
           onClick={onPreview}
           disabled={mutationIsPending}
-          className="shrink-0 px-3"
+          className="native-touch-target shrink-0 px-3"
         >
           Forhåndsvis
         </Button>

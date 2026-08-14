@@ -13,7 +13,14 @@ import { createClient } from "@supabase/supabase-js";
 
 const AUTH_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), ".auth", "user.json");
 const FILTER_FIXTURE_QUERY = "e2efilterfixture";
-const PUBLISH_PROJECTS = ["desktop-web", "mobile-web"] as const;
+const PUBLISH_PROJECTS = [
+  "desktop-web",
+  "mobile-web",
+  "visual-web",
+  "visual-phone",
+  "visual-landscape",
+  "visual-tablet",
+] as const;
 
 export default async function globalSetup() {
   const url = process.env.SUPABASE_URL;

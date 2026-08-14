@@ -27,7 +27,13 @@ export function ComposerReview({ items }: { items: ComposerReviewItem[] }) {
                 {item.value || "Ikke oppgitt"}
               </dd>
             </div>
-            <Button type="button" size="sm" variant="ghost" onClick={item.onEdit}>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="native-touch-target"
+              onClick={item.onEdit}
+            >
               <Pencil className="size-4" aria-hidden /> Endre
             </Button>
           </div>

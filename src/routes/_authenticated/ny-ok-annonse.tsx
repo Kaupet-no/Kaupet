@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useIsNative } from "@/hooks/use-is-native";
 import { createFileRoute, useNavigate, useBlocker, useRouter, Link } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -31,6 +31,7 @@ import { ListingComposerShell } from "@/features/listing-creation/listing-compos
 import { ComposerStepIndicator } from "@/features/listing-creation/step-indicator";
 import { ComposerReview } from "@/features/listing-creation/composer-review";
 import { useComposerHistoryBack } from "@/features/listing-creation/use-composer-history";
+import { composerForwardStep } from "@/features/listing-creation/composer-navigation";
 import { useWtbDraftAutosave } from "@/features/wtb/use-wtb-draft-autosave";
 import {
   AlertDialog,
@@ -136,6 +137,7 @@ function NewWtbPage() {
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [published, setPublished] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const returnToReviewRef = useRef(false);
   const [attributes, setAttributes] = useState<WtbAttributeMap>({});
   const [checkedKeys, setCheckedKeys] = useState<string[]>([]);
   const [titleManualOverride, setTitleManualOverride] = useState(false);
@@ -259,6 +261,7 @@ function NewWtbPage() {
   }, [computedTitle, vehicleGroup, titleManualOverride]);
 
   const categoryLabel = categoryId ? categoryBreadcrumb(categoryId, categoriesById) || null : null;
+  const parsedMaxPrice = maxPriceNok === "" ? null : Number(maxPriceNok);
 
   useEffect(() => {
     if (categoryId || title.trim().length < 5) return;
@@ -321,10 +324,18 @@ function NewWtbPage() {
       step,
       stepNumber: stepIndex + 1,
     });
-    setStepIndex((i) => Math.min(i + 1, STEPS.length - 1));
+    setStepIndex((i) =>
+      composerForwardStep(
+        Math.min(i + 1, STEPS.length - 1),
+        STEPS.length - 1,
+        returnToReviewRef.current,
+      ),
+    );
+    returnToReviewRef.current = false;
     window.scrollTo({ top: 0 });
   }
   function goBack() {
+    returnToReviewRef.current = false;
     setValidationError(null);
     trackProductEvent("listing_creation_step_completed", {
       kind: "want",
@@ -421,6 +432,11 @@ function NewWtbPage() {
             else goNext();
           }}
           disabled={step === "attributes" && !vehicleGroup && !title.trim()}
+          aria-describedby={
+            step === "attributes" && !vehicleGroup && !title.trim()
+              ? "wtb-continue-requirement"
+              : undefined
+          }
           className={native ? "h-14 w-full rounded-xl text-base" : undefined}
         >
           {native ? "Fortsett" : `Neste: ${STEP_META[STEPS[stepIndex + 1]].title}`}{" "}
@@ -473,10 +489,22 @@ function NewWtbPage() {
               <span className="flex-1">
                 Du har et lagret utkast. Vil du fortsette der du slapp?
               </span>
-              <Button type="button" size="sm" variant="secondary" onClick={restoreDraft}>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="native-touch-target"
+                onClick={restoreDraft}
+              >
                 Gjenopprett
               </Button>
-              <Button type="button" size="sm" variant="ghost" onClick={discardDraft}>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="native-touch-target"
+                onClick={discardDraft}
+              >
                 Forkast
               </Button>
             </div>
@@ -566,6 +594,11 @@ function NewWtbPage() {
 
         {step === "attributes" && (
           <section className="space-y-2">
+            {!vehicleGroup && !title.trim() && (
+              <p id="wtb-continue-requirement" className="text-sm text-destructive">
+                Legg inn en kort beskrivelse på første steg før du fortsetter.
+              </p>
+            )}
             {categoryLabel && (
               <p className="text-sm text-muted-foreground">
                 Kategori: <span className="font-medium text-foreground">{categoryLabel}</span>
@@ -627,6 +660,7 @@ function NewWtbPage() {
                       type="button"
                       size="sm"
                       variant="ghost"
+                      className="native-touch-target"
                       onClick={() => setTitleManualOverride(true)}
                     >
                       Rediger manuelt
@@ -700,7 +734,10 @@ function NewWtbPage() {
                   key: "category",
                   label: "Kategori",
                   value: categoryLabel || "Ikke valgt",
-                  onEdit: () => setStepIndex(0),
+                  onEdit: () => {
+                    returnToReviewRef.current = true;
+                    setStepIndex(0);
+                  },
                 },
                 {
                   key: "criteria",
@@ -709,13 +746,19 @@ function NewWtbPage() {
                     Object.keys(attributes).length > 0
                       ? `${Object.keys(attributes).length} valgt`
                       : "Ingen begrensninger",
-                  onEdit: () => setStepIndex(1),
+                  onEdit: () => {
+                    returnToReviewRef.current = true;
+                    setStepIndex(1);
+                  },
                 },
                 {
                   key: "title",
                   label: "Hva du leter etter",
                   value: title,
-                  onEdit: () => setStepIndex(0),
+                  onEdit: () => {
+                    returnToReviewRef.current = true;
+                    setStepIndex(0);
+                  },
                 },
                 {
                   key: "details",
@@ -723,13 +766,16 @@ function NewWtbPage() {
                   value:
                     [
                       description || null,
-                      typeof maxPriceNok === "number"
-                        ? `Maks ${maxPriceNok.toLocaleString("nb-NO")} kr`
+                      parsedMaxPrice !== null && Number.isFinite(parsedMaxPrice)
+                        ? `Maks ${parsedMaxPrice.toLocaleString("nb-NO")} kr`
                         : null,
                     ]
                       .filter(Boolean)
                       .join(" · ") || "Ingen ekstra detaljer",
-                  onEdit: () => setStepIndex(2),
+                  onEdit: () => {
+                    returnToReviewRef.current = true;
+                    setStepIndex(2);
+                  },
                 },
               ]}
             />

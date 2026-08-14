@@ -10,7 +10,8 @@ instruksen.
 1. Les denne filen og den fullstendige [CLAUDE.md](CLAUDE.md). `CLAUDE.md` er
    den autoritative, detaljerte arbeidsinstruksen og skal holdes konsistent med
    denne oversikten.
-2. Les relevant dokumentasjon før du berører området: [UI-GUIDE.md](docs/UI-GUIDE.md)
+2. Les relevant dokumentasjon før du berører området: [ARCHITECTURE.md](docs/ARCHITECTURE.md)
+   for systemgrenser og arkitektur, [UI-GUIDE.md](docs/UI-GUIDE.md)
    for frontend/native UI, [STAGING.md](docs/STAGING.md) for miljø og testing,
    [src/routes/README.md](src/routes/README.md) for routing, og
    [CONTRIBUTING.md](CONTRIBUTING.md) for bidrags- og commit-praksis.

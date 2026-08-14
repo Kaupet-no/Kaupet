@@ -380,13 +380,19 @@ export function VehicleConfirm({
                       placeholder="F.eks. BYD"
                       className="flex-1"
                     />
-                    <Button type="button" size="sm" onClick={() => void submitNewBrand()}>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="native-touch-target"
+                      onClick={() => void submitNewBrand()}
+                    >
                       Legg til
                     </Button>
                     <Button
                       type="button"
                       size="sm"
                       variant="ghost"
+                      className="native-touch-target"
                       onClick={() => setAddingBrand(false)}
                     >
                       Avbryt
@@ -396,7 +402,7 @@ export function VehicleConfirm({
                   <button
                     type="button"
                     onClick={() => setAddingBrand(true)}
-                    className="text-xs text-primary underline-offset-2 hover:underline"
+                    className="native-touch-target inline-flex items-center text-xs text-primary underline-offset-2 hover:underline"
                   >
                     Fant du ikke merket? Legg til nytt
                   </button>
@@ -418,13 +424,19 @@ export function VehicleConfirm({
                       placeholder="F.eks. IONIQ 5 N"
                       className="flex-1"
                     />
-                    <Button type="button" size="sm" onClick={() => void submitNewModel()}>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="native-touch-target"
+                      onClick={() => void submitNewModel()}
+                    >
                       Legg til
                     </Button>
                     <Button
                       type="button"
                       size="sm"
                       variant="ghost"
+                      className="native-touch-target"
                       onClick={() => setAddingModel(false)}
                     >
                       Avbryt
@@ -435,7 +447,7 @@ export function VehicleConfirm({
                     <button
                       type="button"
                       onClick={() => setAddingModel(true)}
-                      className="text-xs text-primary underline-offset-2 hover:underline"
+                      className="native-touch-target inline-flex items-center text-xs text-primary underline-offset-2 hover:underline"
                     >
                       Fant du ikke modellen? Legg til ny
                     </button>

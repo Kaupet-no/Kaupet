@@ -6,7 +6,7 @@
 > verifisering i dette dokumentet i samme commit som hver fase.
 
 Opprettet: 2026-08-13  
-Status: **Fase 5 teknisk fullført – tekniske restgap vurderes før samlet fase 6-QA**
+Status: **Fase 6 automatisert del fullført – manuell enhets- og bruker-QA gjenstår**
 Primær målflate: iOS- og Android-appene  
 Sekundær målflate: responsiv web og nettbrett
 
@@ -474,7 +474,7 @@ gest alene.
 
 ### Fase 6 — Samlet test, QA, utrulling og læringssløyfe
 
-Status: **Ikke startet**
+Status: **Automatisert del fullført – manuell QA og utrulling gjenstår**
 
 1. Utvid page object til begge annonsetyper og delte composer-handlinger.
 2. Test golden path, utkast, tilbake, valideringsfeil, kategoribytte,
@@ -494,6 +494,9 @@ Status: **Ikke startet**
 
 Akseptanse: ingen regresjon i fullføring; lavere frafall eller kortere aktiv
 tid; feilrate og publiseringsduplikater ikke økt; supportfunn er gjennomgått.
+
+Den operative planen for punktene som krever mennesker og fysiske enheter er
+beskrevet i [ANNONSEOPPRETTELSE-MANUELL-QA.md](ANNONSEOPPRETTELSE-MANUELL-QA.md).
 
 ## 8. Testmatrise
 
@@ -541,6 +544,10 @@ per nytt funn, også når funnet løses i samme fase.
 | 2026-08-13 | Fase 0     | Kjøpsønske     | Native «Neste» lå 228 px under første viewport                            | Fast felles native footer i fase 1                                   | Målt lokalt       |
 | 2026-08-13 | Fase 0     | Salg           | Fast handling, fremdrift og lagringsstatus fungerte i 375×812             | Bruk salgsflyten som strukturell baseline                            | Målt lokalt       |
 | 2026-08-13 | Fase 0     | Server         | TanStack Start advarte om manglende CSRF-middleware for serverfunksjoner  | Egen sikkerhetsoppgave; ikke blandes inn i UX-fasen                  | Åpen              |
+| 2026-08-14 | Fase 6     | Kjøpsønske     | Makspris fra skjemaet var en streng og ble derfor utelatt på review       | Normaliser verdien ved reviewgrensen og dekk golden path i E2E       | Løst              |
+| 2026-08-14 | Fase 6     | Testdata       | Skjult E2E-kategori kunne ikke velges i den reelle kjøpsønskeflyten       | Test den støttede «Jeg er usikker»-reisen, ikke en intern fixture    | Løst              |
+| 2026-08-14 | Fase 6     | Visuell QA     | Playwrights standard snapshots var OS-spesifikke og ubrukelige i Linux-CI | Bruk én plattformuavhengig snapshot-kontrakt for fire viewporter     | Implementert      |
+| 2026-08-14 | Fase 6     | Routing        | `InboxPage` eksportert fra rutefil hindrer optimal code splitting         | Flytt eksporten ved senere ytelsesarbeid; ikke del av composer-scope | Åpen/P2           |
 | 2026-08-13 | Fase 1     | Begge          | Samme skall kunne gjenbrukes uten å samle domeneskjemaene                 | Del kun chrome, fremdrift og footer                                  | Implementert      |
 | 2026-08-13 | Fase 1     | Kjøpsønske     | Fast footer flyttet «Fortsett» fra y=1040 til y=648 i 375×812             | Behold felles native footer                                          | Verifisert lokalt |
 | 2026-08-13 | Fase 1     | Native-web     | Layoutflagget ble tolket som ekte Capacitor-runtime                       | Gate plugin på `nativePlatform()`                                    | Løst              |
@@ -580,9 +587,9 @@ Før opp arbeid som oppdages, men som ikke bør snikes inn i aktiv fase.
 | Analyse av bilderåd og bildegjenkjenning                             | Krever produkt/ML-scope                  | Egen discovery                  | Åpen   |
 | Gjør `?forcenative` trygg for Keyboard-pluginen i web                | Separat feil i native emuleringsverktøy  | Plattform før fase 1-visuell QA | Løst   |
 | Avklar og implementer CSRF-beskyttelse for TanStack-serverfunksjoner | Sikkerhetsarkitektur utenfor annonse-UX  | Plattform/sikkerhet snarest     | Åpen   |
-| Returner fra «Endre» til review etter lagring/fortsett               | Oppdaget ved ny kontraktgjennomgang      | Teknisk oppfølging før fase 6   | Åpen   |
-| Forklar blokkert «Fortsett» i kjøpsønskets kriteriesteg              | Akseptanse krever synlig årsak           | Teknisk oppfølging før fase 6   | Åpen   |
-| Fullfør 48 px treffflater i composerens sekundærhandlinger           | Kodegjennomgang fant små `sm`-kontroller | Teknisk oppfølging før fase 6   | Åpen   |
+| Returner fra «Endre» til review etter lagring/fortsett               | Oppdaget ved ny kontraktgjennomgang      | Teknisk oppfølging før fase 6   | Løst   |
+| Forklar blokkert «Fortsett» i kjøpsønskets kriteriesteg              | Akseptanse krever synlig årsak           | Teknisk oppfølging før fase 6   | Løst   |
+| Fullfør 48 px treffflater i composerens sekundærhandlinger           | Kodegjennomgang fant små `sm`-kontroller | Teknisk oppfølging før fase 6   | Løst   |
 | Diskré haptikk ved stegskifte                                        | Forbedring, ikke nødvendig feedback      | Produktpolish etter fase 6      | Vurder |
 | Sticky reviewkolonne på bred web                                     | P2-optimalisering; samme flyt virker nå  | Web-optimalisering ved behov    | Vurder |
 
@@ -766,3 +773,51 @@ Kopier denne malen ved avslutning av hver fase:
   P2-effektivisering, ikke nødvendig for gjenkjennelighet eller fullføring.
 - Utenfor denne planen: CSRF-hardening er fortsatt et separat
   plattform-/sikkerhetstiltak og bør ikke skjules i UX-implementeringen.
+
+#### Teknisk oppfølging — 2026-08-14
+
+- Status: Implementert; samlet QA gjenstår i fase 6
+- Endret: Begge reviewflater husker nå at brukeren redigerer fra review og
+  returnerer dit etter neste gyldige «Fortsett». Kategoribytte i salgsflyten
+  venter til den nye dynamiske sidekontrakten er beregnet før review åpnes.
+  Kjøpsønsket forklarer hvorfor «Fortsett» er blokkert, og relevante native
+  sekundærhandlinger/valg har minst 48 px effektiv treffflate via det etablerte
+  `native-touch-target`-mønsteret.
+- Nye funn: Direkte hopp med gammelt sidetall ville vært feil når en
+  kategoriendring endrer antall sider. Returen må derfor utføres etter
+  rerender. Små review-, utkast-, forhåndsvisnings- og kategoriforslagsknapper
+  var de viktigste resterende treffflategapene.
+- Kontroller kjørt: Prettier, `git diff --check`, full ESLint, TypeScript og
+  full Vitest-suite (309 tester, inkludert review-returkontrakten).
+- Ikke verifisert / risiko: Visuell og fysisk kontroll av fokusretur,
+  tekstskalering og treffflater inngår i fase 6.
+- Commit/PR: Ikke opprettet.
+
+### Fase 6 — 2026-08-14
+
+- Status: Automatisert del fullført; fysisk enhets-, hjelpemiddel- og
+  bruker-QA gjenstår.
+- Endret: Utvidet Playwright page objects og la til golden path og
+  valideringsregresjon for kjøpsønsket på mobil- og desktop-web. La til
+  plattformuavhengige visuelle referanser for 375×812, 844×390, 820×1180 og
+  1440×900. Opprettet en operativ manuell QA-plan og en normativ
+  arkitekturguide som nå er lenket fra agentinstruksene.
+- Nye funn: Review skjulte makspris fordi skjemaverdien fortsatt var en
+  streng. Testen avdekket og verifiserte rettingen. Test-fixtures skal ikke
+  åpne produktveier som en reell bruker ikke kan nå. E2E-serveren gjentar en
+  kjent CSRF-advarsel og en P2-advarsel om code splitting i meldingsruten.
+- Avvik fra plan og begrunnelse: Offline, suspend/kill/resume,
+  skjermlesere, bryterkontroll, fysisk safe area og modererte brukertester er
+  ikke forsvarlig å erklære automatisk verifisert. De er spesifisert med
+  ansvar, enhetsmatrise, scenarier og beslutningsporter i
+  `ANNONSEOPPRETTELSE-MANUELL-QA.md`.
+- Kontroller kjørt: Prettier, full ESLint, TypeScript, full Vitest-suite (309
+  tester), produksjonsbuild, server/client-grense og bundlebudsjett. Hele
+  Playwright-suiten er grønn med 18 tester: kjøpsønske-E2E på mobil og desktop
+  samt visuell E2E på fire avtalte viewporter inngår. Den isolerte lokale
+  Supabase-stacken anvendte alle migrasjoner uten feil.
+- Ikke verifisert / risiko: Se den manuelle QA-planen. Produksjonsnære
+  konverteringstall krever minst én uke eller tilstrekkelig volum etter
+  kontrollert utrulling. CSRF-hardening er fortsatt et separat åpent
+  sikkerhetstiltak.
+- Commit/PR: Ikke opprettet.

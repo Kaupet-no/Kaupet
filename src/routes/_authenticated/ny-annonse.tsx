@@ -144,6 +144,8 @@ function NewListingPage() {
     null,
   );
   const pendingSubmitValuesRef = useRef<ListingForm | null>(null);
+  const returnToReviewRef = useRef(false);
+  const [reviewJumpRequested, setReviewJumpRequested] = useState(false);
   const [showNoImageDialog, setShowNoImageDialog] = useState(false);
   const [showNoPriceDialog, setShowNoPriceDialog] = useState(false);
   const [extraFieldError, setExtraFieldError] = useState<{
@@ -411,6 +413,15 @@ function NewListingPage() {
   } = useListingSteps(pages);
   goNextRef.current = goNext;
 
+  useEffect(() => {
+    if (!reviewJumpRequested) return;
+    const frame = requestAnimationFrame(() => {
+      setStep(pages.length);
+      setReviewJumpRequested(false);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [pages.length, reviewJumpRequested, setStep]);
+
   const currentStepKey = currentPage?.groups[0]?.key ?? "unknown";
   useEffect(() => {
     trackProductEvent("listing_creation_step_completed", {
@@ -422,6 +433,7 @@ function NewListingPage() {
   }, [currentStepKey, step]);
 
   function goBack() {
+    returnToReviewRef.current = false;
     trackProductEvent("listing_creation_step_completed", {
       kind: "sell",
       action: "back",
@@ -452,6 +464,7 @@ function NewListingPage() {
     p.groups.some((g) => g.key === "category-attributes"),
   );
   const editReviewSection = (section: "category" | "content" | "details" | "location") => {
+    returnToReviewRef.current = true;
     setValidationError(null);
     const groupKeys: Record<typeof section, string[]> = {
       category: ["category-select"],
@@ -709,7 +722,9 @@ function NewListingPage() {
       step: currentStepKey,
       stepNumber: step,
     });
-    goNext();
+    if (returnToReviewRef.current) setReviewJumpRequested(true);
+    else goNext();
+    returnToReviewRef.current = false;
     window.scrollTo({ top: 0 });
   }
 
@@ -1181,10 +1196,22 @@ function NewListingPage() {
                 <span className="flex-1">
                   Du har et ulagret utkast. Vil du fortsette der du slapp?
                 </span>
-                <Button type="button" size="sm" variant="secondary" onClick={restoreDraft}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="native-touch-target"
+                  onClick={restoreDraft}
+                >
                   Gjenopprett
                 </Button>
-                <Button type="button" size="sm" variant="ghost" onClick={discardLocalDraftBanner}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="native-touch-target"
+                  onClick={discardLocalDraftBanner}
+                >
                   Forkast
                 </Button>
               </div>

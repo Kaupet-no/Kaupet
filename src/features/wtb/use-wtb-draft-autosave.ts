@@ -43,7 +43,11 @@ export function useWtbDraftAutosave(
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [draftSaveError, setDraftSaveError] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const saveInProgress = useRef(false);
+  const saveInProgress = useRef<Promise<string | null> | null>(null);
+  const fieldsRef = useRef(fields);
+  useEffect(() => {
+    fieldsRef.current = fields;
+  }, [fields]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -85,7 +89,7 @@ export function useWtbDraftAutosave(
           draft_kind: "want",
           draft_version: DRAFT_VERSION,
           saved_at: Date.now(),
-          ...fields,
+          ...fieldsRef.current,
         } satisfies WtbDraftData),
       );
       setLastSaved(new Date());
@@ -99,38 +103,46 @@ export function useWtbDraftAutosave(
     if (restorableDraft) return;
     const timeout = window.setTimeout(saveLocal, 2_000);
     return () => window.clearTimeout(timeout);
-    // saveLocal always captures this render's complete fields snapshot.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fields, restorableDraft]);
 
   async function saveToServer(): Promise<string | null> {
     saveLocal();
-    if (saveInProgress.current || fields.title.trim().length < 3) return draftId;
-    saveInProgress.current = true;
+    // An autosave and a publish-triggered save can land on the same tick;
+    // share the in-flight promise instead of one of them bailing out with a
+    // stale draftId, which would otherwise leave the concurrent save's
+    // draft row orphaned (see saveWtbDraft/createWtbListing).
+    if (saveInProgress.current) return saveInProgress.current;
+    const currentFields = fieldsRef.current;
+    if (currentFields.title.trim().length < 3) return draftId;
     setIsSaving(true);
-    try {
-      const result = await saveWtbDraft({
-        data: {
-          ...(draftId ? { id: draftId } : {}),
-          title: fields.title,
-          description: fields.description || undefined,
-          category_id: fields.category_id,
-          max_price_nok: typeof fields.max_price_nok === "number" ? fields.max_price_nok : null,
-          attributes: fields.attributes,
-        },
-      });
-      setDraftId(result.id);
-      localStorage.setItem(DRAFT_ID_KEY, result.id);
-      setLastSaved(new Date());
-      setDraftSaveError(false);
-      return result.id;
-    } catch {
-      setDraftSaveError(true);
-      return null;
-    } finally {
-      saveInProgress.current = false;
-      setIsSaving(false);
-    }
+    const promise = (async () => {
+      try {
+        const result = await saveWtbDraft({
+          data: {
+            ...(draftId ? { id: draftId } : {}),
+            title: currentFields.title,
+            description: currentFields.description || undefined,
+            category_id: currentFields.category_id,
+            max_price_nok:
+              typeof currentFields.max_price_nok === "number" ? currentFields.max_price_nok : null,
+            attributes: currentFields.attributes,
+          },
+        });
+        setDraftId(result.id);
+        localStorage.setItem(DRAFT_ID_KEY, result.id);
+        setLastSaved(new Date());
+        setDraftSaveError(false);
+        return result.id;
+      } catch {
+        setDraftSaveError(true);
+        return null;
+      } finally {
+        saveInProgress.current = null;
+        setIsSaving(false);
+      }
+    })();
+    saveInProgress.current = promise;
+    return promise;
   }
 
   useEffect(() => {
@@ -143,9 +155,11 @@ export function useWtbDraftAutosave(
       window.clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-    // The fields object intentionally represents the latest complete snapshot.
+    // Interval/listener identity must stay stable across field edits —
+    // saveToServer always reads the latest fields via fieldsRef, so it
+    // doesn't belong in this effect's deps (see fieldsRef above).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fields, draftId]);
+  }, [draftId]);
 
   function clearStorage() {
     localStorage.removeItem(DRAFT_KEY);

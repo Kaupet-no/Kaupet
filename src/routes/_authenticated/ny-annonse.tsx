@@ -145,6 +145,7 @@ function NewListingPage() {
   );
   const pendingSubmitValuesRef = useRef<ListingForm | null>(null);
   const returnToReviewRef = useRef(false);
+  const reviewSectionLastStepRef = useRef<number | null>(null);
   const [reviewJumpRequested, setReviewJumpRequested] = useState(false);
   const [showNoImageDialog, setShowNoImageDialog] = useState(false);
   const [showNoPriceDialog, setShowNoPriceDialog] = useState(false);
@@ -434,6 +435,7 @@ function NewListingPage() {
 
   function goBack() {
     returnToReviewRef.current = false;
+    reviewSectionLastStepRef.current = null;
     trackProductEvent("listing_creation_step_completed", {
       kind: "sell",
       action: "back",
@@ -472,11 +474,14 @@ function NewListingPage() {
       details: ["category-attributes", "description-keywords", "price"],
       location: ["delivery-location"],
     };
-    const pageIndex = pages.findIndex((page) =>
-      page.groups.some((group) => groupKeys[section].includes(group.key)),
-    );
-    if (pageIndex < 0) return;
-    setStep(pageIndex + 1);
+    const matchingIndices = pages
+      .map((page, idx) =>
+        page.groups.some((group) => groupKeys[section].includes(group.key)) ? idx : -1,
+      )
+      .filter((idx) => idx >= 0);
+    if (matchingIndices.length === 0) return;
+    reviewSectionLastStepRef.current = Math.max(...matchingIndices) + 1;
+    setStep(matchingIndices[0] + 1);
     window.scrollTo({ top: 0 });
   };
 
@@ -722,9 +727,13 @@ function NewListingPage() {
       step: currentStepKey,
       stepNumber: step,
     });
-    if (returnToReviewRef.current) setReviewJumpRequested(true);
-    else goNext();
-    returnToReviewRef.current = false;
+    if (returnToReviewRef.current && step === reviewSectionLastStepRef.current) {
+      setReviewJumpRequested(true);
+      returnToReviewRef.current = false;
+      reviewSectionLastStepRef.current = null;
+    } else {
+      goNext();
+    }
     window.scrollTo({ top: 0 });
   }
 

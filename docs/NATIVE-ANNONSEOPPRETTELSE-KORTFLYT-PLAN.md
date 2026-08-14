@@ -394,7 +394,7 @@ Foreslått commit: `refactor: del native annonsefelt i fokuserte steg`
 
 ### Fase 2 — Native kortstokk og swipe
 
-Status: **Ikke startet**
+Status: **Pågår**
 Formål: Innføre swipe uten å svekke vertikal scroll, feltkontroller eller
 tilgjengelighet.
 
@@ -571,7 +571,7 @@ Fysisk QA er obligatorisk for tastatur, WebView-gest, haptikk og safe area.
 | ----------------------------- | ------------ | --------------------- | --------- |
 | 0 – Global nav og kontrollrad | Pågår        | –                     | –         |
 | 1 – Kategori/feltgrupper      | Pågår        | Fase 0 (pågår)        | –         |
-| 2 – Kortstokk og swipe        | Ikke startet | Fase 1                | –         |
+| 2 – Kortstokk og swipe        | Pågår        | Fase 1                | –         |
 | 3 – Valideringsrespons        | Ikke startet | Fase 2                | –         |
 | 4 – Feltstil og tastatur      | Ikke startet | Fase 3                | –         |
 | 5 – Bevegelse/polish          | Ikke startet | Fase 4                | –         |
@@ -667,6 +667,31 @@ test` (319 tester), `bun run lint` og `bunx tsc --noEmit` bestått.
 - Ikke verifisert / risiko: Composer-E2E, visuell native flyt, fysisk iOS/
   Android og publiseringspayload mot en kjørende Supabase-instans.
 - Commit/PR: Denne committen (`feat: innfør native composer-grunnlag`).
+
+### Fase 2 — 2026-08-14
+
+- Status: Pågår
+- Ansvarlig: Codex
+- Formål oppnådd: Påbegynt ren gestterskel og en native kortgrense der
+  fremoverswipe bruker samme asynkrone valideringsfunksjon som knappen,
+  bakoverswipe bruker eksisterende tilbakehandling og kun aktivt kort er
+  montert.
+- Endrede filer: Composer-navigasjon og tester, ny `NativeComposerDeck`,
+  salgsruten samt eksplisitte gest-unntak på bildeopplaster og kart.
+- Nye funn: Eksisterende `data-vaul-no-drag` kan gjenbrukes som gest-unntak
+  for sliders/sheets; interaktive HTML-kontroller unntas generisk.
+- Avvik fra plan og begrunnelse: Kjøpsønsket migreres fortsatt i Fase 6.
+  Nabokort monteres ikke i denne første leveransen fordi aktivt innhold er
+  tilstrekkelig for drag-overgangen og unngår dupliserte felt/fokusnoder.
+- Blokkere og avhengigheter (med eier): Playwright-scenarier og fysisk
+  iOS/Android-verifisering av retningslås og system-kantsveip gjenstår for
+  implementerende agent/QA.
+- Kontroller kjørt og resultat: Målrettet Vitest (11 tester), `bun run lint`
+  og `bunx tsc --noEmit` bestått. Full test kjøres før levering.
+- Manuelt verifisert på: Ikke utført.
+- Ikke verifisert / risiko: Fysisk WebView-gest, bilde-draing, kart, sheet,
+  textarea-selection, skjermleser og Reduce Motion på enhet.
+- Commit/PR: Denne committen (`feat: påbegynn swipebar native composer`).
 
 ## 13. Åpne funn og avhengigheter
 

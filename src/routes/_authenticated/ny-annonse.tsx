@@ -70,6 +70,7 @@ import { NewListingError } from "@/features/listing-creation/new-listing-error";
 import { StepIndicator } from "@/features/listing-creation/step-indicator";
 import { ListingComposerShell } from "@/features/listing-creation/listing-composer-shell";
 import { useComposerHistoryBack } from "@/features/listing-creation/use-composer-history";
+import { NativeComposerDeck } from "@/features/listing-creation/native-composer-deck";
 
 const listingSchema = z.object({
   title: z.string().trim().min(5, "Tittelen må være minst 5 tegn").max(120, "Maks 120 tegn"),
@@ -631,10 +632,10 @@ function NewListingPage() {
           reason: "registration_number",
         });
         setValidationError("Skriv inn registreringsnummer før du fortsetter.");
-        return;
+        return false;
       }
       await runVehicleLookup(vehicleRegNrInput);
-      return;
+      return false;
     }
 
     // For kjøretøy rendrer title-photos kun bilder (se TitlePhotos) — feltet
@@ -653,7 +654,7 @@ function NewListingPage() {
         step: currentStepKey,
         reason: "form",
       });
-      return;
+      return false;
     }
     const validateCtx = {
       images,
@@ -683,7 +684,7 @@ function NewListingPage() {
           reason: "image",
         });
         setShowNoImageDialog(true);
-        return;
+        return false;
       }
       if (result === "SHOW_NO_PRICE_DIALOG") {
         if (native) continue;
@@ -695,7 +696,7 @@ function NewListingPage() {
           reason: "price",
         });
         setShowNoPriceDialog(true);
-        return;
+        return false;
       }
       if (typeof result === "string") {
         trackProductEvent("listing_creation_step_completed", {
@@ -706,7 +707,7 @@ function NewListingPage() {
         });
         if (group.key === "category-attributes") setAttributesTouched(true);
         setValidationError(result);
-        return;
+        return false;
       }
       if (result && typeof result === "object") {
         trackProductEvent("listing_creation_step_completed", {
@@ -718,7 +719,7 @@ function NewListingPage() {
         if (group.key === "category-attributes") setAttributesTouched(true);
         setExtraFieldError(result);
         setValidationError(result.message);
-        return;
+        return false;
       }
     }
     trackProductEvent("listing_creation_step_completed", {
@@ -735,6 +736,7 @@ function NewListingPage() {
       goNext();
     }
     window.scrollTo({ top: 0 });
+    return true;
   }
 
   const mutation = useMutation({
@@ -1239,19 +1241,36 @@ function NewListingPage() {
           footer={composerFooter}
           firstStep={isFirst}
         >
-          <div
-            data-testid={groups[0] ? `wizard-step-${groups[0].key}` : undefined}
-            className={isNativeDescriptionSoloPage ? "flex flex-col" : "space-y-6"}
-            style={
-              isNativeDescriptionSoloPage
-                ? { height: "calc(var(--vvh, 100dvh) - var(--app-bottom-nav-h) - 13.75rem)" }
-                : undefined
-            }
-          >
-            {groups.map((g) => (
-              <g.Component key={g.key} {...sharedProps} />
-            ))}
-          </div>
+          {native ? (
+            <NativeComposerDeck
+              key={currentStepKey}
+              onBack={isFirst ? undefined : goBack}
+              onForward={() => goToNextPage()}
+            >
+              <div
+                data-testid={groups[0] ? `wizard-step-${groups[0].key}` : undefined}
+                className={isNativeDescriptionSoloPage ? "flex flex-col" : "space-y-6"}
+                style={
+                  isNativeDescriptionSoloPage
+                    ? { height: "calc(var(--vvh, 100dvh) - var(--app-bottom-nav-h) - 13.75rem)" }
+                    : undefined
+                }
+              >
+                {groups.map((g) => (
+                  <g.Component key={g.key} {...sharedProps} />
+                ))}
+              </div>
+            </NativeComposerDeck>
+          ) : (
+            <div
+              data-testid={groups[0] ? `wizard-step-${groups[0].key}` : undefined}
+              className={isNativeDescriptionSoloPage ? "flex flex-col" : "space-y-6"}
+            >
+              {groups.map((g) => (
+                <g.Component key={g.key} {...sharedProps} />
+              ))}
+            </div>
+          )}
         </ListingComposerShell>
       </form>
 

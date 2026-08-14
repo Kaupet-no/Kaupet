@@ -84,7 +84,10 @@ export function ListingLocationPicker({ lat, lng, onChange, readOnly = false }: 
   );
 
   return (
-    <div className="isolate h-52 w-full overflow-hidden rounded-2xl border border-border">
+    <div
+      className="isolate h-52 w-full overflow-hidden rounded-2xl border border-border"
+      data-composer-no-swipe
+    >
       <MapContainer
         center={[lat, lng]}
         zoom={13}

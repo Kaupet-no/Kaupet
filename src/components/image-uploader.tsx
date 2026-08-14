@@ -248,7 +248,7 @@ export function ImageUploader({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" data-composer-no-swipe>
       {showGuide && <PhotoGuide onDismiss={dismissGuide} />}
 
       <div

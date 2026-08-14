@@ -122,6 +122,9 @@
       />
       <div class="error" id="ip-error">Bruk localhost eller en privat IP-adresse med port.</div>
       <button id="ip-btn" type="button">Koble til lokal server</button>
+      <button id="switch-btn" type="button" style="display: none; margin-top: 4px">
+        Bytt server
+      </button>
     </div>
     <script>
       var STORAGE_KEY = "kaupet_backend_target";
@@ -183,22 +186,33 @@
         if (url) goToLocal(url);
       } else {
         var saved = localStorage.getItem(STORAGE_KEY);
-        if (saved === "staging") {
-          goToStaging();
-        } else if (saved) {
-          window.location.replace(saved);
-        } else {
-          document.getElementById("staging-btn").addEventListener("click", goToStaging);
-          document.getElementById("ip-btn").addEventListener("click", function () {
-            var input = document.getElementById("ip-input");
-            var url = localDevServerUrl(input.value);
-            var error = document.getElementById("ip-error");
-            if (!url) {
-              error.style.display = "block";
-              return;
-            }
-            error.style.display = "none";
-            goToLocal(url);
+        document.getElementById("staging-btn").addEventListener("click", goToStaging);
+        document.getElementById("ip-btn").addEventListener("click", function () {
+          var input = document.getElementById("ip-input");
+          var url = localDevServerUrl(input.value);
+          var error = document.getElementById("ip-error");
+          if (!url) {
+            error.style.display = "block";
+            return;
+          }
+          error.style.display = "none";
+          goToLocal(url);
+        });
+
+        if (saved) {
+          // Husket valg: naviger dit automatisk, men gi et kort vindu til å
+          // trykke "Bytt server" — ellers sitter man fast på et gammelt
+          // localStorage-valg for alltid, siden WebView-data overlever
+          // APK-reinstallasjoner.
+          var switchBtn = document.getElementById("switch-btn");
+          switchBtn.style.display = "block";
+          var redirectTimer = setTimeout(function () {
+            if (saved === "staging") goToStaging();
+            else window.location.replace(saved);
+          }, 600);
+          switchBtn.addEventListener("click", function () {
+            clearTimeout(redirectTimer);
+            switchBtn.style.display = "none";
           });
         }
       }

@@ -140,7 +140,10 @@ export default defineConfig(({ command, mode }) => {
                 // Wrangler's redirected-config mode (used by Nitro's
                 // deployConfig) rejects `env.*` blocks, so the worker name
                 // for non-prod targets is selected via env var instead.
-                wrangler: { name: process.env.CLOUDFLARE_WORKER_NAME || "kaupet-no" },
+                wrangler: {
+                  name: process.env.CLOUDFLARE_WORKER_NAME || "kaupet-no",
+                  observability: { enabled: true },
+                },
               },
             }),
           ]

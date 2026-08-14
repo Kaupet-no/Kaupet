@@ -81,6 +81,19 @@ export default defineConfig(({ command, mode }) => {
                 maxSize: 450 * 1024,
                 priority: 15,
               },
+              {
+                // seroval deserializes every serverFn response on the client and
+                // has a multi-level Error class hierarchy (SerovalError extends
+                // Error, SerovalParserError extends SerovalError, etc). Splitting
+                // it across chunks without a guaranteed load order caused
+                // "Cannot read properties of undefined (reading 'extends')"
+                // crashes while parsing responses for the profile page's widgets.
+                name: "seroval",
+                test: /node_modules[\\/]seroval(-plugins)?[\\/]/,
+                includeDependenciesRecursively: true,
+                maxSize: 450 * 1024,
+                priority: 15,
+              },
             ],
           },
         },

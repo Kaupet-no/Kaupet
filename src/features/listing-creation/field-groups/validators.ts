@@ -22,7 +22,7 @@ export function validateRequiredFieldGroups(
     return "Velg en tilstand for annonsen.";
   }
   if (
-    fieldGroups.includes("delivery-location") &&
+    fieldGroups.includes("delivery") &&
     behavior.requiresDeliveryMethod &&
     values.can_ship == null
   ) {

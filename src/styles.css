@@ -217,6 +217,10 @@
 .pb-bottom-nav {
   padding-bottom: var(--app-bottom-nav-h);
 }
+.composer-route {
+  --app-bottom-nav-h: 0px;
+  --app-nav-rail-w: 0px;
+}
 
 /* Nettbrett (fase 10): bunnpillen erstattes av en sidestilt navigasjon, så
    plassen skal reserveres til venstre i stedet for under. `.nav-rail` settes

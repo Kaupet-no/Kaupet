@@ -437,7 +437,7 @@ function NewWtbPage() {
               ? "wtb-continue-requirement"
               : undefined
           }
-          className={native ? "h-14 w-full rounded-xl text-base" : undefined}
+          className={native ? "min-h-12 min-w-24 rounded-xl px-3 text-base" : undefined}
         >
           {native ? "Fortsett" : `Neste: ${STEP_META[STEPS[stepIndex + 1]].title}`}{" "}
           <ChevronRight className="size-4" aria-hidden />
@@ -465,7 +465,7 @@ function NewWtbPage() {
             },
           )}
           disabled={isPending}
-          className={native ? "h-14 w-full rounded-xl text-base" : "gap-2"}
+          className={native ? "min-h-12 min-w-24 rounded-xl px-3 text-base" : "gap-2"}
         >
           {isPending && <Loader2 className="size-4 animate-spin" aria-hidden />}
           {native ? "Publiser" : "Publiser ønskes kjøpt"}
@@ -483,6 +483,7 @@ function NewWtbPage() {
         native={native}
         backLabel={stepIndex === 0 ? "Avbryt" : "Tilbake"}
         onBack={stepIndex === 0 ? () => void navigate({ to: "/" }) : goBack}
+        onCancel={() => void navigate({ to: "/" })}
         notice={
           restorableDraft ? (
             <div className="mt-4 flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">

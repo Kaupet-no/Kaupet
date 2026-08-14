@@ -132,7 +132,7 @@ export async function fillDescriptionAndAdvance(
 ) {
   await wizardStep(page, "description-keywords").waitFor();
   await page.getByTestId("listing-description-textarea").fill(description);
-  await clickNextAndWaitFor(page, wizardStep(page, "delivery-location"), testInfo);
+  await clickNextAndWaitFor(page, wizardStep(page, "delivery"), testInfo);
 }
 
 /**

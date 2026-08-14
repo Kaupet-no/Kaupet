@@ -185,16 +185,7 @@ export function PublishActions({
 }: PublishActionsProps) {
   if (native) {
     return (
-      <div className="flex w-full items-center gap-2">
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={onPreview}
-          disabled={mutationIsPending}
-          className="native-touch-target shrink-0 px-3"
-        >
-          Forhåndsvis
-        </Button>
+      <>
         {turnstileEnabled && (
           <Turnstile
             siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
@@ -207,12 +198,12 @@ export function PublishActions({
           type="submit"
           data-testid="publish-listing-button"
           disabled={mutationIsPending || (turnstileEnabled && !turnstileToken)}
-          className="h-14 flex-1 rounded-xl text-base"
+          className="min-h-12 min-w-24 rounded-xl px-3 text-base"
         >
           {mutationIsPending && <Loader2 className="size-4 animate-spin" />}
           Publiser
         </Button>
-      </div>
+      </>
     );
   }
 

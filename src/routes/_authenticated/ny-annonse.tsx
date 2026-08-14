@@ -470,9 +470,9 @@ function NewListingPage() {
     setValidationError(null);
     const groupKeys: Record<typeof section, string[]> = {
       category: ["category-select"],
-      content: ["title-photos"],
+      content: ["photos", "title"],
       details: ["category-attributes", "description-keywords", "price"],
-      location: ["delivery-location"],
+      location: ["delivery", "location"],
     };
     const matchingIndices = pages
       .map((page, idx) =>
@@ -772,9 +772,7 @@ function NewListingPage() {
           lat: finalCoords?.lat ?? null,
           lng: finalCoords?.lng ?? null,
           can_ship:
-            fieldGroupKeys.includes("delivery-location") && !isVehicle
-              ? values.can_ship !== "pickup"
-              : null,
+            fieldGroupKeys.includes("delivery") && !isVehicle ? values.can_ship !== "pickup" : null,
           known_issues: isVehicle ? values.known_issues || null : null,
           no_known_issues: isVehicle ? !!values.no_known_issues : null,
           maintenance_history: isVehicle ? values.maintenance_history || null : null,
@@ -1164,7 +1162,7 @@ function NewListingPage() {
           data-testid="wizard-next-button"
           disabled={vehicleLookupLoading}
           onClick={() => void goToNextPage()}
-          className={native ? "h-14 w-full rounded-xl text-base" : undefined}
+          className={native ? "min-h-12 min-w-24 rounded-xl px-3 text-base" : undefined}
         >
           {vehicleLookupLoading ? (
             "Slår opp kjøretøy…"
@@ -1199,6 +1197,7 @@ function NewListingPage() {
           native={native}
           backLabel={isFirst ? "Avbryt" : "Tilbake"}
           onBack={isFirst ? () => void navigate({ to: "/" }) : goBack}
+          onCancel={() => void navigate({ to: "/" })}
           notice={
             hasDraftData ? (
               <div className="mt-4 flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">

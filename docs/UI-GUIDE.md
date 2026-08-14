@@ -262,7 +262,10 @@ lokal variant av valgflaten per filter.
 
 Retningslinjene gjelder innholdsproduksjon som annonseopprettelse på tvers av
 native og web. Den detaljerte målarkitekturen og den levende statusloggen for
-annonser ligger i [ANNONSEOPPRETTELSE-UX-PLAN.md](ANNONSEOPPRETTELSE-UX-PLAN.md).
+annonser ligger i
+[NATIVE-ANNONSEOPPRETTELSE-KORTFLYT-PLAN.md](NATIVE-ANNONSEOPPRETTELSE-KORTFLYT-PLAN.md).
+Historikk fra den tidligere composer-konsolideringen ligger i
+[ANNONSEOPPRETTELSE-UX-PLAN.md](ANNONSEOPPRETTELSE-UX-PLAN.md).
 
 ### Én gjenkjennelig composer
 

@@ -86,4 +86,20 @@ describe("NativeComposerDeck", () => {
     expect(onForward).toHaveBeenCalledOnce();
     resolve("advanced");
   });
+
+  it("starter neste kort fra motsatt side etter godkjent swipe", async () => {
+    vi.stubGlobal(
+      "requestAnimationFrame",
+      vi.fn(() => 1),
+    );
+    render(
+      <NativeComposerDeck onForward={vi.fn().mockResolvedValue("advanced")}>
+        Kort
+      </NativeComposerDeck>,
+    );
+    const card = screen.getByTestId("native-composer-card");
+
+    swipe(card, 120, 20);
+    await waitFor(() => expect((card as HTMLElement).style.transform).toContain("48px"));
+  });
 });

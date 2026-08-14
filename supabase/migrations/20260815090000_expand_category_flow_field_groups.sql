@@ -19,6 +19,49 @@ SET field_groups = ARRAY(
 )
 WHERE field_groups && ARRAY['title-photos', 'delivery-location'];
 
+-- Vehicle cards have an intentional semantic order independent of the
+-- historic admin order: facts, free-text description, structured condition,
+-- then optional equipment.
+WITH vehicle_flows AS (
+  SELECT
+    id,
+    field_groups,
+    array_remove(
+      array_remove(
+        array_remove(field_groups, 'description-keywords'),
+        'vehicle-condition'
+      ),
+      'vehicle-equipment'
+    ) AS base_groups
+  FROM public.category_flows
+  WHERE field_groups @> ARRAY['vehicle-registration', 'vehicle-facts']::text[]
+), reordered AS (
+  SELECT
+    id,
+    COALESCE(
+      base_groups[1:array_position(base_groups, 'vehicle-facts')],
+      ARRAY[]::text[]
+    )
+      || CASE WHEN 'description-keywords' = ANY(field_groups)
+        THEN ARRAY['description-keywords']::text[] ELSE ARRAY[]::text[] END
+      || CASE WHEN 'vehicle-condition' = ANY(field_groups)
+        THEN ARRAY['vehicle-condition']::text[] ELSE ARRAY[]::text[] END
+      || CASE WHEN 'vehicle-equipment' = ANY(field_groups)
+        THEN ARRAY['vehicle-equipment']::text[] ELSE ARRAY[]::text[] END
+      || COALESCE(
+        base_groups[
+          array_position(base_groups, 'vehicle-facts') + 1:cardinality(base_groups)
+        ],
+        ARRAY[]::text[]
+      )
+      AS field_groups
+  FROM vehicle_flows
+)
+UPDATE public.category_flows AS flow
+SET field_groups = reordered.field_groups
+FROM reordered
+WHERE flow.id = reordered.id;
+
 ALTER TABLE public.category_flows
   ALTER COLUMN field_groups SET DEFAULT
     '{photos,title,category-attributes,condition,price,description-keywords,delivery,location,review-publish}'::text[],

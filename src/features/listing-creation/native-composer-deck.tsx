@@ -21,7 +21,7 @@ export function NativeComposerDeck({
   onForward: () => Promise<ComposerNavigationResult>;
   children: ReactNode;
 }) {
-  const startRef = useRef<{ x: number; y: number; pointerId: number } | null>(null);
+  const startRef = useRef<{ x: number; y: number; pointerId: number; time: number } | null>(null);
   const deltaRef = useRef({ x: 0, y: 0 });
   const [offset, setOffset] = useState(0);
   const [dragging, setDragging] = useState(false);
@@ -32,16 +32,31 @@ export function NativeComposerDeck({
 
   if (!enabled) return children;
 
-  function resetGesture() {
+  function clearGesture() {
     startRef.current = null;
     deltaRef.current = { x: 0, y: 0 };
     setDragging(false);
-    setOffset(0);
+  }
+
+  function animateEntrance(direction: "back" | "forward") {
+    setDragging(true);
+    setOffset(direction === "forward" ? 48 : -48);
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        setDragging(false);
+        setOffset(0);
+      }),
+    );
   }
 
   function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
     if (navigating || !event.isPrimary || gestureIsExcluded(event.target)) return;
-    startRef.current = { x: event.clientX, y: event.clientY, pointerId: event.pointerId };
+    startRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      pointerId: event.pointerId,
+      time: performance.now(),
+    };
     deltaRef.current = { x: 0, y: 0 };
     setDragging(true);
     event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -58,19 +73,29 @@ export function NativeComposerDeck({
   async function handlePointerEnd(event: PointerEvent<HTMLDivElement>) {
     const start = startRef.current;
     if (!start || start.pointerId !== event.pointerId) return;
-    const direction = composerSwipeDirection(deltaRef.current.x, deltaRef.current.y);
-    resetGesture();
+    const direction = composerSwipeDirection(
+      deltaRef.current.x,
+      deltaRef.current.y,
+      64,
+      performance.now() - start.time,
+    );
+    clearGesture();
     if (direction === "back") {
       onBack?.();
+      animateEntrance("back");
       return;
     }
     if (direction === "forward") {
       setNavigating(true);
       try {
-        await onForward();
+        const result = await onForward();
+        if (result === "advanced") animateEntrance("forward");
+        else setOffset(0);
       } finally {
         setNavigating(false);
       }
+    } else {
+      setOffset(0);
     }
   }
 
@@ -87,7 +112,10 @@ export function NativeComposerDeck({
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={(event) => void handlePointerEnd(event)}
-        onPointerCancel={resetGesture}
+        onPointerCancel={() => {
+          clearGesture();
+          setOffset(0);
+        }}
       >
         {children}
       </div>

@@ -133,9 +133,8 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
   // MIDDLE_FIELD_GROUP_KEYS either — same reasoning and same fix as
   // vehicle-registration above: they must survive a save if the category
   // already has them, or the vehicle flow silently loses steps the next time
-  // someone touches this dialog. vehicle-equipment is placed right after
-  // middleOrder (which includes description-keywords) since it's meant to
-  // render on the same page, directly under the Beskrivelse field.
+  // someone touches this dialog. Native vehicle order is facts, description,
+  // condition, equipment, as defined by the composer plan.
   const hasVehicleFacts = storedFieldGroups.includes("vehicle-facts");
   const hasVehicleCondition = storedFieldGroups.includes("vehicle-condition");
   const hasVehicleEquipment = storedFieldGroups.includes("vehicle-equipment");
@@ -144,11 +143,16 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
     "photos",
     ...(hasVehicleRegistration ? [] : ["title"]),
     ...(hasVehicleFacts ? ["vehicle-facts"] : []),
+    ...(hasVehicleFacts && storedFieldGroups.includes("description-keywords")
+      ? ["description-keywords"]
+      : []),
     ...(hasVehicleCondition ? ["vehicle-condition"] : []),
-    ...middleOrder.filter(
-      (k) => LOCKED_FIELD_GROUP_KEYS.includes(k) || storedFieldGroups.includes(k),
-    ),
     ...(hasVehicleEquipment ? ["vehicle-equipment"] : []),
+    ...middleOrder.filter(
+      (k) =>
+        !(hasVehicleFacts && k === "description-keywords") &&
+        (LOCKED_FIELD_GROUP_KEYS.includes(k) || storedFieldGroups.includes(k)),
+    ),
     ...(deliveryActive ? ["delivery", "location"] : ["location"]),
     "review-publish",
   ];
@@ -229,11 +233,16 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
       "photos",
       ...(hasVehicleRegistration ? [] : ["title"]),
       ...(hasVehicleFacts ? ["vehicle-facts"] : []),
+      ...(hasVehicleFacts && storedFieldGroups.includes("description-keywords")
+        ? ["description-keywords"]
+        : []),
       ...(hasVehicleCondition ? ["vehicle-condition"] : []),
-      ...reordered.filter(
-        (k) => LOCKED_FIELD_GROUP_KEYS.includes(k) || storedFieldGroups.includes(k),
-      ),
       ...(hasVehicleEquipment ? ["vehicle-equipment"] : []),
+      ...reordered.filter(
+        (k) =>
+          !(hasVehicleFacts && k === "description-keywords") &&
+          (LOCKED_FIELD_GROUP_KEYS.includes(k) || storedFieldGroups.includes(k)),
+      ),
       ...(deliveryActive ? ["delivery", "location"] : ["location"]),
       "review-publish",
     ]);

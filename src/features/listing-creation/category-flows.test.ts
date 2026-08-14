@@ -124,6 +124,35 @@ describe("effectiveFlowForCategory", () => {
       "review-publish",
     ]);
   });
+
+  it("orders vehicle description between facts and condition", () => {
+    const flows = [
+      row({
+        category_id: "cars",
+        field_groups: [
+          "vehicle-registration",
+          "title-photos",
+          "vehicle-facts",
+          "vehicle-condition",
+          "description-keywords",
+          "vehicle-equipment",
+          "delivery-location",
+          "review-publish",
+        ],
+      }),
+    ];
+    expect(effectiveFlowForCategory("cars", flows, byId).fieldGroups).toEqual([
+      "category-select",
+      "vehicle-registration",
+      "photos",
+      "vehicle-facts",
+      "description-keywords",
+      "vehicle-condition",
+      "vehicle-equipment",
+      "location",
+      "review-publish",
+    ]);
+  });
 });
 
 describe("resolveWizardPages", () => {

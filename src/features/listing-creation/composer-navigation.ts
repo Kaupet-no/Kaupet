@@ -9,7 +9,14 @@ export function composerSwipeDirection(
   deltaX: number,
   deltaY: number,
   threshold = 64,
+  durationMs?: number,
 ): ComposerSwipeDirection | null {
-  if (Math.abs(deltaX) < threshold || Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return null;
+  const horizontal = Math.abs(deltaX);
+  const fastEnough = durationMs !== undefined && durationMs > 0 && horizontal / durationMs >= 0.5;
+  if (
+    (horizontal < threshold && !(fastEnough && horizontal >= threshold / 2)) ||
+    horizontal < Math.abs(deltaY) * 1.25
+  )
+    return null;
   return deltaX < 0 ? "forward" : "back";
 }

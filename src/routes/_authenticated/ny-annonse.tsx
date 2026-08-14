@@ -1264,11 +1264,7 @@ function NewListingPage() {
           firstStep={isFirst}
         >
           {native ? (
-            <NativeComposerDeck
-              key={currentStepKey}
-              onBack={isFirst ? undefined : goBack}
-              onForward={attemptNextPage}
-            >
+            <NativeComposerDeck onBack={isFirst ? undefined : goBack} onForward={attemptNextPage}>
               <div
                 data-testid={groups[0] ? `wizard-step-${groups[0].key}` : undefined}
                 className={isNativeDescriptionSoloPage ? "flex flex-col" : "space-y-6"}

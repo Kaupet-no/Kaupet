@@ -19,4 +19,9 @@ describe("composerSwipeDirection", () => {
     expect(composerSwipeDirection(-40, 0)).toBeNull();
     expect(composerSwipeDirection(-80, 70)).toBeNull();
   });
+
+  it("godtar en kort, tydelig flick basert på hastighet", () => {
+    expect(composerSwipeDirection(-40, 4, 64, 60)).toBe("forward");
+    expect(composerSwipeDirection(-40, 4, 64, 200)).toBeNull();
+  });
 });

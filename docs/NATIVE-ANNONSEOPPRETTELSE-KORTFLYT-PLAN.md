@@ -7,7 +7,7 @@
 > motstrid gjelder dette dokumentet for den native kortflyten.
 
 Opprettet: 2026-08-14
-Status: **Fase 0–1 pågår**
+Status: **Teknisk implementering fullført – lokal DB/E2E og fysisk QA gjenstår**
 Eier: Den som utfører aktiv fase
 Målflate: iOS og Android i Capacitor
 Ikke målflate: Redesign av webflyten
@@ -333,7 +333,7 @@ avhengig appkode pushes.
 
 ### Fase 0 — Skjul global navigasjon og innfør avgrenset kontrollrad
 
-Status: **Pågår**
+Status: **Teknisk fullført – fysisk QA gjenstår**
 Formål: Fjerne avbrytingspunkter og etablere riktig geometri før swipe.
 
 Oppgaver:
@@ -360,7 +360,7 @@ Foreslått commit: `feat: avgrens native composer-navigasjon`
 
 ### Fase 1 — Kategori først og atomiske feltgrupper
 
-Status: **Pågår**
+Status: **Teknisk fullført – lokal migrasjonsverifisering gjenstår**
 Formål: Gi hvert kort én oppgave og fjerne tittelfeltet fra inngangen.
 
 Oppgaver:
@@ -394,7 +394,7 @@ Foreslått commit: `refactor: del native annonsefelt i fokuserte steg`
 
 ### Fase 2 — Native kortstokk og swipe
 
-Status: **Pågår**
+Status: **Teknisk fullført – fysisk gesture-QA gjenstår**
 Formål: Innføre swipe uten å svekke vertikal scroll, feltkontroller eller
 tilgjengelighet.
 
@@ -425,7 +425,7 @@ Foreslått commit: `feat: legg til swipebar native composer`
 
 ### Fase 3 — Valideringsanimasjon og haptikk
 
-Status: **Pågår**
+Status: **Teknisk fullført – fysisk haptikk-QA gjenstår**
 Formål: Gjøre blokkert fremovernavigasjon tydelig, rolig og tilgjengelig.
 
 Oppgaver:
@@ -453,7 +453,7 @@ Foreslått commit: `feat: gi native kort tydelig valideringsrespons`
 
 ### Fase 4 — Native feltstil og tastatursikkerhet
 
-Status: **Pågår**
+Status: **Teknisk fullført – fysisk tastatur-QA gjenstår**
 Formål: Gi feltene premium native uttrykk og bevise at brukeren alltid ser
 det som skrives.
 
@@ -483,7 +483,7 @@ Foreslått commit: `feat: tilpass composer-felt og tastatur for native`
 
 ### Fase 5 — Rolig bevegelse og helhetlig polish
 
-Status: **Pågår**
+Status: **Teknisk fullført – fysisk design-QA gjenstår**
 Formål: Samordne bevegelse og visuelt hierarki uten funksjonell omskriving.
 
 Oppgaver:
@@ -508,7 +508,7 @@ Foreslått commit: `style: finpuss native annonsekort`
 
 ### Fase 6 — Kjøpsønske, migrasjon og samlet utrulling
 
-Status: **Pågår**
+Status: **Teknisk implementert – lokal DB/E2E og utrulling gjenstår**
 Formål: Fullføre felles native kontrakt og fjerne overgangskode kontrollert.
 
 Oppgaver:
@@ -567,15 +567,15 @@ Fysisk QA er obligatorisk for tastatur, WebView-gest, haptikk og safe area.
 
 ## 11. Statusoversikt
 
-| Fase                          | Status | Avhengigheter         | Commit/PR |
-| ----------------------------- | ------ | --------------------- | --------- |
-| 0 – Global nav og kontrollrad | Pågår  | –                     | –         |
-| 1 – Kategori/feltgrupper      | Pågår  | Fase 0 (pågår)        | –         |
-| 2 – Kortstokk og swipe        | Pågår  | Fase 1                | –         |
-| 3 – Valideringsrespons        | Pågår  | Fase 2                | –         |
-| 4 – Feltstil og tastatur      | Pågår  | Fase 3                | –         |
-| 5 – Bevegelse/polish          | Pågår  | Fase 4                | –         |
-| 6 – Kjøpsønske/utrulling      | Pågår  | Fase 5, ev. migrasjon | –         |
+| Fase                          | Status                                     | Avhengigheter     | Commit/PR            |
+| ----------------------------- | ------------------------------------------ | ----------------- | -------------------- |
+| 0 – Global nav og kontrollrad | Teknisk fullført                           | –                 | `eca2d81`            |
+| 1 – Kategori/feltgrupper      | Teknisk fullført, DB-verifisering gjenstår | Fase 0            | `eca2d81`, `58ee404` |
+| 2 – Kortstokk og swipe        | Teknisk fullført                           | Fase 1            | `b683b32`            |
+| 3 – Valideringsrespons        | Teknisk fullført                           | Fase 2            | `5ff81d5`            |
+| 4 – Feltstil og tastatur      | Teknisk fullført                           | Fase 3            | `58d64ca`            |
+| 5 – Bevegelse/polish          | Teknisk fullført                           | Fase 4            | `58d64ca`            |
+| 6 – Kjøpsønske/utrulling      | Teknisk implementert, DB/E2E gjenstår      | Fase 5, migrasjon | `58d64ca`            |
 
 ## 12. Fasejournal
 
@@ -622,7 +622,7 @@ fase. Eksisterende poster skal ikke overskrives.
 
 ### Fase 0 — 2026-08-14
 
-- Status: Pågår
+- Status: Teknisk fullført; fysisk QA gjenstår
 - Ansvarlig: Codex
 - Formål oppnådd: Rotlayouten undertrykker global bunnavigasjon og rail på
   begge composer-ruter og nullstiller nav-offsetene. Det delte skallet har en
@@ -647,7 +647,7 @@ test` (319 tester), `bun run lint` og `bunx tsc --noEmit` bestått.
 
 ### Fase 1 — 2026-08-14
 
-- Status: Pågår
+- Status: Teknisk fullført; lokal migrasjonsverifisering gjenstår
 - Ansvarlig: Codex
 - Formål oppnådd: Påbegynt bakoverkompatibel oppsplitting av `title-photos`
   og `delivery-location`, fjernet tittel og kategoriforslag fra første native
@@ -670,7 +670,7 @@ test` (319 tester), `bun run lint` og `bunx tsc --noEmit` bestått.
 
 ### Fase 2 — 2026-08-14
 
-- Status: Pågår
+- Status: Teknisk fullført; fysisk gesture-QA gjenstår
 - Ansvarlig: Codex
 - Formål oppnådd: Påbegynt ren gestterskel og en native kortgrense der
   fremoverswipe bruker samme asynkrone valideringsfunksjon som knappen,
@@ -695,7 +695,7 @@ test` (319 tester), `bun run lint` og `bunx tsc --noEmit` bestått.
 
 ### Fase 3 — 2026-08-14
 
-- Status: Pågår
+- Status: Teknisk fullført; fysisk haptikk-QA gjenstår
 - Ansvarlig: Codex
 - Formål oppnådd: Påbegynt eksplisitt navigasjonsresultat for salgsflyten og
   felles blokkering av samtidige fremoverforsøk. Native-skallet viser én
@@ -715,11 +715,11 @@ test` (319 tester), `bun run lint` og `bunx tsc --noEmit` bestått.
 - Manuelt verifisert på: Ikke utført.
 - Ikke verifisert / risiko: Fysisk haptikk, Reduce Motion og raske blandede
   knapp/swipe-forsøk i WebView.
-- Commit/PR: Ikke opprettet.
+- Commit/PR: `5ff81d5` (`feat: gi native kort tydelig valideringsrespons`).
 
 ### Fase 4 — 2026-08-14
 
-- Status: Pågår
+- Status: Teknisk fullført; fysisk tastatur-QA gjenstår
 - Ansvarlig: Codex
 - Formål oppnådd: Påbegynt native-only feltgeometri og composer-lokal,
   kansellerbar fokussynlighet for fokusbytte, stegskifte og endringer i
@@ -739,11 +739,11 @@ test` (326 tester), `bun run lint`, `bunx tsc --noEmit` og `git diff
 - Manuelt verifisert på: Ikke utført ennå.
 - Ikke verifisert / risiko: IME, safe area, Dynamic Type/font scale, mørk modus
   og nettbrettlandskap.
-- Commit/PR: Ikke opprettet.
+- Commit/PR: `58d64ca` (`feat: fullfør teknisk native kortflyt`).
 
 ### Fase 5 — 2026-08-15
 
-- Status: Pågår
+- Status: Teknisk fullført; fysisk design-QA gjenstår
 - Ansvarlig: Codex
 - Formål oppnådd: Samlet kortskifte og feilrespons under lokale
   bevegelsestokens og lagt ett lett native valgsignal på faktiske kortskifter.
@@ -761,11 +761,11 @@ test` (326 tester), `bun run lint`, `bunx tsc --noEmit` og `git diff
 - Manuelt verifisert på: Ikke utført ennå.
 - Ikke verifisert / risiko: Offline-, opplastings-, oppslags- og
   publiseringstilstander på fysisk enhet.
-- Commit/PR: Ikke opprettet.
+- Commit/PR: `58d64ca` (`feat: fullfør teknisk native kortflyt`).
 
 ### Fase 6 — 2026-08-15
 
-- Status: Pågår
+- Status: Teknisk implementert; lokal DB/E2E og utrulling gjenstår
 - Ansvarlig: Codex
 - Formål oppnådd: Kjøpsønske bruker teknisk samme native kort-, swipe-,
   footer-, validerings-, haptikk- og tastaturkontrakt som salgsflyten.
@@ -790,7 +790,28 @@ test` (326 tester), `bun run lint`, `bunx tsc --noEmit` og `git diff
 - Manuelt verifisert på: Ikke utført ennå.
 - Ikke verifisert / risiko: Migrasjon mot lokal/lenket Supabase, RLS,
   tilgjengelighetsmatrise, livssyklus og rollback.
-- Commit/PR: Ikke opprettet.
+- Commit/PR: `58ee404` og `58d64ca`.
+
+### Teknisk kvalitetssikring — 2026-08-15
+
+- Status: Tekniske kodeavvik rettet; lokal DB/E2E blokkert av en annen lokal
+  Supabase-stack på portene 54321–54324.
+- Endret: Låste kjøretøyrekkefølgen til fakta, beskrivelse, tilstand og utstyr
+  i runtime-normalisering, adminlagring og migrasjon. Swipe støtter nå korte,
+  raske flicks og lar neste kort komme inn fra motsatt side etter godkjent
+  validering. Salgsflyten beholder kortstokken montert mellom steg slik at
+  inngangsovergangen kan fullføres.
+- Nye tester: Regresjon for kjøretøyrekkefølge, hastighetsbasert swipe og
+  inngangsovergang etter godkjent swipe.
+- Kontroller kjørt: `git diff --check`, full ESLint, TypeScript, 331
+  Vitest-tester og produksjonsbuild bestått. Tre målrettede testfiler med 25
+  tester dekker de korrigerte kontraktene.
+- Blokkere: `bunx supabase start` kan ikke starte Kaupet-stacken fordi en annen
+  stack med prosjekt-ID `local` bruker port 54322. Den andre stacken er ikke
+  stoppet uten eksplisitt brukerautorisasjon.
+- Ikke verifisert: Lokal anvendelse av migrasjonen, RLS, Playwright og fysisk
+  native QA.
+- Commit/PR: Denne committen (`fix: fullfør native kortflyt mot planen`).
 
 ## 13. Åpne funn og avhengigheter
 

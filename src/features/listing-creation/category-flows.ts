@@ -42,7 +42,17 @@ export function normalizeFieldGroupKeys(keys: string[]): string[] {
     return [key];
   });
   if (!normalized.includes("vehicle-registration")) return normalized;
-  return normalized.filter((key) => key !== "title" && key !== "delivery");
+  const vehicle = normalized.filter((key) => key !== "title" && key !== "delivery");
+  const factsIndex = vehicle.indexOf("vehicle-facts");
+  if (factsIndex === -1) return vehicle;
+  const orderedVehicleGroups = [
+    "description-keywords",
+    "vehicle-condition",
+    "vehicle-equipment",
+  ].filter((key) => vehicle.includes(key));
+  const withoutOrderedGroups = vehicle.filter((key) => !orderedVehicleGroups.includes(key));
+  withoutOrderedGroups.splice(factsIndex + 1, 0, ...orderedVehicleGroups);
+  return withoutOrderedGroups;
 }
 
 /** Writers keep legacy keys until the phase 6 transition migration is applied everywhere. */

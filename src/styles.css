@@ -376,6 +376,9 @@
   }
 }
 
+/* -even/-odd are duplicates of the same keyframes on purpose: alternating
+   the class name on every validation attempt forces the animation to
+   restart even when two consecutive attempts land on the same class. */
 @keyframes composer-validation-error-even {
   0%,
   100% {

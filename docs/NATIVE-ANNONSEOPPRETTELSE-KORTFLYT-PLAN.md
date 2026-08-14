@@ -813,12 +813,48 @@ test` (326 tester), `bun run lint`, `bunx tsc --noEmit` og `git diff
   native QA.
 - Commit/PR: Denne committen (`fix: fullfør native kortflyt mot planen`).
 
+### Kodegjennomgang og retting — 2026-08-15
+
+- Status: Funn fra kvalitetssikring rettet.
+- Ansvarlig: Claude (kodegjennomgang på oppdrag fra eier)
+- Formål oppnådd: Full gjennomgang av `eca2d81^..5e821f9` opp mot planens
+  akseptansekriterier. Ett funn med reell produksjonsrisiko rettet, to mindre
+  observasjoner rettet.
+- Endrede filer: `supabase/migrations/20260815090000_expand_category_flow_field_groups.sql`,
+  `src/features/listing-creation/native-composer-deck.tsx`, `src/styles.css`.
+- Nye funn: Overgangsmigrasjonen skrev opprinnelig eksisterende
+  `category_flows`-rader om til de nye atomære nøklene (`photos`/`title`/
+  `delivery`/`location`) med det samme, mens adminlagring
+  (`toStoredFieldGroupKeys`) bevisst fortsetter å skrive legacy-format
+  (`title-photos`) til alle miljøer er migrert. Det ga to problemer: (1) et
+  vindu der allerede utrullet appkode kunne lese rader i et format den ikke
+  kjente, siden migrasjonen pushes automatisk uavhengig av appkode-utrulling;
+  (2) enhver admin-lagring etter migrasjonen ville stille reversere den
+  tilbake til legacy-format. Migrasjonen er endret til kun å utvide
+  CHECK-constraint til å akseptere begge formater, uten å skrive om
+  eksisterende data — datakonvertering hører til en egen, senere migrasjon
+  etter bekreftet appkode-utrulling.
+- Avvik fra plan og begrunnelse: Ingen ny avhengighet eller scope-utvidelse;
+  rettelsene holder seg innenfor Fase 6s og §5.4s egne regler.
+- Blokkere og avhengigheter (med eier): Migrasjonen er fortsatt ikke anvendt
+  mot en lokal/lenket Supabase-instans (samme Docker-blokkering som tidligere
+  QA-runder). Datakonverteringsmigrasjonen nevnt over er ikke laget ennå
+  (eier: implementerende agent, etter bekreftet appkode-utrulling).
+- Kontroller kjørt og resultat: Målrettet Vitest (`native-composer-deck`,
+  `category-flows`, 21 tester), full `bun run test` (331 tester), `bun run
+lint` og `bunx tsc --noEmit` bestått.
+- Manuelt verifisert på: Ikke utført.
+- Ikke verifisert / risiko: Migrasjonen er ikke kjørt mot en faktisk database
+  i denne runden; fysisk native QA gjenstår som før.
+- Commit/PR: Denne committen.
+
 ## 13. Åpne funn og avhengigheter
 
 Legg nye funn her når de ikke hører hjemme i aktiv fase. Hver rad må ha eier
 og neste handling; «senere» er ikke en status.
 
-| Dato       | Fase      | Funn                                                    | Neste handling                               | Eier                     | Status |
-| ---------- | --------- | ------------------------------------------------------- | -------------------------------------------- | ------------------------ | ------ |
-| 2026-08-14 | Vurdering | Fysisk keyboard-overlay er ikke verifisert for composer | Kjør enhetsmatrisen og legg evidens i fase 4 | QA/implementerende agent | Åpen   |
-| 2026-08-15 | Fase 6    | Overgangsmigrasjon er laget, men ikke anvendt           | Start Docker, kjør RLS og deploy migrasjonen | Implementerende agent    | Åpen   |
+| Dato       | Fase            | Funn                                                                                                                               | Neste handling                                                                      | Eier                     | Status |
+| ---------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------ | ------ |
+| 2026-08-14 | Vurdering       | Fysisk keyboard-overlay er ikke verifisert for composer                                                                            | Kjør enhetsmatrisen og legg evidens i fase 4                                        | QA/implementerende agent | Åpen   |
+| 2026-08-15 | Fase 6          | Overgangsmigrasjon er laget, men ikke anvendt                                                                                      | Start Docker, kjør RLS og deploy migrasjonen                                        | Implementerende agent    | Åpen   |
+| 2026-08-15 | Kodegjennomgang | Migrasjonen ble rettet til kun å utvide constraint; faktisk datakonvertering til atomære nøkler mangler fortsatt en egen migrasjon | Lag datakonverteringsmigrasjonen etter bekreftet appkode-utrulling til alle miljøer | Implementerende agent    | Åpen   |

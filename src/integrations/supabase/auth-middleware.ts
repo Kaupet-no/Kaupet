@@ -52,8 +52,26 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
       },
     });
 
-    const { data, error } = await supabase.auth.getClaims(token);
+    let claimsResult: Awaited<ReturnType<typeof supabase.auth.getClaims>>;
+    try {
+      claimsResult = await supabase.auth.getClaims(token);
+    } catch (thrown) {
+      console.error(
+        "PROFILE_AUTH_DEBUG getClaims threw",
+        thrown instanceof Error
+          ? { name: thrown.name, message: thrown.message, stack: thrown.stack }
+          : thrown,
+      );
+      throw thrown;
+    }
+    const { data, error } = claimsResult;
     if (error || !data?.claims) {
+      console.error(
+        "PROFILE_AUTH_DEBUG getClaims returned error",
+        error instanceof Error
+          ? { name: error.name, message: error.message, stack: error.stack }
+          : error,
+      );
       throw new Error("Unauthorized: Invalid token");
     }
 

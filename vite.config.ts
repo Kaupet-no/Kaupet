@@ -75,15 +75,9 @@ export default defineConfig(({ command, mode }) => {
                 priority: 20,
               },
               {
-                // Keep the whole router dependency graph in one chunk —
-                // router-core has cross-file class inheritance
-                // (e.g. BaseRootRoute extends BaseRoute), and splitting a
-                // subclass from its base class without a guaranteed load
-                // order caused "Cannot read properties of undefined
-                // (reading 'extends')" crashes in the native WebView.
                 name: "tanstack-router",
                 test: /node_modules[\\/]@tanstack[\\/](?:react-router|router-core|history)/,
-                includeDependenciesRecursively: true,
+                includeDependenciesRecursively: false,
                 maxSize: 450 * 1024,
                 priority: 15,
               },

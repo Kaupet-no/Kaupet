@@ -17,7 +17,7 @@ function swipe(target: Element, fromX: number, toX: number, toY = 0) {
 
 describe("NativeComposerDeck", () => {
   it("bruker samme fremoverhandling for swipe og lar bakoverswipe gå tilbake", async () => {
-    const onForward = vi.fn().mockResolvedValue(true);
+    const onForward = vi.fn().mockResolvedValue("advanced");
     const onBack = vi.fn();
     render(
       <NativeComposerDeck onForward={onForward} onBack={onBack}>
@@ -33,7 +33,7 @@ describe("NativeComposerDeck", () => {
   });
 
   it("kaprer ikke vertikal scroll eller gester fra interaktive kontroller", () => {
-    const onForward = vi.fn().mockResolvedValue(true);
+    const onForward = vi.fn().mockResolvedValue("advanced");
     render(
       <NativeComposerDeck onForward={onForward}>
         <textarea aria-label="Beskrivelse" />
@@ -53,7 +53,9 @@ describe("NativeComposerDeck", () => {
       vi.fn(() => ({ matches: true })),
     );
     render(
-      <NativeComposerDeck onForward={vi.fn().mockResolvedValue(true)}>Kort</NativeComposerDeck>,
+      <NativeComposerDeck onForward={vi.fn().mockResolvedValue("advanced")}>
+        Kort
+      </NativeComposerDeck>,
     );
     const card = screen.getByTestId("native-composer-card");
 
@@ -63,8 +65,8 @@ describe("NativeComposerDeck", () => {
   });
 
   it("blokkerer et nytt swipe mens fremovernavigasjon pågår", async () => {
-    let resolve!: (value: boolean) => void;
-    const onForward = vi.fn(() => new Promise<boolean>((done) => (resolve = done)));
+    let resolve!: (value: "advanced") => void;
+    const onForward = vi.fn(() => new Promise<"advanced">((done) => (resolve = done)));
     render(<NativeComposerDeck onForward={onForward}>Kort</NativeComposerDeck>);
     const card = screen.getByTestId("native-composer-card");
 
@@ -72,6 +74,6 @@ describe("NativeComposerDeck", () => {
     await waitFor(() => expect(card.getAttribute("aria-busy")).toBe("true"));
     swipe(card, 100, 0);
     expect(onForward).toHaveBeenCalledOnce();
-    resolve(true);
+    resolve("advanced");
   });
 });

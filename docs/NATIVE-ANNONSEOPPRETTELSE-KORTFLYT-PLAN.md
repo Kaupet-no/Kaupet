@@ -425,7 +425,7 @@ Foreslått commit: `feat: legg til swipebar native composer`
 
 ### Fase 3 — Valideringsanimasjon og haptikk
 
-Status: **Ikke startet**
+Status: **Pågår**
 Formål: Gjøre blokkert fremovernavigasjon tydelig, rolig og tilgjengelig.
 
 Oppgaver:
@@ -572,7 +572,7 @@ Fysisk QA er obligatorisk for tastatur, WebView-gest, haptikk og safe area.
 | 0 – Global nav og kontrollrad | Pågår        | –                     | –         |
 | 1 – Kategori/feltgrupper      | Pågår        | Fase 0 (pågår)        | –         |
 | 2 – Kortstokk og swipe        | Pågår        | Fase 1                | –         |
-| 3 – Valideringsrespons        | Ikke startet | Fase 2                | –         |
+| 3 – Valideringsrespons        | Pågår        | Fase 2                | –         |
 | 4 – Feltstil og tastatur      | Ikke startet | Fase 3                | –         |
 | 5 – Bevegelse/polish          | Ikke startet | Fase 4                | –         |
 | 6 – Kjøpsønske/utrulling      | Ikke startet | Fase 5, ev. migrasjon | –         |
@@ -692,6 +692,30 @@ test` (319 tester), `bun run lint` og `bunx tsc --noEmit` bestått.
 - Ikke verifisert / risiko: Fysisk WebView-gest, bilde-draing, kart, sheet,
   textarea-selection, skjermleser og Reduce Motion på enhet.
 - Commit/PR: Denne committen (`feat: påbegynn swipebar native composer`).
+
+### Fase 3 — 2026-08-14
+
+- Status: Pågår
+- Ansvarlig: Codex
+- Formål oppnådd: Påbegynt eksplisitt navigasjonsresultat for salgsflyten og
+  felles blokkering av samtidige fremoverforsøk. Native-skallet viser én
+  semantisk feilsekvens og sender ett lett feilsignal for hvert blokkert
+  knappetrykk eller swipe.
+- Endrede filer: Composer-navigasjon, native kortstokk, composer-skall,
+  salgsruten, globale animasjonsstiler og målrettede komponenttester.
+- Nye funn: Reacts animasjonsevent er prefikset som `webkitAnimationEnd` i
+  Vitest/jsdom-miljøet; produksjonskoden bruker Reacts normaliserte handler.
+- Avvik fra plan og begrunnelse: Kjøpsønske-ruten får den delte native
+  kontrakten i Fase 6 som planlagt. Feltspesifikk tastatur-scroll hører til
+  Fase 4 og er ikke trukket inn i dette første snittet.
+- Blokkere og avhengigheter (med eier): Konkret feltfokus beholdes fra React
+  Hook Form, men fysisk tastatur-/WebView-verifisering gjenstår for Fase 4/QA.
+- Kontroller kjørt og resultat: Målrettet Vitest bestått. Full Vitest, lint og
+  typecheck kjøres før levering.
+- Manuelt verifisert på: Ikke utført.
+- Ikke verifisert / risiko: Fysisk haptikk, Reduce Motion og raske blandede
+  knapp/swipe-forsøk i WebView.
+- Commit/PR: Ikke opprettet.
 
 ## 13. Åpne funn og avhengigheter
 

@@ -334,3 +334,50 @@
     opacity: 0.6;
   }
 }
+
+@keyframes composer-validation-error-even {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  30% {
+    transform: translateX(-0.35rem);
+  }
+  60% {
+    transform: translateX(0.25rem);
+  }
+}
+
+@keyframes composer-validation-error-odd {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  30% {
+    transform: translateX(-0.35rem);
+  }
+  60% {
+    transform: translateX(0.25rem);
+  }
+}
+
+.composer-validation-error-even,
+.composer-validation-error-odd {
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--destructive) 55%, transparent);
+  background-color: color-mix(in oklab, var(--destructive) 7%, transparent);
+}
+
+.composer-validation-error-even {
+  animation: composer-validation-error-even 500ms ease-out;
+}
+
+.composer-validation-error-odd {
+  animation: composer-validation-error-odd 500ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer-validation-error-even,
+  .composer-validation-error-odd {
+    animation: none;
+  }
+}

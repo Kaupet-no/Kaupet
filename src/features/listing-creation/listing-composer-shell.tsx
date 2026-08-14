@@ -1,9 +1,10 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronLeft, X } from "lucide-react";
 
 import { NativePageHeader } from "@/components/native-page-header";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { hapticNotification } from "@/lib/haptics";
 import { ComposerErrorSummary } from "./composer-error-summary";
 
 export function ListingComposerShell({
@@ -18,6 +19,7 @@ export function ListingComposerShell({
   notice,
   status,
   errorSummary,
+  validationAttempt = 0,
   children,
   footer,
   firstStep,
@@ -34,6 +36,7 @@ export function ListingComposerShell({
   notice?: ReactNode;
   status?: ReactNode;
   errorSummary?: string | null;
+  validationAttempt?: number;
   children: ReactNode;
   footer: ReactNode;
   firstStep: boolean;
@@ -41,6 +44,12 @@ export function ListingComposerShell({
 }) {
   const pageHeadingRef = useRef<HTMLHeadingElement>(null);
   const previousPageRef = useRef(pageKey);
+  const [dismissedValidationAttempt, setDismissedValidationAttempt] = useState(0);
+  const showValidationFeedback =
+    native &&
+    !!errorSummary &&
+    validationAttempt > 0 &&
+    validationAttempt !== dismissedValidationAttempt;
 
   useEffect(() => {
     if (previousPageRef.current === pageKey) return;
@@ -48,6 +57,11 @@ export function ListingComposerShell({
     window.scrollTo({ top: 0 });
     requestAnimationFrame(() => pageHeadingRef.current?.focus());
   }, [pageKey]);
+
+  useEffect(() => {
+    if (!native || validationAttempt === 0) return;
+    void hapticNotification("error");
+  }, [native, validationAttempt]);
 
   return (
     <div className="mx-auto max-w-3xl px-4 pt-6 pb-4">
@@ -64,7 +78,22 @@ export function ListingComposerShell({
 
       <ComposerErrorSummary message={errorSummary ?? null} />
 
-      <div data-testid={`composer-page-${pageKey}`} className={cn("mt-8 pb-24", contentClassName)}>
+      <div
+        data-testid={`composer-page-${pageKey}`}
+        aria-invalid={showValidationFeedback || undefined}
+        className={cn(
+          "mt-8 rounded-2xl pb-24",
+          showValidationFeedback &&
+            (validationAttempt % 2 === 0
+              ? "composer-validation-error-even"
+              : "composer-validation-error-odd"),
+          contentClassName,
+        )}
+        onAnimationEndCapture={() => {
+          setDismissedValidationAttempt(validationAttempt);
+        }}
+        onInputCapture={() => setDismissedValidationAttempt(validationAttempt)}
+      >
         <h2 ref={pageHeadingRef} tabIndex={-1} className="sr-only">
           {pageTitle}
         </h2>

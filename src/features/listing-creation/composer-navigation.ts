@@ -3,6 +3,7 @@ export function composerForwardStep(nextStep: number, reviewStep: number, return
 }
 
 export type ComposerSwipeDirection = "back" | "forward";
+export type ComposerNavigationResult = "advanced" | "blocked" | "busy";
 
 export function composerSwipeDirection(
   deltaX: number,

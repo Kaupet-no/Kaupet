@@ -71,6 +71,7 @@ import { StepIndicator } from "@/features/listing-creation/step-indicator";
 import { ListingComposerShell } from "@/features/listing-creation/listing-composer-shell";
 import { useComposerHistoryBack } from "@/features/listing-creation/use-composer-history";
 import { NativeComposerDeck } from "@/features/listing-creation/native-composer-deck";
+import type { ComposerNavigationResult } from "@/features/listing-creation/composer-navigation";
 
 const listingSchema = z.object({
   title: z.string().trim().min(5, "Tittelen må være minst 5 tegn").max(120, "Maks 120 tegn"),
@@ -155,6 +156,8 @@ function NewListingPage() {
     message: string;
   } | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [validationAttempt, setValidationAttempt] = useState(0);
+  const forwardAttemptPendingRef = useRef(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const [hasPreviewed, setHasPreviewed] = useState(false);
@@ -609,7 +612,10 @@ function NewListingPage() {
     await goToNextPage();
   }
 
-  async function goToNextPage(options?: { skipImageCheck?: boolean; skipPriceCheck?: boolean }) {
+  async function goToNextPage(options?: {
+    skipImageCheck?: boolean;
+    skipPriceCheck?: boolean;
+  }): Promise<ComposerNavigationResult> {
     setValidationError(null);
     const groups = currentPage?.groups ?? [];
 
@@ -632,10 +638,10 @@ function NewListingPage() {
           reason: "registration_number",
         });
         setValidationError("Skriv inn registreringsnummer før du fortsetter.");
-        return false;
+        return "blocked";
       }
       await runVehicleLookup(vehicleRegNrInput);
-      return false;
+      return "busy";
     }
 
     // For kjøretøy rendrer title-photos kun bilder (se TitlePhotos) — feltet
@@ -654,7 +660,7 @@ function NewListingPage() {
         step: currentStepKey,
         reason: "form",
       });
-      return false;
+      return "blocked";
     }
     const validateCtx = {
       images,
@@ -684,7 +690,7 @@ function NewListingPage() {
           reason: "image",
         });
         setShowNoImageDialog(true);
-        return false;
+        return "blocked";
       }
       if (result === "SHOW_NO_PRICE_DIALOG") {
         if (native) continue;
@@ -696,7 +702,7 @@ function NewListingPage() {
           reason: "price",
         });
         setShowNoPriceDialog(true);
-        return false;
+        return "blocked";
       }
       if (typeof result === "string") {
         trackProductEvent("listing_creation_step_completed", {
@@ -707,7 +713,7 @@ function NewListingPage() {
         });
         if (group.key === "category-attributes") setAttributesTouched(true);
         setValidationError(result);
-        return false;
+        return "blocked";
       }
       if (result && typeof result === "object") {
         trackProductEvent("listing_creation_step_completed", {
@@ -719,7 +725,7 @@ function NewListingPage() {
         if (group.key === "category-attributes") setAttributesTouched(true);
         setExtraFieldError(result);
         setValidationError(result.message);
-        return false;
+        return "blocked";
       }
     }
     trackProductEvent("listing_creation_step_completed", {
@@ -736,7 +742,22 @@ function NewListingPage() {
       goNext();
     }
     window.scrollTo({ top: 0 });
-    return true;
+    return "advanced";
+  }
+
+  async function attemptNextPage(options?: {
+    skipImageCheck?: boolean;
+    skipPriceCheck?: boolean;
+  }): Promise<ComposerNavigationResult> {
+    if (forwardAttemptPendingRef.current) return "busy";
+    forwardAttemptPendingRef.current = true;
+    try {
+      const result = await goToNextPage(options);
+      if (result === "blocked" && native) setValidationAttempt((attempt) => attempt + 1);
+      return result;
+    } finally {
+      forwardAttemptPendingRef.current = false;
+    }
   }
 
   const mutation = useMutation({
@@ -1163,7 +1184,7 @@ function NewListingPage() {
           type="button"
           data-testid="wizard-next-button"
           disabled={vehicleLookupLoading}
-          onClick={() => void goToNextPage()}
+          onClick={() => void attemptNextPage()}
           className={native ? "min-h-12 min-w-24 rounded-xl px-3 text-base" : undefined}
         >
           {vehicleLookupLoading ? (
@@ -1238,6 +1259,7 @@ function NewListingPage() {
             ) : undefined
           }
           errorSummary={validationError}
+          validationAttempt={validationAttempt}
           footer={composerFooter}
           firstStep={isFirst}
         >
@@ -1245,7 +1267,7 @@ function NewListingPage() {
             <NativeComposerDeck
               key={currentStepKey}
               onBack={isFirst ? undefined : goBack}
-              onForward={() => goToNextPage()}
+              onForward={attemptNextPage}
             >
               <div
                 data-testid={groups[0] ? `wizard-step-${groups[0].key}` : undefined}

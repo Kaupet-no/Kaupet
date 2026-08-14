@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ListingComposerShell } from "./listing-composer-shell";
@@ -7,6 +7,9 @@ import { ListingComposerShell } from "./listing-composer-shell";
 vi.mock("@/components/native-page-header", () => ({
   NativePageHeader: () => <header>Ny annonse</header>,
 }));
+
+const { hapticNotification } = vi.hoisted(() => ({ hapticNotification: vi.fn() }));
+vi.mock("@/lib/haptics", () => ({ hapticNotification }));
 
 function renderShell({ firstStep = false, footer = "Fortsett", native = true } = {}) {
   const onBack = vi.fn();
@@ -28,7 +31,10 @@ function renderShell({ firstStep = false, footer = "Fortsett", native = true } =
   return { onBack, onCancel, ...result };
 }
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 describe("ListingComposerShell", () => {
   it("skjuler Forrige på første native steg", () => {
@@ -56,5 +62,31 @@ describe("ListingComposerShell", () => {
     renderShell({ native: false });
     expect(screen.queryByRole("button", { name: "Avbryt annonseopprettelse" })).toBeNull();
     expect(screen.getByRole("button", { name: "Fortsett" })).toBeTruthy();
+  });
+
+  it("viser og nullstiller native valideringsrespons ved animationend", async () => {
+    const { rerender } = renderShell();
+    rerender(
+      <ListingComposerShell
+        title="Ny annonse"
+        pageKey="title"
+        pageTitle="Tittel"
+        native
+        onBack={vi.fn()}
+        onCancel={vi.fn()}
+        errorSummary="Fyll inn tittelen før du fortsetter."
+        validationAttempt={1}
+        footer={<button type="button">Fortsett</button>}
+        firstStep={false}
+      >
+        Innhold
+      </ListingComposerShell>,
+    );
+
+    const page = screen.getByTestId("composer-page-title");
+    await waitFor(() => expect(page.getAttribute("aria-invalid")).toBe("true"));
+    expect(hapticNotification).toHaveBeenCalledWith("error");
+    page.dispatchEvent(new Event("webkitAnimationEnd", { bubbles: true }));
+    await waitFor(() => expect(page.getAttribute("aria-invalid")).toBeNull());
   });
 });

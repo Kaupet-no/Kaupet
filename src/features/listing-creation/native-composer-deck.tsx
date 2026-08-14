@@ -1,7 +1,7 @@
 import { useRef, useState, type PointerEvent, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
-import { composerSwipeDirection } from "./composer-navigation";
+import { composerSwipeDirection, type ComposerNavigationResult } from "./composer-navigation";
 
 const GESTURE_EXCLUSION =
   "button, a, input, textarea, select, [contenteditable='true'], [role='slider'], [data-composer-no-swipe], [data-vaul-no-drag], .leaflet-container";
@@ -16,7 +16,7 @@ export function NativeComposerDeck({
   children,
 }: {
   onBack?: () => void;
-  onForward: () => Promise<boolean>;
+  onForward: () => Promise<ComposerNavigationResult>;
   children: ReactNode;
 }) {
   const startRef = useRef<{ x: number; y: number; pointerId: number } | null>(null);

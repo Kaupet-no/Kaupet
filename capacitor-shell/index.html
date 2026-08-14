@@ -127,6 +127,15 @@
       </button>
     </div>
     <script>
+      // Native splash (launchAutoHide: false, se capacitor.config.ts) skjules
+      // normalt av hideNativeBootSplash() i SPA-en (src/routes/__root.tsx).
+      // Denne siden lastes derimot FØR SPA-en i det hele tatt navigeres til,
+      // så uten dette kallet blir splashen stående over kortet under —
+      // det appearer som en blank side ved kaldstart.
+      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SplashScreen) {
+        window.Capacitor.Plugins.SplashScreen.hide().catch(function () {});
+      }
+
       var STORAGE_KEY = "kaupet_backend_target";
 
       function localDevServerUrl(address) {

@@ -8,8 +8,11 @@ vi.mock("@/components/native-page-header", () => ({
   NativePageHeader: () => <header>Ny annonse</header>,
 }));
 
-const { hapticNotification } = vi.hoisted(() => ({ hapticNotification: vi.fn() }));
-vi.mock("@/lib/haptics", () => ({ hapticNotification }));
+const { hapticNotification, hapticSelection } = vi.hoisted(() => ({
+  hapticNotification: vi.fn(),
+  hapticSelection: vi.fn(),
+}));
+vi.mock("@/lib/haptics", () => ({ hapticNotification, hapticSelection }));
 
 function renderShell({ firstStep = false, footer = "Fortsett", native = true } = {}) {
   const onBack = vi.fn();
@@ -51,6 +54,25 @@ describe("ListingComposerShell", () => {
     expect(onBack).toHaveBeenCalledOnce();
     expect(onCancel).toHaveBeenCalledOnce();
     expect(screen.getByRole("button", { name: "Fortsett" })).toBeTruthy();
+  });
+
+  it("gir ett lett valgsignal når native-kortet skifter", () => {
+    const { rerender } = renderShell();
+    rerender(
+      <ListingComposerShell
+        title="Ny annonse"
+        pageKey="description"
+        pageTitle="Beskrivelse"
+        native
+        onBack={vi.fn()}
+        onCancel={vi.fn()}
+        footer={<button type="button">Fortsett</button>}
+        firstStep={false}
+      >
+        Innhold
+      </ListingComposerShell>,
+    );
+    expect(hapticSelection).toHaveBeenCalledOnce();
   });
 
   it("viser publisering i høyre posisjon på siste steg", () => {

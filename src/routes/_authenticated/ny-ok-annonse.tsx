@@ -31,7 +31,11 @@ import { ListingComposerShell } from "@/features/listing-creation/listing-compos
 import { ComposerStepIndicator } from "@/features/listing-creation/step-indicator";
 import { ComposerReview } from "@/features/listing-creation/composer-review";
 import { useComposerHistoryBack } from "@/features/listing-creation/use-composer-history";
-import { composerForwardStep } from "@/features/listing-creation/composer-navigation";
+import {
+  composerForwardStep,
+  type ComposerNavigationResult,
+} from "@/features/listing-creation/composer-navigation";
+import { NativeComposerDeck } from "@/features/listing-creation/native-composer-deck";
 import { useWtbDraftAutosave } from "@/features/wtb/use-wtb-draft-autosave";
 import {
   AlertDialog,
@@ -108,12 +112,17 @@ function capitalizeWord(value: unknown): string | null {
   return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
 }
 
-type WtbStep = "category" | "attributes" | "details" | "review";
-const STEPS: WtbStep[] = ["category", "attributes", "details", "review"];
+type WtbStep = "category" | "title" | "attributes" | "details" | "review";
+const WEB_STEPS: WtbStep[] = ["category", "attributes", "details", "review"];
+const NATIVE_STEPS: WtbStep[] = ["category", "title", "attributes", "details", "review"];
 const STEP_META: Record<WtbStep, { title: string; help: string }> = {
   category: {
     title: "Hva leter du etter?",
-    help: "Beskriv det kort, og velg kategorien som passer best.",
+    help: "Velg kategorien som passer best.",
+  },
+  title: {
+    title: "Gi kjøpsønsket en tittel",
+    help: "Beskriv kort hva du leter etter.",
   },
   attributes: {
     title: "Hva er viktig for deg?",
@@ -131,13 +140,16 @@ const STEP_META: Record<WtbStep, { title: string; help: string }> = {
 
 function NewWtbPage() {
   const native = useIsNative();
+  const steps = native ? NATIVE_STEPS : WEB_STEPS;
   const navigate = useNavigate();
   const [stepIndex, setStepIndex] = useState(0);
   const [notifyOnMatch, setNotifyOnMatch] = useState(false);
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [published, setPublished] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [validationAttempt, setValidationAttempt] = useState(0);
   const returnToReviewRef = useRef(false);
+  const forwardBusyRef = useRef(false);
   const [attributes, setAttributes] = useState<WtbAttributeMap>({});
   const [checkedKeys, setCheckedKeys] = useState<string[]>([]);
   const [titleManualOverride, setTitleManualOverride] = useState(false);
@@ -146,7 +158,7 @@ function NewWtbPage() {
     name_nb: string;
   } | null>(null);
 
-  const step = STEPS[stepIndex];
+  const step = steps[stepIndex];
 
   useEffect(() => {
     trackProductEvent("listing_creation_started", { kind: "want" });
@@ -326,13 +338,38 @@ function NewWtbPage() {
     });
     setStepIndex((i) =>
       composerForwardStep(
-        Math.min(i + 1, STEPS.length - 1),
-        STEPS.length - 1,
+        Math.min(i + 1, steps.length - 1),
+        steps.length - 1,
         returnToReviewRef.current,
       ),
     );
     returnToReviewRef.current = false;
     window.scrollTo({ top: 0 });
+  }
+
+  async function attemptNext(): Promise<ComposerNavigationResult> {
+    if (step === "review") return "busy";
+    if (forwardBusyRef.current) return "busy";
+    forwardBusyRef.current = true;
+    try {
+      const valid =
+        step === "title"
+          ? await trigger("title", { shouldFocus: true })
+          : step === "details"
+            ? await trigger(native ? ["description", "max_price_nok"] : undefined, {
+                shouldFocus: true,
+              })
+            : true;
+      if (!valid) {
+        setValidationError("Rett feltene som er markert før du fortsetter.");
+        setValidationAttempt((attempt) => attempt + 1);
+        return "blocked";
+      }
+      goNext();
+      return "advanced";
+    } finally {
+      forwardBusyRef.current = false;
+    }
   }
   function goBack() {
     returnToReviewRef.current = false;
@@ -349,9 +386,9 @@ function NewWtbPage() {
 
   function handleInvalid(fields: FieldErrors<WtbForm>) {
     const targetStep = fields.title
-      ? 0
+      ? steps.indexOf(native ? "title" : "category")
       : fields.description || fields.max_price_nok
-        ? 2
+        ? steps.indexOf("details")
         : stepIndex;
     setStepIndex(targetStep);
     setValidationError("Rett feltene som er markert før du fortsetter.");
@@ -423,23 +460,16 @@ function NewWtbPage() {
       {step !== "review" ? (
         <Button
           type="button"
-          onClick={() => {
-            if (step === "details")
-              void trigger(undefined, { shouldFocus: true }).then((valid) => {
-                if (valid) goNext();
-                else setValidationError("Rett feltene som er markert før du fortsetter.");
-              });
-            else goNext();
-          }}
-          disabled={step === "attributes" && !vehicleGroup && !title.trim()}
+          onClick={() => void attemptNext()}
+          disabled={!native && step === "attributes" && !vehicleGroup && !title.trim()}
           aria-describedby={
-            step === "attributes" && !vehicleGroup && !title.trim()
+            !native && step === "attributes" && !vehicleGroup && !title.trim()
               ? "wtb-continue-requirement"
               : undefined
           }
           className={native ? "min-h-12 min-w-24 rounded-xl px-3 text-base" : undefined}
         >
-          {native ? "Fortsett" : `Neste: ${STEP_META[STEPS[stepIndex + 1]].title}`}{" "}
+          {native ? "Fortsett" : `Neste: ${STEP_META[steps[stepIndex + 1]].title}`}{" "}
           <ChevronRight className="size-4" aria-hidden />
         </Button>
       ) : (
@@ -514,7 +544,7 @@ function NewWtbPage() {
         progress={
           <ComposerStepIndicator
             current={stepIndex + 1}
-            total={STEPS.length}
+            total={steps.length}
             label={STEP_META[step].title}
           />
         }
@@ -531,18 +561,84 @@ function NewWtbPage() {
           ) : undefined
         }
         errorSummary={validationError}
+        validationAttempt={validationAttempt}
         footer={footer}
         firstStep={stepIndex === 0}
         contentClassName="flex flex-col gap-6"
       >
-        <p className="text-sm text-muted-foreground">{STEP_META[step].help}</p>
-        {/* Ingen <form>: publisering skjer kun via eksplisitt klikk på publiser-knappen,
+        <NativeComposerDeck
+          enabled={native}
+          onBack={stepIndex === 0 ? undefined : goBack}
+          onForward={attemptNext}
+        >
+          <p className="text-sm text-muted-foreground">{STEP_META[step].help}</p>
+          {/* Ingen <form>: publisering skjer kun via eksplisitt klikk på publiser-knappen,
           slik at verken Enter i input-felter eller knappe-bytte i footeren kan utløse den. */}
-        {step === "category" && (
-          <section className="space-y-3">
-            <div className="space-y-2">
+          {step === "category" && (
+            <section className="space-y-3">
+              {!native && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="title">Kort beskrivelse</Label>
+                    <span className="text-xs text-muted-foreground">{titleLength}/120</span>
+                  </div>
+                  <Input
+                    id="title"
+                    placeholder="f.eks. PlayStation 5, Trek sykkel eller iPhone 14"
+                    autoFocus
+                    aria-invalid={!!errors.title}
+                    aria-describedby={errors.title ? "title-error" : undefined}
+                    {...register("title")}
+                  />
+                  {errors.title && (
+                    <p id="title-error" className="text-sm text-destructive">
+                      {errors.title.message}
+                    </p>
+                  )}
+                </div>
+              )}
+              {!native && !categoryId && categorySuggestion && (
+                <button
+                  type="button"
+                  className="flex min-h-14 w-full items-center justify-between rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-left"
+                  onClick={() => {
+                    setValue("category_id", categorySuggestion.category_id, {
+                      shouldValidate: true,
+                    });
+                    setCategorySuggestion(null);
+                  }}
+                >
+                  <span>
+                    <span className="block text-sm text-muted-foreground">Foreslått kategori</span>
+                    <span className="font-medium">{categorySuggestion.name_nb}</span>
+                  </span>
+                  <ChevronRight className="size-5 text-muted-foreground" aria-hidden />
+                </button>
+              )}
+              <Label>Velg kategori</Label>
+              <CategoryPicker
+                inline
+                open={false}
+                onOpenChange={() => {}}
+                categories={categories}
+                selectedId={categoryId ?? ""}
+                onSelect={(id) => {
+                  setValue("category_id", id, { shouldValidate: true });
+                  goNext();
+                }}
+              />
+              <Button type="button" size="sm" variant="ghost" className="min-h-12" onClick={goNext}>
+                Jeg er usikker – fortsett uten kategori
+              </Button>
+            </section>
+          )}
+
+          {step === "title" && (
+            <section className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="title">Kort beskrivelse</Label>
+                <Label htmlFor="title">
+                  Tittel <span className="text-destructive">*</span>
+                </Label>
                 <span className="text-xs text-muted-foreground">{titleLength}/120</span>
               </div>
               <Input
@@ -551,264 +647,233 @@ function NewWtbPage() {
                 autoFocus
                 aria-invalid={!!errors.title}
                 aria-describedby={errors.title ? "title-error" : undefined}
-                {...register("title")}
+                {...register("title", { onChange: () => setTitleManualOverride(true) })}
               />
               {errors.title && (
                 <p id="title-error" className="text-sm text-destructive">
                   {errors.title.message}
                 </p>
               )}
-            </div>
-            {!categoryId && categorySuggestion && (
-              <button
-                type="button"
-                className="flex min-h-14 w-full items-center justify-between rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-left"
-                onClick={() => {
-                  setValue("category_id", categorySuggestion.category_id, { shouldValidate: true });
-                  setCategorySuggestion(null);
-                }}
-              >
-                <span>
-                  <span className="block text-sm text-muted-foreground">Foreslått kategori</span>
-                  <span className="font-medium">{categorySuggestion.name_nb}</span>
-                </span>
-                <ChevronRight className="size-5 text-muted-foreground" aria-hidden />
-              </button>
-            )}
-            <Label>Velg kategori</Label>
-            <CategoryPicker
-              inline
-              open={false}
-              onOpenChange={() => {}}
-              categories={categories}
-              selectedId={categoryId ?? ""}
-              onSelect={(id) => {
-                setValue("category_id", id, { shouldValidate: true });
-                goNext();
-              }}
-            />
-            <Button type="button" size="sm" variant="ghost" className="min-h-12" onClick={goNext}>
-              Jeg er usikker – fortsett uten kategori
-            </Button>
-          </section>
-        )}
+            </section>
+          )}
 
-        {step === "attributes" && (
-          <section className="space-y-2">
-            {!vehicleGroup && !title.trim() && (
-              <p id="wtb-continue-requirement" className="text-sm text-destructive">
-                Legg inn en kort beskrivelse på første steg før du fortsetter.
-              </p>
-            )}
-            {categoryLabel && (
-              <p className="text-sm text-muted-foreground">
-                Kategori: <span className="font-medium text-foreground">{categoryLabel}</span>
-              </p>
-            )}
-            <WtbCriteriaFields
-              categoryId={categoryId ?? null}
-              categories={categories}
-              value={attributes}
-              onChange={setAttributes}
-              checkedKeys={checkedKeys}
-              onCheckedKeysChange={setCheckedKeys}
-              native={native}
-            />
-            <div className="space-y-2 pt-4">
-              <Label htmlFor="wtb-freetext">
-                Fritekstsøk <span className="font-normal text-muted-foreground">(valgfritt)</span>
-              </Label>
-              <Input
-                id="wtb-freetext"
-                placeholder="Utstyrskode eller annen relevant informasjon"
-                value={typeof attributes.__freetext === "string" ? attributes.__freetext : ""}
-                onChange={(e) =>
-                  setAttributes((prev) => {
-                    const next = { ...prev };
-                    if (e.target.value) next.__freetext = e.target.value;
-                    else delete next.__freetext;
-                    return next;
-                  })
-                }
+          {step === "attributes" && (
+            <section className="space-y-2">
+              {!native && !vehicleGroup && !title.trim() && (
+                <p id="wtb-continue-requirement" className="text-sm text-destructive">
+                  Legg inn en kort beskrivelse på første steg før du fortsetter.
+                </p>
+              )}
+              {categoryLabel && (
+                <p className="text-sm text-muted-foreground">
+                  Kategori: <span className="font-medium text-foreground">{categoryLabel}</span>
+                </p>
+              )}
+              <WtbCriteriaFields
+                categoryId={categoryId ?? null}
+                categories={categories}
+                value={attributes}
+                onChange={setAttributes}
+                checkedKeys={checkedKeys}
+                onCheckedKeysChange={setCheckedKeys}
+                native={native}
               />
-            </div>
-          </section>
-        )}
+              <div className="space-y-2 pt-4">
+                <Label htmlFor="wtb-freetext">
+                  Fritekstsøk <span className="font-normal text-muted-foreground">(valgfritt)</span>
+                </Label>
+                <Input
+                  id="wtb-freetext"
+                  placeholder="Utstyrskode eller annen relevant informasjon"
+                  value={typeof attributes.__freetext === "string" ? attributes.__freetext : ""}
+                  onChange={(e) =>
+                    setAttributes((prev) => {
+                      const next = { ...prev };
+                      if (e.target.value) next.__freetext = e.target.value;
+                      else delete next.__freetext;
+                      return next;
+                    })
+                  }
+                />
+              </div>
+            </section>
+          )}
 
-        {step === "details" && (
-          <>
-            {vehicleGroup && (
+          {step === "details" && (
+            <>
+              {vehicleGroup && !native && (
+                <section className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="title">
+                      Tittel <span className="text-destructive">*</span>
+                    </Label>
+                    <div className="flex items-center gap-1.5">
+                      <FieldValid show={!!touchedFields.title && !errors.title} />
+                      <span
+                        className={`text-xs ${titleLength > 100 ? "text-destructive" : "text-muted-foreground"}`}
+                      >
+                        {titleLength}/120
+                      </span>
+                    </div>
+                  </div>
+                  {!titleManualOverride ? (
+                    <div className="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
+                      <span className={computedTitle ? "" : "text-muted-foreground"}>
+                        {computedTitle || "Fylles ut fra Årsmodell, Merke og Modell"}
+                      </span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="native-touch-target"
+                        onClick={() => setTitleManualOverride(true)}
+                      >
+                        Rediger manuelt
+                      </Button>
+                    </div>
+                  ) : (
+                    <Input
+                      id="title"
+                      placeholder="f.eks. 2019 BMW 320d"
+                      autoFocus
+                      aria-invalid={!!errors.title}
+                      aria-describedby={errors.title ? "title-error" : undefined}
+                      {...register("title")}
+                    />
+                  )}
+                  {errors.title && (
+                    <p id="title-error" className="text-sm text-destructive">
+                      {errors.title.message}
+                    </p>
+                  )}
+                </section>
+              )}
               <section className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="title">
-                    Tittel <span className="text-destructive">*</span>
-                  </Label>
-                  <div className="flex items-center gap-1.5">
-                    <FieldValid show={!!touchedFields.title && !errors.title} />
-                    <span
-                      className={`text-xs ${titleLength > 100 ? "text-destructive" : "text-muted-foreground"}`}
-                    >
-                      {titleLength}/120
-                    </span>
-                  </div>
+                  <Label htmlFor="description">Beskrivelse / krav (valgfritt)</Label>
+                  <span className="text-xs text-muted-foreground">{descriptionLength}/2000</span>
                 </div>
-                {!titleManualOverride ? (
-                  <div className="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
-                    <span className={computedTitle ? "" : "text-muted-foreground"}>
-                      {computedTitle || "Fylles ut fra Årsmodell, Merke og Modell"}
-                    </span>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      className="native-touch-target"
-                      onClick={() => setTitleManualOverride(true)}
-                    >
-                      Rediger manuelt
-                    </Button>
-                  </div>
-                ) : (
-                  <Input
-                    id="title"
-                    placeholder="f.eks. 2019 BMW 320d"
-                    autoFocus
-                    aria-invalid={!!errors.title}
-                    aria-describedby={errors.title ? "title-error" : undefined}
-                    {...register("title")}
-                  />
-                )}
-                {errors.title && (
-                  <p id="title-error" className="text-sm text-destructive">
-                    {errors.title.message}
+                <Textarea
+                  id="description"
+                  placeholder="Beskriv gjerne ønsket stand, farge, versjon, o.l."
+                  rows={3}
+                  aria-invalid={!!errors.description}
+                  aria-describedby={errors.description ? "description-error" : undefined}
+                  {...register("description")}
+                />
+                {errors.description && (
+                  <p id="description-error" className="text-sm text-destructive">
+                    {errors.description.message}
                   </p>
                 )}
               </section>
-            )}
-            <section className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="description">Beskrivelse / krav (valgfritt)</Label>
-                <span className="text-xs text-muted-foreground">{descriptionLength}/2000</span>
-              </div>
-              <Textarea
-                id="description"
-                placeholder="Beskriv gjerne ønsket stand, farge, versjon, o.l."
-                rows={3}
-                aria-invalid={!!errors.description}
-                aria-describedby={errors.description ? "description-error" : undefined}
-                {...register("description")}
-              />
-              {errors.description && (
-                <p id="description-error" className="text-sm text-destructive">
-                  {errors.description.message}
-                </p>
-              )}
-            </section>
 
-            <section className="space-y-2">
-              <Label htmlFor="max_price">Maks pris du vil betale (valgfritt)</Label>
-              <Input
-                id="max_price"
-                type="number"
-                inputMode="numeric"
-                placeholder="kr"
-                className="max-w-[200px]"
-                min={0}
-                max={10000000}
-                aria-invalid={!!errors.max_price_nok}
-                aria-describedby={errors.max_price_nok ? "max-price-error" : undefined}
-                {...register("max_price_nok")}
-              />
-              {errors.max_price_nok && (
-                <p id="max-price-error" className="text-sm text-destructive">
-                  {errors.max_price_nok.message}
-                </p>
-              )}
-            </section>
-          </>
-        )}
+              <section className="space-y-2">
+                <Label htmlFor="max_price">Maks pris du vil betale (valgfritt)</Label>
+                <Input
+                  id="max_price"
+                  type="number"
+                  inputMode="numeric"
+                  placeholder="kr"
+                  className="max-w-[200px]"
+                  min={0}
+                  max={10000000}
+                  aria-invalid={!!errors.max_price_nok}
+                  aria-describedby={errors.max_price_nok ? "max-price-error" : undefined}
+                  {...register("max_price_nok")}
+                />
+                {errors.max_price_nok && (
+                  <p id="max-price-error" className="text-sm text-destructive">
+                    {errors.max_price_nok.message}
+                  </p>
+                )}
+              </section>
+            </>
+          )}
 
-        {step === "review" && (
-          <div className="space-y-6">
-            <ComposerReview
-              items={[
-                {
-                  key: "category",
-                  label: "Kategori",
-                  value: categoryLabel || "Ikke valgt",
-                  onEdit: () => {
-                    returnToReviewRef.current = true;
-                    setStepIndex(0);
+          {step === "review" && (
+            <div className="space-y-6">
+              <ComposerReview
+                items={[
+                  {
+                    key: "category",
+                    label: "Kategori",
+                    value: categoryLabel || "Ikke valgt",
+                    onEdit: () => {
+                      returnToReviewRef.current = true;
+                      setStepIndex(0);
+                    },
                   },
-                },
-                {
-                  key: "criteria",
-                  label: "Kriterier",
-                  value:
-                    Object.keys(attributes).length > 0
-                      ? `${Object.keys(attributes).length} valgt`
-                      : "Ingen begrensninger",
-                  onEdit: () => {
-                    returnToReviewRef.current = true;
-                    setStepIndex(1);
+                  {
+                    key: "criteria",
+                    label: "Kriterier",
+                    value:
+                      Object.keys(attributes).length > 0
+                        ? `${Object.keys(attributes).length} valgt`
+                        : "Ingen begrensninger",
+                    onEdit: () => {
+                      returnToReviewRef.current = true;
+                      setStepIndex(steps.indexOf("attributes"));
+                    },
                   },
-                },
-                {
-                  key: "title",
-                  label: "Hva du leter etter",
-                  value: title,
-                  onEdit: () => {
-                    returnToReviewRef.current = true;
-                    setStepIndex(0);
+                  {
+                    key: "title",
+                    label: "Hva du leter etter",
+                    value: title,
+                    onEdit: () => {
+                      returnToReviewRef.current = true;
+                      setStepIndex(steps.indexOf(native ? "title" : "category"));
+                    },
                   },
-                },
-                {
-                  key: "details",
-                  label: "Detaljer",
-                  value:
-                    [
-                      description || null,
-                      parsedMaxPrice !== null && Number.isFinite(parsedMaxPrice)
-                        ? `Maks ${parsedMaxPrice.toLocaleString("nb-NO")} kr`
-                        : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ") || "Ingen ekstra detaljer",
-                  onEdit: () => {
-                    returnToReviewRef.current = true;
-                    setStepIndex(2);
+                  {
+                    key: "details",
+                    label: "Detaljer",
+                    value:
+                      [
+                        description || null,
+                        parsedMaxPrice !== null && Number.isFinite(parsedMaxPrice)
+                          ? `Maks ${parsedMaxPrice.toLocaleString("nb-NO")} kr`
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ") || "Ingen ekstra detaljer",
+                    onEdit: () => {
+                      returnToReviewRef.current = true;
+                      setStepIndex(steps.indexOf("details"));
+                    },
                   },
-                },
-              ]}
-            />
-            <label
-              htmlFor="notify-on-match"
-              aria-label="Varsle meg om matchende annonser"
-              className="flex min-h-14 cursor-pointer items-start gap-3 rounded-xl border border-border bg-card p-4 text-left"
-            >
-              <Checkbox
-                id="notify-on-match"
-                checked={notifyOnMatch}
-                onCheckedChange={(checked) => setNotifyOnMatch(checked === true)}
-                aria-describedby="notify-on-match-help"
+                ]}
               />
-              <span>
-                <span className="block font-medium">Varsle meg om matchende annonser</span>
-                <span
-                  id="notify-on-match-help"
-                  className="mt-1 block text-sm text-muted-foreground"
-                >
-                  Kaupet varsler deg når en ny annonse matcher kategorien og kriteriene du har
-                  valgt.
+              <label
+                htmlFor="notify-on-match"
+                aria-label="Varsle meg om matchende annonser"
+                className="flex min-h-14 cursor-pointer items-start gap-3 rounded-xl border border-border bg-card p-4 text-left"
+              >
+                <Checkbox
+                  id="notify-on-match"
+                  checked={notifyOnMatch}
+                  onCheckedChange={(checked) => setNotifyOnMatch(checked === true)}
+                  aria-describedby="notify-on-match-help"
+                />
+                <span>
+                  <span className="block font-medium">Varsle meg om matchende annonser</span>
+                  <span
+                    id="notify-on-match-help"
+                    className="mt-1 block text-sm text-muted-foreground"
+                  >
+                    Kaupet varsler deg når en ny annonse matcher kategorien og kriteriene du har
+                    valgt.
+                  </span>
                 </span>
-              </span>
-            </label>
-            {isPending && (
-              <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
-                Publiserer kjøpsønsket …
-              </p>
-            )}
-          </div>
-        )}
+              </label>
+              {isPending && (
+                <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
+                  Publiserer kjøpsønsket …
+                </p>
+              )}
+            </div>
+          )}
+        </NativeComposerDeck>
       </ListingComposerShell>
 
       <AlertDialog

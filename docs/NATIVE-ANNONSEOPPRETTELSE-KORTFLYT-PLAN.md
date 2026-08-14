@@ -453,7 +453,7 @@ Foreslått commit: `feat: gi native kort tydelig valideringsrespons`
 
 ### Fase 4 — Native feltstil og tastatursikkerhet
 
-Status: **Ikke startet**
+Status: **Pågår**
 Formål: Gi feltene premium native uttrykk og bevise at brukeren alltid ser
 det som skrives.
 
@@ -483,7 +483,7 @@ Foreslått commit: `feat: tilpass composer-felt og tastatur for native`
 
 ### Fase 5 — Rolig bevegelse og helhetlig polish
 
-Status: **Ikke startet**
+Status: **Pågår**
 Formål: Samordne bevegelse og visuelt hierarki uten funksjonell omskriving.
 
 Oppgaver:
@@ -508,7 +508,7 @@ Foreslått commit: `style: finpuss native annonsekort`
 
 ### Fase 6 — Kjøpsønske, migrasjon og samlet utrulling
 
-Status: **Ikke startet**
+Status: **Pågår**
 Formål: Fullføre felles native kontrakt og fjerne overgangskode kontrollert.
 
 Oppgaver:
@@ -567,15 +567,15 @@ Fysisk QA er obligatorisk for tastatur, WebView-gest, haptikk og safe area.
 
 ## 11. Statusoversikt
 
-| Fase                          | Status       | Avhengigheter         | Commit/PR |
-| ----------------------------- | ------------ | --------------------- | --------- |
-| 0 – Global nav og kontrollrad | Pågår        | –                     | –         |
-| 1 – Kategori/feltgrupper      | Pågår        | Fase 0 (pågår)        | –         |
-| 2 – Kortstokk og swipe        | Pågår        | Fase 1                | –         |
-| 3 – Valideringsrespons        | Pågår        | Fase 2                | –         |
-| 4 – Feltstil og tastatur      | Ikke startet | Fase 3                | –         |
-| 5 – Bevegelse/polish          | Ikke startet | Fase 4                | –         |
-| 6 – Kjøpsønske/utrulling      | Ikke startet | Fase 5, ev. migrasjon | –         |
+| Fase                          | Status | Avhengigheter         | Commit/PR |
+| ----------------------------- | ------ | --------------------- | --------- |
+| 0 – Global nav og kontrollrad | Pågår  | –                     | –         |
+| 1 – Kategori/feltgrupper      | Pågår  | Fase 0 (pågår)        | –         |
+| 2 – Kortstokk og swipe        | Pågår  | Fase 1                | –         |
+| 3 – Valideringsrespons        | Pågår  | Fase 2                | –         |
+| 4 – Feltstil og tastatur      | Pågår  | Fase 3                | –         |
+| 5 – Bevegelse/polish          | Pågår  | Fase 4                | –         |
+| 6 – Kjøpsønske/utrulling      | Pågår  | Fase 5, ev. migrasjon | –         |
 
 ## 12. Fasejournal
 
@@ -717,12 +717,87 @@ test` (319 tester), `bun run lint` og `bunx tsc --noEmit` bestått.
   knapp/swipe-forsøk i WebView.
 - Commit/PR: Ikke opprettet.
 
+### Fase 4 — 2026-08-14
+
+- Status: Pågår
+- Ansvarlig: Codex
+- Formål oppnådd: Påbegynt native-only feltgeometri og composer-lokal,
+  kansellerbar fokussynlighet for fokusbytte, stegskifte og endringer i
+  `visualViewport`.
+- Endrede filer: Composer-skall, native viewport-fallback, globale native
+  composer-stiler og dette plandokumentet.
+- Nye funn: Den globale native viewport-handleren brukte alltid smooth scroll
+  og måtte avgrenses fra composerens egen scrollcontainer for å unngå to
+  konkurrerende scrolljobber.
+- Avvik fra plan og begrunnelse: Fase 4 er bare startet. Fase 5 og 6 startes
+  ikke før fase 4 er verifisert, slik faseplanens sekvenseringsregel krever.
+- Blokkere og avhengigheter (med eier): Fysisk iOS-/Android-verifisering og
+  visuell matrise gjenstår (eier: implementatør/QA).
+- Kontroller kjørt og resultat: Målrettet Vitest (9 tester), full `bun run
+test` (326 tester), `bun run lint`, `bunx tsc --noEmit` og `git diff
+--check` bestått.
+- Manuelt verifisert på: Ikke utført ennå.
+- Ikke verifisert / risiko: IME, safe area, Dynamic Type/font scale, mørk modus
+  og nettbrettlandskap.
+- Commit/PR: Ikke opprettet.
+
+### Fase 5 — 2026-08-15
+
+- Status: Pågår
+- Ansvarlig: Codex
+- Formål oppnådd: Samlet kortskifte og feilrespons under lokale
+  bevegelsestokens og lagt ett lett native valgsignal på faktiske kortskifter.
+- Endrede filer: Composer-skall, native kortstokk, globale composer-stiler,
+  tester og dette plandokumentet.
+- Nye funn: Eksisterende haptikkwrapper dekker valgsignal uten ny avhengighet.
+- Avvik fra plan og begrunnelse: Teknisk implementering er utført før samlet
+  testkjøring etter eksplisitt bestilling. Fysisk designgjennomgang og
+  snapshots gjenstår.
+- Blokkere og avhengigheter (med eier): Fysisk UI-gjennomgang i lys/mørk og
+  Reduce Motion (eier: implementatør/QA).
+- Kontroller kjørt og resultat: `bun run lint`, `bunx tsc --noEmit`, full
+  `bun run test` (328 tester), `bun run build` og `git diff --check` bestått.
+  Playwright ble blokkert før teststart fordi Docker Desktop ikke kjører.
+- Manuelt verifisert på: Ikke utført ennå.
+- Ikke verifisert / risiko: Offline-, opplastings-, oppslags- og
+  publiseringstilstander på fysisk enhet.
+- Commit/PR: Ikke opprettet.
+
+### Fase 6 — 2026-08-15
+
+- Status: Pågår
+- Ansvarlig: Codex
+- Formål oppnådd: Kjøpsønske bruker teknisk samme native kort-, swipe-,
+  footer-, validerings-, haptikk- og tastaturkontrakt som salgsflyten.
+  Overgangsmigrasjon utvider lagrede sammensatte feltgrupper atomisk og
+  beholder støtte for legacy-skriving.
+- Endrede filer: Kjøpsønske-ruten, delt kortstokk, overgangsmigrasjon, tester
+  og dette plandokumentet.
+- Nye funn: Feltgruppenøklene er lagret i category_flows; kompatibilitetslesing
+  må derfor beholdes til alle miljøer og eldre utkast er migrert.
+- Avvik fra plan og begrunnelse: Bare teknisk implementering er utført.
+  Migrasjonen er ikke pushet/anvendt, og utrulling, fysisk QA og brukertester
+  krever eksterne miljøer og deltakere.
+- Blokkere og avhengigheter (med eier): Migrasjon må committes/pushes separat
+  og bekreftes anvendt før eventuell overgangskode fjernes (eier:
+  implementatør). Fysisk QA, fem brukertester og staging/produksjonsutrulling
+  gjenstår (eier: QA/produkt/release).
+- Kontroller kjørt og resultat: `bun run lint`, `bunx tsc --noEmit`, full
+  `bun run test` (328 tester), `bun run build` og `git diff --check` bestått.
+  `bun run test:e2e` og `bun run test:rls` ble blokkert før teststart fordi
+  Docker Desktop ikke kjører. Playwright-innsamling uten global setup ble
+  videre blokkert fordi den genererte `e2e/.auth/user.json` derfor manglet.
+- Manuelt verifisert på: Ikke utført ennå.
+- Ikke verifisert / risiko: Migrasjon mot lokal/lenket Supabase, RLS,
+  tilgjengelighetsmatrise, livssyklus og rollback.
+- Commit/PR: Ikke opprettet.
+
 ## 13. Åpne funn og avhengigheter
 
 Legg nye funn her når de ikke hører hjemme i aktiv fase. Hver rad må ha eier
 og neste handling; «senere» er ikke en status.
 
-| Dato       | Fase      | Funn                                                    | Neste handling                                 | Eier                     | Status |
-| ---------- | --------- | ------------------------------------------------------- | ---------------------------------------------- | ------------------------ | ------ |
-| 2026-08-14 | Vurdering | Fysisk keyboard-overlay er ikke verifisert for composer | Kjør enhetsmatrisen og legg evidens i fase 4   | QA/implementerende agent | Åpen   |
-| 2026-08-14 | Vurdering | Gamle flow-rader kan kreve datamigrasjon                | Inventer faktiske rader og normaliser i fase 1 | Implementerende agent    | Åpen   |
+| Dato       | Fase      | Funn                                                    | Neste handling                               | Eier                     | Status |
+| ---------- | --------- | ------------------------------------------------------- | -------------------------------------------- | ------------------------ | ------ |
+| 2026-08-14 | Vurdering | Fysisk keyboard-overlay er ikke verifisert for composer | Kjør enhetsmatrisen og legg evidens i fase 4 | QA/implementerende agent | Åpen   |
+| 2026-08-15 | Fase 6    | Overgangsmigrasjon er laget, men ikke anvendt           | Start Docker, kjør RLS og deploy migrasjonen | Implementerende agent    | Åpen   |

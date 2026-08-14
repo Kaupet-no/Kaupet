@@ -222,6 +222,47 @@
   --app-nav-rail-w: 0px;
 }
 
+.native .native-composer-shell {
+  --composer-motion-card: 240ms;
+  --composer-motion-error: 500ms;
+  height: var(--vvh, 100dvh);
+  max-height: var(--vvh, 100dvh);
+  overflow: hidden;
+}
+
+.native .native-composer-motion {
+  transition-duration: var(--composer-motion-card);
+  transition-timing-function: ease-out;
+}
+
+.native .native-composer-card {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 1.25rem;
+  scroll-padding-block: 4rem 8rem;
+  box-shadow: 0 0.5rem 2rem color-mix(in oklab, var(--foreground) 8%, transparent);
+}
+
+.native .native-composer-card :is(input:not([type="checkbox"]):not([type="radio"]), select) {
+  min-height: 3.5rem;
+  padding-inline: 1rem;
+  border-radius: 0.75rem;
+}
+
+.native .native-composer-card textarea {
+  min-height: 8rem;
+  padding: 0.875rem 1rem;
+  border-radius: 0.75rem;
+}
+
+.native .native-composer-card :is(input, textarea, select) {
+  scroll-margin-block: 5rem 9rem;
+}
+
+.native .native-composer-card label {
+  line-height: 1.5;
+}
+
 /* Nettbrett (fase 10): bunnpillen erstattes av en sidestilt navigasjon, så
    plassen skal reserveres til venstre i stedet for under. `.nav-rail` settes
    på <html> av AppBottomNav når useFormFactor() === "tablet".
@@ -368,11 +409,11 @@
 }
 
 .composer-validation-error-even {
-  animation: composer-validation-error-even 500ms ease-out;
+  animation: composer-validation-error-even var(--composer-motion-error, 500ms) ease-out;
 }
 
 .composer-validation-error-odd {
-  animation: composer-validation-error-odd 500ms ease-out;
+  animation: composer-validation-error-odd var(--composer-motion-error, 500ms) ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {

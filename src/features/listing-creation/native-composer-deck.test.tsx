@@ -16,6 +16,16 @@ function swipe(target: Element, fromX: number, toX: number, toY = 0) {
 }
 
 describe("NativeComposerDeck", () => {
+  it("beholder webinnhold uten kort- eller gest-wrapper", () => {
+    render(
+      <NativeComposerDeck enabled={false} onForward={vi.fn()}>
+        Webinnhold
+      </NativeComposerDeck>,
+    );
+    expect(screen.getByText("Webinnhold")).toBeTruthy();
+    expect(screen.queryByTestId("native-composer-deck")).toBeNull();
+  });
+
   it("bruker samme fremoverhandling for swipe og lar bakoverswipe gå tilbake", async () => {
     const onForward = vi.fn().mockResolvedValue("advanced");
     const onBack = vi.fn();

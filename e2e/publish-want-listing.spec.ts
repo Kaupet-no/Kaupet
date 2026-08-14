@@ -60,3 +60,23 @@ test("forklarer hvorfor kjøpsønsket ikke kan fortsette", async ({ page }, test
   ).toBeVisible();
   await expect(page.getByRole("button", { name: /^(Fortsett|Neste:)/ })).toBeDisabled();
 });
+
+test("bruker atomiske, validerte kort i native kjøpsønske", async ({ page }, testInfo) => {
+  const credentials = users[testInfo.project.name];
+  if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);
+
+  await login(page, credentials.email, credentials.password);
+  await goToNewWantListing(page, true);
+  await expect(page.getByLabel("Kort beskrivelse")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Jeg er usikker – fortsett uten kategori" }).click();
+  await composerPage(page, "title").waitFor();
+  await page.getByRole("button", { name: "Fortsett" }).click();
+  await expect(page.getByText("Rett feltene som er markert før du fortsetter.")).toBeVisible();
+  await expect(composerPage(page, "title")).toBeVisible();
+
+  await page.getByLabel("Tittel").fill("E2E ønsker å kjøpe barnestol");
+  await advanceWantStep(page, "attributes");
+  await advanceWantStep(page, "details");
+  await advanceWantStep(page, "review");
+});

@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronLeft, X } from "lucide-react";
 
 import { NativePageHeader } from "@/components/native-page-header";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { hapticNotification } from "@/lib/haptics";
+import { hapticNotification, hapticSelection } from "@/lib/haptics";
 import { ComposerErrorSummary } from "./composer-error-summary";
 
 export function ListingComposerShell({
@@ -43,6 +43,8 @@ export function ListingComposerShell({
   contentClassName?: string;
 }) {
   const pageHeadingRef = useRef<HTMLHeadingElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const focusFrameRef = useRef<number | null>(null);
   const previousPageRef = useRef(pageKey);
   const [dismissedValidationAttempt, setDismissedValidationAttempt] = useState(0);
   const showValidationFeedback =
@@ -51,12 +53,47 @@ export function ListingComposerShell({
     validationAttempt > 0 &&
     validationAttempt !== dismissedValidationAttempt;
 
+  const ensureFocusedFieldVisible = useCallback(() => {
+    if (!native) return;
+    if (focusFrameRef.current !== null) cancelAnimationFrame(focusFrameRef.current);
+    focusFrameRef.current = requestAnimationFrame(() => {
+      focusFrameRef.current = null;
+      const field = document.activeElement;
+      const container = scrollContainerRef.current;
+      if (
+        !(field instanceof HTMLElement) ||
+        !container?.contains(field) ||
+        !field.matches("input, textarea, select, [contenteditable='true']")
+      )
+        return;
+      field.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        block: "center",
+      });
+    });
+  }, [native]);
+
   useEffect(() => {
     if (previousPageRef.current === pageKey) return;
     previousPageRef.current = pageKey;
     window.scrollTo({ top: 0 });
     requestAnimationFrame(() => pageHeadingRef.current?.focus());
-  }, [pageKey]);
+    if (native) void hapticSelection();
+  }, [native, pageKey]);
+
+  useEffect(() => {
+    if (!native) return;
+    const viewport = window.visualViewport;
+    const container = scrollContainerRef.current;
+    container?.addEventListener("focusin", ensureFocusedFieldVisible);
+    viewport?.addEventListener("resize", ensureFocusedFieldVisible);
+    ensureFocusedFieldVisible();
+    return () => {
+      container?.removeEventListener("focusin", ensureFocusedFieldVisible);
+      viewport?.removeEventListener("resize", ensureFocusedFieldVisible);
+      if (focusFrameRef.current !== null) cancelAnimationFrame(focusFrameRef.current);
+    };
+  }, [ensureFocusedFieldVisible, native, pageKey]);
 
   useEffect(() => {
     if (!native || validationAttempt === 0) return;
@@ -64,7 +101,12 @@ export function ListingComposerShell({
   }, [native, validationAttempt]);
 
   return (
-    <div className="mx-auto max-w-3xl px-4 pt-6 pb-4">
+    <div
+      className={cn(
+        "mx-auto max-w-3xl px-4 pt-6 pb-4",
+        native && "native-composer-shell flex flex-col",
+      )}
+    >
       <NativePageHeader title={title} backLabel={backLabel} onBack={onBack} hideBack={native} />
       {!native && <h1 className="font-display text-3xl tracking-tight">{title}</h1>}
       {notice}
@@ -79,10 +121,14 @@ export function ListingComposerShell({
       <ComposerErrorSummary message={errorSummary ?? null} />
 
       <div
+        ref={scrollContainerRef}
+        data-composer-scroll={native || undefined}
         data-testid={`composer-page-${pageKey}`}
         aria-invalid={showValidationFeedback || undefined}
         className={cn(
           "mt-8 rounded-2xl pb-24",
+          native &&
+            "native-composer-card overflow-y-auto overscroll-contain border border-border bg-card",
           showValidationFeedback &&
             (validationAttempt % 2 === 0
               ? "composer-validation-error-even"

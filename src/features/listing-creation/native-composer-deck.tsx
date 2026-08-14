@@ -11,10 +11,12 @@ function gestureIsExcluded(target: EventTarget | null) {
 }
 
 export function NativeComposerDeck({
+  enabled = true,
   onBack,
   onForward,
   children,
 }: {
+  enabled?: boolean;
   onBack?: () => void;
   onForward: () => Promise<ComposerNavigationResult>;
   children: ReactNode;
@@ -27,6 +29,8 @@ export function NativeComposerDeck({
   const reduceMotion =
     typeof window !== "undefined" &&
     window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+  if (!enabled) return children;
 
   function resetGesture() {
     startRef.current = null;
@@ -76,8 +80,8 @@ export function NativeComposerDeck({
         data-testid="native-composer-card"
         aria-busy={navigating || undefined}
         className={cn(
-          "touch-pan-y will-change-transform",
-          !dragging && "transition-transform duration-200 ease-out motion-reduce:transition-none",
+          "native-composer-motion touch-pan-y will-change-transform",
+          !dragging && "transition-transform motion-reduce:transition-none",
         )}
         style={{ transform: reduceMotion ? undefined : `translate3d(${offset}px, 0, 0)` }}
         onPointerDown={handlePointerDown}

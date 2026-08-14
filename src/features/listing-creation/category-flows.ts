@@ -45,7 +45,7 @@ export function normalizeFieldGroupKeys(keys: string[]): string[] {
   return normalized.filter((key) => key !== "title" && key !== "delivery");
 }
 
-/** The database keeps the legacy compound keys until the phase 6 migration. */
+/** Writers keep legacy keys until the phase 6 transition migration is applied everywhere. */
 export function toStoredFieldGroupKeys(keys: string[]): string[] {
   const stored: string[] = [];
   for (let index = 0; index < keys.length; index += 1) {

@@ -1,6 +1,6 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Search, MessageCircle, Plus, X, LogIn } from "lucide-react";
-import { AdPickerOptions } from "@/components/ad-picker-options";
+import { IntentTitleLanding } from "@/components/intent-title-landing";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/hooks/use-auth";
@@ -212,16 +212,7 @@ export function AppBottomNav() {
           <DialogHeader>
             <DialogTitle>Hva vil du annonsere?</DialogTitle>
           </DialogHeader>
-          <AdPickerOptions
-            onSell={() => {
-              setAdPickerOpen(false);
-              void navigate({ to: "/ny-annonse", search: { type: "sell" } });
-            }}
-            onBuy={() => {
-              setAdPickerOpen(false);
-              void navigate({ to: "/ny-ok-annonse" });
-            }}
-          />
+          <IntentTitleLanding onNavigate={() => setAdPickerOpen(false)} />
         </ResponsiveOverlayContent>
       </ResponsiveOverlay>
     </nav>

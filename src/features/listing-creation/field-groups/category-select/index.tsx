@@ -20,11 +20,11 @@ export function CategorySelect({
   categories,
   categoryId,
   onCategorySelect,
-  categorySuggestion,
+  categorySuggestions,
   categoryTouchedManually,
   applyCategorySuggestion,
   setSuggestionDismissed,
-  setCategorySuggestion,
+  setCategorySuggestions,
   bilOgMcCategoryId,
 }: WizardSharedProps) {
   return (
@@ -34,25 +34,30 @@ export function CategorySelect({
         <RequiredMark />
       </Label>
 
-      {!native && categorySuggestion && !categoryTouchedManually && (
-        <div className="flex items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
+      {!native && categorySuggestions.length > 0 && !categoryTouchedManually && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
           <Sparkles className="size-4 shrink-0 text-primary" aria-hidden />
-          <span>
-            {categorySuggestion.parent_name_nb
-              ? `${categorySuggestion.parent_name_nb} › ${categorySuggestion.name_nb}`
-              : categorySuggestion.name_nb}
-          </span>
-          <Button type="button" size="sm" onClick={applyCategorySuggestion} className="ml-auto">
-            Bruk forslag
-          </Button>
+          <span>Foreslått: </span>
+          {categorySuggestions.map((s) => (
+            <Button
+              key={s.category_id}
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => applyCategorySuggestion(s.category_id)}
+            >
+              {s.parent_name_nb ? `${s.parent_name_nb} › ${s.name_nb}` : s.name_nb}
+            </Button>
+          ))}
           <Button
             type="button"
             size="sm"
             variant="ghost"
             aria-label="Lukk kategoriforslag"
+            className="ml-auto"
             onClick={() => {
               setSuggestionDismissed(true);
-              setCategorySuggestion(null);
+              setCategorySuggestions([]);
             }}
           >
             ✕

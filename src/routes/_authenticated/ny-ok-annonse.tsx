@@ -61,6 +61,7 @@ const wtbSchema = z.object({
 type WtbForm = z.infer<typeof wtbSchema>;
 
 export const Route = createFileRoute("/_authenticated/ny-ok-annonse")({
+  validateSearch: z.object({ title: z.string().optional() }).catch({}),
   head: () => ({
     meta: [
       { title: "Ønskes kjøpt — Kaupet.no" },
@@ -112,13 +113,17 @@ function capitalizeWord(value: unknown): string | null {
   return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
 }
 
-type WtbStep = "category" | "title" | "attributes" | "details" | "review";
+type WtbStep = "category" | "category-confirm" | "title" | "attributes" | "details" | "review";
 const WEB_STEPS: WtbStep[] = ["category", "attributes", "details", "review"];
 const NATIVE_STEPS: WtbStep[] = ["category", "title", "attributes", "details", "review"];
 const STEP_META: Record<WtbStep, { title: string; help: string }> = {
   category: {
     title: "Hva leter du etter?",
     help: "Velg kategorien som passer best.",
+  },
+  "category-confirm": {
+    title: "Bekreft kategori",
+    help: "Vi har foreslått en kategori basert på tittelen din.",
   },
   title: {
     title: "Gi kjøpsønsket en tittel",
@@ -140,7 +145,24 @@ const STEP_META: Record<WtbStep, { title: string; help: string }> = {
 
 function NewWtbPage() {
   const native = useIsNative();
-  const steps = native ? NATIVE_STEPS : WEB_STEPS;
+  const { title: titleParam } = Route.useSearch();
+  // Set once from the initial search params: true when the wizard was
+  // entered via the intent+title landing screen — skips the forced "category"
+  // (and, on native, "title") step in favor of a category-confirm step after
+  // "details", mirroring the same pattern in ny-annonse.tsx.
+  const [skipCategoryStep] = useState(() => !!titleParam?.trim());
+  const steps = useMemo(() => {
+    const base = native ? NATIVE_STEPS : WEB_STEPS;
+    if (!skipCategoryStep) return base;
+    const withoutCategory = base.filter((s) => s !== "category" && s !== "title");
+    const detailsIdx = withoutCategory.indexOf("details");
+    const insertAt = detailsIdx === -1 ? withoutCategory.length : detailsIdx + 1;
+    return [
+      ...withoutCategory.slice(0, insertAt),
+      "category-confirm" as const,
+      ...withoutCategory.slice(insertAt),
+    ];
+  }, [native, skipCategoryStep]);
   const navigate = useNavigate();
   const [stepIndex, setStepIndex] = useState(0);
   const [notifyOnMatch, setNotifyOnMatch] = useState(false);
@@ -153,10 +175,12 @@ function NewWtbPage() {
   const [attributes, setAttributes] = useState<WtbAttributeMap>({});
   const [checkedKeys, setCheckedKeys] = useState<string[]>([]);
   const [titleManualOverride, setTitleManualOverride] = useState(false);
-  const [categorySuggestion, setCategorySuggestion] = useState<{
-    category_id: string;
-    name_nb: string;
-  } | null>(null);
+  const [categorySuggestions, setCategorySuggestions] = useState<
+    { category_id: string; name_nb: string }[]
+  >([]);
+  const [categorySuggestionLoading, setCategorySuggestionLoading] = useState(false);
+  const [categoryConfirmShowPicker, setCategoryConfirmShowPicker] = useState(false);
+  const suggestionFiredImmediatelyRef = useRef(false);
 
   const step = steps[stepIndex];
 
@@ -203,7 +227,7 @@ function NewWtbPage() {
     resolver: zodResolver(wtbSchema),
     mode: "onTouched",
     defaultValues: {
-      title: "",
+      title: titleParam ?? "",
       description: "",
       category_id: null,
       max_price_nok: "",
@@ -277,12 +301,23 @@ function NewWtbPage() {
 
   useEffect(() => {
     if (categoryId || title.trim().length < 5) return;
-    const timeout = window.setTimeout(() => {
-      void suggestCategoryForTitle({ data: { title: title.trim() } })
-        .then((result) => setCategorySuggestion(result.suggestion))
-        .catch(() => setCategorySuggestion(null));
-    }, 400);
+    const fireImmediately = skipCategoryStep && !suggestionFiredImmediatelyRef.current;
+    if (fireImmediately) suggestionFiredImmediatelyRef.current = true;
+    // Synchronous so the category-confirm step's skeleton shows immediately,
+    // not one tick late (mirrors use-listing-title-hints.ts's same toggle).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCategorySuggestionLoading(true);
+    const timeout = window.setTimeout(
+      () => {
+        void suggestCategoryForTitle({ data: { title: title.trim() } })
+          .then((result) => setCategorySuggestions(result.suggestions))
+          .catch(() => setCategorySuggestions([]))
+          .finally(() => setCategorySuggestionLoading(false));
+      },
+      fireImmediately ? 0 : 400,
+    );
     return () => window.clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categoryId, title]);
 
   const shouldBlockNav = !published && (title.trim().length > 0 || stepIndex > 0);
@@ -597,23 +632,28 @@ function NewWtbPage() {
                   )}
                 </div>
               )}
-              {!native && !categoryId && categorySuggestion && (
-                <button
-                  type="button"
-                  className="flex min-h-14 w-full items-center justify-between rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-left"
-                  onClick={() => {
-                    setValue("category_id", categorySuggestion.category_id, {
-                      shouldValidate: true,
-                    });
-                    setCategorySuggestion(null);
-                  }}
-                >
-                  <span>
-                    <span className="block text-sm text-muted-foreground">Foreslått kategori</span>
-                    <span className="font-medium">{categorySuggestion.name_nb}</span>
-                  </span>
-                  <ChevronRight className="size-5 text-muted-foreground" aria-hidden />
-                </button>
+              {!native && !categoryId && categorySuggestions.length > 0 && (
+                <div className="space-y-2">
+                  {categorySuggestions.map((s) => (
+                    <button
+                      key={s.category_id}
+                      type="button"
+                      className="flex min-h-14 w-full items-center justify-between rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-left"
+                      onClick={() => {
+                        setValue("category_id", s.category_id, { shouldValidate: true });
+                        setCategorySuggestions([]);
+                      }}
+                    >
+                      <span>
+                        <span className="block text-sm text-muted-foreground">
+                          Foreslått kategori
+                        </span>
+                        <span className="font-medium">{s.name_nb}</span>
+                      </span>
+                      <ChevronRight className="size-5 text-muted-foreground" aria-hidden />
+                    </button>
+                  ))}
+                </div>
               )}
               <Label>Velg kategori</Label>
               <CategoryPicker
@@ -630,6 +670,72 @@ function NewWtbPage() {
               <Button type="button" size="sm" variant="ghost" className="min-h-12" onClick={goNext}>
                 Jeg er usikker – fortsett uten kategori
               </Button>
+            </section>
+          )}
+
+          {step === "category-confirm" && (
+            <section className="space-y-3">
+              {categoryConfirmShowPicker ||
+              (categorySuggestions.length === 0 && !categorySuggestionLoading) ? (
+                <>
+                  <Label>Velg kategori</Label>
+                  <CategoryPicker
+                    inline
+                    open={false}
+                    onOpenChange={() => {}}
+                    categories={categories}
+                    selectedId={categoryId ?? ""}
+                    onSelect={(id) => {
+                      setValue("category_id", id, { shouldValidate: true });
+                      goNext();
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="min-h-12"
+                    onClick={goNext}
+                  >
+                    Jeg er usikker – fortsett uten kategori
+                  </Button>
+                </>
+              ) : categorySuggestionLoading || categorySuggestions.length === 0 ? (
+                <div className="space-y-4 py-6 text-center">
+                  <div className="mx-auto h-6 w-2/3 animate-pulse rounded bg-muted" />
+                  <p className="text-sm text-muted-foreground">Gi oss et lite øyeblikk…</p>
+                </div>
+              ) : (
+                <div className="space-y-4 py-4 text-center">
+                  <p className="text-lg font-semibold">
+                    {categorySuggestions.length > 1
+                      ? `Er denne annonsen i kategori ${categorySuggestions.map((s) => s.name_nb).join(" eller ")}?`
+                      : `Denne annonsen blir opprettet i kategori ${categorySuggestions[0].name_nb}. Er det riktig?`}
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-3">
+                    {categorySuggestions.map((s) => (
+                      <Button
+                        key={s.category_id}
+                        type="button"
+                        onClick={() => {
+                          setValue("category_id", s.category_id, { shouldValidate: true });
+                          setCategorySuggestions([]);
+                          goNext();
+                        }}
+                      >
+                        {s.name_nb}
+                      </Button>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setCategoryConfirmShowPicker(true)}
+                    >
+                      Nei
+                    </Button>
+                  </div>
+                </div>
+              )}
             </section>
           )}
 

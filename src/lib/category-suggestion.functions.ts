@@ -23,18 +23,22 @@ export const suggestCategoryForTitle = createServerFn({ method: "GET" })
 
     if (!top || totalVotes < MIN_TOTAL_VOTES || share < MIN_SHARE) {
       const { suggestCategoryForTitleAi } = await import("@/lib/category-suggestion-ai.server");
-      const aiSuggestion = await suggestCategoryForTitleAi({ title: data.title }).catch(() => null);
-      return { suggestion: aiSuggestion };
+      const aiSuggestions = await suggestCategoryForTitleAi({ title: data.title }).catch(
+        () => null,
+      );
+      return { suggestions: aiSuggestions ?? [] };
     }
 
     return {
-      suggestion: {
-        category_id: top.category_id as string,
-        slug: top.slug as string,
-        name_nb: top.name_nb as string,
-        parent_id: top.parent_id as string | null,
-        parent_name_nb: top.parent_name_nb as string | null,
-        confidence: share,
-      },
+      suggestions: [
+        {
+          category_id: top.category_id as string,
+          slug: top.slug as string,
+          name_nb: top.name_nb as string,
+          parent_id: top.parent_id as string | null,
+          parent_name_nb: top.parent_name_nb as string | null,
+          confidence: share,
+        },
+      ],
     };
   });

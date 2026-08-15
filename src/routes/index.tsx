@@ -14,7 +14,7 @@ import { useIsNative } from "@/hooks/use-is-native";
 import { AppLanding } from "@/components/app-landing";
 import { KaupetCodeDialog } from "@/components/kaupet-code-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AdPickerOptions } from "@/components/ad-picker-options";
+import { IntentTitleLanding } from "@/components/intent-title-landing";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { findCategorySuggestion } from "@/lib/categories";
 import { Badge } from "@/components/ui/badge";
@@ -584,16 +584,7 @@ function WebLanding() {
                       <DialogHeader>
                         <DialogTitle>Ny annonse</DialogTitle>
                       </DialogHeader>
-                      <AdPickerOptions
-                        onSell={() => {
-                          setAdPickerOpen(false);
-                          void navigate({ to: "/ny-annonse", search: { type: "sell" } });
-                        }}
-                        onBuy={() => {
-                          setAdPickerOpen(false);
-                          void navigate({ to: "/ny-ok-annonse" });
-                        }}
-                      />
+                      <IntentTitleLanding onNavigate={() => setAdPickerOpen(false)} />
                     </DialogContent>
                   </Dialog>
                   <KaupetCodeDialog />

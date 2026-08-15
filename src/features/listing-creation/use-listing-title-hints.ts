@@ -33,6 +33,12 @@ export function useListingTitleHints(params: {
   priceNok?: number | undefined;
   isFree?: boolean;
   attributes?: AttributeMap;
+  /** When true, and a title of at least 5 characters is already present on
+   * first mount (e.g. prefilled from the intent+title landing screen), fires
+   * the category suggestion fetch immediately instead of waiting the normal
+   * 400ms typing debounce — the suggestion is then often ready before the
+   * user reaches the category-confirm step. */
+  immediate?: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setValue: (field: any, value: any, options?: any) => void;
 }) {
@@ -46,36 +52,50 @@ export function useListingTitleHints(params: {
     priceNok,
     isFree,
     attributes,
+    immediate,
     setValue,
   } = params;
 
-  const [categorySuggestion, setCategorySuggestion] = useState<CategorySuggestion | null>(null);
+  const [categorySuggestions, setCategorySuggestions] = useState<CategorySuggestion[]>([]);
+  const [categorySuggestionLoading, setCategorySuggestionLoading] = useState(false);
   const [suggestionDismissed, setSuggestionDismissed] = useState(false);
+  const [firedImmediately, setFiredImmediately] = useState(false);
 
   useEffect(() => {
     if (categoryTouchedManually || suggestionDismissed) return;
     const t = (title ?? "").trim();
     if (t.length < 5) {
-      setCategorySuggestion(null);
+      setCategorySuggestions([]);
       return;
     }
+    const fireImmediately = immediate && !firedImmediately;
+    if (fireImmediately) setFiredImmediately(true);
+    const delay = fireImmediately ? 0 : 400;
+    setCategorySuggestionLoading(true);
     const timer = window.setTimeout(async () => {
       try {
         const result = await suggestCategoryForTitle({ data: { title: t } });
-        setCategorySuggestion(result.suggestion);
+        setCategorySuggestions(result.suggestions);
       } catch {
-        setCategorySuggestion(null);
+        setCategorySuggestions([]);
+      } finally {
+        setCategorySuggestionLoading(false);
       }
-    }, 400);
+    }, delay);
     return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, categoryTouchedManually, suggestionDismissed]);
 
-  function applyCategorySuggestion() {
-    if (!categorySuggestion) return;
-    setSelectedParentId(categorySuggestion.parent_id ?? categorySuggestion.category_id);
-    setValue("category_id", categorySuggestion.category_id, { shouldValidate: true });
+  /** `categoryId` must be one of `categorySuggestions`' ids — lets the caller
+   * (category-confirm, or category-select's "Bruk forslag" chip) apply
+   * whichever of the (up to 2) candidates the user picked. */
+  function applyCategorySuggestion(categoryId: string) {
+    const suggestion = categorySuggestions.find((s) => s.category_id === categoryId);
+    if (!suggestion) return;
+    setSelectedParentId(suggestion.parent_id ?? suggestion.category_id);
+    setValue("category_id", suggestion.category_id, { shouldValidate: true });
     setCategoryTouchedManually(true);
-    setCategorySuggestion(null);
+    setCategorySuggestions([]);
   }
 
   const {
@@ -95,8 +115,9 @@ export function useListingTitleHints(params: {
   });
 
   return {
-    categorySuggestion,
-    setCategorySuggestion,
+    categorySuggestions,
+    categorySuggestionLoading,
+    setCategorySuggestions,
     setSuggestionDismissed,
     applyCategorySuggestion,
     similarListings,

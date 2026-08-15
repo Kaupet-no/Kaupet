@@ -56,6 +56,7 @@ export function Price({
   vehicleLookupResult,
   attributes,
   onAttributesChange,
+  lockedFree,
 }: WizardSharedProps) {
   const [editingAvgift, setEditingAvgift] = useState(false);
   const calculatedAvgiftKr = isVehicle
@@ -135,6 +136,11 @@ export function Price({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [maxPriceInputKr]);
   const priceField = register("price_nok");
+  // type=="free" (fra intent+tittel-landingsbildet): hele
+  // pris-spørsmålet skal skjules — is_free er allerede forhåndssatt true av
+  // ny-annonse.tsx sine defaultValues. type=="sell": prisfeltet vises som
+  // vanlig, men "gis bort gratis"-avkrysningen skjules helt (se under).
+  if (lockedFree === "free") return null;
   return (
     <section className="space-y-3">
       <div className="flex items-center gap-1.5">
@@ -201,7 +207,7 @@ export function Price({
             />
           </div>
         )}
-        {!isVehicle && (
+        {!isVehicle && lockedFree !== "sell" && (
           <label className="flex items-center gap-2 text-sm">
             <Checkbox checked={isFree} onCheckedChange={(v) => setValue("is_free", Boolean(v))} />
             Gis bort gratis
@@ -269,6 +275,7 @@ export function Price({
  * of being interleaved ad hoc per platform in ny-annonse.tsx.
  */
 export function PriceGroup(props: WizardSharedProps) {
+  if (props.lockedFree === "free") return null;
   return (
     <>
       <Price {...props} />

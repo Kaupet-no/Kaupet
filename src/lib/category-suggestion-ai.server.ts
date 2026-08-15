@@ -7,9 +7,10 @@ type CategoryRow = { id: string; slug: string; name_nb: string; parent_id: strin
 /**
  * AI fallback for `suggestCategoryForTitle` (category-suggestion.functions.ts),
  * used only when the vote-based RPC has no confident match — e.g. a title
- * with no prior listing history. Prompts the borealis-1b endpoint to pick a
- * category name from the full list, then validates the answer against real
- * categories before returning it (never trust model output directly).
+ * with no prior listing history. Prompts the borealis-1b endpoint to pick one
+ * or two category names from the full list, then validates the answer(s)
+ * against real categories before returning them (never trust model output
+ * directly). Returns null if nothing validated, otherwise 1-2 candidates.
  */
 export async function suggestCategoryForTitleAi(input: unknown) {
   const { title } = inputSchema.parse(input);
@@ -25,19 +26,45 @@ export async function suggestCategoryForTitleAi(input: unknown) {
     .eq("is_hidden", false);
   if (error || !categories || categories.length === 0) return null;
 
-  const byName = new Map((categories as CategoryRow[]).map((c) => [c.name_nb, c]));
-  const prompt = `Du skal klassifisere annonsetitler til riktig kategori for den norske markedsplassen Kaupet.
-Tilgjengelige kategorier: ${categories.map((c) => c.name_nb).join(", ")}
-Annonsetittel: "${title}"
-Svar kun med det eksakte kategorinavnet fra listen over, ingen annen tekst.`;
+  // Only leaf categories (no children) are ever a valid category_id target —
+  // CategoryPicker itself only lets a user select one with no children (see
+  // category-picker.tsx's hasChildren check), so a parent/mid-level "container"
+  // category (e.g. "Sittemøbler") was never a real answer to begin with.
+  // This also keeps the prompt within the model's context window: sending the
+  // full category tree (incl. non-leaf nodes) overflows borealis-1b's
+  // 1024-token context as the tree grows; leaf-only fits with headroom today.
+  const parentIds = new Set(
+    (categories as CategoryRow[]).map((c) => c.parent_id).filter((id): id is string => !!id),
+  );
+  const leafCategories = (categories as CategoryRow[]).filter((c) => !parentIds.has(c.id));
+  if (leafCategories.length === 0) return null;
+
+  const byName = new Map(leafCategories.map((c) => [c.name_nb, c]));
+  // Truncated defensively — the model only needs enough of the title to
+  // classify it, and this keeps a margin against the context limit above as
+  // the leaf category count grows (title itself is already capped at 120
+  // chars by listingSchema/wtbSchema, so this rarely bites in practice).
+  const truncatedTitle = title.slice(0, 100);
+  const prompt = `Du skal klassifisere annonsetitler til riktig kategori for en norsk nettbasert markedsplass.
+Tilgjengelige kategorier: ${leafCategories.map((c) => c.name_nb).join(", ")}
+Annonsetittel: "${truncatedTitle}"
+Svar med det ene kategorinavnet fra listen over som passer best. Hvis to kategorier er
+omtrent like sannsynlige, svar med begge, atskilt med komma. Ingen annen tekst.`;
 
   const response = await fetch(`${endpointUrl}/v1/chat/completions`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({
+      // 0, not a small-but-nonzero value: this is a closed-set classification
+      // (pick a name off the list), not creative generation, so there's no
+      // upside to sampling randomness — only downside. Verified live: the
+      // same title ("2024 Porsche 911 991.2") answered "Bil" consistently at
+      // temperature 0, but non-deterministically produced an unrelated
+      // category ("Kjøleskap og fryser") at 0.1 — the 1B model is uncertain
+      // enough that any sampling noise can flip it off a correct greedy pick.
       messages: [{ role: "user", content: prompt }],
       max_tokens: 20,
-      temperature: 0.1,
+      temperature: 0,
     }),
   });
   if (!response.ok) return null;
@@ -46,21 +73,30 @@ Svar kun med det eksakte kategorinavnet fra listen over, ingen annen tekst.`;
   const generated = result.choices?.[0]?.message?.content?.trim();
   if (!generated) return null;
 
-  const match =
-    byName.get(generated) ??
-    (categories as CategoryRow[]).find((c) => generated.includes(c.name_nb));
-  if (!match) return null;
+  // Up to 2 candidates — matches the confirm UI's "Er dette kategori X eller
+  // Y?" pattern, offering both instead of forcing a single guess through the
+  // full category list.
+  const matches: CategoryRow[] = [];
+  for (const part of generated.split(",")) {
+    const name = part.trim();
+    if (!name) continue;
+    const match = byName.get(name) ?? leafCategories.find((c) => name.includes(c.name_nb));
+    if (match && !matches.some((m) => m.id === match.id)) matches.push(match);
+    if (matches.length === 2) break;
+  }
+  if (matches.length === 0) return null;
 
-  const parent = match.parent_id
-    ? (categories as CategoryRow[]).find((c) => c.id === match.parent_id)
-    : null;
-
-  return {
-    category_id: match.id,
-    slug: match.slug,
-    name_nb: match.name_nb,
-    parent_id: match.parent_id,
-    parent_name_nb: parent?.name_nb ?? null,
-    confidence: 0.5,
-  };
+  return matches.map((match) => {
+    const parent = match.parent_id
+      ? (categories as CategoryRow[]).find((c) => c.id === match.parent_id)
+      : null;
+    return {
+      category_id: match.id,
+      slug: match.slug,
+      name_nb: match.name_nb,
+      parent_id: match.parent_id,
+      parent_name_nb: parent?.name_nb ?? null,
+      confidence: 0.5,
+    };
+  });
 }

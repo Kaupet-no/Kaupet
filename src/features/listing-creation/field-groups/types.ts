@@ -96,16 +96,25 @@ export type WizardSharedProps = {
    * only wired where a subcategory choice can carry filled-in data that a
    * change would discard (currently vehicle-registration). */
   onCategoryDeselect?: (parentId: string) => void;
-  categorySuggestion: {
+  /** 0-2 candidates — the vote-based RPC always returns a single confident
+   * top match when it has one, but the AI fallback (borealis-1b) may return
+   * two roughly-equally-likely categories (e.g. "Bil" vs. "Bilsport" for a
+   * sports car title) instead of forcing a single guess. category-confirm
+   * offers a button per candidate plus "Nei" for the full manual picker. */
+  categorySuggestions: {
     category_id: string;
     parent_id: string | null;
     name_nb: string;
     parent_name_nb: string | null;
-  } | null;
+  }[];
+  /** True while `suggestCategoryForTitle` is in flight — drives the
+   * category-confirm step's skeleton state. */
+  categorySuggestionLoading: boolean;
   categoryTouchedManually: boolean;
-  applyCategorySuggestion: () => void;
+  /** Applies whichever of `categorySuggestions` has this category_id. */
+  applyCategorySuggestion: (categoryId: string) => void;
   setSuggestionDismissed: (v: boolean) => void;
-  setCategorySuggestion: (v: null) => void;
+  setCategorySuggestions: (v: []) => void;
 
   // category attributes (modules)
   attributes: AttributeMap;
@@ -257,4 +266,12 @@ export type WizardSharedProps = {
   setTurnstileToken: (token: string | null) => void;
   onCancel: () => void;
   onEditReviewSection: (section: "category" | "content" | "details" | "location") => void;
+
+  /** Set from the ny-annonse.tsx `type` search param when the wizard was
+   * entered via the intent+title landing screen — locks the price group's
+   * "gis bort gratis" question instead of leaving it open-ended. "sell" hides
+   * the checkbox (forces is_free false); "free" hides the whole price
+   * question (forces is_free true). null outside that entry path (manual/
+   * edit flow keeps today's checkbox). */
+  lockedFree: "sell" | "free" | null;
 };

@@ -2,6 +2,7 @@ import type { ComponentType } from "react";
 
 import { PhotosGroup, TitleGroup } from "./title-photos";
 import { CategorySelect } from "./category-select";
+import { CategoryConfirm } from "./category-confirm";
 import { CategoryAttributes } from "./category-attributes";
 import { VehicleRegistration } from "./vehicle-registration";
 import { VehicleConfirm } from "./vehicle-confirm";
@@ -53,6 +54,11 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
   "category-select": {
     key: "category-select",
     Component: CategorySelect,
+    fieldsToValidate: ["category_id"],
+  },
+  "category-confirm": {
+    key: "category-confirm",
+    Component: CategoryConfirm,
     fieldsToValidate: ["category_id"],
   },
   photos: {
@@ -218,6 +224,7 @@ export function fieldGroupsForKeys(keys: string[]): FieldGroup[] {
  */
 const FIELD_GROUP_LABEL_NATIVE_NB: Record<string, string> = {
   "category-select": "Kategori",
+  "category-confirm": "Kategori",
   "vehicle-registration": "Registreringsnr.",
   "vehicle-confirm": "Bekreft kjøretøy",
   photos: "Bilder",
@@ -237,6 +244,7 @@ const FIELD_GROUP_LABEL_NATIVE_NB: Record<string, string> = {
 
 const FIELD_GROUP_LABEL_WEB_NB: Record<string, string> = {
   "category-select": "Kategori",
+  "category-confirm": "Kategori",
   "vehicle-registration": "Registreringsnummer",
   "vehicle-confirm": "Bekreft kjøretøy",
   photos: "Bilder",
@@ -263,6 +271,7 @@ export function pageLabel(groups: FieldGroup[], native: boolean): string {
 /** Norwegian admin-display labels — distinct from the step-indicator labels above (different audience/purpose). */
 export const FIELD_GROUP_LABELS_NB: Record<string, string> = {
   "category-select": "Kategori",
+  "category-confirm": "Bekreft kategori",
   "vehicle-registration": "Kjøretøyregistrering",
   "vehicle-confirm": "Bekreft kjøretøy (Statens vegvesen)",
   photos: "Bilder",

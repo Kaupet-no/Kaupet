@@ -90,21 +90,23 @@ export function effectiveFlowForCategory(
   categoryId: string | null,
   allFlows: CategoryFlowRow[],
   categoriesById: Map<string, CategoryNode>,
+  skipCategoryStep = false,
 ): CategoryFlow {
-  if (!categoryId) return prependCategorySelect(DEFAULT_FLOW);
+  const prepend = skipCategoryStep ? (flow: CategoryFlow) => flow : prependCategorySelect;
+  if (!categoryId) return prepend(DEFAULT_FLOW);
   const flowsByCategoryId = new Map(allFlows.map((f) => [f.category_id, f]));
   let cur: CategoryNode | undefined = categoriesById.get(categoryId);
   while (cur) {
     const row = flowsByCategoryId.get(cur.id);
     if (row) {
-      return prependCategorySelect({
+      return prepend({
         fieldGroups: normalizeFieldGroupKeys(row.field_groups),
         modules: row.modules,
       });
     }
     cur = cur.parent_id ? categoriesById.get(cur.parent_id) : undefined;
   }
-  return prependCategorySelect(DEFAULT_FLOW);
+  return prepend(DEFAULT_FLOW);
 }
 
 function prependCategorySelect(flow: CategoryFlow): CategoryFlow {
@@ -137,6 +139,7 @@ function prependCategorySelect(flow: CategoryFlow): CategoryFlow {
  * with unrelated groups like `condition`/`price`. */
 const SOLO_FIELD_GROUP_KEYS = new Set([
   "category-select",
+  "category-confirm",
   "vehicle-registration",
   "vehicle-confirm",
 ]);

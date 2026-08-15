@@ -106,6 +106,9 @@ export function PhotosGroup({
   return (
     <section className="space-y-2">
       <Label>Bilder</Label>
+      <p className="text-sm text-muted-foreground">
+        Annonser med bilder får mer oppmerksomhet. Vi anbefaler minst 3 bilder.
+      </p>
       <ImageUploader images={images} onChange={setImages} uploadProgress={uploadProgress} />
     </section>
   );

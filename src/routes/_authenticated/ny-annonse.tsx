@@ -120,7 +120,8 @@ const VEHICLE_FORCE_BREAK_BEFORE_KEYS = new Set([
 export const Route = createFileRoute("/_authenticated/ny-annonse")({
   validateSearch: z
     .object({
-      type: z.enum(["sell"]).optional(),
+      type: z.enum(["sell", "free"]).optional(),
+      title: z.string().optional(),
     })
     .catch({}),
   head: () => ({
@@ -176,8 +177,14 @@ function NewListingPage() {
   const { data: isDemo = false } = useIsDemo();
   const turnstileEnabled = !!import.meta.env.VITE_TURNSTILE_SITE_KEY;
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  const { type: typeParam } = Route.useSearch();
+  const { type: typeParam, title: titleParam } = Route.useSearch();
   const listingType = typeParam ?? null;
+  // Set once from the initial search params (mirrors the useForm defaultValues
+  // pattern below — not kept in sync with titleParam afterwards): true when
+  // the wizard was entered via the intent+title landing screen, which is what
+  // lets us skip the forced category-select-as-step-1 in favor of the
+  // AI-suggestion-driven category-confirm step (see category-flows.ts).
+  const [skipCategoryStep] = useState(() => !!titleParam?.trim());
 
   const { data: categories } = useQuery({
     queryKey: ["categories", "with-parent"],
@@ -227,12 +234,12 @@ function NewListingPage() {
     resolver: zodResolver(listingSchema),
     mode: "onTouched",
     defaultValues: {
-      title: "",
+      title: titleParam ?? "",
       subtitle: "",
       description: "",
       category_id: "",
       condition: "good",
-      is_free: false,
+      is_free: typeParam === "free",
       can_ship: "pickup" as const,
       price_nok: "",
       postal_code: "",
@@ -304,9 +311,14 @@ function NewListingPage() {
   const activeModules = useMemo(
     () =>
       modulesForKeys(
-        effectiveFlowForCategory(categoryId || null, allFlows ?? [], categoriesById).modules,
+        effectiveFlowForCategory(
+          categoryId || null,
+          allFlows ?? [],
+          categoriesById,
+          skipCategoryStep,
+        ).modules,
       ),
-    [categoryId, allFlows, categoriesById],
+    [categoryId, allFlows, categoriesById, skipCategoryStep],
   );
 
   // Hoisted above its natural spot (near the other category-suggestion state)
@@ -348,8 +360,10 @@ function NewListingPage() {
   });
 
   const baseFieldGroupKeys = useMemo(
-    () => effectiveFlowForCategory(categoryId || null, allFlows ?? [], categoriesById).fieldGroups,
-    [categoryId, allFlows, categoriesById],
+    () =>
+      effectiveFlowForCategory(categoryId || null, allFlows ?? [], categoriesById, skipCategoryStep)
+        .fieldGroups,
+    [categoryId, allFlows, categoriesById, skipCategoryStep],
   );
 
   const vehicleAttributeHiddenKeys = [
@@ -385,16 +399,22 @@ function NewListingPage() {
   // Inject vehicle-confirm right after vehicle-registration once a lookup has
   // succeeded — it's never part of a category's stored field_groups (see
   // category-flows.ts), so it only ever appears in the live wizard state.
+  // Same for category-confirm right after photos, but only when the wizard
+  // was entered via the intent+title landing screen (skipCategoryStep) — the
+  // same condition that made effectiveFlowForCategory above omit
+  // category-select.
   const fieldGroupKeys = useMemo(() => {
-    if (!vehicleLookupResult) return baseFieldGroupKeys;
-    const idx = baseFieldGroupKeys.indexOf("vehicle-registration");
-    if (idx === -1) return baseFieldGroupKeys;
-    return [
-      ...baseFieldGroupKeys.slice(0, idx + 1),
-      "vehicle-confirm",
-      ...baseFieldGroupKeys.slice(idx + 1),
-    ];
-  }, [baseFieldGroupKeys, vehicleLookupResult]);
+    let keys = baseFieldGroupKeys;
+    if (skipCategoryStep) {
+      const photosIdx = keys.indexOf("photos");
+      const insertAt = photosIdx === -1 ? 0 : photosIdx + 1;
+      keys = [...keys.slice(0, insertAt), "category-confirm", ...keys.slice(insertAt)];
+    }
+    if (!vehicleLookupResult) return keys;
+    const idx = keys.indexOf("vehicle-registration");
+    if (idx === -1) return keys;
+    return [...keys.slice(0, idx + 1), "vehicle-confirm", ...keys.slice(idx + 1)];
+  }, [baseFieldGroupKeys, vehicleLookupResult, skipCategoryStep]);
 
   const pages: WizardPage[] = useMemo(
     () =>
@@ -582,8 +602,9 @@ function NewListingPage() {
   }, [user?.id]);
 
   const {
-    categorySuggestion,
-    setCategorySuggestion,
+    categorySuggestions,
+    categorySuggestionLoading,
+    setCategorySuggestions,
     setSuggestionDismissed,
     applyCategorySuggestion,
     similarListings,
@@ -601,6 +622,7 @@ function NewListingPage() {
     priceNok: typeof priceNok === "number" ? priceNok : undefined,
     isFree,
     attributes,
+    immediate: skipCategoryStep,
     setValue,
   });
 
@@ -949,7 +971,7 @@ function NewListingPage() {
     setCategoryTouchedManually(true);
     setSelectedParentId(parentId);
     setValue("category_id", id, { shouldValidate: true });
-    setCategorySuggestion(null);
+    setCategorySuggestions([]);
     if (via !== "wizard") return;
     if (currentPage?.groups?.some((g) => g.key === "category-select")) {
       goToNextPage();
@@ -998,8 +1020,8 @@ function NewListingPage() {
     applyCategorySelect(via, id, parentId);
   };
 
-  const applySuggestedCategory = () => {
-    applyCategorySuggestion();
+  const applySuggestedCategory = (id: string) => {
+    applyCategorySuggestion(id);
     if (currentPage?.groups?.some((group) => group.key === "category-select")) {
       goToNextPage();
     }
@@ -1022,6 +1044,7 @@ function NewListingPage() {
     isVehicle,
     behavior,
     showMileage,
+    lockedFree: typeParam ?? null,
 
     register,
     watch,
@@ -1050,11 +1073,12 @@ function NewListingPage() {
     setCategoryPickerOpen,
     onCategorySelect: (id, parentId) => requestCategorySelect("wizard", id, parentId),
     onCategoryDeselect: requestCategoryDeselect,
-    categorySuggestion,
+    categorySuggestions,
+    categorySuggestionLoading,
     categoryTouchedManually,
     applyCategorySuggestion: applySuggestedCategory,
     setSuggestionDismissed,
-    setCategorySuggestion,
+    setCategorySuggestions,
 
     attributes,
     onAttributesChange: setAttributes,

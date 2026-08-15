@@ -18,6 +18,15 @@ Kaupet består av:
 Native og web deler domene, ruter og hovedkomponenter. Plattformtilpasning
 skal ligge i tydelige presentasjonsgrenser, ikke i parallelle produktflyter.
 
+Eksterne tredjepartstjenester (kalt kun server-side, se § 3):
+
+- Vipps/MobilePay for betaling (promoteringer).
+- Cloudflare Turnstile for bot-beskyttelse ved annonsepublisering.
+- Statens Vegvesen (Datautlevering) for kjøretøyoppslag.
+- Hugging Face Inference Endpoints (NB-AI Lab Borealis) for AI-basert
+  kategoriforslag, som fallback når vote-basert forslag mangler treffsikker
+  historikk.
+
 ## 2. Avhengighetsretning
 
 Tillatt hovedretning:
@@ -169,3 +178,6 @@ Ikke opprett ADR for vanlig komponentarbeid eller små refaktoreringer.
 - Fungerer løsningen i web og Capacitor uten parallell forretningslogikk?
 - Har endringen minste relevante test på riktig nivå?
 - Er rollback mulig, og må migrasjon/appkode deployes i to steg?
+- Skjer nye eksterne API-kall kun server-side, med nøkler i secrets/Worker-
+  secrets — ikke i `VITE_*` eller committet i klartekst?
+- Introduserer endringen en ny ekstern avhengighet? Vurder en ADR (§ 10).

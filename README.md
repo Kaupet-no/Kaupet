@@ -66,7 +66,7 @@ VITE_SUPABASE_PROJECT_ID=...
 - [Supabase](https://supabase.com) — database, auth, storage
 - [Cloudflare Workers](https://www.cloudflare.com/products/workers/) for hosting
 - [Capacitor](https://capacitorjs.com) for native iOS og Android-app — se [README-CAPACITOR.md](README-CAPACITOR.md) for oppsett av native build
-- [NB-AI Lab Borealis](https://huggingface.co/collections/NbAiLab/borealis) — norsk språkmodell brukt til AI-basert kategoriforslag ved annonsering, som fallback når vote-basert forslag mangler treffsikker historikk
+- [NB-AI Lab Borealis](https://huggingface.co/collections/NbAiLab/borealis) — norsk språkmodell utviklet av Nasjonalbiblioteket. Denne benyttes for kategoriforslag ved opprettelse av annonser, som fallback når vote-basert forslag mangler treffsikker historikk.
 
 ## Bidra
 

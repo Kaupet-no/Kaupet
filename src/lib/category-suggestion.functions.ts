@@ -13,14 +13,18 @@ export const suggestCategoryForTitle = createServerFn({ method: "GET" })
       _title: data.title,
     });
     if (error) throw error;
-    if (!rows || rows.length === 0) return { suggestion: null };
 
-    const top = rows[0];
-    const totalVotes = rows.reduce((sum: number, r: { votes: number }) => sum + Number(r.votes), 0);
-    const share = Number(top.votes) / totalVotes;
+    const top = rows?.[0];
+    const totalVotes = (rows ?? []).reduce(
+      (sum: number, r: { votes: number }) => sum + Number(r.votes),
+      0,
+    );
+    const share = top ? Number(top.votes) / totalVotes : 0;
 
-    if (totalVotes < MIN_TOTAL_VOTES || share < MIN_SHARE) {
-      return { suggestion: null };
+    if (!top || totalVotes < MIN_TOTAL_VOTES || share < MIN_SHARE) {
+      const { suggestCategoryForTitleAi } = await import("@/lib/category-suggestion-ai.server");
+      const aiSuggestion = await suggestCategoryForTitleAi({ title: data.title }).catch(() => null);
+      return { suggestion: aiSuggestion };
     }
 
     return {

@@ -53,6 +53,12 @@ minst to reelle konsumenter trenger samme kontrakt.
   testet alternativ mekanisme.
 - Ikke logg fritekst, registreringsnummer, adresse, token eller andre
   personopplysninger i analyse eller generelle feillogger.
+- Kall mot eksterne tredjeparts-API-er (f.eks. Hugging Face Inference
+  Endpoints for AI-basert kategoriforslag i
+  `category-suggestion-ai.server.ts`) skjer kun fra `*.server.ts`-moduler,
+  aldri fra klientkode. Nøkler/endepunkt-URL-er lagres i sops-secrets
+  (`secrets/`) og som Cloudflare Worker-secrets, aldri i `VITE_*`-variabler
+  eller committet i klartekst.
 
 ## 4. Domenegrenser for annonser
 

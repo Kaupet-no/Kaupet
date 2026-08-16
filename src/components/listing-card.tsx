@@ -217,7 +217,7 @@ export function ListingCard({
           />
         </div>
         <div className="space-y-1 p-3">
-          <h3 className="line-clamp-2 text-sm font-medium leading-snug">{listing.title}</h3>
+          <h3 className="truncate text-sm font-medium leading-snug">{listing.title}</h3>
           {listing.subtitle && (
             <p className="line-clamp-1 text-xs text-muted-foreground">{listing.subtitle}</p>
           )}

@@ -9,6 +9,7 @@ import { ComposerErrorSummary } from "./composer-error-summary";
 
 export function ListingComposerShell({
   title,
+  onEditCategory,
   pageKey,
   pageTitle,
   native,
@@ -26,11 +27,16 @@ export function ListingComposerShell({
   contentClassName,
 }: {
   title: string;
+  /** When set, the title becomes clickable (web only) — used by the
+   * intent+title flow to let the user change a category they've already
+   * confirmed, via a confirmation dialog + the manual picker sheet, rather
+   * than through ordinary step navigation. */
+  onEditCategory?: () => void;
   pageKey: string;
   pageTitle: string;
   native: boolean;
   backLabel?: string;
-  onBack: () => void;
+  onBack?: () => void;
   onCancel: () => void;
   progress?: ReactNode;
   notice?: ReactNode;
@@ -108,7 +114,21 @@ export function ListingComposerShell({
       )}
     >
       <NativePageHeader title={title} backLabel={backLabel} onBack={onBack} hideBack={native} />
-      {!native && <h1 className="font-display text-3xl tracking-tight">{title}</h1>}
+      {!native && (
+        <h1 className="font-display text-3xl tracking-tight">
+          {onEditCategory ? (
+            <button
+              type="button"
+              onClick={onEditCategory}
+              className="text-left underline decoration-dotted underline-offset-4 hover:decoration-solid"
+            >
+              {title}
+            </button>
+          ) : (
+            title
+          )}
+        </h1>
+      )}
       {notice}
 
       {(progress || status) && (
@@ -160,9 +180,12 @@ export function ListingComposerShell({
               type="button"
               variant="ghost"
               onClick={onBack}
-              className={cn("min-h-12 justify-self-start px-2", firstStep && "invisible")}
-              aria-hidden={firstStep || undefined}
-              tabIndex={firstStep ? -1 : undefined}
+              className={cn(
+                "min-h-12 justify-self-start px-2",
+                (firstStep || !onBack) && "invisible",
+              )}
+              aria-hidden={firstStep || !onBack || undefined}
+              tabIndex={firstStep || !onBack ? -1 : undefined}
             >
               <ChevronLeft className="size-5" aria-hidden />
               Forrige

@@ -59,10 +59,11 @@ export function CategoryConfirm({
   // Captured before applyCategorySuggestion clears categorySuggestions (it's
   // shared state also used to dismiss the category-select suggestion chip) —
   // without this, confirming would clear categorySuggestions and fall
-  // straight back into the "no suggestion" branch below, i.e. dump the user
-  // on the manual picker right after they confirmed. Once set, this step is
-  // done; the wizard's own "Neste" button (unaffected by this field group)
-  // takes the user forward.
+  // straight back into the "no suggestion" branch below, i.e. flash the
+  // manual picker for a tick before the wizard navigates away. Selecting a
+  // category here removes this step from the wizard entirely (see
+  // categoryConfirmed in ny-annonse.tsx), advancing automatically — this is
+  // purely a one-render safety net for that transition, not a resting state.
   const [confirmedName, setConfirmedName] = useState<string | null>(null);
   const isWaitingForSuggestion =
     !confirmedName && !showPicker && categorySuggestionLoading && categorySuggestions.length === 0;
@@ -104,7 +105,6 @@ export function CategoryConfirm({
           Denne annonsen blir opprettet i kategori{" "}
           <span className="text-primary">{confirmedName}</span>.
         </p>
-        <p className="text-sm text-muted-foreground">Trykk «Neste» for å fortsette.</p>
       </section>
     );
   }

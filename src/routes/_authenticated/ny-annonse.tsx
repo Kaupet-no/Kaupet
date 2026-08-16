@@ -185,6 +185,16 @@ function NewListingPage() {
   // lets us skip the forced category-select-as-step-1 in favor of the
   // AI-suggestion-driven category-confirm step (see category-flows.ts).
   const [skipCategoryStep] = useState(() => !!titleParam?.trim());
+  // True once the user has confirmed a category on the category-confirm step
+  // (suggestion click or manual pick) — removes "category-confirm" from
+  // fieldGroupKeys below for the rest of the session, so the page it occupied
+  // simply disappears: "Neste" from photos never lands on it again, and
+  // "Tilbake" from the page after it goes straight to photos. Never reset to
+  // false — the title-click "Endre kategori" flow (see categoryEditConfirmOpen)
+  // reopens the category picker sheet directly rather than this step.
+  const [categoryConfirmed, setCategoryConfirmed] = useState(false);
+  const [categoryEditConfirmOpen, setCategoryEditConfirmOpen] = useState(false);
+  const [editingCategoryViaTitle, setEditingCategoryViaTitle] = useState(false);
 
   const { data: categories } = useQuery({
     queryKey: ["categories", "with-parent"],
@@ -282,6 +292,8 @@ function NewListingPage() {
       "maintenance_history",
     ],
   });
+
+  const categoryName = categoryId ? categoriesById.get(categoryId)?.name_nb : undefined;
 
   const missingFilters = useMemo(
     () =>
@@ -405,7 +417,7 @@ function NewListingPage() {
   // category-select.
   const fieldGroupKeys = useMemo(() => {
     let keys = baseFieldGroupKeys;
-    if (skipCategoryStep) {
+    if (skipCategoryStep && !categoryConfirmed) {
       const photosIdx = keys.indexOf("photos");
       const insertAt = photosIdx === -1 ? 0 : photosIdx + 1;
       keys = [...keys.slice(0, insertAt), "category-confirm", ...keys.slice(insertAt)];
@@ -414,7 +426,7 @@ function NewListingPage() {
     const idx = keys.indexOf("vehicle-registration");
     if (idx === -1) return keys;
     return [...keys.slice(0, idx + 1), "vehicle-confirm", ...keys.slice(idx + 1)];
-  }, [baseFieldGroupKeys, vehicleLookupResult, skipCategoryStep]);
+  }, [baseFieldGroupKeys, vehicleLookupResult, skipCategoryStep, categoryConfirmed]);
 
   const pages: WizardPage[] = useMemo(
     () =>
@@ -458,6 +470,12 @@ function NewListingPage() {
   }, [currentStepKey, step]);
 
   function goBack() {
+    // Mirrors the hidden Tilbake/Forrige buttons on category-confirm — this
+    // is the single function behind the footer button, the shell's header
+    // arrow, the native swipe deck, AND the browser/hardware back button (via
+    // useComposerHistoryBack below), so guarding it here is what keeps all
+    // four consistent instead of just the visible buttons.
+    if (currentPage?.groups?.some((g) => g.key === "category-confirm")) return;
     returnToReviewRef.current = false;
     reviewSectionLastStepRef.current = null;
     trackProductEvent("listing_creation_step_completed", {
@@ -975,6 +993,8 @@ function NewListingPage() {
     if (via !== "wizard") return;
     if (currentPage?.groups?.some((g) => g.key === "category-select")) {
       goToNextPage();
+    } else if (currentPage?.groups?.some((g) => g.key === "category-confirm")) {
+      setCategoryConfirmed(true);
     } else if (
       currentPage?.groups?.some((g) => g.key === "vehicle-registration") &&
       id !== bilOgMcCategoryId
@@ -1024,6 +1044,8 @@ function NewListingPage() {
     applyCategorySuggestion(id);
     if (currentPage?.groups?.some((group) => group.key === "category-select")) {
       goToNextPage();
+    } else if (currentPage?.groups?.some((group) => group.key === "category-confirm")) {
+      setCategoryConfirmed(true);
     }
   };
 
@@ -1147,6 +1169,10 @@ function NewListingPage() {
   const isNativeDescriptionSoloPage =
     native && groups.length === 1 && groups[0].key === "description-keywords";
   const isVehicleConfirmPage = groups.length === 1 && groups[0].key === "vehicle-confirm";
+  // Category selection (suggestion click or manual pick) auto-advances the
+  // wizard on this step — see applyCategorySelect/applySuggestedCategory —
+  // so no separate Next/Back controls are needed or wanted here.
+  const isCategoryConfirmPage = groups.length === 1 && groups[0].key === "category-confirm";
   const nextGroups = pages[step]?.groups ?? [];
   function handleInvalidSubmit(fields: FieldErrors<ListingForm>) {
     const firstField = Object.keys(fields)[0] as keyof ListingForm | undefined;
@@ -1196,13 +1222,13 @@ function NewListingPage() {
   );
   const composerFooter = (
     <>
-      {!native && !isFirst && (
+      {!native && !isFirst && !isCategoryConfirmPage && (
         <Button type="button" variant="ghost" onClick={goBack}>
           <ChevronLeft className="size-4" aria-hidden /> Tilbake
         </Button>
       )}
-      {isVehicleConfirmPage ? (
-        <div ref={setVehicleConfirmFooterSlot} className="contents" />
+      {isVehicleConfirmPage || isCategoryConfirmPage ? (
+        isVehicleConfirmPage && <div ref={setVehicleConfirmFooterSlot} className="contents" />
       ) : !isLast ? (
         <Button
           type="button"
@@ -1238,12 +1264,23 @@ function NewListingPage() {
     <>
       <form onSubmit={submitComposer}>
         <ListingComposerShell
-          title="Ny annonse"
+          title={
+            skipCategoryStep && categoryConfirmed && categoryName
+              ? `Ny annonse i kategori ${categoryName}`
+              : "Ny annonse"
+          }
+          onEditCategory={
+            skipCategoryStep && categoryConfirmed && categoryId
+              ? () => setCategoryEditConfirmOpen(true)
+              : undefined
+          }
           pageKey={currentStepKey}
           pageTitle={pageLabel(groups, native)}
           native={native}
           backLabel={isFirst ? "Avbryt" : "Tilbake"}
-          onBack={isFirst ? () => void navigate({ to: "/" }) : goBack}
+          onBack={
+            isFirst ? () => void navigate({ to: "/" }) : isCategoryConfirmPage ? undefined : goBack
+          }
           onCancel={() => void navigate({ to: "/" })}
           notice={
             hasDraftData ? (
@@ -1288,7 +1325,10 @@ function NewListingPage() {
           firstStep={isFirst}
         >
           {native ? (
-            <NativeComposerDeck onBack={isFirst ? undefined : goBack} onForward={attemptNextPage}>
+            <NativeComposerDeck
+              onBack={isFirst || isCategoryConfirmPage ? undefined : goBack}
+              onForward={attemptNextPage}
+            >
               <div
                 data-testid={groups[0] ? `wizard-step-${groups[0].key}` : undefined}
                 className={isNativeDescriptionSoloPage ? "flex flex-col" : "space-y-6"}
@@ -1354,8 +1394,53 @@ function NewListingPage() {
         onOpenChange={setCategoryPickerOpen}
         categories={pickableCategories}
         selectedId={categoryId}
-        onSelect={(id, parentId) => requestCategorySelect("sheet", id, parentId)}
+        onSelect={(id, parentId) => {
+          if (editingCategoryViaTitle) {
+            // Already confirmed via categoryEditConfirmOpen below — apply
+            // directly instead of routing through requestCategorySelect's own
+            // (attribute-count-gated) confirm dialog, which would otherwise
+            // double-prompt the user for the same change. Still discards
+            // category-specific attributes on the way, same as
+            // confirmPendingCategoryChange does for the ordinary mid-flow
+            // category switch — they belonged to the old category and may
+            // not even apply as fields under the new one.
+            setEditingCategoryViaTitle(false);
+            setAttributes({});
+            setAttributesTouched(false);
+            applyCategorySelect("sheet", id, parentId);
+            return;
+          }
+          requestCategorySelect("sheet", id, parentId);
+        }}
       />
+
+      {/* "Endre kategori" via siden tittelen (kun for intent+title-flyten,
+          etter at kategorien er bekreftet) — bekreft først, åpne så den
+          vanlige manuelle kategori-sheeten over. */}
+      <AlertDialog open={categoryEditConfirmOpen} onOpenChange={setCategoryEditConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Bytte kategori?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Informasjonen du har fylt ut i annonsen kan gå tapt hvis du bytter kategori. Er du
+              sikker?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                setCategoryEditConfirmOpen(false);
+                setEditingCategoryViaTitle(true);
+                setCategoryPickerOpen(true);
+              }}
+            >
+              Ja, bytt kategori
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Confirm discarding category-specific data on mid-flow category change */}
       <AlertDialog

@@ -1,7 +1,18 @@
-import { ArrowUpDown, Expand, LayoutList, LayoutGrid, Map as MapIcon, SearchX } from "lucide-react";
+import {
+  ArrowUpDown,
+  Expand,
+  LayoutList,
+  LayoutGrid,
+  Rows3,
+  Image,
+  Map as MapIcon,
+  SearchX,
+} from "lucide-react";
 import { lazy, type ReactNode, Suspense, useEffect, useRef, useState } from "react";
 
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
+import { ListingCardExpanded } from "@/components/listing-card-expanded";
+import { ListingCardImages } from "@/components/listing-card-images";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -117,13 +128,32 @@ export function ResultList({
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
-  const [viewMode, setViewMode] = useState<"grid" | "list">(() => {
+  const [viewMode, setViewMode] = useState<"grid" | "list" | "card" | "images">(() => {
     try {
-      return (localStorage.getItem("kaupet_view_mode") as "grid" | "list") ?? "grid";
+      return (
+        (localStorage.getItem("kaupet_view_mode") as "grid" | "list" | "card" | "images") ?? "grid"
+      );
     } catch {
       return "grid";
     }
   });
+  const changeViewMode = (next: "grid" | "list" | "card" | "images") => {
+    void hapticImpact("light");
+    setViewMode(next);
+    try {
+      localStorage.setItem("kaupet_view_mode", next);
+    } catch {
+      /* ignore */
+    }
+  };
+  const [viewModeOpen, setViewModeOpen] = useState(false);
+  const VIEW_MODE_META = {
+    grid: { icon: LayoutGrid, label: "Fliser" },
+    list: { icon: LayoutList, label: "Liste" },
+    card: { icon: Rows3, label: "Kort" },
+    images: { icon: Image, label: "Bilder" },
+  } as const;
+  const { icon: ViewModeIcon, label: viewModeLabel } = VIEW_MODE_META[viewMode];
   const signedImageUrls = useListingCardImages(cards);
   const { favoriteIds, isReady: favoriteStateReady } = useListingFavorites(
     cards.map((card) => card.id),
@@ -188,33 +218,35 @@ export function ResultList({
               ? "Søker…"
               : `${(totalCount ?? cards.length).toLocaleString("nb-NO")} annonse${(totalCount ?? cards.length) === 1 ? "" : "r"}`}
           </span>
-          {isNative && (
-            <button
-              type="button"
-              onClick={() => {
-                void hapticImpact("light");
-                const next = viewMode === "grid" ? "list" : "grid";
-                setViewMode(next);
-                try {
-                  localStorage.setItem("kaupet_view_mode", next);
-                } catch {
-                  /* ignore */
-                }
-              }}
-              className="rounded-lg border border-border bg-card p-1.5 text-muted-foreground hover:text-foreground"
-              aria-label={
-                viewMode === "grid" ? "Bytt til listevisning" : "Bytt til rutenettvisning"
-              }
-            >
-              {viewMode === "grid" ? (
-                <LayoutList className="size-4" />
-              ) : (
-                <LayoutGrid className="size-4" />
-              )}
-            </button>
-          )}
         </div>
         <div className="flex items-center gap-2">
+          <Popover open={viewModeOpen} onOpenChange={setViewModeOpen}>
+            <PopoverTrigger asChild>
+              <Button type="button" variant="outline" size="sm" className="gap-1.5">
+                <ViewModeIcon className="size-4" /> {viewModeLabel}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-40 p-1">
+              {(Object.keys(VIEW_MODE_META) as Array<keyof typeof VIEW_MODE_META>).map((mode) => {
+                const { icon: Icon, label } = VIEW_MODE_META[mode];
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => {
+                      changeViewMode(mode);
+                      setViewModeOpen(false);
+                    }}
+                    className={`flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-muted ${
+                      viewMode === mode ? "bg-muted font-medium" : ""
+                    }`}
+                  >
+                    <Icon className="size-4" /> {label}
+                  </button>
+                );
+              })}
+            </PopoverContent>
+          </Popover>
           <Popover open={sortOpen} onOpenChange={setSortOpen}>
             <PopoverTrigger asChild>
               <Button type="button" variant="outline" size="sm" className="gap-1.5">
@@ -342,24 +374,44 @@ export function ResultList({
           ) : (
             <div
               className={
-                isNative && viewMode === "list"
+                viewMode === "list" || viewMode === "card" || viewMode === "images"
                   ? "flex flex-col gap-3"
                   : `grid grid-cols-2 gap-4 sm:grid-cols-3 ${isDesktop && !desktopMapVisible ? "lg:grid-cols-4" : ""}`
               }
             >
-              {cards.map((l) => (
-                <ListingCard
-                  key={l.id}
-                  listing={l}
-                  highlighted={hoveredId === l.id || activeId === l.id}
-                  onHoverChange={setHoveredId}
-                  compact={isNative && viewMode === "list"}
-                  linkState={{ fromSearch: true }}
-                  signedImageUrl={signedImageUrls[l.id] ?? null}
-                  knownFavorite={favoriteIds.has(l.id)}
-                  favoriteStateReady={favoriteStateReady}
-                />
-              ))}
+              {cards.map((l) =>
+                viewMode === "card" ? (
+                  <ListingCardExpanded
+                    key={l.id}
+                    listing={l}
+                    linkState={{ fromSearch: true }}
+                    coverImageUrl={signedImageUrls[l.id] ?? null}
+                    knownFavorite={favoriteIds.has(l.id)}
+                    favoriteStateReady={favoriteStateReady}
+                  />
+                ) : viewMode === "images" ? (
+                  <ListingCardImages
+                    key={l.id}
+                    listing={l}
+                    linkState={{ fromSearch: true }}
+                    coverImageUrl={signedImageUrls[l.id] ?? null}
+                    knownFavorite={favoriteIds.has(l.id)}
+                    favoriteStateReady={favoriteStateReady}
+                  />
+                ) : (
+                  <ListingCard
+                    key={l.id}
+                    listing={l}
+                    highlighted={hoveredId === l.id || activeId === l.id}
+                    onHoverChange={setHoveredId}
+                    compact={viewMode === "list"}
+                    linkState={{ fromSearch: true }}
+                    signedImageUrl={signedImageUrls[l.id] ?? null}
+                    knownFavorite={favoriteIds.has(l.id)}
+                    favoriteStateReady={favoriteStateReady}
+                  />
+                ),
+              )}
             </div>
           )}
           {/* Infinite scroll sentinel — same pattern on web and native. */}

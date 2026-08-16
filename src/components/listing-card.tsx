@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Eye, Gauge, ImageOff, MapPin } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { signListingImageUrls, thumbPathFor } from "@/lib/storage";
 import { formatPrice } from "@/lib/format";
 import { computeListingTotalPriceKr } from "@/lib/vehicle/vehicle-classification";
@@ -28,7 +28,7 @@ export type ListingCardData = {
 
 /** Vehicle listing cards show the price including omregistreringsavgift —
  * same total as the listing detail page — not just what the seller set. */
-function displayPriceNok(listing: ListingCardData): number | null {
+export function displayPriceNok(listing: ListingCardData): number | null {
   return (
     computeListingTotalPriceKr(listing.category_slug, listing.price_nok, listing.attributes) ??
     listing.price_nok
@@ -37,7 +37,7 @@ function displayPriceNok(listing: ListingCardData): number | null {
 
 /** Usage metric under the title: kilometers for vehicles, engine hours for
  * boats — whichever the listing's attributes carry. */
-function UsageLabel({
+export function UsageLabel({
   value,
   unit,
   className,
@@ -116,6 +116,12 @@ export function ListingCard({
   const isNative = useIsNative();
   const [imgUrl, setImgUrl] = useState<string | null>(null);
   const priceLabel = formatPrice({ price_nok: displayPriceNok(listing), is_free: listing.is_free });
+  const supportsHover = useRef(true);
+  const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    supportsHover.current = window.matchMedia?.("(hover: hover)").matches ?? true;
+  }, []);
 
   useEffect(() => {
     if (signedImageUrl !== undefined) return;
@@ -151,7 +157,14 @@ export function ListingCard({
 
   if (compact) {
     return (
-      <article className={`${cardClass} flex items-center`}>
+      <article
+        className={`${cardClass} flex items-center`}
+        onMouseMove={(e) => {
+          if (!supportsHover.current || !effectiveImageUrl) return;
+          setHoverPos({ x: e.clientX, y: e.clientY });
+        }}
+        onMouseLeave={() => setHoverPos(null)}
+      >
         <Link
           to="/$kaupetCode"
           params={{ kaupetCode: listing.kaupet_code }}
@@ -192,6 +205,18 @@ export function ListingCard({
           knownFavorite={knownFavorite}
           favoriteStateReady={favoriteStateReady}
         />
+        {/* Flyover-forhåndsvisning som følger musepekeren — kun desktop-hover, ikke i selve thumbnail-boksen. */}
+        {hoverPos && effectiveImageUrl && (
+          <div
+            className="pointer-events-none fixed z-50 size-64 overflow-hidden rounded-lg border border-border bg-muted shadow-xl"
+            style={{
+              left: Math.min(hoverPos.x + 20, window.innerWidth - 256 - 12),
+              top: Math.min(hoverPos.y + 20, window.innerHeight - 256 - 12),
+            }}
+          >
+            <img src={effectiveImageUrl} alt="" className="size-full object-cover" />
+          </div>
+        )}
       </article>
     );
   }

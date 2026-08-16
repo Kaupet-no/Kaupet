@@ -60,6 +60,8 @@ export function ImageGallery({
   onImageClick,
   overlaySlot,
   vehicle360,
+  showThumbnails = true,
+  fit = "contain",
 }: {
   images: ListingImage[];
   imgUrls: Record<string, string>;
@@ -76,6 +78,15 @@ export function ImageGallery({
    * de vanlige bildenes indekser én opp (`activeImage`/`onSelect` regner i
    * dette kombinerte indeksrommet). */
   vehicle360?: { frames: Vehicle360Frame[]; imgUrls: Record<string, string> };
+  /** Slått av i trange kontekster (f.eks. søkeresultat-kort) — piltastene og
+   * karusellpilene er nok til å bla, thumbnail-raden tar mye vertikal plass. */
+  showThumbnails?: boolean;
+  /** "contain" (standard, detaljsiden) viser hele bildet med en blurret
+   * letterbox-bakgrunn der proporsjonen ikke fyller 4:3-boksen. "cover"
+   * beskjærer i stedet bildet til å fylle boksen helt — for kompakte
+   * bla-gjennom-kort (f.eks. Bilder-visningen) der en tekst-overlay ligger
+   * oppå bildet og letterbox-stripene ville brutt opp den flaten. */
+  fit?: "contain" | "cover";
 }) {
   const isNative = useIsNative();
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
@@ -124,7 +135,7 @@ export function ImageGallery({
   }, [carouselApi, totalSlides]);
 
   const thumbnailStrip =
-    totalSlides > 1 ? (
+    showThumbnails && totalSlides > 1 ? (
       <ScrollArrowRow className="mt-10">
         {has360 && (
           <button
@@ -197,7 +208,7 @@ export function ImageGallery({
                 return (
                   <CarouselItem key={img.storage_path} className="pl-0">
                     <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-border bg-muted">
-                      <BlurredBackdrop src={imgUrls[img.storage_path]} />
+                      {fit === "contain" && <BlurredBackdrop src={imgUrls[img.storage_path]} />}
                       {onImageClick ? (
                         <button
                           type="button"
@@ -208,14 +219,14 @@ export function ImageGallery({
                           <img
                             src={imgUrls[img.storage_path]}
                             alt={i === 0 && !has360 ? title : `${title} – bilde ${i + 1}`}
-                            className="relative size-full object-contain"
+                            className={`relative size-full ${fit === "cover" ? "object-cover" : "object-contain"}`}
                           />
                         </button>
                       ) : (
                         <img
                           src={imgUrls[img.storage_path]}
                           alt={i === 0 && !has360 ? title : `${title} – bilde ${i + 1}`}
-                          className="relative size-full object-contain"
+                          className={`relative size-full ${fit === "cover" ? "object-cover" : "object-contain"}`}
                         />
                       )}
                       <ImageCaption caption={img.caption} />

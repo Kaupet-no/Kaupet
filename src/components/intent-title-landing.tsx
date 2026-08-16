@@ -41,12 +41,12 @@ export function IntentTitleLanding({ onNavigate }: { onNavigate?: () => void }) 
       setError(`Tittelen må være minst ${minTitleLength(intent)} tegn`);
       return;
     }
+    // Kicks off the (cold-start-prone) AI category call now rather than
+    // waiting for the wizard route to mount — see prefetchCategorySuggestion.
+    prefetchCategorySuggestion(trimmed);
     if (intent === "buy") {
       void navigate({ to: "/ny-ok-annonse", search: { title: trimmed } });
     } else {
-      // Kicks off the (cold-start-prone) AI category call now rather than
-      // waiting for /ny-annonse to mount — see prefetchCategorySuggestion.
-      prefetchCategorySuggestion(trimmed);
       void navigate({ to: "/ny-annonse", search: { type: intent, title: trimmed } });
     }
     onNavigate?.();

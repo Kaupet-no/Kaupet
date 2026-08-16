@@ -11,7 +11,8 @@ import { AlertCircle, ChevronLeft, ChevronRight, Loader2, Check, Bell } from "lu
 
 import { supabase } from "@/integrations/supabase/client";
 import { createWtbListing } from "@/lib/wtb-listings.functions";
-import { suggestCategoryForTitle } from "@/lib/category-suggestion.functions";
+import { prefetchCategorySuggestion } from "@/lib/category-suggestion.functions";
+import { useCategorySuggestionLoadingMessage } from "@/features/listing-creation/use-category-suggestion-loading-message";
 import { CategoryPicker } from "@/components/category-picker";
 import { useAllCategoryFilters } from "@/components/attribute-fields";
 import { WtbCriteriaFields } from "@/features/wtb/wtb-criteria-fields";
@@ -151,9 +152,16 @@ function NewWtbPage() {
   // (and, on native, "title") step in favor of a category-confirm step after
   // "details", mirroring the same pattern in ny-annonse.tsx.
   const [skipCategoryStep] = useState(() => !!titleParam?.trim());
+  // True once the user has resolved the category-confirm step (suggestion
+  // click, manual pick, or "fortsett uten kategori") — removes
+  // "category-confirm" from `steps` for the rest of the session, mirroring
+  // ny-annonse.tsx's categoryConfirmed: the page it occupied just disappears,
+  // so "Neste" never lands on it twice and "Tilbake" from "review" goes
+  // straight to "details" instead of back into it.
+  const [categoryConfirmed, setCategoryConfirmed] = useState(false);
   const steps = useMemo(() => {
     const base = native ? NATIVE_STEPS : WEB_STEPS;
-    if (!skipCategoryStep) return base;
+    if (!skipCategoryStep || categoryConfirmed) return base;
     const withoutCategory = base.filter((s) => s !== "category" && s !== "title");
     const detailsIdx = withoutCategory.indexOf("details");
     const insertAt = detailsIdx === -1 ? withoutCategory.length : detailsIdx + 1;
@@ -162,7 +170,7 @@ function NewWtbPage() {
       "category-confirm" as const,
       ...withoutCategory.slice(insertAt),
     ];
-  }, [native, skipCategoryStep]);
+  }, [native, skipCategoryStep, categoryConfirmed]);
   const navigate = useNavigate();
   const [stepIndex, setStepIndex] = useState(0);
   const [notifyOnMatch, setNotifyOnMatch] = useState(false);
@@ -181,6 +189,9 @@ function NewWtbPage() {
   const [categorySuggestionLoading, setCategorySuggestionLoading] = useState(false);
   const [categoryConfirmShowPicker, setCategoryConfirmShowPicker] = useState(false);
   const suggestionFiredImmediatelyRef = useRef(false);
+  const categoryLoadingMessage = useCategorySuggestionLoadingMessage(
+    !categoryConfirmShowPicker && categorySuggestionLoading && categorySuggestions.length === 0,
+  );
 
   const step = steps[stepIndex];
 
@@ -309,7 +320,7 @@ function NewWtbPage() {
     setCategorySuggestionLoading(true);
     const timeout = window.setTimeout(
       () => {
-        void suggestCategoryForTitle({ data: { title: title.trim() } })
+        void prefetchCategorySuggestion(title.trim())
           .then((result) => setCategorySuggestions(result.suggestions))
           .catch(() => setCategorySuggestions([]))
           .finally(() => setCategorySuggestionLoading(false));
@@ -407,6 +418,11 @@ function NewWtbPage() {
     }
   }
   function goBack() {
+    // Mirrors the hidden Tilbake/Neste on category-confirm — single function
+    // behind the footer button, the shell's header arrow, the native swipe
+    // deck, AND the browser/hardware back button (useComposerHistoryBack
+    // below), so guarding here keeps all four consistent at once.
+    if (step === "category-confirm") return;
     returnToReviewRef.current = false;
     setValidationError(null);
     trackProductEvent("listing_creation_step_completed", {
@@ -485,14 +501,15 @@ function NewWtbPage() {
     );
   }
 
+  const isCategoryConfirmStep = step === "category-confirm";
   const footer = (
     <>
-      {!native && stepIndex > 0 && (
+      {!native && stepIndex > 0 && !isCategoryConfirmStep && (
         <Button type="button" variant="ghost" onClick={goBack}>
           <ChevronLeft className="size-4" aria-hidden /> Tilbake
         </Button>
       )}
-      {step !== "review" ? (
+      {isCategoryConfirmStep ? null : step !== "review" ? (
         <Button
           type="button"
           onClick={() => void attemptNext()}
@@ -547,7 +564,13 @@ function NewWtbPage() {
         pageTitle={STEP_META[step].title}
         native={native}
         backLabel={stepIndex === 0 ? "Avbryt" : "Tilbake"}
-        onBack={stepIndex === 0 ? () => void navigate({ to: "/" }) : goBack}
+        onBack={
+          stepIndex === 0
+            ? () => void navigate({ to: "/" })
+            : isCategoryConfirmStep
+              ? undefined
+              : goBack
+        }
         onCancel={() => void navigate({ to: "/" })}
         notice={
           restorableDraft ? (
@@ -603,7 +626,7 @@ function NewWtbPage() {
       >
         <NativeComposerDeck
           enabled={native}
-          onBack={stepIndex === 0 ? undefined : goBack}
+          onBack={stepIndex === 0 || isCategoryConfirmStep ? undefined : goBack}
           onForward={attemptNext}
         >
           <p className="text-sm text-muted-foreground">{STEP_META[step].help}</p>
@@ -687,7 +710,7 @@ function NewWtbPage() {
                     selectedId={categoryId ?? ""}
                     onSelect={(id) => {
                       setValue("category_id", id, { shouldValidate: true });
-                      goNext();
+                      setCategoryConfirmed(true);
                     }}
                   />
                   <Button
@@ -695,7 +718,7 @@ function NewWtbPage() {
                     size="sm"
                     variant="ghost"
                     className="min-h-12"
-                    onClick={goNext}
+                    onClick={() => setCategoryConfirmed(true)}
                   >
                     Jeg er usikker – fortsett uten kategori
                   </Button>
@@ -703,7 +726,7 @@ function NewWtbPage() {
               ) : categorySuggestionLoading || categorySuggestions.length === 0 ? (
                 <div className="space-y-4 py-6 text-center">
                   <div className="mx-auto h-6 w-2/3 animate-pulse rounded bg-muted" />
-                  <p className="text-sm text-muted-foreground">Gi oss et lite øyeblikk…</p>
+                  <p className="text-sm text-muted-foreground">{categoryLoadingMessage}</p>
                 </div>
               ) : (
                 <div className="space-y-4 py-4 text-center">
@@ -720,7 +743,7 @@ function NewWtbPage() {
                         onClick={() => {
                           setValue("category_id", s.category_id, { shouldValidate: true });
                           setCategorySuggestions([]);
-                          goNext();
+                          setCategoryConfirmed(true);
                         }}
                       >
                         {s.name_nb}

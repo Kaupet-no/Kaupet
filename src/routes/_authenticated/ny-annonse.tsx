@@ -47,6 +47,7 @@ import type { VehicleLeafSlug } from "@/lib/vehicle/vehicle-classification";
 import { useIsDemo } from "@/hooks/use-is-demo";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
+import { DiscardListingDialog } from "@/features/listing-creation/discard-listing-dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1546,78 +1547,56 @@ function NewListingPage() {
         <PreviewDraftView draft={previewDraft} onClose={() => setPreviewOpen(false)} />
       )}
 
-      <AlertDialog
-        open={blocker.status === "blocked"}
-        onOpenChange={(open) => {
-          if (!open) blocker.reset?.();
-        }}
-      >
-        <AlertDialogContent onClickOutside={() => blocker.reset?.()}>
-          {previewOpen ? (
-            <>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Annonsen er ikke publisert ennå</AlertDialogTitle>
-                <AlertDialogDescription>Er du sikker på at du vil avslutte?</AlertDialogDescription>
-              </AlertDialogHeader>
-              <div className="flex flex-col gap-3 px-6 pb-6 pt-2">
-                <AlertDialogAction
-                  className="h-14 w-full bg-secondary text-destructive hover:bg-secondary/80"
-                  onClick={() => {
-                    setPreviewOpen(false);
-                    blocker.proceed?.();
-                  }}
-                >
-                  Avslutt uten å publisere
-                </AlertDialogAction>
-                <AlertDialogCancel
-                  className="h-14 w-full border-0 bg-secondary text-secondary-foreground hover:bg-secondary/80 !mt-0"
-                  onClick={() => blocker.reset?.()}
-                >
-                  Fortsett forhåndsvisning
-                </AlertDialogCancel>
-              </div>
-            </>
-          ) : (
-            <>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Avbryte annonsen?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Vil du lagre annonsen som kladd og fortsette senere, eller forkaste den?
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <div className="flex flex-col gap-3 px-6 pb-6 pt-2">
-                <AlertDialogAction
-                  className="h-14 w-full bg-secondary text-destructive hover:bg-secondary/80"
-                  onClick={() => {
-                    clearDraftStorage();
-                    blocker.proceed?.();
-                  }}
-                >
-                  Forkast annonse
-                </AlertDialogAction>
-                <AlertDialogAction
-                  className="h-14 w-full bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                  disabled={isSavingDraft}
-                  onClick={async () => {
-                    setIsSavingDraft(true);
-                    await saveDraftToSupabase();
-                    setIsSavingDraft(false);
-                    blocker.proceed?.();
-                  }}
-                >
-                  {isSavingDraft ? "Lagrer…" : "Lagre som kladd"}
-                </AlertDialogAction>
-                <AlertDialogCancel
-                  className="h-14 w-full border-0 bg-secondary text-secondary-foreground hover:bg-secondary/80 !mt-0"
-                  onClick={() => blocker.reset?.()}
-                >
-                  Fortsett å redigere
-                </AlertDialogCancel>
-              </div>
-            </>
-          )}
-        </AlertDialogContent>
-      </AlertDialog>
+      {previewOpen ? (
+        <AlertDialog
+          open={blocker.status === "blocked"}
+          onOpenChange={(open) => {
+            if (!open) blocker.reset?.();
+          }}
+        >
+          <AlertDialogContent onClickOutside={() => blocker.reset?.()}>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Annonsen er ikke publisert ennå</AlertDialogTitle>
+              <AlertDialogDescription>Er du sikker på at du vil avslutte?</AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="flex flex-col gap-3 px-6 pb-6 pt-2">
+              <AlertDialogAction
+                className="h-14 w-full bg-secondary text-destructive hover:bg-secondary/80"
+                onClick={() => {
+                  setPreviewOpen(false);
+                  blocker.proceed?.();
+                }}
+              >
+                Avslutt uten å publisere
+              </AlertDialogAction>
+              <AlertDialogCancel
+                className="h-14 w-full border-0 bg-secondary text-secondary-foreground hover:bg-secondary/80 !mt-0"
+                onClick={() => blocker.reset?.()}
+              >
+                Fortsett forhåndsvisning
+              </AlertDialogCancel>
+            </div>
+          </AlertDialogContent>
+        </AlertDialog>
+      ) : (
+        <DiscardListingDialog
+          open={blocker.status === "blocked"}
+          onReset={() => blocker.reset?.()}
+          onDiscard={() => {
+            clearDraftStorage();
+            blocker.proceed?.();
+          }}
+          onSaveDraft={async () => {
+            setIsSavingDraft(true);
+            const id = await saveDraftToSupabase();
+            setIsSavingDraft(false);
+            if (!id) return false;
+            blocker.proceed?.();
+            return true;
+          }}
+          isSavingDraft={isSavingDraft}
+        />
+      )}
 
       {publishedId && (
         <PublishedListingDialog

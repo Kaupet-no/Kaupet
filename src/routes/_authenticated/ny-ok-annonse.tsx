@@ -38,16 +38,7 @@ import {
 } from "@/features/listing-creation/composer-navigation";
 import { NativeComposerDeck } from "@/features/listing-creation/native-composer-deck";
 import { useWtbDraftAutosave } from "@/features/wtb/use-wtb-draft-autosave";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { DiscardListingDialog } from "@/features/listing-creation/discard-listing-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 
 const wtbSchema = z.object({
@@ -807,24 +798,6 @@ function NewWtbPage() {
                 onCheckedKeysChange={setCheckedKeys}
                 native={native}
               />
-              <div className="space-y-2 pt-4">
-                <Label htmlFor="wtb-freetext">
-                  Fritekstsøk <span className="font-normal text-muted-foreground">(valgfritt)</span>
-                </Label>
-                <Input
-                  id="wtb-freetext"
-                  placeholder="Utstyrskode eller annen relevant informasjon"
-                  value={typeof attributes.__freetext === "string" ? attributes.__freetext : ""}
-                  onChange={(e) =>
-                    setAttributes((prev) => {
-                      const next = { ...prev };
-                      if (e.target.value) next.__freetext = e.target.value;
-                      else delete next.__freetext;
-                      return next;
-                    })
-                  }
-                />
-              </div>
             </section>
           )}
 
@@ -879,9 +852,15 @@ function NewWtbPage() {
               )}
               <section className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="description">Beskrivelse / krav (valgfritt)</Label>
+                  <Label htmlFor="description">
+                    Beskrivelse / krav{" "}
+                    <span className="font-normal text-muted-foreground">(valgfritt)</span>
+                  </Label>
                   <span className="text-xs text-muted-foreground">{descriptionLength}/2000</span>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Fritekst som vises i annonsen din, slik at selgere kan lese hva du ønsker.
+                </p>
                 <Textarea
                   id="description"
                   placeholder="Beskriv gjerne ønsket stand, farge, versjon, o.l."
@@ -898,7 +877,33 @@ function NewWtbPage() {
               </section>
 
               <section className="space-y-2">
-                <Label htmlFor="max_price">Maks pris du vil betale (valgfritt)</Label>
+                <Label htmlFor="wtb-freetext">
+                  Fritekstsøk <span className="font-normal text-muted-foreground">(valgfritt)</span>
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Brukes til å matche annonsen din mot søk fra selgere, f.eks. en utstyrskode. Vises
+                  ikke i annonsen.
+                </p>
+                <Input
+                  id="wtb-freetext"
+                  placeholder="Utstyrskode eller annen relevant informasjon"
+                  value={typeof attributes.__freetext === "string" ? attributes.__freetext : ""}
+                  onChange={(e) =>
+                    setAttributes((prev) => {
+                      const next = { ...prev };
+                      if (e.target.value) next.__freetext = e.target.value;
+                      else delete next.__freetext;
+                      return next;
+                    })
+                  }
+                />
+              </section>
+
+              <section className="space-y-2">
+                <Label htmlFor="max_price">
+                  Maks pris du vil betale{" "}
+                  <span className="font-normal text-muted-foreground">(valgfritt)</span>
+                </Label>
                 <Input
                   id="max_price"
                   type="number"
@@ -1005,43 +1010,22 @@ function NewWtbPage() {
         </NativeComposerDeck>
       </ListingComposerShell>
 
-      <AlertDialog
+      <DiscardListingDialog
         open={blocker.status === "blocked"}
-        onOpenChange={(open) => {
-          if (!open) blocker.reset?.();
+        onReset={() => blocker.reset?.()}
+        onDiscard={async () => {
+          await discardDraft();
+          blocker.proceed?.();
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Avbryte annonsen?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Du kan lagre arbeidet som utkast, fortsette å redigere eller forkaste det.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => blocker.reset?.()}>
-              Fortsett å redigere
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={async () => {
-                await saveToServer();
-                blocker.proceed?.();
-              }}
-            >
-              Lagre som utkast
-            </AlertDialogAction>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={async () => {
-                await discardDraft();
-                blocker.proceed?.();
-              }}
-            >
-              Forkast annonse
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        onSaveDraft={async () => {
+          const id = await saveToServer();
+          if (!id) return false;
+          blocker.proceed?.();
+          return true;
+        }}
+        isSavingDraft={isSaving}
+        saveDraftLabel="Lagre som utkast"
+      />
     </>
   );
 }

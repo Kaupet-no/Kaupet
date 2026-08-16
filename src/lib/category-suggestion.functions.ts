@@ -42,3 +42,20 @@ export const suggestCategoryForTitle = createServerFn({ method: "GET" })
       ],
     };
   });
+
+/** In-memory cache of in-flight/settled suggestion requests, keyed by trimmed
+ * title. Lets `intent-title-landing.tsx` kick off the (cold-start-prone, up
+ * to ~20s) AI category call the moment the user submits a title, while
+ * `use-listing-title-hints.ts` reuses that same promise once the wizard
+ * mounts instead of starting a fresh request — turning the image step's
+ * duration into free warm-up time. Survives client-side route navigation
+ * since it's a module-level singleton, not per-component state. */
+const suggestionCache = new Map<string, ReturnType<typeof suggestCategoryForTitle>>();
+
+export function prefetchCategorySuggestion(title: string) {
+  const key = title.trim();
+  if (!suggestionCache.has(key)) {
+    suggestionCache.set(key, suggestCategoryForTitle({ data: { title: key } }));
+  }
+  return suggestionCache.get(key)!;
+}

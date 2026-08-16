@@ -51,23 +51,37 @@ Annonsetittel: "${truncatedTitle}"
 Svar med det ene kategorinavnet fra listen over som passer best. Hvis to kategorier er
 omtrent like sannsynlige, svar med begge, atskilt med komma. Ingen annen tekst.`;
 
-  const response = await fetch(`${endpointUrl}/v1/chat/completions`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      // 0, not a small-but-nonzero value: this is a closed-set classification
-      // (pick a name off the list), not creative generation, so there's no
-      // upside to sampling randomness — only downside. Verified live: the
-      // same title ("2024 Porsche 911 991.2") answered "Bil" consistently at
-      // temperature 0, but non-deterministically produced an unrelated
-      // category ("Kjøleskap og fryser") at 0.1 — the 1B model is uncertain
-      // enough that any sampling noise can flip it off a correct greedy pick.
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 20,
-      temperature: 0,
-    }),
-  });
-  if (!response.ok) return null;
+  // Borealis scales to zero between requests (deliberate cost tradeoff at
+  // current traffic) and cold start alone measures ~20s in practice — 25s
+  // gives headroom for the actual inference on top of that without leaving
+  // the caller hanging indefinitely on a wedged request.
+  let response: Response;
+  try {
+    response = await fetch(`${endpointUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        // 0, not a small-but-nonzero value: this is a closed-set classification
+        // (pick a name off the list), not creative generation, so there's no
+        // upside to sampling randomness — only downside. Verified live: the
+        // same title ("2024 Porsche 911 991.2") answered "Bil" consistently at
+        // temperature 0, but non-deterministically produced an unrelated
+        // category ("Kjøleskap og fryser") at 0.1 — the 1B model is uncertain
+        // enough that any sampling noise can flip it off a correct greedy pick.
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 20,
+        temperature: 0,
+      }),
+      signal: AbortSignal.timeout(25_000),
+    });
+  } catch (err) {
+    console.error("[category-suggestion-ai] fetch failed", err);
+    return null;
+  }
+  if (!response.ok) {
+    console.error("[category-suggestion-ai] non-ok response", response.status);
+    return null;
+  }
 
   const result = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
   const generated = result.choices?.[0]?.message?.content?.trim();

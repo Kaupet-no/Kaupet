@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { suggestCategoryForTitle } from "@/lib/category-suggestion.functions";
+import { prefetchCategorySuggestion } from "@/lib/category-suggestion.functions";
 import { useTitleBasedListingHints } from "@/features/listing-creation/use-title-based-listing-hints";
 import type { AttributeMap } from "@/components/attribute-fields";
 
@@ -74,7 +74,7 @@ export function useListingTitleHints(params: {
     setCategorySuggestionLoading(true);
     const timer = window.setTimeout(async () => {
       try {
-        const result = await suggestCategoryForTitle({ data: { title: t } });
+        const result = await prefetchCategorySuggestion(t);
         setCategorySuggestions(result.suggestions);
       } catch {
         setCategorySuggestions([]);

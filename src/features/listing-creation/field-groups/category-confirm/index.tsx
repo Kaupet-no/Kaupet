@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -8,6 +8,29 @@ import type { WizardSharedProps } from "../types";
 
 function suggestionLabel(s: { name_nb: string; parent_name_nb: string | null }): string {
   return s.parent_name_nb ? `${s.parent_name_nb} › ${s.name_nb}` : s.name_nb;
+}
+
+/** Matches the AI fallback's cold-start budget (~20s observed, 25s timeout —
+ * see category-suggestion-ai.server.ts) with staged copy, so a slow but
+ * still-in-flight request doesn't read as frozen or broken. */
+const LOADING_MESSAGES = [
+  "Setter opp annonse...",
+  "Henter kategoriforslag...",
+  "Dette tar litt lenger tid enn forventet. Beklager ventetiden.",
+];
+
+function useLoadingMessage(active: boolean): string {
+  const [stage, setStage] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    const t1 = window.setTimeout(() => setStage(1), 8_000);
+    const t2 = window.setTimeout(() => setStage(2), 15_000);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, [active]);
+  return active ? LOADING_MESSAGES[stage] : LOADING_MESSAGES[0];
 }
 
 /**
@@ -41,6 +64,9 @@ export function CategoryConfirm({
   // done; the wizard's own "Neste" button (unaffected by this field group)
   // takes the user forward.
   const [confirmedName, setConfirmedName] = useState<string | null>(null);
+  const isWaitingForSuggestion =
+    !confirmedName && !showPicker && categorySuggestionLoading && categorySuggestions.length === 0;
+  const loadingMessage = useLoadingMessage(isWaitingForSuggestion);
 
   if (
     !confirmedName &&
@@ -66,7 +92,7 @@ export function CategoryConfirm({
     return (
       <section className="space-y-4 py-6 text-center">
         <Skeleton className="mx-auto h-6 w-2/3" />
-        <p className="text-sm text-muted-foreground">Gi oss et lite øyeblikk…</p>
+        <p className="text-sm text-muted-foreground">{loadingMessage}</p>
       </section>
     );
   }

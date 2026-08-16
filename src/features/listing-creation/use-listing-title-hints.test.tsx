@@ -11,6 +11,7 @@ vi.mock("@tanstack/react-start", () => ({
 const suggestCategoryForTitleMock = vi.fn();
 vi.mock("@/lib/category-suggestion.functions", () => ({
   suggestCategoryForTitle: (...args: unknown[]) => suggestCategoryForTitleMock(...args),
+  prefetchCategorySuggestion: (title: string) => suggestCategoryForTitleMock({ data: { title } }),
 }));
 
 const suggestKeywordsForListingMock = vi.fn();

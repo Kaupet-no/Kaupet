@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { prefetchCategorySuggestion } from "@/lib/category-suggestion.functions";
 
 type Intent = "sell" | "buy" | "free";
 
@@ -43,6 +44,9 @@ export function IntentTitleLanding({ onNavigate }: { onNavigate?: () => void }) 
     if (intent === "buy") {
       void navigate({ to: "/ny-ok-annonse", search: { title: trimmed } });
     } else {
+      // Kicks off the (cold-start-prone) AI category call now rather than
+      // waiting for /ny-annonse to mount — see prefetchCategorySuggestion.
+      prefetchCategorySuggestion(trimmed);
       void navigate({ to: "/ny-annonse", search: { type: intent, title: trimmed } });
     }
     onNavigate?.();
@@ -103,7 +107,7 @@ export function IntentTitleLanding({ onNavigate }: { onNavigate?: () => void }) 
         />
         {error && <p className="text-center text-xs text-destructive">{error}</p>}
         <p className="text-center text-xs text-muted-foreground">
-          Dette blir annonsens tittel{" "}
+          Dette blir tittelen på annonsen din.{" "}
           <span className="group relative inline-block cursor-help">
             *
             <span

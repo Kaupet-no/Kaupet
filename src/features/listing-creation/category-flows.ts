@@ -8,12 +8,14 @@ import type { CategoryNode } from "@/lib/category-filters";
  * with location; description is its own native page but inline on web).
  */
 export const DEFAULT_FIELD_GROUPS: string[] = [
-  "title-photos",
+  "photos",
+  "title",
   "category-attributes",
   "condition",
   "price",
   "description-keywords",
-  "delivery-location",
+  "delivery",
+  "location",
   "review-publish",
 ];
 export const DEFAULT_MODULES: string[] = ["generic-attributes"];
@@ -33,6 +35,45 @@ export type CategoryFlowRow = {
 
 const DEFAULT_FLOW: CategoryFlow = { fieldGroups: DEFAULT_FIELD_GROUPS, modules: DEFAULT_MODULES };
 
+export function normalizeFieldGroupKeys(keys: string[]): string[] {
+  const normalized = keys.flatMap((key) => {
+    if (key === "title-photos") return ["photos", "title"];
+    if (key === "delivery-location") return ["delivery", "location"];
+    return [key];
+  });
+  if (!normalized.includes("vehicle-registration")) return normalized;
+  const vehicle = normalized.filter((key) => key !== "title" && key !== "delivery");
+  const factsIndex = vehicle.indexOf("vehicle-facts");
+  if (factsIndex === -1) return vehicle;
+  const orderedVehicleGroups = [
+    "description-keywords",
+    "vehicle-condition",
+    "vehicle-equipment",
+  ].filter((key) => vehicle.includes(key));
+  const withoutOrderedGroups = vehicle.filter((key) => !orderedVehicleGroups.includes(key));
+  withoutOrderedGroups.splice(factsIndex + 1, 0, ...orderedVehicleGroups);
+  return withoutOrderedGroups;
+}
+
+/** Writers keep legacy keys until the phase 6 transition migration is applied everywhere. */
+export function toStoredFieldGroupKeys(keys: string[]): string[] {
+  const stored: string[] = [];
+  for (let index = 0; index < keys.length; index += 1) {
+    if (keys[index] === "photos") {
+      stored.push("title-photos");
+      if (keys[index + 1] === "title") index += 1;
+    } else if (keys[index] === "delivery" && keys[index + 1] === "location") {
+      stored.push("delivery-location");
+      index += 1;
+    } else if (keys[index] === "location") {
+      stored.push("delivery-location");
+    } else {
+      stored.push(keys[index]);
+    }
+  }
+  return stored;
+}
+
 /**
  * Returns the effective flow (field groups + modules) for a category: the
  * flow declared on the category itself, or the nearest ancestor's flow, or
@@ -49,16 +90,23 @@ export function effectiveFlowForCategory(
   categoryId: string | null,
   allFlows: CategoryFlowRow[],
   categoriesById: Map<string, CategoryNode>,
+  skipCategoryStep = false,
 ): CategoryFlow {
-  if (!categoryId) return prependCategorySelect(DEFAULT_FLOW);
+  const prepend = skipCategoryStep ? (flow: CategoryFlow) => flow : prependCategorySelect;
+  if (!categoryId) return prepend(DEFAULT_FLOW);
   const flowsByCategoryId = new Map(allFlows.map((f) => [f.category_id, f]));
   let cur: CategoryNode | undefined = categoriesById.get(categoryId);
   while (cur) {
     const row = flowsByCategoryId.get(cur.id);
-    if (row) return prependCategorySelect({ fieldGroups: row.field_groups, modules: row.modules });
+    if (row) {
+      return prepend({
+        fieldGroups: normalizeFieldGroupKeys(row.field_groups),
+        modules: row.modules,
+      });
+    }
     cur = cur.parent_id ? categoriesById.get(cur.parent_id) : undefined;
   }
-  return prependCategorySelect(DEFAULT_FLOW);
+  return prepend(DEFAULT_FLOW);
 }
 
 function prependCategorySelect(flow: CategoryFlow): CategoryFlow {
@@ -91,6 +139,7 @@ function prependCategorySelect(flow: CategoryFlow): CategoryFlow {
  * with unrelated groups like `condition`/`price`. */
 const SOLO_FIELD_GROUP_KEYS = new Set([
   "category-select",
+  "category-confirm",
   "vehicle-registration",
   "vehicle-confirm",
 ]);
@@ -109,21 +158,27 @@ export function resolveWizardPages(
     forceBreakBeforeKeys?: ReadonlySet<string>;
   },
 ): string[][] {
+  if (options.native) {
+    return fieldGroupKeys.map((key) => [key]);
+  }
   const chunkSize = options.native ? 3 : 4;
   const forceBreakBeforeKeys = options.forceBreakBeforeKeys;
 
   const withoutEnds = fieldGroupKeys.filter(
-    (k) => k !== "review-publish" && k !== "delivery-location",
+    (k) => k !== "review-publish" && k !== "delivery" && k !== "location",
   );
   const hasReviewPublish = fieldGroupKeys.includes("review-publish");
-  const hasDeliveryLocation = fieldGroupKeys.includes("delivery-location");
+  const hasDelivery = fieldGroupKeys.includes("delivery");
+  const hasLocation = fieldGroupKeys.includes("location");
 
   const pages: string[][] = [];
   let buffer: string[] = [];
+  let bufferSize = 0;
   const flush = () => {
     if (buffer.length > 0) {
       pages.push(buffer);
       buffer = [];
+      bufferSize = 0;
     }
   };
 
@@ -134,13 +189,15 @@ export function resolveWizardPages(
     } else {
       if (forceBreakBeforeKeys?.has(key)) flush();
       buffer.push(key);
-      if (buffer.length >= chunkSize) flush();
+      if (!(key === "title" && buffer.at(-2) === "photos")) bufferSize += 1;
+      if (bufferSize >= chunkSize) flush();
     }
   }
   flush();
 
   const lastPage: string[] = [];
-  if (hasDeliveryLocation) lastPage.push("delivery-location");
+  if (hasDelivery) lastPage.push("delivery");
+  if (hasLocation) lastPage.push("location");
   if (hasReviewPublish) lastPage.push("review-publish");
   if (lastPage.length > 0) pages.push(lastPage);
 

@@ -1684,8 +1684,14 @@ describe.skipIf(!canRun)(
 
     const userIds: string[] = [];
     let ownerId: string;
+    let otherId: string;
     let activeId: string;
+    let notifiedActiveId: string;
     let fulfilledId: string;
+    let draftId: string;
+    let activatableDraftId: string;
+    let deletableDraftId: string;
+    let matchingListingId: string;
 
     async function signIn(email: string) {
       return signInWithRetry(email);
@@ -1703,44 +1709,123 @@ describe.skipIf(!canRun)(
         return data.user!.id;
       };
       ownerId = await mkUser(emails.owner);
-      await mkUser(emails.other);
+      otherId = await mkUser(emails.other);
 
-      const mkWtb = async (status: "active" | "fulfilled") => {
+      const mkWtb = async (status: "draft" | "active" | "fulfilled", notifyMatches = false) => {
         const { data, error } = await admin
           .from("wtb_listings")
-          .insert({ user_id: ownerId, title: `RLS wtb ${status} listing`, status })
+          .insert({
+            user_id: ownerId,
+            title: `RLS wtb ${status} listing`,
+            status,
+            notify_matches: notifyMatches,
+          })
           .select("id")
           .single();
         if (error) throw error;
         return data.id;
       };
       activeId = await mkWtb("active");
+      notifiedActiveId = await mkWtb("active", true);
       fulfilledId = await mkWtb("fulfilled");
+      draftId = await mkWtb("draft");
+      activatableDraftId = await mkWtb("draft");
+      deletableDraftId = await mkWtb("draft");
+
+      const { data: listing, error: listingError } = await admin
+        .from("listings")
+        .insert({
+          seller_id: otherId,
+          title: "Matching listing for WTB notification preference",
+          price_nok: 100,
+          status: "active",
+        })
+        .select("id")
+        .single();
+      if (listingError) throw listingError;
+      matchingListingId = listing.id;
     });
 
     afterAll(async () => {
       if (!canRun) return;
+      const wtbIds = [
+        activeId,
+        notifiedActiveId,
+        fulfilledId,
+        draftId,
+        activatableDraftId,
+        deletableDraftId,
+      ];
+      await admin.from("wtb_match_notifications").delete().in("wtb_listing_id", wtbIds);
+      await admin.from("listings").delete().eq("id", matchingListingId);
+      await admin.from("wtb_listings").delete().in("id", wtbIds);
       await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
     });
 
-    it("lets the owner see both their active and fulfilled wtb listings", async () => {
+    it("lets the owner see their active, fulfilled, and draft wtb listings", async () => {
       const owner = await signIn(emails.owner);
       const { data, error } = await owner
         .from("wtb_listings")
         .select("id")
-        .in("id", [activeId, fulfilledId]);
+        .in("id", [activeId, fulfilledId, draftId]);
       expect(error).toBeNull();
-      expect(new Set(data?.map((w) => w.id))).toEqual(new Set([activeId, fulfilledId]));
+      expect(new Set(data?.map((w) => w.id))).toEqual(new Set([activeId, fulfilledId, draftId]));
     });
 
-    it("hides the fulfilled listing from other users but shows the active one", async () => {
+    it("hides fulfilled and draft listings from other users but shows the active one", async () => {
       const other = await signIn(emails.other);
       const { data, error } = await other
         .from("wtb_listings")
         .select("id")
-        .in("id", [activeId, fulfilledId]);
+        .in("id", [activeId, fulfilledId, draftId]);
       expect(error).toBeNull();
       expect(data?.map((w) => w.id)).toEqual([activeId]);
+    });
+
+    it("hides draft listings from anonymous visitors", async () => {
+      const anon = createClient(URL!, ANON_KEY!);
+      const { data, error } = await anon.from("wtb_listings").select("id").eq("id", draftId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(0);
+    });
+
+    it("lets the owner update and activate their own draft", async () => {
+      const owner = await signIn(emails.owner);
+      const { error, count } = await owner
+        .from("wtb_listings")
+        .update({ title: "Updated private draft", status: "active" }, { count: "exact" })
+        .eq("id", activatableDraftId);
+      expect(error).toBeNull();
+      expect(count).toBe(1);
+    });
+
+    it("blocks a non-owner from activating someone else's draft", async () => {
+      const other = await signIn(emails.other);
+      const { error, count } = await other
+        .from("wtb_listings")
+        .update({ status: "active" }, { count: "exact" })
+        .eq("id", draftId);
+      expect(error).toBeNull();
+      expect(count).toBe(0);
+    });
+
+    it("lets the owner delete their own draft", async () => {
+      const owner = await signIn(emails.owner);
+      const { error, count } = await owner
+        .from("wtb_listings")
+        .delete({ count: "exact" })
+        .eq("id", deletableDraftId);
+      expect(error).toBeNull();
+      expect(count).toBe(1);
+    });
+
+    it("creates WTB notifications only when the owner opted in", async () => {
+      const { data, error } = await admin
+        .from("wtb_match_notifications")
+        .select("wtb_listing_id")
+        .in("wtb_listing_id", [activeId, notifiedActiveId]);
+      expect(error).toBeNull();
+      expect(data?.map((row) => row.wtb_listing_id)).toEqual([notifiedActiveId]);
     });
 
     it("blocks a non-owner from updating someone else's wtb listing", async () => {

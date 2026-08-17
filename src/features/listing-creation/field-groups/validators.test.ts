@@ -7,11 +7,13 @@ const VEHICLE_BEHAVIOR = getCategoryBehavior("bil");
 
 describe("validateRequiredFieldGroups", () => {
   const DEFAULT_FLOW = [
-    "title-photos",
+    "photos",
+    "title",
     "category-attributes",
     "condition",
     "price",
-    "delivery-location",
+    "delivery",
+    "location",
   ];
 
   it("passes for the default flow when both fields are set", () => {
@@ -38,12 +40,12 @@ describe("validateRequiredFieldGroups", () => {
   });
 
   it("allows can_ship: null when the flow omits the delivery-location group", () => {
-    const flow = DEFAULT_FLOW.filter((k) => k !== "delivery-location");
+    const flow = DEFAULT_FLOW.filter((k) => k !== "delivery");
     expect(validateRequiredFieldGroups(flow, { condition: "good", can_ship: null })).toBeNull();
   });
 
   it("allows both to be null when the flow omits both groups", () => {
-    const flow = DEFAULT_FLOW.filter((k) => k !== "condition" && k !== "delivery-location");
+    const flow = DEFAULT_FLOW.filter((k) => k !== "condition" && k !== "delivery");
     expect(validateRequiredFieldGroups(flow, { condition: null, can_ship: null })).toBeNull();
   });
 

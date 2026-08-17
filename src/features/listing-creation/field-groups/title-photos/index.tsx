@@ -63,7 +63,7 @@ export function VehicleTitleFields({
  * description-keywords/index.tsx), so it no longer needs its own
  * vehicle-vs-generic branch.
  */
-function TitleSection(
+export function TitleGroup(
   props: Pick<
     WizardSharedProps,
     "register" | "errors" | "touchedFields" | "title" | "titleExample"
@@ -98,7 +98,7 @@ function TitleSection(
   );
 }
 
-function ImagesSection({
+export function PhotosGroup({
   images,
   setImages,
   uploadProgress,
@@ -106,6 +106,9 @@ function ImagesSection({
   return (
     <section className="space-y-2">
       <Label>Bilder</Label>
+      <p className="text-sm text-muted-foreground">
+        Annonser med bilder får mer oppmerksomhet. Vi anbefaler minst 3 bilder.
+      </p>
       <ImageUploader images={images} onChange={setImages} uploadProgress={uploadProgress} />
     </section>
   );
@@ -123,8 +126,8 @@ export function TitlePhotos(props: WizardSharedProps) {
   if (props.native) {
     return (
       <div className="space-y-6">
-        {!props.isVehicle && <TitleSection {...props} />}
-        <ImagesSection {...props} />
+        {!props.isVehicle && <TitleGroup {...props} />}
+        <PhotosGroup {...props} />
         {props.isVehicle && (
           <Vehicle360CaptureLauncher
             listingId={props.draftId}
@@ -137,11 +140,11 @@ export function TitlePhotos(props: WizardSharedProps) {
   }
   return (
     <div className="space-y-6">
-      <ImagesSection {...props} />
+      <PhotosGroup {...props} />
       {props.isVehicle && (
         <Vehicle360QrPanel draftId={props.draftId} ensureDraftId={props.ensureDraftId} />
       )}
-      {!props.isVehicle && <TitleSection {...props} />}
+      {!props.isVehicle && <TitleGroup {...props} />}
     </div>
   );
 }

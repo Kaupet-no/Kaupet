@@ -70,8 +70,20 @@ let supabaseStarted = false;
 let exitCode = 1;
 
 try {
-  const start = run("bunx", ["supabase", "--workdir", e2eRoot, "start"]);
-  if (start.status !== 0) {
+  // supabase start har en kjent race mot Docker (og kan rammes av Docker
+  // Hub sin rate-limiting på anonyme pulls) — retry med opprydding mellom
+  // forsøk, samme mønster som rls-jobben i .github/workflows/ci.yml.
+  let started = false;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const start = run("bunx", ["supabase", "--workdir", e2eRoot, "start"]);
+    if (start.status === 0) {
+      started = true;
+      break;
+    }
+    console.error(`supabase start feilet (forsøk ${attempt}/3), rydder opp og prøver igjen …`);
+    run("bunx", ["supabase", "--workdir", e2eRoot, "stop", "--no-backup"]);
+  }
+  if (!started) {
     throw new Error(
       "Kunne ikke starte isolert lokal Supabase. Kontroller at Docker kjører, og prøv igjen.",
     );

@@ -196,6 +196,7 @@ function ConversationPage() {
       );
       queryClient.invalidateQueries({ queryKey: ["unread-conversations"] });
       queryClient.invalidateQueries({ queryKey: ["my-conversations"] });
+      queryClient.invalidateQueries({ queryKey: ["messages-preview"] });
     },
     onError: (e: Error) => {
       lastMarkedRef.current = null;
@@ -266,8 +267,10 @@ function ConversationPage() {
         el.scrollTop = el.scrollHeight;
       });
     }
-    if (messages && messages.length > 0 && conv && user) {
-      markReadMutation.mutate(messages[messages.length - 1].created_at);
+    if (messages && conv && user) {
+      const readAt =
+        messages.length > 0 ? messages[messages.length - 1].created_at : new Date().toISOString();
+      markReadMutation.mutate(readAt);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages, id, conv, user]);

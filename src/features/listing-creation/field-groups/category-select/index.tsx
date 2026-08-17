@@ -2,7 +2,6 @@ import { Sparkles } from "lucide-react";
 
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { CategoryPicker } from "@/components/category-picker";
 
 import type { WizardSharedProps } from "../types";
@@ -18,71 +17,52 @@ import { RequiredMark } from "../required-mark";
 export function CategorySelect({
   errors,
   native,
-  register,
-  title,
   categories,
   categoryId,
   onCategorySelect,
-  categorySuggestion,
+  categorySuggestions,
   categoryTouchedManually,
   applyCategorySuggestion,
   setSuggestionDismissed,
-  setCategorySuggestion,
+  setCategorySuggestions,
   bilOgMcCategoryId,
 }: WizardSharedProps) {
   return (
     <section className="space-y-3">
-      {native && (
-        <div className="space-y-2 rounded-2xl bg-primary/5 p-4">
-          <div className="space-y-1">
-            <Label htmlFor="listing-start-title">Hva selger du?</Label>
-            <p className="text-sm text-muted-foreground">
-              Skriv en kort tittel, så hjelper vi deg med å finne riktig kategori.
-            </p>
-          </div>
-          <Input
-            id="listing-start-title"
-            data-testid="listing-title-input"
-            value={title ?? ""}
-            placeholder="F.eks. Trek Marlin 5 sykkel"
-            autoComplete="off"
-            {...register("title")}
-          />
-        </div>
-      )}
-
       <Label>
         Kategori
         <RequiredMark />
       </Label>
 
-      {categorySuggestion && !categoryTouchedManually && (
-        <div className="flex items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
+      {!native && categorySuggestions.length > 0 && !categoryTouchedManually && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
           <Sparkles className="size-4 shrink-0 text-primary" aria-hidden />
-          <span>
-            {categorySuggestion.parent_name_nb
-              ? `${categorySuggestion.parent_name_nb} › ${categorySuggestion.name_nb}`
-              : categorySuggestion.name_nb}
-          </span>
-          <Button type="button" size="sm" onClick={applyCategorySuggestion} className="ml-auto">
-            Bruk forslag
-          </Button>
+          <span>Foreslått: </span>
+          {categorySuggestions.map((s) => (
+            <Button
+              key={s.category_id}
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => applyCategorySuggestion(s.category_id)}
+            >
+              {s.parent_name_nb ? `${s.parent_name_nb} › ${s.name_nb}` : s.name_nb}
+            </Button>
+          ))}
           <Button
             type="button"
             size="sm"
             variant="ghost"
             aria-label="Lukk kategoriforslag"
+            className="ml-auto"
             onClick={() => {
               setSuggestionDismissed(true);
-              setCategorySuggestion(null);
+              setCategorySuggestions([]);
             }}
           >
             ✕
           </Button>
         </div>
-      )}
-      {categorySuggestion && !categoryTouchedManually && (
-        <p className="text-xs text-muted-foreground">Eller velg en annen kategori selv:</p>
       )}
 
       <CategoryPicker

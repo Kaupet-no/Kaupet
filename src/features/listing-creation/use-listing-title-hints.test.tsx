@@ -11,6 +11,7 @@ vi.mock("@tanstack/react-start", () => ({
 const suggestCategoryForTitleMock = vi.fn();
 vi.mock("@/lib/category-suggestion.functions", () => ({
   suggestCategoryForTitle: (...args: unknown[]) => suggestCategoryForTitleMock(...args),
+  prefetchCategorySuggestion: (title: string) => suggestCategoryForTitleMock({ data: { title } }),
 }));
 
 const suggestKeywordsForListingMock = vi.fn();
@@ -58,12 +59,14 @@ describe("useListingTitleHints", () => {
   it("suggests a category once the title is at least 5 characters and not yet touched manually", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     suggestCategoryForTitleMock.mockResolvedValue({
-      suggestion: {
-        category_id: "cat-1",
-        parent_id: "parent-1",
-        name_nb: "Sykkel",
-        parent_name_nb: null,
-      },
+      suggestions: [
+        {
+          category_id: "cat-1",
+          parent_id: "parent-1",
+          name_nb: "Sykkel",
+          parent_name_nb: null,
+        },
+      ],
     });
     const setValue = vi.fn();
     const { result } = renderHook(
@@ -82,9 +85,9 @@ describe("useListingTitleHints", () => {
 
     await act(() => vi.advanceTimersByTimeAsync(400));
 
-    expect(result.current.categorySuggestion).toEqual(
+    expect(result.current.categorySuggestions).toEqual([
       expect.objectContaining({ category_id: "cat-1" }),
-    );
+    ]);
     vi.useRealTimers();
   });
 
@@ -106,20 +109,22 @@ describe("useListingTitleHints", () => {
 
     await act(() => vi.advanceTimersByTimeAsync(400));
 
-    expect(result.current.categorySuggestion).toBeNull();
+    expect(result.current.categorySuggestions).toEqual([]);
     expect(suggestCategoryForTitleMock).not.toHaveBeenCalled();
     vi.useRealTimers();
   });
 
-  it("applyCategorySuggestion writes the suggested category and clears the suggestion", async () => {
+  it("applyCategorySuggestion writes the suggested category and clears the suggestions", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     suggestCategoryForTitleMock.mockResolvedValue({
-      suggestion: {
-        category_id: "cat-1",
-        parent_id: "parent-1",
-        name_nb: "Sykkel",
-        parent_name_nb: null,
-      },
+      suggestions: [
+        {
+          category_id: "cat-1",
+          parent_id: "parent-1",
+          name_nb: "Sykkel",
+          parent_name_nb: null,
+        },
+      ],
     });
     const setValue = vi.fn();
     const setSelectedParentId = vi.fn();
@@ -138,14 +143,14 @@ describe("useListingTitleHints", () => {
       { wrapper },
     );
     await act(() => vi.advanceTimersByTimeAsync(400));
-    expect(result.current.categorySuggestion).not.toBeNull();
+    expect(result.current.categorySuggestions).not.toEqual([]);
 
-    act(() => result.current.applyCategorySuggestion());
+    act(() => result.current.applyCategorySuggestion("cat-1"));
 
     expect(setSelectedParentId).toHaveBeenCalledWith("parent-1");
     expect(setValue).toHaveBeenCalledWith("category_id", "cat-1", { shouldValidate: true });
     expect(setCategoryTouchedManually).toHaveBeenCalledWith(true);
-    expect(result.current.categorySuggestion).toBeNull();
+    expect(result.current.categorySuggestions).toEqual([]);
     vi.useRealTimers();
   });
 });

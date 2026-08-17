@@ -75,7 +75,10 @@ export async function setupNative(): Promise<void> {
         // browser has had one frame to reflow the shrunken layout.
         requestAnimationFrame(() => {
           const el = document.activeElement as HTMLElement | null;
-          if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+          if (
+            (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) &&
+            !el.closest("[data-composer-scroll]")
+          ) {
             el.scrollIntoView({ behavior: "smooth", block: "nearest" });
           }
         });

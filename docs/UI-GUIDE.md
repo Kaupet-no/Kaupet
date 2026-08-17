@@ -12,6 +12,7 @@ Kort referanse for konsistente mønstre i Kaupet-frontend.
 8. [Native (Capacitor)](#native-capacitor)
 9. [Native søk og filtre](#native-søk-og-filtre)
 10. [Skjemavalidering](#skjemavalidering)
+11. [Flerstegs opprettelsesflyter](#flerstegs-opprettelsesflyter)
 
 ## shadcn/ui-primitiver
 
@@ -246,3 +247,123 @@ lokal variant av valgflaten per filter.
 ## Skjemavalidering
 
 - `react-hook-form` + `zod` via `zodResolver`. Se `src/routes/auth.tsx` for standardoppsett med `mode: "onTouched"`.
+- Flerstegs-composere bruker `mode: "onTouched"` og den delte
+  `ComposerErrorSummary`. Feltfeil vises ved feltet med `aria-invalid` og
+  `aria-describedby`; oppsummeringen har `role="alert"` og mottar fokus når
+  brukeren forsøker å gå videre. Ved publiseringsfeil navigerer flyten til
+  steget med første ugyldige felt.
+- Domene-/valideringsfeil vises ved feltet eller i feiloppsummeringen. Toast er
+  forbeholdt nettverks-, tillatelses- og systemfeil som ikke tilhører ett felt.
+- Programmatisk stegnavigasjon skal ikke tvinge glatt scrolling. Bruk
+  `window.scrollTo({ top: 0 })`, slik at flyten ikke introduserer bevegelse som
+  strider mot brukerens tilgjengelighetsinnstillinger.
+
+## Flerstegs opprettelsesflyter
+
+Retningslinjene gjelder innholdsproduksjon som annonseopprettelse på tvers av
+native og web. Den detaljerte målarkitekturen og den levende statusloggen for
+annonser ligger i
+[NATIVE-ANNONSEOPPRETTELSE-KORTFLYT-PLAN.md](NATIVE-ANNONSEOPPRETTELSE-KORTFLYT-PLAN.md).
+Historikk fra den tidligere composer-konsolideringen ligger i
+[ANNONSEOPPRETTELSE-UX-PLAN.md](ANNONSEOPPRETTELSE-UX-PLAN.md).
+
+### Én gjenkjennelig composer
+
+- Flyter som oppretter samme type brukerinnhold skal dele skall, navigasjon,
+  fremdrift, lagringsstatus, valideringsmønster og ferdigtilstand. Del ikke
+  domene-spesifikke felt bare for visuell likhet.
+- På telefon er en kompleks flerstegsoppgave en full rute, ikke en veiviser
+  inni et bunn-sheet. Sheet/dialog brukes til korte valg og detaljkontroller.
+- Bruk ett delt composer-skall når det er implementert. Skallet skal eie
+  `NativePageHeader`, `StepIndicator`, safe area, fast native footer, fokus ved
+  sideskifte og avslutningsvern; det skal ikke inneholde kategori- eller
+  kjøretøylogikk.
+- Native og web skal ha samme semantiske siderekkefølge og valideringsgrenser.
+  Web kan samle relaterte grupper på færre sider og bruke en sekundærkolonne,
+  men skal ikke bli en separat produktflyt.
+
+### Sidekontrakt og visuell rytme
+
+- Ett steg skal ha ett forståelig oppgavenavn og primært én hovedbeslutning.
+  Bruk korte verb-/spørsmålsformuleringer som «Hva vil du selge?» fremfor
+  interne domenenavn.
+- På telefon: 16 px horisontal padding, minst 24 px mellom hovedseksjoner og
+  8–12 px mellom relaterte felt. Bruk luft og typografi før rammer; aldri kort
+  inni kort for å skille hvert enkelt felt.
+- Valgrader er minst 56 px høye og hele raden er tappbar. Alle interaktive
+  treffområder er minst 48×48 px.
+- Valgfrie søkekriterier skal ikke kreve en separat aktiverings-checkbox før
+  feltet kan brukes. En satt verdi aktiverer kriteriet; tom verdi vises som
+  «Ingen begrensning». På telefon brukes oversiktsrader med verdissammendrag
+  og en fokusert `NativeSheet`; web kan beholde effektive inline-kontroller.
+- I kategoribaserte flyter kan en kort tittel/fritekst brukes til å foreslå
+  kategori før brukeren velger manuelt. Forslaget er en tydelig handling, ikke
+  en skjult automatisk overskriving, og «Jeg er usikker» er sekundær vei.
+- Fast native footer ligger over `--app-bottom-nav-h`, håndterer safe area og
+  har én fullbredde `Button size="lg"`/`h-14` som primærhandling. Tilbake er i
+  native header; web kan vise tilbake i footer.
+- Tastaturet skal ikke dekke aktivt felt eller primærhandlingen. Ikke bruk
+  fast viewporthøyde uten å ta hensyn til `--vvh`, safe area, appnavigasjon og
+  skalert tekst.
+
+### Fremdrift, navigasjon og fokus
+
+- Bruk `StepIndicator`/`Progress`, med «Steg X av Y» og gjeldende oppgavenavn.
+  Ikke bygg en lokal variant med nummererte sirkler.
+- Ikke vis et eksakt totalantall før den kategoriavhengige flyten er kjent.
+  Dynamisk innsetting av tekniske undersider skal ikke få det synlige
+  stegantallet til å hoppe urimelig.
+- Android system-tilbake, iOS kantsveip og synlig tilbakehandling går ett
+  steg tilbake før ruten forlates. Bruk én delt historikkmekanisme; ikke legg
+  lokale `pushState`-varianter i hver flyt.
+- Etter sideskifte flyttes fokus til sidens overskrift eller første relevante
+  felt og scroll starter på toppen. Ved valideringsfeil flyttes fokus til
+  første ugyldige felt. «Endre» fra oppsummering skal returnere fokus og
+  scroll til seksjonen som åpnet steget.
+
+### Utkast, validering og status
+
+- Brukergenerert innhold i en flerstegsflyt skal autolagres lokalt, og på
+  konto når mulig. Vis stabil status: «Lagrer …», «Lagret» eller en konkret
+  feil. En lagringsfeil skal aldri slette den lokale kopien.
+- Lokale utkast skal ha eksplisitt innholdstype og skjemaversjon. Salg og
+  kjøpsønske bruker separate lagringsnøkler, og nyeste gyldige kopi vinner ved
+  konflikt mellom enhet og server. Et nyere lokalt utkast overskrives aldri
+  automatisk av en eldre serverkopi.
+- Ved avslutning med endringer: tilby «Lagre som utkast», «Forkast» og
+  «Fortsett å redigere». Vanlig tilbake mellom steg skal ikke utløse dialog.
+- Feltvalidering vises inline med `aria-invalid` og `aria-describedby`.
+  Ved flere feil vises en fokusérbar feiloppsummering øverst. Toast er for
+  nettverks-/systemfeil, ikke eneste forklaring på et ugyldig felt.
+- Bruk `mode: "onTouched"`. En deaktivert «Fortsett»-knapp skal ikke være
+  eneste signal om hva som mangler; forklar kravet ved feltet.
+- Langvarig oppslag, opplasting og publisering viser konkret status med
+  `role="status"`/`aria-live="polite"`. Blokker dobbeltinnsending og gjør
+  publiseringskall idempotente der det er mulig.
+
+### Oppsummering og ferdigtilstand
+
+- Før publisering skal brukeren få en kompakt «Se over»-side. Vis seksjoner
+  med forståelige verdier og «Endre» som går til riktig steg. Visuell
+  fullforhåndsvisning kan være sekundær; ikke tving alle annonsetyper inn i
+  samme kortpresentasjon.
+- Varslingsvalg tas på «Se over»-siden, før publisering, med en konkret
+  forklaring av hva som lagres og når brukeren varsles. Bruk én domenetilpasset
+  varslingsmotor per innholdstype; ikke opprett et parallelt lagret søk når
+  kjøpsønskets egen matchmotor allerede dekker kriteriene.
+- Vis hvem som kan se informasjon og hva publisering/varsling gjør der
+  beslutningen tas. Konkret status skaper mer tillit enn dekorative
+  sikkerhetsmerker.
+- Ferdigtilstanden bekrefter resultatet og har én anbefalt neste handling
+  («Se annonsen»/«Se kjøpsønsket») samt én sekundær vei til oversikten.
+  Haptikk kan støtte visuell og tekstlig feedback, aldri erstatte den.
+
+### Plattform- og tilgjengelighetskontroll
+
+- Verifiser minimum 375×812, 844×390, 820×1180 og 1024×1366, pluss 320 px
+  web og 200 % zoom/tekst. Test lys/mørk modus og redusert bevegelse.
+- Verifiser VoiceOver, TalkBack, Switch Access og eksternt tastatur. Ingen
+  handling skal avhenge av swipe, farge, hover eller tidsbegrenset toast.
+- Følg Apples anbefalinger om enkel datainntasting og vern mot datatap, og
+  Androids krav om minst 48 dp treffområder. Plattformkildene og begrunnelsen
+  er samlet i annonseplanens seksjon «Grunnlag og metode».

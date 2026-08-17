@@ -35,6 +35,14 @@ export async function goToNewListing(page: Page) {
   await page.goto("/ny-annonse?type=sell");
 }
 
+export async function goToNewWantListing(page: Page, native = false) {
+  await page.goto(`/ny-ok-annonse${native ? "?forcenative=1" : ""}`);
+}
+
+export function composerPage(page: Page, pageKey: string) {
+  return page.getByTestId(`composer-page-${pageKey}`);
+}
+
 /**
  * Clicks `trigger` and waits for `expected` to appear. Retries the click a
  * bounded number of times if `expected` doesn't show up in time — clicks in
@@ -124,7 +132,7 @@ export async function fillDescriptionAndAdvance(
 ) {
   await wizardStep(page, "description-keywords").waitFor();
   await page.getByTestId("listing-description-textarea").fill(description);
-  await clickNextAndWaitFor(page, wizardStep(page, "delivery-location"), testInfo);
+  await clickNextAndWaitFor(page, wizardStep(page, "delivery"), testInfo);
 }
 
 /**

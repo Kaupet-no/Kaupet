@@ -7,6 +7,7 @@ import {
   DEFAULT_MODULES,
   effectiveFlowForCategory,
   resolveWizardPages,
+  toStoredFieldGroupKeys,
   type CategoryFlowRow,
 } from "./category-flows";
 
@@ -73,7 +74,7 @@ describe("effectiveFlowForCategory", () => {
     expect(effectiveFlowForCategory("cars", flows, byId).modules).toEqual(["generic-attributes"]);
   });
 
-  it("returns custom field_groups from a row unchanged", () => {
+  it("normalizes legacy compound field groups from stored rows", () => {
     const flows = [
       row({
         category_id: "cars",
@@ -82,8 +83,73 @@ describe("effectiveFlowForCategory", () => {
     ];
     expect(effectiveFlowForCategory("cars", flows, byId).fieldGroups).toEqual([
       "category-select",
+      "photos",
+      "title",
+      "category-attributes",
+      "review-publish",
+    ]);
+  });
+
+  it("keeps the legacy database format when saving atomic field groups", () => {
+    expect(toStoredFieldGroupKeys(DEFAULT_FIELD_GROUPS)).toEqual([
       "title-photos",
       "category-attributes",
+      "condition",
+      "price",
+      "description-keywords",
+      "delivery-location",
+      "review-publish",
+    ]);
+  });
+
+  it("omits generic title and delivery cards from vehicle flows", () => {
+    const flows = [
+      row({
+        category_id: "cars",
+        field_groups: [
+          "vehicle-registration",
+          "title-photos",
+          "vehicle-facts",
+          "delivery-location",
+          "review-publish",
+        ],
+      }),
+    ];
+    expect(effectiveFlowForCategory("cars", flows, byId).fieldGroups).toEqual([
+      "category-select",
+      "vehicle-registration",
+      "photos",
+      "vehicle-facts",
+      "location",
+      "review-publish",
+    ]);
+  });
+
+  it("orders vehicle description between facts and condition", () => {
+    const flows = [
+      row({
+        category_id: "cars",
+        field_groups: [
+          "vehicle-registration",
+          "title-photos",
+          "vehicle-facts",
+          "vehicle-condition",
+          "description-keywords",
+          "vehicle-equipment",
+          "delivery-location",
+          "review-publish",
+        ],
+      }),
+    ];
+    expect(effectiveFlowForCategory("cars", flows, byId).fieldGroups).toEqual([
+      "category-select",
+      "vehicle-registration",
+      "photos",
+      "vehicle-facts",
+      "description-keywords",
+      "vehicle-condition",
+      "vehicle-equipment",
+      "location",
       "review-publish",
     ]);
   });
@@ -95,29 +161,37 @@ describe("resolveWizardPages", () => {
   it("reproduces today's web split for the default flow (chunks of 4, ends pinned)", () => {
     expect(resolveWizardPages(flowWithCategorySelect, { native: false })).toEqual([
       ["category-select"],
-      ["title-photos", "category-attributes", "condition", "price"],
+      ["photos", "title", "category-attributes", "condition", "price"],
       ["description-keywords"],
-      ["delivery-location", "review-publish"],
+      ["delivery", "location", "review-publish"],
     ]);
   });
 
-  it("keeps location and publishing together on native to avoid a confirmation-only step", () => {
+  it("gives every atomic field group its own native page", () => {
     expect(resolveWizardPages(flowWithCategorySelect, { native: true })).toEqual([
       ["category-select"],
-      ["title-photos", "category-attributes", "condition"],
-      ["price", "description-keywords"],
-      ["delivery-location", "review-publish"],
+      ["photos"],
+      ["title"],
+      ["category-attributes"],
+      ["condition"],
+      ["price"],
+      ["description-keywords"],
+      ["delivery"],
+      ["location"],
+      ["review-publish"],
     ]);
   });
 
   it("produces fewer, smaller pages for a category with fewer groups", () => {
-    const groups = ["title-photos", "category-attributes", "review-publish"];
+    const groups = ["photos", "title", "category-attributes", "review-publish"];
     expect(resolveWizardPages(groups, { native: false })).toEqual([
-      ["title-photos", "category-attributes"],
+      ["photos", "title", "category-attributes"],
       ["review-publish"],
     ]);
     expect(resolveWizardPages(groups, { native: true })).toEqual([
-      ["title-photos", "category-attributes"],
+      ["photos"],
+      ["title"],
+      ["category-attributes"],
       ["review-publish"],
     ]);
   });
@@ -133,28 +207,36 @@ describe("resolveWizardPages", () => {
       "vehicle-registration",
       "vehicle-confirm",
       "category-attributes",
-      "title-photos",
+      "photos",
+      "title",
       "condition",
       "price",
       "description-keywords",
-      "delivery-location",
+      "delivery",
+      "location",
       "review-publish",
     ];
     expect(resolveWizardPages(groups, { native: false })).toEqual([
       ["category-select"],
       ["vehicle-registration"],
       ["vehicle-confirm"],
-      ["category-attributes", "title-photos", "condition", "price"],
+      ["category-attributes", "photos", "title", "condition", "price"],
       ["description-keywords"],
-      ["delivery-location", "review-publish"],
+      ["delivery", "location", "review-publish"],
     ]);
     expect(resolveWizardPages(groups, { native: true })).toEqual([
       ["category-select"],
       ["vehicle-registration"],
       ["vehicle-confirm"],
-      ["category-attributes", "title-photos", "condition"],
-      ["price", "description-keywords"],
-      ["delivery-location", "review-publish"],
+      ["category-attributes"],
+      ["photos"],
+      ["title"],
+      ["condition"],
+      ["price"],
+      ["description-keywords"],
+      ["delivery"],
+      ["location"],
+      ["review-publish"],
     ]);
   });
 });

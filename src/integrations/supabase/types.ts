@@ -1746,6 +1746,7 @@ export type Database = {
           expires_at: string
           id: string
           max_price_nok: number | null
+          notify_matches: boolean
           search_vector: unknown
           status: string
           subtitle: string | null
@@ -1761,6 +1762,7 @@ export type Database = {
           expires_at?: string
           id?: string
           max_price_nok?: number | null
+          notify_matches?: boolean
           search_vector?: unknown
           status?: string
           subtitle?: string | null
@@ -1776,6 +1778,7 @@ export type Database = {
           expires_at?: string
           id?: string
           max_price_nok?: number | null
+          notify_matches?: boolean
           search_vector?: unknown
           status?: string
           subtitle?: string | null

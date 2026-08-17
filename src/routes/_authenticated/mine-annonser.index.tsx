@@ -393,6 +393,7 @@ function MyListingsPage() {
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2">
                         <p className="font-medium">{w.title}</p>
+                        {w.status === "draft" && <Badge variant="outline">Utkast</Badge>}
                         {w.status === "fulfilled" && <Badge variant="secondary">Oppfylt</Badge>}
                       </div>
                       {w.description && (
@@ -415,16 +416,24 @@ function MyListingsPage() {
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
-                      <Link to="/ok/$id" params={{ id: w.id }} search={{ edit: true }}>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="text-muted-foreground"
-                          aria-label="Rediger"
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
-                      </Link>
+                      {w.status === "draft" ? (
+                        <Link to="/ny-ok-annonse">
+                          <Button size="sm" variant="outline">
+                            Fortsett
+                          </Button>
+                        </Link>
+                      ) : (
+                        <Link to="/ok/$id" params={{ id: w.id }} search={{ edit: true }}>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="text-muted-foreground"
+                            aria-label="Rediger"
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                        </Link>
+                      )}
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button

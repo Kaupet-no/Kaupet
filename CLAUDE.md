@@ -23,6 +23,11 @@ bare en automatisk sjekk.
 
 ## Arkitektur
 
+Den normative arkitekturguiden ligger i [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Les den før endringer som berører systemgrenser, datamodell, serverfunksjoner,
+plattformtilpasning eller delt featurearkitektur, og gå gjennom sjekklisten i
+guidens § 11 før du anser en slik endring som ferdig.
+
 Stack: TanStack Start (Vite + React) på Cloudflare Workers (via nitro/wrangler),
 Supabase (Postgres + RLS + Auth), Capacitor (iOS/Android-wrapper).
 

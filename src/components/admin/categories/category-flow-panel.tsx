@@ -25,7 +25,9 @@ import { formatErrorMessage } from "@/lib/errors";
 import {
   DEFAULT_FIELD_GROUPS,
   DEFAULT_MODULES,
+  normalizeFieldGroupKeys,
   resolveWizardPages,
+  toStoredFieldGroupKeys,
 } from "@/features/listing-creation/category-flows";
 import { MODULE_LABELS_NB, MODULE_REGISTRY } from "@/features/listing-creation/modules/registry";
 import {
@@ -112,12 +114,13 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
   const hasCustomFlow = !!flowRow;
 
   const [fieldGroups, setFieldGroups] = useState<string[] | null>(null);
-  const storedFieldGroups = fieldGroups ?? flowRow?.field_groups ?? DEFAULT_FIELD_GROUPS;
+  const storedFieldGroups =
+    fieldGroups ?? normalizeFieldGroupKeys(flowRow?.field_groups ?? DEFAULT_FIELD_GROUPS);
   const middleOrder = [
     ...storedFieldGroups.filter((k) => MIDDLE_FIELD_GROUP_KEYS.includes(k)),
     ...MIDDLE_FIELD_GROUP_KEYS.filter((k) => !storedFieldGroups.includes(k)),
   ];
-  const deliveryActive = storedFieldGroups.includes("delivery-location");
+  const deliveryActive = storedFieldGroups.includes("delivery");
   // vehicle-registration (Statens vegvesen-oppslag for Bil og MC) isn't part
   // of MIDDLE_FIELD_GROUP_KEYS — this simple editor doesn't support letting
   // admins reorder/toggle it yet — but it must survive a save if the
@@ -130,22 +133,27 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
   // MIDDLE_FIELD_GROUP_KEYS either — same reasoning and same fix as
   // vehicle-registration above: they must survive a save if the category
   // already has them, or the vehicle flow silently loses steps the next time
-  // someone touches this dialog. vehicle-equipment is placed right after
-  // middleOrder (which includes description-keywords) since it's meant to
-  // render on the same page, directly under the Beskrivelse field.
+  // someone touches this dialog. Native vehicle order is facts, description,
+  // condition, equipment, as defined by the composer plan.
   const hasVehicleFacts = storedFieldGroups.includes("vehicle-facts");
   const hasVehicleCondition = storedFieldGroups.includes("vehicle-condition");
   const hasVehicleEquipment = storedFieldGroups.includes("vehicle-equipment");
   const activeFieldGroups = [
     ...(hasVehicleRegistration ? ["vehicle-registration"] : []),
-    "title-photos",
+    "photos",
+    ...(hasVehicleRegistration ? [] : ["title"]),
     ...(hasVehicleFacts ? ["vehicle-facts"] : []),
+    ...(hasVehicleFacts && storedFieldGroups.includes("description-keywords")
+      ? ["description-keywords"]
+      : []),
     ...(hasVehicleCondition ? ["vehicle-condition"] : []),
-    ...middleOrder.filter(
-      (k) => LOCKED_FIELD_GROUP_KEYS.includes(k) || storedFieldGroups.includes(k),
-    ),
     ...(hasVehicleEquipment ? ["vehicle-equipment"] : []),
-    ...(deliveryActive ? ["delivery-location"] : []),
+    ...middleOrder.filter(
+      (k) =>
+        !(hasVehicleFacts && k === "description-keywords") &&
+        (LOCKED_FIELD_GROUP_KEYS.includes(k) || storedFieldGroups.includes(k)),
+    ),
+    ...(deliveryActive ? ["delivery", "location"] : ["location"]),
     "review-publish",
   ];
 
@@ -164,12 +172,14 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
       nextModules: string[];
       nextFieldGroups: string[];
     }) => {
-      const { error } = await supabase
-        .from("category_flows")
-        .upsert(
-          { category_id: category.id, field_groups: nextFieldGroups, modules: nextModules },
-          { onConflict: "category_id" },
-        );
+      const { error } = await supabase.from("category_flows").upsert(
+        {
+          category_id: category.id,
+          field_groups: toStoredFieldGroupKeys(nextFieldGroups),
+          modules: nextModules,
+        },
+        { onConflict: "category_id" },
+      );
       if (error) throw error;
     },
     onSuccess: () => {
@@ -220,14 +230,20 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
     const reordered = arrayMove(middleOrder, oldIndex, newIndex);
     setFieldGroups([
       ...(hasVehicleRegistration ? ["vehicle-registration"] : []),
-      "title-photos",
+      "photos",
+      ...(hasVehicleRegistration ? [] : ["title"]),
       ...(hasVehicleFacts ? ["vehicle-facts"] : []),
+      ...(hasVehicleFacts && storedFieldGroups.includes("description-keywords")
+        ? ["description-keywords"]
+        : []),
       ...(hasVehicleCondition ? ["vehicle-condition"] : []),
-      ...reordered.filter(
-        (k) => LOCKED_FIELD_GROUP_KEYS.includes(k) || storedFieldGroups.includes(k),
-      ),
       ...(hasVehicleEquipment ? ["vehicle-equipment"] : []),
-      ...(deliveryActive ? ["delivery-location"] : []),
+      ...reordered.filter(
+        (k) =>
+          !(hasVehicleFacts && k === "description-keywords") &&
+          (LOCKED_FIELD_GROUP_KEYS.includes(k) || storedFieldGroups.includes(k)),
+      ),
+      ...(deliveryActive ? ["delivery", "location"] : ["location"]),
       "review-publish",
     ]);
   }
@@ -278,7 +294,9 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
               <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm text-muted-foreground">
                 <span className="inline-block size-4 shrink-0" aria-hidden />
                 <Checkbox checked disabled />
-                {FIELD_GROUP_LABELS_NB["title-photos"]}
+                {hasVehicleRegistration
+                  ? FIELD_GROUP_LABELS_NB.photos
+                  : `${FIELD_GROUP_LABELS_NB.photos} & ${FIELD_GROUP_LABELS_NB.title.toLowerCase()}`}
                 <span className="text-xs">(alltid først)</span>
               </li>
               {hasVehicleFacts && (
@@ -337,9 +355,9 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
                 <label className="flex items-center gap-2 text-sm">
                   <Checkbox
                     checked={deliveryActive}
-                    onCheckedChange={() => toggleFieldGroup("delivery-location")}
+                    onCheckedChange={() => toggleFieldGroup("delivery")}
                   />
-                  {FIELD_GROUP_LABELS_NB["delivery-location"]}
+                  {FIELD_GROUP_LABELS_NB.delivery}
                 </label>
               </li>
               <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm text-muted-foreground">

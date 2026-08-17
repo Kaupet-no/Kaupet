@@ -13,24 +13,49 @@ export const suggestCategoryForTitle = createServerFn({ method: "GET" })
       _title: data.title,
     });
     if (error) throw error;
-    if (!rows || rows.length === 0) return { suggestion: null };
 
-    const top = rows[0];
-    const totalVotes = rows.reduce((sum: number, r: { votes: number }) => sum + Number(r.votes), 0);
-    const share = Number(top.votes) / totalVotes;
+    const top = rows?.[0];
+    const totalVotes = (rows ?? []).reduce(
+      (sum: number, r: { votes: number }) => sum + Number(r.votes),
+      0,
+    );
+    const share = top ? Number(top.votes) / totalVotes : 0;
 
-    if (totalVotes < MIN_TOTAL_VOTES || share < MIN_SHARE) {
-      return { suggestion: null };
+    if (!top || totalVotes < MIN_TOTAL_VOTES || share < MIN_SHARE) {
+      const { suggestCategoryForTitleAi } = await import("@/lib/category-suggestion-ai.server");
+      const aiSuggestions = await suggestCategoryForTitleAi({ title: data.title }).catch(
+        () => null,
+      );
+      return { suggestions: aiSuggestions ?? [] };
     }
 
     return {
-      suggestion: {
-        category_id: top.category_id as string,
-        slug: top.slug as string,
-        name_nb: top.name_nb as string,
-        parent_id: top.parent_id as string | null,
-        parent_name_nb: top.parent_name_nb as string | null,
-        confidence: share,
-      },
+      suggestions: [
+        {
+          category_id: top.category_id as string,
+          slug: top.slug as string,
+          name_nb: top.name_nb as string,
+          parent_id: top.parent_id as string | null,
+          parent_name_nb: top.parent_name_nb as string | null,
+          confidence: share,
+        },
+      ],
     };
   });
+
+/** In-memory cache of in-flight/settled suggestion requests, keyed by trimmed
+ * title. Lets `intent-title-landing.tsx` kick off the (cold-start-prone, up
+ * to ~20s) AI category call the moment the user submits a title, while
+ * `use-listing-title-hints.ts` reuses that same promise once the wizard
+ * mounts instead of starting a fresh request — turning the image step's
+ * duration into free warm-up time. Survives client-side route navigation
+ * since it's a module-level singleton, not per-component state. */
+const suggestionCache = new Map<string, ReturnType<typeof suggestCategoryForTitle>>();
+
+export function prefetchCategorySuggestion(title: string) {
+  const key = title.trim();
+  if (!suggestionCache.has(key)) {
+    suggestionCache.set(key, suggestCategoryForTitle({ data: { title: key } }));
+  }
+  return suggestionCache.get(key)!;
+}

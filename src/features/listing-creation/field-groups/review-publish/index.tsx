@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ComposerReview } from "@/features/listing-creation/composer-review";
 
 import type { WizardSharedProps } from "../types";
 
@@ -113,6 +114,35 @@ export function ReviewPublishGroup(props: WizardSharedProps) {
           </AlertDescription>
         </Alert>
       )}
+      <ComposerReview
+        items={[
+          {
+            key: "category",
+            label: "Kategori",
+            value: props.categoryLabel || "Ikke valgt",
+            onEdit: () => props.onEditReviewSection("category"),
+          },
+          {
+            key: "content",
+            label: "Tittel og bilder",
+            value: `${props.title || "Ingen tittel"} · ${props.images.length} ${props.images.length === 1 ? "bilde" : "bilder"}`,
+            onEdit: () => props.onEditReviewSection("content"),
+          },
+          {
+            key: "details",
+            label: "Pris og detaljer",
+            value:
+              [props.previewPrice, props.subtitle].filter(Boolean).join(" · ") || "Ikke oppgitt",
+            onEdit: () => props.onEditReviewSection("details"),
+          },
+          {
+            key: "location",
+            label: "Sted",
+            value: [props.postalCode, props.city].filter(Boolean).join(" ") || "Ikke oppgitt",
+            onEdit: () => props.onEditReviewSection("location"),
+          },
+        ]}
+      />
       <ReviewPreview
         images={props.images}
         title={props.title}
@@ -155,16 +185,7 @@ export function PublishActions({
 }: PublishActionsProps) {
   if (native) {
     return (
-      <div className="flex w-full items-center gap-2">
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={onPreview}
-          disabled={mutationIsPending}
-          className="shrink-0 px-3"
-        >
-          Forhåndsvis
-        </Button>
+      <>
         {turnstileEnabled && (
           <Turnstile
             siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
@@ -177,12 +198,12 @@ export function PublishActions({
           type="submit"
           data-testid="publish-listing-button"
           disabled={mutationIsPending || (turnstileEnabled && !turnstileToken)}
-          className="h-14 flex-1 rounded-xl text-base"
+          className="min-h-12 min-w-24 rounded-xl px-3 text-base"
         >
           {mutationIsPending && <Loader2 className="size-4 animate-spin" />}
           Publiser
         </Button>
-      </div>
+      </>
     );
   }
 

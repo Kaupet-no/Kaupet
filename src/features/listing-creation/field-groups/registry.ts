@@ -1,7 +1,8 @@
 import type { ComponentType } from "react";
 
-import { TitlePhotos } from "./title-photos";
+import { PhotosGroup, TitleGroup } from "./title-photos";
 import { CategorySelect } from "./category-select";
+import { CategoryConfirm } from "./category-confirm";
 import { CategoryAttributes } from "./category-attributes";
 import { VehicleRegistration } from "./vehicle-registration";
 import { VehicleConfirm } from "./vehicle-confirm";
@@ -12,7 +13,7 @@ import { BoatFactsGroup } from "./boat-facts";
 import { VehicleConditionGroup } from "./vehicle-condition";
 import { VehicleEquipmentGroup } from "./vehicle-equipment";
 import { DescriptionKeywordsGroup } from "./description-keywords";
-import { DeliveryLocation } from "./delivery-location";
+import { DeliveryGroup, LocationGroup } from "./delivery-location";
 import { ReviewPublishGroup } from "./review-publish";
 import type { ListingFormShape, WizardSharedProps } from "./types";
 import type { CategoryBehavior } from "@/lib/category-behavior";
@@ -55,11 +56,20 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
     Component: CategorySelect,
     fieldsToValidate: ["category_id"],
   },
-  "title-photos": {
-    key: "title-photos",
-    Component: TitlePhotos,
-    fieldsToValidate: ["title"],
+  "category-confirm": {
+    key: "category-confirm",
+    Component: CategoryConfirm,
+    fieldsToValidate: ["category_id"],
+  },
+  photos: {
+    key: "photos",
+    Component: PhotosGroup,
     validateExtra: (ctx) => (ctx.images.length === 0 ? "SHOW_NO_IMAGE_DIALOG" : null),
+  },
+  title: {
+    key: "title",
+    Component: TitleGroup,
+    fieldsToValidate: ["title"],
   },
   "vehicle-registration": {
     key: "vehicle-registration",
@@ -185,9 +195,13 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
     Component: DescriptionKeywordsGroup,
     fieldsToValidate: ["description"],
   },
-  "delivery-location": {
-    key: "delivery-location",
-    Component: DeliveryLocation,
+  delivery: {
+    key: "delivery",
+    Component: DeliveryGroup,
+  },
+  location: {
+    key: "location",
+    Component: LocationGroup,
   },
   "review-publish": {
     key: "review-publish",
@@ -210,9 +224,11 @@ export function fieldGroupsForKeys(keys: string[]): FieldGroup[] {
  */
 const FIELD_GROUP_LABEL_NATIVE_NB: Record<string, string> = {
   "category-select": "Kategori",
+  "category-confirm": "Kategori",
   "vehicle-registration": "Registreringsnr.",
   "vehicle-confirm": "Bekreft kjøretøy",
-  "title-photos": "Tittel",
+  photos: "Bilder",
+  title: "Tittel",
   "category-attributes": "Detaljer",
   condition: "Detaljer",
   price: "Detaljer",
@@ -221,15 +237,18 @@ const FIELD_GROUP_LABEL_NATIVE_NB: Record<string, string> = {
   "vehicle-condition": "Tilstand",
   "vehicle-equipment": "Utstyr",
   "description-keywords": "Beskrivelse",
-  "delivery-location": "Sted",
+  delivery: "Levering",
+  location: "Sted",
   "review-publish": "Publiser",
 };
 
 const FIELD_GROUP_LABEL_WEB_NB: Record<string, string> = {
   "category-select": "Kategori",
+  "category-confirm": "Kategori",
   "vehicle-registration": "Registreringsnummer",
   "vehicle-confirm": "Bekreft kjøretøy",
-  "title-photos": "Bilder & tittel",
+  photos: "Bilder",
+  title: "Tittel",
   "category-attributes": "Detaljer",
   condition: "Detaljer",
   price: "Detaljer",
@@ -238,7 +257,8 @@ const FIELD_GROUP_LABEL_WEB_NB: Record<string, string> = {
   "vehicle-condition": "Tilstand",
   "vehicle-equipment": "Utstyr",
   "description-keywords": "Beskrivelse",
-  "delivery-location": "Lokasjon",
+  delivery: "Levering",
+  location: "Lokasjon",
   "review-publish": "Publiser",
 };
 
@@ -251,9 +271,11 @@ export function pageLabel(groups: FieldGroup[], native: boolean): string {
 /** Norwegian admin-display labels — distinct from the step-indicator labels above (different audience/purpose). */
 export const FIELD_GROUP_LABELS_NB: Record<string, string> = {
   "category-select": "Kategori",
+  "category-confirm": "Bekreft kategori",
   "vehicle-registration": "Kjøretøyregistrering",
   "vehicle-confirm": "Bekreft kjøretøy (Statens vegvesen)",
-  "title-photos": "Bilder & tittel",
+  photos: "Bilder",
+  title: "Tittel",
   "category-attributes": "Kategoriegenskaper",
   condition: "Tilstand",
   price: "Pris",
@@ -262,13 +284,15 @@ export const FIELD_GROUP_LABELS_NB: Record<string, string> = {
   "vehicle-condition": "Kjøretøy: Tilstand & historikk",
   "vehicle-equipment": "Kjøretøy: Utstyr",
   "description-keywords": "Beskrivelse & nøkkelord",
-  "delivery-location": "Levering & sted",
+  delivery: "Levering",
+  location: "Sted",
   "review-publish": "Forhåndsvisning & publiser",
 };
 
 /** Field groups every flow must include — admin UI won't let these be unchecked; enforced in DB too. */
 export const LOCKED_FIELD_GROUP_KEYS: string[] = [
-  "title-photos",
+  "photos",
+  "title",
   "category-attributes",
   "description-keywords",
   "review-publish",
@@ -293,4 +317,4 @@ export const LOCKED_FIELD_GROUP_KEYS: string[] = [
  * normal, admin-configurable field group (seeded on the Bil og MC category's
  * flow row) since an admin may legitimately want to reorder it.
  */
-export const POSITION_FIXED_FIELD_GROUP_KEYS: string[] = ["review-publish", "delivery-location"];
+export const POSITION_FIXED_FIELD_GROUP_KEYS: string[] = ["review-publish", "delivery", "location"];

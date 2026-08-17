@@ -61,7 +61,7 @@ test("logger inn og publiserer en annonse", async ({ page }, testInfo) => {
   // Tittel, Kategori (already set), Tilstand and Pris all live on the same
   // "Bilder & tittel" step. The test category has no attributes, so there's
   // nothing else to fill in here.
-  await wizardStep(page, "title-photos").waitFor();
+  await wizardStep(page, "photos").waitFor();
   await page.getByTestId("listing-title-input").fill("E2E testannonse — Stokke Tripp Trapp");
   await page.getByRole("checkbox", { name: "Gis bort gratis" }).click();
 

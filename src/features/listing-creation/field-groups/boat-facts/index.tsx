@@ -133,9 +133,14 @@ function SubtitleField({
         id="subtitle"
         placeholder="Utstyrskode eller annen relevant informasjon"
         aria-invalid={!!errors.subtitle}
+        aria-describedby={errors.subtitle ? "boat-subtitle-error" : undefined}
         {...register("subtitle")}
       />
-      {errors.subtitle && <p className="text-sm text-destructive">{errors.subtitle.message}</p>}
+      {errors.subtitle && (
+        <p id="boat-subtitle-error" className="text-sm text-destructive">
+          {errors.subtitle.message}
+        </p>
+      )}
     </div>
   );
 }

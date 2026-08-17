@@ -48,7 +48,13 @@ export function PreviewDraftView({ draft, onClose }: { draft: PreviewDraft; onCl
                 <Eye className="size-4" />
                 Dette er en forhåndsvisning — annonsen er ikke publisert ennå
               </span>
-              <Button type="button" size="sm" variant="ghost" onClick={onClose}>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="native-touch-target"
+                onClick={onClose}
+              >
                 <ArrowLeft className="size-4" /> Tilbake til annonsen
               </Button>
             </div>

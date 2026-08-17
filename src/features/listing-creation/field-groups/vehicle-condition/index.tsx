@@ -41,13 +41,20 @@ function VehicleConditionDetails({
           disabled={noKnownIssues}
           placeholder="Beskriv kjente feil eller mangler ved kjøretøyet."
           aria-invalid={!!errors.known_issues || !!knownIssuesExtraError}
+          aria-describedby={
+            errors.known_issues || knownIssuesExtraError ? "known-issues-error" : undefined
+          }
           {...register("known_issues")}
         />
         {errors.known_issues && (
-          <p className="text-sm text-destructive">{errors.known_issues.message}</p>
+          <p id="known-issues-error" className="text-sm text-destructive">
+            {errors.known_issues.message}
+          </p>
         )}
         {!errors.known_issues && knownIssuesExtraError && (
-          <p className="text-sm text-destructive">{knownIssuesExtraError}</p>
+          <p id="known-issues-error" className="text-sm text-destructive">
+            {knownIssuesExtraError}
+          </p>
         )}
         <label className="flex items-center gap-2 text-sm">
           <Checkbox
@@ -77,10 +84,13 @@ function VehicleConditionDetails({
           rows={3}
           placeholder="Hvilket vedlikehold er utført, og når?"
           aria-invalid={!!errors.maintenance_history}
+          aria-describedby={errors.maintenance_history ? "maintenance-history-error" : undefined}
           {...register("maintenance_history")}
         />
         {errors.maintenance_history && (
-          <p className="text-sm text-destructive">{errors.maintenance_history.message}</p>
+          <p id="maintenance-history-error" className="text-sm text-destructive">
+            {errors.maintenance_history.message}
+          </p>
         )}
       </section>
     </>

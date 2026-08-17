@@ -186,7 +186,7 @@ export function VehicleBrandField({
             role="combobox"
             aria-expanded={open}
             aria-invalid={!!error}
-            className="w-full justify-between font-normal hover:text-foreground"
+            className="native-touch-target w-full justify-between font-normal hover:text-foreground"
           >
             <span className={cn("truncate", !currentLabel && "text-muted-foreground")}>
               {currentLabel ?? "Velg merke…"}
@@ -293,7 +293,7 @@ export function VehicleModelField({
             aria-expanded={open}
             aria-invalid={!!error}
             disabled={!brandKnown}
-            className="w-full justify-between font-normal hover:text-foreground"
+            className="native-touch-target w-full justify-between font-normal hover:text-foreground"
           >
             <span className={cn("truncate", !currentLabel && "text-muted-foreground")}>
               {currentLabel ?? (brandKnown ? "Velg modell…" : "Velg merke først")}
@@ -550,7 +550,7 @@ export function VehicleModelMultiField({
             role="combobox"
             aria-expanded={open}
             disabled={!brandKnown}
-            className="w-full justify-between font-normal hover:text-foreground"
+            className="native-touch-target w-full justify-between font-normal hover:text-foreground"
           >
             <span className={cn("truncate", !triggerLabel && "text-muted-foreground")}>
               {triggerLabel ?? (brandKnown ? `Velg ${label.toLowerCase()}…` : "Velg merke først")}

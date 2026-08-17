@@ -10,6 +10,7 @@ import { nb } from "date-fns/locale";
 import { NativePageHeader } from "@/components/native-page-header";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useIsNative } from "@/hooks/use-is-native";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
 import { updateWtbListing } from "@/lib/wtb-listings.functions";
@@ -42,6 +43,7 @@ function WtbListingPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const native = useIsNative();
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
 
   const { data: listing, isLoading } = useQuery({
@@ -271,6 +273,7 @@ function WtbListingPage() {
                   categoryId={listing.category_id}
                   categories={categories ?? []}
                   attributes={attributes}
+                  native={native}
                   onSave={(next) => saveField({ group: "attributes", attributes: next })}
                 />
               )}
@@ -354,19 +357,18 @@ function WtbListingPage() {
   );
 }
 
-/** Local checked/unchecked UI state for the criteria panel — separate from
- * `attributes` so a user can activate a criterion before filling it in
- * without an autosave firing on every checkbox click (see
- * `WtbCriteriaFields`'s checked-without-value semantics). */
+/** Criteria values are the source of truth; empty means no limitation. */
 function WtbCriteriaPanel({
   categoryId,
   categories,
   attributes,
+  native,
   onSave,
 }: {
   categoryId: string | null;
   categories: CategoryNode[];
   attributes: WtbAttributeMap;
+  native: boolean;
   onSave: (next: WtbAttributeMap) => void;
 }) {
   const [checkedKeys, setCheckedKeys] = useState<string[]>(() => Object.keys(attributes));
@@ -379,7 +381,7 @@ function WtbCriteriaPanel({
       onChange={onSave}
       checkedKeys={checkedKeys}
       onCheckedKeysChange={setCheckedKeys}
-      showErrors={false}
+      native={native}
     />
   );
 }

@@ -63,8 +63,21 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # supabase start har en kjent race mot Docker der en intern
+      # "stop old containers"-opprydding kan kollidere med oppstart av den
+      # nye db-containeren på port 54322 ("address already in use").
+      # Retry med en full stop mellom forsøk kompenserer for det.
       - name: Start isolated Supabase and apply migrations
-        run: bunx supabase start
+        run: |
+          for attempt in 1 2 3; do
+            if bunx supabase start; then
+              exit 0
+            fi
+            echo "supabase start feilet (forsøk $attempt/3), rydder opp og prøver igjen …" >&2
+            bunx supabase stop --no-backup || true
+            sleep 5
+          done
+          exit 1
 
       - name: Run RLS integration tests
         run: bun run test:rls
@@ -263,6 +276,96 @@ jobs:
           name: playwright-report
           path: test-results/
           retention-days: 14
+
+  staging-gate:
+    name: Staging deployment gate
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # Bekrefter at det PR-en inneholder allerede er del av en vellykket
+      # staging-deploy (deploy-staging-jobben poster automatisk deployment-
+      # status for "staging"-environmentet siden den har environment:
+      # staging satt). "Require deployments to succeed" på main sjekker
+      # PR-ens egen HEAD-SHA, ikke staging sin — derfor posterer vi en egen
+      # deployment-status på PR-commiten nedenfor, basert på dette
+      # resultatet.
+      #
+      # deploy-staging krever at verify+rls+native-android fullfører først,
+      # så en fersk push til staging kan ligge flere minutter bak denne
+      # jobben (som trigges parallelt av samme push, men uten den
+      # ventetiden). Derfor polles det i stedet for én engangssjekk.
+      - name: Vent på og sjekk vellykket staging-deploy for PR-innholdet
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git fetch origin staging
+          ok=false
+          elapsed=0
+          timeout=720
+          interval=20
+
+          while [ "$elapsed" -lt "$timeout" ]; do
+            # Eksakt treff: PR_HEAD er selv deployet.
+            exact=$(gh api "repos/${{ github.repository }}/deployments?environment=staging&per_page=20" \
+              | jq -r --arg sha "$PR_HEAD" '[.[] | select(.sha == $sha)][0].id // empty')
+
+            if [ -n "$exact" ]; then
+              state=$(gh api "repos/${{ github.repository }}/deployments/$exact/statuses" --jq 'sort_by(.created_at) | last | .state // "pending"')
+              if [ "$state" = "success" ]; then
+                ok=true
+                break
+              fi
+            else
+              # Ingen eksakt deploy ennå — sjekk om PR_HEAD er en ancestor
+              # av siste vellykkede staging-deploy (staging kan ha gått
+              # forbi PR-en siden den ble åpnet).
+              latest=$(gh api "repos/${{ github.repository }}/deployments?environment=staging&per_page=1" --jq '.[0]')
+              latest_id=$(echo "$latest" | jq -r '.id')
+              latest_sha=$(echo "$latest" | jq -r '.sha')
+              latest_state=$(gh api "repos/${{ github.repository }}/deployments/$latest_id/statuses" --jq 'sort_by(.created_at) | last | .state // "pending"')
+              if [ "$latest_state" = "success" ] && git merge-base --is-ancestor "$PR_HEAD" "$latest_sha" 2>/dev/null; then
+                ok=true
+                break
+              fi
+            fi
+
+            echo "Venter på vellykket staging-deploy for $PR_HEAD … (${elapsed}/${timeout}s)"
+            sleep "$interval"
+            elapsed=$((elapsed + interval))
+          done
+
+          echo "ok=$ok" >> "$GITHUB_OUTPUT"
+          [ "$ok" = "true" ] || echo "Fant ingen vellykket staging-deploy som inkluderer $PR_HEAD innen ${timeout}s." >&2
+
+      - name: Post deployment-status for denne PR-en
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          state="failure"
+          [ "${{ steps.check.outputs.ok }}" = "true" ] && state="success"
+
+          # required_contexts må sendes eksplisitt som tom liste, ellers
+          # avviser deployment-endepunktet med 409 hvis andre required
+          # status-sjekker på PR-en ikke er "success" ennå.
+          deploy_id=$(jq -n --arg ref "$PR_HEAD" \
+            '{ref: $ref, environment: "staging", auto_merge: false, required_contexts: []}' \
+            | gh api "repos/${{ github.repository }}/deployments" --input - --jq '.id')
+
+          gh api "repos/${{ github.repository }}/deployments/$deploy_id/statuses" \
+            -f state="$state" -f environment=staging \
+            -f description="PR-innhold verifisert mot staging sin deploy"
+
+          [ "$state" = "success" ]
 
   deploy-staging:
     name: Deploy to Cloudflare Workers (staging)

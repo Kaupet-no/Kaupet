@@ -1,4 +1,4 @@
-import { createStart, createMiddleware } from "@tanstack/react-start";
+import { createStart, createMiddleware, createCsrfMiddleware } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 
 import { renderErrorPage } from "./lib/error-page";
@@ -90,7 +90,14 @@ const ipBanMiddleware = createMiddleware().server(async ({ next }) => {
   return next();
 });
 
+// GET server functions are read-only and don't need CSRF protection; excluding
+// them avoids false-positive 403s (e.g. requests missing Origin/Sec-Fetch-Site
+// headers) breaking read paths like category suggestion.
+const csrfMiddleware = createCsrfMiddleware({
+  filter: (ctx) => ctx.handlerType === "serverFn" && ctx.request.method !== "GET",
+});
+
 export const startInstance = createStart(() => ({
   functionMiddleware: [attachSupabaseAuth],
-  requestMiddleware: [errorMiddleware, requestSizeMiddleware, ipBanMiddleware],
+  requestMiddleware: [errorMiddleware, requestSizeMiddleware, ipBanMiddleware, csrfMiddleware],
 }));

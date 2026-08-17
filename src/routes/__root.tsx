@@ -4,6 +4,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -32,6 +33,7 @@ import { FeedbackTag } from "@/components/feedback-tag";
 import { TestEnvBanner } from "@/components/test-env-banner";
 import { TestEnvGate } from "@/components/test-env-gate";
 import { useIsTestEnv } from "@/lib/env";
+import { isComposerRoute } from "@/features/listing-creation/composer-route";
 
 function NotFoundComponent() {
   return (
@@ -310,6 +312,8 @@ function RootComponent() {
 function RootBody({ native }: { native: boolean }) {
   const isTest = useIsTestEnv();
   const keyboardVisible = useKeyboardVisible();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const composerRoute = isComposerRoute(pathname);
 
   useEffect(() => {
     // Runs after the browser has painted this render — by the time we get
@@ -341,7 +345,9 @@ function RootBody({ native }: { native: boolean }) {
   }, [isTest]);
 
   const body = (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div
+      className={`flex min-h-screen flex-col bg-background${composerRoute ? " composer-route" : ""}`}
+    >
       {!native && (
         <a
           href="#main-content"
@@ -355,7 +361,7 @@ function RootBody({ native }: { native: boolean }) {
       <ModerationBanner />
       <main
         id="main-content"
-        className={`flex-1${native && !keyboardVisible ? " pb-bottom-nav" : ""}`}
+        className={`flex-1${native && !keyboardVisible && !composerRoute ? " pb-bottom-nav" : ""}`}
       >
         <Outlet />
       </main>
@@ -402,7 +408,7 @@ function RootBody({ native }: { native: boolean }) {
           </div>
         </footer>
       )}
-      {native && !keyboardVisible && <AppBottomNav />}
+      {native && !keyboardVisible && !composerRoute && <AppBottomNav />}
       <FeedbackTag />
     </div>
   );

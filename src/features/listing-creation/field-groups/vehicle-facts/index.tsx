@@ -80,9 +80,14 @@ function SubtitleField({
         id="subtitle"
         placeholder="F.eks. Utstyrspakke, modellkode eller annen viktig info"
         aria-invalid={!!errors.subtitle}
+        aria-describedby={errors.subtitle ? "vehicle-subtitle-error" : undefined}
         {...register("subtitle")}
       />
-      {errors.subtitle && <p className="text-sm text-destructive">{errors.subtitle.message}</p>}
+      {errors.subtitle && (
+        <p id="vehicle-subtitle-error" className="text-sm text-destructive">
+          {errors.subtitle.message}
+        </p>
+      )}
     </section>
   );
 }

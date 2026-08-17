@@ -169,7 +169,7 @@ export function ListingComposerShell({
       <div
         className={cn(
           native
-            ? "px-safe pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 pt-3 backdrop-blur"
+            ? "px-safe pb-safe shrink-0 border-t border-border bg-background/95 pt-3 backdrop-blur"
             : "flex flex-wrap items-center gap-3 border-t border-border pt-6",
           !native && (firstStep ? "justify-end" : "justify-between"),
         )}

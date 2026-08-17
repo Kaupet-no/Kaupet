@@ -681,13 +681,7 @@ function NewWtbPage() {
                   goNext();
                 }}
               />
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className="min-h-12 scroll-mb-36"
-                onClick={goNext}
-              >
+              <Button type="button" size="sm" variant="ghost" className="min-h-12" onClick={goNext}>
                 Jeg er usikker – fortsett uten kategori
               </Button>
             </section>
@@ -714,7 +708,7 @@ function NewWtbPage() {
                     type="button"
                     size="sm"
                     variant="ghost"
-                    className="min-h-12 scroll-mb-36"
+                    className="min-h-12"
                     onClick={() => setCategoryConfirmed(true)}
                   >
                     Jeg er usikker – fortsett uten kategori

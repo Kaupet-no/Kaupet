@@ -1067,7 +1067,7 @@ function NewListingPage() {
     isVehicle,
     behavior,
     showMileage,
-    lockedFree: typeParam ?? null,
+    lockedFree: skipCategoryStep ? (typeParam ?? null) : null,
 
     register,
     watch,

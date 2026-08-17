@@ -53,10 +53,16 @@ omtrent like sannsynlige, svar med begge, atskilt med komma. Ingen annen tekst.`
 
   // Borealis scales to zero between requests (deliberate cost tradeoff at
   // current traffic). A cold request doesn't hold the connection open until
-  // the model is warm — it answers 503 "loading" near-instantly instead — so
-  // we poll on 503 until the model comes up or the overall budget (cold start
-  // measures ~20s in practice, so 45s gives headroom) runs out.
+  // the model is warm — it answers 503 "loading" near-instantly instead, or
+  // the connection itself fails while the container is still booting — so we
+  // poll until the model comes up or the overall budget (cold start measures
+  // ~20s in practice, so 45s gives headroom) runs out. Each individual
+  // attempt gets its own fixed, generous timeout (round-trip + generation
+  // measured ~9s warm) rather than "whatever's left of the 45s" — otherwise
+  // the attempt that finally lands after a long boot only gets a few seconds
+  // to complete and gets cut off by our own timeout, not the endpoint's.
   const deadline = Date.now() + 45_000;
+  const PER_ATTEMPT_TIMEOUT_MS = 20_000;
   let response: Response;
   for (;;) {
     try {
@@ -75,13 +81,14 @@ omtrent like sannsynlige, svar med begge, atskilt med komma. Ingen annen tekst.`
           max_tokens: 20,
           temperature: 0,
         }),
-        signal: AbortSignal.timeout(Math.max(1000, deadline - Date.now())),
+        signal: AbortSignal.timeout(PER_ATTEMPT_TIMEOUT_MS),
       });
     } catch (err) {
-      // Connection-level failures (refused/reset/hang up) are expected while
-      // the container is still booting, before its HTTP listener is even up
-      // — not just the 503 the app returns once it can talk HTTP. Retry
-      // those the same way, within the same budget.
+      // Connection-level failures (refused/reset/hang up), and this attempt's
+      // own timeout aborting, are expected while the container is still
+      // booting — not just the 503 the app returns once it can talk HTTP.
+      // Retry those the same way, as long as we're still within budget to
+      // start another attempt.
       if (Date.now() < deadline) {
         console.error("[category-suggestion-ai] fetch failed, retrying", err);
         await new Promise((resolve) => setTimeout(resolve, 1500));

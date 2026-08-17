@@ -72,17 +72,23 @@ export function useListingTitleHints(params: {
     if (fireImmediately) setFiredImmediately(true);
     const delay = fireImmediately ? 0 : 400;
     setCategorySuggestionLoading(true);
+    let cancelled = false;
     const timer = window.setTimeout(async () => {
       try {
         const result = await prefetchCategorySuggestion(t);
+        if (cancelled) return;
         setCategorySuggestions(result.suggestions);
       } catch {
+        if (cancelled) return;
         setCategorySuggestions([]);
       } finally {
-        setCategorySuggestionLoading(false);
+        if (!cancelled) setCategorySuggestionLoading(false);
       }
     }, delay);
-    return () => window.clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, categoryTouchedManually, suggestionDismissed]);
 

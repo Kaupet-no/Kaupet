@@ -55,8 +55,8 @@ omtrent like sannsynlige, svar med begge, atskilt med komma. Ingen annen tekst.`
   // current traffic). A cold request doesn't hold the connection open until
   // the model is warm — it answers 503 "loading" near-instantly instead — so
   // we poll on 503 until the model comes up or the overall budget (cold start
-  // measures ~20s in practice, so 35s gives headroom) runs out.
-  const deadline = Date.now() + 35_000;
+  // measures ~20s in practice, so 45s gives headroom) runs out.
+  const deadline = Date.now() + 45_000;
   let response: Response;
   for (;;) {
     try {

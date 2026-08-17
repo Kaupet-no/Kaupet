@@ -9,6 +9,7 @@ export const CATEGORY_SUGGESTION_LOADING_MESSAGES = [
   "Setter opp annonse...",
   "Henter kategoriforslag...",
   "Dette tar litt lenger tid enn forventet. Beklager ventetiden.",
+  "Snart ferdig...",
 ];
 
 export function useCategorySuggestionLoadingMessage(active: boolean): string {
@@ -17,9 +18,11 @@ export function useCategorySuggestionLoadingMessage(active: boolean): string {
     if (!active) return;
     const t1 = window.setTimeout(() => setStage(1), 8_000);
     const t2 = window.setTimeout(() => setStage(2), 15_000);
+    const t3 = window.setTimeout(() => setStage(3), 25_000);
     return () => {
       window.clearTimeout(t1);
       window.clearTimeout(t2);
+      window.clearTimeout(t3);
     };
   }, [active]);
   return active

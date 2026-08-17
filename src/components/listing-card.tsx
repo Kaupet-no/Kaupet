@@ -2,8 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Eye, Gauge, ImageOff, MapPin } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { signListingImageUrls, thumbPathFor } from "@/lib/storage";
-import { formatPrice } from "@/lib/format";
-import { computeListingTotalPriceKr } from "@/lib/vehicle/vehicle-classification";
+import { formatPrice, displayPriceNok } from "@/lib/format";
 import { FavoriteButton } from "@/components/favorite-button";
 import { useIsNative } from "@/hooks/use-is-native";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,15 +24,6 @@ export type ListingCardData = {
   category_slug?: string | null;
   attributes?: Record<string, unknown> | null;
 };
-
-/** Vehicle listing cards show the price including omregistreringsavgift —
- * same total as the listing detail page — not just what the seller set. */
-export function displayPriceNok(listing: ListingCardData): number | null {
-  return (
-    computeListingTotalPriceKr(listing.category_slug, listing.price_nok, listing.attributes) ??
-    listing.price_nok
-  );
-}
 
 /** Usage metric under the title: kilometers for vehicles, engine hours for
  * boats — whichever the listing's attributes carry. */

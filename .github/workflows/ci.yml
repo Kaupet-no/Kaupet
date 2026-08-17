@@ -63,8 +63,21 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # supabase start har en kjent race mot Docker der en intern
+      # "stop old containers"-opprydding kan kollidere med oppstart av den
+      # nye db-containeren på port 54322 ("address already in use").
+      # Retry med en full stop mellom forsøk kompenserer for det.
       - name: Start isolated Supabase and apply migrations
-        run: bunx supabase start
+        run: |
+          for attempt in 1 2 3; do
+            if bunx supabase start; then
+              exit 0
+            fi
+            echo "supabase start feilet (forsøk $attempt/3), rydder opp og prøver igjen …" >&2
+            bunx supabase stop --no-backup || true
+            sleep 5
+          done
+          exit 1
 
       - name: Run RLS integration tests
         run: bun run test:rls

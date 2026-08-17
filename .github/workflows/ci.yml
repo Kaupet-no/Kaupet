@@ -300,7 +300,7 @@ jobs:
           while [ "$elapsed" -lt "$timeout" ]; do
             # Eksakt treff: PR_HEAD er selv deployet.
             exact=$(gh api "repos/${{ github.repository }}/deployments?environment=staging&per_page=20" \
-              --jq --arg sha "$PR_HEAD" '[.[] | select(.sha == $sha)][0].id // empty')
+              | jq -r --arg sha "$PR_HEAD" '[.[] | select(.sha == $sha)][0].id // empty')
 
             if [ -n "$exact" ]; then
               state=$(gh api "repos/${{ github.repository }}/deployments/$exact/statuses" --jq 'sort_by(.created_at) | last | .state // "pending"')

@@ -146,7 +146,8 @@ export function ListingComposerShell({
         data-testid={`composer-page-${pageKey}`}
         aria-invalid={showValidationFeedback || undefined}
         className={cn(
-          "mt-8 rounded-2xl pb-24",
+          "mt-8 rounded-2xl",
+          native ? "pb-32" : "pb-24",
           native &&
             "native-composer-card overflow-y-auto overscroll-contain border border-border bg-card",
           showValidationFeedback &&

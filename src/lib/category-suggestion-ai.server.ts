@@ -78,6 +78,15 @@ omtrent like sannsynlige, svar med begge, atskilt med komma. Ingen annen tekst.`
         signal: AbortSignal.timeout(Math.max(1000, deadline - Date.now())),
       });
     } catch (err) {
+      // Connection-level failures (refused/reset/hang up) are expected while
+      // the container is still booting, before its HTTP listener is even up
+      // — not just the 503 the app returns once it can talk HTTP. Retry
+      // those the same way, within the same budget.
+      if (Date.now() < deadline) {
+        console.error("[category-suggestion-ai] fetch failed, retrying", err);
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        continue;
+      }
       console.error("[category-suggestion-ai] fetch failed", err);
       return null;
     }

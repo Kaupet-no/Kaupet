@@ -1,7 +1,7 @@
 import { useState } from "react";
+import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { CategoryPicker } from "@/components/category-picker";
 import { useCategorySuggestionLoadingMessage } from "@/features/listing-creation/use-category-suggestion-loading-message";
 
@@ -70,7 +70,7 @@ export function CategoryConfirm({
   if (!confirmedName && (categorySuggestionLoading || categorySuggestions.length === 0)) {
     return (
       <section className="space-y-4 py-6 text-center">
-        <Skeleton className="mx-auto h-6 w-2/3" />
+        <Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" />
         <p className="text-sm text-muted-foreground">{loadingMessage}</p>
       </section>
     );

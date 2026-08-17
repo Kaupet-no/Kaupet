@@ -75,7 +75,7 @@ test("bruker atomiske, validerte kort i native kjøpsønske", async ({ page }, t
   await expect(page.getByText("Rett feltene som er markert før du fortsetter.")).toBeVisible();
   await expect(composerPage(page, "title")).toBeVisible();
 
-  await page.getByLabel("Tittel").fill("E2E ønsker å kjøpe barnestol");
+  await composerPage(page, "title").getByLabel("Tittel").fill("E2E ønsker å kjøpe barnestol");
   await advanceWantStep(page, "attributes");
   await advanceWantStep(page, "details");
   await advanceWantStep(page, "review");

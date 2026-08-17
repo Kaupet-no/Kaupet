@@ -50,6 +50,11 @@ const TEST_MODEL = "XC60";
 test("logger inn og publiserer en kjøretøy-annonse (manuell registrering)", async ({
   page,
 }, testInfo) => {
+  // 7 wizard-steg vs. publish-listing.spec.ts sine 5 — hvert clickAndWaitFor-
+  // kall kan i verste fall bruke ~39s alene ved retry (se listing-wizard.ts),
+  // så standard 30s-timeout er for stramt for denne lengre flyten på en
+  // belastet CI-runner. Matchet mot webServer-timeouten i playwright.config.ts.
+  testInfo.setTimeout(60_000);
   const credentials = users[testInfo.project.name];
   if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);
   const { email, password } = credentials;

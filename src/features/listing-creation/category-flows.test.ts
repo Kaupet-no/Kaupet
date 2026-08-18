@@ -7,6 +7,7 @@ import {
   DEFAULT_MODULES,
   effectiveFlowForCategory,
   resolveWizardPages,
+  withRuntimeFieldGroups,
   toStoredFieldGroupKeys,
   type CategoryFlowRow,
 } from "./category-flows";
@@ -125,6 +126,72 @@ describe("effectiveFlowForCategory", () => {
     ]);
   });
 
+  it("deduplicates repeated field groups, keeping the first occurrence", () => {
+    const flows = [
+      row({
+        category_id: "cars",
+        field_groups: [
+          "photos",
+          "category-attributes",
+          "title-photos",
+          "description-keywords",
+          "review-publish",
+        ],
+      }),
+    ];
+    expect(effectiveFlowForCategory("cars", flows, byId).fieldGroups).toEqual([
+      "category-select",
+      "photos",
+      "category-attributes",
+      "title",
+      "description-keywords",
+      "review-publish",
+    ]);
+  });
+
+  it("hoists photos first and drops title when entered from the landing screen", () => {
+    expect(effectiveFlowForCategory(null, [], byId, true).fieldGroups).toEqual([
+      "photos",
+      "category-attributes",
+      "condition",
+      "price",
+      "description-keywords",
+      "delivery",
+      "location",
+      "review-publish",
+    ]);
+  });
+
+  it("keeps photos first in a vehicle flow entered from the landing screen", () => {
+    const flows = [
+      row({
+        category_id: "cars",
+        field_groups: [
+          "vehicle-registration",
+          "category-attributes",
+          "title-photos",
+          "vehicle-facts",
+          "vehicle-condition",
+          "description-keywords",
+          "delivery-location",
+          "review-publish",
+        ],
+      }),
+    ];
+    // The images step must stay step 1 both before and after the flow swap at
+    // category-confirm — otherwise it reappears mid-vehicle-flow.
+    expect(effectiveFlowForCategory("cars", flows, byId, true).fieldGroups).toEqual([
+      "photos",
+      "vehicle-registration",
+      "category-attributes",
+      "vehicle-facts",
+      "description-keywords",
+      "vehicle-condition",
+      "location",
+      "review-publish",
+    ]);
+  });
+
   it("orders vehicle description between facts and condition", () => {
     const flows = [
       row({
@@ -201,11 +268,11 @@ describe("resolveWizardPages", () => {
     expect(resolveWizardPages([], { native: true })).toEqual([]);
   });
 
-  it("solo-pages vehicle-registration and vehicle-confirm wherever they land in the array", () => {
+  it("solo-pages vehicle-registration and vehicle-360 wherever they land in the array", () => {
     const groups = [
       "category-select",
       "vehicle-registration",
-      "vehicle-confirm",
+      "vehicle-360",
       "category-attributes",
       "photos",
       "title",
@@ -219,7 +286,7 @@ describe("resolveWizardPages", () => {
     expect(resolveWizardPages(groups, { native: false })).toEqual([
       ["category-select"],
       ["vehicle-registration"],
-      ["vehicle-confirm"],
+      ["vehicle-360"],
       ["category-attributes", "photos", "title", "condition", "price"],
       ["description-keywords"],
       ["delivery", "location", "review-publish"],
@@ -227,7 +294,7 @@ describe("resolveWizardPages", () => {
     expect(resolveWizardPages(groups, { native: true })).toEqual([
       ["category-select"],
       ["vehicle-registration"],
-      ["vehicle-confirm"],
+      ["vehicle-360"],
       ["category-attributes"],
       ["photos"],
       ["title"],
@@ -238,5 +305,59 @@ describe("resolveWizardPages", () => {
       ["location"],
       ["review-publish"],
     ]);
+  });
+});
+
+describe("withRuntimeFieldGroups", () => {
+  const landingFlow = ["photos", "category-attributes", "description-keywords", "review-publish"];
+  const vehicleFlow = [
+    "photos",
+    "vehicle-registration",
+    "category-attributes",
+    "vehicle-facts",
+    "review-publish",
+  ];
+
+  it("puts category-confirm right after photos while the suggestion is unconfirmed", () => {
+    expect(withRuntimeFieldGroups(landingFlow, { showCategoryConfirm: true })).toEqual([
+      "photos",
+      "category-confirm",
+      "category-attributes",
+      "description-keywords",
+      "review-publish",
+    ]);
+  });
+
+  it("drops category-confirm once the category is confirmed", () => {
+    expect(withRuntimeFieldGroups(landingFlow, { showCategoryConfirm: false })).toEqual(
+      landingFlow,
+    );
+  });
+
+  it("adds the 360 step right after vehicle-registration", () => {
+    expect(withRuntimeFieldGroups(vehicleFlow, { showCategoryConfirm: false })).toEqual([
+      "photos",
+      "vehicle-registration",
+      "vehicle-360",
+      "category-attributes",
+      "vehicle-facts",
+      "review-publish",
+    ]);
+  });
+
+  it("never adds vehicle steps to a non-vehicle flow", () => {
+    expect(withRuntimeFieldGroups(landingFlow, { showCategoryConfirm: false })).toEqual(
+      landingFlow,
+    );
+  });
+
+  it("keeps photos as step 1 across the flow swap at category-confirm", () => {
+    // Bilder skal aldri spørres om to ganger: siden begge arrayene starter
+    // på photos, peker stegindeksen på samme side før og etter byttet.
+    const before = withRuntimeFieldGroups(landingFlow, { showCategoryConfirm: true });
+    const after = withRuntimeFieldGroups(vehicleFlow, { showCategoryConfirm: false });
+    expect(before[0]).toBe("photos");
+    expect(after[0]).toBe("photos");
+    expect(after.filter((k) => k === "photos")).toHaveLength(1);
   });
 });

@@ -36,11 +36,19 @@ export type CategoryFlowRow = {
 const DEFAULT_FLOW: CategoryFlow = { fieldGroups: DEFAULT_FIELD_GROUPS, modules: DEFAULT_MODULES };
 
 export function normalizeFieldGroupKeys(keys: string[]): string[] {
-  const normalized = keys.flatMap((key) => {
-    if (key === "title-photos") return ["photos", "title"];
-    if (key === "delivery-location") return ["delivery", "location"];
-    return [key];
-  });
+  // Deduplicated (first occurrence wins): a field group asked twice in the
+  // same flow means the user is asked the same question twice, which is a
+  // configuration mistake in every case — cheaper to make impossible here
+  // than to guard in each group.
+  const normalized = [
+    ...new Set(
+      keys.flatMap((key) => {
+        if (key === "title-photos") return ["photos", "title"];
+        if (key === "delivery-location") return ["delivery", "location"];
+        return [key];
+      }),
+    ),
+  ];
   if (!normalized.includes("vehicle-registration")) return normalized;
   const vehicle = normalized.filter((key) => key !== "title" && key !== "delivery");
   const factsIndex = vehicle.indexOf("vehicle-facts");
@@ -90,9 +98,9 @@ export function effectiveFlowForCategory(
   categoryId: string | null,
   allFlows: CategoryFlowRow[],
   categoriesById: Map<string, CategoryNode>,
-  skipCategoryStep = false,
+  fromLanding = false,
 ): CategoryFlow {
-  const prepend = skipCategoryStep ? (flow: CategoryFlow) => flow : prependCategorySelect;
+  const prepend = fromLanding ? applyLandingEntry : prependCategorySelect;
   if (!categoryId) return prepend(DEFAULT_FLOW);
   const flowsByCategoryId = new Map(allFlows.map((f) => [f.category_id, f]));
   let cur: CategoryNode | undefined = categoriesById.get(categoryId);
@@ -111,6 +119,52 @@ export function effectiveFlowForCategory(
 
 function prependCategorySelect(flow: CategoryFlow): CategoryFlow {
   return { ...flow, fieldGroups: ["category-select", ...flow.fieldGroups] };
+}
+
+/**
+ * Entry from the intent+title landing screen: the title is already answered
+ * and photos are always step 1, whichever category flow ends up applying.
+ * Both are therefore removed from wherever the stored flow put them —
+ * `photos` re-added at the front, `title` dropped entirely (it stays
+ * editable from the composer header instead).
+ *
+ * Hoisting `photos` rather than leaving it in place is what keeps the wizard
+ * stable when the flow is swapped mid-session: the user picks a category on
+ * step 2 (category-confirm), which replaces the whole page array while the
+ * step index stays put. With `photos` first in *every* flow, step 1 is the
+ * same page before and after the swap, so the images step can never reappear
+ * later in a vehicle flow that happens to list it further down.
+ */
+function applyLandingEntry(flow: CategoryFlow): CategoryFlow {
+  const rest = flow.fieldGroups.filter((key) => key !== "photos" && key !== "title");
+  return { ...flow, fieldGroups: ["photos", ...rest] };
+}
+
+/**
+ * Injects the field groups that can't be stored in a category's
+ * `field_groups` because they depend on live wizard state:
+ *
+ * - `category-confirm` right after `photos`, while the landing-screen entry
+ *   still has an unconfirmed AI category suggestion;
+ * - `vehicle-360` right after `vehicle-registration`. 360°-opptak only
+ *   applies to Bil og MC, so it can't live on the images step — that one is
+ *   always step 1, before any category is known.
+ *
+ * Pure so the resulting step order is testable without mounting the wizard.
+ */
+export function withRuntimeFieldGroups(
+  keys: string[],
+  options: { showCategoryConfirm: boolean },
+): string[] {
+  let next = keys;
+  if (options.showCategoryConfirm) {
+    const photosIdx = next.indexOf("photos");
+    const insertAt = photosIdx === -1 ? 0 : photosIdx + 1;
+    next = [...next.slice(0, insertAt), "category-confirm", ...next.slice(insertAt)];
+  }
+  const regIdx = next.indexOf("vehicle-registration");
+  if (regIdx === -1) return next;
+  return [...next.slice(0, regIdx + 1), "vehicle-360", ...next.slice(regIdx + 1)];
 }
 
 /**
@@ -133,7 +187,7 @@ function prependCategorySelect(flow: CategoryFlow): CategoryFlow {
  */
 /** Field-group keys that always get their own solo page, wherever they land
  * in the ordered array — `category-select` is always first (see
- * prependCategorySelect); `vehicle-registration`/`vehicle-confirm` can land
+ * prependCategorySelect); `vehicle-registration`/`vehicle-360` can land
  * anywhere in the array (admin-configurable position for the former,
  * runtime-injected right after it for the latter), but must never be bundled
  * with unrelated groups like `condition`/`price`. */
@@ -141,7 +195,7 @@ const SOLO_FIELD_GROUP_KEYS = new Set([
   "category-select",
   "category-confirm",
   "vehicle-registration",
-  "vehicle-confirm",
+  "vehicle-360",
 ]);
 
 export function resolveWizardPages(

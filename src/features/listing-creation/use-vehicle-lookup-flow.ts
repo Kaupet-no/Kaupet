@@ -2,47 +2,45 @@
 import { useServerFn } from "@tanstack/react-start";
 import { showErrorToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
-import {
-  vehicleCategoryGroupFor,
-  type CategoryFilter,
-  type CategoryNode,
-} from "@/lib/category-filters";
+import type { CategoryNode } from "@/lib/category-filters";
 import { lookupVehicleByRegNumber } from "@/lib/vehicle/vehicle-lookup.functions";
-import { matchVehicleBrandModel } from "@/lib/vehicle/vehicle-brand-match.functions";
-import { classifyVehicleCategory } from "@/lib/vehicle/vehicle-classification";
-import { firstRegistrationYear } from "@/lib/vehicle/first-registration";
-import type {
-  AvgiftskodeGruppe,
-  VehicleClassification,
+import {
+  classifyVehicleCategory,
+  avgiftskodeGruppeFromCode,
 } from "@/lib/vehicle/vehicle-classification";
+import { firstRegistrationYear } from "@/lib/vehicle/first-registration";
+import type { VehicleClassification } from "@/lib/vehicle/vehicle-classification";
 import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.types";
 import type { AttributeMap } from "@/components/attribute-fields";
 
-type VehicleSpecOverrides = Partial<{
-  year: number;
-  fuel_type: string;
-  transmission: string;
-  drive_type: string;
-  weight_kg: number;
-  power_hk: number;
-  tow_hitch: boolean;
-  max_tow_weight_kg: number;
-  seats: number;
-  color: string;
-  next_eu_control: string;
-  eu_control_exempt: boolean;
-  sleeping_places: number;
-  max_total_weight_kg: number;
-  length_m: number;
-  imported_used: boolean;
-  first_registration_date: string;
-  cylinders: number;
-  engine_displacement_cc: number;
-  engine_code: string;
-  avgiftskode_gruppe: AvgiftskodeGruppe;
-}>;
-
 type CategoriesById = Map<string, CategoryNode & { name_nb: string; slug?: string }>;
+
+/** SVV returns color as free text (e.g. "SORT", "SØLV METALLIC") — best-effort
+ * maps it onto the fixed color list so it matches the "manual entry" path's
+ * fixed values (used for display/filtering) instead of storing raw text that
+ * wouldn't match any of them. */
+function guessColorOption(raw: string | null | undefined): string | undefined {
+  if (!raw) return undefined;
+  const s = raw.toLowerCase();
+  const matchers: [string, string[]][] = [
+    ["black", ["sort", "svart"]],
+    ["white", ["hvit"]],
+    ["silver", ["sølv", "solv"]],
+    ["gray", ["grå", "gra"]],
+    ["red", ["rød", "rod"]],
+    ["blue", ["blå", "bla"]],
+    ["green", ["grønn", "gronn"]],
+    ["yellow", ["gul"]],
+    ["orange", ["oransje"]],
+    ["brown", ["brun"]],
+    ["beige", ["beige"]],
+    ["purple", ["lilla", "fiolett"]],
+  ];
+  for (const [value, keywords] of matchers) {
+    if (keywords.some((k) => s.includes(k))) return value;
+  }
+  return "other";
+}
 
 /**
  * Owns the "Bil og MC" registration-number lookup flow: running the SVV
@@ -52,7 +50,6 @@ type CategoriesById = Map<string, CategoryNode & { name_nb: string; slug?: strin
  * concern in one component — see also useDraftAutosave for the same pattern.
  */
 export function useVehicleLookupFlow(params: {
-  allFilters: CategoryFilter[] | undefined;
   categoriesById: CategoriesById;
   attributes: AttributeMap;
   setAttributes: (next: AttributeMap) => void;
@@ -63,7 +60,6 @@ export function useVehicleLookupFlow(params: {
   goNext: () => void;
 }) {
   const {
-    allFilters,
     categoriesById,
     attributes,
     setAttributes,
@@ -82,17 +78,8 @@ export function useVehicleLookupFlow(params: {
   );
   const [vehiclePreviousClassificationMismatch, setVehiclePreviousClassificationMismatch] =
     useState<{ slug: string | null; lookedUpAt: string } | null>(null);
-  const [vehicleLookupConfirmOpen, setVehicleLookupConfirmOpen] = useState(false);
-  /** DOM node for the shared step footer's primary-action slot, on the
-   * vehicle-confirm page — lets VehicleConfirm portal its "Bekreft og
-   * fortsett" button there instead of rendering it inline, so it sits on the
-   * same row as "Tilbake" like every other step's primary action. */
-  const [vehicleConfirmFooterSlot, setVehicleConfirmFooterSlot] = useState<HTMLDivElement | null>(
-    null,
-  );
   const [vehicleRegNrInput, setVehicleRegNrInput] = useState("");
   const lookupVehicleFn = useServerFn(lookupVehicleByRegNumber);
-  const matchBrandModelFn = useServerFn(matchVehicleBrandModel);
 
   async function runVehicleLookup(registrationNumber: string): Promise<boolean> {
     setVehicleLookupLoading(true);
@@ -111,7 +98,6 @@ export function useVehicleLookupFlow(params: {
         ),
       );
       setVehiclePreviousClassificationMismatch(previousClassificationMismatch);
-      setVehicleLookupConfirmOpen(true);
       return true;
     } catch (e) {
       setVehicleLookupError(
@@ -126,28 +112,15 @@ export function useVehicleLookupFlow(params: {
     }
   }
 
-  /** Runs the deferred brand/model match for a chosen leaf category, so
-   * vehicle-confirm can show/resolve an unmatched brand or model to the user
-   * *before* they commit — rather than confirmVehicleData silently leaving
-   * brand/model unset. */
-  async function matchVehicleBrandForLeaf(leafCategoryId: string) {
-    const lookup = vehicleLookupResult;
-    if (!lookup) return null;
-    const categoryGroup = vehicleCategoryGroupFor(leafCategoryId, allFilters ?? [], categoriesById);
-    if (!categoryGroup) return null;
-    const { brandMatch, modelMatch } = await matchBrandModelFn({
-      data: { brand: lookup.brand, model: lookup.model, categoryGroup },
-    });
-    return { categoryGroup, brandMatch, modelMatch };
-  }
-
-  function confirmVehicleData(
-    leafCategoryId: string,
-    resolved?: { brandName?: string; modelName?: string; specOverrides?: VehicleSpecOverrides },
-  ) {
+  /** Skriver rå SVV-data til attributes uten redigeringssteg — brukeren
+   * bekrefter kun at registreringsnummeret stemmer (se den nye
+   * vehicle-registration-popupen), ikke hvert enkelt tekniske felt. Merke/
+   * modell er allerede satt av brukeren på dette steget (SVVs tekst er ikke
+   * presis nok til å overstyre det), og eventuelle feil i øvrige felt rettes
+   * ved forhåndsvisning eller ved redigering av publisert annonse. */
+  function confirmVehicleData(leafCategoryId: string) {
     const lookup = vehicleLookupResult;
     if (!lookup) return;
-    const spec = resolved?.specOverrides;
 
     const next: AttributeMap = {
       ...attributes,
@@ -155,62 +128,42 @@ export function useVehicleLookupFlow(params: {
       registration_number: lookup.registrationNumber,
       vehicle_lookup: JSON.stringify(lookup),
     };
-    const year = spec?.year ?? lookup.year;
-    if (year) next.year = year;
-    const fuelType = spec?.fuel_type ?? lookup.fuel_type;
-    if (fuelType) next.fuel_type = fuelType;
-    const weightKg = spec?.weight_kg ?? lookup.weight_kg;
-    if (weightKg != null) next.weight_kg = weightKg;
-    const transmission = spec?.transmission ?? lookup.transmission;
-    if (transmission) next.transmission = transmission;
-    const color = spec?.color ?? lookup.color;
+    if (lookup.year) next.year = lookup.year;
+    if (lookup.fuel_type) next.fuel_type = lookup.fuel_type;
+    if (lookup.weight_kg != null) next.weight_kg = lookup.weight_kg;
+    if (lookup.transmission) next.transmission = lookup.transmission;
+    const color = guessColorOption(lookup.color);
     if (color) next.color = color;
-    const nextEuControl = spec?.next_eu_control ?? lookup.next_eu_control;
-    if (nextEuControl) next.next_eu_control = nextEuControl;
-    if (spec?.eu_control_exempt != null) next.eu_control_exempt = spec.eu_control_exempt;
-    const powerHk = spec?.power_hk ?? lookup.power_hk;
-    if (powerHk != null) next.power_hk = powerHk;
-    const driveType = spec?.drive_type ?? lookup.drive_type;
-    if (driveType) next.drive_type = driveType;
-    const towHitch = spec?.tow_hitch ?? lookup.tow_hitch;
-    if (towHitch != null) next.tow_hitch = towHitch;
-    const maxTowWeightKg = spec?.max_tow_weight_kg ?? lookup.max_tow_weight_kg;
-    if (maxTowWeightKg != null) next.max_tow_weight_kg = maxTowWeightKg;
-    const maxTotalWeightKg = spec?.max_total_weight_kg ?? lookup.max_total_weight_kg;
-    if (maxTotalWeightKg != null) next.max_total_weight_kg = maxTotalWeightKg;
-    const lengthM = spec?.length_m ?? lookup.length_m;
-    if (lengthM != null) next.length_m = lengthM;
-    const seats = spec?.seats ?? lookup.seats;
-    if (seats != null) next.seats = seats;
-    const importedUsed = spec?.imported_used ?? lookup.imported_used;
-    if (importedUsed != null) next.imported_used = importedUsed;
-    const firstRegistrationDate = spec?.first_registration_date ?? lookup.first_registration_date;
-    if (firstRegistrationDate) {
-      next.first_registration_date = firstRegistrationDate;
+    if (lookup.next_eu_control) next.next_eu_control = lookup.next_eu_control;
+    if (lookup.power_hk != null) next.power_hk = lookup.power_hk;
+    if (lookup.drive_type) next.drive_type = lookup.drive_type;
+    if (lookup.tow_hitch != null) next.tow_hitch = lookup.tow_hitch;
+    if (lookup.max_tow_weight_kg != null) next.max_tow_weight_kg = lookup.max_tow_weight_kg;
+    if (lookup.max_total_weight_kg != null) next.max_total_weight_kg = lookup.max_total_weight_kg;
+    if (lookup.length_m != null) next.length_m = lookup.length_m;
+    if (lookup.seats != null) next.seats = lookup.seats;
+    if (lookup.imported_used != null) next.imported_used = lookup.imported_used;
+    if (lookup.first_registration_date) {
+      next.first_registration_date = lookup.first_registration_date;
       // Den eksakte datoen vises på annonsesiden, men søkes på som år — så
       // året lagres avledet ved siden av (se
       // 20260729130000_first_registration_year_numeric.sql).
-      const year = firstRegistrationYear(firstRegistrationDate);
+      const year = firstRegistrationYear(lookup.first_registration_date);
       if (year != null) next.first_registration_year = year;
     }
-    const cylinders = spec?.cylinders ?? lookup.cylinders;
-    if (cylinders != null) next.cylinders = cylinders;
-    const engineDisplacementCc = spec?.engine_displacement_cc ?? lookup.engine_displacement_cc;
-    if (engineDisplacementCc != null) next.engine_displacement_cc = engineDisplacementCc;
-    const engineCode = spec?.engine_code ?? lookup.engine_code;
-    if (engineCode) next.engine_code = engineCode;
-    const sleepingPlaces = spec?.sleeping_places ?? lookup.sleeping_places;
-    if (sleepingPlaces != null) next.sleeping_places = sleepingPlaces;
-    // Personbil/Varebil-gruppen (utledet i vehicle-confirm fra avgiftsklasse-
-    // koden) manglet her tidligere — den ble beregnet og sendt med i
-    // specOverrides, men aldri faktisk skrevet til attributes, så
-    // omregistreringsavgiften kunne aldri beregnes for noen "bil"-annonse
-    // (alltid "Vi klarte ikke å beregne avgiften automatisk", uansett hvor
-    // komplett SVV-dataen var — se bug-rapport for DR50500, en Audi A3
-    // e-tron med fullstendige data).
-    if (spec?.avgiftskode_gruppe) next.avgiftskode_gruppe = spec.avgiftskode_gruppe;
-    if (resolved?.brandName) next.brand = resolved.brandName;
-    if (resolved?.modelName) next.model = resolved.modelName;
+    if (lookup.cylinders != null) next.cylinders = lookup.cylinders;
+    if (lookup.engine_displacement_cc != null)
+      next.engine_displacement_cc = lookup.engine_displacement_cc;
+    if (lookup.engine_code) next.engine_code = lookup.engine_code;
+    if (lookup.sleeping_places != null) next.sleeping_places = lookup.sleeping_places;
+    // Personbil/Varebil-gruppen, utledet automatisk fra avgiftsklassekoden —
+    // uten denne kan ikke omregistreringsavgiften beregnes (se bug-rapport
+    // for DR50500, en Audi A3 e-tron med fullstendige data der denne manglet).
+    const avgiftskodeGruppe = avgiftskodeGruppeFromCode(
+      lookup.avgiftsklasse_code,
+      lookup.classification_code,
+    );
+    if (avgiftskodeGruppe) next.avgiftskode_gruppe = avgiftskodeGruppe;
 
     setAttributes(next);
     setCategoryTouchedManually(true);
@@ -224,28 +177,26 @@ export function useVehicleLookupFlow(params: {
     window.scrollTo({ top: 0 });
   }
 
-  /** Called from the post-lookup confirm overlay's "Juster registreringsnummer"
-   * action: clears the lookup so the user can retype and re-search, without
-   * touching vehicleRegistered or navigating away from the current step. */
+  /** Clears the lookup so the user can retype and re-search, without
+   * touching vehicleRegistered or navigating away from the current step.
+   * Brukes av kjennemerke-dialogen i redigeringsflyten
+   * (vehicle-plate-edit-dialog.tsx). */
   function adjustVehicleRegistrationNumber() {
-    setVehicleLookupConfirmOpen(false);
     setVehicleLookupResult(null);
     setVehicleClassification(null);
     setVehicleLookupError(null);
     setVehiclePreviousClassificationMismatch(null);
   }
 
-  /** Stepping back from vehicle-confirm to vehicle-registration (via
-   * "Tilbake") is the only way to reach vehicle-registration a second time —
-   * clear the stale lookup so the reg-nr field is editable again and
-   * pressing "Neste" re-runs the lookup instead of bouncing straight back to
-   * vehicle-confirm with old data. */
+  /** Clears the lookup so the reg-nr field is editable again and pressing
+   * "Neste" re-runs the lookup — used both when stepping back from a later
+   * page to vehicle-registration, and when the user answers "Nei" to the
+   * reg-nr confirmation popup shown right after a successful lookup. */
   function resetLookupOnReturnToRegistration() {
     setVehicleLookupResult(null);
     setVehicleClassification(null);
     setVehicleLookupError(null);
     setVehiclePreviousClassificationMismatch(null);
-    setVehicleLookupConfirmOpen(false);
   }
 
   function showMissingRegNrError() {
@@ -260,14 +211,9 @@ export function useVehicleLookupFlow(params: {
     vehicleLookupResult,
     vehicleClassification,
     vehiclePreviousClassificationMismatch,
-    vehicleLookupConfirmOpen,
-    setVehicleLookupConfirmOpen,
-    vehicleConfirmFooterSlot,
-    setVehicleConfirmFooterSlot,
     vehicleRegNrInput,
     setVehicleRegNrInput,
     runVehicleLookup,
-    matchVehicleBrandForLeaf,
     confirmVehicleData,
     adjustVehicleRegistrationNumber,
     resetLookupOnReturnToRegistration,

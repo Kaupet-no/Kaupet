@@ -6,7 +6,7 @@ import { TermGroupChips } from "@/components/term-group-editor";
 import type { LocationValue } from "@/components/location-filter";
 import type { TermGroup } from "@/lib/term-groups";
 import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
-import { parseIsoDate } from "@/features/listing-creation/field-groups/vehicle-confirm/spec";
+import { parseIsoDate } from "@/lib/vehicle/vehicle-date";
 
 type SearchLike = {
   q: string;

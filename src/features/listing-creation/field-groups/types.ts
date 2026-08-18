@@ -132,7 +132,7 @@ export type WizardSharedProps = {
    * show an inline message next to the offending input. */
   extraFieldError: { field: string; message: string } | null;
 
-  // vehicle-first flow (vehicle-registration / vehicle-confirm field groups)
+  // vehicle-first flow (vehicle-registration field group)
   bilOgMcCategoryId: string | null;
   vehicleRegistered: boolean;
   setVehicleRegistered: (v: boolean) => void;
@@ -142,72 +142,21 @@ export type WizardSharedProps = {
   vehicleClassification: VehicleClassification | null;
   /** Set when the same user previously looked up the same registration
    * number and got a different classification — surfaced as a soft warning
-   * in vehicle-confirm (personalized plates can be transferred between
-   * vehicles of a different class). */
+   * in the reg-nr confirmation popup (personalized plates can be transferred
+   * between vehicles of a different class). */
   vehiclePreviousClassificationMismatch: { slug: string | null; lookedUpAt: string } | null;
-  /** DOM node for the shared step footer's primary-action slot on the
-   * vehicle-confirm page. vehicle-confirm portals its "Bekreft og fortsett"
-   * button there so it lines up with "Tilbake" like every other step's
-   * primary action, instead of rendering inline within the field group. */
-  vehicleConfirmFooterSlot: HTMLDivElement | null;
-  /** Controls the post-lookup confirm overlay (Regnr/Merke/Modell) shown
-   * right after a successful lookup, before the vehicle-confirm step's
-   * type-picker + detail table. */
-  vehicleLookupConfirmOpen: boolean;
-  setVehicleLookupConfirmOpen: (open: boolean) => void;
-  /** Clears the lookup result so the user can retype the registration
-   * number, without navigating away from the current step. */
-  adjustVehicleRegistrationNumber: () => void;
-  /** Closes the confirm overlay and advances to the vehicle-confirm step. */
-  confirmVehicleLookupAndContinue: () => void | Promise<void>;
   /** Registration number as typed so far — lifted out of the field group so
    * the wizard's "Neste" button can trigger the lookup itself (the dedicated
    * "Slå opp" button was removed). */
   vehicleRegNrInput: string;
   setVehicleRegNrInput: (v: string) => void;
   runVehicleLookup: (registrationNumber: string) => Promise<boolean>;
-  /** Matches the lookup's raw brand/model against approved vehicle_brands/
-   * vehicle_models for the brand group implied by `leafCategoryId`. Returns
-   * null if the leaf has no brand group (shouldn't happen for the 7 vehicle
-   * leaves, but defensive). Lets vehicle-confirm show/resolve an unmatched
-   * brand or model *before* the user commits, instead of silently. */
-  matchVehicleBrandForLeaf: (leafCategoryId: string) => Promise<{
-    categoryGroup: "bil" | "motorsykkel" | "moped_atv" | "bobil_campingvogn" | "henger";
-    brandMatch: { id: string; name: string } | null;
-    modelMatch: { id: string; name: string } | null;
-  } | null>;
-  confirmVehicleData: (
-    leafCategoryId: string,
-    resolved?: {
-      brandName?: string;
-      modelName?: string;
-      /** User edits made inline in vehicle-confirm, overriding the raw SVV
-       * lookup values for these fields before they're written to
-       * `attributes`. Undefined fields fall back to the lookup's value. */
-      specOverrides?: Partial<{
-        year: number;
-        fuel_type: string;
-        transmission: string;
-        drive_type: string;
-        weight_kg: number;
-        power_hk: number;
-        tow_hitch: boolean;
-        max_tow_weight_kg: number;
-        seats: number;
-        color: string;
-        next_eu_control: string;
-        eu_control_exempt: boolean;
-        sleeping_places: number;
-        max_total_weight_kg: number;
-        length_m: number;
-        imported_used: boolean;
-        first_registration_date: string;
-        cylinders: number;
-        engine_displacement_cc: number;
-        engine_code: string;
-      }>;
-    },
-  ) => void | Promise<void>;
+  /** Writes the raw (unedited) SVV lookup data into `attributes` and advances
+   * the wizard — called when the user confirms the reg-nr popup with "Ja". */
+  confirmVehicleData: (leafCategoryId: string) => void;
+  /** Clears the current lookup so the reg-nr field is editable again — called
+   * when the user answers "Nei" to the reg-nr confirmation popup. */
+  resetLookupOnReturnToRegistration: () => void;
 
   // condition
   conditionDescription: string | undefined;

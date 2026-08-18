@@ -5,7 +5,7 @@ import { CategorySelect } from "./category-select";
 import { CategoryConfirm } from "./category-confirm";
 import { CategoryAttributes } from "./category-attributes";
 import { VehicleRegistration } from "./vehicle-registration";
-import { VehicleConfirm } from "./vehicle-confirm";
+import { Vehicle360Group } from "./vehicle-360";
 import { Condition } from "./condition";
 import { PriceGroup } from "./price";
 import { VehicleFactsGroup } from "./vehicle-facts";
@@ -28,8 +28,10 @@ export type ValidateCtx = {
   isFree: boolean;
   priceNok: WizardSharedProps["priceNok"];
   categoryId: string;
+  categories: WizardSharedProps["categories"];
   bilOgMcCategoryId: string | null;
   vehicleLookupResult: WizardSharedProps["vehicleLookupResult"];
+  vehicleRegistered: WizardSharedProps["vehicleRegistered"];
   behavior: CategoryBehavior;
   knownIssues: WizardSharedProps["knownIssues"];
   noKnownIssues: WizardSharedProps["noKnownIssues"];
@@ -76,26 +78,62 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
     Component: VehicleRegistration,
     fieldsToValidate: ["category_id"],
     validateExtra: (ctx) => {
-      // Either a lookup succeeded (proceed to vehicle-confirm) or the user
-      // manually picked a real leaf category (opted out of registered path)
-      // and filled in the same required technical fields by hand.
-      if (ctx.vehicleLookupResult) return null;
-      if (ctx.categoryId && ctx.categoryId !== ctx.bilOgMcCategoryId) {
-        if (ctx.missingFilters.length > 0) {
-          return `Fyll inn ${ctx.missingFilters.map((f) => f.label_nb).join(", ")} før du går videre.`;
-        }
-        return null;
+      // Forsvar i dybden: underkategori-rutenettet i VehicleRegistration
+      // committer alltid category_id bort fra selve "Bil og MC"-roten (enten
+      // direkte fra category-confirm, eller via en ett-gangs fallback-effekt
+      // ved montering), så dette bør aldri faktisk treffes.
+      if (ctx.categoryId === ctx.bilOgMcCategoryId) {
+        return "Velg underkategori før du går videre.";
       }
-      return "Slå opp registreringsnummer, eller velg kjøretøytype manuelt.";
+      // Merke og modell oppgis av brukeren her (SVV er ikke presis nok på
+      // disse, se VehicleRegistration) og er påkrevd uansett hvilken vei
+      // brukeren tar videre.
+      const brand = ctx.attributes.brand;
+      if (typeof brand !== "string" || !brand.trim()) {
+        return { field: "brand", message: "Velg merke før du går videre." };
+      }
+      const model = ctx.attributes.model;
+      if (typeof model !== "string" || !model.trim()) {
+        return { field: "model", message: "Velg modell før du går videre." };
+      }
+      // Bobil/campingvogn og tilhenger har hvert sitt påkrevde spørsmål SVV
+      // aldri kan svare på — spørres her, uansett registrert/ikke-registrert,
+      // siden reg.nr.-bekreftelsespopupen (vist av "Neste") ikke dekker dem.
+      const slug = ctx.categories.find((c) => c.id === ctx.categoryId)?.slug;
+      if (
+        (slug === "bobil" || slug === "campingvogn") &&
+        (typeof ctx.attributes.sleeping_places !== "number" || !ctx.attributes.sleeping_places)
+      ) {
+        return {
+          field: "sleeping_places",
+          message: "Fyll inn antall soveplasser før du går videre.",
+        };
+      }
+      if (slug === "tilhenger-leaf" && ctx.attributes.eu_control_exempt == null) {
+        return {
+          field: "eu_control_exempt",
+          message: "Svar på om hengeren er fritatt for EU-kontroll før du går videre.",
+        };
+      }
+      // Deretter: enten er et oppslag allerede gjort (reg.nr.-popupen tar
+      // over herfra), eller så har brukeren krysset av for at kjøretøyet
+      // ikke er registrert og må ha fylt inn de tekniske feltene selv.
+      // Selve oppslaget trigges av Neste-knappen (se goToNextPage), som
+      // kjører før denne valideringen når regnr er utfylt.
+      if (ctx.vehicleLookupResult) return null;
+      if (ctx.vehicleRegistered) {
+        return "Skriv inn registreringsnummer, eller kryss av for at kjøretøyet ikke er registrert.";
+      }
+      if (ctx.missingFilters.length > 0) {
+        return `Fyll inn ${ctx.missingFilters.map((f) => f.label_nb).join(", ")} før du går videre.`;
+      }
+      return null;
     },
   },
-  "vehicle-confirm": {
-    key: "vehicle-confirm",
-    Component: VehicleConfirm,
-    validateExtra: (ctx) => {
-      if (ctx.categoryId && ctx.categoryId !== ctx.bilOgMcCategoryId) return null;
-      return "Bekreft opplysningene fra Statens vegvesen før du går videre.";
-    },
+  "vehicle-360": {
+    key: "vehicle-360",
+    Component: Vehicle360Group,
+    // Ingen validering — 360-opptak er valgfritt og skal aldri blokkere.
   },
   "category-attributes": {
     key: "category-attributes",
@@ -103,7 +141,7 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
     fieldsToValidate: ["category_id"],
     validateExtra: (ctx) => {
       // For kjøretøy er kategori og Egenskaper allerede bekreftet i
-      // vehicle-confirm — denne field group-en rendrer ingenting for
+      // vehicle-registration — denne field group-en rendrer ingenting for
       // kjøretøy (se CategoryAttributes), så den skal heller ikke validere
       // noe her.
       if (!ctx.behavior.showGenericAttributes) return null;
@@ -225,8 +263,8 @@ export function fieldGroupsForKeys(keys: string[]): FieldGroup[] {
 const FIELD_GROUP_LABEL_NATIVE_NB: Record<string, string> = {
   "category-select": "Kategori",
   "category-confirm": "Kategori",
-  "vehicle-registration": "Registreringsnr.",
-  "vehicle-confirm": "Bekreft kjøretøy",
+  "vehicle-registration": "Merke & modell",
+  "vehicle-360": "360°-opptak",
   photos: "Bilder",
   title: "Tittel",
   "category-attributes": "Detaljer",
@@ -245,8 +283,8 @@ const FIELD_GROUP_LABEL_NATIVE_NB: Record<string, string> = {
 const FIELD_GROUP_LABEL_WEB_NB: Record<string, string> = {
   "category-select": "Kategori",
   "category-confirm": "Kategori",
-  "vehicle-registration": "Registreringsnummer",
-  "vehicle-confirm": "Bekreft kjøretøy",
+  "vehicle-registration": "Merke & modell",
+  "vehicle-360": "360°-opptak",
   photos: "Bilder",
   title: "Tittel",
   "category-attributes": "Detaljer",
@@ -272,8 +310,8 @@ export function pageLabel(groups: FieldGroup[], native: boolean): string {
 export const FIELD_GROUP_LABELS_NB: Record<string, string> = {
   "category-select": "Kategori",
   "category-confirm": "Bekreft kategori",
-  "vehicle-registration": "Kjøretøyregistrering",
-  "vehicle-confirm": "Bekreft kjøretøy (Statens vegvesen)",
+  "vehicle-registration": "Kjøretøy: Merke, modell & registreringsnummer",
+  "vehicle-360": "Kjøretøy: 360°-opptak",
   photos: "Bilder",
   title: "Tittel",
   "category-attributes": "Kategoriegenskaper",
@@ -310,11 +348,8 @@ export const LOCKED_FIELD_GROUP_KEYS: string[] = [
  * `category-attributes` before it — needed so vehicle lookup fills
  * brand/model/year before the title step reads them.
  *
- * `vehicle-confirm` behaves similarly to `category-select`: it's injected at
- * runtime (in ny-annonse.tsx) only once a Statens Vegvesen lookup has
- * succeeded, and is never part of a category's stored `field_groups` — so it
- * never appears in the admin-facing list either. `vehicle-registration` IS a
- * normal, admin-configurable field group (seeded on the Bil og MC category's
- * flow row) since an admin may legitimately want to reorder it.
+ * `vehicle-registration` IS a normal, admin-configurable field group (seeded
+ * on the Bil og MC category's flow row) since an admin may legitimately want
+ * to reorder it.
  */
 export const POSITION_FIXED_FIELD_GROUP_KEYS: string[] = ["review-publish", "delivery", "location"];

@@ -565,7 +565,11 @@ function NewListingPage() {
     publishedId === null &&
     (title.trim().length > 0 || images.length > 0 || vehicleLookupResult !== null);
   const blocker = useBlocker({
-    shouldBlockFn: () => shouldBlockNav,
+    // `next.pathname === current.pathname` skjer når et overlay (f.eks.
+    // forhåndsvisning) rydder sin egen synthetic history-oppføring med
+    // `history.back()` ved lukking — se useOverlayHistory. Det er ikke en
+    // faktisk sideforlatelse, så den skal ikke trigge "endringer går tapt".
+    shouldBlockFn: ({ current, next }) => shouldBlockNav && next.pathname !== current.pathname,
     withResolver: true,
     enableBeforeUnload: shouldBlockNav,
   });

@@ -408,12 +408,20 @@ function NewListingPage() {
   // category-confirm/vehicle-360 er aldri en del av en kategoris lagrede
   // field_groups — de avhenger av live wizard-state, og injiseres derfor her.
   // Se withRuntimeFieldGroups.
+  //
+  // category-attributes er derimot alltid en del av de lagrede field_groups
+  // (DB-håndhevet, se category_flows_field_groups_required, og låst i
+  // admin-UI via LOCKED_FIELD_GROUP_KEYS) — men rendrer ingenting for
+  // kjøretøy (behavior.showGenericAttributes er false, se CategoryAttributes
+  // og VEHICLE_BEHAVIOR). Filtrert ut her, ikke i den lagrede rekken, slik at
+  // en tom "Detaljer"-side ikke likevel tar sin egen steg-plass i wizarden —
+  // konstraintet/den globale låsen forblir uendret for alle andre kategorier.
   const fieldGroupKeys = useMemo(
     () =>
       withRuntimeFieldGroups(baseFieldGroupKeys, {
         showCategoryConfirm: fromLanding && !categoryConfirmed,
-      }),
-    [baseFieldGroupKeys, fromLanding, categoryConfirmed],
+      }).filter((key) => key !== "category-attributes" || !isVehicleFlow),
+    [baseFieldGroupKeys, fromLanding, categoryConfirmed, isVehicleFlow],
   );
 
   const pages: WizardPage[] = useMemo(

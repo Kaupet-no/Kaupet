@@ -107,13 +107,13 @@ type ListingForm = z.infer<typeof listingSchema>;
  * vehicle-condition (Tilstand/kjente feil-mangler/vedlikeholdshistorikk) —
  * split up per the UX audit so the flow isn't one overloaded "Beskrivelse"
  * step. Deliberately excludes "vehicle-equipment" (Utstyr): that one is
- * meant to sit on the *same* page as vehicle-condition — so as long as it's
- * the very next key after vehicle-condition in field_groups (see
- * `normalizeFieldGroupKeys`), it joins that page's buffer instead of
- * starting a new one. `vehicle-price` doesn't need an entry here — it's in
- * `SOLO_FIELD_GROUP_KEYS` (category-flows.ts), which guarantees its own page
- * unconditionally, on every platform. See resolveWizardPages'
- * `forceBreakBeforeKeys`. */
+ * meant to sit on the *same* page as vehicle-facts (ved siden av
+ * Beskrivelse-feltet, ikke Tilstand) — so as long as it's the very next key
+ * after vehicle-facts in field_groups (see `normalizeFieldGroupKeys`), it
+ * joins that page's buffer instead of starting a new one. `vehicle-price`
+ * doesn't need an entry here — it's in `SOLO_FIELD_GROUP_KEYS`
+ * (category-flows.ts), which guarantees its own page unconditionally, on
+ * every platform. See resolveWizardPages' `forceBreakBeforeKeys`. */
 const VEHICLE_FORCE_BREAK_BEFORE_KEYS = new Set(["vehicle-facts", "vehicle-condition"]);
 
 export const Route = createFileRoute("/_authenticated/ny-annonse")({
@@ -413,12 +413,24 @@ function NewListingPage() {
   // og VEHICLE_BEHAVIOR). Filtrert ut her, ikke i den lagrede rekken, slik at
   // en tom "Detaljer"-side ikke likevel tar sin egen steg-plass i wizarden —
   // konstraintet/den globale låsen forblir uendret for alle andre kategorier.
+  //
+  // vehicle-equipment (Utstyr) er i dag kun relevant for underkategorien
+  // "bil" — andre kjøretøytyper (MC, tilhenger, campingvogn, ...) kan få
+  // egne utstyrsvalg senere, men frem til det finnes skal ikke Utstyr-steget
+  // vises for dem (selve komponenten skjuler seg allerede når ingen
+  // category_filters matcher, men det hindrer ikke en tom side fra å ta sin
+  // egen steg-plass i wizarden — samme grunn som category-attributes over).
+  const isCarLeaf = categoriesById.get(categoryId)?.slug === "bil";
   const fieldGroupKeys = useMemo(
     () =>
       withRuntimeFieldGroups(baseFieldGroupKeys, {
         showCategoryConfirm: fromLanding && !categoryConfirmed,
-      }).filter((key) => key !== "category-attributes" || !isVehicleFlow),
-    [baseFieldGroupKeys, fromLanding, categoryConfirmed, isVehicleFlow],
+      }).filter(
+        (key) =>
+          (key !== "category-attributes" || !isVehicleFlow) &&
+          (key !== "vehicle-equipment" || isCarLeaf),
+      ),
+    [baseFieldGroupKeys, fromLanding, categoryConfirmed, isVehicleFlow, isCarLeaf],
   );
 
   const pages: WizardPage[] = useMemo(

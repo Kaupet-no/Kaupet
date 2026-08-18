@@ -61,7 +61,11 @@ export function normalizeFieldGroupKeys(keys: string[]): string[] {
   );
   const factsIndex = vehicle.indexOf("vehicle-facts");
   if (factsIndex === -1) return vehicle;
-  const orderedVehicleGroups = ["vehicle-condition", "vehicle-equipment"].filter((key) =>
+  // vehicle-equipment (Utstyr) sitter sammen med vehicle-facts (Beskrivelse-
+  // siden), ikke vehicle-condition (Tilstand) — se VEHICLE_FORCE_BREAK_BEFORE_KEYS
+  // i ny-annonse.tsx, som force-bryter siden før vehicle-condition, men ikke
+  // før vehicle-equipment.
+  const orderedVehicleGroups = ["vehicle-equipment", "vehicle-condition"].filter((key) =>
     vehicle.includes(key),
   );
   const withoutOrderedGroups = vehicle.filter((key) => !orderedVehicleGroups.includes(key));

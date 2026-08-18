@@ -191,7 +191,7 @@ describe("effectiveFlowForCategory", () => {
     ]);
   });
 
-  it("drops description-keywords and orders condition/equipment right after facts", () => {
+  it("drops description-keywords, and pins equipment right after facts (before condition)", () => {
     const flows = [
       row({
         category_id: "cars",
@@ -212,8 +212,8 @@ describe("effectiveFlowForCategory", () => {
       "vehicle-registration",
       "photos",
       "vehicle-facts",
-      "vehicle-condition",
       "vehicle-equipment",
+      "vehicle-condition",
       "location",
       "review-publish",
     ]);

@@ -102,7 +102,11 @@ omtrent like sannsynlige, svar med begge, atskilt med komma. Ingen annen tekst.`
         continue;
       }
       console.error("[category-suggestion-ai] fetch failed", err);
-      return null;
+      // Cold-start budget exhausted without a usable response — a real
+      // failure, not "the model looked and found nothing". Must throw
+      // (not return null) so the caller's retry logic actually retries
+      // instead of caching this as a valid empty answer.
+      throw new Error("category-suggestion-ai: exhausted retry budget", { cause: err });
     }
     if (response.status === 503 && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 1500));
@@ -110,7 +114,7 @@ omtrent like sannsynlige, svar med begge, atskilt med komma. Ingen annen tekst.`
     }
     if (!response.ok) {
       console.error("[category-suggestion-ai] non-ok response", response.status);
-      return null;
+      throw new Error(`category-suggestion-ai: non-ok response ${response.status}`);
     }
     break;
   }

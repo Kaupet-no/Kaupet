@@ -23,9 +23,11 @@ export const suggestCategoryForTitle = createServerFn({ method: "GET" })
 
     if (!top || totalVotes < MIN_TOTAL_VOTES || share < MIN_SHARE) {
       const { suggestCategoryForTitleAi } = await import("@/lib/category-suggestion-ai.server");
-      const aiSuggestions = await suggestCategoryForTitleAi({ title: data.title }).catch(
-        () => null,
-      );
+      // No .catch(() => null) here: a genuine AI failure (cold-start budget
+      // exhausted, non-ok response) must reject this server fn so
+      // suggestWithRetry's catch below actually retries instead of caching
+      // an empty result as if the model had confidently found nothing.
+      const aiSuggestions = await suggestCategoryForTitleAi({ title: data.title });
       return { suggestions: aiSuggestions ?? [] };
     }
 
@@ -52,12 +54,18 @@ export const suggestCategoryForTitle = createServerFn({ method: "GET" })
  * since it's a module-level singleton, not per-component state. */
 const suggestionCache = new Map<string, ReturnType<typeof suggestCategoryForTitle>>();
 
-const RETRY_ATTEMPTS = 3;
-const RETRY_DELAY_MS = 3000;
+// suggestCategoryForTitleAi already absorbs cold start internally (polls up
+// to its own 45s deadline before throwing), so a rejection here means that
+// budget was already exhausted once. One retry is enough headroom for a
+// genuine transient blip; RETRY_DELAY_MS is short since the inner call
+// already backed off internally — worst case is now ~2x45s + 1s instead of
+// 3x45s + 2x3s.
+const RETRY_ATTEMPTS = 2;
+const RETRY_DELAY_MS = 1000;
 
-/** The AI call is cold-start-prone (up to ~20s), so a request fired early
- * (e.g. from the landing screen) can fail before the endpoint has warmed
- * up. Retries a few times rather than caching a permanently-rejected
+/** The AI call is cold-start-prone (up to ~45s worst case), so a request
+ * fired early (e.g. from the landing screen) can fail before the endpoint
+ * has warmed up. Retries once rather than caching a permanently-rejected
  * promise, since callers only re-invoke prefetch when the title changes. */
 async function suggestWithRetry(title: string) {
   for (let attempt = 1; attempt <= RETRY_ATTEMPTS; attempt++) {

@@ -121,7 +121,10 @@ omtrent like sannsynlige, svar med begge, atskilt med komma. Ingen annen tekst.`
 
   const result = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
   const generated = result.choices?.[0]?.message?.content?.trim();
-  if (!generated) return null;
+  if (!generated) {
+    console.error("[category-suggestion-ai] empty model response");
+    return null;
+  }
 
   // Up to 2 candidates — matches the confirm UI's "Er dette kategori X eller
   // Y?" pattern, offering both instead of forcing a single guess through the
@@ -134,7 +137,10 @@ omtrent like sannsynlige, svar med begge, atskilt med komma. Ingen annen tekst.`
     if (match && !matches.some((m) => m.id === match.id)) matches.push(match);
     if (matches.length === 2) break;
   }
-  if (matches.length === 0) return null;
+  if (matches.length === 0) {
+    console.error("[category-suggestion-ai] no category matched model output", { generated });
+    return null;
+  }
 
   return matches.map((match) => {
     const parent = match.parent_id

@@ -52,10 +52,29 @@ export const suggestCategoryForTitle = createServerFn({ method: "GET" })
  * since it's a module-level singleton, not per-component state. */
 const suggestionCache = new Map<string, ReturnType<typeof suggestCategoryForTitle>>();
 
+const RETRY_ATTEMPTS = 3;
+const RETRY_DELAY_MS = 3000;
+
+/** The AI call is cold-start-prone (up to ~20s), so a request fired early
+ * (e.g. from the landing screen) can fail before the endpoint has warmed
+ * up. Retries a few times rather than caching a permanently-rejected
+ * promise, since callers only re-invoke prefetch when the title changes. */
+async function suggestWithRetry(title: string) {
+  for (let attempt = 1; attempt <= RETRY_ATTEMPTS; attempt++) {
+    try {
+      return await suggestCategoryForTitle({ data: { title } });
+    } catch {
+      if (attempt === RETRY_ATTEMPTS) return { suggestions: [] };
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+    }
+  }
+  return { suggestions: [] };
+}
+
 export function prefetchCategorySuggestion(title: string) {
   const key = title.trim();
   if (!suggestionCache.has(key)) {
-    suggestionCache.set(key, suggestCategoryForTitle({ data: { title: key } }));
+    suggestionCache.set(key, suggestWithRetry(key));
   }
   return suggestionCache.get(key)!;
 }

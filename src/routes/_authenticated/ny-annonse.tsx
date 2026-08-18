@@ -103,21 +103,18 @@ type ListingForm = z.infer<typeof listingSchema>;
 
 /** Forces each of the Bil og MC vehicle-only steps onto its own page,
  * separate from title-photos (images only for vehicles) and from each
- * other: vehicle-facts (Tittel/Kilometerstand/Pris/Undertittel),
- * vehicle-condition (Tilstand/kjente feil-mangler/vedlikeholdshistorikk) and
- * description-keywords (ren beskrivelse+nøkkelord) — split up per the UX
- * audit so the flow isn't one overloaded "Beskrivelse" step. Deliberately
- * excludes "vehicle-equipment" (Utstyr): that one is meant to sit on the
- * *same* page as description-keywords, directly under the Beskrivelse
- * field — so as long as it's the very next key after description-keywords
- * in field_groups (see the bil-og-mc migration), it joins that page's
- * buffer instead of starting a new one. See resolveWizardPages'
+ * other: vehicle-facts (Tittel/Undertittel/Kilometerstand/Beskrivelse) and
+ * vehicle-condition (Tilstand/kjente feil-mangler/vedlikeholdshistorikk) —
+ * split up per the UX audit so the flow isn't one overloaded "Beskrivelse"
+ * step. Deliberately excludes "vehicle-equipment" (Utstyr): that one is
+ * meant to sit on the *same* page as vehicle-condition — so as long as it's
+ * the very next key after vehicle-condition in field_groups (see
+ * `normalizeFieldGroupKeys`), it joins that page's buffer instead of
+ * starting a new one. `vehicle-price` doesn't need an entry here — it's in
+ * `SOLO_FIELD_GROUP_KEYS` (category-flows.ts), which guarantees its own page
+ * unconditionally, on every platform. See resolveWizardPages'
  * `forceBreakBeforeKeys`. */
-const VEHICLE_FORCE_BREAK_BEFORE_KEYS = new Set([
-  "vehicle-facts",
-  "vehicle-condition",
-  "description-keywords",
-]);
+const VEHICLE_FORCE_BREAK_BEFORE_KEYS = new Set(["vehicle-facts", "vehicle-condition"]);
 
 export const Route = createFileRoute("/_authenticated/ny-annonse")({
   validateSearch: z
@@ -399,8 +396,8 @@ function NewListingPage() {
   // leaf — a step count that visibly *grows* mid-flow reads as a bad sign to
   // most users, who are on the registered-vehicle path. Since every leaf
   // under Bil og MC goes through the same vehicle-facts/vehicle-condition/
-  // description-keywords pages regardless of registered-or-not, the page
-  // count itself never actually needs to change — only `isVehicle` (which
+  // vehicle-price pages regardless of registered-or-not, the page count
+  // itself never actually needs to change — only `isVehicle` (which
   // still gates vehicle-specific rendering choices like condition options or
   // showMileage, evaluated later once a leaf is genuinely known) does.
   const isVehicleFlow = baseFieldGroupKeys.includes("vehicle-registration");
@@ -524,7 +521,13 @@ function NewListingPage() {
     const groupKeys: Record<typeof section, string[]> = {
       category: ["category-select"],
       content: ["photos", "title"],
-      details: ["category-attributes", "description-keywords", "price"],
+      details: [
+        "category-attributes",
+        "description-keywords",
+        "price",
+        "vehicle-facts",
+        "vehicle-price",
+      ],
       location: ["delivery", "location"],
     };
     const matchingIndices = pages
@@ -697,8 +700,8 @@ function NewListingPage() {
     }
 
     // For kjøretøy rendrer title-photos kun bilder (se TitlePhotos) — feltet
-    // "title" fylles først på description-keywords-steget (VehicleTitleFields),
-    // så det skal ikke valideres her, ellers blokkeres Neste stille uten
+    // "title" fylles først på vehicle-facts-steget (VehicleTitleFields), så
+    // det skal ikke valideres her, ellers blokkeres Neste stille uten
     // synlig feilmelding.
     const fields = groups
       .flatMap((g) => g.fieldsToValidate ?? [])
@@ -1186,8 +1189,15 @@ function NewListingPage() {
   };
 
   const groups = currentPage?.groups ?? [];
+  // Native gives the description textarea a flex-fill layout so it grows to
+  // fill the remaining page height instead of a fixed row count — needed on
+  // any solo native page containing it: the generic description-keywords
+  // page (non-vehicle categories) and vehicle-facts (Tittel/Undertittel/
+  // Kilometerstand/Beskrivelse — now includes the same DescriptionField).
   const isNativeDescriptionSoloPage =
-    native && groups.length === 1 && groups[0].key === "description-keywords";
+    native &&
+    groups.length === 1 &&
+    (groups[0].key === "description-keywords" || groups[0].key === "vehicle-facts");
   // Category selection (suggestion click or manual pick) auto-advances the
   // wizard on this step — see applyCategorySelect/applySuggestedCategory —
   // so no separate Next/Back controls are needed or wanted here.

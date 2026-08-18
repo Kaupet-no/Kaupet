@@ -185,14 +185,13 @@ describe("effectiveFlowForCategory", () => {
       "vehicle-registration",
       "category-attributes",
       "vehicle-facts",
-      "description-keywords",
       "vehicle-condition",
       "location",
       "review-publish",
     ]);
   });
 
-  it("orders vehicle description between facts and condition", () => {
+  it("drops description-keywords and orders condition/equipment right after facts", () => {
     const flows = [
       row({
         category_id: "cars",
@@ -213,7 +212,6 @@ describe("effectiveFlowForCategory", () => {
       "vehicle-registration",
       "photos",
       "vehicle-facts",
-      "description-keywords",
       "vehicle-condition",
       "vehicle-equipment",
       "location",
@@ -334,13 +332,14 @@ describe("withRuntimeFieldGroups", () => {
     );
   });
 
-  it("adds the 360 step right after vehicle-registration", () => {
+  it("adds the 360 step right after vehicle-registration and the price step right before review-publish", () => {
     expect(withRuntimeFieldGroups(vehicleFlow, { showCategoryConfirm: false })).toEqual([
       "photos",
       "vehicle-registration",
       "vehicle-360",
       "category-attributes",
       "vehicle-facts",
+      "vehicle-price",
       "review-publish",
     ]);
   });

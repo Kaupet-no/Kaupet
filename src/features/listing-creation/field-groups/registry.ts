@@ -9,6 +9,7 @@ import { Vehicle360Group } from "./vehicle-360";
 import { Condition } from "./condition";
 import { PriceGroup } from "./price";
 import { VehicleFactsGroup } from "./vehicle-facts";
+import { VehiclePriceGroup } from "./vehicle-price";
 import { BoatFactsGroup } from "./boat-facts";
 import { VehicleConditionGroup } from "./vehicle-condition";
 import { VehicleEquipmentGroup } from "./vehicle-equipment";
@@ -172,14 +173,12 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
   "vehicle-facts": {
     key: "vehicle-facts",
     Component: VehicleFactsGroup,
-    fieldsToValidate: ["title", "price_nok"],
+    fieldsToValidate: ["title", "description"],
     validateExtra: (ctx) => {
-      // Kjøretøyets "harde fakta" — Tittel, Kilometerstand, Pris, Undertittel
-      // — samlet på ett eget steg (se UX-audit), atskilt fra
-      // vehicle-condition og description-keywords.
-      if (!ctx.isFree && (ctx.priceNok === "" || ctx.priceNok === undefined)) {
-        return "SHOW_NO_PRICE_DIALOG";
-      }
+      // Kjøretøyets "harde fakta" — Tittel, Undertittel, Kilometerstand,
+      // Beskrivelse — samlet på ett eget steg (se UX-audit), atskilt fra
+      // vehicle-condition. Pris (+ omregistreringsavgift) har sitt eget
+      // dedikerte steg (vehicle-price) rett før forhåndsvisning.
       if (ctx.showMileage) {
         const km = ctx.attributes.mileage_km;
         if (typeof km !== "number" || !Number.isFinite(km) || km < 0) {
@@ -188,6 +187,15 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
       }
       return null;
     },
+  },
+  "vehicle-price": {
+    key: "vehicle-price",
+    Component: VehiclePriceGroup,
+    fieldsToValidate: ["price_nok"],
+    validateExtra: (ctx) =>
+      !ctx.isFree && (ctx.priceNok === "" || ctx.priceNok === undefined)
+        ? "SHOW_NO_PRICE_DIALOG"
+        : null,
   },
   "boat-facts": {
     key: "boat-facts",
@@ -214,7 +222,7 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
     validateExtra: (ctx) => {
       // Tilstandsvurderingen — Tilstand, kjente feil/mangler og
       // vedlikeholdshistorikk — samlet på ett eget steg (se UX-audit),
-      // atskilt fra vehicle-facts og description-keywords.
+      // atskilt fra vehicle-facts og vehicle-price.
       if (ctx.noKnownIssues) return null;
       if ((ctx.knownIssues ?? "").trim().length > 0) return null;
       return {
@@ -270,7 +278,8 @@ const FIELD_GROUP_LABEL_NATIVE_NB: Record<string, string> = {
   "category-attributes": "Detaljer",
   condition: "Detaljer",
   price: "Detaljer",
-  "vehicle-facts": "Detaljer",
+  "vehicle-facts": "Beskrivelse",
+  "vehicle-price": "Pris",
   "boat-facts": "Båt",
   "vehicle-condition": "Tilstand",
   "vehicle-equipment": "Utstyr",
@@ -290,7 +299,8 @@ const FIELD_GROUP_LABEL_WEB_NB: Record<string, string> = {
   "category-attributes": "Detaljer",
   condition: "Detaljer",
   price: "Detaljer",
-  "vehicle-facts": "Pris & detaljer",
+  "vehicle-facts": "Beskrivelse",
+  "vehicle-price": "Pris",
   "boat-facts": "Merke & modell",
   "vehicle-condition": "Tilstand",
   "vehicle-equipment": "Utstyr",
@@ -317,7 +327,8 @@ export const FIELD_GROUP_LABELS_NB: Record<string, string> = {
   "category-attributes": "Kategoriegenskaper",
   condition: "Tilstand",
   price: "Pris",
-  "vehicle-facts": "Kjøretøy: Tittel, pris & kilometerstand",
+  "vehicle-facts": "Kjøretøy: Tittel, kilometerstand & beskrivelse",
+  "vehicle-price": "Kjøretøy: Pris & omregistreringsavgift",
   "boat-facts": "Båt: Merke, modell & undertittel",
   "vehicle-condition": "Kjøretøy: Tilstand & historikk",
   "vehicle-equipment": "Kjøretøy: Utstyr",
@@ -351,5 +362,10 @@ export const LOCKED_FIELD_GROUP_KEYS: string[] = [
  * `vehicle-registration` IS a normal, admin-configurable field group (seeded
  * on the Bil og MC category's flow row) since an admin may legitimately want
  * to reorder it.
+ *
+ * `vehicle-price` behaves like `vehicle-360`: runtime-injected right before
+ * `review-publish` (see `withRuntimeFieldGroups`) whenever the flow has
+ * `vehicle-registration`, never part of a category's stored `field_groups`,
+ * so it never appears in the admin-facing list either.
  */
 export const POSITION_FIXED_FIELD_GROUP_KEYS: string[] = ["review-publish", "delivery", "location"];

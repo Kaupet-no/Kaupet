@@ -50,14 +50,20 @@ export function normalizeFieldGroupKeys(keys: string[]): string[] {
     ),
   ];
   if (!normalized.includes("vehicle-registration")) return normalized;
-  const vehicle = normalized.filter((key) => key !== "title" && key !== "delivery");
+  // description-keywords er droppet helt for kjøretøy: Beskrivelse (+
+  // nøkkelord-chips) rendres nå direkte inne i vehicle-facts (Tittel,
+  // Undertittel, Kilometerstand, Beskrivelse), ikke som et eget steg. Den
+  // lagrede raden i DB må fortsatt inneholde nøkkelen (se
+  // category_flows_field_groups_required-constrainten og
+  // LOCKED_FIELD_GROUP_KEYS) — filtreres derfor bort her, ikke i databasen.
+  const vehicle = normalized.filter(
+    (key) => key !== "title" && key !== "delivery" && key !== "description-keywords",
+  );
   const factsIndex = vehicle.indexOf("vehicle-facts");
   if (factsIndex === -1) return vehicle;
-  const orderedVehicleGroups = [
-    "description-keywords",
-    "vehicle-condition",
-    "vehicle-equipment",
-  ].filter((key) => vehicle.includes(key));
+  const orderedVehicleGroups = ["vehicle-condition", "vehicle-equipment"].filter((key) =>
+    vehicle.includes(key),
+  );
   const withoutOrderedGroups = vehicle.filter((key) => !orderedVehicleGroups.includes(key));
   withoutOrderedGroups.splice(factsIndex + 1, 0, ...orderedVehicleGroups);
   return withoutOrderedGroups;
@@ -142,13 +148,22 @@ function applyLandingEntry(flow: CategoryFlow): CategoryFlow {
 
 /**
  * Injects the field groups that can't be stored in a category's
- * `field_groups` because they depend on live wizard state:
+ * `field_groups` because they depend on live wizard state, or that are
+ * vehicle-only content with no admin-configurable position of their own:
  *
  * - `category-confirm` right after `photos`, while the landing-screen entry
  *   still has an unconfirmed AI category suggestion;
  * - `vehicle-360` right after `vehicle-registration`. 360°-opptak only
  *   applies to Bil og MC, so it can't live on the images step — that one is
- *   always step 1, before any category is known.
+ *   always step 1, before any category is known;
+ * - `vehicle-price` right before `review-publish` — the dedicated, large-
+ *   typography Pris + omregistreringsavgift step. Runtime-injected rather
+ *   than a stored field group (like `vehicle-360`) so it needs no DB
+ *   migration and never shows up as an admin-togglable checkbox: every
+ *   vehicle flow gets it, always in the same place, always last before
+ *   review/publish (`resolveWizardPages` always pulls `location`/
+ *   `review-publish` onto the true final page regardless of array position,
+ *   so inserting right before `review-publish` here is sufficient).
  *
  * Pure so the resulting step order is testable without mounting the wizard.
  */
@@ -164,7 +179,10 @@ export function withRuntimeFieldGroups(
   }
   const regIdx = next.indexOf("vehicle-registration");
   if (regIdx === -1) return next;
-  return [...next.slice(0, regIdx + 1), "vehicle-360", ...next.slice(regIdx + 1)];
+  next = [...next.slice(0, regIdx + 1), "vehicle-360", ...next.slice(regIdx + 1)];
+  const reviewIdx = next.indexOf("review-publish");
+  const priceInsertAt = reviewIdx === -1 ? next.length : reviewIdx;
+  return [...next.slice(0, priceInsertAt), "vehicle-price", ...next.slice(priceInsertAt)];
 }
 
 /**
@@ -187,15 +205,16 @@ export function withRuntimeFieldGroups(
  */
 /** Field-group keys that always get their own solo page, wherever they land
  * in the ordered array — `category-select` is always first (see
- * prependCategorySelect); `vehicle-registration`/`vehicle-360` can land
- * anywhere in the array (admin-configurable position for the former,
- * runtime-injected right after it for the latter), but must never be bundled
+ * prependCategorySelect); `vehicle-registration`/`vehicle-360`/`vehicle-price`
+ * can land anywhere in the array (admin-configurable position for the
+ * former, runtime-injected for the latter two), but must never be bundled
  * with unrelated groups like `condition`/`price`. */
 const SOLO_FIELD_GROUP_KEYS = new Set([
   "category-select",
   "category-confirm",
   "vehicle-registration",
   "vehicle-360",
+  "vehicle-price",
 ]);
 
 export function resolveWizardPages(
@@ -206,9 +225,9 @@ export function resolveWizardPages(
      * without being solo themselves — unlike `SOLO_FIELD_GROUP_KEYS`, keys
      * after a force-break one still bundle together up to `chunkSize`. Used
      * to split the Bil og MC flow into an images-only page (title-photos)
-     * and a combined Tittel/Tilstand/Kilometerstand/Pris/Beskrivelse page
-     * (description-keywords), without changing chunking for every other
-     * category. Optional — omitting it preserves prior behavior exactly. */
+     * and its own Tittel/Undertittel/Kilometerstand/Beskrivelse page
+     * (vehicle-facts), without changing chunking for every other category.
+     * Optional — omitting it preserves prior behavior exactly. */
     forceBreakBeforeKeys?: ReadonlySet<string>;
   },
 ): string[][] {

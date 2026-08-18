@@ -5,7 +5,7 @@ import { digitsOnlyClamped, formatThousands } from "@/lib/number-input";
 import type { WizardSharedProps } from "../types";
 import { RequiredMark } from "../required-mark";
 import { VehicleTitleFields } from "../title-photos";
-import { PriceGroup } from "../price";
+import { DescriptionField, KeywordChips } from "../description-keywords";
 
 /** Highest mileage a vehicle can report — same cap as the price field, and
  * for the same reason: clamp in the input itself instead of letting the user
@@ -93,11 +93,15 @@ function SubtitleField({
 }
 
 /**
- * Første av de tre vehicle-only stegene som erstatter det tidligere
- * overbelastede "Beskrivelse"-steget (se UX-audit): de "harde faktaene" som
- * fylles ut raskt — Tittel (autogenerert), Kilometerstand, Pris og
- * Undertittel. Tilstand/kjente feil/vedlikehold ligger i `vehicle-condition`,
- * fritekstbeskrivelsen i `description-keywords`.
+ * Første av de vehicle-only stegene som erstatter det tidligere
+ * overbelastede "Beskrivelse"-steget (se UX-audit): Tittel (autogenerert),
+ * Undertittel, Kilometerstand og fritekstbeskrivelsen (+ nøkkelord-chips,
+ * gjenbrukt fra `description-keywords` — se den filens eksporterte
+ * `DescriptionField`/`KeywordChips`, som er "registry-facing"-wrapperen der
+ * kun brukes av ikke-kjøretøy-flyter). Tilstand/kjente feil/vedlikehold
+ * ligger i `vehicle-condition`; Pris (+ omregistreringsavgift) har sitt eget
+ * dedikerte, visuelt distinkte steg (`vehicle-price`) rett før
+ * forhåndsvisning/publisering.
  */
 export function VehicleFactsGroup(props: WizardSharedProps) {
   return (
@@ -105,7 +109,8 @@ export function VehicleFactsGroup(props: WizardSharedProps) {
       <VehicleTitleFields {...props} />
       <SubtitleField {...props} />
       {props.showMileage && <MileageField {...props} />}
-      <PriceGroup {...props} />
+      <DescriptionField {...props} />
+      <KeywordChips {...props} />
     </>
   );
 }

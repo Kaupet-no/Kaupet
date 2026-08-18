@@ -57,7 +57,12 @@ export function Price({
   attributes,
   onAttributesChange,
   lockedFree,
-}: WizardSharedProps) {
+  heroSize = false,
+}: WizardSharedProps & {
+  /** Larger price input/label — used by `vehicle-price`'s dedicated,
+   * visually distinct last-step page. Cosmetic only, no behavior change. */
+  heroSize?: boolean;
+}) {
   const [editingAvgift, setEditingAvgift] = useState(false);
   const calculatedAvgiftKr = isVehicle
     ? computeOmregistreringsavgift(
@@ -144,7 +149,7 @@ export function Price({
   return (
     <section className="space-y-3">
       <div className="flex items-center gap-1.5">
-        <Label htmlFor="price_nok">
+        <Label htmlFor="price_nok" className={heroSize ? "text-base" : undefined}>
           Pris
           <RequiredMark />
         </Label>
@@ -156,16 +161,18 @@ export function Price({
           }
         />
       </div>
-      <div className="flex items-end gap-3">
+      <div className={`flex items-end gap-3 ${heroSize ? "flex-wrap" : ""}`}>
         <div className="space-y-1">
-          <div className="relative max-w-[200px]">
+          <div className={`relative ${heroSize ? "max-w-[280px]" : "max-w-[200px]"}`}>
             <Input
               id="price_nok"
               type="text"
               inputMode="numeric"
               placeholder="0"
               disabled={isFree}
-              className="pr-9 text-right"
+              className={
+                heroSize ? "h-16 pr-12 text-right text-4xl font-semibold" : "pr-9 text-right"
+              }
               aria-invalid={!!errors.price_nok}
               aria-describedby={errors.price_nok ? "price-error" : undefined}
               // Only `name`/`ref` from register() — NOT the full spread.
@@ -189,20 +196,31 @@ export function Price({
                 });
               }}
             />
-            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+            <span
+              className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground ${heroSize ? "text-xl" : "text-sm"}`}
+            >
               kr
             </span>
           </div>
         </div>
         {isVehicle && totalprisKr != null && (
           <div className="space-y-1">
-            <Label htmlFor="price-visible-in-listing" className="text-xs text-muted-foreground">
+            <Label
+              htmlFor="price-visible-in-listing"
+              className={
+                heroSize ? "text-sm text-muted-foreground" : "text-xs text-muted-foreground"
+              }
+            >
               Pris synlig i annonse
             </Label>
             <Input
               id="price-visible-in-listing"
               disabled
-              className="max-w-[200px] text-muted-foreground"
+              className={
+                heroSize
+                  ? "h-16 max-w-[280px] text-right text-2xl text-muted-foreground"
+                  : "max-w-[200px] text-muted-foreground"
+              }
               value={`${totalprisKr.toLocaleString("nb-NO")} kr`}
             />
           </div>

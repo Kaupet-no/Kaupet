@@ -567,7 +567,9 @@ function NewWtbPage() {
           restorableDraft ? (
             <div className="mt-4 flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
               <span className="flex-1">
-                Du har et lagret utkast. Vil du fortsette der du slapp?
+                {restorableDraft.title.trim()
+                  ? `Utkast for annonse "${restorableDraft.title}" er lagret. Vil du fortsette der du slapp?`
+                  : "Du har et lagret utkast. Vil du fortsette der du slapp?"}
               </span>
               <Button
                 type="button"

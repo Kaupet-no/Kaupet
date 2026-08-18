@@ -63,7 +63,7 @@ const suggestionCache = new Map<string, ReturnType<typeof suggestCategoryForTitl
 const RETRY_ATTEMPTS = 2;
 const RETRY_DELAY_MS = 1000;
 
-/** The AI call is cold-start-prone (up to ~45s worst case), so a request
+/** The AI call is cold-start-prone, so a request
  * fired early (e.g. from the landing screen) can fail before the endpoint
  * has warmed up. Retries once rather than caching a permanently-rejected
  * promise, since callers only re-invoke prefetch when the title changes. */

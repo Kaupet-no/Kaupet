@@ -53,6 +53,7 @@ const lookupResult = {
   eu_control_exempt: null,
   power_hk: 120,
   drive_type: null,
+  axle_count: null,
   tow_hitch: null,
   max_tow_weight_kg: null,
   max_total_weight_kg: null,

@@ -35,6 +35,7 @@ type DraftFields = {
   knownIssues?: string;
   noKnownIssues?: boolean;
   maintenanceHistory?: string;
+  stepKey: string;
 };
 
 type RestoreTarget = {
@@ -76,6 +77,7 @@ export function useDraftAutosave(fields: DraftFields) {
     knownIssues,
     noKnownIssues,
     maintenanceHistory,
+    stepKey,
   } = fields;
 
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -163,6 +165,7 @@ export function useDraftAutosave(fields: DraftFields) {
             no_known_issues: noKnownIssues,
             maintenance_history: maintenanceHistory,
             image_count: images.length,
+            step_key: stepKey,
             saved_at: Date.now(),
           }),
         );
@@ -190,6 +193,7 @@ export function useDraftAutosave(fields: DraftFields) {
     noKnownIssues,
     maintenanceHistory,
     images.length,
+    stepKey,
   ]);
 
   useEffect(() => {

@@ -6,7 +6,12 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.types";
 import type { VehicleLeafSlug } from "@/lib/vehicle/vehicle-classification";
 import { CONDITION_LABEL, VEHICLE_CONDITION_LABEL_BY_SLUG } from "@/lib/constants";
-import { DRIVE_TYPE_LABEL_NB, FUEL_LABEL_NB, TRANSMISSION_LABEL_NB } from "./vehicle-labels";
+import {
+  AXLE_CONFIG_LABEL_NB,
+  DRIVE_TYPE_LABEL_NB,
+  FUEL_LABEL_NB,
+  TRANSMISSION_LABEL_NB,
+} from "./vehicle-labels";
 
 type Row = { label: string; value: string };
 
@@ -21,6 +26,7 @@ export function VehicleTechTable({
   mileageKm,
   euControlExempt,
   driveType,
+  axleConfig,
   condition,
   vehicleLeafSlug,
 }: {
@@ -33,6 +39,10 @@ export function VehicleTechTable({
   /** Selgerens bekreftede verdi (`attributes.drive_type`), som har forrang
    * over `vehicleLookup.drive_type` — se `vehicle-info-grid.tsx`. */
   driveType?: string | null;
+  /** Selgerens valgte akselkombinasjon (`attributes.axle_config`) for
+   * bobil/lastebil/buss — ikke fra SVV (som kun gir akseltall), så ingen
+   * fallback-kilde. */
+  axleConfig?: string | null;
   /** Tilstand (samme `condition`-enum som vanlige annonser, se
    * VEHICLE_CONDITIONS_BY_SLUG) — vist med kjøretøytype-spesifikk etikett når
    * slug er kjent, ellers den generiske etiketten. */
@@ -69,6 +79,11 @@ export function VehicleTechTable({
     rows.push({ label: "Effekt", value: `${vehicleLookup.power_hk} hk` });
   if (driveType)
     rows.push({ label: "Hjuldrift", value: DRIVE_TYPE_LABEL_NB[driveType] ?? driveType });
+  if (axleConfig)
+    rows.push({
+      label: "Akselkombinasjon",
+      value: AXLE_CONFIG_LABEL_NB[axleConfig] ?? axleConfig,
+    });
   if (vehicleLookup?.weight_kg)
     rows.push({ label: "Vekt", value: `${vehicleLookup.weight_kg} kg` });
   if (vehicleLookup?.max_total_weight_kg)

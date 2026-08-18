@@ -243,6 +243,11 @@ export function ListingDetailView({
     isVehicleListing && typeof driveTypeRaw === "string"
       ? driveTypeRaw
       : (vehicleLookup?.drive_type ?? null);
+  // Akselkombinasjon (bobil/lastebil/buss) — selgerens eget valg, ikke fra
+  // SVV (som kun oppgir akseltall, ikke hvilken kombinasjon), så ingen
+  // vehicleLookup-fallback slik driveType har.
+  const axleConfigRaw = attributes.axle_config;
+  const axleConfig = isVehicleListing && typeof axleConfigRaw === "string" ? axleConfigRaw : null;
   const avgiftOverrideRaw = attributes.omregistreringsavgift_override_kr;
   const avgiftFritatt = isVehicleListing && attributes.omregistreringsavgift_fritatt === true;
   const avgiftInkludert = isVehicleListing && attributes.omregistreringsavgift_inkludert === true;
@@ -368,6 +373,7 @@ export function ListingDetailView({
       mileageKm={mileageKm}
       euControlExempt={euControlExempt}
       driveType={driveType}
+      axleConfig={axleConfig}
       avgiftNote={avgiftNote}
       totalPriceKr={totalPriceKr}
       isNative={isNative}
@@ -440,6 +446,7 @@ function ListingDetailViewBody({
   mileageKm,
   euControlExempt,
   driveType,
+  axleConfig,
   avgiftNote,
   totalPriceKr,
   isNative,
@@ -491,6 +498,7 @@ function ListingDetailViewBody({
   mileageKm: number | null;
   euControlExempt: boolean | null;
   driveType: string | null;
+  axleConfig: string | null;
   avgiftNote: string | null;
   totalPriceKr: number | null;
   isNative: boolean;
@@ -838,6 +846,7 @@ function ListingDetailViewBody({
                     mileageKm={mileageKm}
                     euControlExempt={euControlExempt}
                     driveType={driveType}
+                    axleConfig={axleConfig}
                     condition={condition}
                     vehicleLeafSlug={vehicleLeafSlug}
                   />

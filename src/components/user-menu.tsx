@@ -26,6 +26,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { NewListingDialog } from "@/components/new-listing-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,6 +50,7 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
   const canToggleTest = !!(isAdmin || isDemo);
   const isTest = useIsTestEnv();
   const [toggling, setToggling] = useState(false);
+  const [newListingOpen, setNewListingOpen] = useState(false);
   const callSetTestMode = useServerFn(setTestMode);
   const { resolvedTheme, setTheme } = useTheme();
 
@@ -109,10 +111,14 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
             <ListChecks className="size-4" /> Mine annonser
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link to="/ny-annonse" className="cursor-pointer">
-            <Plus className="size-4" /> Ny annonse
-          </Link>
+        <DropdownMenuItem
+          className="cursor-pointer"
+          onSelect={(e) => {
+            e.preventDefault();
+            setNewListingOpen(true);
+          }}
+        >
+          <Plus className="size-4" /> Ny annonse
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link to="/favoritter" className="cursor-pointer">
@@ -190,6 +196,7 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
           <LogOut className="size-4" /> Logg ut
         </DropdownMenuItem>
       </DropdownMenuContent>
+      <NewListingDialog open={newListingOpen} onOpenChange={setNewListingOpen} />
     </DropdownMenu>
   );
 }

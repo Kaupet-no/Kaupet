@@ -149,6 +149,7 @@ function NewListingPage() {
   const returnToReviewRef = useRef(false);
   const reviewSectionLastStepRef = useRef<number | null>(null);
   const [reviewJumpRequested, setReviewJumpRequested] = useState(false);
+  const pendingRestoreStepKeyRef = useRef<string | null>(null);
   const [showNoImageDialog, setShowNoImageDialog] = useState(false);
   const [showNoPriceDialog, setShowNoPriceDialog] = useState(false);
   const [extraFieldError, setExtraFieldError] = useState<{
@@ -614,6 +615,7 @@ function NewListingPage() {
     knownIssues,
     noKnownIssues: !!noKnownIssues,
     maintenanceHistory,
+    stepKey: currentStepKey,
   });
 
   function restoreDraft() {
@@ -622,6 +624,8 @@ function NewListingPage() {
       action: "draft_restored",
       step: currentStepKey,
     });
+    const savedStepKey = hasDraftData?.step_key;
+    if (typeof savedStepKey === "string") pendingRestoreStepKeyRef.current = savedStepKey;
     void restoreDraftFields({
       setValue,
       setSelectedParentId,
@@ -630,6 +634,20 @@ function NewListingPage() {
       setCoords,
     });
   }
+
+  // `pages` only reflects the restored category/attributes once the field
+  // updates above have propagated through state, so the step jump has to
+  // wait for `pages` to catch up rather than happening inline in
+  // restoreDraft() — mirrors the reviewJumpRequested pattern above.
+  useEffect(() => {
+    const targetKey = pendingRestoreStepKeyRef.current;
+    if (!targetKey) return;
+    const pageIndex = pages.findIndex((page) => page.groups.some((g) => g.key === targetKey));
+    if (pageIndex >= 0) {
+      setStep(pageIndex + 1);
+      pendingRestoreStepKeyRef.current = null;
+    }
+  }, [pages, setStep]);
 
   // Pre-fill location from user's last listing (if no draft)
   useEffect(() => {
@@ -1341,7 +1359,9 @@ function NewListingPage() {
             hasDraftData ? (
               <div className="mt-4 flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
                 <span className="flex-1">
-                  Du har et ulagret utkast. Vil du fortsette der du slapp?
+                  {typeof hasDraftData.title === "string" && hasDraftData.title.trim()
+                    ? `Utkast for annonse "${hasDraftData.title}" er lagret. Vil du fortsette der du slapp?`
+                    : "Du har et ulagret utkast. Vil du fortsette der du slapp?"}
                 </span>
                 <Button
                   type="button"

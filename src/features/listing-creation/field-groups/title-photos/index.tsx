@@ -3,8 +3,6 @@
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ImageUploader } from "@/components/image-uploader";
-import { Vehicle360QrPanel } from "@/components/vehicle-360-qr-panel";
-import { Vehicle360CaptureLauncher } from "@/components/vehicle-360-capture-launcher";
 import { computeVehicleTitle } from "@/lib/vehicle/vehicle-title";
 
 import type { WizardSharedProps } from "../types";
@@ -109,6 +107,9 @@ export function PhotosGroup({
       <p className="text-sm text-muted-foreground">
         Annonser med bilder får mer oppmerksomhet. Vi anbefaler minst 3 bilder.
       </p>
+      <p className="text-xs text-muted-foreground">
+        Tips: Godt lys, nøytral bakgrunn og bilde av eventuelle feil.
+      </p>
       <ImageUploader images={images} onChange={setImages} uploadProgress={uploadProgress} />
     </section>
   );
@@ -121,6 +122,10 @@ export function PhotosGroup({
  * description-keywords/index.tsx. Web shows images first then title; native
  * shows title first then images — same content, different order, preserved
  * verbatim from the original per-platform JSX.
+ *
+ * 360°-opptak lå tidligere her, men bildesteget er nå alltid steg 1 — før
+ * kategori er bekreftet — så opptaket har fått sitt eget steg lenger ute i
+ * kjøretøyflyten (`field-groups/vehicle-360`).
  */
 export function TitlePhotos(props: WizardSharedProps) {
   if (props.native) {
@@ -128,22 +133,12 @@ export function TitlePhotos(props: WizardSharedProps) {
       <div className="space-y-6">
         {!props.isVehicle && <TitleGroup {...props} />}
         <PhotosGroup {...props} />
-        {props.isVehicle && (
-          <Vehicle360CaptureLauncher
-            listingId={props.draftId}
-            ensureListingId={props.ensureDraftId}
-            listingTitle={props.title || "kjøretøyet ditt"}
-          />
-        )}
       </div>
     );
   }
   return (
     <div className="space-y-6">
       <PhotosGroup {...props} />
-      {props.isVehicle && (
-        <Vehicle360QrPanel draftId={props.draftId} ensureDraftId={props.ensureDraftId} />
-      )}
       {!props.isVehicle && <TitleGroup {...props} />}
     </div>
   );

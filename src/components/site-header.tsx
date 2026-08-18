@@ -26,6 +26,8 @@ export function SiteHeader() {
           <span className="font-display text-xl text-muted-foreground">no</span>
         </Link>
 
+        <div id="header-search-slot" className="hidden flex-1 md:block" />
+
         <div className="ml-auto flex items-center gap-2">
           <Button
             type="button"

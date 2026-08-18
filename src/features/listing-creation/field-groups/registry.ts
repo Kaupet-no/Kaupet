@@ -18,6 +18,7 @@ import { DeliveryGroup, LocationGroup } from "./delivery-location";
 import { ReviewPublishGroup } from "./review-publish";
 import type { ListingFormShape, WizardSharedProps } from "./types";
 import type { CategoryBehavior } from "@/lib/category-behavior";
+import { getAxleConfigOptions } from "@/lib/vehicle/vehicle-options";
 
 /** Context passed to a field-group's `validateExtra`, mirroring what
  * `goToStep2/3` used to close over directly in ny-annonse.tsx. */
@@ -183,6 +184,25 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
         const km = ctx.attributes.mileage_km;
         if (typeof km !== "number" || !Number.isFinite(km) || km < 0) {
           return { field: "mileage_km", message: "Fyll inn kilometerstand før du går videre." };
+        }
+      }
+      const leafSlug = ctx.categories.find((c) => c.id === ctx.categoryId)?.slug;
+      if (leafSlug === "bil" || leafSlug === "atv") {
+        if (typeof ctx.attributes.drive_type !== "string" || !ctx.attributes.drive_type) {
+          return { field: "drive_type", message: "Velg hjuldrift før du går videre." };
+        }
+      }
+      if (
+        leafSlug === "bobil" ||
+        leafSlug === "lastebil-og-henger" ||
+        leafSlug === "buss-og-minibuss"
+      ) {
+        const options = getAxleConfigOptions(ctx.vehicleLookupResult?.axle_count ?? null);
+        if (
+          options.length > 0 &&
+          (typeof ctx.attributes.axle_config !== "string" || !ctx.attributes.axle_config)
+        ) {
+          return { field: "axle_config", message: "Velg akselkombinasjon før du går videre." };
         }
       }
       return null;

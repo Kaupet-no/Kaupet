@@ -24,11 +24,6 @@
       "count": 1
     }
   },
-  "src/components/image-uploader.tsx": {
-    "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
-  },
   "src/components/listing-detail/listing-detail-view.tsx": {
     "react-hooks/set-state-in-effect": {
       "count": 1
@@ -104,11 +99,6 @@
       "count": 2
     }
   },
-  "src/features/listing-creation/field-groups/vehicle-confirm/index.tsx": {
-    "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
-  },
   "src/features/listing-creation/use-draft-autosave.ts": {
     "react-hooks/set-state-in-effect": {
       "count": 1
@@ -178,11 +168,6 @@
     }
   },
   "src/routes/_authenticated/admin/vipps-webhooks.tsx": {
-    "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
-  },
-  "src/routes/_authenticated/meldinger.index.tsx": {
     "react-hooks/set-state-in-effect": {
       "count": 1
     }

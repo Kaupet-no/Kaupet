@@ -38,6 +38,7 @@ import { NativePageHeader } from "@/components/native-page-header";
 import { PullToRefreshIndicator } from "@/components/pull-to-refresh-indicator";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { ListingRow, type Row } from "@/features/my-listings/listing-row";
+import { NewListingDialog } from "@/components/new-listing-dialog";
 
 export const Route = createFileRoute("/_authenticated/mine-annonser/")({
   head: () => ({
@@ -65,6 +66,7 @@ function MyListingsPage() {
   } | null>(null);
   const [promoteId, setPromoteId] = useState<string | null>(null);
   const [markSoldId, setMarkSoldId] = useState<string | null>(null);
+  const [newListingIntent, setNewListingIntent] = useState<"sell" | "buy" | null>(null);
   const native = useIsNative();
 
   const { refreshing, pullDistance } = usePullToRefresh({
@@ -239,11 +241,9 @@ function MyListingsPage() {
             </p>
           </div>
           {!native && (
-            <Link to="/ny-annonse">
-              <Button>
-                <Plus className="size-4" /> Ny annonse
-              </Button>
-            </Link>
+            <Button onClick={() => setNewListingIntent("sell")}>
+              <Plus className="size-4" /> Ny annonse
+            </Button>
           )}
         </div>
 
@@ -308,11 +308,9 @@ function MyListingsPage() {
                 <EmptyState
                   title="Ingen annonser å vise her."
                   action={
-                    <Link to="/ny-annonse">
-                      <Button size="sm" variant="outline">
-                        <Plus className="size-4" /> Opprett din første annonse
-                      </Button>
-                    </Link>
+                    <Button size="sm" variant="outline" onClick={() => setNewListingIntent("sell")}>
+                      <Plus className="size-4" /> Opprett din første annonse
+                    </Button>
                   }
                 />
               ) : (
@@ -376,11 +374,9 @@ function MyListingsPage() {
               <EmptyState
                 title="Du har ingen ønskes kjøpt-annonser ennå."
                 action={
-                  <Link to="/ny-ok-annonse">
-                    <Button size="sm" variant="outline">
-                      <Plus className="size-4" /> Opprett ønskes kjøpt
-                    </Button>
-                  </Link>
+                  <Button size="sm" variant="outline" onClick={() => setNewListingIntent("buy")}>
+                    <Plus className="size-4" /> Opprett ønskes kjøpt
+                  </Button>
                 }
               />
             ) : (
@@ -559,6 +555,11 @@ function MyListingsPage() {
             );
           })()}
       </div>
+      <NewListingDialog
+        open={newListingIntent !== null}
+        onOpenChange={(o) => !o && setNewListingIntent(null)}
+        defaultIntent={newListingIntent ?? undefined}
+      />
     </>
   );
 }

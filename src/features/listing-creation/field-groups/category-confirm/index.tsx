@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -11,11 +11,24 @@ function suggestionLabel(s: { name_nb: string; parent_name_nb: string | null }):
   return s.parent_name_nb ? `${s.parent_name_nb} › ${s.name_nb}` : s.name_nb;
 }
 
-/** Categories the model most often gets confused between and Motorsport
- * (fast cars/bikes get suggested as one of these, but Motorsport is often
- * what the user actually meant) — see category-suggestion-ai.server.ts,
- * which keeps Motorsport out of the model's own candidate list entirely. */
-const MOTORSPORT_CONFUSABLE_NAMES = new Set(["Bil", "Motorsykkel", "Moped", "ATV", "Snøscooter"]);
+/** True if `id`'s ancestor chain (walked via `parent_id`) reaches
+ * `bilOgMcCategoryId`. Used to detect when every current AI/vote suggestion
+ * is a Bil og MC underkategori — in which case the model's specific guess
+ * (Bil vs. MC vs. Tilhenger, ...) isn't reliable enough to ask about
+ * directly (see module doc below), so we only confirm the broad category. */
+function isUnderBilOgMc(
+  id: string,
+  categoriesById: Map<string, { id: string; parent_id: string | null }>,
+  bilOgMcCategoryId: string | null,
+): boolean {
+  if (!bilOgMcCategoryId) return false;
+  let cur = categoriesById.get(id);
+  while (cur) {
+    if (cur.id === bilOgMcCategoryId) return true;
+    cur = cur.parent_id ? categoriesById.get(cur.parent_id) : undefined;
+  }
+  return false;
+}
 
 /**
  * Runtime-only step spliced into `fieldGroupKeys` right after `title-photos`
@@ -40,6 +53,13 @@ export function CategoryConfirm({
   bilOgMcCategoryId,
 }: WizardSharedProps) {
   const motorsportCategory = categories?.find((c) => c.name_nb === "Motorsport");
+  const categoriesById = useMemo(
+    () => new Map((categories ?? []).map((c) => [c.id, c])),
+    [categories],
+  );
+  const bilOgMcName = bilOgMcCategoryId
+    ? categoriesById.get(bilOgMcCategoryId)?.name_nb
+    : undefined;
   const [showPicker, setShowPicker] = useState(false);
   // Captured before applyCategorySuggestion clears categorySuggestions (it's
   // shared state also used to dismiss the category-select suggestion chip) —
@@ -107,41 +127,43 @@ export function CategoryConfirm({
   }
 
   const names = categorySuggestions.map(suggestionLabel);
-  const question =
-    categorySuggestions.length > 1
+  // Underkategorien modellen/stemme-RPC-en foreslår (Bil vs. MC vs.
+  // Tilhenger, ...) er ikke pålitelig nok til å spørre om direkte — se
+  // isUnderBilOgMc over. Når alle forslagene ligger under Bil og MC,
+  // kollapses spørsmålet til å kun bekrefte den brede kategorien; den
+  // spesifikke underkategorien blir i stedet et endrbart forslag i
+  // ikonrutenettet over Merke/Modell (vehicle-registration).
+  const isVehicleSuggestion =
+    categorySuggestions.length > 0 &&
+    !!bilOgMcName &&
+    categorySuggestions.every((s) =>
+      isUnderBilOgMc(s.category_id, categoriesById, bilOgMcCategoryId),
+    );
+  const question = isVehicleSuggestion
+    ? `Denne annonsen blir opprettet i kategori ${bilOgMcName}. Er det riktig?`
+    : categorySuggestions.length > 1
       ? `Er denne annonsen i kategori ${names.join(" eller ")}?`
       : `Denne annonsen blir opprettet i kategori ${names[0]}. Er det riktig?`;
-  const showMotorsportButton =
-    motorsportCategory &&
-    categorySuggestions.some((s) => MOTORSPORT_CONFUSABLE_NAMES.has(s.name_nb));
+  const primaryButtons = isVehicleSuggestion
+    ? categorySuggestions.slice(0, 1)
+    : categorySuggestions;
 
   return (
     <section className="space-y-4 py-4 text-center">
       <p className="text-lg font-semibold">{question}</p>
       <div className="flex flex-wrap justify-center gap-3">
-        {categorySuggestions.map((suggestion, i) => (
+        {primaryButtons.map((suggestion, i) => (
           <Button
             key={suggestion.category_id}
             type="button"
             onClick={() => {
-              setClickedName(names[i]);
+              setClickedName(isVehicleSuggestion ? (bilOgMcName ?? names[i]) : names[i]);
               applyCategorySuggestion(suggestion.category_id);
             }}
           >
-            {names[i]}
+            {isVehicleSuggestion ? "Ja" : categorySuggestions.length > 1 ? names[i] : "Ja"}
           </Button>
         ))}
-        {showMotorsportButton && motorsportCategory && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() =>
-              onCategorySelect(motorsportCategory.id, motorsportCategory.parent_id ?? "")
-            }
-          >
-            Benytt kategori Motorsport
-          </Button>
-        )}
         <Button type="button" variant="outline" onClick={() => setShowPicker(true)}>
           Nei
         </Button>

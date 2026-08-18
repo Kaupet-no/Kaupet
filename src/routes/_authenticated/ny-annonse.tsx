@@ -60,7 +60,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { formatErrorMessage } from "@/lib/errors";
-import { CONDITIONS, VEHICLE_CONDITIONS } from "@/lib/constants";
+import { CONDITIONS } from "@/lib/constants";
 import { isNative } from "@/lib/native";
 
 import { PublishActions } from "@/features/listing-creation/field-groups/review-publish";
@@ -932,9 +932,11 @@ function NewListingPage() {
     },
   });
 
-  const conditionDescription = (isVehicle ? VEHICLE_CONDITIONS : CONDITIONS).find(
-    (c) => c.value === condition,
-  )?.description;
+  // Kjøretøy-tilstandsetiketter (Ny bil/Bruktbil/...) har ingen beskrivelse —
+  // selvforklarende, i motsetning til de generiske (Helt ny/Som ny/...).
+  const conditionDescription = isVehicle
+    ? undefined
+    : CONDITIONS.find((c) => c.value === condition)?.description;
 
   const parsedPriceNok =
     typeof priceNok === "number" ? priceNok : priceNok !== "" ? Number(priceNok) : NaN;

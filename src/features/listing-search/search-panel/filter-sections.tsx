@@ -13,11 +13,7 @@ import { CategoryFilterFields } from "@/components/category-filter-fields";
 import { describeAttrValue } from "@/components/active-filters";
 import { RangeFilterField } from "@/components/range-filter-field";
 import { PRICE_BOUNDS } from "@/lib/filter-range-bounds";
-import {
-  CONDITIONS,
-  isBilOgMcCategory,
-  type AdvancedSearchValue,
-} from "@/components/advanced-search-value";
+import { CONDITIONS, type AdvancedSearchValue } from "@/components/advanced-search-value";
 import type { Category } from "@/lib/categories";
 import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/location-filter";
 import { emptyTermGroup, type TermGroup } from "@/lib/term-groups";
@@ -88,7 +84,6 @@ export function SearchFilterSections({
   const [activeSection, setActiveSection] = useState<SearchFilterSection>(section);
   const [activeAttributeKey, setActiveAttributeKey] = useState<string | null>(null);
 
-  const showCondition = !isBilOgMcCategory(categories, v.categories);
   // Falls back to editing the draft's own location when no live location is
   // passed in (saved-search editing on mine-sok.tsx), so the "Sted" section
   // works in both contexts without a second code path.
@@ -189,13 +184,11 @@ export function SearchFilterSections({
           onClick={() => openSection("location")}
         />
         <FilterOverviewRow label="Pris" value={priceSummary} onClick={() => openSection("price")} />
-        {showCondition && (
-          <FilterOverviewRow
-            label="Tilstand"
-            value={v.conditions.length ? `${v.conditions.length} valgt` : "Alle"}
-            onClick={() => setConditionsOpen(true)}
-          />
-        )}
+        <FilterOverviewRow
+          label="Tilstand"
+          value={v.conditions.length ? `${v.conditions.length} valgt` : "Alle"}
+          onClick={() => setConditionsOpen(true)}
+        />
       </div>
       <div className="mt-6 space-y-2">
         {primaryFilters.map((filter) => (

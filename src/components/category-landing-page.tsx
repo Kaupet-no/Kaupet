@@ -30,7 +30,6 @@ import {
   genericBrandFilterFor,
 } from "@/lib/category-filters";
 import { getCategoryBehavior } from "@/lib/category-behavior";
-import { BIL_OG_MC_SLUG } from "@/components/advanced-search-value";
 import { SearchBar } from "@/components/search-bar";
 import { searchSchema, conditionEnum } from "@/features/listing-search/search-schema";
 import { useAnnonserSearchState } from "@/features/listing-search/use-annonser-search-state";
@@ -152,10 +151,6 @@ export function CategoryLandingPage({
   );
   const breadcrumbEntries = useMemo(() => [...breadcrumb, ...extraPath], [breadcrumb, extraPath]);
   const children = tree.childrenByParent.get(selected.id) ?? [];
-
-  // No Bil og MC listing has a "Tilstand" attribute, so the condition filter
-  // is meaningless (and hidden) anywhere under that root category.
-  const isBilOgMc = (breadcrumb[0]?.slug ?? category.slug) === BIL_OG_MC_SLUG;
 
   // Selecting a different (deeper/shallower/sibling) category never navigates
   // away from this page's own URL — it only updates the search param.
@@ -402,7 +397,6 @@ export function CategoryLandingPage({
               onConditionsChange={(c) =>
                 updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
               }
-              hideCondition={isBilOgMc}
               counts={facetCounts}
               layout="card"
               location={location}

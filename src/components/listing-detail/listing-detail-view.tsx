@@ -838,6 +838,8 @@ function ListingDetailViewBody({
                     mileageKm={mileageKm}
                     euControlExempt={euControlExempt}
                     driveType={driveType}
+                    condition={condition}
+                    vehicleLeafSlug={vehicleLeafSlug}
                   />
                   <LoanCalculator totalPriceKr={totalPriceKr} />
                 </section>

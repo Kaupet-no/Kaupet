@@ -4,6 +4,8 @@ import { ChevronDown } from "lucide-react";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.types";
+import type { VehicleLeafSlug } from "@/lib/vehicle/vehicle-classification";
+import { CONDITION_LABEL, VEHICLE_CONDITION_LABEL_BY_SLUG } from "@/lib/constants";
 import { DRIVE_TYPE_LABEL_NB, FUEL_LABEL_NB, TRANSMISSION_LABEL_NB } from "./vehicle-labels";
 
 type Row = { label: string; value: string };
@@ -19,6 +21,8 @@ export function VehicleTechTable({
   mileageKm,
   euControlExempt,
   driveType,
+  condition,
+  vehicleLeafSlug,
 }: {
   vehicleLookup: VehicleLookupResult | null;
   mileageKm: number | null;
@@ -29,10 +33,23 @@ export function VehicleTechTable({
   /** Selgerens bekreftede verdi (`attributes.drive_type`), som har forrang
    * over `vehicleLookup.drive_type` — se `vehicle-info-grid.tsx`. */
   driveType?: string | null;
+  /** Tilstand (samme `condition`-enum som vanlige annonser, se
+   * VEHICLE_CONDITIONS_BY_SLUG) — vist med kjøretøytype-spesifikk etikett når
+   * slug er kjent, ellers den generiske etiketten. */
+  condition?: string | null;
+  vehicleLeafSlug?: VehicleLeafSlug | null;
 }) {
   const [open, setOpen] = useState(false);
   const rows: Row[] = [];
 
+  if (condition) {
+    const label = vehicleLeafSlug
+      ? (VEHICLE_CONDITION_LABEL_BY_SLUG[vehicleLeafSlug]?.[
+          condition as keyof (typeof VEHICLE_CONDITION_LABEL_BY_SLUG)[VehicleLeafSlug]
+        ] ?? CONDITION_LABEL[condition])
+      : CONDITION_LABEL[condition];
+    rows.push({ label: "Tilstand", value: label ?? condition });
+  }
   if (mileageKm != null)
     rows.push({ label: "Kilometerstand", value: `${mileageKm.toLocaleString("nb-NO")} km` });
   if (vehicleLookup?.year) rows.push({ label: "Årsmodell", value: String(vehicleLookup.year) });

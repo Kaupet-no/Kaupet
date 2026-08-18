@@ -14,10 +14,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AttributeFields, useAllCategoryFilters } from "@/components/attribute-fields";
-import {
-  VEHICLE_LOOKUP_FILTER_KEYS,
-  VEHICLE_WIZARD_MANAGED_KEYS,
-} from "@/lib/vehicle/vehicle-lookup.types";
+import { VEHICLE_WIZARD_MANAGED_KEYS } from "@/lib/vehicle/vehicle-lookup.types";
 import { vehicleCategoryGroupFor } from "@/lib/category-filters";
 import { useAllVehicleBrands, useAllVehicleModels } from "@/lib/vehicle/vehicle-brands";
 import { matchBrandAndModelInTitle } from "@/lib/vehicle/vehicle-brand-match";
@@ -52,18 +49,13 @@ const HIDDEN_KEYS_FOR_MANUAL_SPECS = [
 /** For registrerte kjøretøy dekker SVV-oppslaget resten av de tekniske
  * feltene selv (se confirmVehicleData) — men "Antall soveplasser"
  * (bobil/campingvogn) og "Fritatt for EU-kontroll" (tilhenger) er
- * påkrevde felt SVV aldri har data for, så de spørres her uansett,
- * på samme måte som Merke/Modell over. Skjuler dermed alt annet i
- * VEHICLE_LOOKUP_FILTER_KEYS-settet — de to unntakene er de eneste
- * feltene denne AttributeFields-instansen faktisk skal rendre. */
+ * påkrevde felt SVV aldri har data for, så de spørres her uansett, på
+ * samme måte som Merke/Modell over. Disse to er de eneste feltene denne
+ * AttributeFields-instansen skal rendre — alt annet skjules dynamisk (se
+ * `hiddenKeysForRegisteredExtraSpecs` under) fremfor via en hardkodet
+ * nøkkelliste, som tidligere ikke dekket alle SVV-utledede felt (f.eks.
+ * årsmodell, førstegangsregistrering) og dermed spurte om dem på nytt her. */
 const VEHICLE_REGISTERED_REQUIRED_SPEC_KEYS = ["sleeping_places", "eu_control_exempt"];
-const HIDDEN_KEYS_FOR_REGISTERED_EXTRA_SPECS = [
-  ...VEHICLE_WIZARD_MANAGED_KEYS,
-  ...VEHICLE_EQUIPMENT_FILTER_KEYS,
-  "brand",
-  "model",
-  ...VEHICLE_LOOKUP_FILTER_KEYS.filter((k) => !VEHICLE_REGISTERED_REQUIRED_SPEC_KEYS.includes(k)),
-];
 
 /**
  * Første steg i kjøretøyflyten, etter at kategorien er bekreftet: Merke og
@@ -113,6 +105,19 @@ export function VehicleRegistration(props: WizardSharedProps) {
   const categoriesById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
   const categoryGroup =
     vehicleCategoryGroupFor(categoryId || null, allFilters ?? [], categoriesById) ?? "bil";
+
+  /** Skjuler alle kategoriens filtre bortsett fra de to som ikke kommer fra
+   * SVV — bygget fra de faktiske filtrene i stedet for en hardkodet
+   * nøkkelliste, slik at et nytt SVV-utledet felt (lagt til i
+   * confirmVehicleData) automatisk forblir skjult her uten en samtidig
+   * oppdatering to steder. */
+  const hiddenKeysForRegisteredExtraSpecs = useMemo(
+    () =>
+      (allFilters ?? [])
+        .map((f) => f.key)
+        .filter((k) => !VEHICLE_REGISTERED_REQUIRED_SPEC_KEYS.includes(k)),
+    [allFilters],
+  );
 
   const leafBySlug = useMemo(() => vehicleLeafCategoriesBySlug(categories), [categories]);
   const currentLeafSlug = categoriesById.get(categoryId)?.slug as VehicleLeafSlug | undefined;
@@ -324,7 +329,7 @@ export function VehicleRegistration(props: WizardSharedProps) {
               value={attributes}
               onChange={onAttributesChange}
               showErrors={attributesTouched}
-              hiddenKeys={HIDDEN_KEYS_FOR_REGISTERED_EXTRA_SPECS}
+              hiddenKeys={hiddenKeysForRegisteredExtraSpecs}
               required
             />
           </>

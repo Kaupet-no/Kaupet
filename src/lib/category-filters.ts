@@ -142,7 +142,7 @@ export function normalizeFilter(row: {
 }
 
 /** Returns whether a filter's dependency (if any) is satisfied by the current
- * attribute values — e.g. Bilsport's "Gren"/"Klasse" only apply once
+ * attribute values — e.g. Motorsport's "Gren"/"Klasse" only apply once
  * "Er bilen lisensiert?" is true. Filters without a dependency always apply. */
 export function filterDependencyMet(
   filter: Pick<CategoryFilter, "depends_on_key" | "depends_on_value" | "depends_on_not_value">,

@@ -36,7 +36,14 @@ export async function suggestCategoryForTitleAi(input: unknown) {
   const parentIds = new Set(
     (categories as CategoryRow[]).map((c) => c.parent_id).filter((id): id is string => !!id),
   );
-  const leafCategories = (categories as CategoryRow[]).filter((c) => !parentIds.has(c.id));
+  // "Motorsport" (tidl. "Bilsport") holdes utenfor modellens valgmuligheter —
+  // den er ofte "riktig" for en rask bil/MC, men brukeren mener som regel
+  // "Bil"/"MC". category-confirm tilbyr i stedet en egen
+  // "Benytt kategori Motorsport"-knapp når modellen foreslår en av de
+  // vertikalene den lett forveksles med.
+  const leafCategories = (categories as CategoryRow[]).filter(
+    (c) => !parentIds.has(c.id) && c.name_nb !== "Motorsport",
+  );
   if (leafCategories.length === 0) return null;
 
   const byName = new Map(leafCategories.map((c) => [c.name_nb, c]));

@@ -98,8 +98,8 @@ export type WizardSharedProps = {
   onCategoryDeselect?: (parentId: string) => void;
   /** 0-2 candidates — the vote-based RPC always returns a single confident
    * top match when it has one, but the AI fallback (borealis-1b) may return
-   * two roughly-equally-likely categories (e.g. "Bil" vs. "Bilsport" for a
-   * sports car title) instead of forcing a single guess. category-confirm
+   * two roughly-equally-likely categories (e.g. "Bil" vs. "MC" for an
+   * ambiguous title) instead of forcing a single guess. category-confirm
    * offers a button per candidate plus "Nei" for the full manual picker. */
   categorySuggestions: {
     category_id: string;

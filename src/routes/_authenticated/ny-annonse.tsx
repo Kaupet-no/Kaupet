@@ -388,7 +388,7 @@ function NewListingPage() {
     // Utstyr-nøklene inherits from Bil og MC (see category_filters), but are
     // only meant to be filled in via the dedicated vehicle-equipment step —
     // hidden here unconditionally so a category without that step (e.g.
-    // Bilsport) doesn't get them leaking into the generic attributes list.
+    // Motorsport) doesn't get them leaking into the generic attributes list.
     ...VEHICLE_EQUIPMENT_FILTER_KEYS,
   ];
 

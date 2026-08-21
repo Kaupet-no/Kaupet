@@ -30,26 +30,13 @@ export function ComposerStepIndicator({
   );
 }
 
-/** A page (1-based index into `pages`) whose only group is `vehicle-confirm`
- * doesn't get its own dot in the step indicator — it's the same logical
- * "Registreringsnummer" step as the vehicle-registration page right before
- * it (SVV lookup + confirmation are one user-facing step, even though
- * they're two separate wizard pages internally). */
 type DisplayStep = { label: string; startIndex: number; endIndex: number };
 
 function buildDisplaySteps(pages: WizardPage[], native: boolean): DisplayStep[] {
-  const steps: DisplayStep[] = [];
-  pages.forEach((p, i) => {
+  return pages.map((p, i) => {
     const index = i + 1;
-    const isVehicleConfirmPage = p.groups.length === 1 && p.groups[0].key === "vehicle-confirm";
-    const prev = steps[steps.length - 1];
-    if (isVehicleConfirmPage && prev) {
-      prev.endIndex = index;
-      return;
-    }
-    steps.push({ label: pageLabel(p.groups, native), startIndex: index, endIndex: index });
+    return { label: pageLabel(p.groups, native), startIndex: index, endIndex: index };
   });
-  return steps;
 }
 
 /**

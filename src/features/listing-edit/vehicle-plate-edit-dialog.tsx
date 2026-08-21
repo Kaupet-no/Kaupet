@@ -68,7 +68,6 @@ export function VehiclePlateEditDialog({
   }, [categories]);
 
   const flow = useVehicleLookupFlow({
-    allFilters,
     categoriesById,
     attributes: attributes as import("@/components/attribute-fields").AttributeMap,
     setAttributes: () => {},

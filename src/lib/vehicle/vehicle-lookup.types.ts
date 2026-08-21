@@ -13,6 +13,7 @@ export type VehicleLookupResult = {
   next_eu_control: string | null;
   power_hk: number | null;
   drive_type: string | null;
+  axle_count: number | null;
   tow_hitch: boolean | null;
   max_tow_weight_kg: number | null;
   seats: number | null;

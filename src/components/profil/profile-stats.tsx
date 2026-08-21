@@ -1,12 +1,13 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Link } from "@tanstack/react-router";
 import { ListChecks, Loader2, ShoppingBag, Star } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { StarRating } from "@/components/star-rating";
 import { getMyProfileStats } from "@/lib/reviews.functions";
 import { formatErrorMessage } from "@/lib/errors";
+import { NewListingDialog } from "@/components/new-listing-dialog";
 
 export function StatCell({
   label,
@@ -36,6 +37,7 @@ export function StatCell({
 }
 
 export function ProfileStats() {
+  const [newListingOpen, setNewListingOpen] = useState(false);
   const getStats = useServerFn(getMyProfileStats);
   const {
     data: stats,
@@ -82,12 +84,13 @@ export function ProfileStats() {
               {stats.listings_count.toLocaleString("nb-NO")}
             </span>
           ) : (
-            <Link
-              to="/ny-annonse"
+            <button
+              type="button"
+              onClick={() => setNewListingOpen(true)}
               className="text-xs font-medium text-primary underline-offset-2 hover:underline"
             >
               Opprett din første
-            </Link>
+            </button>
           )}
         </StatCell>
         <StatCell label="Salg" icon={<ShoppingBag className="size-3.5" />}>
@@ -112,6 +115,7 @@ export function ProfileStats() {
           )}
         </StatCell>
       </CardContent>
+      <NewListingDialog open={newListingOpen} onOpenChange={setNewListingOpen} />
     </Card>
   );
 }

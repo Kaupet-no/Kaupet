@@ -2,7 +2,7 @@ import { format } from "date-fns";
 import { SORT_OPTIONS, type SortValue, type Category } from "@/lib/categories";
 import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
 import { boundsForFilter } from "@/lib/filter-range-bounds";
-import { parseIsoDate } from "@/features/listing-creation/field-groups/vehicle-confirm/spec";
+import { parseIsoDate } from "@/lib/vehicle/vehicle-date";
 
 /**
  * Shared label/active-state derivation used by both NativeFilterChips and

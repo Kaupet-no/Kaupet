@@ -95,6 +95,35 @@ const AVGIFTSKLASSE_TO_SLUG: Record<string, VehicleLeafSlug> = {
   "722": "tilhenger-leaf",
   "723": "campingvogn", // Semitrailer (campingtilhenger)
   "729": "tilhenger-leaf",
+  // Buss (201/210-215) — verifisert mot SVVs AVGIFT-kodeverk (kodeverkId=
+  // AVGIFT), august 2026. Manglet tidligere helt her og falt derfor gjennom
+  // til EU-teknisk-klasse-fallback (som heller ikke dekker M2/M3), og endte
+  // typisk feilaktig i "bil" — se commit-melding for detaljer om bugen.
+  "201": "buss-og-minibuss",
+  "210": "buss-og-minibuss",
+  "211": "buss-og-minibuss",
+  "212": "buss-og-minibuss",
+  "213": "buss-og-minibuss",
+  "214": "buss-og-minibuss",
+  "215": "buss-og-minibuss",
+  // Lastebil (320-381, ekskl. varebil-kodene 301/310/311/314/315 og
+  // campingbil-på-lastebil 336, som forblir hhv. "bil"/"bobil" over).
+  "320": "lastebil-og-henger",
+  "321": "lastebil-og-henger",
+  "323": "lastebil-og-henger",
+  "325": "lastebil-og-henger",
+  "330": "lastebil-og-henger",
+  "335": "lastebil-og-henger",
+  "340": "lastebil-og-henger",
+  "350": "lastebil-og-henger",
+  "360": "lastebil-og-henger",
+  "361": "lastebil-og-henger",
+  "363": "lastebil-og-henger",
+  "365": "lastebil-og-henger",
+  "370": "lastebil-og-henger",
+  "375": "lastebil-og-henger",
+  "380": "lastebil-og-henger",
+  "381": "lastebil-og-henger",
 };
 
 /** Avgiftsklasse-koder som mapper til "bil" ovenfor, splittet i sin
@@ -176,6 +205,8 @@ export function classifyVehicleCategory(
     return { slug: "bil", confidence: "high" };
   }
   if (code === "N1") return { slug: "bil", confidence: "high" };
+  if (code === "N2" || code === "N3") return { slug: "lastebil-og-henger", confidence: "high" };
+  if (code === "M2" || code === "M3") return { slug: "buss-og-minibuss", confidence: "high" };
   if (code === "L3E" || code === "L4E") return { slug: "motorsykkel", confidence: "high" };
   if (code === "L1E" || code === "L2E") return { slug: "moped-og-scooter", confidence: "high" };
   // L5e/L6e -> ATV/quad; L7e is a heavier quad that could also be a
@@ -206,6 +237,41 @@ export const VEHICLE_LEAF_SLUGS: VehicleLeafSlug[] = [
   "traktor-og-redskap",
   "anleggsmaskiner",
 ];
+
+export const LEAF_LABELS_NB: Record<VehicleLeafSlug, string> = {
+  bil: "Bil",
+  bobil: "Bobil",
+  campingvogn: "Campingvogn",
+  motorsykkel: "Motorsykkel",
+  "moped-og-scooter": "Moped/scooter",
+  atv: "ATV",
+  snoscooter: "Snøscooter",
+  "tilhenger-leaf": "Tilhenger",
+  "lastebil-og-henger": "Lastebil/henger",
+  "buss-og-minibuss": "Buss/minibuss",
+  "traktor-og-redskap": "Traktor/redskap",
+  anleggsmaskiner: "Anleggsmaskin",
+};
+
+/**
+ * Maps the vehicle leaf categories (per `VEHICLE_LEAF_SLUGS`) present in a
+ * category list, keyed by slug — shared by every place that needs to go
+ * from a `VehicleLeafSlug` to the actual category row (id, name, icon):
+ * vehicle-confirm's post-lookup type picker and vehicle-registration's
+ * underkategori icon grid.
+ */
+export function vehicleLeafCategoriesBySlug<T extends { slug?: string | null }>(
+  categories: T[],
+): Map<VehicleLeafSlug, T & { slug: string }> {
+  return new Map(
+    categories
+      .filter(
+        (c): c is T & { slug: string } =>
+          !!c.slug && VEHICLE_LEAF_SLUGS.includes(c.slug as VehicleLeafSlug),
+      )
+      .map((c) => [c.slug as VehicleLeafSlug, c]),
+  );
+}
 
 /** Leaves where the "modell"-felt aldri matches mot `vehicle_models`-tabellen
  * — SVV-importert modelltekst fylles kun inn som fritekst som brukeren kan

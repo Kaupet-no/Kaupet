@@ -45,6 +45,7 @@ const baseFields = {
   attributes: {},
   images: [],
   setImages: vi.fn(),
+  stepKey: "title-photos",
 };
 
 beforeEach(() => {

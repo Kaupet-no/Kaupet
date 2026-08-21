@@ -4,8 +4,7 @@ import { CalendarIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-
-import { parseIsoDate, startOfToday } from "./spec";
+import { parseIsoDate, startOfToday } from "@/lib/vehicle/vehicle-date";
 
 const Calendar = lazy(() =>
   import("@/components/ui/calendar").then((module) => ({ default: module.Calendar })),

@@ -36,7 +36,14 @@ export async function suggestCategoryForTitleAi(input: unknown) {
   const parentIds = new Set(
     (categories as CategoryRow[]).map((c) => c.parent_id).filter((id): id is string => !!id),
   );
-  const leafCategories = (categories as CategoryRow[]).filter((c) => !parentIds.has(c.id));
+  // "Motorsport" (tidl. "Bilsport") holdes utenfor modellens valgmuligheter —
+  // den er ofte "riktig" for en rask bil/MC, men brukeren mener som regel
+  // "Bil"/"MC". category-confirm tilbyr i stedet en egen
+  // "Benytt kategori Motorsport"-knapp når modellen foreslår en av de
+  // vertikalene den lett forveksles med.
+  const leafCategories = (categories as CategoryRow[]).filter(
+    (c) => !parentIds.has(c.id) && c.name_nb !== "Motorsport",
+  );
   if (leafCategories.length === 0) return null;
 
   const byName = new Map(leafCategories.map((c) => [c.name_nb, c]));
@@ -45,9 +52,27 @@ export async function suggestCategoryForTitleAi(input: unknown) {
   // the leaf category count grows (title itself is already capped at 120
   // chars by listingSchema/wtbSchema, so this rarely bites in practice).
   const truncatedTitle = title.slice(0, 100);
+  // Few-shot examples target the two failure modes we've actually seen in
+  // testing (a 1B model has no real-world brand knowledge to fall back on):
+  // car/motorcycle brand+model titles getting classified as an unrelated
+  // household category, and cars vs. motorcycles being confused with each
+  // other. Only included when the relevant category exists in this instance's
+  // leaf list, so the examples never reference an invalid answer.
+  const examples: string[] = [];
+  if (byName.has("Bil")) {
+    examples.push('"Volvo XC40 2019, dieselmotor" -> Bil', '"BMW 320d 2015" -> Bil');
+  }
+  if (byName.has("Motorsykkel")) {
+    examples.push('"Suzuki GSXR 750" -> Motorsykkel', '"Honda CBR 600RR 2018" -> Motorsykkel');
+  }
+  const examplesBlock = examples.length ? `\nEksempler:\n${examples.join("\n")}\n` : "";
+
   const prompt = `Du skal klassifisere annonsetitler til riktig kategori for en norsk nettbasert markedsplass.
 Tilgjengelige kategorier: ${leafCategories.map((c) => c.name_nb).join(", ")}
-Annonsetittel: "${truncatedTitle}"
+Titler som starter med et bilmerke og en modellbetegnelse er nesten alltid kjøretøy, ikke
+husholdningsartikler eller annet elektronikk — se etter merke/modell-mønsteret, ikke
+enkeltord i tittelen.
+${examplesBlock}Annonsetittel: "${truncatedTitle}"
 Svar med det ene kategorinavnet fra listen over som passer best. Hvis to kategorier er
 omtrent like sannsynlige, svar med begge, atskilt med komma. Ingen annen tekst.`;
 
@@ -72,10 +97,7 @@ omtrent like sannsynlige, svar med begge, atskilt med komma. Ingen annen tekst.`
         body: JSON.stringify({
           // 0, not a small-but-nonzero value: this is a closed-set classification
           // (pick a name off the list), not creative generation, so there's no
-          // upside to sampling randomness — only downside. Verified live: the
-          // same title ("2024 Porsche 911 991.2") answered "Bil" consistently at
-          // temperature 0, but non-deterministically produced an unrelated
-          // category ("Kjøleskap og fryser") at 0.1 — the 1B model is uncertain
+          // upside to sampling randomness — only downside.The 1B model is uncertain
           // enough that any sampling noise can flip it off a correct greedy pick.
           messages: [{ role: "user", content: prompt }],
           max_tokens: 20,
@@ -95,7 +117,11 @@ omtrent like sannsynlige, svar med begge, atskilt med komma. Ingen annen tekst.`
         continue;
       }
       console.error("[category-suggestion-ai] fetch failed", err);
-      return null;
+      // Cold-start budget exhausted without a usable response — a real
+      // failure, not "the model looked and found nothing". Must throw
+      // (not return null) so the caller's retry logic actually retries
+      // instead of caching this as a valid empty answer.
+      throw new Error("category-suggestion-ai: exhausted retry budget", { cause: err });
     }
     if (response.status === 503 && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 1500));
@@ -103,14 +129,17 @@ omtrent like sannsynlige, svar med begge, atskilt med komma. Ingen annen tekst.`
     }
     if (!response.ok) {
       console.error("[category-suggestion-ai] non-ok response", response.status);
-      return null;
+      throw new Error(`category-suggestion-ai: non-ok response ${response.status}`);
     }
     break;
   }
 
   const result = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
   const generated = result.choices?.[0]?.message?.content?.trim();
-  if (!generated) return null;
+  if (!generated) {
+    console.error("[category-suggestion-ai] empty model response");
+    return null;
+  }
 
   // Up to 2 candidates — matches the confirm UI's "Er dette kategori X eller
   // Y?" pattern, offering both instead of forcing a single guess through the
@@ -123,7 +152,10 @@ omtrent like sannsynlige, svar med begge, atskilt med komma. Ingen annen tekst.`
     if (match && !matches.some((m) => m.id === match.id)) matches.push(match);
     if (matches.length === 2) break;
   }
-  if (matches.length === 0) return null;
+  if (matches.length === 0) {
+    console.error("[category-suggestion-ai] no category matched model output", { generated });
+    return null;
+  }
 
   return matches.map((match) => {
     const parent = match.parent_id

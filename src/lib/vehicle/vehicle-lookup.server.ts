@@ -353,6 +353,7 @@ export async function lookupVehicle(registrationNumber: string): Promise<Vehicle
       return kw ? Math.round(kw * 1.35962) : null;
     })(),
     drive_type: driveTypeFromAxles(teknisk?.akslinger),
+    axle_count: teknisk?.akslinger?.antallAksler ?? null,
     tow_hitch: tilhengerkopling ? Boolean(tilhengerkopling.belastningLoddrettMaks) : null,
     max_tow_weight_kg:
       teknisk?.vekter?.tillattTilhengervektMedBrems ??

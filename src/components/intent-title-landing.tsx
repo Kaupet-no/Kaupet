@@ -29,9 +29,15 @@ function minTitleLength(intent: Intent): number {
   return intent === "buy" ? 3 : 5;
 }
 
-export function IntentTitleLanding({ onNavigate }: { onNavigate?: () => void }) {
+export function IntentTitleLanding({
+  onNavigate,
+  defaultIntent = "sell",
+}: {
+  onNavigate?: () => void;
+  defaultIntent?: Intent;
+}) {
   const navigate = useNavigate();
-  const [intent, setIntent] = useState<Intent>("sell");
+  const [intent, setIntent] = useState<Intent>(defaultIntent);
   const [title, setTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
 

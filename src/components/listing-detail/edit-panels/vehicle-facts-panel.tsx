@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 
 import { useListingEdit } from "@/features/listing-edit/edit-mode-context";
-import { DRIVE_TYPE_OPTIONS } from "@/features/listing-creation/field-groups/vehicle-confirm";
+import { DRIVE_TYPE_OPTIONS } from "@/lib/vehicle/vehicle-options";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";

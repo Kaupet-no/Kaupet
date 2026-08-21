@@ -9,6 +9,8 @@ import { ComposerErrorSummary } from "./composer-error-summary";
 
 export function ListingComposerShell({
   title,
+  onTitleChange,
+  categoryLabel,
   onEditCategory,
   pageKey,
   pageTitle,
@@ -26,8 +28,17 @@ export function ListingComposerShell({
   firstStep,
   contentClassName,
 }: {
+  /** Annonsens egen tittel, oppgitt på landingsskjermen — vist gjennom hele
+   * wizarden så brukeren ser hva de holder på med, i stedet for et eget
+   * tittelsteg midt i flyten (se applyLandingEntry i category-flows.ts). */
   title: string;
-  /** When set, the title becomes clickable (web only) — used by the
+  /** When set, the title is editable inline (click to edit, save on
+   * blur/Enter). Left undefined for vehicle listings, whose title is
+   * generated from Årsmodell/Merke/Modell (see computeVehicleTitle). */
+  onTitleChange?: (value: string) => void;
+  /** Bekreftet kategori, vist som en klikkbar chip under tittelen. */
+  categoryLabel?: string;
+  /** When set, the category chip becomes clickable (web only) — used by the
    * intent+title flow to let the user change a category they've already
    * confirmed, via a confirmation dialog + the manual picker sheet, rather
    * than through ordinary step navigation. */
@@ -113,21 +124,27 @@ export function ListingComposerShell({
         native && "native-composer-shell flex flex-col",
       )}
     >
-      <NativePageHeader title={title} backLabel={backLabel} onBack={onBack} hideBack={native} />
-      {!native && (
-        <h1 className="font-display text-3xl tracking-tight">
+      <NativePageHeader
+        title={title || "Ny annonse"}
+        backLabel={backLabel}
+        onBack={onBack}
+        hideBack={native}
+      />
+      {!native && <ComposerHeading title={title} onTitleChange={onTitleChange} />}
+      {categoryLabel && (
+        <p className="mt-1 text-sm text-muted-foreground">
           {onEditCategory ? (
             <button
               type="button"
               onClick={onEditCategory}
-              className="text-left underline decoration-dotted underline-offset-4 hover:decoration-solid"
+              className="underline decoration-dotted underline-offset-4 hover:decoration-solid"
             >
-              {title}
+              {categoryLabel}
             </button>
           ) : (
-            title
+            categoryLabel
           )}
-        </h1>
+        </p>
       )}
       {notice}
 
@@ -207,5 +224,72 @@ export function ListingComposerShell({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Annonsetittelen i wizard-headeren. Klikkbar når `onTitleChange` er satt:
+ * tittelen ble oppgitt på landingsskjermen, og dette er stedet den rettes —
+ * wizarden har ikke lenger noe eget tittelsteg. Er den ikke redigerbar
+ * (kjøretøy, der tittelen genereres av Årsmodell/Merke/Modell) vises den som
+ * ren tekst.
+ */
+function ComposerHeading({
+  title,
+  onTitleChange,
+}: {
+  title: string;
+  onTitleChange?: (value: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(title);
+  const className = "font-display text-3xl tracking-tight";
+
+  if (editing && onTitleChange) {
+    const commit = () => {
+      onTitleChange(draft.trim());
+      setEditing(false);
+    };
+    return (
+      <input
+        autoFocus
+        aria-label="Annonsetittel"
+        value={draft}
+        maxLength={120}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commit();
+          }
+          if (e.key === "Escape") {
+            setDraft(title);
+            setEditing(false);
+          }
+        }}
+        className={cn(className, "w-full border-b border-border bg-transparent outline-none")}
+      />
+    );
+  }
+
+  return (
+    <h1 className={className}>
+      {onTitleChange ? (
+        <button
+          type="button"
+          onClick={() => {
+            setDraft(title);
+            setEditing(true);
+          }}
+          className="text-left underline decoration-dotted underline-offset-4 hover:decoration-solid"
+          title="Endre tittel"
+        >
+          {title || "Ny annonse"}
+        </button>
+      ) : (
+        title || "Ny annonse"
+      )}
+    </h1>
   );
 }

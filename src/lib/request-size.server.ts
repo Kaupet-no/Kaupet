@@ -10,7 +10,15 @@ export async function requestBodyExceedsLimit(
   if (Number.isFinite(declaredLength) && declaredLength > maxBytes) return true;
   if (!request.body) return false;
 
-  const reader = request.clone().body?.getReader();
+  let clone: Request;
+  try {
+    clone = request.clone();
+  } catch {
+    // Body already consumed/locked upstream (e.g. by the server function
+    // dispatcher). The declared-length check above already ran.
+    return false;
+  }
+  const reader = clone.body?.getReader();
   if (!reader) return false;
 
   let received = 0;

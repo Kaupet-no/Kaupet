@@ -20,6 +20,7 @@ import { useAllCategoryFilters, type AttributeMap } from "@/components/attribute
 import { modulesForKeys } from "@/features/listing-creation/modules/registry";
 import {
   effectiveFlowForCategory,
+  withRuntimeFieldGroups,
   resolveWizardPages,
 } from "@/features/listing-creation/category-flows";
 import { useAllCategoryFlows } from "@/features/listing-creation/use-all-category-flows";
@@ -59,7 +60,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { formatErrorMessage } from "@/lib/errors";
-import { CONDITIONS, VEHICLE_CONDITIONS } from "@/lib/constants";
+import { CONDITIONS } from "@/lib/constants";
 import { isNative } from "@/lib/native";
 
 import { PublishActions } from "@/features/listing-creation/field-groups/review-publish";
@@ -102,21 +103,18 @@ type ListingForm = z.infer<typeof listingSchema>;
 
 /** Forces each of the Bil og MC vehicle-only steps onto its own page,
  * separate from title-photos (images only for vehicles) and from each
- * other: vehicle-facts (Tittel/Kilometerstand/Pris/Undertittel),
- * vehicle-condition (Tilstand/kjente feil-mangler/vedlikeholdshistorikk) and
- * description-keywords (ren beskrivelse+nøkkelord) — split up per the UX
- * audit so the flow isn't one overloaded "Beskrivelse" step. Deliberately
- * excludes "vehicle-equipment" (Utstyr): that one is meant to sit on the
- * *same* page as description-keywords, directly under the Beskrivelse
- * field — so as long as it's the very next key after description-keywords
- * in field_groups (see the bil-og-mc migration), it joins that page's
- * buffer instead of starting a new one. See resolveWizardPages'
- * `forceBreakBeforeKeys`. */
-const VEHICLE_FORCE_BREAK_BEFORE_KEYS = new Set([
-  "vehicle-facts",
-  "vehicle-condition",
-  "description-keywords",
-]);
+ * other: vehicle-facts (Tittel/Undertittel/Kilometerstand/Beskrivelse) and
+ * vehicle-condition (Tilstand/kjente feil-mangler/vedlikeholdshistorikk) —
+ * split up per the UX audit so the flow isn't one overloaded "Beskrivelse"
+ * step. Deliberately excludes "vehicle-equipment" (Utstyr): that one is
+ * meant to sit on the *same* page as vehicle-facts (ved siden av
+ * Beskrivelse-feltet, ikke Tilstand) — so as long as it's the very next key
+ * after vehicle-facts in field_groups (see `normalizeFieldGroupKeys`), it
+ * joins that page's buffer instead of starting a new one. `vehicle-price`
+ * doesn't need an entry here — it's in `SOLO_FIELD_GROUP_KEYS`
+ * (category-flows.ts), which guarantees its own page unconditionally, on
+ * every platform. See resolveWizardPages' `forceBreakBeforeKeys`. */
+const VEHICLE_FORCE_BREAK_BEFORE_KEYS = new Set(["vehicle-facts", "vehicle-condition"]);
 
 export const Route = createFileRoute("/_authenticated/ny-annonse")({
   validateSearch: z
@@ -151,6 +149,7 @@ function NewListingPage() {
   const returnToReviewRef = useRef(false);
   const reviewSectionLastStepRef = useRef<number | null>(null);
   const [reviewJumpRequested, setReviewJumpRequested] = useState(false);
+  const pendingRestoreStepKeyRef = useRef<string | null>(null);
   const [showNoImageDialog, setShowNoImageDialog] = useState(false);
   const [showNoPriceDialog, setShowNoPriceDialog] = useState(false);
   const [extraFieldError, setExtraFieldError] = useState<{
@@ -182,10 +181,13 @@ function NewListingPage() {
   const listingType = typeParam ?? null;
   // Set once from the initial search params (mirrors the useForm defaultValues
   // pattern below — not kept in sync with titleParam afterwards): true when
-  // the wizard was entered via the intent+title landing screen, which is what
-  // lets us skip the forced category-select-as-step-1 in favor of the
-  // AI-suggestion-driven category-confirm step (see category-flows.ts).
-  const [skipCategoryStep] = useState(() => !!titleParam?.trim());
+  // the wizard was entered via the intent+title landing screen. That entry
+  // already answered the title and starts on photos, so it (a) skips the
+  // forced category-select-as-step-1 in favor of the AI-suggestion-driven
+  // category-confirm step, and (b) drops the `title` group and hoists
+  // `photos` to the front of whatever flow applies — see
+  // effectiveFlowForCategory/applyLandingEntry in category-flows.ts.
+  const [fromLanding] = useState(() => !!titleParam?.trim());
   // True once the user has confirmed a category on the category-confirm step
   // (suggestion click or manual pick) — removes "category-confirm" from
   // fieldGroupKeys below for the rest of the session, so the page it occupied
@@ -295,6 +297,9 @@ function NewListingPage() {
   });
 
   const categoryName = categoryId ? categoriesById.get(categoryId)?.name_nb : undefined;
+  const bilOgMcName = bilOgMcCategoryId
+    ? categoriesById.get(bilOgMcCategoryId)?.name_nb
+    : undefined;
 
   const missingFilters = useMemo(
     () =>
@@ -324,14 +329,10 @@ function NewListingPage() {
   const activeModules = useMemo(
     () =>
       modulesForKeys(
-        effectiveFlowForCategory(
-          categoryId || null,
-          allFlows ?? [],
-          categoriesById,
-          skipCategoryStep,
-        ).modules,
+        effectiveFlowForCategory(categoryId || null, allFlows ?? [], categoriesById, fromLanding)
+          .modules,
       ),
-    [categoryId, allFlows, categoriesById, skipCategoryStep],
+    [categoryId, allFlows, categoriesById, fromLanding],
   );
 
   // Hoisted above its natural spot (near the other category-suggestion state)
@@ -350,19 +351,12 @@ function NewListingPage() {
     vehicleLookupResult,
     vehicleClassification,
     vehiclePreviousClassificationMismatch,
-    vehicleLookupConfirmOpen,
-    setVehicleLookupConfirmOpen,
-    vehicleConfirmFooterSlot,
-    setVehicleConfirmFooterSlot,
     vehicleRegNrInput,
     setVehicleRegNrInput,
     runVehicleLookup,
-    matchVehicleBrandForLeaf,
     confirmVehicleData,
-    adjustVehicleRegistrationNumber,
     resetLookupOnReturnToRegistration,
   } = useVehicleLookupFlow({
-    allFilters,
     categoriesById,
     attributes,
     setAttributes,
@@ -374,9 +368,9 @@ function NewListingPage() {
 
   const baseFieldGroupKeys = useMemo(
     () =>
-      effectiveFlowForCategory(categoryId || null, allFlows ?? [], categoriesById, skipCategoryStep)
+      effectiveFlowForCategory(categoryId || null, allFlows ?? [], categoriesById, fromLanding)
         .fieldGroups,
-    [categoryId, allFlows, categoriesById, skipCategoryStep],
+    [categoryId, allFlows, categoriesById, fromLanding],
   );
 
   const vehicleAttributeHiddenKeys = [
@@ -388,7 +382,7 @@ function NewListingPage() {
     // Utstyr-nøklene inherits from Bil og MC (see category_filters), but are
     // only meant to be filled in via the dedicated vehicle-equipment step —
     // hidden here unconditionally so a category without that step (e.g.
-    // Bilsport) doesn't get them leaking into the generic attributes list.
+    // Motorsport) doesn't get them leaking into the generic attributes list.
     ...VEHICLE_EQUIPMENT_FILTER_KEYS,
   ];
 
@@ -403,31 +397,42 @@ function NewListingPage() {
   // leaf — a step count that visibly *grows* mid-flow reads as a bad sign to
   // most users, who are on the registered-vehicle path. Since every leaf
   // under Bil og MC goes through the same vehicle-facts/vehicle-condition/
-  // description-keywords pages regardless of registered-or-not, the page
-  // count itself never actually needs to change — only `isVehicle` (which
+  // vehicle-price pages regardless of registered-or-not, the page count
+  // itself never actually needs to change — only `isVehicle` (which
   // still gates vehicle-specific rendering choices like condition options or
   // showMileage, evaluated later once a leaf is genuinely known) does.
   const isVehicleFlow = baseFieldGroupKeys.includes("vehicle-registration");
 
-  // Inject vehicle-confirm right after vehicle-registration once a lookup has
-  // succeeded — it's never part of a category's stored field_groups (see
-  // category-flows.ts), so it only ever appears in the live wizard state.
-  // Same for category-confirm right after photos, but only when the wizard
-  // was entered via the intent+title landing screen (skipCategoryStep) — the
-  // same condition that made effectiveFlowForCategory above omit
-  // category-select.
-  const fieldGroupKeys = useMemo(() => {
-    let keys = baseFieldGroupKeys;
-    if (skipCategoryStep && !categoryConfirmed) {
-      const photosIdx = keys.indexOf("photos");
-      const insertAt = photosIdx === -1 ? 0 : photosIdx + 1;
-      keys = [...keys.slice(0, insertAt), "category-confirm", ...keys.slice(insertAt)];
-    }
-    if (!vehicleLookupResult) return keys;
-    const idx = keys.indexOf("vehicle-registration");
-    if (idx === -1) return keys;
-    return [...keys.slice(0, idx + 1), "vehicle-confirm", ...keys.slice(idx + 1)];
-  }, [baseFieldGroupKeys, vehicleLookupResult, skipCategoryStep, categoryConfirmed]);
+  // category-confirm/vehicle-360 er aldri en del av en kategoris lagrede
+  // field_groups — de avhenger av live wizard-state, og injiseres derfor her.
+  // Se withRuntimeFieldGroups.
+  //
+  // category-attributes er derimot alltid en del av de lagrede field_groups
+  // (DB-håndhevet, se category_flows_field_groups_required, og låst i
+  // admin-UI via LOCKED_FIELD_GROUP_KEYS) — men rendrer ingenting for
+  // kjøretøy (behavior.showGenericAttributes er false, se CategoryAttributes
+  // og VEHICLE_BEHAVIOR). Filtrert ut her, ikke i den lagrede rekken, slik at
+  // en tom "Detaljer"-side ikke likevel tar sin egen steg-plass i wizarden —
+  // konstraintet/den globale låsen forblir uendret for alle andre kategorier.
+  //
+  // vehicle-equipment (Utstyr) er i dag kun relevant for underkategorien
+  // "bil" — andre kjøretøytyper (MC, tilhenger, campingvogn, ...) kan få
+  // egne utstyrsvalg senere, men frem til det finnes skal ikke Utstyr-steget
+  // vises for dem (selve komponenten skjuler seg allerede når ingen
+  // category_filters matcher, men det hindrer ikke en tom side fra å ta sin
+  // egen steg-plass i wizarden — samme grunn som category-attributes over).
+  const isCarLeaf = categoriesById.get(categoryId)?.slug === "bil";
+  const fieldGroupKeys = useMemo(
+    () =>
+      withRuntimeFieldGroups(baseFieldGroupKeys, {
+        showCategoryConfirm: fromLanding && !categoryConfirmed,
+      }).filter(
+        (key) =>
+          (key !== "category-attributes" || !isVehicleFlow) &&
+          (key !== "vehicle-equipment" || isCarLeaf),
+      ),
+    [baseFieldGroupKeys, fromLanding, categoryConfirmed, isVehicleFlow, isCarLeaf],
+  );
 
   const pages: WizardPage[] = useMemo(
     () =>
@@ -449,7 +454,23 @@ function NewListingPage() {
     isFirst,
     isLast,
   } = useListingSteps(pages);
+  // Intentionally kept fresh every render (not in an effect) since
+  // useVehicleLookupFlow's goNext callback, constructed above
+  // `pages`/`goNext`, must see the latest function the moment it's called,
+  // not one render behind.
+  // eslint-disable-next-line react-hooks/refs
   goNextRef.current = goNext;
+
+  // Underkategori (Bil/MC/Tilhenger/...) er valgfri å endre uten varsel
+  // helt til brukeren forlater vehicle-registration-siden (se
+  // requestCategorySelect over) — deretter regnes den som "låst" og vises
+  // sammen med hovedkategorien i headeren, med bekreftelse før endring
+  // (samme mønster som categoryEditConfirmOpen).
+  const vehicleRegPageIndex = pages.findIndex((p) =>
+    p.groups.some((g) => g.key === "vehicle-registration"),
+  );
+  const vehicleSubcategoryLocked =
+    isVehicle && vehicleRegPageIndex >= 0 && step > vehicleRegPageIndex + 1;
 
   useEffect(() => {
     if (!reviewJumpRequested) return;
@@ -489,16 +510,15 @@ function NewListingPage() {
   }
   useComposerHistoryBack(isFirst, goBack);
 
-  /** Stepping back from vehicle-confirm to vehicle-registration (via
-   * "Tilbake") is the only way to reach vehicle-registration a second time —
-   * clear the stale lookup so the reg-nr field is editable again and
-   * pressing "Neste" re-runs the lookup instead of bouncing straight back to
-   * vehicle-confirm with old data. Replaces the old dedicated "Feil treff /
-   * kjøretøyet er ikke registrert" link, since Tilbake now covers that. */
+  /** Stepping back from vehicle-360 to vehicle-registration (via "Tilbake")
+   * is the only way to reach vehicle-registration a second time after a
+   * confirmed lookup — clear the stale lookup so the reg-nr field and
+   * confirmation popup reset, and pressing "Neste" re-runs the lookup
+   * instead of reopening the popup with old data. */
   const prevPageKeyRef = useRef<string | undefined>(currentPage?.groups?.[0]?.key);
   useEffect(() => {
     const key = currentPage?.groups?.[0]?.key;
-    if (key === "vehicle-registration" && prevPageKeyRef.current === "vehicle-confirm") {
+    if (key === "vehicle-registration" && prevPageKeyRef.current === "vehicle-360") {
       resetLookupOnReturnToRegistration();
     }
     prevPageKeyRef.current = key;
@@ -514,7 +534,13 @@ function NewListingPage() {
     const groupKeys: Record<typeof section, string[]> = {
       category: ["category-select"],
       content: ["photos", "title"],
-      details: ["category-attributes", "description-keywords", "price"],
+      details: [
+        "category-attributes",
+        "description-keywords",
+        "price",
+        "vehicle-facts",
+        "vehicle-price",
+      ],
       location: ["delivery", "location"],
     };
     const matchingIndices = pages
@@ -522,7 +548,14 @@ function NewListingPage() {
         page.groups.some((group) => groupKeys[section].includes(group.key)) ? idx : -1,
       )
       .filter((idx) => idx >= 0);
-    if (matchingIndices.length === 0) return;
+    if (matchingIndices.length === 0) {
+      // Landing-flyten har verken category-select eller (etter bekreftelse)
+      // category-confirm igjen som steg, så "Endre kategori" fra
+      // forhåndsvisningen har ingen side å hoppe til — den åpner samme
+      // dialog som kategori-chippen i headeren i stedet.
+      if (section === "category" && categoryId) setCategoryEditConfirmOpen(true);
+      return;
+    }
     reviewSectionLastStepRef.current = Math.max(...matchingIndices) + 1;
     setStep(matchingIndices[0] + 1);
     window.scrollTo({ top: 0 });
@@ -532,7 +565,11 @@ function NewListingPage() {
     publishedId === null &&
     (title.trim().length > 0 || images.length > 0 || vehicleLookupResult !== null);
   const blocker = useBlocker({
-    shouldBlockFn: () => shouldBlockNav,
+    // `next.pathname === current.pathname` skjer når et overlay (f.eks.
+    // forhåndsvisning) rydder sin egen synthetic history-oppføring med
+    // `history.back()` ved lukking — se useOverlayHistory. Det er ikke en
+    // faktisk sideforlatelse, så den skal ikke trigge "endringer går tapt".
+    shouldBlockFn: ({ current, next }) => shouldBlockNav && next.pathname !== current.pathname,
     withResolver: true,
     enableBeforeUnload: shouldBlockNav,
   });
@@ -582,6 +619,7 @@ function NewListingPage() {
     knownIssues,
     noKnownIssues: !!noKnownIssues,
     maintenanceHistory,
+    stepKey: currentStepKey,
   });
 
   function restoreDraft() {
@@ -590,6 +628,8 @@ function NewListingPage() {
       action: "draft_restored",
       step: currentStepKey,
     });
+    const savedStepKey = hasDraftData?.step_key;
+    if (typeof savedStepKey === "string") pendingRestoreStepKeyRef.current = savedStepKey;
     void restoreDraftFields({
       setValue,
       setSelectedParentId,
@@ -598,6 +638,20 @@ function NewListingPage() {
       setCoords,
     });
   }
+
+  // `pages` only reflects the restored category/attributes once the field
+  // updates above have propagated through state, so the step jump has to
+  // wait for `pages` to catch up rather than happening inline in
+  // restoreDraft() — mirrors the reviewJumpRequested pattern above.
+  useEffect(() => {
+    const targetKey = pendingRestoreStepKeyRef.current;
+    if (!targetKey) return;
+    const pageIndex = pages.findIndex((page) => page.groups.some((g) => g.key === targetKey));
+    if (pageIndex >= 0) {
+      setStep(pageIndex + 1);
+      pendingRestoreStepKeyRef.current = null;
+    }
+  }, [pages, setStep]);
 
   // Pre-fill location from user's last listing (if no draft)
   useEffect(() => {
@@ -641,17 +695,9 @@ function NewListingPage() {
     priceNok: typeof priceNok === "number" ? priceNok : undefined,
     isFree,
     attributes,
-    immediate: skipCategoryStep,
+    immediate: fromLanding,
     setValue,
   });
-
-  /** "Stemmer, fortsett" i bekreftelsesoverlayet: lukker overlayet og tar
-   * brukeren rett videre til vehicle-confirm-steget (type-valg + detaljtabell),
-   * fremfor å kreve et ekstra klikk på Neste. */
-  async function confirmVehicleLookupAndContinue() {
-    setVehicleLookupConfirmOpen(false);
-    await goToNextPage();
-  }
 
   async function goToNextPage(options?: {
     skipImageCheck?: boolean;
@@ -660,34 +706,36 @@ function NewListingPage() {
     setValidationError(null);
     const groups = currentPage?.groups ?? [];
 
-    // "Slå opp"-knappen er fjernet — oppslaget kjøres nå fra selve
-    // Neste-knappen når brukeren står på vehicle-registration-steget med et
-    // uslått-opp regnr. Ved treff åpner runVehicleLookup bekreftelsesoverlayet
-    // (Regnr/Merke/Modell) og vi blir stående på steget til brukeren
-    // bekrefter der; ved feil vises vehicleLookupError og vi blir også
-    // stående, slik at brukeren kan rette registreringsnummeret.
+    // "Slå opp"-knappen er fjernet — oppslaget kjøres fra selve Neste-knappen
+    // når brukeren står på vehicle-registration-steget med et uslått-opp
+    // regnr. Merke og modell spørres på samme steg og må være besvart først:
+    // ellers ville et utfylt skilt vist bekreftelsespopupen med tomt
+    // merke/modell. Manglende felter (inkludert tomt skilt) faller gjennom
+    // til field-groupens egen validering lenger nede, som gir én
+    // feilmelding per felt.
     if (
       groups.some((g) => g.key === "vehicle-registration") &&
       vehicleRegistered &&
-      !vehicleLookupResult
+      !vehicleLookupResult &&
+      vehicleRegNrInput.trim() &&
+      typeof attributes.brand === "string" &&
+      attributes.brand.trim() &&
+      typeof attributes.model === "string" &&
+      attributes.model.trim()
     ) {
-      if (!vehicleRegNrInput.trim()) {
-        trackProductEvent("listing_creation_step_completed", {
-          kind: "sell",
-          action: "validation_failed",
-          step: currentStepKey,
-          reason: "registration_number",
-        });
-        setValidationError("Skriv inn registreringsnummer før du fortsetter.");
-        return "blocked";
-      }
+      // Ved treff blir vi stående på dette steget — VehicleRegistration viser
+      // da en bekreftelsespopup (regnr/merke/modell/farge/årsmodell) basert
+      // på at vehicleLookupResult er satt. "Ja" i popupen kaller
+      // confirmVehicleData, som selv går videre til neste steg. Ved feil blir
+      // vi stående her med vehicleLookupError synlig, slik at brukeren kan
+      // rette registreringsnummeret.
       await runVehicleLookup(vehicleRegNrInput);
       return "busy";
     }
 
     // For kjøretøy rendrer title-photos kun bilder (se TitlePhotos) — feltet
-    // "title" fylles først på description-keywords-steget (VehicleTitleFields),
-    // så det skal ikke valideres her, ellers blokkeres Neste stille uten
+    // "title" fylles først på vehicle-facts-steget (VehicleTitleFields), så
+    // det skal ikke valideres her, ellers blokkeres Neste stille uten
     // synlig feilmelding.
     const fields = groups
       .flatMap((g) => g.fieldsToValidate ?? [])
@@ -711,8 +759,10 @@ function NewListingPage() {
       isFree,
       priceNok,
       categoryId,
+      categories: pickableCategories,
       bilOgMcCategoryId,
       vehicleLookupResult,
+      vehicleRegistered,
       behavior,
       knownIssues,
       noKnownIssues: !!noKnownIssues,
@@ -916,9 +966,11 @@ function NewListingPage() {
     },
   });
 
-  const conditionDescription = (isVehicle ? VEHICLE_CONDITIONS : CONDITIONS).find(
-    (c) => c.value === condition,
-  )?.description;
+  // Kjøretøy-tilstandsetiketter (Ny bil/Bruktbil/...) har ingen beskrivelse —
+  // selvforklarende, i motsetning til de generiske (Helt ny/Som ny/...).
+  const conditionDescription = isVehicle
+    ? undefined
+    : CONDITIONS.find((c) => c.value === condition)?.description;
 
   const parsedPriceNok =
     typeof priceNok === "number" ? priceNok : priceNok !== "" ? Number(priceNok) : NaN;
@@ -1034,7 +1086,18 @@ function NewListingPage() {
   };
 
   const requestCategorySelect = (via: "wizard" | "sheet", id: string, parentId: string) => {
-    if (categoryId && id !== categoryId && Object.keys(attributes).length > 0) {
+    // Picking a different underkategori while still on vehicle-registration
+    // (the new icon grid over Merke/Modell) is deliberately friction-free —
+    // no "may lose data" dialog — since nothing is considered committed
+    // until the user actually leaves this page. See vehicleSubcategoryLocked
+    // below for the (separate) confirm-gated flow once they have left it.
+    const onVehicleRegPage = currentPage?.groups?.some((g) => g.key === "vehicle-registration");
+    if (
+      !onVehicleRegPage &&
+      categoryId &&
+      id !== categoryId &&
+      Object.keys(attributes).length > 0
+    ) {
       setPendingCategoryChange({ id, parentId, via, kind: "select" });
       return;
     }
@@ -1067,7 +1130,7 @@ function NewListingPage() {
     isVehicle,
     behavior,
     showMileage,
-    lockedFree: skipCategoryStep ? (typeParam ?? null) : null,
+    lockedFree: fromLanding ? (typeParam ?? null) : null,
 
     register,
     watch,
@@ -1118,16 +1181,11 @@ function NewListingPage() {
     vehicleLookupResult,
     vehicleClassification,
     vehiclePreviousClassificationMismatch,
-    vehicleConfirmFooterSlot,
-    vehicleLookupConfirmOpen,
-    setVehicleLookupConfirmOpen,
-    adjustVehicleRegistrationNumber,
-    confirmVehicleLookupAndContinue,
     vehicleRegNrInput,
     setVehicleRegNrInput,
     runVehicleLookup,
-    matchVehicleBrandForLeaf,
     confirmVehicleData,
+    resetLookupOnReturnToRegistration,
 
     conditionDescription,
 
@@ -1167,9 +1225,15 @@ function NewListingPage() {
   };
 
   const groups = currentPage?.groups ?? [];
+  // Native gives the description textarea a flex-fill layout so it grows to
+  // fill the remaining page height instead of a fixed row count — needed on
+  // any solo native page containing it: the generic description-keywords
+  // page (non-vehicle categories) and vehicle-facts (Tittel/Undertittel/
+  // Kilometerstand/Beskrivelse — now includes the same DescriptionField).
   const isNativeDescriptionSoloPage =
-    native && groups.length === 1 && groups[0].key === "description-keywords";
-  const isVehicleConfirmPage = groups.length === 1 && groups[0].key === "vehicle-confirm";
+    native &&
+    groups.length === 1 &&
+    (groups[0].key === "description-keywords" || groups[0].key === "vehicle-facts");
   // Category selection (suggestion click or manual pick) auto-advances the
   // wizard on this step — see applyCategorySelect/applySuggestedCategory —
   // so no separate Next/Back controls are needed or wanted here.
@@ -1185,7 +1249,11 @@ function NewListingPage() {
     if (pageIndex >= 0) setStep(pageIndex + 1);
     setValidationError("Rett feltene som er markert før du publiserer.");
   }
+  // handleSubmit's callbacks only run later, from the form's submit event,
+  // not during this render; the ref read inside them (pendingSubmitValuesRef)
+  // is safe.
   const submitComposer = handleSubmit(
+    // eslint-disable-next-line react-hooks/refs
     (v) => {
       if (missingFilters.length > 0) {
         trackProductEvent("listing_creation_step_completed", {
@@ -1228,9 +1296,7 @@ function NewListingPage() {
           <ChevronLeft className="size-4" aria-hidden /> Tilbake
         </Button>
       )}
-      {isVehicleConfirmPage || isCategoryConfirmPage ? (
-        isVehicleConfirmPage && <div ref={setVehicleConfirmFooterSlot} className="contents" />
-      ) : !isLast ? (
+      {isCategoryConfirmPage ? null : !isLast ? (
         <Button
           type="button"
           data-testid="wizard-next-button"
@@ -1265,13 +1331,23 @@ function NewListingPage() {
     <>
       <form onSubmit={submitComposer}>
         <ListingComposerShell
-          title={
-            skipCategoryStep && categoryConfirmed && categoryName
-              ? `Ny annonse i kategori ${categoryName}`
-              : "Ny annonse"
+          title={title}
+          // Kjøretøytittelen genereres av Årsmodell/Merke/Modell
+          // (computeVehicleTitle) og skal ikke skrives fritt.
+          onTitleChange={
+            isVehicle ? undefined : (v) => setValue("title", v, { shouldValidate: true })
+          }
+          categoryLabel={
+            fromLanding && categoryConfirmed
+              ? isVehicle
+                ? vehicleSubcategoryLocked && bilOgMcName && categoryName
+                  ? `${bilOgMcName} › ${categoryName}`
+                  : (bilOgMcName ?? categoryName)
+                : categoryName
+              : undefined
           }
           onEditCategory={
-            skipCategoryStep && categoryConfirmed && categoryId
+            fromLanding && categoryConfirmed && categoryId
               ? () => setCategoryEditConfirmOpen(true)
               : undefined
           }
@@ -1287,7 +1363,9 @@ function NewListingPage() {
             hasDraftData ? (
               <div className="mt-4 flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
                 <span className="flex-1">
-                  Du har et ulagret utkast. Vil du fortsette der du slapp?
+                  {typeof hasDraftData.title === "string" && hasDraftData.title.trim()
+                    ? `Utkast for annonse "${hasDraftData.title}" er lagret. Vil du fortsette der du slapp?`
+                    : "Du har et ulagret utkast. Vil du fortsette der du slapp?"}
                 </span>
                 <Button
                   type="button"
@@ -1421,10 +1499,13 @@ function NewListingPage() {
       <AlertDialog open={categoryEditConfirmOpen} onOpenChange={setCategoryEditConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Bytte kategori?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {vehicleSubcategoryLocked ? "Bytte underkategori?" : "Bytte kategori?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Informasjonen du har fylt ut i annonsen kan gå tapt hvis du bytter kategori. Er du
-              sikker?
+              {vehicleSubcategoryLocked
+                ? "Informasjonen du har fylt ut om merke, modell og tekniske detaljer kan gå tapt hvis du bytter underkategori. Er du sikker?"
+                : "Informasjonen du har fylt ut i annonsen kan gå tapt hvis du bytter kategori. Er du sikker?"}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1433,11 +1514,16 @@ function NewListingPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
                 setCategoryEditConfirmOpen(false);
+                if (vehicleSubcategoryLocked && vehicleRegPageIndex >= 0) {
+                  setStep(vehicleRegPageIndex + 1);
+                  window.scrollTo({ top: 0 });
+                  return;
+                }
                 setEditingCategoryViaTitle(true);
                 setCategoryPickerOpen(true);
               }}
             >
-              Ja, bytt kategori
+              {vehicleSubcategoryLocked ? "Ja, bytt underkategori" : "Ja, bytt kategori"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

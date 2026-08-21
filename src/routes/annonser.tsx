@@ -44,7 +44,6 @@ import {
   genericBrandFilterFor,
 } from "@/lib/category-filters";
 import { getCategoryBehavior } from "@/lib/category-behavior";
-import { isBilOgMcCategory } from "@/components/advanced-search-value";
 import { useWtbListings } from "@/features/listing-search/use-wtb-listings";
 import { useAuth } from "@/hooks/use-auth";
 import { useIsNative } from "@/hooks/use-is-native";
@@ -216,10 +215,6 @@ function BrowsePage() {
     max: search.max,
     includeFree: search.includeFree ?? true,
   });
-
-  // No Bil og MC listing has a "Tilstand" attribute, so the condition filter
-  // is meaningless (and hidden) once the search narrows to that category.
-  const isBilOgMc = isBilOgMcCategory(categories ?? [], effectiveCategories);
 
   // When the category filter narrows the results down to a single main-category
   // branch, the page presents itself like that category's own landing page —
@@ -683,7 +678,6 @@ function BrowsePage() {
                 onConditionsChange={(c) =>
                   updateSearch({ conditions: c as z.infer<typeof conditionEnum>[] })
                 }
-                hideCondition={isBilOgMc}
                 hasCategory={effectiveCategories.length > 0}
                 counts={facetCounts}
                 layout="card"

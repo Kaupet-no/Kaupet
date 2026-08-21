@@ -27,9 +27,9 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   CONDITION_LABEL,
-  VEHICLE_CONDITION_LABEL,
+  VEHICLE_CONDITION_LABEL_BY_SLUG,
   CONDITIONS,
-  VEHICLE_CONDITIONS,
+  VEHICLE_CONDITIONS_BY_SLUG,
 } from "@/lib/constants";
 import {
   VEHICLE_LEAF_SLUGS,
@@ -243,6 +243,11 @@ export function ListingDetailView({
     isVehicleListing && typeof driveTypeRaw === "string"
       ? driveTypeRaw
       : (vehicleLookup?.drive_type ?? null);
+  // Akselkombinasjon (bobil/lastebil/buss) — selgerens eget valg, ikke fra
+  // SVV (som kun oppgir akseltall, ikke hvilken kombinasjon), så ingen
+  // vehicleLookup-fallback slik driveType har.
+  const axleConfigRaw = attributes.axle_config;
+  const axleConfig = isVehicleListing && typeof axleConfigRaw === "string" ? axleConfigRaw : null;
   const avgiftOverrideRaw = attributes.omregistreringsavgift_override_kr;
   const avgiftFritatt = isVehicleListing && attributes.omregistreringsavgift_fritatt === true;
   const avgiftInkludert = isVehicleListing && attributes.omregistreringsavgift_inkludert === true;
@@ -368,6 +373,7 @@ export function ListingDetailView({
       mileageKm={mileageKm}
       euControlExempt={euControlExempt}
       driveType={driveType}
+      axleConfig={axleConfig}
       avgiftNote={avgiftNote}
       totalPriceKr={totalPriceKr}
       isNative={isNative}
@@ -440,6 +446,7 @@ function ListingDetailViewBody({
   mileageKm,
   euControlExempt,
   driveType,
+  axleConfig,
   avgiftNote,
   totalPriceKr,
   isNative,
@@ -491,6 +498,7 @@ function ListingDetailViewBody({
   mileageKm: number | null;
   euControlExempt: boolean | null;
   driveType: string | null;
+  axleConfig: string | null;
   avgiftNote: string | null;
   totalPriceKr: number | null;
   isNative: boolean;
@@ -506,6 +514,10 @@ function ListingDetailViewBody({
   const isBoatListing = !isVehicleListing && isBoatAttributes(attributes);
   const nativeSpecLayout = isNative && (isVehicleListing || isBoatListing);
   const nativePlateUnderTitle = isNative && isVehicleListing;
+  // Tilstand-etiketter er per kjøretøytype (se VEHICLE_CONDITIONS_BY_SLUG) —
+  // faller tilbake til de generiske etikettene (via `?? v`/CONDITIONS der de
+  // brukes) dersom slug mangler eller ikke finnes i tabellen.
+  const vehicleLeafSlug = isVehicleListing ? (category?.slug as VehicleLeafSlug) : null;
 
   return (
     <div className={`mx-auto max-w-6xl px-4 py-8 ${showStickyContact ? "pb-28 md:pb-8" : ""}`}>
@@ -834,6 +846,9 @@ function ListingDetailViewBody({
                     mileageKm={mileageKm}
                     euControlExempt={euControlExempt}
                     driveType={driveType}
+                    axleConfig={axleConfig}
+                    condition={condition}
+                    vehicleLeafSlug={vehicleLeafSlug}
                   />
                   <LoanCalculator totalPriceKr={totalPriceKr} />
                 </section>
@@ -895,13 +910,13 @@ function ListingDetailViewBody({
 
             return (
               <dl className="grid grid-cols-2 gap-3 rounded-xl border border-border bg-card p-4 text-sm @sm:grid-cols-3">
-                {/* Vehicles never have a "condition" field group in their category
-                    flow (see category_flows for "Bil og MC") — their condition is
-                    represented instead by the vehicle-condition panel (known
-                    issues/maintenance history) and the SVV lookup data, so this
-                    tile is hidden in edit mode for vehicle listings. Legacy data
-                    with a stray value is still shown read-only. */}
-                {(condition || (editCtx?.editMode && !isVehicleListing)) && (
+                {/* Kjøretøy har tilstand fylt ut allerede fra opprettelsen (se
+                    VehicleConditionGroup), med kjøretøytype-spesifikke etiketter
+                    (se VEHICLE_CONDITIONS_BY_SLUG) — så tilen vises normalt for
+                    dem også. Skjules kun i redigeringsmodus uten eksisterende
+                    verdi og ukjent slug, der vi ikke har noe alternativlisté å
+                    tilby. */}
+                {(condition || (editCtx?.editMode && (!isVehicleListing || vehicleLeafSlug))) && (
                   <EditableField
                     fieldKey="condition"
                     value={condition}
@@ -910,9 +925,12 @@ function ListingDetailViewBody({
                         <div>
                           <dt className="text-muted-foreground">Tilstand</dt>
                           <dd className="font-medium">
-                            {(isVehicleListing ? VEHICLE_CONDITION_LABEL : CONDITION_LABEL)[
-                              v as keyof typeof CONDITION_LABEL
-                            ] ?? v}
+                            {(vehicleLeafSlug
+                              ? (VEHICLE_CONDITION_LABEL_BY_SLUG[vehicleLeafSlug] as Record<
+                                  string,
+                                  string
+                                >)
+                              : CONDITION_LABEL)[v] ?? v}
                           </dd>
                         </div>
                       ) : (
@@ -936,7 +954,10 @@ function ListingDetailViewBody({
                             <SelectValue placeholder="Velg tilstand" />
                           </SelectTrigger>
                           <SelectContent>
-                            {(isVehicleListing ? VEHICLE_CONDITIONS : CONDITIONS).map((c) => (
+                            {(vehicleLeafSlug
+                              ? VEHICLE_CONDITIONS_BY_SLUG[vehicleLeafSlug]
+                              : CONDITIONS
+                            ).map((c) => (
                               <SelectItem key={c.value} value={c.value}>
                                 {c.label}
                               </SelectItem>

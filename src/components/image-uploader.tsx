@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, ChevronLeft, ChevronRight, ImagePlus, Lightbulb, X } from "lucide-react";
+import { Camera, ChevronLeft, ChevronRight, ImagePlus, X } from "lucide-react";
 import {
   DndContext,
   PointerSensor,
@@ -25,8 +25,6 @@ export type PendingImage = {
   previewUrl: string;
   caption?: string;
 };
-
-const GUIDE_KEY = "kaupet_photo_guide_seen";
 
 function SortableImageItem({
   img,
@@ -117,23 +115,6 @@ function SortableImageItem({
   );
 }
 
-function PhotoGuide({ onDismiss }: { onDismiss: () => void }) {
-  return (
-    <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
-      <Lightbulb className="size-3.5 shrink-0 text-accent" aria-hidden />
-      <span className="flex-1">Tips: Godt lys, nøytral bakgrunn og bilde av eventuelle feil.</span>
-      <button
-        type="button"
-        onClick={onDismiss}
-        className="shrink-0 hover:text-foreground"
-        aria-label="Lukk tips"
-      >
-        <X className="size-3.5" />
-      </button>
-    </div>
-  );
-}
-
 export function ImageUploader({
   images,
   onChange,
@@ -146,19 +127,6 @@ export function ImageUploader({
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [showGuide, setShowGuide] = useState(false);
-
-  // Show guide on first-ever visit (not subsequent sessions)
-  useEffect(() => {
-    if (!localStorage.getItem(GUIDE_KEY)) {
-      setShowGuide(true);
-    }
-  }, []);
-
-  function dismissGuide() {
-    localStorage.setItem(GUIDE_KEY, "1");
-    setShowGuide(false);
-  }
 
   // Revoke object URLs on unmount
   useEffect(() => {
@@ -249,8 +217,6 @@ export function ImageUploader({
 
   return (
     <div className="space-y-3" data-composer-no-swipe>
-      {showGuide && <PhotoGuide onDismiss={dismissGuide} />}
-
       <div
         onDragOver={(e) => {
           e.preventDefault();

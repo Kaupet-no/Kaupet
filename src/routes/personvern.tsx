@@ -187,10 +187,6 @@ function PersonvernPage() {
                 rutenett eller liste. Forlater ikke enheten din.
               </li>
               <li>
-                <strong>kaupet_photo_guide_seen</strong> — husker at du har sett veiledningen for
-                opplasting av bilder, slik at den ikke vises på nytt.
-              </li>
-              <li>
                 <strong>kaupet_360_hint_seen</strong> — husker at du har sett veiledningen for
                 360°-visning av kjøretøy, slik at den ikke vises på nytt.
               </li>

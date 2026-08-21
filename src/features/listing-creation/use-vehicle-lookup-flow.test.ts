@@ -1,12 +1,12 @@
-﻿// @vitest-environment jsdom
+// @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useVehicleLookupFlow } from "./use-vehicle-lookup-flow";
 
 vi.mock("@tanstack/react-start", () => ({
-  // The hook's tests call runVehicleLookup/matchVehicleBrandForLeaf directly,
-  // so useServerFn just needs to hand back a callable that forwards to the
-  // mocked implementation below.
+  // The hook's tests call runVehicleLookup directly, so useServerFn just
+  // needs to hand back a callable that forwards to the mocked
+  // implementation below.
   useServerFn: (fn: unknown) => fn,
 }));
 
@@ -15,29 +15,14 @@ vi.mock("@/lib/vehicle/vehicle-lookup.functions", () => ({
   lookupVehicleByRegNumber: (...args: unknown[]) => lookupVehicleByRegNumberMock(...args),
 }));
 
-const matchVehicleBrandModelMock = vi.fn();
-vi.mock("@/lib/vehicle/vehicle-brand-match.functions", () => ({
-  matchVehicleBrandModel: (...args: unknown[]) => matchVehicleBrandModelMock(...args),
-}));
-
 vi.mock("@/lib/toast", () => ({
   showErrorToast: vi.fn(),
 }));
 
 const CAR_CATEGORY_ID = "car-leaf-id";
 
-vi.mock("@/lib/category-filters", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/category-filters")>();
-  return {
-    ...actual,
-    vehicleCategoryGroupFor: (categoryId: string | null) =>
-      categoryId === CAR_CATEGORY_ID ? "car" : null,
-  };
-});
-
 function makeParams(overrides?: Partial<Parameters<typeof useVehicleLookupFlow>[0]>) {
   return {
-    allFilters: [],
     categoriesById: new Map([
       [CAR_CATEGORY_ID, { id: CAR_CATEGORY_ID, parent_id: "cars-root", name_nb: "Bil" }],
     ]),
@@ -68,6 +53,7 @@ const lookupResult = {
   eu_control_exempt: null,
   power_hk: 120,
   drive_type: null,
+  axle_count: null,
   tow_hitch: null,
   max_tow_weight_kg: null,
   max_total_weight_kg: null,
@@ -82,7 +68,6 @@ const lookupResult = {
 
 beforeEach(() => {
   lookupVehicleByRegNumberMock.mockReset();
-  matchVehicleBrandModelMock.mockReset();
 });
 
 describe("useVehicleLookupFlow", () => {
@@ -94,7 +79,7 @@ describe("useVehicleLookupFlow", () => {
     expect(result.current.vehicleLookupError).toBeNull();
   });
 
-  it("runVehicleLookup stores the result and opens the confirm dialog on success", async () => {
+  it("runVehicleLookup stores the result on success", async () => {
     lookupVehicleByRegNumberMock.mockResolvedValue({
       lookup: lookupResult,
       previousClassificationMismatch: null,
@@ -105,7 +90,6 @@ describe("useVehicleLookupFlow", () => {
 
     expect(ok).toBe(true);
     expect(result.current.vehicleLookupResult).toEqual(lookupResult);
-    expect(result.current.vehicleLookupConfirmOpen).toBe(true);
     expect(result.current.vehicleLookupLoading).toBe(false);
     expect(result.current.vehicleLookupError).toBeNull();
   });
@@ -125,55 +109,6 @@ describe("useVehicleLookupFlow", () => {
     expect(result.current.vehicleLookupError).toBe("SVV unavailable");
   });
 
-  it("matchVehicleBrandForLeaf returns null when there is no lookup result yet", async () => {
-    const { result } = renderHook(() => useVehicleLookupFlow(makeParams()));
-
-    const match = await act(() => result.current.matchVehicleBrandForLeaf(CAR_CATEGORY_ID));
-
-    expect(match).toBeNull();
-    expect(matchVehicleBrandModelMock).not.toHaveBeenCalled();
-  });
-
-  it("matchVehicleBrandForLeaf returns null for a category with no vehicle brand group", async () => {
-    lookupVehicleByRegNumberMock.mockResolvedValue({
-      lookup: lookupResult,
-      previousClassificationMismatch: null,
-    });
-    const { result } = renderHook(() => useVehicleLookupFlow(makeParams()));
-    await act(() => result.current.runVehicleLookup("EK12345"));
-
-    const match = await act(() =>
-      result.current.matchVehicleBrandForLeaf("not-a-vehicle-category"),
-    );
-
-    expect(match).toBeNull();
-    expect(matchVehicleBrandModelMock).not.toHaveBeenCalled();
-  });
-
-  it("matchVehicleBrandForLeaf queries brand/model matches for a recognized vehicle category", async () => {
-    lookupVehicleByRegNumberMock.mockResolvedValue({
-      lookup: lookupResult,
-      previousClassificationMismatch: null,
-    });
-    matchVehicleBrandModelMock.mockResolvedValue({
-      brandMatch: { id: "toyota-id" },
-      modelMatch: { id: "corolla-id" },
-    });
-    const { result } = renderHook(() => useVehicleLookupFlow(makeParams()));
-    await act(() => result.current.runVehicleLookup("EK12345"));
-
-    const match = await act(() => result.current.matchVehicleBrandForLeaf(CAR_CATEGORY_ID));
-
-    expect(match).toEqual({
-      categoryGroup: "car",
-      brandMatch: { id: "toyota-id" },
-      modelMatch: { id: "corolla-id" },
-    });
-    expect(matchVehicleBrandModelMock).toHaveBeenCalledWith({
-      data: { brand: "Toyota", model: "Corolla", categoryGroup: "car" },
-    });
-  });
-
   it("confirmVehicleData is a no-op without a prior lookup result", () => {
     const setAttributes = vi.fn();
     const goNext = vi.fn();
@@ -187,7 +122,7 @@ describe("useVehicleLookupFlow", () => {
     expect(goNext).not.toHaveBeenCalled();
   });
 
-  it("confirmVehicleData merges the lookup into attributes, sets the category, and advances the wizard", async () => {
+  it("confirmVehicleData merges the raw lookup into attributes, sets the category, and advances the wizard", async () => {
     // jsdom doesn't implement scrollTo — stub it so confirmVehicleData's
     // window.scrollTo call doesn't throw.
     window.scrollTo = vi.fn();
@@ -203,7 +138,10 @@ describe("useVehicleLookupFlow", () => {
     const { result } = renderHook(() =>
       useVehicleLookupFlow(
         makeParams({
-          attributes: { existing_key: "kept" },
+          // Brand/model are already answered on vehicle-registration itself
+          // (SVV's text isn't precise enough to override them) — confirmVehicleData
+          // just keeps whatever's already in attributes.
+          attributes: { existing_key: "kept", brand: "Toyota", model: "Corolla" },
           setAttributes,
           setCategoryTouchedManually,
           setSelectedParentId,
@@ -214,12 +152,7 @@ describe("useVehicleLookupFlow", () => {
     );
     await act(() => result.current.runVehicleLookup("EK12345"));
 
-    act(() =>
-      result.current.confirmVehicleData(CAR_CATEGORY_ID, {
-        brandName: "Toyota",
-        modelName: "Corolla",
-      }),
-    );
+    act(() => result.current.confirmVehicleData(CAR_CATEGORY_ID));
 
     expect(setAttributes).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -259,30 +192,6 @@ describe("useVehicleLookupFlow", () => {
     );
   });
 
-  it("confirmVehicleData derives the year from an edited first-registration date", async () => {
-    window.scrollTo = vi.fn();
-    lookupVehicleByRegNumberMock.mockResolvedValue({
-      lookup: { ...lookupResult, first_registration_date: "2018-05-14" },
-      previousClassificationMismatch: null,
-    });
-    const setAttributes = vi.fn();
-    const { result } = renderHook(() => useVehicleLookupFlow(makeParams({ setAttributes })));
-    await act(() => result.current.runVehicleLookup("EK12345"));
-
-    act(() =>
-      result.current.confirmVehicleData(CAR_CATEGORY_ID, {
-        specOverrides: { first_registration_date: "2021-01-02" },
-      }),
-    );
-
-    expect(setAttributes).toHaveBeenCalledWith(
-      expect.objectContaining({
-        first_registration_date: "2021-01-02",
-        first_registration_year: 2021,
-      }),
-    );
-  });
-
   it("adjustVehicleRegistrationNumber and resetLookupOnReturnToRegistration both clear the lookup state", async () => {
     lookupVehicleByRegNumberMock.mockResolvedValue({
       lookup: lookupResult,
@@ -295,7 +204,6 @@ describe("useVehicleLookupFlow", () => {
     act(() => result.current.adjustVehicleRegistrationNumber());
 
     expect(result.current.vehicleLookupResult).toBeNull();
-    expect(result.current.vehicleLookupConfirmOpen).toBe(false);
 
     // Re-run to also cover resetLookupOnReturnToRegistration.
     await act(() => result.current.runVehicleLookup("EK12345"));
@@ -303,6 +211,5 @@ describe("useVehicleLookupFlow", () => {
 
     expect(result.current.vehicleLookupResult).toBeNull();
     expect(result.current.vehicleClassification).toBeNull();
-    expect(result.current.vehicleLookupConfirmOpen).toBe(false);
   });
 });

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSheet } from "@/components/ui/native-sheet";
-import { EuControlDateField } from "@/features/listing-creation/field-groups/vehicle-confirm/eu-control-date-field";
+import { EuControlDateField } from "@/components/eu-control-date-field";
 import {
   VehicleBrandField,
   VehicleModelWithClassField,

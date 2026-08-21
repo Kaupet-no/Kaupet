@@ -52,7 +52,6 @@ export { ModeToggle };
 import {
   BIL_OG_MC_SLUG,
   CONDITIONS,
-  isBilOgMcCategory,
   type AdvancedSearchValue,
 } from "@/components/advanced-search-value";
 
@@ -230,25 +229,23 @@ export function AdvancedSearchSheet({
             </section>
 
             {/* Tilstand */}
-            {!isBilOgMcCategory(categories, v.categories) && (
-              <section className="space-y-2">
-                <Label className="text-sm font-medium">Tilstand</Label>
-                <div className="grid grid-cols-1 gap-1 rounded-md border border-border p-2 sm:grid-cols-2">
-                  {CONDITIONS.map((c) => (
-                    <label
-                      key={c.value}
-                      className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted"
-                    >
-                      <Checkbox
-                        checked={v.conditions.includes(c.value)}
-                        onCheckedChange={() => toggleCondition(c.value)}
-                      />
-                      <span>{c.label}</span>
-                    </label>
-                  ))}
-                </div>
-              </section>
-            )}
+            <section className="space-y-2">
+              <Label className="text-sm font-medium">Tilstand</Label>
+              <div className="grid grid-cols-1 gap-1 rounded-md border border-border p-2 sm:grid-cols-2">
+                {CONDITIONS.map((c) => (
+                  <label
+                    key={c.value}
+                    className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted"
+                  >
+                    <Checkbox
+                      checked={v.conditions.includes(c.value)}
+                      onCheckedChange={() => toggleCondition(c.value)}
+                    />
+                    <span>{c.label}</span>
+                  </label>
+                ))}
+              </div>
+            </section>
 
             {/* Lokasjon */}
             <section className="space-y-2">

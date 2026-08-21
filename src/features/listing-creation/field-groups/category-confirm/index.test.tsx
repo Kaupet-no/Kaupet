@@ -1,12 +1,20 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { WizardSharedProps } from "../types";
 import { CategoryConfirm } from ".";
 
 afterEach(() => {
   cleanup();
+});
+
+beforeEach(() => {
+  window.matchMedia = vi.fn().mockReturnValue({
+    matches: false,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  });
 });
 
 const BIL_OG_MC_ID = "bil-og-mc";
@@ -35,6 +43,14 @@ function props(overrides: Partial<WizardSharedProps>): WizardSharedProps {
 }
 
 describe("CategoryConfirm", () => {
+  it("lets the user open the category picker while a suggestion is loading", () => {
+    render(<CategoryConfirm {...props({ categorySuggestionLoading: true })} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Velg kategori selv" }));
+
+    expect(screen.getByText("Velg kategori")).toBeTruthy();
+  });
+
   it("collapses two vehicle-tree suggestions to a single Bil og MC question", () => {
     render(
       <CategoryConfirm

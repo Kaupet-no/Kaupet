@@ -17,24 +17,28 @@ export function OmregistreringsavgiftBox({
   avgiftOverrideKr,
   avgiftFritatt,
   avgiftInkludert,
+  avgiftKjoperBekoster,
   editingAvgift,
   setEditingAvgift,
   onOverrideChange,
   onResetOverride,
   setAvgiftFritatt,
   setAvgiftInkludert,
+  setAvgiftKjoperBekoster,
 }: {
   omregistreringsavgiftKr: number | null;
   calculatedAvgiftKr: number | null;
   avgiftOverrideKr: number | null;
   avgiftFritatt: boolean;
   avgiftInkludert: boolean;
+  avgiftKjoperBekoster: boolean;
   editingAvgift: boolean;
   setEditingAvgift: (v: boolean) => void;
   onOverrideChange: (value: string) => void;
   onResetOverride: () => void;
   setAvgiftFritatt: (checked: boolean) => void;
   setAvgiftInkludert: (checked: boolean) => void;
+  setAvgiftKjoperBekoster: () => void;
 }) {
   return (
     <div className="space-y-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-xs">
@@ -94,6 +98,14 @@ export function OmregistreringsavgiftBox({
       )}
 
       <div className="space-y-1.5 border-t border-border pt-2">
+        <label className="flex items-center gap-2">
+          <Checkbox
+            checked={avgiftKjoperBekoster}
+            onCheckedChange={(v) => v && setAvgiftKjoperBekoster()}
+          />
+          Kjøper bekoster omregistrering{" "}
+          <span className="text-muted-foreground">(Mest vanlig)</span>
+        </label>
         <label className="flex items-center gap-2">
           <Checkbox checked={avgiftFritatt} onCheckedChange={(v) => setAvgiftFritatt(Boolean(v))} />
           Fritatt omregistreringsavgift

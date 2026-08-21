@@ -1,13 +1,10 @@
 import { useEffect, useState } from "react";
 
-/** Matches the AI category-suggestion fallback's worst-case budget (~91s:
- * up to 2 outer retries x 45s cold-start deadline each, see
- * category-suggestion.functions.ts and category-suggestion-ai.server.ts)
- * with staged copy, so a slow but still-in-flight request doesn't read as
- * frozen or broken. Shared by the sell flow's CategoryConfirm and the WTB
+/** Matches the AI category-suggestion fallback's worst-case budget
+ * . Shared by the sell flow's CategoryConfirm and the WTB
  * (ønskes kjøpt) flow's equivalent step in ny-ok-annonse.tsx. */
 export const CATEGORY_SUGGESTION_LOADING_MESSAGES = [
-  "Setter opp annonse...",
+  "Forsøker å identifisere annonsekategori",
   "Identifiserer innhold",
   "Henter kategoriforslag...",
   "Snart ferdig...",

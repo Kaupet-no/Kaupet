@@ -78,6 +78,21 @@ TABLE public.<tabell>` og `CREATE POLICY`), siden gjeldende policy kan være
   commit og push migrasjonen først, vent på at den er anvendt, og push deretter
   avhengig appkode.
 
+## Test
+
+Den normative teststrategien er [docs/TESTSTRATEGI.md](docs/TESTSTRATEGI.md).
+Før du skriver eller endrer en test: finn riktig testnivå i § 3 og følg
+playbooken i § 10. Konkrete testcaser for hele repoet ligger i § 11.
+
+Repoet har to etablerte testagenter og en slash-kommando som tildeler dem
+arbeid:
+
+- `/testoppgave <TC-ID | område>` — slår opp casene, velger nivå og playbook,
+  og delegerer.
+- `test-author` — skriver og utvider automatiserte tester (PB-1–PB-4, PB-8).
+- `test-explorer` — eksplorativ feiljakt, ytelse og tilgjengelighet
+  (PB-5–PB-7). Rapporterer, endrer ikke kode.
+
 ## Leveranse
 
 Rapporter kort hva som er endret og hvilke kontroller som ble kjørt. For hver

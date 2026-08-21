@@ -19,7 +19,7 @@ export function VehiclePriceGroup(props: WizardSharedProps) {
   return (
     <section className="flex flex-col items-center gap-6 py-4 text-center">
       <div className="space-y-1">
-        <h2 className="text-2xl font-semibold">Hva skal annonsen koste?</h2>
+        <h2 className="text-2xl font-semibold">Hva skal det koste?</h2>
         <p className="text-sm text-muted-foreground">
           Prisen vises på annonsen sammen med eventuell omregistreringsavgift kjøper betaler.
         </p>

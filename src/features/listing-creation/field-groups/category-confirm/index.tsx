@@ -111,6 +111,9 @@ export function CategoryConfirm({
       <section className="space-y-4 py-6 text-center">
         <Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" />
         <p className="text-sm text-muted-foreground">{loadingMessage}</p>
+        <Button type="button" variant="outline" onClick={() => setShowPicker(true)}>
+          Velg kategori selv
+        </Button>
       </section>
     );
   }

@@ -1,6 +1,6 @@
 /**
  * Native e2e coverage for the global search panel (`SearchPanel`,
- * fase 12) — flagged as missing tech debt in docs/UX-GJENSTAENDE-PLAN.md.
+ * fase 12) — flagged as missing tech debt in docs/plans/UX-GJENSTAENDE-PLAN.md.
  * `?forcenative` (dev-only, see src/lib/native.ts) flips `isNative()` on in
  * a plain browser so the panel's native-only entry points render without a
  * simulator.

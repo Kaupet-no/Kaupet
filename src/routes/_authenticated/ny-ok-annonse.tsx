@@ -720,6 +720,13 @@ function NewWtbPage() {
                 <div className="space-y-4 py-6 text-center">
                   <div className="mx-auto h-6 w-2/3 animate-pulse rounded bg-muted" />
                   <p className="text-sm text-muted-foreground">{categoryLoadingMessage}</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setCategoryConfirmShowPicker(true)}
+                  >
+                    Velg kategori selv
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-4 py-4 text-center">

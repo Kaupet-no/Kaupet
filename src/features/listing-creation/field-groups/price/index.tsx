@@ -97,6 +97,17 @@ export function Price({
     }
     onAttributesChange(next);
   };
+  // Ikke en egen attributt — "kjøper bekoster" er ganske enkelt fraværet av
+  // begge de andre flaggene (standardtilstanden appen alltid har hatt), men
+  // vises nå som en egen, forhåndsavkrysset boks i tredelt radio-lignende
+  // UI i stedet for å være implisitt.
+  const avgiftKjoperBekoster = !avgiftFritatt && !avgiftInkludert;
+  const setAvgiftKjoperBekoster = () => {
+    const next = { ...attributes };
+    delete next.omregistreringsavgift_fritatt;
+    delete next.omregistreringsavgift_inkludert;
+    onAttributesChange(next);
+  };
   // Avgiften kjøper faktisk betaler i tillegg til kjøpesummen — null når
   // fritatt (ingen avgift) eller inkludert i kjøpesummen (allerede betalt av
   // selger), selv om det beregnede/overstyrte beløpet fortsatt vises
@@ -257,8 +268,10 @@ export function Price({
             delete next.omregistreringsavgift_override_kr;
             onAttributesChange(next);
           }}
+          avgiftKjoperBekoster={avgiftKjoperBekoster}
           setAvgiftFritatt={setAvgiftFritatt}
           setAvgiftInkludert={setAvgiftInkludert}
+          setAvgiftKjoperBekoster={setAvgiftKjoperBekoster}
         />
       )}
       {wtbMatch && wtbMatch.count > 0 && (

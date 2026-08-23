@@ -401,6 +401,9 @@ Disse tre gir mer egenart enn en ny gradient, illustrasjonsstil eller mikroanima
    `bun run lint` og `bunx tsc --noEmit` er bestått.
 
 8. Behold autosave, første ugyldige felt, Turnstile, idempotens og servervalidering uendret.
+   **Status 24.08.2026: Fullført.** Kontraktene er sporet ende til ende etter steg 3–7. Autosave beholder lokal lagring, bildeutkast, 30-sekunders og skjult-fane-lagring samt gjenbruk av eksisterende `draftId`; eneste diff i hooken er en kommentar. Første ugyldige skjemafelt blir fortsatt funnet i React Hook Form-feilrekkefølgen, mappet til første eierside og presentert i det fokuserte feilsammendraget. Turnstile blokkerer fortsatt submit uten token både i publiseringsknappen og klientmutasjonen, og `createListing` verifiserer tokenet server-side. Retry bruker fortsatt samme utkast-ID og serveren aktiverer bare et eid utkast med status `draft`, slik at et nytt insert ikke kjøres. `createListing` sin Zod-, kategoriattributt-, modul-, tilstands- og leveringsvalidering er byte-for-byte uendret siden før steg 3. Ingen produksjonskode eller ny test var nødvendig.
+
+   **Verifisering:** `git diff --exit-code 0d13a1f..6a7b845 -- src/lib/listings.functions.ts` var tom. `bun run test -- src/features/listing-creation/use-draft-autosave.test.ts src/features/listing-creation/composer-error-summary.test.tsx src/features/listing-creation/category-flows.test.ts src/features/listing-creation/field-groups/review-publish/index.test.tsx src/features/listing-creation/field-groups/validators.test.ts src/features/listing-creation/modules/validators.test.ts` (6 filer / 52 tester), `bun run test` (83 filer / 406 tester), `bun run lint` og `bunx tsc --noEmit` er bestått. `bun run test:e2e -- e2e/publish-listing.spec.ts --project=desktop-web` ble forsøkt, men kunne ikke starte isolert Supabase fordi Docker Desktop ikke kjørte; ingen E2E-resultater er derfor påstått.
 
 **Berørte områder:**
 

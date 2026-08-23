@@ -2,9 +2,9 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowRight, FolderOpen, Hash, Search } from "lucide-react";
 import { z } from "zod";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import Autoplay from "embla-carousel-autoplay";
 import { OnboardingFlow } from "@/components/onboarding-flow";
+import { HeaderSearchPortal } from "@/components/site-header";
 
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -188,8 +188,6 @@ function WebLanding() {
   }, []);
   // Portalen holdes montert (fadet inn/ut med CSS) fremfor å monteres/
   // avmonteres, slik at inn- og ut-animasjonen faktisk får spilt av.
-  const headerSearchSlot =
-    typeof document !== "undefined" ? document.getElementById("header-search-slot") : null;
   const defaultSearchExamples = useDefaultSearchExamples();
   // When a category is active, hint at what's searchable within it by typing
   // its (deepest-level) subcategory names instead of the generic suggestions.
@@ -264,37 +262,35 @@ function WebLanding() {
 
   return (
     <div>
-      {headerSearchSlot &&
-        createPortal(
-          <form
-            onSubmit={submitSearch}
-            aria-hidden={heroSearchVisible}
-            inert={heroSearchVisible}
-            className={`mx-auto flex max-w-md gap-2 transition-opacity duration-200 ${
-              heroSearchVisible ? "pointer-events-none opacity-0" : "opacity-100"
-            }`}
+      <HeaderSearchPortal>
+        <form
+          onSubmit={submitSearch}
+          aria-hidden={heroSearchVisible}
+          inert={heroSearchVisible}
+          className={`mx-auto flex max-w-md gap-2 transition-opacity duration-200 ${
+            heroSearchVisible ? "pointer-events-none opacity-0" : "opacity-100"
+          }`}
+        >
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={qDraft}
+              onChange={(e) => setQDraft(e.target.value)}
+              placeholder={typewriterPlaceholder}
+              className="h-9 rounded-full border-border bg-card pl-9 text-sm"
+              aria-label="Søk i annonser"
+            />
+          </div>
+          <Button
+            type="submit"
+            size="icon"
+            className="size-9 shrink-0 rounded-full"
+            aria-label="Søk"
           >
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={qDraft}
-                onChange={(e) => setQDraft(e.target.value)}
-                placeholder={typewriterPlaceholder}
-                className="h-9 rounded-full border-border bg-card pl-9 text-sm"
-                aria-label="Søk i annonser"
-              />
-            </div>
-            <Button
-              type="submit"
-              size="icon"
-              className="size-9 shrink-0 rounded-full"
-              aria-label="Søk"
-            >
-              <ArrowRight className="size-4" />
-            </Button>
-          </form>,
-          headerSearchSlot,
-        )}
+            <ArrowRight className="size-4" />
+          </Button>
+        </form>
+      </HeaderSearchPortal>
       {/* Hero — søkefeltet får all oppmerksomheten, som en søkemotor */}
       <section className="relative overflow-hidden bg-surface">
         {/* Per-category background tint that animates in from the left when a

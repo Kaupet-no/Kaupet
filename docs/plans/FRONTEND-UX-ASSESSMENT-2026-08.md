@@ -315,6 +315,40 @@ Disse tre gir mer egenart enn en ny gradient, illustrasjonsstil eller mikroanima
 **Mål:** Halver opplevde stopp uten å svekke validering, sikkerhet eller datakvalitet.
 
 1. Mål dagens median tid og frafall per `step` fra eksisterende hendelser før rekkefølgen endres.
+   **Status 23.08.2026: Fullført – eksisterende data gir kun en beslutningssvak proxy.** Det lenkede Supabase-miljøet inneholdt 538 `listing_creation_step_completed`-hendelser i det tilgjengelige vinduet 13.08.2026 19:42:20–23.08.2026 21:12:45 UTC. Baseline ble beregnet lokalt i minnet fra kun anonym `session_id`, tidspunkt, plattform og de kontrollerte egenskapene `kind`, `action` og `step`; ingen rå rader eller sesjons-ID-er ble lagret eller rapportert.
+
+   | Type         | Plattform | `step`                 | Forløp sett | Forløp fullført | Frafall | Parede tider | Median tid |
+   | ------------ | --------- | ---------------------- | ----------: | --------------: | ------: | -----------: | ---------: |
+   | selge        | android   | `category-select`      |           1 |               1 |     0 % |            1 |     25,6 s |
+   | selge        | android   | `photos`               |           1 |               1 |     0 % |            3 |      2,0 s |
+   | selge        | android   | `title`                |           1 |               0 |   100 % |            0 |          — |
+   | selge        | web       | `category-attributes`  |           4 |               2 |    50 % |            3 |     32,0 s |
+   | selge        | web       | `category-confirm`     |          49 |               1 |  98,0 % |            1 |     15,8 s |
+   | selge        | web       | `category-select`      |           5 |               1 |  80,0 % |            1 |     13,1 s |
+   | selge        | web       | `condition`            |           1 |               1 |     0 % |            1 |      7,0 s |
+   | selge        | web       | `delivery`             |           1 |               1 |     0 % |            1 |      7,3 s |
+   | selge        | web       | `description-keywords` |           3 |               1 |  66,7 % |            1 |     18,3 s |
+   | selge        | web       | `location`             |           2 |               1 |    50 % |            1 |     13,3 s |
+   | selge        | web       | `photos`               |         103 |              49 |  52,4 % |           36 |      3,1 s |
+   | selge        | web       | `price`                |           1 |               1 |     0 % |            1 |      7,3 s |
+   | selge        | web       | `review-publish`       |           1 |               0 |   100 % |            0 |          — |
+   | selge        | web       | `title`                |           1 |               0 |   100 % |            0 |          — |
+   | selge        | web       | `title-photos`         |           1 |               0 |   100 % |            0 |          — |
+   | selge        | web       | `vehicle-360`          |           4 |               4 |     0 % |            5 |      5,7 s |
+   | selge        | web       | `vehicle-condition`    |           2 |               1 |    50 % |            4 |      1,0 s |
+   | selge        | web       | `vehicle-confirm`      |           2 |               0 |   100 % |            0 |          — |
+   | selge        | web       | `vehicle-facts`        |           4 |               3 |    25 % |            5 |     19,6 s |
+   | selge        | web       | `vehicle-price`        |           1 |               1 |     0 % |            3 |      1,5 s |
+   | selge        | web       | `vehicle-registration` |          12 |               0 |   100 % |            0 |          — |
+   | ønskes kjøpt | web       | `attributes`           |           5 |               2 |    60 % |            1 |    231,2 s |
+   | ønskes kjøpt | web       | `category`             |           2 |               2 |     0 % |            0 |          — |
+   | ønskes kjøpt | web       | `category-confirm`     |           2 |               0 |   100 % |            0 |          — |
+   | ønskes kjøpt | web       | `details`              |           2 |               2 |     0 % |            2 |    160,1 s |
+
+   **Metode:** Et forløp starter ved siste `listing_creation_started` innen samme anonyme sesjon og `kind`. For hvert `step` og plattform telles distinkte forløp med `action=viewed`; fullføring er `action=completed`, mens siste publiseringssteg fullføres av `listing_published`. Tid pares fra siste `viewed` til neste fullføring i samme forløp; medianen beregnes kun av gyldige par på 0–86 400 sekunder. Frafall er `1 - fullførte forløp / sette forløp`. Dette kan reproduseres direkte fra dagens `product_events`-skjema med de tre hendelsesnavnene over, uten fritekst, bruker-ID eller nye hendelser.
+
+   **Datamangler/verifisering:** Datagrunnlaget har 215 web-selge-, 11 web-kjøpsønske- og ett Android-selge-startsignal, ingen iOS-signaler og ingen `listing_published`-hendelser. Det blander gamle og nye step-nøkler og har ingen miljø-/buildmarkør, så testtrafikk kan ikke skilles fra reell bruk. Fire-and-forget-kall tidsstemples ved servermottak og kan ankomme i annen rekkefølge; de må derfor ikke tolkes som presis oppholdstid. Kodegjennomgangen viser også at blant annet kategori-/kjøretøybekreftelse kan navigere uten `action=completed`, slik at de høye frafallstallene ikke beviser faktisk brukerfrafall. Wizardrekkefølgen er derfor uendret; samme metode må kjøres på et sammenlignbart vindu med komplette par før fase 2 steg 3 besluttes.
+
 2. Klassifiser eksisterende feltgrupper som publiseringskrav, tillitsanbefaling eller valgfri forbedring.
 3. Endre `resolveWizardPages` slik at ordinær nativeflyt grupperes i fire meningsfulle sider; ikke opprett en ny parallell wizard.
 4. Behold kjøretøyregistrering solo. Gruppér oppslåtte fakta med brukerens bekreftelse, ikke som gjentatt dataregistrering.

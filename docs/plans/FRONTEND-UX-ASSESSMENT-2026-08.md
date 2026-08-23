@@ -429,6 +429,10 @@ Disse tre gir mer egenart enn en ny gradient, illustrasjonsstil eller mikroanima
    **Verifisering:** Den lokale typekontrakten låser unionen eksakt til `registry | seller | kaupet | unknown`; typecheck feilet kontrollert da kildetypen ble fjernet. `bun run test -- src/components/listing-detail/fact-source.test.ts` (1 fil / 1 test), `bun run test` (84 filer / 407 tester), `bun run lint` og `bunx tsc --noEmit` er bestått.
 
 2. Map eksisterende kjøretøyoppslag, profilalder, anmeldelser og selgerfelter til kilder.
+   **Status 24.08.2026: Fullført.** Den lokale detaljmappingen klassifiserer et eksisterende `vehicle_lookup`-snapshot som `registry`, profilalder og anmeldelsessammendrag som `kaupet`, og selgeroppgitte annonsefelt som `seller`; ukjente fakta faller tilbake til `unknown`. Kjøretøydataene kommer fra det autentiserte Statens vegvesen-oppslaget før snapshotet lagres i annonsens `attributes`, profilalderen kommer fra Kaupet-forvaltede `profiles.created_at`, og anmeldelsessammendraget beregnes av Kaupets `user_review_summary` over gjennomførte handler. Bare profilalder beholder tidsstempel, fordi detaljflyten ikke har et dokumenterbart oppslagstidspunkt for kjøretøysnapshotet eller sammendragstidspunkt for anmeldelser. Annonse-`updated_at` og den separate, brukerbaserte oppslagsloggen brukes ikke som proxy.
+
+   **Verifisering:** Kontrakttesten feilet rødt før mappingen fantes og dekker de fire dokumenterbare kildene, `unknown`-fallback og at tidsstempel bare følger profilalder. `bun run test -- src/components/listing-detail/fact-source.test.ts` (1 fil / 2 tester), `bun run test` (84 filer / 408 tester), `bun run lint` og `bunx tsc --noEmit` er bestått. Ingen UI, score, badge, databaseendring eller generisk listingmodell er innført.
+
 3. Bygg en kompakt `ListingEvidence`-seksjon med tekstlige kilder og tidspunkt der det finnes.
 4. Skill «Ingen kjente feil oppgitt» visuelt og språklig fra «verifisert uten feil».
 5. Flytt trygg-handel-råd til kontaktøyeblikket og første samtale, ikke en generell tekstvegg.

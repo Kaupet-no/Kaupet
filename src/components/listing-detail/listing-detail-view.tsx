@@ -59,6 +59,7 @@ import { EditableField } from "@/features/listing-edit/editable-field";
 import { EditableRegion } from "@/features/listing-edit/editable-region";
 import { VehicleFactsPanel } from "@/components/listing-detail/edit-panels/vehicle-facts-panel";
 import { VehicleConditionPanel } from "@/components/listing-detail/edit-panels/vehicle-condition-panel";
+import { SellerNoKnownIssues } from "@/components/listing-detail/listing-evidence";
 import { VehicleEquipmentPanel } from "@/components/listing-detail/edit-panels/vehicle-equipment-panel";
 import { GenericAttributesPanel } from "@/components/listing-detail/edit-panels/generic-attributes-panel";
 
@@ -806,11 +807,13 @@ function ListingDetailViewBody({
                 <Fragment>
                   <section className="mt-8">
                     <h2 className="font-display text-xl">Kjente feil og mangler</h2>
-                    <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
-                      {noKnownIssues
-                        ? "Ingen kjente feil eller mangler oppgitt av selger"
-                        : knownIssues}
-                    </p>
+                    {noKnownIssues ? (
+                      <SellerNoKnownIssues />
+                    ) : (
+                      <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+                        {knownIssues}
+                      </p>
+                    )}
                   </section>
                   {maintenanceHistory && (
                     <section className="mt-8">

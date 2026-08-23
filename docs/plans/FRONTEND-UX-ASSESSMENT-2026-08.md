@@ -439,6 +439,21 @@ Disse tre gir mer egenart enn en ny gradient, illustrasjonsstil eller mikroanima
    **Verifisering:** Komponenttesten feilet rødt før komponenten fantes og dekker tekstene for `registry`, `seller`, `kaupet` og `unknown`, registreringstidspunkt når det finnes og fravær av andre tidspunkt. `bun run test -- src/components/listing-detail/fact-source.test.ts src/components/listing-detail/listing-evidence.test.tsx` (2 filer / 3 tester), `bun run test` (85 filer / 409 tester), `bun run lint` og `bunx tsc --noEmit` er bestått.
 
 4. Skill «Ingen kjente feil oppgitt» visuelt og språklig fra «verifisert uten feil».
+   **Status 24.08.2026: Fullført.** Den delte detaljvisningen viser nå
+   avkrysset fravær av kjente feil som en nøytral, visuelt avgrenset
+   «Oppgitt av selger»-opplysning. Teksten sier eksplisitt at dette er
+   selgerens påstand; ingen Kaupet-, register- eller verifikasjonspåstand er
+   lagt til. Samme presentasjon brukes av publisert annonsedetalj og levende
+   forhåndsvisning via eksisterende `ListingDetailView` og
+   `ListingEvidence`, uten badge, score eller ny validering.
+
+   **Verifisering:** Komponenttesten feilet rødt da selgeretiketten
+   midlertidig ble erstattet med «Verifisert uten feil», og dekker nå
+   kildeetikett, nøytral semantisk tokenflate og fravær av «verifisert»,
+   «kontrollert» og «bekreftet». Målrettet komponenttest (1 fil / 2 tester),
+   `bun run test` (85 filer / 410 tester), `bun run lint` og
+   `bunx tsc --noEmit` er bestått.
+
 5. Flytt trygg-handel-råd til kontaktøyeblikket og første samtale, ikke en generell tekstvegg.
 6. Ikke lag score eller badge før det finnes validerte data og en dokumentert modell for feilklassifisering.
 

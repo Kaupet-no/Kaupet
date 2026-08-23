@@ -3,7 +3,7 @@
 import { render, screen } from "@testing-library/react";
 import { expect, it } from "vitest";
 
-import { ListingEvidence } from "./listing-evidence";
+import { ListingEvidence, SellerNoKnownIssues } from "./listing-evidence";
 
 it("viser tekstlig kilde og bare dokumenterte tidspunkt", () => {
   const { container } = render(
@@ -23,4 +23,16 @@ it("viser tekstlig kilde og bare dokumenterte tidspunkt", () => {
   expect(screen.getByText("Kilden til opplysningen er ukjent")).toBeTruthy();
   expect(screen.getByText("Registrert 12. mars 2024")).toBeTruthy();
   expect(container.querySelectorAll("time")).toHaveLength(1);
+});
+
+it("viser fravær av oppgitte feil som en nøytral selgeropplysning", () => {
+  const { container } = render(<SellerNoKnownIssues />);
+
+  expect(screen.getByRole("note", { name: "Selgeropplysning" })).toBeTruthy();
+  expect(screen.getByText("Oppgitt av selger")).toBeTruthy();
+  expect(
+    screen.getByText("Selger har oppgitt at kjøretøyet ikke har kjente feil eller mangler."),
+  ).toBeTruthy();
+  expect(screen.queryByText(/verifisert|kontrollert|bekreftet/i)).toBeNull();
+  expect(container.firstElementChild?.classList.contains("bg-muted/40")).toBe(true);
 });

@@ -5,7 +5,7 @@ import { useForm, useWatch, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { createListing } from "@/lib/listings.functions";
@@ -72,7 +72,11 @@ import { StepIndicator } from "@/features/listing-creation/step-indicator";
 import { ListingComposerShell } from "@/features/listing-creation/listing-composer-shell";
 import { useComposerHistoryBack } from "@/features/listing-creation/use-composer-history";
 import { NativeComposerDeck } from "@/features/listing-creation/native-composer-deck";
-import type { ComposerNavigationResult } from "@/features/listing-creation/composer-navigation";
+import {
+  canPreviewDraft,
+  reviewSectionSteps,
+  type ComposerNavigationResult,
+} from "@/features/listing-creation/composer-navigation";
 
 const FullscreenLocationPicker = lazy(() =>
   import("@/components/fullscreen-location-picker").then((m) => ({
@@ -540,26 +544,29 @@ function NewListingPage() {
         "category-attributes",
         "description-keywords",
         "price",
+        "boat-facts",
         "vehicle-facts",
         "vehicle-price",
       ],
       location: ["delivery", "location"],
     };
-    const matchingIndices = pages
-      .map((page, idx) =>
-        page.groups.some((group) => groupKeys[section].includes(group.key)) ? idx : -1,
-      )
-      .filter((idx) => idx >= 0);
-    if (matchingIndices.length === 0) {
+    const target = reviewSectionSteps(pages, groupKeys[section]);
+    if (!target) {
       // Landing-flyten har verken category-select eller (etter bekreftelse)
       // category-confirm igjen som steg, så "Endre kategori" fra
       // forhåndsvisningen har ingen side å hoppe til — den åpner samme
       // dialog som kategori-chippen i headeren i stedet.
-      if (section === "category" && categoryId) setCategoryEditConfirmOpen(true);
+      if (section === "category" && categoryId) {
+        reviewSectionLastStepRef.current = null;
+        setCategoryEditConfirmOpen(true);
+        return;
+      }
+      returnToReviewRef.current = false;
+      reviewSectionLastStepRef.current = null;
       return;
     }
-    reviewSectionLastStepRef.current = Math.max(...matchingIndices) + 1;
-    setStep(matchingIndices[0] + 1);
+    reviewSectionLastStepRef.current = target.last;
+    setStep(target.first);
     window.scrollTo({ top: 0 });
   };
 
@@ -1234,6 +1241,8 @@ function NewListingPage() {
   // wizard on this step — see applyCategorySelect/applySuggestedCategory —
   // so no separate Next/Back controls are needed or wanted here.
   const isCategoryConfirmPage = groups.length === 1 && groups[0].key === "category-confirm";
+  const showEarlyPreview =
+    !isLast && canPreviewDraft(pages, step, !!categoryId && title.trim().length >= 5);
   const nextGroups = pages[step]?.groups ?? [];
   function handleInvalidSubmit(fields: FieldErrors<ListingForm>) {
     const firstField = Object.keys(fields)[0] as keyof ListingForm | undefined;
@@ -1413,6 +1422,16 @@ function NewListingPage() {
                     : undefined
                 }
               >
+                {showEarlyPreview && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="native-touch-target self-start"
+                    onClick={openPreview}
+                  >
+                    <Eye className="size-4" aria-hidden /> Forhåndsvis annonsen
+                  </Button>
+                )}
                 {groups.map((g) => (
                   <g.Component key={g.key} {...sharedProps} />
                 ))}
@@ -1423,6 +1442,16 @@ function NewListingPage() {
               data-testid={groups[0] ? `wizard-step-${groups[0].key}` : undefined}
               className={isNativeDescriptionSoloPage ? "flex flex-col" : "space-y-6"}
             >
+              {showEarlyPreview && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="self-start"
+                  onClick={openPreview}
+                >
+                  <Eye className="size-4" aria-hidden /> Forhåndsvis annonsen
+                </Button>
+              )}
               {groups.map((g) => (
                 <g.Component key={g.key} {...sharedProps} />
               ))}
@@ -1466,7 +1495,13 @@ function NewListingPage() {
       {/* Category picker bottom sheet */}
       <CategoryPicker
         open={categoryPickerOpen}
-        onOpenChange={setCategoryPickerOpen}
+        onOpenChange={(open) => {
+          setCategoryPickerOpen(open);
+          if (!open && editingCategoryViaTitle) {
+            setEditingCategoryViaTitle(false);
+            returnToReviewRef.current = false;
+          }
+        }}
         categories={pickableCategories}
         selectedId={categoryId}
         onSelect={(id, parentId) => {
@@ -1483,6 +1518,10 @@ function NewListingPage() {
             setAttributes({});
             setAttributesTouched(false);
             applyCategorySelect("sheet", id, parentId);
+            if (returnToReviewRef.current) {
+              setReviewJumpRequested(true);
+              returnToReviewRef.current = false;
+            }
             return;
           }
           requestCategorySelect("sheet", id, parentId);
@@ -1505,7 +1544,14 @@ function NewListingPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogCancel
+              onClick={() => {
+                returnToReviewRef.current = false;
+                reviewSectionLastStepRef.current = null;
+              }}
+            >
+              Avbryt
+            </AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {

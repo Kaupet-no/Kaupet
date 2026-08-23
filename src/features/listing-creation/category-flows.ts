@@ -191,21 +191,17 @@ export function withRuntimeFieldGroups(
 
 /**
  * Chunks an ordered list of active field-group keys into wizard "pages" for a
- * given platform: web pages hold more groups per page, native pages hold
- * fewer. `category-select` is always solo first (category must be chosen
- * before anything else, including the full title/photo step). Location and
- * review/publish share the final page on both platforms so native users do
- * not have to advance through a separate confirmation-only step.
+ * given platform. Web keeps the existing positional chunks. Ordinary native
+ * flows use four task pages after category entry: show the item, make it
+ * searchable, clarify the trade, and review/publish. Category selection and
+ * confirmation remain structural solo pages. Bil og MC keeps its existing
+ * atomic pages until its dedicated vehicle-flow phases are implemented.
  * `title-photos` is no longer forced first — its position is just whatever
  * order it has in `fieldGroupKeys`, so a category flow can put
  * `category-attributes` (and any vehicle lookup it triggers) before it.
  *
- * Chunking is purely positional: it has no notion of "these groups prefer to
- * stay adjacent," so a category that reorders `delivery-location` between
- * `condition` and `price` will split them onto separate native pages purely
- * because of where `delivery-location` landed in the array. This is an
- * accepted limitation (not solved by a second hidden rule), mitigated by a
- * live pagination preview in the admin UI.
+ * Group order within each native task page still follows the configured flow;
+ * only the four established task boundaries are fixed.
  */
 /** Field-group keys that always get their own solo page, wherever they land
  * in the ordered array — `category-select` is always first (see
@@ -236,9 +232,33 @@ export function resolveWizardPages(
   },
 ): string[][] {
   if (options.native) {
-    return fieldGroupKeys.map((key) => [key]);
+    if (fieldGroupKeys.includes("vehicle-registration")) {
+      return fieldGroupKeys.map((key) => [key]);
+    }
+
+    const itemKeys = new Set(["photos", "title"]);
+    const searchableKeys = new Set(["boat-facts", "category-attributes", "description-keywords"]);
+    const tradeKeys = new Set(["condition", "price", "delivery", "location"]);
+    const structuralKeys = new Set(["category-select", "category-confirm", "review-publish"]);
+    const page = (keys: ReadonlySet<string>) => fieldGroupKeys.filter((key) => keys.has(key));
+    const other = fieldGroupKeys.filter(
+      (key) =>
+        !structuralKeys.has(key) &&
+        !itemKeys.has(key) &&
+        !searchableKeys.has(key) &&
+        !tradeKeys.has(key),
+    );
+    const pages = [
+      ...(fieldGroupKeys.includes("category-select") ? [["category-select"]] : []),
+      page(itemKeys),
+      ...(fieldGroupKeys.includes("category-confirm") ? [["category-confirm"]] : []),
+      [...page(searchableKeys), ...other],
+      page(tradeKeys),
+      ...(fieldGroupKeys.includes("review-publish") ? [["review-publish"]] : []),
+    ];
+    return pages.filter((groups) => groups.length > 0);
   }
-  const chunkSize = options.native ? 3 : 4;
+  const chunkSize = 4;
   const forceBreakBeforeKeys = options.forceBreakBeforeKeys;
 
   const withoutEnds = fieldGroupKeys.filter(

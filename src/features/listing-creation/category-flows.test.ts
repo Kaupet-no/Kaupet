@@ -232,17 +232,12 @@ describe("resolveWizardPages", () => {
     ]);
   });
 
-  it("gives every atomic field group its own native page", () => {
+  it("grupperer en generisk nativeflyt i fire hovedstopp etter kategoriinngangen", () => {
     expect(resolveWizardPages(flowWithCategorySelect, { native: true })).toEqual([
       ["category-select"],
-      ["photos"],
-      ["title"],
-      ["category-attributes"],
-      ["condition"],
-      ["price"],
-      ["description-keywords"],
-      ["delivery"],
-      ["location"],
+      ["photos", "title"],
+      ["category-attributes", "description-keywords"],
+      ["condition", "price", "delivery", "location"],
       ["review-publish"],
     ]);
   });
@@ -254,8 +249,7 @@ describe("resolveWizardPages", () => {
       ["review-publish"],
     ]);
     expect(resolveWizardPages(groups, { native: true })).toEqual([
-      ["photos"],
-      ["title"],
+      ["photos", "title"],
       ["category-attributes"],
       ["review-publish"],
     ]);
@@ -266,14 +260,53 @@ describe("resolveWizardPages", () => {
     expect(resolveWizardPages([], { native: true })).toEqual([]);
   });
 
-  it("solo-pages vehicle-registration and vehicle-360 wherever they land in the array", () => {
-    const groups = [
-      "category-select",
-      "vehicle-registration",
-      "vehicle-360",
-      "category-attributes",
+  it.each(["bil med oppslag", "uregistrert kjøretøy"])(
+    "bevarer dagens Bil og MC-sider for %s",
+    () => {
+      const groups = [
+        "category-select",
+        "vehicle-registration",
+        "vehicle-360",
+        "category-attributes",
+        "photos",
+        "title",
+        "condition",
+        "price",
+        "description-keywords",
+        "delivery",
+        "location",
+        "review-publish",
+      ];
+      expect(resolveWizardPages(groups, { native: false })).toEqual([
+        ["category-select"],
+        ["vehicle-registration"],
+        ["vehicle-360"],
+        ["category-attributes", "photos", "title", "condition", "price"],
+        ["description-keywords"],
+        ["delivery", "location", "review-publish"],
+      ]);
+      expect(resolveWizardPages(groups, { native: true })).toEqual([
+        ["category-select"],
+        ["vehicle-registration"],
+        ["vehicle-360"],
+        ["category-attributes"],
+        ["photos"],
+        ["title"],
+        ["condition"],
+        ["price"],
+        ["description-keywords"],
+        ["delivery"],
+        ["location"],
+        ["review-publish"],
+      ]);
+    },
+  );
+
+  it("beholder første kategoriside etter bekreftelse når påkrevde attributter finnes", () => {
+    const beforeConfirmation = [
       "photos",
-      "title",
+      "category-confirm",
+      "category-attributes",
       "condition",
       "price",
       "description-keywords",
@@ -281,26 +314,36 @@ describe("resolveWizardPages", () => {
       "location",
       "review-publish",
     ];
-    expect(resolveWizardPages(groups, { native: false })).toEqual([
-      ["category-select"],
-      ["vehicle-registration"],
-      ["vehicle-360"],
-      ["category-attributes", "photos", "title", "condition", "price"],
-      ["description-keywords"],
-      ["delivery", "location", "review-publish"],
-    ]);
-    expect(resolveWizardPages(groups, { native: true })).toEqual([
-      ["category-select"],
-      ["vehicle-registration"],
-      ["vehicle-360"],
-      ["category-attributes"],
+    const afterConfirmation = beforeConfirmation.filter((key) => key !== "category-confirm");
+
+    expect(resolveWizardPages(beforeConfirmation, { native: true })).toEqual([
       ["photos"],
-      ["title"],
-      ["condition"],
-      ["price"],
-      ["description-keywords"],
-      ["delivery"],
-      ["location"],
+      ["category-confirm"],
+      ["category-attributes", "description-keywords"],
+      ["condition", "price", "delivery", "location"],
+      ["review-publish"],
+    ]);
+    expect(resolveWizardPages(afterConfirmation, { native: true })[1]).toEqual([
+      "category-attributes",
+      "description-keywords",
+    ]);
+  });
+
+  it("grupperer båtflyten i de samme fire native hovedstoppene", () => {
+    const groups = [
+      "photos",
+      "boat-facts",
+      "category-attributes",
+      "description-keywords",
+      "delivery",
+      "location",
+      "review-publish",
+    ];
+
+    expect(resolveWizardPages(groups, { native: true })).toEqual([
+      ["photos"],
+      ["boat-facts", "category-attributes", "description-keywords"],
+      ["delivery", "location"],
       ["review-publish"],
     ]);
   });

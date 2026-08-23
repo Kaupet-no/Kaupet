@@ -363,6 +363,10 @@ Disse tre gir mer egenart enn en ny gradient, illustrasjonsstil eller mikroanima
    **Verifisering:** En kontrakttest låser klassifiseringen for samtlige registry-nøkler. Eksisterende klient- og servervalidering er urørt; klassifiseringen brukes foreløpig ikke til å filtrere eller omgå grupper.
 
 3. Endre `resolveWizardPages` slik at ordinær nativeflyt grupperes i fire meningsfulle sider; ikke opprett en ny parallell wizard.
+   **Status 23.08.2026: Fullført.** Den eksisterende resolveren grupperer nå ordinære nativefeltgrupper i fire oppgavestopp etter kategoriinngangen: varen, søkbarhet, handel og kontroll/publisering. Kategoriinngang og kategoribekreftelse forblir strukturelle solosider, mens dagens atomiske Bil og MC-sider er bevart slik at kjøretøyregistrering, 360° og faktaflyt ikke endres før steg 4–5. Webgrenen er uendret. Sidegruppene bruker fortsatt samme wizard, registry og feltgrupper; validering, første ugyldige felt, autosave-step keys, review-retur og kategoribytte finner gruppene på tvers av de nye sidegrensene som før.
+
+   **Verifisering:** Kontraktstesten feilet rødt på den gamle én-gruppe-per-side-atferden og dekker nå beslutningstabellen generisk flyt, påkrevde attributter med stabil kategoribekreftelse, bil med oppslag, uregistrert kjøretøy og båt, samt uendret webkontrakt. `bun run test -- src/features/listing-creation/category-flows.test.ts` (26 tester), `bun run test` (81 filer / 399 tester), `bun run lint` og `bunx tsc --noEmit` er bestått. Build er ikke kjørt fordi ingen servergrense er berørt.
+
 4. Behold kjøretøyregistrering solo. Gruppér oppslåtte fakta med brukerens bekreftelse, ikke som gjentatt dataregistrering.
 5. Flytt `vehicle-360` ut av lineær minimumsflyt og presenter den etter grunnbilder eller publisering som forbedring.
 6. Vis `PreviewDraftView` tidligere som en del av flyten; la reviewseksjoner åpne riktig side og returnere til review.

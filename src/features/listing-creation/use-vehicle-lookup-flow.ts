@@ -112,12 +112,9 @@ export function useVehicleLookupFlow(params: {
     }
   }
 
-  /** Skriver rå SVV-data til attributes uten redigeringssteg — brukeren
-   * bekrefter kun at registreringsnummeret stemmer (se den nye
-   * vehicle-registration-popupen), ikke hvert enkelt tekniske felt. Merke/
-   * modell er allerede satt av brukeren på dette steget (SVVs tekst er ikke
-   * presis nok til å overstyre det), og eventuelle feil i øvrige felt rettes
-   * ved forhåndsvisning eller ved redigering av publisert annonse. */
+  /** Skriver rå SVV-data til attributes etter at brukeren har kontrollert
+   * merke/modell i vehicle-registration-popupen. Eksisterende korreksjoner
+   * vinner; ellers brukes oppslagsverdiene uten en ekstra registreringsrunde. */
   function confirmVehicleData(leafCategoryId: string) {
     const lookup = vehicleLookupResult;
     if (!lookup) return;
@@ -128,6 +125,12 @@ export function useVehicleLookupFlow(params: {
       registration_number: lookup.registrationNumber,
       vehicle_lookup: JSON.stringify(lookup),
     };
+    if (!(typeof next.brand === "string" && next.brand.trim()) && lookup.brand) {
+      next.brand = lookup.brand;
+    }
+    if (!(typeof next.model === "string" && next.model.trim()) && lookup.model) {
+      next.model = lookup.model;
+    }
     if (lookup.year) next.year = lookup.year;
     if (lookup.fuel_type) next.fuel_type = lookup.fuel_type;
     if (lookup.weight_kg != null) next.weight_kg = lookup.weight_kg;

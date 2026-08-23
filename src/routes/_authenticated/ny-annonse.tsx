@@ -713,20 +713,14 @@ function NewListingPage() {
 
     // "Slå opp"-knappen er fjernet — oppslaget kjøres fra selve Neste-knappen
     // når brukeren står på vehicle-registration-steget med et uslått-opp
-    // regnr. Merke og modell spørres på samme steg og må være besvart først:
-    // ellers ville et utfylt skilt vist bekreftelsespopupen med tomt
-    // merke/modell. Manglende felter (inkludert tomt skilt) faller gjennom
-    // til field-groupens egen validering lenger nede, som gir én
-    // feilmelding per felt.
+    // regnr. Merke/modell fylles fra oppslaget og kan korrigeres i samme
+    // bekreftelse, så registreringssiden krever ikke en ekstra inntasting.
+    // Tomt skilt faller gjennom til field-groupens egen validering.
     if (
       groups.some((g) => g.key === "vehicle-registration") &&
       vehicleRegistered &&
       !vehicleLookupResult &&
-      vehicleRegNrInput.trim() &&
-      typeof attributes.brand === "string" &&
-      attributes.brand.trim() &&
-      typeof attributes.model === "string" &&
-      attributes.model.trim()
+      vehicleRegNrInput.trim()
     ) {
       // Ved treff blir vi stående på dette steget — VehicleRegistration viser
       // da en bekreftelsespopup (regnr/merke/modell/farge/årsmodell) basert

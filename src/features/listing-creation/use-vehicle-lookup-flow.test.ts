@@ -122,7 +122,7 @@ describe("useVehicleLookupFlow", () => {
     expect(goNext).not.toHaveBeenCalled();
   });
 
-  it("confirmVehicleData merges the raw lookup into attributes, sets the category, and advances the wizard", async () => {
+  it("confirmVehicleData reuses looked-up brand and model without a second registration", async () => {
     // jsdom doesn't implement scrollTo — stub it so confirmVehicleData's
     // window.scrollTo call doesn't throw.
     window.scrollTo = vi.fn();
@@ -138,10 +138,7 @@ describe("useVehicleLookupFlow", () => {
     const { result } = renderHook(() =>
       useVehicleLookupFlow(
         makeParams({
-          // Brand/model are already answered on vehicle-registration itself
-          // (SVV's text isn't precise enough to override them) — confirmVehicleData
-          // just keeps whatever's already in attributes.
-          attributes: { existing_key: "kept", brand: "Toyota", model: "Corolla" },
+          attributes: { existing_key: "kept" },
           setAttributes,
           setCategoryTouchedManually,
           setSelectedParentId,

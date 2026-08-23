@@ -93,9 +93,13 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
       if (ctx.categoryId === ctx.bilOgMcCategoryId) {
         return "Velg underkategori før du går videre.";
       }
-      // Merke og modell oppgis av brukeren her (SVV er ikke presis nok på
-      // disse, se VehicleRegistration) og er påkrevd uansett hvilken vei
-      // brukeren tar videre.
+      // Registrert vei fyller merke/modell fra oppslaget og lar brukeren
+      // korrigere dem i samme bekreftelse. Manuell vei må fortsatt fylle dem
+      // inn på siden.
+      if (ctx.vehicleLookupResult) return null;
+      if (ctx.vehicleRegistered) {
+        return "Skriv inn registreringsnummer, eller kryss av for at kjøretøyet ikke er registrert.";
+      }
       const brand = ctx.attributes.brand;
       if (typeof brand !== "string" || !brand.trim()) {
         return { field: "brand", message: "Velg merke før du går videre." };
@@ -122,15 +126,6 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
           field: "eu_control_exempt",
           message: "Svar på om hengeren er fritatt for EU-kontroll før du går videre.",
         };
-      }
-      // Deretter: enten er et oppslag allerede gjort (reg.nr.-popupen tar
-      // over herfra), eller så har brukeren krysset av for at kjøretøyet
-      // ikke er registrert og må ha fylt inn de tekniske feltene selv.
-      // Selve oppslaget trigges av Neste-knappen (se goToNextPage), som
-      // kjører før denne valideringen når regnr er utfylt.
-      if (ctx.vehicleLookupResult) return null;
-      if (ctx.vehicleRegistered) {
-        return "Skriv inn registreringsnummer, eller kryss av for at kjøretøyet ikke er registrert.";
       }
       if (ctx.missingFilters.length > 0) {
         return `Fyll inn ${ctx.missingFilters.map((f) => f.label_nb).join(", ")} før du går videre.`;
@@ -310,7 +305,7 @@ export function fieldGroupsForKeys(keys: string[]): FieldGroup[] {
 const FIELD_GROUP_LABEL_NATIVE_NB: Record<string, string> = {
   "category-select": "Kategori",
   "category-confirm": "Kategori",
-  "vehicle-registration": "Merke & modell",
+  "vehicle-registration": "Registreringsnummer",
   "vehicle-360": "360°-opptak",
   photos: "Bilder",
   title: "Tittel",
@@ -331,7 +326,7 @@ const FIELD_GROUP_LABEL_NATIVE_NB: Record<string, string> = {
 const FIELD_GROUP_LABEL_WEB_NB: Record<string, string> = {
   "category-select": "Kategori",
   "category-confirm": "Kategori",
-  "vehicle-registration": "Merke & modell",
+  "vehicle-registration": "Registreringsnummer",
   "vehicle-360": "360°-opptak",
   photos: "Bilder",
   title: "Tittel",
@@ -359,7 +354,7 @@ export function pageLabel(groups: FieldGroup[], native: boolean): string {
 export const FIELD_GROUP_LABELS_NB: Record<string, string> = {
   "category-select": "Kategori",
   "category-confirm": "Bekreft kategori",
-  "vehicle-registration": "Kjøretøy: Merke, modell & registreringsnummer",
+  "vehicle-registration": "Kjøretøyregistrering",
   "vehicle-360": "Kjøretøy: 360°-opptak",
   photos: "Bilder",
   title: "Tittel",

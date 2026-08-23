@@ -49,24 +49,24 @@ const HIDDEN_KEYS_FOR_MANUAL_SPECS = [
 /** For registrerte kjøretøy dekker SVV-oppslaget resten av de tekniske
  * feltene selv (se confirmVehicleData) — men "Antall soveplasser"
  * (bobil/campingvogn) og "Fritatt for EU-kontroll" (tilhenger) er
- * påkrevde felt SVV aldri har data for, så de spørres her uansett, på
- * samme måte som Merke/Modell over. Disse to er de eneste feltene denne
- * AttributeFields-instansen skal rendre — alt annet skjules dynamisk (se
+ * påkrevde felt SVV aldri har data for, så de spørres i samme bekreftelse
+ * som Merke/Modell. Disse to er de eneste feltene denne AttributeFields-
+ * instansen skal rendre — alt annet skjules dynamisk (se
  * `hiddenKeysForRegisteredExtraSpecs` under) fremfor via en hardkodet
  * nøkkelliste, som tidligere ikke dekket alle SVV-utledede felt (f.eks.
- * årsmodell, førstegangsregistrering) og dermed spurte om dem på nytt her. */
+ * årsmodell, førstegangsregistrering) og dermed spurte om dem på nytt. */
 const VEHICLE_REGISTERED_REQUIRED_SPEC_KEYS = ["sleeping_places", "eu_control_exempt"];
 
 /**
- * Første steg i kjøretøyflyten, etter at kategorien er bekreftet: Merke og
- * Modell, så registreringsnummer.
+ * Første steg i kjøretøyflyten etter at kategorien er bekreftet:
+ * registreringsnummer/oppslag alene for registrerte kjøretøy, eller manuell
+ * merke-, modell- og teknisk registrering for uregistrerte kjøretøy.
  *
- * Merke/Modell spørres her — ikke utledet fra Statens vegvesen alene — fordi
- * SVVs merke-/modelltekst ikke er presis nok til å bygge annonsens tittel og
- * søkefiltre på. Feltene forhåndsutfylles fra tittelen brukeren skrev på
+ * Merke/Modell forhåndsutfylles fra tittelen brukeren skrev på
  * landingsskjermen ("Porsche 911" → Porsche / 911, se
- * `matchBrandAndModelInTitle`), så det vanligste tilfellet krever null
- * klikk; begge kan overstyres i nedtrekkslistene.
+ * `matchBrandAndModelInTitle`). For registrerte kjøretøy vises feltene først
+ * sammen med SVV-faktaene i bekreftelsen; uregistrerte kjøretøy fyller dem
+ * manuelt på siden.
  *
  * Registreringsnummeret brukes kun til å hente *tekniske* data fra SVV.
  * Oppslaget kjøres fra wizardens "Neste"-knapp (se `goToNextPage` i
@@ -206,6 +206,14 @@ export function VehicleRegistration(props: WizardSharedProps) {
   const lookupSummary = lookup
     ? [lookup.color, lookup.brand, lookup.model].filter(Boolean).join(" ")
     : "";
+  const confirmedBrand = brand ?? lookup?.brand ?? undefined;
+  const confirmedModel = brand === undefined ? (model ?? lookup?.model ?? undefined) : model;
+  const registeredExtraSpecMissing =
+    ((selectedLeafSlug === "bobil" || selectedLeafSlug === "campingvogn") &&
+      (typeof attributes.sleeping_places !== "number" || !attributes.sleeping_places)) ||
+    (selectedLeafSlug === "tilhenger-leaf" && attributes.eu_control_exempt == null);
+  const lookupReadyToConfirm =
+    !!confirmedBrand?.trim() && !!confirmedModel?.trim() && !registeredExtraSpecMissing;
   function formatRegNr(v: string) {
     const m = /^([A-Z]{2,3})(\d{3,5})$/.exec(v);
     return m ? `${m[1]} ${m[2]}` : v;
@@ -249,23 +257,25 @@ export function VehicleRegistration(props: WizardSharedProps) {
         </div>
       </div>
 
-      <div className="space-y-4 border-t pt-4">
-        <VehicleBrandField
-          categoryGroup={categoryGroup}
-          value={brand}
-          onChange={(v) => setAttribute("brand", v)}
-          required
-          error={fieldError("brand")}
-        />
-        <VehicleModelWithClassField
-          categoryGroup={categoryGroup}
-          brandName={brand}
-          value={model}
-          onChange={(v) => setAttribute("model", v)}
-          required
-          error={fieldError("model")}
-        />
-      </div>
+      {!vehicleRegistered && (
+        <div className="space-y-4 border-t pt-4">
+          <VehicleBrandField
+            categoryGroup={categoryGroup}
+            value={brand}
+            onChange={(v) => setAttribute("brand", v)}
+            required
+            error={fieldError("brand")}
+          />
+          <VehicleModelWithClassField
+            categoryGroup={categoryGroup}
+            brandName={brand}
+            value={model}
+            onChange={(v) => setAttribute("model", v)}
+            required
+            error={fieldError("model")}
+          />
+        </div>
+      )}
 
       <div className="space-y-3 border-t pt-4">
         <Label htmlFor="vehicle-reg-nr">
@@ -322,16 +332,6 @@ export function VehicleRegistration(props: WizardSharedProps) {
                 {vehicleLookupError}
               </p>
             )}
-
-            <AttributeFields
-              categoryId={categoryId}
-              categories={categories}
-              value={attributes}
-              onChange={onAttributesChange}
-              showErrors={attributesTouched}
-              hiddenKeys={hiddenKeysForRegisteredExtraSpecs}
-              required
-            />
           </>
         )}
 
@@ -394,11 +394,51 @@ export function VehicleRegistration(props: WizardSharedProps) {
               </AlertDescription>
             </Alert>
           )}
+          {lookup && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Kontroller merke og modell. Rett bare hvis opplysningene fra Statens vegvesen ikke
+                stemmer.
+              </p>
+              <VehicleBrandField
+                categoryGroup={categoryGroup}
+                value={confirmedBrand}
+                onChange={(v) => setAttribute("brand", v)}
+                required
+              />
+              <VehicleModelWithClassField
+                categoryGroup={categoryGroup}
+                brandName={confirmedBrand}
+                value={confirmedModel}
+                onChange={(v) => setAttribute("model", v)}
+                required
+              />
+              <AttributeFields
+                categoryId={categoryId}
+                categories={categories}
+                value={attributes}
+                onChange={onAttributesChange}
+                showErrors
+                hiddenKeys={hiddenKeysForRegisteredExtraSpecs}
+                required
+              />
+              {!lookupReadyToConfirm && (
+                <p className="text-sm text-destructive">
+                  Fyll inn alle påkrevde opplysninger før du fortsetter.
+                </p>
+              )}
+            </div>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => resetLookupOnReturnToRegistration()}>
               Nei
             </AlertDialogCancel>
-            <AlertDialogAction onClick={() => confirmVehicleData(categoryId)}>Ja</AlertDialogAction>
+            <AlertDialogAction
+              disabled={!lookupReadyToConfirm}
+              onClick={() => confirmVehicleData(categoryId)}
+            >
+              Ja
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

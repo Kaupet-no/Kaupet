@@ -1,5 +1,5 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
-import { createFileRoute, useNavigate, useBlocker } from "@tanstack/react-router";
+﻿import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { ClientOnly, createFileRoute, useNavigate, useBlocker } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm, useWatch, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,7 +12,6 @@ import { createListing } from "@/lib/listings.functions";
 import { uploadListingImage, uploadListingImageThumb } from "@/lib/storage";
 import { geocodeNorwayAddress } from "@/lib/geocode";
 import { type PendingImage } from "@/components/image-uploader";
-import { FullscreenLocationPicker } from "@/components/fullscreen-location-picker";
 import { PromoteListingDialog } from "@/components/promote-listing-dialog";
 import { PublishedListingDialog } from "@/components/published-listing-dialog";
 import { CategoryPicker } from "@/components/category-picker";
@@ -74,6 +73,12 @@ import { ListingComposerShell } from "@/features/listing-creation/listing-compos
 import { useComposerHistoryBack } from "@/features/listing-creation/use-composer-history";
 import { NativeComposerDeck } from "@/features/listing-creation/native-composer-deck";
 import type { ComposerNavigationResult } from "@/features/listing-creation/composer-navigation";
+
+const FullscreenLocationPicker = lazy(() =>
+  import("@/components/fullscreen-location-picker").then((m) => ({
+    default: m.FullscreenLocationPicker,
+  })),
+);
 
 const listingSchema = z.object({
   title: z.string().trim().min(5, "Tittelen må være minst 5 tegn").max(120, "Maks 120 tegn"),
@@ -1617,16 +1622,20 @@ function NewListingPage() {
 
       {/* Cancel confirmation dialog */}
       {fullscreenMapOpen && coords && (
-        <FullscreenLocationPicker
-          lat={coords.lat}
-          lng={coords.lng}
-          onConfirm={(next) => {
-            markerMovedRef.current = true;
-            lastEditedRef.current = "map";
-            setCoords(next);
-          }}
-          onClose={() => setFullscreenMapOpen(false)}
-        />
+        <ClientOnly>
+          <Suspense fallback={null}>
+            <FullscreenLocationPicker
+              lat={coords.lat}
+              lng={coords.lng}
+              onConfirm={(next) => {
+                markerMovedRef.current = true;
+                lastEditedRef.current = "map";
+                setCoords(next);
+              }}
+              onClose={() => setFullscreenMapOpen(false)}
+            />
+          </Suspense>
+        </ClientOnly>
       )}
 
       {previewOpen && previewDraft && (

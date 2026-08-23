@@ -1,11 +1,35 @@
+import { lazy, Suspense } from "react";
+import { ClientOnly } from "@tanstack/react-router";
 import { Hash, Loader2, LocateFixed, MapPin } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ListingLocationPicker } from "@/components/listing-location-picker";
+import { Skeleton } from "@/components/ui/skeleton";
 
 import type { WizardSharedProps } from "../types";
 import { RequiredMark } from "../required-mark";
+
+const ListingLocationPicker = lazy(() =>
+  import("@/components/listing-location-picker").then((m) => ({
+    default: m.ListingLocationPicker,
+  })),
+);
+
+function ClientLocationPicker(props: {
+  lat: number;
+  lng: number;
+  onChange: (next: { lat: number; lng: number }) => void;
+  readOnly?: boolean;
+}) {
+  const fallback = <Skeleton className="h-52 w-full rounded-2xl" />;
+  return (
+    <ClientOnly fallback={fallback}>
+      <Suspense fallback={fallback}>
+        <ListingLocationPicker {...props} />
+      </Suspense>
+    </ClientOnly>
+  );
+}
 
 /** Delivery-method buttons + location section (GPS/postal/map). Identical on web and native. */
 export function DeliveryLocation({
@@ -124,7 +148,7 @@ export function DeliveryLocation({
                       className="relative cursor-pointer"
                       onClick={() => setFullscreenMapOpen(true)}
                     >
-                      <ListingLocationPicker
+                      <ClientLocationPicker
                         lat={coords.lat}
                         lng={coords.lng}
                         onChange={() => {}}
@@ -137,7 +161,7 @@ export function DeliveryLocation({
                       </div>
                     </div>
                   ) : (
-                    <ListingLocationPicker
+                    <ClientLocationPicker
                       lat={coords.lat}
                       lng={coords.lng}
                       onChange={(next) => {
@@ -196,7 +220,7 @@ export function DeliveryLocation({
                       className="relative cursor-pointer"
                       onClick={() => setFullscreenMapOpen(true)}
                     >
-                      <ListingLocationPicker
+                      <ClientLocationPicker
                         lat={coords.lat}
                         lng={coords.lng}
                         onChange={() => {}}
@@ -209,7 +233,7 @@ export function DeliveryLocation({
                       </div>
                     </div>
                   ) : (
-                    <ListingLocationPicker
+                    <ClientLocationPicker
                       lat={coords.lat}
                       lng={coords.lng}
                       onChange={(next) => {

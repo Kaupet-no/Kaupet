@@ -249,6 +249,7 @@ Disse tre gir mer egenart enn en ny gradient, illustrasjonsstil eller mikroanima
 1. Fiks SSR/hydration for sticky header-søk i `src/routes/index.tsx` og `src/components/site-header.tsx`.
    **Status 23.08.2026: Fullført.** `HeaderSearchPortal` venter til etter mount før portal-målet leses, mens søkefeltet forblir montert gjennom sticky-overgangen. Verifisert med en hydration-regresjonstest, full unit-suite, lint og typecheck.
 2. Fjern Leaflet fra SSR-modulgrafen ved å laste `FullscreenLocationPicker` og øvrige kartflater klient-only.
+   **Status 23.08.2026: Fullført.** Kartvelgere, resultatkart og detaljkart lastes nå med `lazy` bak `ClientOnly`. `check:server-boundary` følger statiske importer fra rutene og avviser Leaflet i SSR-grafen. Verifisert med rødt/grønt boundary-sjekk, full unit-suite, lint, typecheck og produksjonsbuild.
 3. Innfør én `isFocusedRoute(pathname)` ved siden av `composer-route.ts`; skjul bunnnav på auth, reset, onboarding og bekreftelsesflater i `src/routes/__root.tsx`.
 4. Gjør onboardingen adaptiv: hent authstatus, antall lagrede søk og pushstatus; vis tidlig push-tilbud kun når kontoen allerede har lagrede søk, ellers flyttes forespørselen til relevant handling.
 5. Fjern offentlige visningstall fra `src/components/listing-card.tsx`.

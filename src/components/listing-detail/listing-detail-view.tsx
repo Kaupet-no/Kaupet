@@ -1,5 +1,5 @@
-import { Fragment, lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
+import { Fragment, lazy, Suspense, useCallback, useState, type ReactNode } from "react";
+import { ClientOnly, Link } from "@tanstack/react-router";
 import { Loader2, MapPin, Maximize2 } from "lucide-react";
 
 import { useIsNative } from "@/hooks/use-is-native";
@@ -50,7 +50,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FullscreenLocationPicker } from "@/components/fullscreen-location-picker";
 import {
   ListingEditContext,
   useListingEdit,
@@ -65,6 +64,11 @@ import { GenericAttributesPanel } from "@/components/listing-detail/edit-panels/
 
 const ListingDetailMap = lazy(() =>
   import("@/components/listing-detail-map").then((m) => ({ default: m.ListingDetailMap })),
+);
+const FullscreenLocationPicker = lazy(() =>
+  import("@/components/fullscreen-location-picker").then((m) => ({
+    default: m.FullscreenLocationPicker,
+  })),
 );
 const ImageLightbox = lazy(() =>
   import("@/components/listing-detail/image-lightbox").then((m) => ({ default: m.ImageLightbox })),
@@ -200,12 +204,10 @@ export function ListingDetailView({
 }: ListingDetailViewProps) {
   const isNative = useIsNative();
   const [activeImage, setActiveImage] = useState(0);
-  const [mounted, setMounted] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [mapOverlayOpen, setMapOverlayOpen] = useState(false);
   const closeLightbox = useCallback(() => setLightboxIndex(null), []);
   const closeMapOverlay = useCallback(() => setMapOverlayOpen(false), []);
-  useEffect(() => setMounted(true), []);
 
   const sortedImages = images.slice().sort((a, b) => a.sort_order - b.sort_order);
   const has360 = !!vehicle360Frames && vehicle360Frames.length > 0;
@@ -356,7 +358,6 @@ export function ListingDetailView({
       previewBanner={previewBanner}
       activeImage={activeImage}
       setActiveImage={setActiveImage}
-      mounted={mounted}
       lightboxIndex={lightboxIndex}
       setLightboxIndex={setLightboxIndex}
       mapOverlayOpen={mapOverlayOpen}
@@ -429,7 +430,6 @@ function ListingDetailViewBody({
   previewBanner,
   activeImage,
   setActiveImage,
-  mounted,
   lightboxIndex,
   setLightboxIndex,
   mapOverlayOpen,
@@ -481,7 +481,6 @@ function ListingDetailViewBody({
   previewBanner?: ReactNode;
   activeImage: number;
   setActiveImage: (i: number) => void;
-  mounted: boolean;
   lightboxIndex: number | null;
   setLightboxIndex: (i: number | null) => void;
   mapOverlayOpen: boolean;
@@ -1038,21 +1037,25 @@ function ListingDetailViewBody({
           })()}
 
           {locationPickerOpen && pendingCoords && (
-            <FullscreenLocationPicker
-              lat={pendingCoords.lat}
-              lng={pendingCoords.lng}
-              onConfirm={async (next) => {
-                setLocationPickerOpen(false);
-                await editCtx?.saveField({
-                  group: "location",
-                  postal_code: postalCode ?? null,
-                  city: city ?? null,
-                  lat: next.lat,
-                  lng: next.lng,
-                });
-              }}
-              onClose={() => setLocationPickerOpen(false)}
-            />
+            <ClientOnly>
+              <Suspense fallback={<LightboxLoadingFallback />}>
+                <FullscreenLocationPicker
+                  lat={pendingCoords.lat}
+                  lng={pendingCoords.lng}
+                  onConfirm={async (next) => {
+                    setLocationPickerOpen(false);
+                    await editCtx?.saveField({
+                      group: "location",
+                      postal_code: postalCode ?? null,
+                      city: city ?? null,
+                      lat: next.lat,
+                      lng: next.lng,
+                    });
+                  }}
+                  onClose={() => setLocationPickerOpen(false)}
+                />
+              </Suspense>
+            </ClientOnly>
           )}
 
           {ownerStatsSlot}
@@ -1068,13 +1071,11 @@ function ListingDetailViewBody({
             aria-label="Se kart i fullskjerm"
             className="relative block h-80 w-full cursor-pointer overflow-hidden rounded-2xl border border-border"
           >
-            {mounted ? (
+            <ClientOnly fallback={<Skeleton className="h-full w-full rounded-none" />}>
               <Suspense fallback={<Skeleton className="h-full w-full rounded-none" />}>
                 <ListingDetailMap lat={displayLat} lng={displayLng} interactive={false} />
               </Suspense>
-            ) : (
-              <Skeleton className="h-full w-full rounded-none" />
-            )}
+            </ClientOnly>
             <span className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium shadow-lg">
               <Maximize2 className="size-3.5" />
               Se i fullskjerm
@@ -1102,11 +1103,13 @@ function ListingDetailViewBody({
         </Suspense>
       )}
 
-      {mapOverlayOpen && displayLat != null && displayLng != null && (
-        <Suspense fallback={<LightboxLoadingFallback />}>
-          <MapOverlay lat={displayLat} lng={displayLng} onClose={closeMapOverlay} />
-        </Suspense>
-      )}
+      <ClientOnly>
+        {mapOverlayOpen && displayLat != null && displayLng != null && (
+          <Suspense fallback={<LightboxLoadingFallback />}>
+            <MapOverlay lat={displayLat} lng={displayLng} onClose={closeMapOverlay} />
+          </Suspense>
+        )}
+      </ClientOnly>
 
       {showStickyContact && (
         <div

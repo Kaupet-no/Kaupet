@@ -9,6 +9,7 @@ import {
   SearchX,
 } from "lucide-react";
 import { lazy, type ReactNode, Suspense, useEffect, useRef, useState } from "react";
+import { ClientOnly } from "@tanstack/react-router";
 
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
 import { ListingCardExpanded } from "@/components/listing-card-expanded";
@@ -121,7 +122,6 @@ export function ResultList({
   const mostRestrictiveAttrLabel = mostRestrictiveAttrFilter
     ? getAttributeChipState(mostRestrictiveAttrFilter, attrValues[mostRestrictiveAttrKey]).label
     : null;
-  const [mounted, setMounted] = useState(false);
   const [mobileMapOpen, setMobileMapOpen] = useState(false);
   const [bigMapOpen, setBigMapOpen] = useState(false);
   const [desktopMapVisible, setDesktopMapVisible] = useState(true);
@@ -168,8 +168,6 @@ export function ResultList({
     });
   }, [cards.length, effectiveCategories.length, isLoading, q, zeroResultKey]);
 
-  useEffect(() => setMounted(true), []);
-
   useEffect(() => {
     if (!sentinelRef.current) return;
     const el = sentinelRef.current;
@@ -185,8 +183,8 @@ export function ResultList({
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const renderMap = () =>
-    mounted ? (
+  const renderMap = () => (
+    <ClientOnly fallback={<Skeleton className="h-full w-full rounded-2xl" />}>
       <Suspense fallback={<Skeleton className="h-full w-full rounded-2xl" />}>
         <ListingsMap
           center={mapCenter}
@@ -205,9 +203,8 @@ export function ResultList({
           className="h-full w-full"
         />
       </Suspense>
-    ) : (
-      <Skeleton className="h-full w-full rounded-2xl" />
-    );
+    </ClientOnly>
+  );
 
   return (
     <>

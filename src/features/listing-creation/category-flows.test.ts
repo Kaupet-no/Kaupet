@@ -261,12 +261,11 @@ describe("resolveWizardPages", () => {
   });
 
   it.each(["bil med oppslag", "uregistrert kjøretøy"])(
-    "bevarer dagens Bil og MC-sider for %s",
+    "holder 360° utenfor Bil og MC-minimumsflyten for %s",
     () => {
       const groups = [
         "category-select",
         "vehicle-registration",
-        "vehicle-360",
         "category-attributes",
         "photos",
         "title",
@@ -280,7 +279,6 @@ describe("resolveWizardPages", () => {
       expect(resolveWizardPages(groups, { native: false })).toEqual([
         ["category-select"],
         ["vehicle-registration"],
-        ["vehicle-360"],
         ["category-attributes", "photos", "title", "condition", "price"],
         ["description-keywords"],
         ["delivery", "location", "review-publish"],
@@ -288,7 +286,6 @@ describe("resolveWizardPages", () => {
       expect(resolveWizardPages(groups, { native: true })).toEqual([
         ["category-select"],
         ["vehicle-registration"],
-        ["vehicle-360"],
         ["category-attributes"],
         ["photos"],
         ["title"],
@@ -375,11 +372,10 @@ describe("withRuntimeFieldGroups", () => {
     );
   });
 
-  it("adds the 360 step right after vehicle-registration and the price step right before review-publish", () => {
+  it("holder 360° utenfor minimumsflyten og legger pris rett før publisering", () => {
     expect(withRuntimeFieldGroups(vehicleFlow, { showCategoryConfirm: false })).toEqual([
       "photos",
       "vehicle-registration",
-      "vehicle-360",
       "category-attributes",
       "vehicle-facts",
       "vehicle-price",

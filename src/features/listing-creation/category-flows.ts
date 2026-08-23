@@ -157,12 +157,9 @@ function applyLandingEntry(flow: CategoryFlow): CategoryFlow {
  *
  * - `category-confirm` right after `photos`, while the landing-screen entry
  *   still has an unconfirmed AI category suggestion;
- * - `vehicle-360` right after `vehicle-registration`. 360°-opptak only
- *   applies to Bil og MC, so it can't live on the images step — that one is
- *   always step 1, before any category is known;
  * - `vehicle-price` right before `review-publish` — the dedicated, large-
  *   typography Pris + omregistreringsavgift step. Runtime-injected rather
- *   than a stored field group (like `vehicle-360`) so it needs no DB
+ *   than a stored field group so it needs no DB
  *   migration and never shows up as an admin-togglable checkbox: every
  *   vehicle flow gets it, always in the same place, always last before
  *   review/publish (`resolveWizardPages` always pulls `location`/
@@ -181,9 +178,7 @@ export function withRuntimeFieldGroups(
     const insertAt = photosIdx === -1 ? 0 : photosIdx + 1;
     next = [...next.slice(0, insertAt), "category-confirm", ...next.slice(insertAt)];
   }
-  const regIdx = next.indexOf("vehicle-registration");
-  if (regIdx === -1) return next;
-  next = [...next.slice(0, regIdx + 1), "vehicle-360", ...next.slice(regIdx + 1)];
+  if (!next.includes("vehicle-registration")) return next;
   const reviewIdx = next.indexOf("review-publish");
   const priceInsertAt = reviewIdx === -1 ? next.length : reviewIdx;
   return [...next.slice(0, priceInsertAt), "vehicle-price", ...next.slice(priceInsertAt)];
@@ -205,15 +200,14 @@ export function withRuntimeFieldGroups(
  */
 /** Field-group keys that always get their own solo page, wherever they land
  * in the ordered array — `category-select` is always first (see
- * prependCategorySelect); `vehicle-registration`/`vehicle-360`/`vehicle-price`
- * can land anywhere in the array (admin-configurable position for the
- * former, runtime-injected for the latter two), but must never be bundled
+ * prependCategorySelect); `vehicle-registration`/`vehicle-price` can land
+ * anywhere in the array (admin-configurable position for the former,
+ * runtime-injected for the latter), but must never be bundled
  * with unrelated groups like `condition`/`price`. */
 const SOLO_FIELD_GROUP_KEYS = new Set([
   "category-select",
   "category-confirm",
   "vehicle-registration",
-  "vehicle-360",
   "vehicle-price",
 ]);
 

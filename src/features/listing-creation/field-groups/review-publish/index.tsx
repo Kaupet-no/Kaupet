@@ -8,6 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ComposerReview } from "@/features/listing-creation/composer-review";
 
 import type { WizardSharedProps } from "../types";
+import { Vehicle360Group } from "../vehicle-360";
 
 type ReviewPreviewProps = Pick<
   WizardSharedProps,
@@ -152,6 +153,7 @@ export function ReviewPublishGroup(props: WizardSharedProps) {
         postalCode={props.postalCode}
         categoryLabel={props.categoryLabel}
       />
+      {props.isVehicle && <Vehicle360Group {...props} />}
       {props.attributes.vehicle_lookup && (
         <p className="text-xs text-muted-foreground">
           Du er ansvarlig for at opplysningene i annonsen stemmer. Kontroller at opplysningene

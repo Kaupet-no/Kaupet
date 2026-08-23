@@ -210,8 +210,7 @@ export function useDraftAutosave(fields: DraftFields) {
     // Merke/Modell) and is only written into the form's `title` field once
     // the user reaches the description step (see VehicleTitleFields), which
     // comes *after* the image-upload step in the vehicle flow — so without
-    // this fallback a draft could never be saved before that step (e.g. from
-    // the 360°-capture QR panel).
+    // this fallback a vehicle draft could not be saved before that step.
     const effectiveTitle = (isVehicle ? computeVehicleTitle(attributes) : (title ?? "")).trim();
     if (effectiveTitle.length < 5) return null;
     draftSaveInProgress.current = true;

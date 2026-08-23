@@ -397,8 +397,8 @@ export const LOCKED_FIELD_GROUP_KEYS: string[] = [
  * on the Bil og MC category's flow row) since an admin may legitimately want
  * to reorder it.
  *
- * `vehicle-price` behaves like `vehicle-360`: runtime-injected right before
- * `review-publish` (see `withRuntimeFieldGroups`) whenever the flow has
+ * `vehicle-price` is runtime-injected right before `review-publish` (see
+ * `withRuntimeFieldGroups`) whenever the flow has
  * `vehicle-registration`, never part of a category's stored `field_groups`,
  * so it never appears in the admin-facing list either.
  */

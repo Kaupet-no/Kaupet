@@ -408,8 +408,8 @@ function NewListingPage() {
   // showMileage, evaluated later once a leaf is genuinely known) does.
   const isVehicleFlow = baseFieldGroupKeys.includes("vehicle-registration");
 
-  // category-confirm/vehicle-360 er aldri en del av en kategoris lagrede
-  // field_groups — de avhenger av live wizard-state, og injiseres derfor her.
+  // category-confirm er aldri en del av en kategoris lagrede field_groups —
+  // den avhenger av live wizard-state og injiseres derfor her.
   // Se withRuntimeFieldGroups.
   //
   // category-attributes er derimot alltid en del av de lagrede field_groups
@@ -515,20 +515,17 @@ function NewListingPage() {
   }
   useComposerHistoryBack(isFirst, goBack);
 
-  /** Stepping back from vehicle-360 to vehicle-registration (via "Tilbake")
-   * is the only way to reach vehicle-registration a second time after a
-   * confirmed lookup — clear the stale lookup so the reg-nr field and
-   * confirmation popup reset, and pressing "Neste" re-runs the lookup
-   * instead of reopening the popup with old data. */
-  const prevPageKeyRef = useRef<string | undefined>(currentPage?.groups?.[0]?.key);
+  /** Clear a confirmed lookup when navigation returns to registration, so
+   * the registration number can be changed and looked up again. */
+  const previousStepRef = useRef(step);
   useEffect(() => {
     const key = currentPage?.groups?.[0]?.key;
-    if (key === "vehicle-registration" && prevPageKeyRef.current === "vehicle-360") {
+    if (key === "vehicle-registration" && previousStepRef.current > step) {
       resetLookupOnReturnToRegistration();
     }
-    prevPageKeyRef.current = key;
+    previousStepRef.current = step;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage]);
+  }, [currentPage, step]);
 
   const categoryAttributesPageIndex = pages.findIndex((p) =>
     p.groups.some((g) => g.key === "category-attributes"),

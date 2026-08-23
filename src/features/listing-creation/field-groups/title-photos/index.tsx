@@ -124,8 +124,8 @@ export function PhotosGroup({
  * verbatim from the original per-platform JSX.
  *
  * 360°-opptak lå tidligere her, men bildesteget er nå alltid steg 1 — før
- * kategori er bekreftet — så opptaket har fått sitt eget steg lenger ute i
- * kjøretøyflyten (`field-groups/vehicle-360`).
+ * kategori er bekreftet — så den valgfrie forbedringen vises på reviewflaten
+ * (`field-groups/vehicle-360`).
  */
 export function TitlePhotos(props: WizardSharedProps) {
   if (props.native) {

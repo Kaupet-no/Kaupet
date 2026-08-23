@@ -16,7 +16,8 @@ import { ListingCard, type ListingCardData } from "@/components/listing-card";
 import { KaupetCodeDialog } from "@/components/kaupet-code-dialog";
 import { NativeSheet } from "@/components/ui/native-sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
 import { LocationPicker, RadiusPicker } from "@/components/location-filter";
 import { AnimatedSearchPlaceholder } from "@/components/animated-search-placeholder";
 import { useSavedLocation } from "@/hooks/use-saved-location";
@@ -213,7 +214,7 @@ export function AppLanding() {
               interaktivt element inne i et annet er ugyldig og leses dårlig av
               skjermlesere (funn 10.2 / tiltak 28). */}
           <div className="mt-4 flex items-center justify-center gap-1">
-            <Dialog open={locOpen} onOpenChange={setLocOpen}>
+            <ResponsiveOverlay open={locOpen} onOpenChange={setLocOpen}>
               <button
                 type="button"
                 onClick={() => setLocOpen(true)}
@@ -246,8 +247,9 @@ export function AppLanding() {
                   <X className="size-4" />
                 </button>
               )}
-              <DialogContent
-                className="w-[calc(100vw-2rem)] max-w-sm rounded-2xl p-6"
+              <ResponsiveOverlayContent
+                className="sm:max-w-sm"
+                aria-labelledby="app-location-title"
                 tabIndex={-1}
                 onOpenAutoFocus={(e) => {
                   e.preventDefault();
@@ -255,7 +257,7 @@ export function AppLanding() {
                 }}
               >
                 <DialogHeader className="text-left">
-                  <DialogTitle>Velg sted</DialogTitle>
+                  <DialogTitle id="app-location-title">Velg sted</DialogTitle>
                 </DialogHeader>
                 <div className="mt-1 space-y-3">
                   <LocationPicker
@@ -271,8 +273,8 @@ export function AppLanding() {
                     />
                   )}
                 </div>
-              </DialogContent>
-            </Dialog>
+              </ResponsiveOverlayContent>
+            </ResponsiveOverlay>
           </div>
 
           {!isNative && (

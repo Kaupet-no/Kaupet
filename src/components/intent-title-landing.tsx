@@ -113,16 +113,7 @@ export function IntentTitleLanding({
         />
         {error && <p className="text-center text-xs text-destructive">{error}</p>}
         <p className="text-center text-xs text-muted-foreground">
-          Dette blir tittelen på annonsen din.{" "}
-          <span className="group relative inline-block cursor-help">
-            *
-            <span
-              className="pointer-events-none absolute bottom-full left-1/2 z-[10001] mb-1.5 w-56 -translate-x-1/2 rounded-md border bg-popover px-2.5 py-1.5 text-xs text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100"
-              role="tooltip"
-            >
-              Gjelder ikke for annonser i Bil og MC eller Båt, der tittel genereres automatisk
-            </span>
-          </span>
+          Dette blir tittelen på annonsen din. For Bil og MC og Båt genereres tittelen automatisk.
         </p>
       </div>
       <Button type="submit" size="lg" className="w-full">

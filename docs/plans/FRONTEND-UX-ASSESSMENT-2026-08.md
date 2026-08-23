@@ -257,6 +257,7 @@ Disse tre gir mer egenart enn en ny gradient, illustrasjonsstil eller mikroanima
 5. Fjern offentlige visningstall fra `src/components/listing-card.tsx`.
    **Status 23.08.2026: Fullført.** Visningstall er fjernet fra både standardkortet og den utvidede offentlige kortvarianten, mens selgerens statistikkflater er beholdt. Verifisert med målrettet komponenttest, full unit-suite, lint og typecheck.
 6. Bytt native lokasjonsdialog til `ResponsiveOverlay`; fjern hover-only tooltip i `IntentTitleLanding`.
+   **Status 23.08.2026: Fullført.** Nativeforsidens lokasjonsvalg bruker nå eksisterende `ResponsiveOverlay`, med samme fokusoppsett og primitivens innebygde sheet-, safe-area- og historikkoppførsel. Tittelunntaket i `IntentTitleLanding` er synlig uten hover. Verifisert med målrettede komponenttester, full unit-suite, lint og typecheck.
 7. Rett semantisk dobbel `h1` og skjul inaktive onboardingkort korrekt.
 
 **Tester:**

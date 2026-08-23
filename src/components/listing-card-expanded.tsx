@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Eye, MapPin } from "lucide-react";
+import { MapPin } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ImageGallery } from "@/components/listing-detail/image-gallery";
 import { VehicleInfoGrid } from "@/components/listing-detail/vehicle/vehicle-info-grid";
@@ -142,15 +142,6 @@ export function ListingCardExpanded({
               )}
               {isBoatListing && <BoatInfoGrid attributes={attributes} />}
             </div>
-          )}
-          {typeof listing.total_views === "number" && (
-            <p className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Eye className="size-3" />
-              <span>{listing.total_views.toLocaleString("nb-NO")}</span>
-              <span className="text-muted-foreground/70">
-                · {(listing.views_last_week ?? 0).toLocaleString("nb-NO")} siste syv dager
-              </span>
-            </p>
           )}
         </Link>
       </div>

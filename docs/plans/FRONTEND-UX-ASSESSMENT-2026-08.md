@@ -255,6 +255,7 @@ Disse tre gir mer egenart enn en ny gradient, illustrasjonsstil eller mikroanima
 4. Gjør onboardingen adaptiv: hent authstatus, antall lagrede søk og pushstatus; vis tidlig push-tilbud kun når kontoen allerede har lagrede søk, ellers flyttes forespørselen til relevant handling.
    **Status 23.08.2026: Fullført.** Utloggede får én lett velkomst med utforsking eller innlogging og ingen tillatelsesforespørsel. Innloggede får et konkret push-tilbud bare ved minst ett lagret søk med `notify=true` og urørt tillatelse; eksplisitt CTA bruker `usePushStatus().enableOnThisDevice("saved_searches")`, mens `granted`/`denied` hoppes over. Verifisert med fem komponenttilstander og rødt/grønt-kontroll, full unit-suite (70 filer / 383 tester), lint, typecheck og produksjonsbuild.
 5. Fjern offentlige visningstall fra `src/components/listing-card.tsx`.
+   **Status 23.08.2026: Fullført.** Visningstall er fjernet fra både standardkortet og den utvidede offentlige kortvarianten, mens selgerens statistikkflater er beholdt. Verifisert med målrettet komponenttest, full unit-suite, lint og typecheck.
 6. Bytt native lokasjonsdialog til `ResponsiveOverlay`; fjern hover-only tooltip i `IntentTitleLanding`.
 7. Rett semantisk dobbel `h1` og skjul inaktive onboardingkort korrekt.
 

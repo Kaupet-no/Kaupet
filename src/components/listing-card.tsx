@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Eye, Gauge, ImageOff, MapPin } from "lucide-react";
+import { Gauge, ImageOff, MapPin } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { signListingImageUrls, thumbPathFor } from "@/lib/storage";
 import { formatPrice, displayPriceNok } from "@/lib/format";
@@ -251,18 +251,6 @@ export function ListingCard({
               className={`text-xs text-muted-foreground ${isNative ? "" : "flex items-center gap-1"}`}
             >
               {!isNative && <MapPin className="size-3" />} {listing.city}
-            </p>
-          )}
-          {typeof listing.total_views === "number" && (
-            <p
-              className="flex items-center gap-1 text-xs text-muted-foreground"
-              title={`${listing.total_views.toLocaleString("nb-NO")} visninger totalt · ${(listing.views_last_week ?? 0).toLocaleString("nb-NO")} siste syv dager`}
-            >
-              <Eye className="size-3" />
-              <span>{listing.total_views.toLocaleString("nb-NO")}</span>
-              <span className="text-muted-foreground/70">
-                · {(listing.views_last_week ?? 0).toLocaleString("nb-NO")} siste syv dager
-              </span>
             </p>
           )}
         </div>

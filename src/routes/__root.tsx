@@ -34,6 +34,7 @@ import { TestEnvBanner } from "@/components/test-env-banner";
 import { TestEnvGate } from "@/components/test-env-gate";
 import { useIsTestEnv } from "@/lib/env";
 import { isComposerRoute } from "@/features/listing-creation/composer-route";
+import { isFocusedRoute } from "@/features/listing-creation/focused-route";
 
 function NotFoundComponent() {
   return (
@@ -314,6 +315,7 @@ function RootBody({ native }: { native: boolean }) {
   const keyboardVisible = useKeyboardVisible();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const composerRoute = isComposerRoute(pathname);
+  const bottomNavHidden = composerRoute || isFocusedRoute(pathname);
 
   useEffect(() => {
     // Runs after the browser has painted this render — by the time we get
@@ -361,7 +363,7 @@ function RootBody({ native }: { native: boolean }) {
       <ModerationBanner />
       <main
         id="main-content"
-        className={`flex-1${native && !keyboardVisible && !composerRoute ? " pb-bottom-nav" : ""}`}
+        className={`flex-1${native && !keyboardVisible && !bottomNavHidden ? " pb-bottom-nav" : ""}`}
       >
         <Outlet />
       </main>
@@ -408,7 +410,7 @@ function RootBody({ native }: { native: boolean }) {
           </div>
         </footer>
       )}
-      {native && !keyboardVisible && !composerRoute && <AppBottomNav />}
+      {native && !keyboardVisible && !bottomNavHidden && <AppBottomNav />}
       <FeedbackTag />
     </div>
   );

@@ -251,6 +251,7 @@ Disse tre gir mer egenart enn en ny gradient, illustrasjonsstil eller mikroanima
 2. Fjern Leaflet fra SSR-modulgrafen ved å laste `FullscreenLocationPicker` og øvrige kartflater klient-only.
    **Status 23.08.2026: Fullført.** Kartvelgere, resultatkart og detaljkart lastes nå med `lazy` bak `ClientOnly`. `check:server-boundary` følger statiske importer fra rutene og avviser Leaflet i SSR-grafen. Verifisert med rødt/grønt boundary-sjekk, full unit-suite, lint, typecheck og produksjonsbuild.
 3. Innfør én `isFocusedRoute(pathname)` ved siden av `composer-route.ts`; skjul bunnnav på auth, reset, onboarding og bekreftelsesflater i `src/routes/__root.tsx`.
+   **Status 23.08.2026: Fullført.** En tabelltestet ruteklassifisering skjuler native bunnnav og tilhørende innholds-padding på auth, passordreset og betalingsbekreftelse/-kvittering. Onboardingens eksisterende fullskjermsoverlegg dekker og inert-gjør appskallet på `/`. Verifisert med målrettet unit-test, full unit-suite, lint og typecheck.
 4. Gjør onboardingen adaptiv: hent authstatus, antall lagrede søk og pushstatus; vis tidlig push-tilbud kun når kontoen allerede har lagrede søk, ellers flyttes forespørselen til relevant handling.
 5. Fjern offentlige visningstall fra `src/components/listing-card.tsx`.
 6. Bytt native lokasjonsdialog til `ResponsiveOverlay`; fjern hover-only tooltip i `IntentTitleLanding`.

@@ -65,6 +65,7 @@ import {
   type Category,
 } from "@/lib/categories";
 import { submitSearch } from "@/features/listing-search/submit-search";
+import { useZeroResultExpansion } from "@/features/listing-search/zero-result-expansion";
 
 export const Route = createFileRoute("/annonser")({
   validateSearch: searchSchema,
@@ -483,6 +484,13 @@ function BrowsePage() {
 
   const listings = useMemo(() => listingsData?.pages.flatMap((p) => p.rows), [listingsData]);
   const totalCount = listingsData?.pages[0]?.totalCount ?? null;
+  const { expansion: zeroResultExpansion, isPending: zeroResultExpansionPending } =
+    useZeroResultExpansion({
+      applied: appliedSearch,
+      filters: attrFilters,
+      categories: categories ?? [],
+      enabled: !isLoading && totalCount === 0 && !!categories,
+    });
 
   const { wtbCount, wtbLoading, wtbListings, hasSearchCriteria } = useWtbListings({
     q: search.q,
@@ -786,18 +794,9 @@ function BrowsePage() {
             isFetchingNextPage={isFetchingNextPage}
             fetchNextPage={() => void fetchNextPage()}
             resetFilters={resetFilters}
-            onClearCategoryFilter={
-              effectiveCategories.length > 0
-                ? () => updateSearch({ category: "", categories: [] })
-                : undefined
-            }
-            onDropLastWord={(nextQ) => {
-              setQDraft(nextQ);
-              updateSearch({ q: nextQ });
-            }}
-            attrFilters={attrFilters}
-            attrValues={attrValues}
-            onRemoveAttr={(key) => removeAttrWithRestore(key)}
+            zeroResultExpansion={zeroResultExpansion}
+            zeroResultExpansionPending={zeroResultExpansionPending}
+            onApplyZeroResultExpansion={(expansion) => applyPanelDraft(expansion.applied)}
             mapListings={mapListings}
             mapCenter={mapCenter}
             radiusKm={search.radius ?? 10}

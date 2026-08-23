@@ -19,6 +19,29 @@ export function draftToSearchParams({ draft }: DraftCountInput) {
   return writeAppliedSearchState(draft);
 }
 
+export async function countDraftListings(
+  {
+    draft,
+    categories,
+  }: DraftCountInput & {
+    categories: Pick<Category, "id" | "slug" | "parent_id">[];
+  },
+  signal?: AbortSignal,
+) {
+  const search = draftToSearchParams({ draft });
+  const args = buildListingsSearchRpcArgs({
+    search,
+    categories,
+    effectiveCategories: draft.value.categories,
+    terms: draft.value.terms,
+    limit: 1,
+    offset: 0,
+  });
+  if (!args) return 0;
+  const rows = await runListingsSearch(args, signal);
+  return rows[0]?.total_count ?? 0;
+}
+
 export function useDraftResultCount({
   draft,
   categories,
@@ -37,19 +60,7 @@ export function useDraftResultCount({
     queryKey: ["draft-listing-count", search],
     enabled,
     staleTime: 30_000,
-    queryFn: async ({ signal }) => {
-      const args = buildListingsSearchRpcArgs({
-        search,
-        categories,
-        effectiveCategories: debouncedInput.draft.value.categories,
-        terms: debouncedInput.draft.value.terms,
-        limit: 1,
-        offset: 0,
-      });
-      if (!args) return 0;
-      const rows = await runListingsSearch(args, signal);
-      return rows[0]?.total_count ?? 0;
-    },
+    queryFn: ({ signal }) => countDraftListings({ ...debouncedInput, categories }, signal),
   });
 
   return {

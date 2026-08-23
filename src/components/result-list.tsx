@@ -30,9 +30,9 @@ import type { MapListing } from "@/components/listings-map";
 import { FeaturedListingsSection } from "@/components/featured-listings-section";
 import { reverseGeocode } from "@/lib/geocode";
 import { hapticImpact } from "@/lib/haptics";
-import { getAttributeChipState, getSortChipState } from "@/lib/filter-chip-labels";
+import { getSortChipState } from "@/lib/filter-chip-labels";
 import { SORT_OPTIONS, type SortValue } from "@/lib/categories";
-import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
+import type { ZeroResultExpansion } from "@/features/listing-search/zero-result-expansion";
 import { useListingCardImages } from "@/hooks/use-listing-card-images";
 import { useListingFavorites } from "@/hooks/use-listing-favorites";
 import { trackProductEvent } from "@/lib/product-analytics";
@@ -53,17 +53,9 @@ type Props = {
   isFetchingNextPage: boolean;
   fetchNextPage: () => void;
   resetFilters: () => void;
-  onClearCategoryFilter?: () => void;
-  /** Re-search with the last word of `q` dropped — offered on zero results
-   * for a multi-word query, since the last word is often the culprit. */
-  onDropLastWord?: (nextQ: string) => void;
-  /** Active category-attribute filters — used on zero results to suggest
-   * dropping the most restrictive one first (attribute/location filters are
-   * a more likely culprit than free-text terms, which already fall back to
-   * trigram matching). */
-  attrFilters?: CategoryFilter[];
-  attrValues?: Record<string, AttributeFilterValue>;
-  onRemoveAttr?: (key: string) => void;
+  zeroResultExpansion?: ZeroResultExpansion;
+  zeroResultExpansionPending?: boolean;
+  onApplyZeroResultExpansion?: (expansion: ZeroResultExpansion) => void;
   mapListings: MapListing[];
   mapCenter: { lat: number; lng: number } | null;
   radiusKm: number;
@@ -95,11 +87,9 @@ export function ResultList({
   isFetchingNextPage,
   fetchNextPage,
   resetFilters,
-  onClearCategoryFilter,
-  onDropLastWord,
-  attrFilters = [],
-  attrValues = {},
-  onRemoveAttr,
+  zeroResultExpansion,
+  zeroResultExpansionPending = false,
+  onApplyZeroResultExpansion,
   mapListings,
   mapCenter,
   radiusKm,
@@ -112,16 +102,6 @@ export function ResultList({
 }: Props) {
   const [sortOpen, setSortOpen] = useState(false);
   const { label: sortLabel } = getSortChipState(sort);
-  const qWords = q.trim().split(/\s+/).filter(Boolean);
-  const lastWord = qWords.length > 1 ? qWords[qWords.length - 1] : null;
-  // Most restrictive active attribute filter, offered as the first recovery
-  // action on zero results — structured filters narrow the result set harder
-  // than a free-text term, which already tolerates typos via trigram fallback.
-  const [mostRestrictiveAttrKey] = Object.keys(attrValues);
-  const mostRestrictiveAttrFilter = attrFilters.find((f) => f.key === mostRestrictiveAttrKey);
-  const mostRestrictiveAttrLabel = mostRestrictiveAttrFilter
-    ? getAttributeChipState(mostRestrictiveAttrFilter, attrValues[mostRestrictiveAttrKey]).label
-    : null;
   const [mobileMapOpen, setMobileMapOpen] = useState(false);
   const [bigMapOpen, setBigMapOpen] = useState(false);
   const [desktopMapVisible, setDesktopMapVisible] = useState(true);
@@ -339,32 +319,27 @@ export function ResultList({
               }
               action={
                 <>
-                  {mostRestrictiveAttrFilter && mostRestrictiveAttrLabel && onRemoveAttr && (
-                    <Button variant="outline" onClick={() => onRemoveAttr(mostRestrictiveAttrKey)}>
-                      Fjern «{mostRestrictiveAttrLabel}»
-                    </Button>
-                  )}
-                  {effectiveCategories.length > 0 && onClearCategoryFilter && (
-                    <Button variant="outline" onClick={onClearCategoryFilter}>
-                      Fjern kategorifilter
-                    </Button>
-                  )}
-                  {lastWord && onDropLastWord && (
+                  {zeroResultExpansion && onApplyZeroResultExpansion ? (
                     <Button
                       variant="outline"
-                      onClick={() => onDropLastWord(qWords.slice(0, -1).join(" "))}
+                      onClick={() => onApplyZeroResultExpansion(zeroResultExpansion)}
                     >
-                      Prøv uten «{lastWord}»
+                      Vis {zeroResultExpansion.count.toLocaleString("nb-NO")} treff uten «
+                      {zeroResultExpansion.label}»
+                    </Button>
+                  ) : zeroResultExpansionPending ? (
+                    <span
+                      role="status"
+                      aria-live="polite"
+                      className="text-sm text-muted-foreground"
+                    >
+                      Ser etter en bredere variant …
+                    </span>
+                  ) : (
+                    <Button variant="outline" onClick={resetFilters}>
+                      Nullstill alle filtre
                     </Button>
                   )}
-                  {mapCenter && onMapClearLocation && (
-                    <Button variant="outline" onClick={onMapClearLocation}>
-                      Vis resultater i hele Norge
-                    </Button>
-                  )}
-                  <Button variant="outline" onClick={resetFilters}>
-                    Nullstill alle filtre
-                  </Button>
                 </>
               }
             />

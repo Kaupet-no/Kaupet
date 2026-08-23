@@ -287,6 +287,7 @@ Disse tre gir mer egenart enn en ny gradient, illustrasjonsstil eller mikroanima
 5. Behold draft state lokalt i panel; skriv URL én gang ved «Vis treff» eller eksplisitt submit.
    **Status 23.08.2026: Fullført.** `SearchPanel` beholder alle filterendringer i eksisterende lokal `draft`; først `results.onApply` ved «Vis treff» sender hele utkastet gjennom `submitSearch` til én URL-commit. Verifisert med rød/grønn komponentintegrasjonstest der to draft-endringer gir null URL-commit og «Vis treff» gir nøyaktig én, målrettede tester (4 filer / 12 tester), full unit-suite (78 filer / 393 tester), lint og typecheck.
 6. For null treff, beregn effekten av å fjerne ett aktivt kriterium med eksisterende facet-/count-kall og vis beste utvidelse.
+   **Status 23.08.2026: Fullført.** Nulltreff på resultat- og kategoriflater prøver nå kun ett-kriteriums utvidelser mot det eksisterende `search_listings_page`-count-kallet og viser bare alternativet med høyest dokumentert treffantall; handlingen anvender den beregnede `AppliedSearchState` i én URL-commit. Verifisert med rød/grønn komponenttest av beste valg og UI-handling, målrettede tester (2 filer / 2 tester), full unit-suite (79 filer / 394 tester), lint og typecheck.
 7. Flytt termgrupper og «alle/minst ett» bak «Presist søk»; ikke fjern funksjonaliteten for brukere som trenger den.
 
 **Berørte områder:**

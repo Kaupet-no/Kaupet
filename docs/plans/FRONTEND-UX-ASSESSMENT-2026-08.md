@@ -424,6 +424,10 @@ Disse tre gir mer egenart enn en ny gradient, illustrasjonsstil eller mikroanima
 **Mål:** Gjør det tydelig hva kjøperen vet, ikke bare hva annonsen inneholder.
 
 1. Definer en presentasjonsmodell `FactSource` i detalj-feature, ikke i generisk listingdomene: `registry`, `seller`, `kaupet`, `unknown`.
+   **Status 24.08.2026: Fullført.** `FactSource` ligger som en ren unionstype i `src/components/listing-detail/fact-source.ts`, ved detaljvisningens eksisterende presentasjonsgrense. Ingen mapping, runtime-registry, metadata, scoremodell eller endring i det generiske listingdomenet er innført.
+
+   **Verifisering:** Den lokale typekontrakten låser unionen eksakt til `registry | seller | kaupet | unknown`; typecheck feilet kontrollert da kildetypen ble fjernet. `bun run test -- src/components/listing-detail/fact-source.test.ts` (1 fil / 1 test), `bun run test` (84 filer / 407 tester), `bun run lint` og `bunx tsc --noEmit` er bestått.
+
 2. Map eksisterende kjøretøyoppslag, profilalder, anmeldelser og selgerfelter til kilder.
 3. Bygg en kompakt `ListingEvidence`-seksjon med tekstlige kilder og tidspunkt der det finnes.
 4. Skill «Ingen kjente feil oppgitt» visuelt og språklig fra «verifisert uten feil».

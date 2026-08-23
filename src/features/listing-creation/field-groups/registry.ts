@@ -42,6 +42,7 @@ export type ValidateCtx = {
 
 export type FieldGroup = {
   key: string;
+  classification: "requiredToPublish" | "recommendedForTrust" | "optionalEnhancement";
   Component: ComponentType<WizardSharedProps>;
   fieldsToValidate?: (keyof ListingFormShape)[];
   validateExtra?: (
@@ -57,26 +58,31 @@ export type FieldGroup = {
 export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
   "category-select": {
     key: "category-select",
+    classification: "requiredToPublish",
     Component: CategorySelect,
     fieldsToValidate: ["category_id"],
   },
   "category-confirm": {
     key: "category-confirm",
+    classification: "requiredToPublish",
     Component: CategoryConfirm,
     fieldsToValidate: ["category_id"],
   },
   photos: {
     key: "photos",
+    classification: "recommendedForTrust",
     Component: PhotosGroup,
     validateExtra: (ctx) => (ctx.images.length === 0 ? "SHOW_NO_IMAGE_DIALOG" : null),
   },
   title: {
     key: "title",
+    classification: "requiredToPublish",
     Component: TitleGroup,
     fieldsToValidate: ["title"],
   },
   "vehicle-registration": {
     key: "vehicle-registration",
+    classification: "requiredToPublish",
     Component: VehicleRegistration,
     fieldsToValidate: ["category_id"],
     validateExtra: (ctx) => {
@@ -134,11 +140,13 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
   },
   "vehicle-360": {
     key: "vehicle-360",
+    classification: "optionalEnhancement",
     Component: Vehicle360Group,
     // Ingen validering — 360-opptak er valgfritt og skal aldri blokkere.
   },
   "category-attributes": {
     key: "category-attributes",
+    classification: "requiredToPublish",
     Component: CategoryAttributes,
     fieldsToValidate: ["category_id"],
     validateExtra: (ctx) => {
@@ -159,11 +167,13 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
   },
   condition: {
     key: "condition",
+    classification: "requiredToPublish",
     Component: Condition,
     fieldsToValidate: ["condition"],
   },
   price: {
     key: "price",
+    classification: "recommendedForTrust",
     Component: PriceGroup,
     fieldsToValidate: ["price_nok"],
     validateExtra: (ctx) =>
@@ -173,6 +183,7 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
   },
   "vehicle-facts": {
     key: "vehicle-facts",
+    classification: "requiredToPublish",
     Component: VehicleFactsGroup,
     fieldsToValidate: ["title", "description"],
     validateExtra: (ctx) => {
@@ -210,6 +221,7 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
   },
   "vehicle-price": {
     key: "vehicle-price",
+    classification: "recommendedForTrust",
     Component: VehiclePriceGroup,
     fieldsToValidate: ["price_nok"],
     validateExtra: (ctx) =>
@@ -219,6 +231,7 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
   },
   "boat-facts": {
     key: "boat-facts",
+    classification: "requiredToPublish",
     Component: BoatFactsGroup,
     fieldsToValidate: ["subtitle"],
     validateExtra: (ctx) => {
@@ -237,6 +250,7 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
   },
   "vehicle-condition": {
     key: "vehicle-condition",
+    classification: "requiredToPublish",
     Component: VehicleConditionGroup,
     fieldsToValidate: ["condition"],
     validateExtra: (ctx) => {
@@ -253,24 +267,29 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
   },
   "vehicle-equipment": {
     key: "vehicle-equipment",
+    classification: "optionalEnhancement",
     Component: VehicleEquipmentGroup,
     // Ingen validering — utstyrsliste er valgfri, skal ikke blokkere publisering.
   },
   "description-keywords": {
     key: "description-keywords",
+    classification: "requiredToPublish",
     Component: DescriptionKeywordsGroup,
     fieldsToValidate: ["description"],
   },
   delivery: {
     key: "delivery",
+    classification: "requiredToPublish",
     Component: DeliveryGroup,
   },
   location: {
     key: "location",
+    classification: "recommendedForTrust",
     Component: LocationGroup,
   },
   "review-publish": {
     key: "review-publish",
+    classification: "requiredToPublish",
     Component: ReviewPublishGroup,
   },
 };

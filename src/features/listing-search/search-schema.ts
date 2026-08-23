@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { AdvancedSearchValue } from "@/components/advanced-search-value";
 import type { AttributeFilterValue } from "@/lib/category-filters";
 
 export const stringArray = z.preprocess((v) => {
@@ -42,6 +43,13 @@ export const searchSchema = z.object({
   // and encodeAttrFilters/decodeAttrFilters below for the wire format.
   attrs: z.string().optional().default(""),
 });
+
+export type AppliedSearchState = {
+  value: AdvancedSearchValue;
+  attributes: Record<string, AttributeFilterValue>;
+};
+
+type SearchParams = z.infer<typeof searchSchema>;
 
 /**
  * Encodes attribute filter values into the `attrs` URL search param.
@@ -134,6 +142,55 @@ export function decodeAttrFilters(attrs: string | undefined): Record<string, Att
     }
   }
   return result;
+}
+
+/** The URL is the wire format; this is the single applied search model used by the UI. */
+export function readAppliedSearchState(search: SearchParams): AppliedSearchState {
+  const categories = search.categories.includes(search.category)
+    ? search.categories
+    : [...search.categories, search.category].filter(Boolean);
+  return {
+    value: {
+      terms: search.q.trim().split(/\s+/).filter(Boolean),
+      qMode: search.qMode,
+      extraGroups: search.extraGroups,
+      categories,
+      catMode: search.catMode,
+      conditions: search.conditions,
+      min: search.min ?? null,
+      max: search.max ?? null,
+      includeFree: search.includeFree,
+      sort: search.sort,
+      location: {
+        lat: search.lat ?? null,
+        lng: search.lng ?? null,
+        radius: search.radius ?? 10,
+        label: search.loc ?? "",
+      },
+    },
+    attributes: decodeAttrFilters(search.attrs),
+  };
+}
+
+export function writeAppliedSearchState({ value, attributes }: AppliedSearchState): SearchParams {
+  return searchSchema.parse({
+    q: value.terms.join(" "),
+    qMode: value.qMode,
+    extraGroups: value.extraGroups,
+    category: "",
+    categories: value.categories,
+    catMode: value.catMode,
+    conditions: value.conditions,
+    includeFree: value.includeFree,
+    min: value.min ?? undefined,
+    max: value.max ?? undefined,
+    sort: value.sort,
+    lat: value.location.lat ?? undefined,
+    lng: value.location.lng ?? undefined,
+    radius: value.location.lat != null ? value.location.radius : undefined,
+    loc: value.location.label || undefined,
+    attrs: encodeAttrFilters(attributes),
+  });
 }
 
 export type SearchListing = {

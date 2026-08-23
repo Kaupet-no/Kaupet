@@ -187,7 +187,7 @@ export function CategoryLandingPage({
     updateSearch,
     handleLocationChange,
     resetFilters,
-    advancedInitial,
+    appliedSearch,
     applyPanelDraft,
   } = useAnnonserSearchState({
     search: effectiveSearch,
@@ -327,14 +327,12 @@ export function CategoryLandingPage({
 
   const searchPanelResults: SearchPanelResultsContext | null = isNative
     ? {
-        q: search.q,
-        value: advancedInitial,
-        onApply: (value, nextAttributes) => {
-          setQDraft(value.terms.join(" "));
-          applyPanelDraft(value, nextAttributes);
+        applied: appliedSearch,
+        onApply: (draft) => {
+          setQDraft(draft.value.terms.join(" "));
+          applyPanelDraft(draft);
         },
         attributeFilters: attrFilters,
-        attributeValues: attrValues,
         attributeCounts: facetCounts,
         resultCount: totalCount ?? cards.length,
       }

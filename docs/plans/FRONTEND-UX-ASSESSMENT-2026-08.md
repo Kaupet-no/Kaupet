@@ -277,6 +277,7 @@ Disse tre gir mer egenart enn en ny gradient, illustrasjonsstil eller mikroanima
 **Mål:** Samle mental modell og kodevei uten å bygge en ny søkemotor.
 
 1. Gjør `AdvancedSearchValue` + attributtverdier til autoritativ anvendt søkestate.
+   **Status 23.08.2026: Fullført.** `AppliedSearchState` samler `AdvancedSearchValue` og attributter bak én URL-codec; resultatpanelet har én eksplisitt lokal draft og mottar ikke lenger parallelle `q`-/attributtverdier. Verifisert med rød/grønn round-trip-kontrakttest, målrettede tester, full unit-suite, lint og typecheck.
 2. La tekstpipeline returnere både normalisert query og en ordnet liste over tolkede kriterier med `source: "text" | "user"`.
 3. Lag én liten `SearchInterpretation`-komponent som bruker eksisterende chip-/filterhandlinger.
 4. Koble webforside, header, `/annonser` og native `SearchPanel` til samme submitfunksjon.

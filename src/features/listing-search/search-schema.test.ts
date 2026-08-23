@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { decodeAttrFilters, encodeAttrFilters } from "./search-schema";
+import {
+  decodeAttrFilters,
+  encodeAttrFilters,
+  readAppliedSearchState,
+  searchSchema,
+  writeAppliedSearchState,
+} from "./search-schema";
 import type { AttributeFilterValue } from "@/lib/category-filters";
 
 describe("encodeAttrFilters / decodeAttrFilters", () => {
@@ -26,5 +32,32 @@ describe("encodeAttrFilters / decodeAttrFilters", () => {
       body_type: { kind: "multiselect", values: ["suv"] },
     };
     expect(decodeAttrFilters(encodeAttrFilters(values))).toEqual(values);
+  });
+});
+
+describe("anvendt søkestate", () => {
+  it("serialiserer AdvancedSearchValue og attributter gjennom én kontrakt", () => {
+    const applied = readAppliedSearchState(
+      searchSchema.parse({
+        q: "Volvo V90",
+        qMode: "any",
+        category: "bil",
+        conditions: ["good"],
+        min: 100_000,
+        max: 300_000,
+        includeFree: false,
+        sort: "price_asc",
+        lat: 59.91,
+        lng: 10.75,
+        radius: 25,
+        loc: "Oslo",
+        attrs: encodeAttrFilters({
+          fuel_type: { kind: "multiselect", values: ["el", "diesel"] },
+          body_type: { kind: "select", value: "stasjonsvogn" },
+        }),
+      }),
+    );
+
+    expect(readAppliedSearchState(writeAppliedSearchState(applied))).toEqual(applied);
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 import { Drawer } from "vaul";
 import { useNavigate } from "@tanstack/react-router";
 import { Clock, FolderOpen, RotateCcw, Save, Search as SearchIcon, X } from "lucide-react";
@@ -19,7 +19,10 @@ import { useFormFactor } from "@/hooks/use-form-factor";
 import { useOverlayHistory } from "@/hooks/use-overlay-history";
 import { useSheetDragGate } from "@/hooks/use-sheet-drag-gate";
 import { resolveTextToFilters } from "@/features/listing-search/resolve-text-to-filters";
-import { encodeAttrFilters } from "@/features/listing-search/search-schema";
+import {
+  encodeAttrFilters,
+  type AppliedSearchState,
+} from "@/features/listing-search/search-schema";
 import { summarizeCriteria } from "@/lib/saved-searches";
 import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
 import { SearchFilterSections, type SearchFilterSection } from "./filter-sections";
@@ -38,14 +41,9 @@ const SNAP_POINTS = [0.6, 1];
  * while open and calls `onApply` once, so closing the panel never leaves a
  * half-applied search behind. */
 export type SearchPanelResultsContext = {
-  q: string;
-  value: AdvancedSearchValue;
-  onApply: (
-    value: AdvancedSearchValue,
-    attributeValues: Record<string, AttributeFilterValue>,
-  ) => void;
+  applied: AppliedSearchState;
+  onApply: (applied: AppliedSearchState) => void;
   attributeFilters?: CategoryFilter[];
-  attributeValues?: Record<string, AttributeFilterValue>;
   attributeCounts?: Record<string, Record<string, number>>;
   resultCount?: number;
 };
@@ -59,6 +57,10 @@ function cloneValue(value: AdvancedSearchValue): AdvancedSearchValue {
     extraGroups: value.extraGroups.map((group) => ({ ...group, terms: [...group.terms] })),
     location: { ...value.location },
   };
+}
+
+function cloneSearchState(applied: AppliedSearchState): AppliedSearchState {
+  return { value: cloneValue(applied.value), attributes: { ...applied.attributes } };
 }
 
 type Props = {
@@ -92,18 +94,22 @@ export function SearchPanel({
   const { user } = useAuth();
   const navigate = useNavigate();
   const { data: vehicleBrands } = useAllVehicleBrands();
-  const [q, setQ] = useState(results?.q ?? "");
+  const [launchQueryDraft, setLaunchQueryDraft] = useState("");
   const [history, setHistory] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
   const [section, setSection] = useState<SearchFilterSection>(initialSection);
   const [snap, setSnap] = useState<number | string | null>(SNAP_POINTS[0]);
-  const [draft, setDraft] = useState<AdvancedSearchValue>(() =>
-    cloneValue(results?.value ?? defaultAdvancedSearchValue()),
+  const [draft, setDraft] = useState<AppliedSearchState>(() =>
+    results
+      ? cloneSearchState(results.applied)
+      : { value: defaultAdvancedSearchValue(), attributes: {} },
   );
-  const [draftAttributes, setDraftAttributes] = useState<Record<string, AttributeFilterValue>>(
-    () => ({ ...(results?.attributeValues ?? {}) }),
-  );
+  const setDraftValue = (next: SetStateAction<AdvancedSearchValue>) =>
+    setDraft((previous) => ({
+      ...previous,
+      value: typeof next === "function" ? next(previous.value) : next,
+    }));
   // Nettbrett: ikke en fullbredde skuff (fase 9 punkt 5 / funn 3.3.1). Bredden
   // kappes i stedet for å bytte primitiv — detent-dragingen er hele poenget med
   // panelet, og den skal virke likt i begge formater.
@@ -122,10 +128,8 @@ export function SearchPanel({
 
   useEffect(() => {
     if (!open) return;
-    setQ(results?.q ?? "");
     if (results) {
-      setDraft(cloneValue(results.value));
-      setDraftAttributes({ ...(results.attributeValues ?? {}) });
+      setDraft(cloneSearchState(results.applied));
     }
     setSection(initialSection);
     setSnap(SNAP_POINTS[0]);
@@ -139,21 +143,22 @@ export function SearchPanel({
   }, [open, initialSection]);
 
   const categorySuggestion = useMemo(
-    () => (q.length >= 2 ? findCategorySuggestion(categories, q) : null),
-    [q, categories],
+    () =>
+      launchQueryDraft.length >= 2 ? findCategorySuggestion(categories, launchQueryDraft) : null,
+    [launchQueryDraft, categories],
   );
 
   const updateDraftAttribute = (key: string, value: AttributeFilterValue | undefined) => {
-    setDraftAttributes((previous) => {
-      const next = { ...previous };
+    setDraft((previous) => {
+      const next = { ...previous.attributes };
       if (value === undefined) delete next[key];
       else next[key] = value;
-      return next;
+      return { ...previous, attributes: next };
     });
   };
 
   const removeDraftAttribute = (key: string, option?: string) => {
-    const current = draftAttributes[key];
+    const current = draft.attributes[key];
     if (!option || !current || (current.kind !== "multiselect" && current.kind !== "exclude")) {
       updateDraftAttribute(key, undefined);
       return;
@@ -165,47 +170,42 @@ export function SearchPanel({
   const draftItems = results
     ? buildActiveFilterItems({
         search: {
-          q: draft.terms.join(" "),
-          qMode: draft.qMode,
-          extraGroups: draft.extraGroups,
+          q: draft.value.terms.join(" "),
+          qMode: draft.value.qMode,
+          extraGroups: draft.value.extraGroups,
         },
-        terms: draft.terms,
+        terms: draft.value.terms,
         onUpdate: (patch) =>
           setDraft((previous) => ({
             ...previous,
-            terms: patch.q == null ? previous.terms : patch.q.split(/\s+/).filter(Boolean),
-            qMode: patch.qMode ?? previous.qMode,
-            extraGroups: patch.extraGroups ?? previous.extraGroups,
+            value: {
+              ...previous.value,
+              terms: patch.q == null ? previous.value.terms : patch.q.split(/\s+/).filter(Boolean),
+              qMode: patch.qMode ?? previous.value.qMode,
+              extraGroups: patch.extraGroups ?? previous.value.extraGroups,
+            },
           })),
         attrFilters: results.attributeFilters,
-        attrValues: draftAttributes,
+        attrValues: draft.attributes,
         onRemoveAttr: removeDraftAttribute,
-        location: draft.location,
+        location: draft.value.location,
         onRemoveLocation: () =>
           setDraft((previous) => ({
             ...previous,
-            location: { lat: null, lng: null, radius: 10, label: "" },
+            value: {
+              ...previous.value,
+              location: { lat: null, lng: null, radius: 10, label: "" },
+            },
           })),
       })
     : [];
 
-  const draftCriteria = valueToCriteria(draft);
+  const draftCriteria = valueToCriteria(draft.value);
   const visibleResultCount =
-    results &&
-    searchDraftMatchesApplied(draft, draftAttributes, results.value, results.attributeValues ?? {})
-      ? results.resultCount
-      : undefined;
-  const draftChanged =
-    !!results &&
-    !searchDraftMatchesApplied(
-      draft,
-      draftAttributes,
-      results.value,
-      results.attributeValues ?? {},
-    );
+    results && searchDraftMatchesApplied(draft, results.applied) ? results.resultCount : undefined;
+  const draftChanged = !!results && !searchDraftMatchesApplied(draft, results.applied);
   const draftCount = useDraftResultCount({
     draft,
-    attributes: draftAttributes,
     categories,
     enabled: open && draftChanged,
   });
@@ -216,11 +216,6 @@ export function SearchPanel({
     if (submitting) return;
     void hapticImpact("medium");
     saveSearchToHistory(trimmed);
-
-    if (results) {
-      setDraft((previous) => ({ ...previous, terms: trimmed.split(/\s+/).filter(Boolean) }));
-      return;
-    }
 
     setSubmitting(true);
     // Samme kategori-/merke-, utstyrssynonym- og tall+enhet-gjenkjenning som
@@ -248,7 +243,11 @@ export function SearchPanel({
 
   const goToCategory = (cat: Category) => {
     void hapticImpact("medium");
-    if (results) setDraft((previous) => ({ ...previous, categories: [cat.slug] }));
+    if (results)
+      setDraft((previous) => ({
+        ...previous,
+        value: { ...previous.value, categories: [cat.slug] },
+      }));
     else navigate({ to: "/annonser", search: { q: "", category: cat.slug, sort: "new" } });
     close();
   };
@@ -326,9 +325,7 @@ export function SearchPanel({
                         type="button"
                         onClick={() => {
                           void hapticImpact("light");
-                          setDraft(defaultAdvancedSearchValue());
-                          setDraftAttributes({});
-                          setQ("");
+                          setDraft({ value: defaultAdvancedSearchValue(), attributes: {} });
                         }}
                         className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
                       >
@@ -344,20 +341,20 @@ export function SearchPanel({
                     <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                       ref={inputRef}
-                      value={q}
-                      onChange={(e) => setQ(e.target.value)}
+                      value={launchQueryDraft}
+                      onChange={(e) => setLaunchQueryDraft(e.target.value)}
                       onFocus={() => setSnap(1)}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") void submitText(q);
+                        if (e.key === "Enter") void submitText(launchQueryDraft);
                       }}
                       placeholder="Hva leter du etter?"
                       className="h-11 border-0 bg-muted pl-9 pr-11 text-base focus-visible:ring-0"
                       aria-label="Søk i annonser"
                     />
-                    {q && (
+                    {launchQueryDraft && (
                       <button
                         type="button"
-                        onClick={() => setQ("")}
+                        onClick={() => setLaunchQueryDraft("")}
                         className="absolute right-0 top-1/2 flex size-11 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
                         aria-label="Tøm søkefelt"
                       >
@@ -365,10 +362,10 @@ export function SearchPanel({
                       </button>
                     )}
                   </div>
-                  {q.trim() && (
+                  {launchQueryDraft.trim() && (
                     <button
                       type="button"
-                      onClick={() => void submitText(q)}
+                      onClick={() => void submitText(launchQueryDraft)}
                       disabled={submitting}
                       className="min-h-11 shrink-0 px-2 text-sm font-medium text-primary disabled:opacity-50"
                     >
@@ -395,12 +392,12 @@ export function SearchPanel({
               {results ? (
                 <SearchFilterSections
                   key={`${open}-${section}`}
-                  value={draft}
-                  setValue={setDraft}
+                  value={draft.value}
+                  setValue={setDraftValue}
                   categories={categories}
                   section={section}
                   attributeFilters={results.attributeFilters}
-                  attributeValues={draftAttributes}
+                  attributeValues={draft.attributes}
                   onAttributeChange={updateDraftAttribute}
                   attributeCounts={results.attributeCounts}
                   activeItems={draftItems}
@@ -408,7 +405,7 @@ export function SearchPanel({
                 />
               ) : (
                 <BrowseContent
-                  q={q}
+                  q={launchQueryDraft}
                   history={history}
                   categories={categories}
                   onPickHistory={(item) => void submitText(item)}
@@ -426,9 +423,9 @@ export function SearchPanel({
                     data-testid="search-filter-apply-button"
                     size="lg"
                     onClick={() => {
-                      results.onApply(draft, draftAttributes);
+                      results.onApply(draft);
                       trackProductEvent("search_submitted", {
-                        hasCategory: draft.categories.length > 0,
+                        hasCategory: draft.value.categories.length > 0,
                         filterCount: draftItems.length,
                       });
                       close();

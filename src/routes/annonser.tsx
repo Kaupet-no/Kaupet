@@ -198,7 +198,7 @@ function BrowsePage() {
     attrValues,
     handleAttrValueChange,
     terms,
-    advancedInitial,
+    appliedSearch,
     currentCriteria,
     updateSearch,
     applyPanelDraft,
@@ -528,14 +528,12 @@ function BrowsePage() {
   // launch-mode fallback while this page is showing.
   const searchPanelResults: SearchPanelResultsContext | null = isNative
     ? {
-        q: search.q,
-        value: advancedInitial,
-        onApply: (value, nextAttributes) => {
-          setQDraft(value.terms.join(" "));
-          applyPanelDraft(value, nextAttributes);
+        applied: appliedSearch,
+        onApply: (draft) => {
+          setQDraft(draft.value.terms.join(" "));
+          applyPanelDraft(draft);
         },
         attributeFilters: attrFilters,
-        attributeValues: attrValues,
         attributeCounts: facetCounts,
         resultCount: totalCount ?? cards.length,
       }

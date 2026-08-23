@@ -1,13 +1,15 @@
 import { useEffect, useMemo } from "react";
 import { z } from "zod";
 import { hapticNotification } from "@/lib/haptics";
-import { valueToCriteria, type AdvancedSearchValue } from "@/components/advanced-search-value";
+import { valueToCriteria } from "@/components/advanced-search-value";
 import type { LocationValue } from "@/components/location-filter";
 import {
   searchSchema,
-  conditionEnum,
   decodeAttrFilters,
   encodeAttrFilters,
+  readAppliedSearchState,
+  writeAppliedSearchState,
+  type AppliedSearchState,
 } from "@/features/listing-search/search-schema";
 import { buildTree } from "@/lib/categories";
 import {
@@ -58,25 +60,13 @@ export function useAnnonserSearchState(params: {
 }) {
   const { search, navigate, categories, allFilters, setQDraft } = params;
 
-  const location: LocationValue = useMemo(
-    () => ({
-      lat: search.lat ?? null,
-      lng: search.lng ?? null,
-      radius: search.radius ?? 10,
-      label: search.loc ?? "",
-    }),
-    [search.lat, search.lng, search.radius, search.loc],
-  );
-  // Merge legacy single `category` into `categories`
-  const effectiveCategories = useMemo(() => {
-    const arr = Array.isArray(search.categories) ? search.categories : [];
-    if (search.category && !arr.includes(search.category)) return [...arr, search.category];
-    return arr;
-  }, [search.categories, search.category]);
+  const appliedSearch = useMemo(() => readAppliedSearchState(search), [search]);
+  const location: LocationValue = appliedSearch.value.location;
+  const effectiveCategories = appliedSearch.value.categories;
 
   const categoryTree = useMemo(() => buildTree(categories ?? []), [categories]);
 
-  const attrValues = useMemo(() => decodeAttrFilters(search.attrs), [search.attrs]);
+  const attrValues = appliedSearch.attributes;
 
   const attrFilters = useMemo(() => {
     const ids = effectiveCategories
@@ -176,58 +166,14 @@ export function useAnnonserSearchState(params: {
     });
   };
 
-  // Build terms list from `q` (space-separated)
-  const terms = useMemo<string[]>(() => {
-    const q: string = search.q ?? "";
-    return q
-      .trim()
-      .split(/\s+/)
-      .map((t: string) => t.replace(/[%_,()]/g, " ").trim())
-      .filter(Boolean);
-  }, [search.q]);
-  const advancedInitial: AdvancedSearchValue = useMemo(
-    () => ({
-      terms,
-      qMode: search.qMode ?? "all",
-      extraGroups: search.extraGroups ?? [],
-      categories: effectiveCategories,
-      catMode: search.catMode ?? "any",
-      conditions: search.conditions ?? [],
-      min: typeof search.min === "number" ? search.min : null,
-      max: typeof search.max === "number" ? search.max : null,
-      includeFree: search.includeFree ?? true,
-      sort: search.sort,
-      location: {
-        lat: search.lat ?? null,
-        lng: search.lng ?? null,
-        radius: search.radius ?? 10,
-        label: search.loc ?? "",
-      },
-    }),
-    [
-      terms,
-      search.qMode,
-      search.extraGroups,
-      effectiveCategories,
-      search.catMode,
-      search.conditions,
-      search.min,
-      search.max,
-      search.includeFree,
-      search.sort,
-      search.lat,
-      search.lng,
-      search.radius,
-      search.loc,
-    ],
-  );
+  const terms = appliedSearch.value.terms;
 
   const currentCriteria = useMemo(
     () => ({
-      ...valueToCriteria(advancedInitial),
+      ...valueToCriteria(appliedSearch.value),
       sort: search.sort === "relevance" ? "new" : search.sort,
     }),
-    [advancedInitial, search.sort],
+    [appliedSearch.value, search.sort],
   );
 
   const updateSearch = (patch: Partial<z.infer<typeof searchSchema>>) => {
@@ -240,29 +186,9 @@ export function useAnnonserSearchState(params: {
   /** Commits the complete panel draft in one URL transition. Keeping draft
    * changes out of the URL prevents expensive result refetches for every
    * slider tick and makes Avbryt behave as users expect. */
-  const applyPanelDraft = (
-    v: AdvancedSearchValue,
-    nextAttrValues: Record<string, AttributeFilterValue>,
-  ) => {
+  const applyPanelDraft = (draft: AppliedSearchState) => {
     void hapticNotification("success");
-    const c = valueToCriteria(v);
-    updateSearch({
-      q: v.terms.join(" "),
-      qMode: c.qMode,
-      extraGroups: c.extraGroups,
-      categories: c.categories,
-      catMode: c.catMode,
-      conditions: c.conditions as z.infer<typeof conditionEnum>[] | undefined,
-      includeFree: c.includeFree,
-      min: c.min ?? undefined,
-      max: c.max ?? undefined,
-      category: "",
-      attrs: encodeAttrFilters(nextAttrValues),
-      lat: v.location.lat ?? undefined,
-      lng: v.location.lng ?? undefined,
-      radius: v.location.lat != null ? v.location.radius : undefined,
-      loc: v.location.label || undefined,
-    });
+    updateSearch(writeAppliedSearchState(draft));
   };
 
   const handleLocationChange = (v: LocationValue) => {
@@ -287,7 +213,7 @@ export function useAnnonserSearchState(params: {
     attrValues,
     handleAttrValueChange,
     terms,
-    advancedInitial,
+    appliedSearch,
     currentCriteria,
     updateSearch,
     applyPanelDraft,

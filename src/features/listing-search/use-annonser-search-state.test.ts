@@ -104,16 +104,16 @@ describe("useAnnonserSearchState", () => {
     const { result, navigate } = setup();
 
     act(() =>
-      result.current.applyPanelDraft(
-        {
-          ...result.current.advancedInitial,
+      result.current.applyPanelDraft({
+        value: {
+          ...result.current.appliedSearch.value,
           terms: ["grønn", "sykkel"],
           categories: ["mobil"],
           min: 500,
           location: { lat: 59.91, lng: 10.75, radius: 25, label: "Oslo" },
         },
-        { color: { kind: "select", value: "green" } },
-      ),
+        attributes: { color: { kind: "select", value: "green" } },
+      }),
     );
 
     expect(navigate).toHaveBeenCalledTimes(1);

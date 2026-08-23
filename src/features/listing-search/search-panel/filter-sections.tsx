@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { NativeSheet } from "@/components/ui/native-sheet";
 import { NativeChoiceSheet } from "@/components/ui/native-choice-sheet";
 import { CategoryPicker } from "@/components/advanced-search-sheet";
+import { ModeToggle } from "@/components/search-term-mode-toggle";
 import { TermGroupRow } from "@/components/term-group-editor";
 import { SecondaryCategoryFilters } from "@/components/attribute-filter-chips";
 import { CategoryFilterFields } from "@/components/category-filter-fields";
@@ -205,7 +206,7 @@ export function SearchFilterSections({
           onClick={() => openSection("attributes")}
         />
         <FilterOverviewRow
-          label="Avanserte søkeord"
+          label="Presist søk"
           value={advancedSearchSummary || "Ingen"}
           onClick={() => openSection("search")}
         />
@@ -339,7 +340,13 @@ export function SearchFilterSections({
               data-section="search"
               className="space-y-3 rounded-2xl border border-border bg-card p-4"
             >
-              <Label className="text-base font-medium">Avanserte søkeord</Label>
+              <Label className="text-base font-medium">Presist søk</Label>
+
+              <ModeToggle
+                value={v.qMode}
+                onChange={(qMode) => setV((previous) => ({ ...previous, qMode }))}
+                labels={["Alle ord", "Minst ett"]}
+              />
 
               {v.extraGroups.map((g) => (
                 <div
@@ -508,7 +515,7 @@ function OpenTermGroupSheet({
       onOpenChange={(o) => {
         if (!o) onClose();
       }}
-      title="Avanserte søkeord"
+      title="Presist søk"
       titleVisible
       expandable
       className="overflow-y-auto"

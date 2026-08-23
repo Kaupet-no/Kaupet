@@ -1,10 +1,11 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { X, Plus, Save, Search as SearchIcon, RotateCcw } from "lucide-react";
+import { ChevronDown, X, Plus, Save, Search as SearchIcon, RotateCcw } from "lucide-react";
 
 import { PushEnablePrompt } from "@/components/push-enable-prompt";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -133,14 +134,7 @@ export function AdvancedSearchSheet({
           <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
             {/* Søkeord */}
             <section className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <Label className="text-sm font-medium">Søkeord</Label>
-                <ModeToggle
-                  value={v.qMode}
-                  onChange={(m) => setV({ ...v, qMode: m })}
-                  labels={["Alle ord", "Minst ett"]}
-                />
-              </div>
+              <Label className="text-sm font-medium">Søkeord</Label>
               <div className="flex gap-2">
                 <Input
                   value={termDraft}
@@ -179,14 +173,42 @@ export function AdvancedSearchSheet({
               )}
             </section>
 
-            {/* Flere søkelinjer (inkluder/ekskluder) */}
-            <section className="space-y-2">
-              <Label className="text-sm font-medium">Flere søkelinjer</Label>
-              <TermGroupEditor
-                groups={v.extraGroups}
-                onChange={(extraGroups) => setV({ ...v, extraGroups })}
-              />
-            </section>
+            <Collapsible
+              key={v.qMode === "any" || v.extraGroups.length > 0 ? "active" : "default"}
+              defaultOpen={v.qMode === "any" || v.extraGroups.length > 0}
+            >
+              <CollapsibleTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="group gap-1 px-0 text-primary"
+                >
+                  Presist søk
+                  <ChevronDown
+                    className="size-4 transition-transform group-data-[state=open]:rotate-180"
+                    aria-hidden
+                  />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-4 rounded-xl border border-border p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-sm font-medium">Søkeordmodus</Label>
+                  <ModeToggle
+                    value={v.qMode}
+                    onChange={(qMode) => setV({ ...v, qMode })}
+                    labels={["Alle ord", "Minst ett"]}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Flere søkelinjer</Label>
+                  <TermGroupEditor
+                    groups={v.extraGroups}
+                    onChange={(extraGroups) => setV({ ...v, extraGroups })}
+                  />
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
 
             {/* Kategori */}
             <CategoryPicker

@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Search as SearchIcon, ListPlus } from "lucide-react";
+import { ChevronDown, Search as SearchIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ModeToggle } from "@/components/search-term-mode-toggle";
 import { TermGroupEditor } from "@/components/term-group-editor";
 import { describeTermGroup, type TermGroup } from "@/lib/term-groups";
@@ -36,8 +36,7 @@ type Props = {
   showQMode?: boolean;
   /** Extra search lines ("Flere søkelinjer") — optional so callers that don't
    * need them (none currently) aren't forced to wire up empty state. When
-   * provided, a settings button appears in the search bar for both this and
-   * `qMode`, replacing the old separate "Flere valg" filter chip. */
+   * provided, "Presist søk" reveals both this and `qMode`. */
   extraGroups?: TermGroup[];
   onExtraGroupsChange?: (groups: TermGroup[]) => void;
 };
@@ -63,10 +62,9 @@ export function SearchBar({
 }: Props) {
   const [qFocused, setQFocused] = useState(false);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
-  const [moreOpen, setMoreOpen] = useState(false);
-  const firstSuggestionRef = useRef<HTMLElement>(null);
   const showMoreButton = !showQMode && extraGroups != null && onExtraGroupsChange != null;
   const moreCount = (extraGroups?.length ?? 0) + (qMode === "any" ? 1 : 0);
+  const firstSuggestionRef = useRef<HTMLElement>(null);
 
   const defaultSearchExamples = useDefaultSearchExamples();
   const placeholderExamples = useMemo(
@@ -79,10 +77,7 @@ export function SearchBar({
   );
 
   useEffect(() => {
-    if (q || qFocused) {
-      setPlaceholderIndex(0);
-      return;
-    }
+    if (q || qFocused) return;
     const id = setInterval(() => {
       setPlaceholderIndex((i) => (i + 1) % placeholderExamples.length);
     }, 4000);
@@ -105,7 +100,10 @@ export function SearchBar({
           <Input
             value={q}
             onChange={(e) => onQChange(e.target.value)}
-            onFocus={() => setQFocused(true)}
+            onFocus={() => {
+              setPlaceholderIndex(0);
+              setQFocused(true);
+            }}
             onBlur={() => setQFocused(false)}
             onKeyDown={(e) => {
               if ((e.key === "ArrowDown" || e.key === "Tab") && hasDropdown && !e.shiftKey) {
@@ -155,43 +153,6 @@ export function SearchBar({
           </div>
         )}
 
-        {showMoreButton && (
-          <Popover open={moreOpen} onOpenChange={setMoreOpen}>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                aria-label="Flere søkevalg"
-                className={`relative flex size-9 shrink-0 items-center justify-center rounded-full transition ${
-                  moreCount > 0
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-              >
-                <ListPlus className="size-4" />
-                {moreCount > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white">
-                    {moreCount}
-                  </span>
-                )}
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-96 space-y-4 p-4">
-              <div className="flex items-center justify-between gap-2">
-                <Label className="text-sm font-medium">Søkeordmodus</Label>
-                <ModeToggle
-                  value={qMode}
-                  onChange={onQModeChange}
-                  labels={["Alle ord", "Minst ett"]}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Flere søkelinjer</Label>
-                <TermGroupEditor groups={extraGroups ?? []} onChange={onExtraGroupsChange!} />
-              </div>
-            </PopoverContent>
-          </Popover>
-        )}
-
         <Button
           type="submit"
           size="sm"
@@ -201,6 +162,43 @@ export function SearchBar({
           <SearchIcon className="size-4" /> <span className="hidden sm:inline">Søk</span>
         </Button>
       </div>
+
+      {showMoreButton && (
+        <Collapsible
+          key={moreCount > 0 ? "active" : "default"}
+          defaultOpen={moreCount > 0}
+          className="px-4"
+        >
+          <CollapsibleTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="group gap-1 px-0 text-primary"
+            >
+              Presist søk{moreCount > 0 ? ` (${moreCount})` : ""}
+              <ChevronDown
+                className="size-4 transition-transform group-data-[state=open]:rotate-180"
+                aria-hidden
+              />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-4 rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center justify-between gap-2">
+              <Label className="text-sm font-medium">Søkeordmodus</Label>
+              <ModeToggle
+                value={qMode}
+                onChange={onQModeChange}
+                labels={["Alle ord", "Minst ett"]}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Flere søkelinjer</Label>
+              <TermGroupEditor groups={extraGroups ?? []} onChange={onExtraGroupsChange!} />
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      )}
 
       {showQMode && q.trim() && (
         <p className="mt-1.5 px-4 text-xs text-muted-foreground">

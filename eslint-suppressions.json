@@ -59,11 +59,6 @@
       "count": 2
     }
   },
-  "src/components/search-bar.tsx": {
-    "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
-  },
   "src/components/share-listing-dialog.tsx": {
     "react-hooks/set-state-in-effect": {
       "count": 1

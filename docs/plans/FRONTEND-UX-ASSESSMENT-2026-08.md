@@ -289,6 +289,7 @@ Disse tre gir mer egenart enn en ny gradient, illustrasjonsstil eller mikroanima
 6. For null treff, beregn effekten av å fjerne ett aktivt kriterium med eksisterende facet-/count-kall og vis beste utvidelse.
    **Status 23.08.2026: Fullført.** Nulltreff på resultat- og kategoriflater prøver nå kun ett-kriteriums utvidelser mot det eksisterende `search_listings_page`-count-kallet og viser bare alternativet med høyest dokumentert treffantall; handlingen anvender den beregnede `AppliedSearchState` i én URL-commit. Verifisert med rød/grønn komponenttest av beste valg og UI-handling, målrettede tester (2 filer / 2 tester), full unit-suite (79 filer / 394 tester), lint og typecheck.
 7. Flytt termgrupper og «alle/minst ett» bak «Presist søk»; ikke fjern funksjonaliteten for brukere som trenger den.
+   **Status 23.08.2026: Fullført.** Ordinært websøk, filterruten og redigering av lagrede søk bruker eksisterende `Collapsible` med «Presist søk», mens nativepanelets eksisterende oversiktsrad bruker samme etikett og åpner de samme kontrollene på detaljflaten. Eksisterende søkestate, callbacker og URL-format er uendret; aktive URL-kriterier åpnes ved innlasting. Verifisert med rød/grønn komponenttest av skjult standardtilstand, disclosure og eksisterende modus-/termgruppehandlinger, målrettede tester (2 filer / 6 tester), full unit-suite (80 filer / 395 tester), lint og typecheck.
 
 **Berørte områder:**
 

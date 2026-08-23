@@ -1,11 +1,12 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Search as SearchIcon } from "lucide-react";
+import { ArrowLeft, ChevronDown, Search as SearchIcon } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Label } from "@/components/ui/label";
 import { RangeFilterField } from "@/components/range-filter-field";
 import { CategoryFilterFields } from "@/components/category-filter-fields";
@@ -43,6 +44,7 @@ function FilterPage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/annonser/filter" });
   const [, setQDraft] = useState(search.q);
+  const preciseActive = search.qMode === "any" || (search.extraGroups?.length ?? 0) > 0;
 
   const { data: categories } = useQuery({
     queryKey: ["categories", "with-color"],
@@ -261,20 +263,39 @@ function FilterPage() {
           refCb={(el) => (sectionRefs.current.sok = el)}
         >
           <div className="space-y-6">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <Label className="text-sm font-medium">Flere søkelinjer</Label>
-                <ModeToggle
-                  value={search.qMode}
-                  onChange={(m) => updateSearch({ qMode: m })}
-                  labels={["Alle ord", "Minst ett"]}
-                />
-              </div>
-              <TermGroupEditor
-                groups={search.extraGroups ?? []}
-                onChange={(extraGroups) => updateSearch({ extraGroups })}
-              />
-            </div>
+            <Collapsible key={preciseActive ? "active" : "default"} defaultOpen={preciseActive}>
+              <CollapsibleTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="group gap-1 px-0 text-primary"
+                >
+                  Presist søk
+                  <ChevronDown
+                    className="size-4 transition-transform group-data-[state=open]:rotate-180"
+                    aria-hidden
+                  />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-4 rounded-xl border border-border p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-sm font-medium">Søkeordmodus</Label>
+                  <ModeToggle
+                    value={search.qMode}
+                    onChange={(m) => updateSearch({ qMode: m })}
+                    labels={["Alle ord", "Minst ett"]}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Flere søkelinjer</Label>
+                  <TermGroupEditor
+                    groups={search.extraGroups ?? []}
+                    onChange={(extraGroups) => updateSearch({ extraGroups })}
+                  />
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
 
             <CategoryPicker
               categories={categories ?? []}

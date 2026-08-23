@@ -64,6 +64,7 @@ import {
   resolveHeroCategory,
   type Category,
 } from "@/lib/categories";
+import { submitSearch } from "@/features/listing-search/submit-search";
 
 export const Route = createFileRoute("/annonser")({
   validateSearch: searchSchema,
@@ -315,6 +316,20 @@ function BrowsePage() {
   // its vocabulary lookup, so "cruisecontrol" would just fall through to a
   // plain text search that finds nothing. See matchVehicleBrandPhrase.
   const { data: vehicleBrands } = useAllVehicleBrands();
+  const submitQuery = () => {
+    void hapticImpact("medium");
+    void submitSearch({
+      applied: appliedSearch,
+      query: qDraft,
+      categories: categories ?? [],
+      vehicleBrands: vehicleBrands ?? [],
+      allFilters: allFilters ?? [],
+      commit: (next) => {
+        setQDraft(next.q);
+        navigate({ search: next, resetScroll: false });
+      },
+    });
+  };
   const rawCategoryMatch = useMemo(() => {
     const m =
       matchCategoryPhrase(qDraft, categories ?? []) ??
@@ -603,11 +618,7 @@ function BrowsePage() {
             <SearchSummaryPill
               q={qDraft}
               onQChange={setQDraft}
-              onSubmitQ={() => {
-                void hapticImpact("medium");
-                if (categoryMatch) applyCategoryMatch();
-                else updateSearch({ q: qDraft });
-              }}
+              onSubmitQ={submitQuery}
               filterCount={activeFilterCount}
               onOpen={() => openPanel("categories")}
             />
@@ -616,14 +627,7 @@ function BrowsePage() {
             <SearchBar
               q={qDraft}
               onQChange={setQDraft}
-              onSubmitQ={() => {
-                void hapticImpact("medium");
-                // Pressing Enter with a pending category match confirms it
-                // (same action as clicking the suggestion chip below)
-                // instead of running a plain text search for it.
-                if (categoryMatch) applyCategoryMatch();
-                else updateSearch({ q: qDraft });
-              }}
+              onSubmitQ={submitQuery}
               qMode={search.qMode}
               onQModeChange={(m) => updateSearch({ qMode: m })}
               showQMode={false}

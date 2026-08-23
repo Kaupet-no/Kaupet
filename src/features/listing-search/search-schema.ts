@@ -49,7 +49,7 @@ export type AppliedSearchState = {
   attributes: Record<string, AttributeFilterValue>;
 };
 
-type SearchParams = z.infer<typeof searchSchema>;
+export type SearchParams = z.infer<typeof searchSchema>;
 
 /**
  * Encodes attribute filter values into the `attrs` URL search param.

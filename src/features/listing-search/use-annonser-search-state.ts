@@ -8,9 +8,9 @@ import {
   decodeAttrFilters,
   encodeAttrFilters,
   readAppliedSearchState,
-  writeAppliedSearchState,
   type AppliedSearchState,
 } from "@/features/listing-search/search-schema";
+import { submitSearch } from "@/features/listing-search/submit-search";
 import { buildTree } from "@/lib/categories";
 import {
   effectiveFiltersForCategories,
@@ -188,7 +188,7 @@ export function useAnnonserSearchState(params: {
    * slider tick and makes Avbryt behave as users expect. */
   const applyPanelDraft = (draft: AppliedSearchState) => {
     void hapticNotification("success");
-    updateSearch(writeAppliedSearchState(draft));
+    void submitSearch({ applied: draft, commit: updateSearch });
   };
 
   const handleLocationChange = (v: LocationValue) => {

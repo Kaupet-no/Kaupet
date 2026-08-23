@@ -18,11 +18,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { useFormFactor } from "@/hooks/use-form-factor";
 import { useOverlayHistory } from "@/hooks/use-overlay-history";
 import { useSheetDragGate } from "@/hooks/use-sheet-drag-gate";
-import { resolveTextToFilters } from "@/features/listing-search/resolve-text-to-filters";
-import {
-  encodeAttrFilters,
-  type AppliedSearchState,
-} from "@/features/listing-search/search-schema";
+import type { AppliedSearchState } from "@/features/listing-search/search-schema";
+import { submitSearch } from "@/features/listing-search/submit-search";
 import { summarizeCriteria } from "@/lib/saved-searches";
 import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
 import { SearchFilterSections, type SearchFilterSection } from "./filter-sections";
@@ -218,26 +215,14 @@ export function SearchPanel({
     saveSearchToHistory(trimmed);
 
     setSubmitting(true);
-    // Samme kategori-/merke-, utstyrssynonym- og tall+enhet-gjenkjenning som
-    // desktop-pipelinen (resolve-text-to-filters.ts), slik at et native-søk
-    // lander med de samme filtrene som på desktop.
-    const resolved = await resolveTextToFilters({
-      q: trimmed,
+    await submitSearch({
+      query: trimmed,
       categories,
       vehicleBrands: vehicleBrands ?? [],
       allFilters,
-    }).catch(() => null);
-    setSubmitting(false);
-
-    navigate({
-      to: "/annonser",
-      search: {
-        q: resolved?.q ?? trimmed,
-        category: resolved?.categorySlug ?? "",
-        attrs: resolved ? encodeAttrFilters(resolved.attrPatch) : "",
-        sort: "new",
-      },
+      commit: (search) => navigate({ to: "/annonser", search }),
     });
+    setSubmitting(false);
     close();
   };
 

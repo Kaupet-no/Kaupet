@@ -26,6 +26,10 @@ import { useDefaultSearchExamples } from "@/hooks/use-default-search-examples";
 import { useIsNative } from "@/hooks/use-is-native";
 import { useFormFactor } from "@/hooks/use-form-factor";
 import { AppHeroLogo } from "@/components/app-hero-logo";
+import { useLandingCategories } from "@/features/landing/use-landing-categories";
+import { submitSearch } from "@/features/listing-search/submit-search";
+import { defaultAdvancedSearchValue } from "@/components/advanced-search-value";
+import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
 
 type CategoryRow = {
   id: string;
@@ -49,19 +53,8 @@ export function AppLanding() {
   // kaupet.no på desktop, som ikke er en del av denne planen.
   const isTablet = useFormFactor() === "tablet";
 
-  const { data: categories } = useQuery({
-    queryKey: ["categories"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("categories")
-        .select("id, slug, name_nb, parent_id, icon, search_examples")
-        .eq("is_hidden", false)
-        .order("sort_order")
-        .order("name_nb");
-      if (error) throw error;
-      return (data ?? []) as CategoryRow[];
-    },
-  });
+  const { categories, allFilters } = useLandingCategories();
+  const { data: vehicleBrands } = useAllVehicleBrands();
 
   const rootCategories = useMemo(
     () => (categories ?? []).filter((c) => c.parent_id === null),
@@ -101,19 +94,21 @@ export function AppLanding() {
     },
   });
 
-  const submitSearch = (e: React.FormEvent) => {
+  const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    navigate({
-      to: "/annonser",
-      search: {
-        q: q.trim(),
-        category: "",
-        sort: "new",
-        lat: location.lat ?? undefined,
-        lng: location.lng ?? undefined,
-        radius: location.lat != null ? location.radius : undefined,
-        loc: location.label || undefined,
+    void submitSearch({
+      applied: {
+        value: {
+          ...defaultAdvancedSearchValue(),
+          location,
+        },
+        attributes: {},
       },
+      query: q,
+      categories: categories ?? [],
+      vehicleBrands: vehicleBrands ?? [],
+      allFilters: allFilters ?? [],
+      commit: (search) => navigate({ to: "/annonser", search }),
     });
   };
 
@@ -174,7 +169,10 @@ export function AppLanding() {
           Hva leter du etter i dag?
         </h1>
 
-        <form onSubmit={submitSearch} className={`w-full ${isTablet ? "max-w-xl" : "max-w-md"}`}>
+        <form
+          onSubmit={handleSearchSubmit}
+          className={`w-full ${isTablet ? "max-w-xl" : "max-w-md"}`}
+        >
           <div className="relative">
             <SearchIcon className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
             <input

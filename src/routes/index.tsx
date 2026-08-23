@@ -35,6 +35,9 @@ import { useLandingResultCount } from "@/features/landing/use-landing-result-cou
 import { useCategoryFeed, type CategoryFeedSort } from "@/features/landing/use-category-feed";
 import { useCategoryDrilldown } from "@/features/landing/use-category-drilldown";
 import { useFilterFacetCounts } from "@/features/listing-search/use-filter-facet-counts";
+import { submitSearch } from "@/features/listing-search/submit-search";
+import { defaultAdvancedSearchValue } from "@/components/advanced-search-value";
+import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
 
 const searchSchema = z.object({
   q: z.string().optional(),
@@ -86,6 +89,7 @@ function WebLanding() {
   const autoplay = useRef(Autoplay({ delay: 4500, stopOnInteraction: true }));
 
   const { categories, categoriesIsError, refetchCategories, allFilters } = useLandingCategories();
+  const { data: vehicleBrands } = useAllVehicleBrands();
 
   // Only colored root categories are presented as main categories on the landing
   // page; the catch-all "Annet" (no color) stays reachable via search but is not
@@ -248,15 +252,25 @@ function WebLanding() {
 
   const { popular, popularIsError, refetchPopular } = usePopularListings();
 
-  const submitSearch = (e: React.FormEvent) => {
+  const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // When a main category is active, scope the search to just that category
     // — /annonser already expands a parent category to include all of its
     // children server-side, so listing it alone (not every subcategory
     // slug too) is both sufficient and what the filter UI should display.
-    navigate({
-      to: "/annonser",
-      search: { q: qDraft.trim(), category: activeCategory?.slug ?? "", sort: "new" },
+    void submitSearch({
+      applied: {
+        value: {
+          ...defaultAdvancedSearchValue(),
+          categories: activeCategory ? [activeCategory.slug] : [],
+        },
+        attributes: {},
+      },
+      query: qDraft,
+      categories: categories ?? [],
+      vehicleBrands: vehicleBrands ?? [],
+      allFilters: allFilters ?? [],
+      commit: (search) => navigate({ to: "/annonser", search }),
     });
   };
 
@@ -264,7 +278,7 @@ function WebLanding() {
     <div>
       <HeaderSearchPortal>
         <form
-          onSubmit={submitSearch}
+          onSubmit={handleSearchSubmit}
           aria-hidden={heroSearchVisible}
           inert={heroSearchVisible}
           className={`mx-auto flex max-w-md gap-2 transition-opacity duration-200 ${
@@ -330,7 +344,7 @@ function WebLanding() {
 
           <form
             ref={heroSearchSentinelRef}
-            onSubmit={submitSearch}
+            onSubmit={handleSearchSubmit}
             className="mx-auto mt-6 flex max-w-lg gap-2"
           >
             <div className="relative flex-1">

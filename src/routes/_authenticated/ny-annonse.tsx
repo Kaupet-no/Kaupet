@@ -1225,6 +1225,23 @@ function NewListingPage() {
     setTurnstileToken,
     onCancel: () => navigate({ to: "/" }),
     onEditReviewSection: editReviewSection,
+    improvementGroupKeys: fieldGroupsForKeys([
+      ...fieldGroupKeys,
+      ...(isVehicle ? ["vehicle-360"] : []),
+    ])
+      .filter((group) => group.classification !== "requiredToPublish")
+      .map((group) => group.key),
+    publishingRequirementErrors: Array.from(
+      new Set([
+        ...Object.values(errors).flatMap((error) =>
+          typeof error?.message === "string" ? [error.message] : [],
+        ),
+        ...(extraFieldError ? [extraFieldError.message] : []),
+        ...(missingFilters.length > 0
+          ? [`Fyll inn ${missingFilters.map((filter) => filter.label_nb).join(", ")}.`]
+          : []),
+      ]),
+    ),
   };
 
   const groups = currentPage?.groups ?? [];

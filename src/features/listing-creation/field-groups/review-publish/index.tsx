@@ -100,20 +100,65 @@ type PublishActionsProps = {
  * renders it explicitly on the last page instead of via this wrapper.
  */
 export function ReviewPublishGroup(props: WizardSharedProps) {
-  const missing: string[] = [];
-  if (props.images.length === 0) missing.push("bilde");
-  if (!props.previewPrice) missing.push("pris");
+  const improvements = [
+    props.improvementGroupKeys.includes("photos") && props.images.length === 0
+      ? "Legg til bilder"
+      : null,
+    props.improvementGroupKeys.some((key) => key === "price" || key === "vehicle-price") &&
+    !props.previewPrice
+      ? "Oppgi pris"
+      : null,
+    props.improvementGroupKeys.includes("location") && !props.city && !props.postalCode
+      ? "Oppgi sted"
+      : null,
+  ].filter((item): item is string => !!item);
+  const showVehicle360 = props.isVehicle && props.improvementGroupKeys.includes("vehicle-360");
 
   return (
     <>
-      {props.native && missing.length > 0 && (
-        <Alert variant="warning">
-          <AlertTitle>Kan forbedres før publisering</AlertTitle>
-          <AlertDescription>
-            Annonsen mangler {missing.join(" og ")}. Du kan fortsatt publisere, eller gå tilbake og
-            legge det til.
-          </AlertDescription>
-        </Alert>
+      <section aria-labelledby="publishing-readiness-title" className="space-y-2">
+        <h3 id="publishing-readiness-title" className="text-lg font-semibold">
+          Publiseringsklar
+        </h3>
+        {props.publishingRequirementErrors.length > 0 ? (
+          <Alert variant="destructive">
+            <AlertTitle>Må rettes før publisering</AlertTitle>
+            <AlertDescription>
+              <ul className="list-disc space-y-1 pl-5">
+                {props.publishingRequirementErrors.map((error) => (
+                  <li key={error}>{error}</li>
+                ))}
+              </ul>
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <p className="text-sm text-muted-foreground">Alle publiseringskrav er oppfylt.</p>
+        )}
+      </section>
+      {(improvements.length > 0 || showVehicle360) && (
+        <section aria-labelledby="listing-improvements-title" className="space-y-3">
+          <div>
+            <h3 id="listing-improvements-title" className="text-lg font-semibold">
+              Dette vil gi en bedre annonse
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Valgfritt – du kan fortsatt publisere annonsen.
+            </p>
+          </div>
+          {improvements.length > 0 && (
+            <Alert variant="warning" role="note">
+              <AlertTitle>Anbefalte forbedringer</AlertTitle>
+              <AlertDescription>
+                <ul className="list-disc space-y-1 pl-5">
+                  {improvements.map((improvement) => (
+                    <li key={improvement}>{improvement}</li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
+          {showVehicle360 && <Vehicle360Group {...props} />}
+        </section>
       )}
       <ComposerReview
         items={[
@@ -153,7 +198,6 @@ export function ReviewPublishGroup(props: WizardSharedProps) {
         postalCode={props.postalCode}
         categoryLabel={props.categoryLabel}
       />
-      {props.isVehicle && <Vehicle360Group {...props} />}
       {props.attributes.vehicle_lookup && (
         <p className="text-xs text-muted-foreground">
           Du er ansvarlig for at opplysningene i annonsen stemmer. Kontroller at opplysningene

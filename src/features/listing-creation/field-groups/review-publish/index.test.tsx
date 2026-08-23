@@ -4,7 +4,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { WizardSharedProps } from "../types";
-import { ReviewPublishGroup } from ".";
+import { PublishActions, ReviewPublishGroup } from ".";
 
 vi.mock("@tanstack/react-start", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@tanstack/react-start")>()),
@@ -18,6 +18,54 @@ vi.mock("@/features/vehicle-360-capture/capture-flow", () => ({
 }));
 
 describe("ReviewPublishGroup", () => {
+  it("viser harde publiseringskrav separat og lar anbefalinger passeres når kravene er oppfylt", () => {
+    const onSubmit = vi.fn((event: React.FormEvent) => event.preventDefault());
+    const view = (publishingRequirementErrors: string[]) => (
+      <form onSubmit={onSubmit}>
+        <ReviewPublishGroup
+          {...({
+            native: true,
+            isVehicle: false,
+            images: [],
+            title: "Kort",
+            subtitle: undefined,
+            previewPrice: null,
+            city: undefined,
+            postalCode: undefined,
+            categoryLabel: "Møbler",
+            attributes: {},
+            mutationIsPending: false,
+            uploadProgress: null,
+            improvementGroupKeys: ["photos", "price", "location"],
+            publishingRequirementErrors,
+            onEditReviewSection: vi.fn(),
+          } as unknown as WizardSharedProps)}
+        />
+        <PublishActions
+          native
+          turnstileEnabled={false}
+          turnstileToken={null}
+          setTurnstileToken={vi.fn()}
+          mutationIsPending={false}
+          onCancel={vi.fn()}
+          onPreview={vi.fn()}
+        />
+      </form>
+    );
+    const { rerender } = render(view(["Tittelen må være minst 5 tegn"]));
+
+    expect(screen.getByRole("heading", { name: "Publiseringsklar" })).toBeTruthy();
+    expect(screen.getByRole("alert").textContent).toContain("Tittelen må være minst 5 tegn");
+    expect(screen.getByRole("heading", { name: "Dette vil gi en bedre annonse" })).toBeTruthy();
+    expect(screen.getByText("Legg til bilder")).toBeTruthy();
+
+    rerender(view([]));
+    expect(screen.queryByRole("alert")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Publiser" }));
+
+    expect(onSubmit).toHaveBeenCalledOnce();
+  });
+
   it("åpner 360° som valgfri forbedring fra kjøretøyets review", async () => {
     render(
       <ReviewPublishGroup
@@ -37,6 +85,8 @@ describe("ReviewPublishGroup", () => {
           draftId: "draft-1",
           ensureDraftId: vi.fn(),
           onEditReviewSection: vi.fn(),
+          improvementGroupKeys: ["photos", "vehicle-price", "location", "vehicle-360"],
+          publishingRequirementErrors: [],
         } as unknown as WizardSharedProps)}
       />,
     );

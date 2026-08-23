@@ -215,6 +215,8 @@ export type WizardSharedProps = {
   setTurnstileToken: (token: string | null) => void;
   onCancel: () => void;
   onEditReviewSection: (section: "category" | "content" | "details" | "location") => void;
+  improvementGroupKeys: string[];
+  publishingRequirementErrors: string[];
 
   /** Set from the ny-annonse.tsx `type` search param when the wizard was
    * entered via the intent+title landing screen — locks the price group's

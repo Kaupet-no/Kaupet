@@ -383,6 +383,23 @@ Disse tre gir mer egenart enn en ny gradient, illustrasjonsstil eller mikroanima
    **Verifisering:** Kontrakttesten feilet rødt med både tidlig preview og reviewoppslag midlertidig brutt, og dekker første previewpunkt, riktig start-/sluttside, review-retur og grupperte native-sider for generisk flyt og båt. `bun run test -- src/features/listing-creation/composer-navigation.test.ts src/features/listing-creation/category-flows.test.ts src/features/listing-creation/field-groups/review-publish/index.test.tsx src/features/listing-creation/composer-review.test.tsx src/features/listing-creation/use-composer-history.test.tsx` (5 filer / 37 tester), `bun run test` (83 filer / 405 tester), `bun run lint` og `bunx tsc --noEmit` er bestått.
 
 7. Vis «Publiseringsklar» separat fra «Dette vil gi en bedre annonse».
+   **Status 24.08.2026: Fullført.** Reviewflaten viser nå eksisterende harde
+   skjemafeil, feltgruppefeil og manglende obligatoriske kategoriattributter
+   under «Publiseringsklar», separat fra ikke-blokkerende anbefalinger om
+   bilder, pris og sted. Anbefalingene og den valgfrie 360°-forbedringen
+   utledes fra den etablerte `FieldGroup.classification`; det er ikke innført
+   score, badge eller en parallell validator. Eksisterende hopp-over-dialoger,
+   publiseringssubmit, første ugyldige felt, Turnstile og servervalidering er
+   uendret.
+
+   **Verifisering:** Komponenttesten ble bekreftet rød ved midlertidig brudd på
+   seksjonskontrakten og dekker at et hardt krav vises som blokkende
+   publiseringskrav, mens anbefalinger vises som et separat, ikke-blokkerende
+   notat og publisering fortsatt kan sendes når de harde kravene er oppfylt.
+   `bun run test -- src/features/listing-creation/field-groups/review-publish/index.test.tsx src/features/listing-creation/field-groups/registry.test.ts src/features/listing-creation/field-groups/validators.test.ts src/features/listing-creation/modules/validators.test.ts`
+   (4 filer / 13 tester), `bun run test` (83 filer / 406 tester),
+   `bun run lint` og `bunx tsc --noEmit` er bestått.
+
 8. Behold autosave, første ugyldige felt, Turnstile, idempotens og servervalidering uendret.
 
 **Berørte områder:**

@@ -40,6 +40,7 @@ export function OnboardingFlow({ onComplete }: Props) {
   if (user) cards.push("location");
   const scrollRef = useRef<HTMLDivElement>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const activeCard = cards[currentIndex];
   const [finishing, setFinishing] = useState(false);
   const finishTimer = useRef<number | null>(null);
   const [reduceMotion] = useState(() =>
@@ -165,7 +166,11 @@ export function OnboardingFlow({ onComplete }: Props) {
             style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
           >
             {/* Card 1: Welcome */}
-            <div className="flex h-full w-full flex-none snap-center flex-col items-center justify-center px-8 text-center">
+            <div
+              className="flex h-full w-full flex-none snap-center flex-col items-center justify-center px-8 text-center"
+              aria-hidden={activeCard !== "welcome"}
+              inert={activeCard !== "welcome"}
+            >
               <div className="mb-8 flex items-baseline gap-1">
                 <span className="font-display text-4xl font-bold tracking-tight text-primary">
                   kaupet
@@ -209,7 +214,11 @@ export function OnboardingFlow({ onComplete }: Props) {
 
             {/* Card 2: Notifications */}
             {showPushOffer && (
-              <div className="flex h-full w-full flex-none snap-center flex-col items-center justify-center px-8 text-center">
+              <div
+                className="flex h-full w-full flex-none snap-center flex-col items-center justify-center px-8 text-center"
+                aria-hidden={activeCard !== "notifications"}
+                inert={activeCard !== "notifications"}
+              >
                 <div className="mb-6 flex size-20 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <Bell className="size-10" />
                 </div>
@@ -234,7 +243,11 @@ export function OnboardingFlow({ onComplete }: Props) {
 
             {/* Card 3: Location */}
             {user && (
-              <div className="flex h-full w-full flex-none snap-center flex-col items-center justify-center px-8 text-center">
+              <div
+                className="flex h-full w-full flex-none snap-center flex-col items-center justify-center px-8 text-center"
+                aria-hidden={activeCard !== "location"}
+                inert={activeCard !== "location"}
+              >
                 <div className="mb-6 flex size-20 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <MapPin className="size-10" />
                 </div>

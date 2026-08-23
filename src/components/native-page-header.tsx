@@ -31,6 +31,7 @@ export function NativePageHeader({
   const contentTitleOpacity = useScrollFadeOpacity();
   const router = useRouter();
   const navigate = useNavigate();
+  const Title = titleFadesIn ? "span" : "h1";
 
   if (!native) return null;
 
@@ -57,13 +58,13 @@ export function NativePageHeader({
       {/* line-clamp-1: uten den vokser headeren på lange titler og Tilbake-
           knappen havner ute av lodd — verre i landskap, der pl-safe/pr-safe
           også spiser bredde. */}
-      <h1
+      <Title
         className="line-clamp-1 flex-1 text-center text-base font-semibold transition-opacity"
         style={titleFadesIn ? { opacity: 1 - contentTitleOpacity } : undefined}
         aria-hidden={titleFadesIn || undefined}
       >
         {title}
-      </h1>
+      </Title>
       <div className="flex h-12 min-w-[70px] items-center justify-end px-3">{right}</div>
     </header>
   );

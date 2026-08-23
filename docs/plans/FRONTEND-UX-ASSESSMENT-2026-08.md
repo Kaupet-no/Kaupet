@@ -259,6 +259,7 @@ Disse tre gir mer egenart enn en ny gradient, illustrasjonsstil eller mikroanima
 6. Bytt native lokasjonsdialog til `ResponsiveOverlay`; fjern hover-only tooltip i `IntentTitleLanding`.
    **Status 23.08.2026: Fullført.** Nativeforsidens lokasjonsvalg bruker nå eksisterende `ResponsiveOverlay`, med samme fokusoppsett og primitivens innebygde sheet-, safe-area- og historikkoppførsel. Tittelunntaket i `IntentTitleLanding` er synlig uten hover. Verifisert med målrettede komponenttester, full unit-suite, lint og typecheck.
 7. Rett semantisk dobbel `h1` og skjul inaktive onboardingkort korrekt.
+   **Status 23.08.2026: Fullført.** Den fadende native headertittelen bruker ikke overskriftsmarkup når innholdet allerede har dokumentets `h1`. Onboardingkortene beholder snap-animasjonen, men bare aktivt kort er eksponert og interaktivt via native `aria-hidden`/`inert`. Verifisert med målrettede komponenttester, full unit-suite, lint, typecheck og produksjonsbuild.
 
 **Tester:**
 

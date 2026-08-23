@@ -95,6 +95,7 @@ describe("OnboardingFlow", () => {
     expect(screen.getByText(/Du har 3 lagrede søk med varsling/)).toBeTruthy();
     expect(mocks.enableOnThisDevice).not.toHaveBeenCalled();
 
+    fireEvent.click(screen.getByRole("button", { name: "Kom i gang" }));
     fireEvent.click(screen.getByRole("button", { name: "Ja, varsle meg" }));
 
     await waitFor(() => expect(mocks.enableOnThisDevice).toHaveBeenCalledWith("saved_searches"));
@@ -120,5 +121,30 @@ describe("OnboardingFlow", () => {
 
     expect(screen.queryByRole("button", { name: "Ja, varsle meg" })).toBeNull();
     expect(mocks.enableOnThisDevice).not.toHaveBeenCalled();
+  });
+
+  it("eksponerer og aktiverer bare gjeldende kort", () => {
+    mocks.user = { id: "user-1" };
+    mocks.searches = [{ notify: true }];
+
+    render(<OnboardingFlow onComplete={vi.fn()} />);
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Kom i gang" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Ja, varsle meg" })).toBeNull();
+    expect(
+      screen
+        .getByText("Få beskjed om nye treff")
+        .closest("[aria-hidden='true']")
+        ?.hasAttribute("inert"),
+    ).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Gå til kort 2" }));
+
+    expect(screen.getByRole("button", { name: "Ja, varsle meg" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Kom i gang" })).toBeNull();
+    expect(
+      screen.getByText("Velkommen!").closest("[aria-hidden='true']")?.hasAttribute("inert"),
+    ).toBe(true);
   });
 });

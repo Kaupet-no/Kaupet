@@ -434,6 +434,10 @@ Disse tre gir mer egenart enn en ny gradient, illustrasjonsstil eller mikroanima
    **Verifisering:** Kontrakttesten feilet rødt før mappingen fantes og dekker de fire dokumenterbare kildene, `unknown`-fallback og at tidsstempel bare følger profilalder. `bun run test -- src/components/listing-detail/fact-source.test.ts` (1 fil / 2 tester), `bun run test` (84 filer / 408 tester), `bun run lint` og `bunx tsc --noEmit` er bestått. Ingen UI, score, badge, databaseendring eller generisk listingmodell er innført.
 
 3. Bygg en kompakt `ListingEvidence`-seksjon med tekstlige kilder og tidspunkt der det finnes.
+   **Status 24.08.2026: Fullført.** `ListingEvidence` ligger lokalt i detalj-featuret og gjenbruker det eksisterende selger-/kontaktkortet som én kompakt tekstliste uten ny kortflate, badge eller score. Seksjonen skiller mellom kjøretøydata fra Statens vegvesen, selgeropplysninger, Kaupet-kontoopplysninger og ukjent kilde. Registerkilden vises bare når kjøretøysnapshotet kan parses, og bare profilens dokumenterte registreringstidspunkt vises.
+
+   **Verifisering:** Komponenttesten feilet rødt før komponenten fantes og dekker tekstene for `registry`, `seller`, `kaupet` og `unknown`, registreringstidspunkt når det finnes og fravær av andre tidspunkt. `bun run test -- src/components/listing-detail/fact-source.test.ts src/components/listing-detail/listing-evidence.test.tsx` (2 filer / 3 tester), `bun run test` (85 filer / 409 tester), `bun run lint` og `bunx tsc --noEmit` er bestått.
+
 4. Skill «Ingen kjente feil oppgitt» visuelt og språklig fra «verifisert uten feil».
 5. Flytt trygg-handel-råd til kontaktøyeblikket og første samtale, ikke en generell tekstvegg.
 6. Ikke lag score eller badge før det finnes validerte data og en dokumentert modell for feilklassifisering.

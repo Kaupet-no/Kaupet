@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { FavoriteButton } from "@/components/favorite-button";
 import { ShareListingDialog } from "@/components/share-listing-dialog";
 import { StarRating } from "@/components/star-rating";
+import { ListingEvidence } from "@/components/listing-detail/listing-evidence";
+import { mapListingFactSource } from "@/components/listing-detail/fact-source";
 
 type Seller = {
   display_name: string | null;
@@ -26,6 +28,7 @@ export function SellerContactPanel({
   shareOpen,
   onShareOpenChange,
   isNative,
+  hasRegistryData,
 }: {
   isLoggedIn: boolean;
   seller: Seller;
@@ -38,7 +41,18 @@ export function SellerContactPanel({
   shareOpen: boolean;
   onShareOpenChange: (open: boolean) => void;
   isNative?: boolean;
+  hasRegistryData: boolean;
 }) {
+  const evidenceSources = [
+    ...(hasRegistryData ? [mapListingFactSource("vehicleLookup")] : []),
+    mapListingFactSource("sellerFields"),
+    ...(seller?.created_at
+      ? [mapListingFactSource("profileAge", seller.created_at)]
+      : seller?.review_count
+        ? [mapListingFactSource("reviews")]
+        : []),
+  ];
+
   return (
     <div className="rounded-xl border border-border bg-card p-4">
       <div className="flex items-center gap-3">
@@ -96,6 +110,8 @@ export function SellerContactPanel({
           )}
         </div>
       </div>
+
+      <ListingEvidence sources={evidenceSources} />
 
       {!isOwner && (
         <Button className="mt-4 w-full gap-2" onClick={onContact} disabled={contacting}>

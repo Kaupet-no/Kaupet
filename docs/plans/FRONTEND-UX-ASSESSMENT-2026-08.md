@@ -281,6 +281,7 @@ Disse tre gir mer egenart enn en ny gradient, illustrasjonsstil eller mikroanima
 2. La tekstpipeline returnere både normalisert query og en ordnet liste over tolkede kriterier med `source: "text" | "user"`.
    **Status 23.08.2026: Fullført.** `resolveTextToFilters` returnerer nå normalisert `q` sammen med kategori- og attributtkriterier i tekstens rekkefølge, basert på eksisterende søketyper og med eksplisitt kilde. Verifisert med rød/grønn kontrakttest, målrettet test, full unit-suite (390 tester), lint og typecheck.
 3. Lag én liten `SearchInterpretation`-komponent som bruker eksisterende chip-/filterhandlinger.
+   **Status 23.08.2026: Fullført.** `SearchInterpretation` viser ordnede kategori- og attributtkriterier med eksisterende `FilterChip`, eksisterende etikettformatering og de samme kategori-/attributthandlingene som søkeflatene allerede bruker. Komponenten holder ingen egen state; kobling til inngangene hører til steg 4. Verifisert med målrettet komponenttest, full unit-suite, lint og typecheck.
 4. Koble webforside, header, `/annonser` og native `SearchPanel` til samme submitfunksjon.
 5. Behold draft state lokalt i panel; skriv URL én gang ved «Vis treff» eller eksplisitt submit.
 6. For null treff, beregn effekten av å fjerne ett aktivt kriterium med eksisterende facet-/count-kall og vis beste utvidelse.

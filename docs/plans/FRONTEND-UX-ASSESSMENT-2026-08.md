@@ -521,6 +521,8 @@ test` (86 filer / 411 tester), `bun run lint` og `bunx tsc --noEmit` er
 1. Legg hydration-feil og `console.error` inn som feil i Playwright for kjerneflytene.
    **Status 24.08.2026: Implementert.** `e2e/fixtures.ts` gjør `console.error` og `pageerror` til testfeil for alle eksisterende kjerneflyter, og legger diagnostikken ved som Playwright-artefakt. Målrettet E2E-kjøring ble forsøkt, men isolert Supabase kunne ikke starte fordi Docker Desktop ikke kjørte.
 2. Legg visuell snapshotdekning på 375 × 812, 820 × 1180 og 1440 × 900 for forside, søkepanel, resultat, detalj, auth og composer.
+   **Status 24.08.2026: Implementert.** `e2e/core.visual.spec.ts` dekker forside, native søkepanel, resultat, annonsedetalj og auth med ekte seedede E2E-annonser; `listing-composer.visual.spec.ts` dekker composer-flaten. Baselines er generert for `visual-phone`, `visual-tablet` og `visual-web` etter inspeksjon av faktisk rendret UI.
+   **Verifisering:** `bun run test:e2e -- e2e/core.visual.spec.ts --project visual-phone --project visual-tablet --project visual-web --update-snapshots` (15/15), `bun run test:e2e -- e2e/listing-composer.visual.spec.ts --project visual-phone --project visual-tablet --project visual-web --update-snapshots` (3/3), og etterfølgende målrettet composer-kjøring viste kun forventet baseline-drift før oppdatering. Ingen `console.error` eller `pageerror` ble rapportert i flytene.
 3. Sett routebudsjett for `/` og `/annonser`, i tillegg til dagens største-fil-budsjett.
    **Status 24.08.2026: Implementert.** `bun run build` kjører
    `check:bundle` etter produksjonsbuild. Sjekken leser den genererte

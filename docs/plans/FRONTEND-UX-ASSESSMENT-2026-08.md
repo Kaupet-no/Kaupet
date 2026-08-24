@@ -522,6 +522,12 @@ test` (86 filer / 411 tester), `bun run lint` og `bunx tsc --noEmit` er
    **Status 24.08.2026: Implementert.** `e2e/fixtures.ts` gjør `console.error` og `pageerror` til testfeil for alle eksisterende kjerneflyter, og legger diagnostikken ved som Playwright-artefakt. Målrettet E2E-kjøring ble forsøkt, men isolert Supabase kunne ikke starte fordi Docker Desktop ikke kjørte.
 2. Legg visuell snapshotdekning på 375 × 812, 820 × 1180 og 1440 × 900 for forside, søkepanel, resultat, detalj, auth og composer.
 3. Sett routebudsjett for `/` og `/annonser`, i tillegg til dagens største-fil-budsjett.
+   **Status 24.08.2026: Implementert.** `bun run build` kjører
+   `check:bundle` etter produksjonsbuild. Sjekken leser den genererte
+   TanStack-manifesten, summerer unike root- og route-preloads og feiler ved
+   manglende manifest/assets eller regresjon over 1 750 KiB per rute. Baseline
+   fra eksisterende build er 1 631,5 KiB for `/` og 1 645,5 KiB for
+   `/annonser`.
 4. Lazy-load kart først når kartet er synlig eller brukeren velger kartmodus.
 5. Kontroller faktisk bilde-LCP og fontlasting; preload bare den fonten/vekten som brukes over folden hvis måling viser gevinst.
 6. Bruk eksisterende produkthendelser til ukentlig funnel, aggregert og uten fritekst/PII.

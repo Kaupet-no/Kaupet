@@ -19,18 +19,18 @@ Ikke vinn på flere funksjoner. Vinn på mindre friksjon, synlig forklaring og d
 
 ## Scorecard
 
-| Område                 | Vurdering | Kort begrunnelse                                                                                                     |
-| ---------------------- | --------: | -------------------------------------------------------------------------------------------------------------------- |
-| Visuell identitet      |      8/10 | Tydelig egenart, gode tokens og typografi; fortsatt for mye standard kort/pille-chrome i funksjonsflatene.           |
-| Informasjonsarkitektur |      5/10 | God rutebase, men for mange parallelle innganger og kontrollmønstre.                                                 |
-| Søk og filtrering      |      6/10 | Teknisk kraftig og lovende; brukerens mentale modell er ikke samlet.                                                 |
-| Annonseopprettelse     |      5/10 | Robust skall, autosave og validering; for mange steg og for mye konfigurerbar flyt.                                  |
-| Tillit                 |      6/10 | Personvern, åpen kildekode og kjøretøydata er sterke; proveniens og trygg handel er svakt kommunisert.               |
-| Opplevd ytelse         |      5/10 | Gode skeletons og route-splitting, men førstesiden hydrerer feil og de største inngangene er tunge.                  |
-| Native-opplevelse      |      6/10 | Safe area, haptikk og overlays er gjennomtenkt; onboarding, auth og noen web-primitiver bryter helheten.             |
-| Tilgjengelighet        |      6/10 | Gode etablerte regler og flere riktige ARIA-mønstre; reelle semantiske og dialogrelaterte avvik finnes.              |
-| Testbarhet             |      8/10 | 368 tester passerer, gode testid-konvensjoner og tydelig teststrategi. Visuell regresjon og kjernefunnel mangler.    |
-| Frontend-vedlikehold   |      5/10 | God feature-retning, men 49 149 linjer frontend-TSX og flere svært store orkestreringsfiler gir høy endringskostnad. |
+| Område                 | Vurdering | Kort begrunnelse                                                                                                           |
+| ---------------------- | --------: | -------------------------------------------------------------------------------------------------------------------------- |
+| Visuell identitet      |      8/10 | Tydelig egenart, gode tokens og typografi; fortsatt for mye standard kort/pille-chrome i funksjonsflatene.                 |
+| Informasjonsarkitektur |      5/10 | God rutebase, men for mange parallelle innganger og kontrollmønstre.                                                       |
+| Søk og filtrering      |      6/10 | Teknisk kraftig og lovende; brukerens mentale modell er ikke samlet.                                                       |
+| Annonseopprettelse     |      5/10 | Robust skall, autosave og validering; for mange steg og for mye konfigurerbar flyt.                                        |
+| Tillit                 |      6/10 | Personvern, åpen kildekode og kjøretøydata er sterke; proveniens og trygg handel er svakt kommunisert.                     |
+| Opplevd ytelse         |      5/10 | Gode skeletons og route-splitting, men førstesiden hydrerer feil og de største inngangene er tunge.                        |
+| Native-opplevelse      |      6/10 | Safe area, haptikk og overlays er gjennomtenkt; onboarding, auth og noen web-primitiver bryter helheten.                   |
+| Tilgjengelighet        |      6/10 | Gode etablerte regler og flere riktige ARIA-mønstre; reelle semantiske og dialogrelaterte avvik finnes.                    |
+| Testbarhet             |      8/10 | 414 tester passerer, gode testid-konvensjoner og tydelig teststrategi. Visuell regresjon og operativ kjernefunnel mangler. |
+| Frontend-vedlikehold   |      5/10 | God feature-retning, men 49 149 linjer frontend-TSX og flere svært store orkestreringsfiler gir høy endringskostnad.       |
 
 ## Det Kaupet må beholde
 
@@ -519,10 +519,10 @@ test` (86 filer / 411 tester), `bun run lint` og `bunx tsc --noEmit` er
 ### Fase 5 — kvalitet og ytelsesvern (løpende, start i fase 0)
 
 1. Legg hydration-feil og `console.error` inn som feil i Playwright for kjerneflytene.
-   **Status 24.08.2026: Fullført.** `e2e/fixtures.ts` gjør `console.error` og `pageerror` til testfeil for alle eksisterende kjerneflyter, og legger diagnostikken ved som Playwright-artefakt. Den isolerte nye kjøretøyreisen passerer 2/2 på `desktop-web` og `mobile-web`; den lokale E2E-runneren bruker kun sin lokale kjøretøyfixture og lar produksjonsendepunktet være standard ellers.
+   **Status 24.08.2026: Fullført.** `e2e/fixtures.ts` gjør `console.error` og `pageerror` til testfeil for alle eksisterende kjerneflyter, og legger diagnostikken ved som Playwright-artefakt. Den isolerte nye kjøretøyreisen passerer 2/2 på `desktop-web` og `mobile-web`, og semantic keyboard E2E passerer 8/8 på de samme profilene. Den lokale E2E-runneren bruker kun sin lokale kjøretøyfixture og lar produksjonsendepunktet være standard ellers.
 2. Legg visuell snapshotdekning på 375 × 812, 820 × 1180 og 1440 × 900 for forside, søkepanel, resultat, detalj, auth og composer.
    **Status 24.08.2026: Fullført.** `e2e/core.visual.spec.ts` dekker forside, native søkepanel, resultat, annonsedetalj og auth med ekte seedede E2E-annonser; `listing-composer.visual.spec.ts` dekker composer-flaten. Baselines er generert for `visual-phone`, `visual-tablet` og `visual-web` etter inspeksjon av faktisk rendret UI, og visualdataene er gjort deterministiske.
-   **Verifisering:** De visuelle testene passerer med 15/15 for kjerneflatene og 3/3 for composer på de tre viewport-profilene. Full `bun run test:e2e` passerer 38/38.
+   **Verifisering:** De visuelle testene passerer med 15/15 for kjerneflatene og 3/3 for composer på de tre viewport-profilene. Web-resultatets visuelle baseline er oppdatert etter kontroll av faktisk rendret UI. Full `bun run test:e2e` passerer 46/46.
 3. Sett routebudsjett for `/` og `/annonser`, i tillegg til dagens største-fil-budsjett.
    **Status 24.08.2026: Fullført.** `bun run build` kjører
    `check:bundle` etter produksjonsbuild. Sjekken leser den genererte
@@ -540,36 +540,37 @@ test` (86 filer / 411 tester), `bun run lint` og `bunx tsc --noEmit` er
    samme annonsebilde i alle kjøringene). Inter og Newsreader var ferdiglastet
    innen 75,1 ms uten font-preload i alle kjøringene, langt før LCP; målingen
    gir derfor ikke grunnlag for å legge til preload. Dette er lokale
-   produksjonspreview-målinger, ikke felt-CWV.
+   produksjonspreview-målinger, ikke staging- eller felt-CWV; staging-CWV er
+   fortsatt åpen/blokkert.
 6. Bruk eksisterende produkthendelser til ukentlig funnel, aggregert og uten fritekst/PII.
-   **Status 24.08.2026: Instrumentering fullført, operativ oppfølging gjenstår.** Eksisterende produkthendelser dekker søke- og composer-funnelene, og det trengs ingen nye funnel-hendelser eller ny kode. En fast, aggregert ukentlig funnelrapport er likevel ikke etablert.
+   **Status 24.08.2026: Instrumentering fullført, operativ oppfølging gjenstår.** Eksisterende produkthendelser dekker søke- og composer-funnelene, og det trengs ingen nye funnel-hendelser eller ny kode. En fast, aggregert ukentlig funnelrapport er likevel ikke etablert; operativ funnel er derfor fortsatt åpen/blokkert.
 
-**Fase-5-verifisering:** Browser-native QA og native simulator-QA er skilt eksplisitt. `?forcenative=1` ved 375 × 812 verifiserte native forside, `ResponsiveOverlay` for lokasjon og auth uten bunnnav i nettleser. Playwright dekker i tillegg syntetisert tastaturnavigasjon i `desktop-web` og `mobile-web`: Tab/Shift+Tab når søk, filter og auth-handlinger, Enter/Space aktiverer dem, Escape lukker native lokasjons- og søkeoverlay, DOM-fokus returnerer til åpneren, og tabrekkefølgen fortsetter uten fokusfelle. I tillegg ble følgende utført 24.08.2026:
+**Fase-5-verifisering:** Browser-native QA og native simulator-QA er skilt eksplisitt. `?forcenative=1` ved 375 × 812 verifiserte native forside, `ResponsiveOverlay` for lokasjon og auth uten bunnnav i nettleser. Playwright dekker i tillegg syntetisert tastaturnavigasjon i `desktop-web` og `mobile-web`: Tab/Shift+Tab når søk, filter og auth-handlinger, Enter/Space aktiverer dem, Escape lukker native lokasjons- og søkeoverlay, DOM-fokus returnerer til åpneren etter overlay-lukking, og tabrekkefølgen fortsetter uten fokusfelle. I tillegg ble følgende utført 24.08.2026:
 
 - `CAPACITOR_ENV=staging bunx cap sync ios` og Android-sync fullførte; iOS Swift Package Manager-filen ble oppdatert fra Capacitor 8.4.2 til 8.5.0.
 - iOS-build med `xcodebuild` for iPhone-simulator besto. iPhone 17 Pro med iOS 26.5 ble startet, appen installert, og et ekte skjermbilde bekreftet safe area, statuslinje og onboarding.
 - `./gradlew assembleStagingDebug` besto. Medium_Phone-emulatoren ble startet, staging-APK-en installert, og ekte skjermbilder bekreftet servervelger, native forside/bunnnavigasjon og lokasjon i `ResponsiveOverlay`. Android systemtilbake lukket overlayet korrekt.
 - Android font scale 1,3 ble kontrollert uten horisontal overflow. Tilgjengelighetstjenestene sto deaktivert i denne layoutkjøringen; den separate, avgrensede TalkBack-kontrollen er dokumentert nedenfor.
 
-- Android TalkBack med UIAutomator bekreftet semantiske navn for søk, lokasjon, bunnnavigasjon og dialogkontroller. Etter at Escape lukket lokasjonsdialogen, flyttet Androids accessibility-fokus seg til WebView i stedet for åpneren; browserens DOM-fokusretur er derfor ikke bevis for native AT-fokusretur.
+- Android TalkBack med UIAutomator bekreftet semantiske navn i tilgjengelighetstreet for søk, lokasjon, kategori, bunnnavigasjon og dialogkontroller. Etter at Escape lukket lokasjonsdialogen, flyttet Androids accessibility-fokus seg til WebView i stedet for åpneren; browserens DOM-fokusretur er derfor ikke bevis for native AT-fokusretur.
 
-Dette er kontrollene som faktisk er utført. VoiceOver, en full TalkBack-reise og ekstern maskinvaretastatur ble ikke kjørt. TalkBack-kontrollen var avgrenset til de nevnte semantiske navnene og fokusobservasjonen. iOS edge-swipe/system-tilbake ble ikke automatisert; Android systemtilbake er kontrollert kun for lokasjons-overlayet. Native kjøretøycomposer og faktisk native publisering inngår heller ikke i denne verifiseringen.
+Dette er kontrollene som faktisk er utført. VoiceOver, en full TalkBack-reise og ekstern maskinvaretastatur ble ikke kjørt. TalkBack-kontrollen var avgrenset til de nevnte semantiske navnene og fokusobservasjonen, ikke fysisk skjermleser-QA. iOS edge-swipe/system-tilbake ble ikke automatisert; Android systemtilbake er kontrollert kun for lokasjons-overlayet. Native kjøretøycomposer og faktisk native publisering inngår heller ikke i denne verifiseringen.
 
 ## Prioritert backlog
 
-| Rekkefølge | Tiltak                                  | Effekt    | Innsats     | Status                                                                   |
-| ---------: | --------------------------------------- | --------- | ----------- | ------------------------------------------------------------------------ |
-|          1 | Fiks hydration på `/`                   | Svært høy | Lav         | Fullført                                                                 |
-|          2 | Fjern Leaflet fra SSR-modulgrafen       | Svært høy | Lav         | Fullført                                                                 |
-|          3 | Fjern tidlige tillatelseskrav           | Svært høy | Lav         | Fullført                                                                 |
-|          4 | Skjul bunnnav på fokuserte ruter        | Høy       | Lav         | Fullført                                                                 |
-|          5 | Fjern offentlige visningstall           | Middels   | Svært lav   | Fullført                                                                 |
-|          6 | Samle søkestate og vis tolkning         | Svært høy | Middels     | Fullført                                                                 |
-|          7 | Reduser ordinær composer til fire stopp | Svært høy | Middels/høy | Fullført                                                                 |
-|          8 | Flytt 360° ut av minimumsflyt           | Høy       | Lav/middels | Fullført                                                                 |
-|          9 | Innfør faktagrunnlag/proveniens         | Høy       | Middels     | Fullført                                                                 |
-|         10 | Konsolider overlays og a11y-avvik       | Høy       | Lav/middels | Delvis fullført; browser-tastatur automatisert, native AT-fokus gjenstår |
-|         11 | Reduser kort/pille-chrome               | Middels   | Middels     | Delvis fullført; bredere konsolidering gjenstår                          |
+| Rekkefølge | Tiltak                                  | Effekt    | Innsats     | Status                                                                                                    |
+| ---------: | --------------------------------------- | --------- | ----------- | --------------------------------------------------------------------------------------------------------- |
+|          1 | Fiks hydration på `/`                   | Svært høy | Lav         | Fullført                                                                                                  |
+|          2 | Fjern Leaflet fra SSR-modulgrafen       | Svært høy | Lav         | Fullført                                                                                                  |
+|          3 | Fjern tidlige tillatelseskrav           | Svært høy | Lav         | Fullført                                                                                                  |
+|          4 | Skjul bunnnav på fokuserte ruter        | Høy       | Lav         | Fullført                                                                                                  |
+|          5 | Fjern offentlige visningstall           | Middels   | Svært lav   | Fullført                                                                                                  |
+|          6 | Samle søkestate og vis tolkning         | Svært høy | Middels     | Fullført                                                                                                  |
+|          7 | Reduser ordinær composer til fire stopp | Svært høy | Middels/høy | Fullført                                                                                                  |
+|          8 | Flytt 360° ut av minimumsflyt           | Høy       | Lav/middels | Fullført                                                                                                  |
+|          9 | Innfør faktagrunnlag/proveniens         | Høy       | Middels     | Fullført                                                                                                  |
+|         10 | Konsolider overlays og a11y-avvik       | Høy       | Lav/middels | Delvis fullført; overlay-primitiver ryddet og browser/E2E-fokusretur verifisert, native AT-fokus gjenstår |
+|         11 | Reduser kort/pille-chrome               | Middels   | Middels     | Delvis fullført; overlay-/resultatfilter-chrome redusert, bredere konsolidering gjenstår                  |
 
 Statusene gjelder implementering i de prioriterte flatene, ikke at alle verifiserings- eller driftsgap er lukket.
 
@@ -597,8 +598,8 @@ Gjennomført:
 
 - `bun run lint` — bestått;
 - `bunx tsc --noEmit` — bestått;
-- `bun run test` — 86 testfiler og 411 tester bestått;
-- `bun run test:e2e` — 38-test baseline bestått, inkludert desktop composer-publisering (1 test) og kjøpsønskeflyt (3 tester); den nye `bun run test:e2e -- e2e/publish-vehicle-listing.spec.ts --project=desktop-web --project=mobile-web`-kjøringen besto 2/2;
+- `bun run test` — 88 testfiler og 414 tester bestått;
+- `bun run test:e2e` — 46/46 bestått, inkludert semantic keyboard E2E og kjøretøycomposer 2/2 på `desktop-web` og `mobile-web`;
 - `bun run build` — bestått, inkludert routebudsjett for `/` og `/annonser`;
 - browser-native QA med `?forcenative=1` ved 375 × 812: native forside,
   lokasjon via `ResponsiveOverlay` og auth uten bunnnav;
@@ -617,9 +618,9 @@ Gjennomført:
 - native Android-skjermbilder bekreftet servervelger, forside/bunnnavigasjon
   og lokasjon via `ResponsiveOverlay`; systemtilbake lukket overlayet;
   font scale 1,3 ga ingen horisontal overflow;
-- browser semantic E2E — 38/38 bestått.
+- browser semantic E2E — 8/8 bestått på `desktop-web` og `mobile-web`, med tastaturaktivering og DOM-fokusretur etter overlay-lukking;
 - `bun run test:e2e -- e2e/semantic-quality.spec.ts --project=desktop-web --project=mobile-web` mot isolert Docker-backed Supabase — 8/8 bestått; dekker native lokasjonsoverlegg, søkepanel og auth med tastatur samt fokusretur uten fokusfelle;
-- Android TalkBack med UIAutomator — semantiske navn bekreftet for søk, lokasjon, bunnnavigasjon og dialogkontroller; etter Escape landet accessibility-fokus på WebView, ikke åpneren.
+- Android TalkBack med UIAutomator — semantiske navn i tilgjengelighetstreet bekreftet for søk, lokasjon, kategori, bunnnavigasjon og dialogkontroller; etter Escape landet accessibility-fokus på WebView, ikke åpneren.
 
 Native simulator-QA er dermed utført for de nevnte installasjons-, layout-,
 systemtilbake- og avgrensede TalkBack-scenariene. Dette må ikke leses som
@@ -628,7 +629,7 @@ Følgende er ikke utført: VoiceOver, full TalkBack-reise, ekstern fysisk
 maskinvaretastatur, iOS edge-swipe/system-tilbake, native kjøretøycomposer og
 faktisk native publisering. Android accessibility-fokus returnerte dessuten
 til WebView i stedet for overlayåpneren etter Escape, selv om browserens
-DOM-fokusretur består. Felt-CWV; Nitro-tallene over er
+DOM-fokusretur består. Staging-/felt-CWV; Nitro-tallene over er
 lokale produksjonspreview-målinger og må ikke leses som reelle brukerdata;
 kvalitative brukertester; og operativ, aggregert ukentlig funnelrapport.
 Produkt-hendelsene finnes for søk og composer, men rapporteringen er ikke satt

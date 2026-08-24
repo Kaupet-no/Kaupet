@@ -106,6 +106,14 @@
   --border: oklch(0.88 0.02 80);
   --input: oklch(0.9 0.018 80);
   --ring: oklch(0.35 0.06 160);
+  /* Semantic density tiers for the editorial, task, and data surfaces. Keep
+     spacing in the existing token layer so web and native use the same rhythm. */
+  --density-editorial-block: clamp(2.5rem, 7vw, 5rem);
+  --density-editorial-gap: 1.5rem;
+  --density-task-block: 1rem;
+  --density-task-gap: 0.75rem;
+  --density-data-block: 0.75rem;
+  --density-data-gap: 0.5rem;
 }
 
 .dark {
@@ -172,6 +180,20 @@
     font-weight: 500;
     letter-spacing: -0.01em;
   }
+}
+/* The three density tiers keep visual hierarchy explicit without introducing
+   a second component or token system. */
+.density-editorial {
+  padding-block: var(--density-editorial-block);
+  gap: var(--density-editorial-gap);
+}
+.density-task {
+  padding-block: var(--density-task-block);
+  gap: var(--density-task-gap);
+}
+.density-data {
+  padding-block: var(--density-data-block);
+  gap: var(--density-data-gap);
 }
 
 /* Utility: top padding that respects the device safe area (notch / dynamic island). */

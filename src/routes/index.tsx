@@ -307,27 +307,19 @@ function WebLanding() {
       </HeaderSearchPortal>
       {/* Hero — søkefeltet får all oppmerksomheten, som en søkemotor */}
       <section className="relative overflow-hidden bg-surface">
-        {/* Per-category background tint that animates in from the left when a
-            main category is selected. */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 origin-left transition-[transform,background-color,opacity] duration-700 ease-out"
-          style={{
-            background: activeCategory?.color ?? "transparent",
-            opacity: activeCategory ? 0.16 : 0,
-            transform: activeCategory ? "translateX(0)" : "translateX(-100%)",
-          }}
-        />
-        <div className="relative z-10 mx-auto max-w-3xl px-4 py-14 text-center md:py-20">
-          {/* Hero text and the category heading are mutually exclusive, each
-              sliding in from the direction matching the background tint and
-              the subcategory grid below, so picking a category visibly moves
-              the page into a more focused area. */}
+        <div className="density-editorial relative z-10 mx-auto max-w-3xl px-4 text-center">
+          {/* Hero text and category heading share the same editorial space;
+              selecting a category changes the local heading treatment. */}
           {activeCategory ? (
             <h1
               key={activeCategory.id}
-              className="text-5xl leading-[1.05] tracking-tight duration-700 animate-in fade-in slide-in-from-right-4 md:text-6xl"
-              style={{ fontFamily: categoryHeadingFontStack(activeCategory.heading_font) }}
+              className="inline-block border-b-2 border-[var(--cat-tint)] pb-1 text-5xl leading-[1.05] tracking-tight duration-700 animate-in fade-in slide-in-from-right-4 md:text-6xl"
+              style={
+                {
+                  fontFamily: categoryHeadingFontStack(activeCategory.heading_font),
+                  "--cat-tint": activeCategory.color ?? "var(--primary)",
+                } as React.CSSProperties
+              }
             >
               /{activeCategory.name_nb}
             </h1>
@@ -430,14 +422,6 @@ function WebLanding() {
                 </Link>
               </div>
             </div>
-            {/* Kant-fade — kun mobil, hinter om at raden kan sveipes videre.
-                Skjules mens en kategori er valgt, siden fargen ellers ville
-                kollidert med kategoritinten bak. */}
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-surface to-transparent transition-opacity sm:hidden"
-              style={{ opacity: activeCategory ? 0 : 1 }}
-            />
           </div>
 
           <Collapsible

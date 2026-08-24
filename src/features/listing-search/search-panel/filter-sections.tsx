@@ -230,7 +230,7 @@ export function SearchFilterSections({
           {activeSection === "location" && (
             <section
               data-section="location"
-              className="mt-4 scroll-mt-2 space-y-4 rounded-2xl border border-border bg-card p-4"
+              className="density-task mt-4 scroll-mt-2 space-y-4 border-y border-border"
             >
               <Label className="text-base font-medium">Sted</Label>
               <LocationPicker value={location} onChange={onLocationChange} autoFocus={false} />
@@ -246,7 +246,7 @@ export function SearchFilterSections({
           {activeSection === "price" && (
             <section
               data-section="price"
-              className="mt-4 scroll-mt-2 space-y-6 rounded-2xl border border-border bg-card p-4"
+              className="density-task mt-4 scroll-mt-2 space-y-6 border-y border-border"
             >
               <div className="space-y-3">
                 {/* Ingen egen seksjonstittel — RangeFilterField rendrer selv en
@@ -294,7 +294,7 @@ export function SearchFilterSections({
           {activeSection === "attributes" && (
             <section
               data-section="attributes"
-              className="space-y-4 rounded-2xl border border-border bg-card p-4"
+              className="density-task space-y-4 border-y border-border"
             >
               <Label className="text-base font-medium">
                 {activeAttributeKey
@@ -338,7 +338,7 @@ export function SearchFilterSections({
           {activeSection === "search" && (
             <section
               data-section="search"
-              className="space-y-3 rounded-2xl border border-border bg-card p-4"
+              className="density-task space-y-3 border-y border-border"
             >
               <Label className="text-base font-medium">Presist søk</Label>
 

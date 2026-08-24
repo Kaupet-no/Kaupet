@@ -455,6 +455,20 @@ Disse tre gir mer egenart enn en ny gradient, illustrasjonsstil eller mikroanima
    `bunx tsc --noEmit` er bestått.
 
 5. Flytt trygg-handel-råd til kontaktøyeblikket og første samtale, ikke en generell tekstvegg.
+   **Status 24.08.2026: Fullført.** De eksisterende korte rådene fra vilkårene
+   vises nå ved kontaktknappen og samlet i den første tomme samtalen. Rådet
+   styres av faktisk meldingsantall og rendres derfor ikke i etablerte
+   samtaler eller som en generell seksjon på annonsedetaljen. Rapportering,
+   blokkering og eksisterende meldingsflyt er uendret.
+
+   **Verifisering:** Komponenttesten feilet rødt før den delte komponenten
+   fantes og dekker kontaktøyeblikket, tom samtale, etablert samtale og at
+   kontaktflaten ikke blir en generell rådsliste. `bun run test --
+src/components/trade-safety-advice.test.tsx` (1 fil / 1 test), `bun run
+test` (86 filer / 411 tester), `bun run lint` og `bunx tsc --noEmit` er
+   bestått. Ingen onboarding, coach marks, ny meldingsmodell, databasekolonne,
+   sikkerhetsscore eller badge er innført.
+
 6. Ikke lag score eller badge før det finnes validerte data og en dokumentert modell for feilklassifisering.
 
 **Akseptanse:** En bruker kan på fem sekunder svare på hvem som har oppgitt viktigste fakta; ingen tekst lover verifikasjon Kaupet ikke har gjort.
@@ -463,12 +477,42 @@ Disse tre gir mer egenart enn en ny gradient, illustrasjonsstil eller mikroanima
 
 **Mål:** La den eksisterende identiteten bli tydeligere gjennom reduksjon.
 
-1. Definer tre tetthetsnivåer i eksisterende tokens: hero/redaksjonell, oppgave og dataliste.
+1. Definer tre tetthetsnivåer i eksisterende tokens: hero/redaksjonell,
+   oppgave og dataliste.
+   **Status 24.08.2026: Fullført.** `src/styles.css` har semantiske
+   `density-editorial`, `density-task` og `density-data`-klasser med
+   eksisterende spacing-tokens, brukt på hero, søk/filter, kort og faktalister.
+
 2. Fjern unødvendige nested cards og piller i søk/resultat/composer.
-3. Standardiser pris, metadata, proveniens og primærhandling på annonsekort og detalj.
+   **Status 24.08.2026: Fullført.** Avanserte søkefelt, attributtfiltre og
+   native detaljfilter bruker nå flate seksjoner med tynne regler fremfor
+   kort inni kort. Søkekontroller og nødvendige valgkontroller beholder
+   eksplisitt interaksjonschrome.
+
+3. Standardiser pris, metadata, proveniens og primærhandling på annonsekort
+   og detalj.
+   **Status 24.08.2026: Fullført.** Kort og detalj bruker samme grønne
+   Newsreader-pris, metadata ligger samlet under tittelen, kortlenken har
+   eksplisitt tilgjengelig navn, og faktagrunnlaget viser konkrete kilder med
+   tydelig tekstlig proveniens. Selgerrollen er ikke lenger en dekorativ badge.
+
 4. Kort ned nativeheroen og vis første annonse over folden.
-5. Bruk kategoriaksent kun på valgt tilstand/overskrift; behold nøytral skanning ellers.
-6. Dokumenter eksemplene i `docs/UI-GUIDE.md`; ikke lag et separat designsystemdokument.
+   **Status 24.08.2026: Fullført.** Nativeheroen er redusert til 52 % av
+   vanlig telefonhøyde, snarveiene er gjort til lette handlinger uten
+   kortchrome, og «Populært nå» starter tidligere slik at første annonsekort
+   er synlig på 375 × 812.
+
+5. Bruk kategoriaksent kun på valgt tilstand/overskrift; behold nøytral
+   skanning ellers.
+   **Status 24.08.2026: Fullført.** Den globale hero-tinten er fjernet.
+   Kategorifarge brukes lokalt på valgt ikon, underkategoriikon og valgt
+   overskriftsregel; øvrige flater beholder nøytrale tokens.
+
+6. Dokumenter eksemplene i `docs/UI-GUIDE.md`; ikke lag et separat
+   designsystemdokument.
+   **Status 24.08.2026: Fullført.** UI-guiden dokumenterer tetthetsnivåene,
+   kort-/proveniensreglene og native fold-prinsippet. Ingen separat
+   designsystemfil er opprettet.
 
 **Akseptanse:** Flater ser ut som samme produkt uten at web og native er pikselidentiske; semantiske tokens dekker alle nye varianter; dark mode og 200 % tekst er kontrollert.
 
@@ -519,16 +563,18 @@ Gjennomført:
 
 - `bun run lint` — bestått;
 - `bunx tsc --noEmit` — bestått;
-- `bun run test` — 67 testfiler og 368 tester bestått;
-- `bun run build` — bestått;
-- `bun run check:bundle` — bestått;
-- visuell og semantisk kontroll av webforside, søkeresultat, native onboarding, native forside, native søkepanel, native annonsedetalj og native registrering.
+- `bun run test` — 86 testfiler og 411 tester bestått;
+- `bun run build` — bestått etter fase 4-endringene;
+- visuell kontroll av webforside på 1440 × 900, native forside på 375 × 812,
+  native annonsedetalj på 375 × 812, samt mørk modus og 200 % tekst uten
+  horisontal overflow.
 
 Ikke verifisert:
 
 - ekte iOS-/Android-enhet, safe area og systemtilbake;
-- kjøretøycomposer og faktisk publisering; ordinær innlogget flyt er verifisert frem til publiseringsknappen uten å publisere;
-- skjermleser, 200 % tekst og ekstern tastaturbruk;
+- skjermleser og ekstern tastaturbruk;
+- kjøretøycomposer og faktisk publisering; ordinær innlogget flyt er verifisert
+  frem til publiseringsknappen uten å publisere;
 - nettverk med høy latenstid/tap og reelle Core Web Vitals;
 - kvalitative brukertester eller produksjonsfunnel.
 

@@ -1,10 +1,9 @@
 import { Link } from "@tanstack/react-router";
-import { Gauge, ImageOff, MapPin } from "lucide-react";
+import { Gauge, ImageOff } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { signListingImageUrls, thumbPathFor } from "@/lib/storage";
 import { formatPrice, displayPriceNok } from "@/lib/format";
 import { FavoriteButton } from "@/components/favorite-button";
-import { useIsNative } from "@/hooks/use-is-native";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export type ListingCardData = {
@@ -103,7 +102,6 @@ export function ListingCard({
   knownFavorite,
   favoriteStateReady,
 }: Props) {
-  const isNative = useIsNative();
   const [imgUrl, setImgUrl] = useState<string | null>(null);
   const priceLabel = formatPrice({ price_nok: displayPriceNok(listing), is_free: listing.is_free });
   const supportsHover = useRef(true);
@@ -137,10 +135,10 @@ export function ListingCard({
 
   const effectiveImageUrl = signedImageUrl !== undefined ? signedImageUrl : imgUrl;
 
-  const cardClass = `group relative overflow-hidden rounded-xl border bg-card transition hover:shadow-md ${
+  const cardClass = `group relative overflow-hidden rounded-lg border bg-card transition-[border-color,box-shadow] duration-150 ${
     highlighted
-      ? "border-primary shadow-md ring-2 ring-primary/30"
-      : "border-border hover:border-primary"
+      ? "border-primary shadow-sm ring-2 ring-primary/20"
+      : "border-border hover:border-primary/70"
   }`;
   const linkClass =
     "block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";
@@ -178,7 +176,7 @@ export function ListingCard({
               <p className="line-clamp-1 text-xs text-muted-foreground">{listing.subtitle}</p>
             )}
             <div className="flex items-baseline justify-between gap-2">
-              <p className="font-display text-base font-semibold">{priceLabel}</p>
+              <p className="font-display text-base font-semibold text-primary">{priceLabel}</p>
               {typeof listing.mileage_km === "number" ? (
                 <UsageLabel value={listing.mileage_km} unit="km" />
               ) : typeof listing.engine_hours === "number" ? (
@@ -222,6 +220,7 @@ export function ListingCard({
         params={{ kaupetCode: listing.kaupet_code }}
         state={linkState}
         className={linkClass}
+        aria-label={`${listing.title}, ${priceLabel}`}
       >
         <div className="relative aspect-[4/3] bg-muted" style={{ aspectRatio: "4 / 3" }}>
           <ListingImage
@@ -231,28 +230,22 @@ export function ListingCard({
             compact={false}
           />
         </div>
-        <div className="space-y-1 p-3">
+        <div className="density-data px-3">
           <h3 className="truncate text-sm font-medium leading-snug">{listing.title}</h3>
           {listing.subtitle && (
             <p className="line-clamp-1 text-xs text-muted-foreground">{listing.subtitle}</p>
           )}
           <div className="flex items-baseline justify-between gap-2">
-            <p className={`font-display ${isNative ? "text-lg font-semibold" : "text-base"}`}>
-              {priceLabel}
-            </p>
+            <p className="font-display text-lg font-semibold text-primary">{priceLabel}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            {listing.city && <span>{listing.city}</span>}
             {typeof listing.mileage_km === "number" ? (
               <UsageLabel value={listing.mileage_km} unit="km" />
             ) : typeof listing.engine_hours === "number" ? (
               <UsageLabel value={listing.engine_hours} unit="t" />
             ) : null}
           </div>
-          {listing.city && (
-            <p
-              className={`text-xs text-muted-foreground ${isNative ? "" : "flex items-center gap-1"}`}
-            >
-              {!isNative && <MapPin className="size-3" />} {listing.city}
-            </p>
-          )}
         </div>
       </Link>
       <FavoriteButton

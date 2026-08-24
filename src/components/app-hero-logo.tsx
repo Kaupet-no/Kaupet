@@ -1,7 +1,7 @@
 import { useScrollFadeOpacity } from "@/hooks/use-scroll-fade-opacity";
 import { useKeyboardVisible } from "@/hooks/use-keyboard-visible";
 
-/** Large centered wordmark, fixed over the home hero, that fades out on scroll. */
+/** Large centered wordmark in the home flow, fading out as the user scrolls. */
 export function AppHeroLogo() {
   const scrollOpacity = useScrollFadeOpacity();
   const keyboardVisible = useKeyboardVisible();
@@ -9,9 +9,8 @@ export function AppHeroLogo() {
 
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 z-30 flex justify-center"
+      className="pointer-events-none relative z-30 flex justify-center pb-4 pt-safe"
       style={{
-        top: "calc(env(safe-area-inset-top) + 3.5rem)",
         opacity,
         transition: "opacity 150ms ease",
         pointerEvents: opacity < 0.05 ? "none" : "auto",

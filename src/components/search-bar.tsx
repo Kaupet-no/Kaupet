@@ -183,7 +183,7 @@ export function SearchBar({
               />
             </Button>
           </CollapsibleTrigger>
-          <CollapsibleContent className="space-y-4 rounded-xl border border-border bg-card p-4">
+          <CollapsibleContent className="density-task mt-2 space-y-4 border-t border-border px-4">
             <div className="flex items-center justify-between gap-2">
               <Label className="text-sm font-medium">Søkeordmodus</Label>
               <ModeToggle

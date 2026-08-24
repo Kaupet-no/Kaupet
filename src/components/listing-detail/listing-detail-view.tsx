@@ -283,7 +283,7 @@ export function ListingDetailView({
       fieldKey="price"
       value={{ isFree, priceNok }}
       render={(v) => (
-        <p className="font-display text-xl leading-none text-primary">
+        <p className="font-display text-lg font-semibold leading-tight text-primary">
           {v.isFree
             ? "Gis bort"
             : v.priceNok != null
@@ -911,7 +911,7 @@ function ListingDetailViewBody({
               isEditedLater && updatedAt ? fmt(updatedAt) : fmt(publishedAt ?? createdAt);
 
             return (
-              <dl className="grid grid-cols-2 gap-3 rounded-xl border border-border bg-card p-4 text-sm @sm:grid-cols-3">
+              <dl className="density-data grid grid-cols-2 gap-3 border-y border-border text-sm @sm:grid-cols-3">
                 {/* Kjøretøy har tilstand fylt ut allerede fra opprettelsen (se
                     VehicleConditionGroup), med kjøretøytype-spesifikke etiketter
                     (se VEHICLE_CONDITIONS_BY_SLUG) — så tilen vises normalt for

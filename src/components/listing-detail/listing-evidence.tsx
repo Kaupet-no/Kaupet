@@ -11,7 +11,7 @@ export function ListingEvidence({ sources }: { sources: ListingFactSource[] }) {
   return (
     <section
       aria-labelledby="listing-evidence-heading"
-      className="mt-4 border-t border-border pt-4"
+      className="density-data mt-4 border-t border-border"
     >
       <h2 id="listing-evidence-heading" className="text-sm font-medium">
         Faktagrunnlag
@@ -19,7 +19,7 @@ export function ListingEvidence({ sources }: { sources: ListingFactSource[] }) {
       <ul className="mt-2 space-y-1.5 text-xs text-muted-foreground">
         {sources.map(({ source, timestamp }) => (
           <li key={source}>
-            <span>{SOURCE_TEXT[source]}</span>
+            <span className="font-medium text-foreground">{SOURCE_TEXT[source]}</span>
             {timestamp && (
               <>
                 {" · "}

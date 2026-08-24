@@ -4,6 +4,41 @@ const inputSchema = z.object({ title: z.string().min(3).max(200) });
 
 type CategoryRow = { id: string; slug: string; name_nb: string; parent_id: string | null };
 
+function categoryCandidates(categories: CategoryRow[], title: string) {
+  const byId = new Map(categories.map((category) => [category.id, category]));
+  const roots = categories.filter((category) => !category.parent_id);
+  const leaves = categories.filter(
+    (category) => !categories.some((c) => c.parent_id === category.id),
+  );
+  const titleWords = new Set(title.toLocaleLowerCase("nb-NO").match(/[\p{L}\p{N}]+/gu) ?? []);
+
+  function rootOf(category: CategoryRow) {
+    let current = category;
+    while (current.parent_id) {
+      current = byId.get(current.parent_id) ?? current;
+      if (!current.parent_id) break;
+    }
+    return current;
+  }
+
+  // Keep every top-level branch represented: an unknown product name such as
+  // "Nintendo Switch" has no useful lexical overlap with "Elektronikk".
+  return roots.flatMap((root) =>
+    leaves
+      .filter((leaf) => rootOf(leaf).id === root.id)
+      .sort((a, b) => {
+        const score = (category: CategoryRow) =>
+          [category.name_nb, root.name_nb]
+            .join(" ")
+            .toLocaleLowerCase("nb-NO")
+            .match(/[\p{L}\p{N}]+/gu)
+            ?.reduce((sum, word) => sum + (titleWords.has(word) ? 1 : 0), 0) ?? 0;
+        return score(b) - score(a) || a.name_nb.localeCompare(b.name_nb, "nb");
+      })
+      .slice(0, 12),
+  );
+}
+
 /**
  * AI fallback for `suggestCategoryForTitle` (category-suggestion.functions.ts),
  * used only when the vote-based RPC has no confident match — e.g. a title
@@ -46,12 +81,16 @@ export async function suggestCategoryForTitleAi(input: unknown) {
   );
   if (leafCategories.length === 0) return null;
 
-  const byName = new Map(leafCategories.map((c) => [c.name_nb, c]));
   // Truncated defensively — the model only needs enough of the title to
   // classify it, and this keeps a margin against the context limit above as
   // the leaf category count grows (title itself is already capped at 120
   // chars by listingSchema/wtbSchema, so this rarely bites in practice).
   const truncatedTitle = title.slice(0, 100);
+  const candidates = categoryCandidates(
+    (categories as CategoryRow[]).filter((c) => c.name_nb !== "Motorsport"),
+    truncatedTitle,
+  );
+  const byName = new Map(candidates.map((c) => [c.name_nb, c]));
   // Few-shot examples target the two failure modes we've actually seen in
   // testing (a 1B model has no real-world brand knowledge to fall back on):
   // car/motorcycle brand+model titles getting classified as an unrelated
@@ -68,7 +107,7 @@ export async function suggestCategoryForTitleAi(input: unknown) {
   const examplesBlock = examples.length ? `\nEksempler:\n${examples.join("\n")}\n` : "";
 
   const prompt = `Du skal klassifisere annonsetitler til riktig kategori for en norsk nettbasert markedsplass.
-Tilgjengelige kategorier: ${leafCategories.map((c) => c.name_nb).join(", ")}
+Tilgjengelige kandidater (gruppert etter toppkategori): ${candidates.map((c) => `${(categories as CategoryRow[]).find((p) => p.id === c.parent_id)?.name_nb ?? "Annet"} > ${c.name_nb}`).join(", ")}
 Titler som starter med et bilmerke og en modellbetegnelse er nesten alltid kjøretøy, ikke
 husholdningsartikler eller annet elektronikk — se etter merke/modell-mønsteret, ikke
 enkeltord i tittelen.
@@ -148,7 +187,7 @@ omtrent like sannsynlige, svar med begge, atskilt med komma. Ingen annen tekst.`
   for (const part of generated.split(",")) {
     const name = part.trim();
     if (!name) continue;
-    const match = byName.get(name) ?? leafCategories.find((c) => name.includes(c.name_nb));
+    const match = byName.get(name) ?? candidates.find((c) => name.includes(c.name_nb));
     if (match && !matches.some((m) => m.id === match.id)) matches.push(match);
     if (matches.length === 2) break;
   }

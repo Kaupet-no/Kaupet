@@ -151,9 +151,8 @@ export function AppLanding() {
   const placeholderPaused = focused || q.length > 0;
 
   const tileButtonClass =
-    "flex w-32 flex-col items-center gap-2 rounded-2xl border border-border bg-card px-3 py-4 text-center text-sm font-medium transition active:scale-[0.98]";
-  const tileIconClass =
-    "flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary";
+    "flex w-32 flex-col items-center gap-2 border-b border-border px-3 py-4 text-center text-sm font-medium transition active:opacity-70";
+  const tileIconClass = "flex size-11 items-center justify-center text-primary";
 
   return (
     <div className={isNative ? "pb-3" : "pb-24"}>
@@ -162,7 +161,11 @@ export function AppLanding() {
       {/* Hero — sentrert søkefelt */}
       <section
         className={`flex flex-col items-center justify-center px-5 ${
-          isTablet ? "min-h-[40vh] pt-10" : isNative ? "min-h-[68vh] pt-24" : "min-h-[70vh] pt-8"
+          isTablet
+            ? "min-h-[40vh] density-editorial"
+            : isNative
+              ? "min-h-[52vh] density-editorial"
+              : "min-h-[70vh] pt-8"
         }`}
       >
         <h1 className="mb-6 text-center font-display text-2xl tracking-tight">
@@ -528,8 +531,7 @@ export function AppLanding() {
         </section>
       )}
 
-      {/* Populært nå */}
-      <section className="mt-8 pl-5">
+      <section className="mt-6 pl-5">
         <div className="mb-3 flex items-center justify-between pr-5">
           <h2 className="font-display text-lg tracking-tight">Populært nå</h2>
           <Link

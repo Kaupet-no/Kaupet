@@ -678,9 +678,7 @@ export function AttributeFilterChips({
   // labels above each (mobile.de-style), "Flere filter"/"Nullstill" as plain
   // links along the bottom instead of buttons in the field row.
   const cardFields = (
-    <div
-      className={embedCard ? undefined : "rounded-2xl border border-border bg-card p-6 shadow-sm"}
-    >
+    <div className={embedCard ? undefined : "density-task border-y border-border"}>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
         {chips}
         {priceChip}

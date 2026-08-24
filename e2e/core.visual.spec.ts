@@ -7,6 +7,46 @@ async function waitForHydration(page: Page) {
   await page.locator("html[data-kaupet-hydrated='true']").waitFor();
 }
 
+async function installDeterministicListingRoutes(page: Page) {
+  await page.route("**/rest/v1/rpc/search_listings_page", async (route) => {
+    const request = route.request();
+    const payload = (request.postDataJSON() ?? {}) as Record<string, unknown>;
+
+    await route.continue({
+      postData: JSON.stringify({
+        ...payload,
+        _include_groups: [{ mode: "all", terms: [FILTER_QUERY] }],
+        _exclude_any_terms: null,
+        _exclude_all_groups: [],
+        _category_ids: null,
+        _conditions: null,
+        _include_free: true,
+        _min_price: null,
+        _max_price: null,
+        _attribute_filters: {},
+        _center_lat: null,
+        _center_lng: null,
+        _radius_km: 10,
+      }),
+    });
+  });
+
+  await page.route("**/rest/v1/rpc/popular_listings_last_week", async (route) => {
+    const payload = (route.request().postDataJSON() ?? {}) as Record<string, unknown>;
+    const response = await route.fetch({
+      postData: JSON.stringify({ ...payload, _limit: 100 }),
+    });
+    const listings = (await response.json()) as Array<{ title?: string }>;
+    const fixtureListings = listings.filter((listing) => listing.title?.startsWith(FILTER_QUERY));
+
+    await route.fulfill({ response, body: JSON.stringify(fixtureListings) });
+  });
+}
+
+test.beforeEach(async ({ page }) => {
+  await installDeterministicListingRoutes(page);
+});
+
 async function openResults(page: Page, native: boolean) {
   await page.goto(`/annonser?q=${FILTER_QUERY}&sort=price_asc${native ? "&forcenative=1" : ""}`);
   await waitForHydration(page);

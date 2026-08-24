@@ -65,6 +65,7 @@ function assertVehicleLookupConfigured() {
     );
   }
 }
+const SVV_BASE_URL = "https://akfell-datautlevering.atlas.vegvesen.no/enkeltoppslag/kjoretoydata";
 
 const vehicleLookupUrl =
   process.env.E2E_TEST === "1"

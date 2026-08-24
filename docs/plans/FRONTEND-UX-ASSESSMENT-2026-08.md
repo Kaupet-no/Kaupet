@@ -1,9 +1,9 @@
 # Frontend- og UX-assessment for Kaupet
 
-**Dato:** 23. august 2026  
+**Dato:** 24. august 2026
 **Omfang:** Sluttbrukerrettet web og Capacitor-app, med særlig vekt på søk, resultater, annonsedetalj, registrering og annonseopprettelse.  
-**Metode:** Statisk gjennomgang av arkitektur, ruter, komponenter, features, tester og bundle; visuell kontroll av lokal web på 1440 × 900 og native-emulering på 375 × 812; kontroll av DOM, konsoll og sentrale brukerflyter.  
-**Avgrensning:** Ingen produksjonsdata, ekte iOS-/Android-simulator, skjermleser, reell nettverksstrupling eller brukertest inngår.
+**Metode:** Statisk gjennomgang av arkitektur, ruter, komponenter, features, tester og bundle; visuell kontroll av lokal web på 1440 × 900 og native-emulering på 375 × 812; kontroll av DOM, konsoll og sentrale brukerflyter; samt staging-build og native flytkontroll i iOS- og Android-simulator.
+**Avgrensning:** Ingen produksjonsdata, fysiske iOS-/Android-enheter, skjermleser, ekstern maskinvaretastatur, reell nettverksstrupling eller brukertest inngår.
 
 ## Kort dom
 
@@ -544,7 +544,14 @@ test` (86 filer / 411 tester), `bun run lint` og `bunx tsc --noEmit` er
 6. Bruk eksisterende produkthendelser til ukentlig funnel, aggregert og uten fritekst/PII.
    **Status 24.08.2026: Instrumentering fullført, operativ oppfølging gjenstår.** Eksisterende produkthendelser dekker søke- og composer-funnelene, og det trengs ingen nye funnel-hendelser eller ny kode. En fast, aggregert ukentlig funnelrapport er likevel ikke etablert.
 
-**Fase-5-verifisering:** Dette dokumenterer test- og måleresultatene over, men skiller eksplisitt mellom browser-native QA og ekte enheter. `?forcenative=1` ved 375 × 812 verifiserte native forside, `ResponsiveOverlay` for lokasjon og auth uten bunnnav i nettleser; dette er ikke verifisering på iOS-/Android-enhet eller simulator.
+**Fase-5-verifisering:** Browser-native QA og native simulator-QA er skilt eksplisitt. `?forcenative=1` ved 375 × 812 verifiserte native forside, `ResponsiveOverlay` for lokasjon og auth uten bunnnav i nettleser. I tillegg ble følgende utført 24.08.2026:
+
+- `CAPACITOR_ENV=staging bunx cap sync ios` og Android-sync fullførte; iOS Swift Package Manager-filen ble oppdatert fra Capacitor 8.4.2 til 8.5.0.
+- iOS-build med `xcodebuild` for iPhone-simulator besto. iPhone 17 Pro med iOS 26.5 ble startet, appen installert, og et ekte skjermbilde bekreftet safe area, statuslinje og onboarding.
+- `./gradlew assembleStagingDebug` besto. Medium_Phone-emulatoren ble startet, staging-APK-en installert, og ekte skjermbilder bekreftet servervelger, native forside/bunnnavigasjon og lokasjon i `ResponsiveOverlay`. Android systemtilbake lukket overlayet korrekt.
+- Android font scale 1,3 ble kontrollert uten horisontal overflow. Tilgjengelighetstjenestene i Android-innstillingene sto som deaktivert; dette er dokumentert som en miljøbegrensning, ikke som bestått skjermlesertest.
+
+Dette er kontrollene som faktisk er utført. VoiceOver/TalkBack og ekstern maskinvaretastatur ble ikke kjørt. iOS edge-swipe/system-tilbake ble ikke automatisert; Android systemtilbake er kontrollert kun for lokasjons-overlayet. Native kjøretøycomposer og faktisk native publisering inngår heller ikke i denne verifiseringen.
 
 ## Prioritert backlog
 
@@ -601,21 +608,24 @@ Gjennomført:
 - tre isolerte cold-cache-målinger med PerformanceObserver ved 1440 × 900:
   median LCP 816 ms for `/` og 2 176 ms for `/annonser`; begge variable
   fonter var ferdiglastet innen 75,1 ms uten preload;
+- staging-native verifisering: iOS `xcodebuild` for iPhone-simulator besto,
+  iPhone 17 Pro med iOS 26.5 ble startet og installert med skjermbilde av
+  safe area/statuslinje/onboarding; Android `./gradlew assembleStagingDebug`
+  besto, Medium_Phone-emulatoren ble startet og staging-APK-en installert;
+- native Android-skjermbilder bekreftet servervelger, forside/bunnnavigasjon
+  og lokasjon via `ResponsiveOverlay`; systemtilbake lukket overlayet;
+  font scale 1,3 ga ingen horisontal overflow;
+- browser semantic E2E — 38/38 bestått.
 
-Browser-native QA er nettleseremulering, ikke ekte iOS-/Android-enhet eller
-simulator-QA.
-
-Ikke verifisert / gjenstår:
-
-- ekte iOS-/Android-enhet eller simulator, inkludert safe area og
-  systemtilbake;
-- skjermleser og ekstern tastaturbruk;
-- kjøretøycomposer og native publisering; desktop composer-publisering er
-  verifisert, men dette dekker ikke disse flatene;
-- felt-CWV; Nitro-tallene over er lokale produksjonspreview-målinger og må
-  ikke leses som reelle brukerdata;
-- kvalitative brukertester;
-- operativ, aggregert ukentlig funnelrapport. Produkt-hendelsene finnes for
-  søk og composer, men rapporteringen er ikke satt i drift.
+Native simulator-QA er dermed utført for de nevnte installasjons-, layout- og
+systemtilbake-scenariene. Dette må ikke leses som fysisk enhets-QA eller
+skjermleser-QA. Følgende er ikke utført: VoiceOver/TalkBack, ekstern
+maskinvaretastatur, iOS edge-swipe/system-tilbake, native kjøretøycomposer og
+faktisk native publisering. Android-tilgjengelighetstjenesten sto deaktivert,
+så ingen TalkBack-konklusjon kan trekkes. Felt-CWV; Nitro-tallene over er
+lokale produksjonspreview-målinger og må ikke leses som reelle brukerdata;
+kvalitative brukertester; og operativ, aggregert ukentlig funnelrapport.
+Produkt-hendelsene finnes for søk og composer, men rapporteringen er ikke satt
+i drift.
 
 Den eksisterende, urelaterte endringen i `src/lib/category-suggestion-ai.server.ts` er ikke berørt.

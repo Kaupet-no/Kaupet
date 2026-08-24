@@ -18,7 +18,6 @@ function run(command, args, options = {}) {
   });
 }
 
-
 function runAsync(command, args, options = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
@@ -146,7 +145,6 @@ function closeVehicleFixture() {
   vehicleFixture.close();
 }
 
-
 let supabaseStarted = false;
 let exitCode = 1;
 
@@ -202,9 +200,13 @@ try {
     PUBLIC_SITE_URL: `http://localhost:${port(18080)}`,
   };
 
-  const playwright = await runAsync("bun", ["run", "test:e2e:playwright", ...process.argv.slice(2)], {
-    env,
-  });
+  const playwright = await runAsync(
+    "bun",
+    ["run", "test:e2e:playwright", ...process.argv.slice(2)],
+    {
+      env,
+    },
+  );
   exitCode = playwright.status ?? 1;
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);

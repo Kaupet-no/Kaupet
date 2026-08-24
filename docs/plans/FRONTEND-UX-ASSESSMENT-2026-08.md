@@ -519,6 +519,7 @@ test` (86 filer / 411 tester), `bun run lint` og `bunx tsc --noEmit` er
 ### Fase 5 — kvalitet og ytelsesvern (løpende, start i fase 0)
 
 1. Legg hydration-feil og `console.error` inn som feil i Playwright for kjerneflytene.
+   **Status 24.08.2026: Implementert.** `e2e/fixtures.ts` gjør `console.error` og `pageerror` til testfeil for alle eksisterende kjerneflyter, og legger diagnostikken ved som Playwright-artefakt. Målrettet E2E-kjøring ble forsøkt, men isolert Supabase kunne ikke starte fordi Docker Desktop ikke kjørte.
 2. Legg visuell snapshotdekning på 375 × 812, 820 × 1180 og 1440 × 900 for forside, søkepanel, resultat, detalj, auth og composer.
 3. Sett routebudsjett for `/` og `/annonser`, i tillegg til dagens største-fil-budsjett.
 4. Lazy-load kart først når kartet er synlig eller brukeren velger kartmodus.

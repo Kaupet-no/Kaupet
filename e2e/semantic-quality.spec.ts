@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 test("kritiske offentlige sider har landemerker og ingen nøstede interaksjoner", async ({
   page,

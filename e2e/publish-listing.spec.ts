@@ -6,7 +6,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { test } from "@playwright/test";
+import { test } from "./fixtures";
 import {
   clickNextAndWaitFor,
   fillDescriptionAndAdvance,

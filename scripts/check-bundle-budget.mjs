@@ -84,7 +84,6 @@ function assertRouteBudget(route, routes) {
   }
 }
 
-
 function walk(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const filePath = path.join(directory, entry.name);

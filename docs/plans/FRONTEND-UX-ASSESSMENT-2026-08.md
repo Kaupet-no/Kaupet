@@ -3,7 +3,7 @@
 **Dato:** 24. august 2026
 **Omfang:** Sluttbrukerrettet web og Capacitor-app, med særlig vekt på søk, resultater, annonsedetalj, registrering og annonseopprettelse.  
 **Metode:** Statisk gjennomgang av arkitektur, ruter, komponenter, features, tester og bundle; visuell kontroll av lokal web på 1440 × 900 og native-emulering på 375 × 812; kontroll av DOM, konsoll og sentrale brukerflyter; samt staging-build og native flytkontroll i iOS- og Android-simulator.
-**Avgrensning:** Ingen produksjonsdata, fysiske iOS-/Android-enheter, skjermleser, ekstern maskinvaretastatur, reell nettverksstrupling eller brukertest inngår.
+**Avgrensning:** Ingen produksjonsdata, fysiske iOS-/Android-enheter, full VoiceOver-/TalkBack-reise, ekstern maskinvaretastatur, reell nettverksstrupling eller brukertest inngår.
 
 ## Kort dom
 
@@ -544,30 +544,32 @@ test` (86 filer / 411 tester), `bun run lint` og `bunx tsc --noEmit` er
 6. Bruk eksisterende produkthendelser til ukentlig funnel, aggregert og uten fritekst/PII.
    **Status 24.08.2026: Instrumentering fullført, operativ oppfølging gjenstår.** Eksisterende produkthendelser dekker søke- og composer-funnelene, og det trengs ingen nye funnel-hendelser eller ny kode. En fast, aggregert ukentlig funnelrapport er likevel ikke etablert.
 
-**Fase-5-verifisering:** Browser-native QA og native simulator-QA er skilt eksplisitt. `?forcenative=1` ved 375 × 812 verifiserte native forside, `ResponsiveOverlay` for lokasjon og auth uten bunnnav i nettleser. I tillegg ble følgende utført 24.08.2026:
+**Fase-5-verifisering:** Browser-native QA og native simulator-QA er skilt eksplisitt. `?forcenative=1` ved 375 × 812 verifiserte native forside, `ResponsiveOverlay` for lokasjon og auth uten bunnnav i nettleser. Playwright dekker i tillegg syntetisert tastaturnavigasjon i `desktop-web` og `mobile-web`: Tab/Shift+Tab når søk, filter og auth-handlinger, Enter/Space aktiverer dem, Escape lukker native lokasjons- og søkeoverlay, DOM-fokus returnerer til åpneren, og tabrekkefølgen fortsetter uten fokusfelle. I tillegg ble følgende utført 24.08.2026:
 
 - `CAPACITOR_ENV=staging bunx cap sync ios` og Android-sync fullførte; iOS Swift Package Manager-filen ble oppdatert fra Capacitor 8.4.2 til 8.5.0.
 - iOS-build med `xcodebuild` for iPhone-simulator besto. iPhone 17 Pro med iOS 26.5 ble startet, appen installert, og et ekte skjermbilde bekreftet safe area, statuslinje og onboarding.
 - `./gradlew assembleStagingDebug` besto. Medium_Phone-emulatoren ble startet, staging-APK-en installert, og ekte skjermbilder bekreftet servervelger, native forside/bunnnavigasjon og lokasjon i `ResponsiveOverlay`. Android systemtilbake lukket overlayet korrekt.
-- Android font scale 1,3 ble kontrollert uten horisontal overflow. Tilgjengelighetstjenestene i Android-innstillingene sto som deaktivert; dette er dokumentert som en miljøbegrensning, ikke som bestått skjermlesertest.
+- Android font scale 1,3 ble kontrollert uten horisontal overflow. Tilgjengelighetstjenestene sto deaktivert i denne layoutkjøringen; den separate, avgrensede TalkBack-kontrollen er dokumentert nedenfor.
 
-Dette er kontrollene som faktisk er utført. VoiceOver/TalkBack og ekstern maskinvaretastatur ble ikke kjørt. iOS edge-swipe/system-tilbake ble ikke automatisert; Android systemtilbake er kontrollert kun for lokasjons-overlayet. Native kjøretøycomposer og faktisk native publisering inngår heller ikke i denne verifiseringen.
+- Android TalkBack med UIAutomator bekreftet semantiske navn for søk, lokasjon, bunnnavigasjon og dialogkontroller. Etter at Escape lukket lokasjonsdialogen, flyttet Androids accessibility-fokus seg til WebView i stedet for åpneren; browserens DOM-fokusretur er derfor ikke bevis for native AT-fokusretur.
+
+Dette er kontrollene som faktisk er utført. VoiceOver, en full TalkBack-reise og ekstern maskinvaretastatur ble ikke kjørt. TalkBack-kontrollen var avgrenset til de nevnte semantiske navnene og fokusobservasjonen. iOS edge-swipe/system-tilbake ble ikke automatisert; Android systemtilbake er kontrollert kun for lokasjons-overlayet. Native kjøretøycomposer og faktisk native publisering inngår heller ikke i denne verifiseringen.
 
 ## Prioritert backlog
 
-| Rekkefølge | Tiltak                                  | Effekt    | Innsats     | Status                                          |
-| ---------: | --------------------------------------- | --------- | ----------- | ----------------------------------------------- |
-|          1 | Fiks hydration på `/`                   | Svært høy | Lav         | Fullført                                        |
-|          2 | Fjern Leaflet fra SSR-modulgrafen       | Svært høy | Lav         | Fullført                                        |
-|          3 | Fjern tidlige tillatelseskrav           | Svært høy | Lav         | Fullført                                        |
-|          4 | Skjul bunnnav på fokuserte ruter        | Høy       | Lav         | Fullført                                        |
-|          5 | Fjern offentlige visningstall           | Middels   | Svært lav   | Fullført                                        |
-|          6 | Samle søkestate og vis tolkning         | Svært høy | Middels     | Fullført                                        |
-|          7 | Reduser ordinær composer til fire stopp | Svært høy | Middels/høy | Fullført                                        |
-|          8 | Flytt 360° ut av minimumsflyt           | Høy       | Lav/middels | Fullført                                        |
-|          9 | Innfør faktagrunnlag/proveniens         | Høy       | Middels     | Fullført                                        |
-|         10 | Konsolider overlays og a11y-avvik       | Høy       | Lav/middels | Delvis fullført; enhets- og a11y-QA gjenstår    |
-|         11 | Reduser kort/pille-chrome               | Middels   | Middels     | Delvis fullført; bredere konsolidering gjenstår |
+| Rekkefølge | Tiltak                                  | Effekt    | Innsats     | Status                                                                   |
+| ---------: | --------------------------------------- | --------- | ----------- | ------------------------------------------------------------------------ |
+|          1 | Fiks hydration på `/`                   | Svært høy | Lav         | Fullført                                                                 |
+|          2 | Fjern Leaflet fra SSR-modulgrafen       | Svært høy | Lav         | Fullført                                                                 |
+|          3 | Fjern tidlige tillatelseskrav           | Svært høy | Lav         | Fullført                                                                 |
+|          4 | Skjul bunnnav på fokuserte ruter        | Høy       | Lav         | Fullført                                                                 |
+|          5 | Fjern offentlige visningstall           | Middels   | Svært lav   | Fullført                                                                 |
+|          6 | Samle søkestate og vis tolkning         | Svært høy | Middels     | Fullført                                                                 |
+|          7 | Reduser ordinær composer til fire stopp | Svært høy | Middels/høy | Fullført                                                                 |
+|          8 | Flytt 360° ut av minimumsflyt           | Høy       | Lav/middels | Fullført                                                                 |
+|          9 | Innfør faktagrunnlag/proveniens         | Høy       | Middels     | Fullført                                                                 |
+|         10 | Konsolider overlays og a11y-avvik       | Høy       | Lav/middels | Delvis fullført; browser-tastatur automatisert, native AT-fokus gjenstår |
+|         11 | Reduser kort/pille-chrome               | Middels   | Middels     | Delvis fullført; bredere konsolidering gjenstår                          |
 
 Statusene gjelder implementering i de prioriterte flatene, ikke at alle verifiserings- eller driftsgap er lukket.
 
@@ -616,13 +618,17 @@ Gjennomført:
   og lokasjon via `ResponsiveOverlay`; systemtilbake lukket overlayet;
   font scale 1,3 ga ingen horisontal overflow;
 - browser semantic E2E — 38/38 bestått.
+- `bun run test:e2e -- e2e/semantic-quality.spec.ts --project=desktop-web --project=mobile-web` mot isolert Docker-backed Supabase — 8/8 bestått; dekker native lokasjonsoverlegg, søkepanel og auth med tastatur samt fokusretur uten fokusfelle;
+- Android TalkBack med UIAutomator — semantiske navn bekreftet for søk, lokasjon, bunnnavigasjon og dialogkontroller; etter Escape landet accessibility-fokus på WebView, ikke åpneren.
 
-Native simulator-QA er dermed utført for de nevnte installasjons-, layout- og
-systemtilbake-scenariene. Dette må ikke leses som fysisk enhets-QA eller
-skjermleser-QA. Følgende er ikke utført: VoiceOver/TalkBack, ekstern
+Native simulator-QA er dermed utført for de nevnte installasjons-, layout-,
+systemtilbake- og avgrensede TalkBack-scenariene. Dette må ikke leses som
+fysisk enhets-QA, full skjermleser-QA eller ekstern maskinvaretastatur-QA.
+Følgende er ikke utført: VoiceOver, full TalkBack-reise, ekstern fysisk
 maskinvaretastatur, iOS edge-swipe/system-tilbake, native kjøretøycomposer og
-faktisk native publisering. Android-tilgjengelighetstjenesten sto deaktivert,
-så ingen TalkBack-konklusjon kan trekkes. Felt-CWV; Nitro-tallene over er
+faktisk native publisering. Android accessibility-fokus returnerte dessuten
+til WebView i stedet for overlayåpneren etter Escape, selv om browserens
+DOM-fokusretur består. Felt-CWV; Nitro-tallene over er
 lokale produksjonspreview-målinger og må ikke leses som reelle brukerdata;
 kvalitative brukertester; og operativ, aggregert ukentlig funnelrapport.
 Produkt-hendelsene finnes for søk og composer, men rapporteringen er ikke satt

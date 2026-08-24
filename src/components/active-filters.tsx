@@ -120,23 +120,18 @@ export function ActiveFilters({
     allItems.push({
       key: "__q__",
       node: (
-        <div key="__q__" className="rounded-md border border-border p-2">
-          <TermGroupChips
-            group={{ id: "q", mode: search.qMode, exclude: false, terms }}
-            onRemoveTerm={removeLine1Term}
-          />
-        </div>
+        <TermGroupChips
+          key="__q__"
+          group={{ id: "q", mode: search.qMode, exclude: false, terms }}
+          onRemoveTerm={removeLine1Term}
+        />
       ),
     });
   }
   for (const g of search.extraGroups) {
     allItems.push({
       key: g.id,
-      node: (
-        <div key={g.id} className="rounded-md border border-border p-2">
-          <TermGroupChips group={g} onRemoveTerm={(t) => removeGroupTerm(g.id, t)} />
-        </div>
-      ),
+      node: <TermGroupChips key={g.id} group={g} onRemoveTerm={(t) => removeGroupTerm(g.id, t)} />,
     });
   }
   for (const [key, value] of attrEntries) {

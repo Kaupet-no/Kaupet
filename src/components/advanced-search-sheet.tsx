@@ -16,22 +16,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
 import { LocationPicker, RadiusPicker } from "@/components/location-filter";
 import { ModeToggle } from "@/components/search-term-mode-toggle";
 import { TermGroupEditor } from "@/components/term-group-editor";
@@ -122,15 +108,17 @@ export function AdvancedSearchSheet({
 
   return (
     <>
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
-          <SheetHeader className="border-b border-border px-5 py-4">
-            <SheetTitle>Avansert søk</SheetTitle>
-            <SheetDescription>
+      <ResponsiveOverlay open={open} onOpenChange={onOpenChange}>
+        <ResponsiveOverlayContent
+          className="flex max-h-[90vh] w-full flex-col gap-0 p-0 sm:max-w-md"
+          expandable
+        >
+          <DialogHeader className="border-b border-border px-5 py-4">
+            <DialogTitle>Avansert søk</DialogTitle>
+            <DialogDescription>
               Kombiner flere kriterier for å finne akkurat det du leter etter.
-            </SheetDescription>
-          </SheetHeader>
-
+            </DialogDescription>
+          </DialogHeader>
           <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
             {/* Søkeord */}
             <section className="space-y-2">
@@ -293,7 +281,7 @@ export function AdvancedSearchSheet({
             </section>
           </div>
 
-          <SheetFooter className="flex-row items-center justify-between gap-2 border-t border-border px-5 py-3">
+          <DialogFooter className="flex-row items-center justify-between gap-2 border-t border-border px-5 py-3">
             <Button type="button" variant="ghost" size="sm" onClick={handleReset}>
               <RotateCcw className="size-4" /> Nullstill
             </Button>
@@ -307,9 +295,9 @@ export function AdvancedSearchSheet({
                 <SearchIcon className="size-4" /> {applyLabel}
               </Button>
             </div>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+          </DialogFooter>
+        </ResponsiveOverlayContent>
+      </ResponsiveOverlay>
 
       {!hideSaveAction && (
         <SaveSearchDialog
@@ -734,8 +722,8 @@ export function SaveSearchDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+    <ResponsiveOverlay open={open} onOpenChange={onOpenChange}>
+      <ResponsiveOverlayContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Lagre søk</DialogTitle>
           <DialogDescription>
@@ -775,7 +763,7 @@ export function SaveSearchDialog({
             {saving ? "Lagrer…" : "Lagre"}
           </Button>
         </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveOverlayContent>
+    </ResponsiveOverlay>
   );
 }

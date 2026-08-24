@@ -7,6 +7,7 @@ import {
   Image,
   Map as MapIcon,
   SearchX,
+  X,
 } from "lucide-react";
 import { lazy, type ReactNode, Suspense, useEffect, useRef, useState } from "react";
 import { ClientOnly } from "@tanstack/react-router";
@@ -19,13 +20,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NativeSheet } from "@/components/ui/native-sheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { DialogClose, DialogTrigger } from "@/components/ui/dialog";
+import { FullscreenOverlay, FullscreenOverlayContent } from "@/components/ui/fullscreen-overlay";
 import type { MapListing } from "@/components/listings-map";
 import { FeaturedListingsSection } from "@/components/featured-listings-section";
 import { reverseGeocode } from "@/lib/geocode";
@@ -400,7 +396,7 @@ export function ResultList({
             <div className="sticky top-20 h-[calc(100vh-6rem)]">
               <div className="relative h-full overflow-hidden rounded-2xl border border-border shadow-sm">
                 {renderMap()}
-                <Dialog open={bigMapOpen} onOpenChange={setBigMapOpen}>
+                <FullscreenOverlay open={bigMapOpen} onOpenChange={setBigMapOpen}>
                   <DialogTrigger asChild>
                     <Button
                       type="button"
@@ -411,15 +407,22 @@ export function ResultList({
                       <Expand className="size-4" /> Utvid
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-[95vw] p-0 sm:max-w-[95vw]">
-                    <DialogHeader className="px-4 pt-4">
-                      <DialogTitle>Kart</DialogTitle>
-                    </DialogHeader>
-                    <div className="h-[85vh] w-full p-4 pt-2">
-                      {bigMapOpen ? renderMap() : null}
+                  <FullscreenOverlayContent title="Kart" edgeToEdge>
+                    <div className="flex h-full flex-col bg-background">
+                      <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
+                        <h2 className="text-base font-semibold">Kart</h2>
+                        <DialogClose asChild>
+                          <Button type="button" variant="ghost" size="sm">
+                            <X className="size-4" /> Lukk
+                          </Button>
+                        </DialogClose>
+                      </div>
+                      <div className="min-h-0 flex-1 p-4 pt-2">
+                        {bigMapOpen ? renderMap() : null}
+                      </div>
                     </div>
-                  </DialogContent>
-                </Dialog>
+                  </FullscreenOverlayContent>
+                </FullscreenOverlay>
               </div>
             </div>
           </aside>

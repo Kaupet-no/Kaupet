@@ -5,7 +5,8 @@ import { SlidersHorizontal, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { NativeSheet } from "@/components/ui/native-sheet";
 import { Select, SelectContent, SelectItem, SelectTriggerBare } from "@/components/ui/select";
@@ -661,9 +662,7 @@ export function AttributeFilterChips({
       Nullstill
     </Button>
   );
-
-  // Desktop-only now (see moreButton/Dialog below) — no dismiss button needed,
-  // the dialog's own close (X) covers it.
+  // The overlay's own close control handles dismissal on web and narrow viewports.
   const overlayBody = (
     <SecondaryCategoryFilters
       filters={filters}
@@ -735,16 +734,16 @@ export function AttributeFilterChips({
           </NativeSheet>
         ))}
 
-      {/* "Se flere filter" dialog — desktop only, see moreButton comment above. */}
+      {/* "Se flere filter" overlay — web only; native uses NativeAdvancedSearch. */}
       {secondary.length > 0 && !isNative && (
-        <Dialog open={moreOpen} onOpenChange={setMoreOpen}>
-          <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+        <ResponsiveOverlay open={moreOpen} onOpenChange={setMoreOpen}>
+          <ResponsiveOverlayContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg" expandable>
             <DialogHeader>
               <DialogTitle>Flere filter</DialogTitle>
             </DialogHeader>
             {overlayBody}
-          </DialogContent>
-        </Dialog>
+          </ResponsiveOverlayContent>
+        </ResponsiveOverlay>
       )}
     </>
   );

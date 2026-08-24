@@ -531,7 +531,16 @@ test` (86 filer / 411 tester), `bun run lint` og `bunx tsc --noEmit` er
 4. Lazy-load kart først når kartet er synlig eller brukeren velger kartmodus.
    **Status 24.08.2026: Fullført.** Kartvelgere, resultatkart og detaljkart lastes klient-only ved synlighet eller eksplisitt kartvalg; Leaflet ligger ikke på SSR-kritisk sti. Dette er verifisert sammen med servergrensekontrollen og de gjennomførte E2E-/build-kjøringene.
 5. Kontroller faktisk bilde-LCP og fontlasting; preload bare den fonten/vekten som brukes over folden hvis måling viser gevinst.
-   **Status 24.08.2026: Delvis verifisert.** Performance API i lokal Vite-dev målte omtrent LCP 836 ms for `/` og 1 348 ms for `/annonser`. Dette er utviklingsmålinger, ikke produksjons-CWV. Nitro-preview kunne ikke starte fordi lokal Wrangler workerd ikke støtter compatibility date `2026-08-24`; ingen produksjons-LCP/CWV eller preload-beslutning er derfor dokumentert.
+   **Status 24.08.2026: Fullført for lokalt produksjonspreview.** Wrangler
+   4.125.0 startet Nitro-preview med compatibility date `2026-08-24`; `/`
+   returnerte 200, og `/annonser` endte på 200 etter den kanoniske
+   query-redirecten. Tre isolerte cold-cache-kjøringer i Chrome ved
+   1440 × 900 målte med PerformanceObserver median LCP 816 ms for `/`
+   (808–824 ms, H1-tekst) og 2 176 ms for `/annonser` (2 024–2 772 ms,
+   samme annonsebilde i alle kjøringene). Inter og Newsreader var ferdiglastet
+   innen 75,1 ms uten font-preload i alle kjøringene, langt før LCP; målingen
+   gir derfor ikke grunnlag for å legge til preload. Dette er lokale
+   produksjonspreview-målinger, ikke felt-CWV.
 6. Bruk eksisterende produkthendelser til ukentlig funnel, aggregert og uten fritekst/PII.
    **Status 24.08.2026: Instrumentering fullført, operativ oppfølging gjenstår.** Eksisterende produkthendelser dekker søke- og composer-funnelene, og det trengs ingen nye funnel-hendelser eller ny kode. En fast, aggregert ukentlig funnelrapport er likevel ikke etablert.
 
@@ -587,8 +596,11 @@ Gjennomført:
 - visuell kontroll av webforside på 1440 × 900, native forside på 375 × 812,
   native annonsedetalj på 375 × 812, samt mørk modus og 200 % tekst uten
   horisontal overflow;
-- lokale Vite-dev-målinger med Performance API: omtrent LCP 836 ms for `/`
-  og 1 348 ms for `/annonser`.
+- lokalt Nitro-produksjonspreview med Wrangler 4.125.0: `/` returnerte 200,
+  og `/annonser` endte på 200 etter kanonisk redirect;
+- tre isolerte cold-cache-målinger med PerformanceObserver ved 1440 × 900:
+  median LCP 816 ms for `/` og 2 176 ms for `/annonser`; begge variable
+  fonter var ferdiglastet innen 75,1 ms uten preload;
 
 Browser-native QA er nettleseremulering, ikke ekte iOS-/Android-enhet eller
 simulator-QA.
@@ -600,10 +612,8 @@ Ikke verifisert / gjenstår:
 - skjermleser og ekstern tastaturbruk;
 - kjøretøycomposer og native publisering; desktop composer-publisering er
   verifisert, men dette dekker ikke disse flatene;
-- produksjons-CWV, bilde-LCP og eventuell font-preload-effekt: Nitro-preview
-  kunne ikke starte fordi lokal Wrangler workerd ikke støtter compatibility
-  date `2026-08-24`, så de lokale Vite-tallene over må ikke leses som
-  produksjonsmålinger;
+- felt-CWV; Nitro-tallene over er lokale produksjonspreview-målinger og må
+  ikke leses som reelle brukerdata;
 - kvalitative brukertester;
 - operativ, aggregert ukentlig funnelrapport. Produkt-hendelsene finnes for
   søk og composer, men rapporteringen er ikke satt i drift.

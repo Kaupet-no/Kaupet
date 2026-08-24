@@ -415,7 +415,7 @@ Disse tre gir mer egenart enn en ny gradient, illustrasjonsstil eller mikroanima
 - `src/routes/_authenticated/ny-annonse.tsx`;
 - kjøpsønskeflyten kun der delt skall faktisk gir samme semantikk.
 
-**Tester:** Én kontrakttest per representativ flyt: generisk, kategori med påkrevde attributter, bil med oppslag, uregistrert kjøretøy og båt. E2E må dekke utkast, tilbake/review, publiseringsretry og tastatur på telefon.
+**Tester:** Én kontrakttest per representativ flyt: generisk, kategori med påkrevde attributter, bil med oppslag, uregistrert kjøretøy og båt. E2E må dekke utkast, tilbake/review, publiseringsretry og tastatur på telefon. `e2e/publish-vehicle-listing.spec.ts` dekker nå biloppslag og bekreftelse på desktop/mobil, review uten eget 360°-steg og publisering.
 
 **Akseptanse:** Ordinær annonse kan publiseres gjennom maksimalt fire hovedstopp etter inngang; bruker mister ingen data ved kategoriendring eller tilbake; alle gamle sikkerhets- og serverkrav består.
 
@@ -519,7 +519,7 @@ test` (86 filer / 411 tester), `bun run lint` og `bunx tsc --noEmit` er
 ### Fase 5 — kvalitet og ytelsesvern (løpende, start i fase 0)
 
 1. Legg hydration-feil og `console.error` inn som feil i Playwright for kjerneflytene.
-   **Status 24.08.2026: Fullført.** `e2e/fixtures.ts` gjør `console.error` og `pageerror` til testfeil for alle eksisterende kjerneflyter, og legger diagnostikken ved som Playwright-artefakt. `bun run test:e2e` passerer nå 38/38 tester uten slike feil. Desktop-publisering i composer passerer én E2E-test, og kjøpsønskeflyten passerer tre E2E-tester.
+   **Status 24.08.2026: Fullført.** `e2e/fixtures.ts` gjør `console.error` og `pageerror` til testfeil for alle eksisterende kjerneflyter, og legger diagnostikken ved som Playwright-artefakt. Den isolerte nye kjøretøyreisen passerer 2/2 på `desktop-web` og `mobile-web`; den lokale E2E-runneren bruker kun sin lokale kjøretøyfixture og lar produksjonsendepunktet være standard ellers.
 2. Legg visuell snapshotdekning på 375 × 812, 820 × 1180 og 1440 × 900 for forside, søkepanel, resultat, detalj, auth og composer.
    **Status 24.08.2026: Fullført.** `e2e/core.visual.spec.ts` dekker forside, native søkepanel, resultat, annonsedetalj og auth med ekte seedede E2E-annonser; `listing-composer.visual.spec.ts` dekker composer-flaten. Baselines er generert for `visual-phone`, `visual-tablet` og `visual-web` etter inspeksjon av faktisk rendret UI, og visualdataene er gjort deterministiske.
    **Verifisering:** De visuelle testene passerer med 15/15 for kjerneflatene og 3/3 for composer på de tre viewport-profilene. Full `bun run test:e2e` passerer 38/38.
@@ -598,7 +598,7 @@ Gjennomført:
 - `bun run lint` — bestått;
 - `bunx tsc --noEmit` — bestått;
 - `bun run test` — 86 testfiler og 411 tester bestått;
-- `bun run test:e2e` — 38 tester bestått, inkludert desktop composer-publisering (1 test) og kjøpsønskeflyt (3 tester);
+- `bun run test:e2e` — 38-test baseline bestått, inkludert desktop composer-publisering (1 test) og kjøpsønskeflyt (3 tester); den nye `bun run test:e2e -- e2e/publish-vehicle-listing.spec.ts --project=desktop-web --project=mobile-web`-kjøringen besto 2/2;
 - `bun run build` — bestått, inkludert routebudsjett for `/` og `/annonser`;
 - browser-native QA med `?forcenative=1` ved 375 × 812: native forside,
   lokasjon via `ResponsiveOverlay` og auth uten bunnnav;

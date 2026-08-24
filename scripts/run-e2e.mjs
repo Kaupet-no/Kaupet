@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-import { spawnSync } from "node:child_process";
+import { createServer } from "node:http";
+import { spawn, spawnSync } from "node:child_process";
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -17,6 +18,18 @@ function run(command, args, options = {}) {
   });
 }
 
+
+function runAsync(command, args, options = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd: root,
+      stdio: "inherit",
+      env: options.env ?? process.env,
+    });
+    child.once("error", reject);
+    child.once("exit", (code, signal) => resolve({ status: code ?? (signal ? 1 : 0) }));
+  });
+}
 function parseDotenv(text) {
   const values = new Map();
   for (const line of text.split("\n")) {
@@ -65,6 +78,74 @@ const isolatedConfig = readFileSync(configPath, "utf8")
   .replace("inspector_port = 8083", `inspector_port = ${port(8083)}`)
   .replace("[auth.email.smtp]\nenabled = true", "[auth.email.smtp]\nenabled = false");
 writeFileSync(configPath, isolatedConfig);
+const vehicleFixture = createServer((request, response) => {
+  if (request.url?.startsWith("/enkeltoppslag/kjoretoydata")) {
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(
+      JSON.stringify({
+        kjoretoydataListe: [
+          {
+            godkjenning: {
+              tekniskGodkjenning: {
+                kjoretoyklassifisering: {
+                  tekniskKode: { kodeNavn: "M1" },
+                  kjoretoyAvgiftsKode: { kodeVerdi: "101", kodeNavn: "Personbil" },
+                },
+                tekniskeData: {
+                  generelt: { merke: [{ merke: "Volvo" }], handelsbetegnelse: ["XC60"] },
+                  karosseriOgLasteplan: {
+                    rFarge: [{ kodeNavn: "Grå" }],
+                    karosseritype: { kodeVerdi: "AC", kodeNavn: "Stasjonsvogn" },
+                  },
+                  vekter: { egenvekt: 1850, tillattTotalvekt: 2400 },
+                  motorOgDrivverk: {
+                    motor: [
+                      {
+                        drivstoff: [
+                          {
+                            drivstoffKode: { kodeNavn: "Bensin" },
+                            maksEffektPrTime: 184,
+                          },
+                        ],
+                        antallSylindre: 4,
+                        slagvolum: 1969,
+                        motorKode: "B4204T",
+                      },
+                    ],
+                    girkassetype: { kodeNavn: "Automat" },
+                  },
+                  akslinger: {
+                    antallAksler: 2,
+                    akselGruppe: [{ akselListe: [{ drivAksel: true }, { drivAksel: true }] }],
+                  },
+                  persontall: { sitteplasserTotalt: 5 },
+                },
+              },
+            },
+            forstegangsregistrering: { registrertForstegangNorgeDato: "2021-06-15" },
+            kjoretoyId: { understellsnummer: "YV1UZBFV1M1234567", kjennemerke: "AB12345" },
+          },
+        ],
+      }),
+    );
+    return;
+  }
+  response.writeHead(404);
+  response.end();
+});
+await new Promise((resolve, reject) => {
+  vehicleFixture.once("error", reject);
+  vehicleFixture.listen(Number(port(18100)), "127.0.0.1", resolve);
+});
+
+let vehicleFixtureClosed = false;
+
+function closeVehicleFixture() {
+  if (vehicleFixtureClosed) return;
+  vehicleFixtureClosed = true;
+  vehicleFixture.close();
+}
+
 
 let supabaseStarted = false;
 let exitCode = 1;
@@ -104,6 +185,9 @@ try {
 
   const env = {
     ...process.env,
+    E2E_TEST: "1",
+    E2E_VEHICLE_LOOKUP_URL: `http://127.0.0.1:${port(18100)}/enkeltoppslag/kjoretoydata`,
+    STATENS_VEGVESEN_API_KEY: "e2e-fixture-key",
     SUPABASE_PROJECT_ID: projectId,
     SUPABASE_URL: apiUrl,
     SUPABASE_PUBLISHABLE_KEY: publishableKey,
@@ -118,13 +202,14 @@ try {
     PUBLIC_SITE_URL: `http://localhost:${port(18080)}`,
   };
 
-  const playwright = run("bun", ["run", "test:e2e:playwright", ...process.argv.slice(2)], {
+  const playwright = await runAsync("bun", ["run", "test:e2e:playwright", ...process.argv.slice(2)], {
     env,
   });
   exitCode = playwright.status ?? 1;
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
 } finally {
+  closeVehicleFixture();
   if (supabaseStarted) {
     const stop = run("bunx", ["supabase", "--workdir", e2eRoot, "stop", "--no-backup"]);
     if (stop.status !== 0 && exitCode === 0) exitCode = stop.status ?? 1;

@@ -66,7 +66,10 @@ function assertVehicleLookupConfigured() {
   }
 }
 
-const SVV_BASE_URL = "https://akfell-datautlevering.atlas.vegvesen.no/enkeltoppslag/kjoretoydata";
+const vehicleLookupUrl =
+  process.env.E2E_TEST === "1"
+    ? (process.env.E2E_VEHICLE_LOOKUP_URL ?? SVV_BASE_URL)
+    : SVV_BASE_URL;
 
 /** SVV returns "-" (or blank) for fields that don't apply to a given vehicle
  * (e.g. no specific model registered for the brand) — treat that as "no
@@ -231,8 +234,7 @@ export function formatRetryClockNorway(at: Date): string {
 export async function lookupVehicle(registrationNumber: string): Promise<VehicleLookupResult> {
   assertVehicleLookupConfigured();
   const regNr = registrationNumber.trim().toUpperCase();
-
-  const url = new URL(SVV_BASE_URL);
+  const url = new URL(vehicleLookupUrl);
   url.searchParams.set("kjennemerke", regNr);
 
   const res = await fetch(url.toString(), {

@@ -519,36 +519,41 @@ test` (86 filer / 411 tester), `bun run lint` og `bunx tsc --noEmit` er
 ### Fase 5 — kvalitet og ytelsesvern (løpende, start i fase 0)
 
 1. Legg hydration-feil og `console.error` inn som feil i Playwright for kjerneflytene.
-   **Status 24.08.2026: Implementert.** `e2e/fixtures.ts` gjør `console.error` og `pageerror` til testfeil for alle eksisterende kjerneflyter, og legger diagnostikken ved som Playwright-artefakt. Målrettet E2E-kjøring ble forsøkt, men isolert Supabase kunne ikke starte fordi Docker Desktop ikke kjørte.
+   **Status 24.08.2026: Fullført.** `e2e/fixtures.ts` gjør `console.error` og `pageerror` til testfeil for alle eksisterende kjerneflyter, og legger diagnostikken ved som Playwright-artefakt. `bun run test:e2e` passerer nå 38/38 tester uten slike feil. Desktop-publisering i composer passerer én E2E-test, og kjøpsønskeflyten passerer tre E2E-tester.
 2. Legg visuell snapshotdekning på 375 × 812, 820 × 1180 og 1440 × 900 for forside, søkepanel, resultat, detalj, auth og composer.
-   **Status 24.08.2026: Implementert.** `e2e/core.visual.spec.ts` dekker forside, native søkepanel, resultat, annonsedetalj og auth med ekte seedede E2E-annonser; `listing-composer.visual.spec.ts` dekker composer-flaten. Baselines er generert for `visual-phone`, `visual-tablet` og `visual-web` etter inspeksjon av faktisk rendret UI.
-   **Verifisering:** `bun run test:e2e -- e2e/core.visual.spec.ts --project visual-phone --project visual-tablet --project visual-web --update-snapshots` (15/15), `bun run test:e2e -- e2e/listing-composer.visual.spec.ts --project visual-phone --project visual-tablet --project visual-web --update-snapshots` (3/3), og etterfølgende målrettet composer-kjøring viste kun forventet baseline-drift før oppdatering. Ingen `console.error` eller `pageerror` ble rapportert i flytene.
+   **Status 24.08.2026: Fullført.** `e2e/core.visual.spec.ts` dekker forside, native søkepanel, resultat, annonsedetalj og auth med ekte seedede E2E-annonser; `listing-composer.visual.spec.ts` dekker composer-flaten. Baselines er generert for `visual-phone`, `visual-tablet` og `visual-web` etter inspeksjon av faktisk rendret UI, og visualdataene er gjort deterministiske.
+   **Verifisering:** De visuelle testene passerer med 15/15 for kjerneflatene og 3/3 for composer på de tre viewport-profilene. Full `bun run test:e2e` passerer 38/38.
 3. Sett routebudsjett for `/` og `/annonser`, i tillegg til dagens største-fil-budsjett.
-   **Status 24.08.2026: Implementert.** `bun run build` kjører
+   **Status 24.08.2026: Fullført.** `bun run build` kjører
    `check:bundle` etter produksjonsbuild. Sjekken leser den genererte
    TanStack-manifesten, summerer unike root- og route-preloads og feiler ved
-   manglende manifest/assets eller regresjon over 1 750 KiB per rute. Baseline
-   fra eksisterende build er 1 631,5 KiB for `/` og 1 645,5 KiB for
-   `/annonser`.
+   manglende manifest/assets eller regresjon over 1 750 KiB per rute. Routebudsjettene passerer; baseline fra eksisterende build er 1 631,5 KiB for `/` og 1 645,5 KiB for `/annonser`.
 4. Lazy-load kart først når kartet er synlig eller brukeren velger kartmodus.
+   **Status 24.08.2026: Fullført.** Kartvelgere, resultatkart og detaljkart lastes klient-only ved synlighet eller eksplisitt kartvalg; Leaflet ligger ikke på SSR-kritisk sti. Dette er verifisert sammen med servergrensekontrollen og de gjennomførte E2E-/build-kjøringene.
 5. Kontroller faktisk bilde-LCP og fontlasting; preload bare den fonten/vekten som brukes over folden hvis måling viser gevinst.
+   **Status 24.08.2026: Delvis verifisert.** Performance API i lokal Vite-dev målte omtrent LCP 836 ms for `/` og 1 348 ms for `/annonser`. Dette er utviklingsmålinger, ikke produksjons-CWV. Nitro-preview kunne ikke starte fordi lokal Wrangler workerd ikke støtter compatibility date `2026-08-24`; ingen produksjons-LCP/CWV eller preload-beslutning er derfor dokumentert.
 6. Bruk eksisterende produkthendelser til ukentlig funnel, aggregert og uten fritekst/PII.
+   **Status 24.08.2026: Instrumentering fullført, operativ oppfølging gjenstår.** Eksisterende produkthendelser dekker søke- og composer-funnelene, og det trengs ingen nye funnel-hendelser eller ny kode. En fast, aggregert ukentlig funnelrapport er likevel ikke etablert.
+
+**Fase-5-verifisering:** Dette dokumenterer test- og måleresultatene over, men skiller eksplisitt mellom browser-native QA og ekte enheter. `?forcenative=1` ved 375 × 812 verifiserte native forside, `ResponsiveOverlay` for lokasjon og auth uten bunnnav i nettleser; dette er ikke verifisering på iOS-/Android-enhet eller simulator.
 
 ## Prioritert backlog
 
-| Rekkefølge | Tiltak                                  | Effekt    | Innsats     |
-| ---------: | --------------------------------------- | --------- | ----------- |
-|          1 | Fiks hydration på `/`                   | Svært høy | Lav         |
-|          2 | Fjern Leaflet fra SSR-modulgrafen       | Svært høy | Lav         |
-|          3 | Fjern tidlige tillatelseskrav           | Svært høy | Lav         |
-|          4 | Skjul bunnnav på fokuserte ruter        | Høy       | Lav         |
-|          5 | Fjern offentlige visningstall           | Middels   | Svært lav   |
-|          6 | Samle søkestate og vis tolkning         | Svært høy | Middels     |
-|          7 | Reduser ordinær composer til fire stopp | Svært høy | Middels/høy |
-|          8 | Flytt 360° ut av minimumsflyt           | Høy       | Lav/middels |
-|          9 | Innfør faktagrunnlag/proveniens         | Høy       | Middels     |
-|         10 | Konsolider overlays og a11y-avvik       | Høy       | Lav/middels |
-|         11 | Reduser kort/pille-chrome               | Middels   | Middels     |
+| Rekkefølge | Tiltak                                  | Effekt    | Innsats     | Status                                          |
+| ---------: | --------------------------------------- | --------- | ----------- | ----------------------------------------------- |
+|          1 | Fiks hydration på `/`                   | Svært høy | Lav         | Fullført                                        |
+|          2 | Fjern Leaflet fra SSR-modulgrafen       | Svært høy | Lav         | Fullført                                        |
+|          3 | Fjern tidlige tillatelseskrav           | Svært høy | Lav         | Fullført                                        |
+|          4 | Skjul bunnnav på fokuserte ruter        | Høy       | Lav         | Fullført                                        |
+|          5 | Fjern offentlige visningstall           | Middels   | Svært lav   | Fullført                                        |
+|          6 | Samle søkestate og vis tolkning         | Svært høy | Middels     | Fullført                                        |
+|          7 | Reduser ordinær composer til fire stopp | Svært høy | Middels/høy | Fullført                                        |
+|          8 | Flytt 360° ut av minimumsflyt           | Høy       | Lav/middels | Fullført                                        |
+|          9 | Innfør faktagrunnlag/proveniens         | Høy       | Middels     | Fullført                                        |
+|         10 | Konsolider overlays og a11y-avvik       | Høy       | Lav/middels | Delvis fullført; enhets- og a11y-QA gjenstår    |
+|         11 | Reduser kort/pille-chrome               | Middels   | Middels     | Delvis fullført; bredere konsolidering gjenstår |
+
+Statusene gjelder implementering i de prioriterte flatene, ikke at alle verifiserings- eller driftsgap er lukket.
 
 ## Hva som eksplisitt ikke bør bygges nå
 
@@ -560,6 +565,8 @@ test` (86 filer / 411 tester), `bun run lint` og `bunx tsc --noEmit` er
 - Ingen flere onboardingkort, tooltips eller coach marks for å forklare kompleksitet som kan fjernes.
 
 ## Beslutninger som må tas av produkteier
+
+**Status 24.08.2026:** Implementasjonen følger anbefalingene nedenfor som arbeidsretning, men produkteier har ikke formelt godkjent disse beslutningene.
 
 1. Skal Kaupet optimalisere først for **raskt publisert minimumsannonse** eller **maksimal datakompletthet før publisering**? Anbefaling: minimumsannonse med tydelig forbedringsnivå.
 2. Skal avansert boolsk søk være et synlig hovedløfte eller et ekspertverktøy? Anbefaling: ekspertverktøy bak «Presist søk».
@@ -573,18 +580,32 @@ Gjennomført:
 - `bun run lint` — bestått;
 - `bunx tsc --noEmit` — bestått;
 - `bun run test` — 86 testfiler og 411 tester bestått;
-- `bun run build` — bestått etter fase 4-endringene;
+- `bun run test:e2e` — 38 tester bestått, inkludert desktop composer-publisering (1 test) og kjøpsønskeflyt (3 tester);
+- `bun run build` — bestått, inkludert routebudsjett for `/` og `/annonser`;
+- browser-native QA med `?forcenative=1` ved 375 × 812: native forside,
+  lokasjon via `ResponsiveOverlay` og auth uten bunnnav;
 - visuell kontroll av webforside på 1440 × 900, native forside på 375 × 812,
   native annonsedetalj på 375 × 812, samt mørk modus og 200 % tekst uten
-  horisontal overflow.
+  horisontal overflow;
+- lokale Vite-dev-målinger med Performance API: omtrent LCP 836 ms for `/`
+  og 1 348 ms for `/annonser`.
 
-Ikke verifisert:
+Browser-native QA er nettleseremulering, ikke ekte iOS-/Android-enhet eller
+simulator-QA.
 
-- ekte iOS-/Android-enhet, safe area og systemtilbake;
+Ikke verifisert / gjenstår:
+
+- ekte iOS-/Android-enhet eller simulator, inkludert safe area og
+  systemtilbake;
 - skjermleser og ekstern tastaturbruk;
-- kjøretøycomposer og faktisk publisering; ordinær innlogget flyt er verifisert
-  frem til publiseringsknappen uten å publisere;
-- nettverk med høy latenstid/tap og reelle Core Web Vitals;
-- kvalitative brukertester eller produksjonsfunnel.
+- kjøretøycomposer og native publisering; desktop composer-publisering er
+  verifisert, men dette dekker ikke disse flatene;
+- produksjons-CWV, bilde-LCP og eventuell font-preload-effekt: Nitro-preview
+  kunne ikke starte fordi lokal Wrangler workerd ikke støtter compatibility
+  date `2026-08-24`, så de lokale Vite-tallene over må ikke leses som
+  produksjonsmålinger;
+- kvalitative brukertester;
+- operativ, aggregert ukentlig funnelrapport. Produkt-hendelsene finnes for
+  søk og composer, men rapporteringen er ikke satt i drift.
 
 Den eksisterende, urelaterte endringen i `src/lib/category-suggestion-ai.server.ts` er ikke berørt.

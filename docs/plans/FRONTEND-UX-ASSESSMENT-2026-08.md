@@ -549,12 +549,22 @@ test` (86 filer / 411 tester), `bun run lint` og `bunx tsc --noEmit` er
 
 - `CAPACITOR_ENV=staging bunx cap sync ios` og Android-sync fullførte; iOS Swift Package Manager-filen ble oppdatert fra Capacitor 8.4.2 til 8.5.0.
 - iOS-build med `xcodebuild` for iPhone-simulator besto. iPhone 17 Pro med iOS 26.5 ble startet, appen installert, og et ekte skjermbilde bekreftet safe area, statuslinje og onboarding.
+- iOS `AppUITests` ble lagt i den delte `App`-schemen og kjørt i sin helhet
+  på samme simulator etter ren avinstallasjon og staging-sync:
+  `xcodebuild test -project ios/App/App.xcodeproj -scheme App -destination
+'platform=iOS Simulator,id=39E3D7D4-0F61-45C9-AB33-66EC9528CEC1'
+-only-testing:AppUITests CODE_SIGNING_ALLOWED=NO` — 1/1 besto. XCUITest
+  nådde servervelgeren, koblet til `localhost:3000`, fullførte onboarding og
+  nådde native forside. Testen bekreftet tilgjengelige navn og treffbare
+  elementer for primærnavigasjon, lokasjonsåpner og dialogkontroller,
+  bekreftet at den navngitte dialogen hadde tastaturfokus, lukket via «Lukk»
+  og bekreftet at åpneren var treffbar igjen.
 - `./gradlew assembleStagingDebug` besto. Medium_Phone-emulatoren ble startet, staging-APK-en installert, og ekte skjermbilder bekreftet servervelger, native forside/bunnnavigasjon og lokasjon i `ResponsiveOverlay`. Android systemtilbake lukket overlayet korrekt.
 - Android font scale 1,3 ble kontrollert uten horisontal overflow. Tilgjengelighetstjenestene sto deaktivert i denne layoutkjøringen; den separate, avgrensede TalkBack-kontrollen er dokumentert nedenfor.
 
 - Android TalkBack med UIAutomator bekreftet semantiske navn i tilgjengelighetstreet for søk, lokasjon, kategori, bunnnavigasjon og dialogkontroller. Etter at Escape lukket lokasjonsdialogen, flyttet Androids accessibility-fokus seg til WebView i stedet for åpneren; browserens DOM-fokusretur er derfor ikke bevis for native AT-fokusretur.
 
-Dette er kontrollene som faktisk er utført. VoiceOver, en full TalkBack-reise og ekstern maskinvaretastatur ble ikke kjørt. TalkBack-kontrollen var avgrenset til de nevnte semantiske navnene og fokusobservasjonen, ikke fysisk skjermleser-QA. iOS edge-swipe/system-tilbake ble ikke automatisert; Android systemtilbake er kontrollert kun for lokasjons-overlayet. Native kjøretøycomposer og faktisk native publisering inngår heller ikke i denne verifiseringen.
+Dette er kontrollene som faktisk er utført. XCUITest-resultatet over verifiserer elementer, tilgjengelige navn, treffbarhet og tastaturfokus i XCTest-treet; det verifiserer ikke hva VoiceOver uttaler, rotor-/sveiperekkefølge eller native accessibility-fokus. VoiceOver, en full TalkBack-reise og ekstern maskinvaretastatur ble ikke kjørt. TalkBack-kontrollen var avgrenset til de nevnte semantiske navnene og fokusobservasjonen, ikke fysisk skjermleser-QA. XCTest har ingen støttet handling for iOS edge-swipe/system-tilbake, så denne ble ikke automatisert og gapet står åpent; lokasjons-overlayet ble i stedet lukket med den støttede «Lukk»-handlingen. Android systemtilbake er kontrollert kun for lokasjons-overlayet. Native kjøretøycomposer og faktisk native publisering inngår heller ikke i denne verifiseringen.
 
 ## Prioritert backlog
 
@@ -615,6 +625,11 @@ Gjennomført:
   iPhone 17 Pro med iOS 26.5 ble startet og installert med skjermbilde av
   safe area/statuslinje/onboarding; Android `./gradlew assembleStagingDebug`
   besto, Medium_Phone-emulatoren ble startet og staging-APK-en installert;
+- hele den delte iOS `AppUITests`-targeten på iPhone 17 Pro/iOS 26.5 —
+  1/1 besto uten kodesignering; staging-skall → `localhost:3000` →
+  onboarding → native forside → lokasjons-overlay, med semantiske navn,
+  treffbarhet, dialogens tastaturfokus, støttet lukking og treffbar åpner
+  etterpå;
 - native Android-skjermbilder bekreftet servervelger, forside/bunnnavigasjon
   og lokasjon via `ResponsiveOverlay`; systemtilbake lukket overlayet;
   font scale 1,3 ga ingen horisontal overflow;
@@ -623,13 +638,16 @@ Gjennomført:
 - Android TalkBack med UIAutomator — semantiske navn i tilgjengelighetstreet bekreftet for søk, lokasjon, kategori, bunnnavigasjon og dialogkontroller; etter Escape landet accessibility-fokus på WebView, ikke åpneren.
 
 Native simulator-QA er dermed utført for de nevnte installasjons-, layout-,
-systemtilbake- og avgrensede TalkBack-scenariene. Dette må ikke leses som
-fysisk enhets-QA, full skjermleser-QA eller ekstern maskinvaretastatur-QA.
-Følgende er ikke utført: VoiceOver, full TalkBack-reise, ekstern fysisk
-maskinvaretastatur, iOS edge-swipe/system-tilbake, native kjøretøycomposer og
-faktisk native publisering. Android accessibility-fokus returnerte dessuten
-til WebView i stedet for overlayåpneren etter Escape, selv om browserens
-DOM-fokusretur består. Staging-/felt-CWV; Nitro-tallene over er
+systemtilbake-, XCUITest-element- og avgrensede TalkBack-scenariene.
+XCUITest-funnet gjelder accessibility-elementer/navn, treffbarhet og
+tastaturfokus, ikke VoiceOver-uttale eller accessibility-fokus. Dette må ikke
+leses som fysisk enhets-QA, full skjermleser-QA eller ekstern
+maskinvaretastatur-QA. Følgende er ikke utført: VoiceOver, full
+TalkBack-reise, ekstern fysisk maskinvaretastatur, iOS
+edge-swipe/system-tilbake, native kjøretøycomposer og faktisk native
+publisering. Android accessibility-fokus returnerte dessuten til WebView i
+stedet for overlayåpneren etter Escape, selv om browserens DOM-fokusretur
+består. Staging-/felt-CWV; Nitro-tallene over er
 lokale produksjonspreview-målinger og må ikke leses som reelle brukerdata;
 kvalitative brukertester; og operativ, aggregert ukentlig funnelrapport.
 Produkt-hendelsene finnes for søk og composer, men rapporteringen er ikke satt

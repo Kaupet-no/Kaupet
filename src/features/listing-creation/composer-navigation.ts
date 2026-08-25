@@ -19,7 +19,34 @@ export function reviewSectionSteps(pages: ComposerPage[], groupKeys: readonly st
   );
   return steps.length > 0 ? { first: steps[0], last: steps.at(-1)! } : null;
 }
+export function composerFieldId(field: string) {
+  const ids: Record<string, string> = {
+    category_id: "category-search-input",
+    title: "title",
+    subtitle: "subtitle",
+    description: "description",
+    condition: "condition-select",
+    price_nok: "price_nok",
+    postal_code: "postal_code",
+    known_issues: "known_issues",
+    maintenance_history: "maintenance_history",
+    brand: "vehicle-brand",
+    model: "vehicle-model",
+    drive_type: "drive-type-select",
+    axle_config: "axle-config-select",
+  };
+  return ids[field] ?? (field.startsWith("attr-") ? field : `attr-${field}`);
+}
 
+export function focusComposerField(field: string) {
+  if (typeof document === "undefined") return false;
+  const id = composerFieldId(field);
+  const element = document.getElementById(id) ?? document.getElementsByName(field)[0];
+  if (!(element instanceof HTMLElement)) return false;
+  element.focus();
+  element.scrollIntoView?.({ block: "center" });
+  return true;
+}
 export type ComposerSwipeDirection = "back" | "forward";
 export type ComposerNavigationResult = "advanced" | "blocked" | "busy";
 

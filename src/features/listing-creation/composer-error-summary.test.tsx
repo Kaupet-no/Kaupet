@@ -16,6 +16,7 @@ describe("ComposerErrorSummary", () => {
 
     const summary = screen.getByRole("alert");
     expect(summary.textContent).toContain("Fyll inn tittelen før du fortsetter.");
+    expect(summary.getAttribute("aria-live")).toBe("assertive");
     expect(document.activeElement).toBe(summary);
   });
 });

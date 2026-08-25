@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   canPreviewDraft,
+  composerFieldId,
   composerForwardStep,
   composerSwipeDirection,
   reviewSectionSteps,
@@ -11,6 +12,14 @@ describe("composerForwardStep", () => {
   it("returns to review after editing a review section", () => {
     expect(composerForwardStep(2, 5, true)).toBe(5);
     expect(composerForwardStep(2, 5, false)).toBe(2);
+  });
+});
+
+describe("composerFieldId", () => {
+  it("peker både skjemafelt og kategoriegenskaper til riktig kontroll", () => {
+    expect(composerFieldId("title")).toBe("title");
+    expect(composerFieldId("material")).toBe("attr-material");
+    expect(composerFieldId("attr-style")).toBe("attr-style");
   });
 });
 

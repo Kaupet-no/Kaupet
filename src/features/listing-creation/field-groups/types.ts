@@ -31,6 +31,32 @@ export type ListingFormShape = {
   maintenance_history?: string | undefined;
 };
 
+export type ComposerReviewClassification =
+  "requiredToPublish" | "recommendedForTrust" | "optionalEnhancement";
+
+export type ComposerReviewStatus = {
+  key: string;
+  label: string;
+  classification: ComposerReviewClassification;
+  onAction?: () => void;
+  actionLabel?: string;
+};
+
+export type ComposerReviewGroup = {
+  key: string;
+  classification: ComposerReviewClassification;
+};
+
+export type ComposerReviewEditOptions = {
+  field?: string;
+  groupKey?: string;
+};
+
+/*
+ * The review screen only needs the status row and its action. Keeping the
+ * target as a callback avoids a second validation/navigation abstraction.
+ */
+
 /**
  * Single shared props bag passed to every field-group component. Each
  * component only destructures what it needs; kept as one type (rather than
@@ -214,9 +240,14 @@ export type WizardSharedProps = {
   turnstileToken: string | null;
   setTurnstileToken: (token: string | null) => void;
   onCancel: () => void;
-  onEditReviewSection: (section: "category" | "content" | "details" | "location") => void;
+  onEditReviewSection: (
+    section: "category" | "content" | "details" | "location",
+    options?: ComposerReviewEditOptions,
+  ) => void;
   improvementGroupKeys: string[];
+  improvementGroups?: ComposerReviewGroup[];
   publishingRequirementErrors: string[];
+  publishingRequirements?: ComposerReviewStatus[];
 
   /** Set from the ny-annonse.tsx `type` search param when the wizard was
    * entered via the intent+title landing screen — locks the price group's

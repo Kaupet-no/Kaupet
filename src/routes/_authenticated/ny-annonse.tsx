@@ -63,7 +63,11 @@ import { CONDITIONS } from "@/lib/constants";
 import { isNative } from "@/lib/native";
 
 import { PublishActions } from "@/features/listing-creation/field-groups/review-publish";
-import type { WizardSharedProps } from "@/features/listing-creation/field-groups/types";
+import type {
+  ComposerReviewEditOptions,
+  ComposerReviewStatus,
+  WizardSharedProps,
+} from "@/features/listing-creation/field-groups/types";
 import type { PreviewDraft } from "@/features/listing-creation/preview-draft-store";
 import { PreviewDraftView } from "@/features/listing-creation/preview-draft-view";
 import { trackProductEvent } from "@/lib/product-analytics";
@@ -75,6 +79,7 @@ import { NativeComposerDeck } from "@/features/listing-creation/native-composer-
 import { NoImageDialog } from "@/features/listing-creation/no-image-dialog";
 import {
   canPreviewDraft,
+  focusComposerField,
   reviewSectionSteps,
   type ComposerNavigationResult,
 } from "@/features/listing-creation/composer-navigation";
@@ -158,6 +163,7 @@ function NewListingPage() {
   const pendingSubmitValuesRef = useRef<ListingForm | null>(null);
   const returnToReviewRef = useRef(false);
   const reviewSectionLastStepRef = useRef<number | null>(null);
+  const pendingReviewFocusRef = useRef<string | null>(null);
   const [reviewJumpRequested, setReviewJumpRequested] = useState(false);
   const pendingRestoreStepKeyRef = useRef<string | null>(null);
   const [showNoImageDialog, setShowNoImageDialog] = useState(false);
@@ -506,11 +512,11 @@ function NewListingPage() {
     // Mirrors the hidden Tilbake/Forrige buttons on category-confirm — this
     // is the single function behind the footer button, the shell's header
     // arrow, the native swipe deck, AND the browser/hardware back button (via
-    // useComposerHistoryBack below), so guarding it here is what keeps all
-    // four consistent instead of just the visible buttons.
-    if (currentPage?.groups?.some((g) => g.key === "category-confirm")) return;
+    // useComposerHistoryBack below — this
+    // is what keeps all four consistent instead of just the visible buttons.
     returnToReviewRef.current = false;
     reviewSectionLastStepRef.current = null;
+    pendingReviewFocusRef.current = null;
     trackProductEvent("listing_creation_step_completed", {
       kind: "sell",
       action: "back",
@@ -536,8 +542,12 @@ function NewListingPage() {
   const categoryAttributesPageIndex = pages.findIndex((p) =>
     p.groups.some((g) => g.key === "category-attributes"),
   );
-  const editReviewSection = (section: "category" | "content" | "details" | "location") => {
+  const editReviewSection = (
+    section: "category" | "content" | "details" | "location",
+    options?: ComposerReviewEditOptions,
+  ) => {
     returnToReviewRef.current = true;
+    pendingReviewFocusRef.current = options?.field ?? null;
     setValidationError(null);
     const groupKeys: Record<typeof section, string[]> = {
       category: ["category-select"],
@@ -552,8 +562,11 @@ function NewListingPage() {
       ],
       location: ["delivery", "location"],
     };
-    const target = reviewSectionSteps(pages, groupKeys[section]);
+    const target =
+      (options?.groupKey && reviewSectionSteps(pages, [options.groupKey])) ??
+      reviewSectionSteps(pages, groupKeys[section]);
     if (!target) {
+      pendingReviewFocusRef.current = null;
       // Landing-flyten har verken category-select eller (etter bekreftelse)
       // category-confirm igjen som steg, så "Endre kategori" fra
       // forhåndsvisningen har ingen side å hoppe til — den åpner samme
@@ -572,6 +585,109 @@ function NewListingPage() {
     window.scrollTo({ top: 0 });
   };
 
+  useEffect(() => {
+    const field = pendingReviewFocusRef.current;
+    if (!field) return;
+    let secondFrame: number | null = null;
+    const frame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => {
+        focusComposerField(field);
+        pendingReviewFocusRef.current = null;
+      });
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      if (secondFrame !== null) cancelAnimationFrame(secondFrame);
+    };
+  }, [currentStepKey, step]);
+  const reviewFieldLabels: Record<string, string> = {
+    category_id: "Kategori",
+    title: "Tittel",
+    subtitle: "Undertittel",
+    description: "Beskrivelse",
+    condition: "Tilstand",
+    price_nok: "Pris",
+    postal_code: "Postnummer",
+    city: "Sted",
+    can_ship: "Levering",
+    brand: "Merke",
+    model: "Modell",
+    sleeping_places: "Soveplasser",
+    eu_control_exempt: "EU-kontroll",
+    mileage_km: "Kilometerstand",
+    drive_type: "Hjuldrift",
+    axle_config: "Akselkombinasjon",
+    known_issues: "Kjente feil og mangler",
+    maintenance_history: "Vedlikeholdshistorikk",
+  };
+  const reviewGroupKeyForField = (field: string) => {
+    if (field.startsWith("attr-")) {
+      return pages.some((page) => page.groups.some((group) => group.key === "vehicle-registration"))
+        ? "vehicle-registration"
+        : "category-attributes";
+    }
+    const exact = pages
+      .flatMap((page) => page.groups)
+      .find((group) => group.fieldsToValidate?.includes(field as keyof ListingForm))?.key;
+    if (exact) return exact;
+    const candidates =
+      field === "brand" ||
+      field === "model" ||
+      field === "sleeping_places" ||
+      field === "eu_control_exempt"
+        ? ["vehicle-registration", "boat-facts", "category-attributes"]
+        : field === "mileage_km" || field === "drive_type" || field === "axle_config"
+          ? ["vehicle-facts", "category-attributes"]
+          : field === "postal_code" || field === "city" || field === "can_ship"
+            ? ["location", "delivery"]
+            : ["category-attributes", "description-keywords", "details"];
+    return candidates.find((key) =>
+      pages.some((page) => page.groups.some((group) => group.key === key)),
+    );
+  };
+  const reviewSectionForGroup = (groupKey: string | undefined) =>
+    groupKey === "category-select" || groupKey === "category-confirm"
+      ? ("category" as const)
+      : groupKey === "photos" || groupKey === "title"
+        ? ("content" as const)
+        : groupKey === "delivery" || groupKey === "location"
+          ? ("location" as const)
+          : ("details" as const);
+  const publishingRequirements: ComposerReviewStatus[] = [];
+  const requirementKeys = new Set<string>();
+  const addPublishingRequirement = (key: string, label: string, field: string) => {
+    if (requirementKeys.has(key)) return;
+    requirementKeys.add(key);
+    const groupKey = reviewGroupKeyForField(field);
+    publishingRequirements.push({
+      key,
+      label,
+      classification: "requiredToPublish",
+      onAction: () =>
+        editReviewSection(reviewSectionForGroup(groupKey), {
+          field,
+          groupKey,
+        }),
+    });
+  };
+  for (const [field, error] of Object.entries(errors)) {
+    if (typeof error?.message === "string") {
+      // eslint-disable-next-line react-hooks/refs -- runs only from review action callbacks
+      addPublishingRequirement(`form-${field}`, reviewFieldLabels[field] ?? field, field);
+    }
+  }
+  if (extraFieldError) {
+    // eslint-disable-next-line react-hooks/refs -- runs only from review action callbacks
+    addPublishingRequirement(
+      `extra-${extraFieldError.field}`,
+      reviewFieldLabels[extraFieldError.field] ?? extraFieldError.field,
+      extraFieldError.field,
+    );
+  }
+  for (const filter of missingFilters) {
+    // eslint-disable-next-line react-hooks/refs -- runs only from review action callbacks
+    addPublishingRequirement(`filter-${filter.key}`, filter.label_nb, `attr-${filter.key}`);
+  }
   const shouldBlockNav =
     publishedId === null &&
     (title.trim().length > 0 || images.length > 0 || vehicleLookupResult !== null);
@@ -1255,17 +1371,14 @@ function NewListingPage() {
     ])
       .filter((group) => group.classification !== "requiredToPublish")
       .map((group) => group.key),
-    publishingRequirementErrors: Array.from(
-      new Set([
-        ...Object.values(errors).flatMap((error) =>
-          typeof error?.message === "string" ? [error.message] : [],
-        ),
-        ...(extraFieldError ? [extraFieldError.message] : []),
-        ...(missingFilters.length > 0
-          ? [`Fyll inn ${missingFilters.map((filter) => filter.label_nb).join(", ")}.`]
-          : []),
-      ]),
-    ),
+    improvementGroups: fieldGroupsForKeys([
+      ...fieldGroupKeys,
+      ...(isVehicle ? ["vehicle-360"] : []),
+    ])
+      .filter((group) => group.classification !== "requiredToPublish")
+      .map((group) => ({ key: group.key, classification: group.classification })),
+    publishingRequirementErrors: publishingRequirements.map((requirement) => requirement.label),
+    publishingRequirements,
   };
 
   const groups = currentPage?.groups ?? [];
@@ -1292,7 +1405,10 @@ function NewListingPage() {
           page.groups.some((group) => group.fieldsToValidate?.includes(firstField)),
         )
       : -1;
-    if (pageIndex >= 0) setStep(pageIndex + 1);
+    if (pageIndex >= 0) {
+      pendingReviewFocusRef.current = firstField ?? null;
+      setStep(pageIndex + 1);
+    }
     setValidationError("Rett feltene som er markert før du publiserer.");
   }
   // handleSubmit's callbacks only run later, from the form's submit event,
@@ -1309,6 +1425,9 @@ function NewListingPage() {
           reason: "required_attributes",
         });
         setAttributesTouched(true);
+        pendingReviewFocusRef.current = missingFilters[0]?.key
+          ? `attr-${missingFilters[0].key}`
+          : null;
         if (categoryAttributesPageIndex >= 0) setStep(categoryAttributesPageIndex + 1);
         setValidationError("Fyll inn alle obligatoriske egenskaper før du publiserer.");
         return;
@@ -1325,6 +1444,7 @@ function NewListingPage() {
       });
       mutation.mutate(v);
     },
+    // eslint-disable-next-line react-hooks/refs -- callback runs only on form submit
     (fields) => {
       handleInvalidSubmit(fields);
       trackProductEvent("listing_creation_step_completed", {

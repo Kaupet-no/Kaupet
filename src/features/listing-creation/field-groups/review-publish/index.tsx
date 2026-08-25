@@ -4,10 +4,12 @@ import { Turnstile } from "@marsidev/react-turnstile";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ComposerReview } from "@/features/listing-creation/composer-review";
+import {
+  ComposerReview,
+  ComposerReviewStatuses,
+} from "@/features/listing-creation/composer-review";
 
-import type { WizardSharedProps } from "../types";
+import type { WizardSharedProps, ComposerReviewStatus } from "../types";
 import { Vehicle360Group } from "../vehicle-360";
 
 type ReviewPreviewProps = Pick<
@@ -100,19 +102,77 @@ type PublishActionsProps = {
  * renders it explicitly on the last page instead of via this wrapper.
  */
 export function ReviewPublishGroup(props: WizardSharedProps) {
-  const improvements = [
-    props.improvementGroupKeys.includes("photos") && props.images.length === 0
-      ? "Legg til bilder"
-      : null,
-    props.improvementGroupKeys.some((key) => key === "price" || key === "vehicle-price") &&
-    !props.previewPrice
-      ? "Oppgi pris"
-      : null,
-    props.improvementGroupKeys.includes("location") && !props.city && !props.postalCode
-      ? "Oppgi sted"
-      : null,
-  ].filter((item): item is string => !!item);
-  const showVehicle360 = props.isVehicle && props.improvementGroupKeys.includes("vehicle-360");
+  const improvementGroups =
+    props.improvementGroups ??
+    props.improvementGroupKeys.map((key) => ({
+      key,
+      classification:
+        key === "vehicle-360" || key === "vehicle-equipment"
+          ? ("optionalEnhancement" as const)
+          : ("recommendedForTrust" as const),
+    }));
+  const improvementClassification = (key: string) =>
+    improvementGroups.find((group) => group.key === key)?.classification ?? "recommendedForTrust";
+  const editGroup = (key: string) => {
+    const section =
+      key === "category-select" || key === "category-confirm"
+        ? "category"
+        : key === "photos" || key === "title"
+          ? "content"
+          : key === "delivery" || key === "location"
+            ? "location"
+            : "details";
+    props.onEditReviewSection(section, { groupKey: key });
+  };
+  const improvements = (
+    [
+      props.improvementGroupKeys.includes("photos") && props.images.length === 0
+        ? {
+            key: "photos",
+            label: "Legg til bilder",
+            classification: improvementClassification("photos"),
+            onAction: () => editGroup("photos"),
+          }
+        : null,
+      props.improvementGroupKeys.some((key) => key === "price" || key === "vehicle-price") &&
+      !props.previewPrice
+        ? {
+            key: "price",
+            label: "Oppgi pris",
+            classification: improvementClassification(
+              props.improvementGroupKeys.includes("price") ? "price" : "vehicle-price",
+            ),
+            onAction: () =>
+              editGroup(props.improvementGroupKeys.includes("price") ? "price" : "vehicle-price"),
+          }
+        : null,
+      props.improvementGroupKeys.includes("location") && !props.city && !props.postalCode
+        ? {
+            key: "location",
+            label: "Oppgi sted",
+            classification: improvementClassification("location"),
+            onAction: () => editGroup("location"),
+          }
+        : null,
+      props.isVehicle && props.improvementGroupKeys.includes("vehicle-360")
+        ? {
+            key: "vehicle-360",
+            label: "Ta 360°-opptak",
+            classification: improvementClassification("vehicle-360"),
+            onAction: () => editGroup("vehicle-360"),
+          }
+        : null,
+    ] as (ComposerReviewStatus | null)[]
+  ).filter((item): item is ComposerReviewStatus => item !== null);
+  const required = (
+    props.publishingRequirements && props.publishingRequirements.length > 0
+      ? props.publishingRequirements
+      : props.publishingRequirementErrors.map((label, index) => ({
+          key: `publishing-requirement-${index}`,
+          label,
+          classification: "requiredToPublish" as const,
+        }))
+  ) as ComposerReviewStatus[];
 
   return (
     <>
@@ -120,22 +180,13 @@ export function ReviewPublishGroup(props: WizardSharedProps) {
         <h3 id="publishing-readiness-title" className="text-lg font-semibold">
           Publiseringsklar
         </h3>
-        {props.publishingRequirementErrors.length > 0 ? (
-          <Alert variant="destructive">
-            <AlertTitle>Må rettes før publisering</AlertTitle>
-            <AlertDescription>
-              <ul className="list-disc space-y-1 pl-5">
-                {props.publishingRequirementErrors.map((error) => (
-                  <li key={error}>{error}</li>
-                ))}
-              </ul>
-            </AlertDescription>
-          </Alert>
+        {required.length > 0 ? (
+          <ComposerReviewStatuses items={required} />
         ) : (
           <p className="text-sm text-muted-foreground">Alle publiseringskrav er oppfylt.</p>
         )}
       </section>
-      {(improvements.length > 0 || showVehicle360) && (
+      {improvements.length > 0 && (
         <section aria-labelledby="listing-improvements-title" className="space-y-3">
           <div>
             <h3 id="listing-improvements-title" className="text-lg font-semibold">
@@ -145,19 +196,10 @@ export function ReviewPublishGroup(props: WizardSharedProps) {
               Valgfritt – du kan fortsatt publisere annonsen.
             </p>
           </div>
-          {improvements.length > 0 && (
-            <Alert variant="warning" role="note">
-              <AlertTitle>Anbefalte forbedringer</AlertTitle>
-              <AlertDescription>
-                <ul className="list-disc space-y-1 pl-5">
-                  {improvements.map((improvement) => (
-                    <li key={improvement}>{improvement}</li>
-                  ))}
-                </ul>
-              </AlertDescription>
-            </Alert>
+          <ComposerReviewStatuses items={improvements} />
+          {props.isVehicle && props.improvementGroupKeys.includes("vehicle-360") && (
+            <Vehicle360Group {...props} />
           )}
-          {showVehicle360 && <Vehicle360Group {...props} />}
         </section>
       )}
       <ComposerReview
@@ -211,7 +253,6 @@ export function ReviewPublishGroup(props: WizardSharedProps) {
     </>
   );
 }
-
 /**
  * Turnstile + "Avbryt" + "Publiser annonse" submit button — shared verbatim.
  * Renders as flat siblings (not a wrapping div) so the caller's own

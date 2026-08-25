@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -15,7 +15,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AttributeFields, useAllCategoryFilters } from "@/components/attribute-fields";
 import { VEHICLE_WIZARD_MANAGED_KEYS } from "@/lib/vehicle/vehicle-lookup.types";
-import { vehicleCategoryGroupFor } from "@/lib/category-filters";
+import { getMissingRequiredFilters, vehicleCategoryGroupFor } from "@/lib/category-filters";
 import { useAllVehicleBrands, useAllVehicleModels } from "@/lib/vehicle/vehicle-brands";
 import { matchBrandAndModelInTitle } from "@/lib/vehicle/vehicle-brand-match";
 import { getCategoryIcon } from "@/lib/category-icons";
@@ -45,6 +45,99 @@ const HIDDEN_KEYS_FOR_MANUAL_SPECS = [
   "brand",
   "model",
 ];
+const MANUAL_SPEC_SECTION_KEYS = {
+  grunnfakta: ["year", "color", "body_type", "imported_used"],
+  drivlinje: [
+    "fuel_type",
+    "transmission",
+    "power_hk",
+    "drive_type",
+    "cylinders",
+    "engine_displacement_cc",
+    "engine_code",
+  ],
+  praktiske: [
+    "weight_kg",
+    "max_total_weight_kg",
+    "length_m",
+    "tow_hitch",
+    "max_tow_weight_kg",
+    "seats",
+  ],
+  flere: ["next_eu_control", "eu_control_exempt", "sleeping_places"],
+} as const;
+
+function hiddenKeysForManualSection(
+  allKeys: readonly string[],
+  visibleKeys: readonly string[],
+): string[] {
+  return [...HIDDEN_KEYS_FOR_MANUAL_SPECS, ...allKeys.filter((key) => !visibleKeys.includes(key))];
+}
+
+function ManualSpecSection({
+  heading,
+  sectionId,
+  visibleKeys,
+  allKeys,
+  initialOpen = false,
+  hasErrors = false,
+  ...props
+}: {
+  heading: string;
+  sectionId: string;
+  visibleKeys: readonly string[];
+  allKeys: readonly string[];
+  initialOpen?: boolean;
+  hasErrors?: boolean;
+} & Pick<
+  WizardSharedProps,
+  "categoryId" | "categories" | "attributes" | "onAttributesChange" | "attributesTouched"
+>) {
+  const [open, setOpen] = useState(initialOpen);
+
+  const errorId = `${sectionId}-error`;
+  const contentId = `${sectionId}-content`;
+
+  return (
+    <details
+      open={open || hasErrors}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+      aria-labelledby={sectionId}
+      className="rounded-xl border border-border"
+    >
+      <summary
+        aria-controls={contentId}
+        aria-describedby={hasErrors ? errorId : undefined}
+        className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 [&::-webkit-details-marker]:hidden"
+      >
+        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+          <span id={sectionId} role="heading" aria-level={3} className="text-sm font-medium">
+            {heading}
+          </span>
+          {hasErrors && (
+            <span id={errorId} role="status" className="text-sm font-medium text-destructive">
+              Mangler påkrevde opplysninger
+            </span>
+          )}
+        </span>
+        <span aria-hidden className="text-muted-foreground">
+          {open ? "−" : "+"}
+        </span>
+      </summary>
+      <div id={contentId} className="space-y-3 border-t border-border p-4">
+        <AttributeFields
+          categoryId={props.categoryId}
+          categories={props.categories}
+          value={props.attributes}
+          onChange={props.onAttributesChange}
+          showErrors={props.attributesTouched}
+          hiddenKeys={hiddenKeysForManualSection(allKeys, visibleKeys)}
+          required
+        />
+      </div>
+    </details>
+  );
+}
 
 /** For registrerte kjøretøy dekker SVV-oppslaget resten av de tekniske
  * feltene selv (se confirmVehicleData) — men "Antall soveplasser"
@@ -90,7 +183,6 @@ export function VehicleRegistration(props: WizardSharedProps) {
     setVehicleRegNrInput,
     attributes,
     onAttributesChange,
-    attributesTouched,
     extraFieldError,
     bilOgMcCategoryId,
     onCategorySelect,
@@ -118,7 +210,36 @@ export function VehicleRegistration(props: WizardSharedProps) {
         .filter((k) => !VEHICLE_REGISTERED_REQUIRED_SPEC_KEYS.includes(k)),
     [allFilters],
   );
-
+  const manualSpecKeys = useMemo(
+    () => [...new Set((allFilters ?? []).map((filter) => filter.key))],
+    [allFilters],
+  );
+  const manualSections = useMemo(() => {
+    const knownKeys = new Set<string>(Object.values(MANUAL_SPEC_SECTION_KEYS).flat());
+    return {
+      grunnfakta: MANUAL_SPEC_SECTION_KEYS.grunnfakta,
+      drivlinje: MANUAL_SPEC_SECTION_KEYS.drivlinje,
+      praktiske: MANUAL_SPEC_SECTION_KEYS.praktiske,
+      flere: [
+        ...MANUAL_SPEC_SECTION_KEYS.flere,
+        ...manualSpecKeys.filter(
+          (key) => !knownKeys.has(key) && !HIDDEN_KEYS_FOR_MANUAL_SPECS.includes(key),
+        ),
+      ],
+    };
+  }, [manualSpecKeys]);
+  const missingManualSpecKeys = useMemo(() => {
+    if (!props.attributesTouched) return new Set<string>();
+    return new Set(
+      getMissingRequiredFilters(
+        categoryId,
+        allFilters ?? [],
+        categoriesById,
+        attributes,
+        HIDDEN_KEYS_FOR_MANUAL_SPECS,
+      ).map((filter) => filter.key),
+    );
+  }, [props.attributesTouched, categoryId, allFilters, categoriesById, attributes]);
   const leafBySlug = useMemo(() => vehicleLeafCategoriesBySlug(categories), [categories]);
   const currentLeafSlug = categoriesById.get(categoryId)?.slug as VehicleLeafSlug | undefined;
   const selectedLeafSlug: VehicleLeafSlug =
@@ -258,7 +379,7 @@ export function VehicleRegistration(props: WizardSharedProps) {
       </div>
 
       {!vehicleRegistered && (
-        <div className="space-y-4 border-t pt-4">
+        <section className="space-y-4 border-t pt-4">
           <VehicleBrandField
             categoryGroup={categoryGroup}
             value={brand}
@@ -274,7 +395,16 @@ export function VehicleRegistration(props: WizardSharedProps) {
             required
             error={fieldError("model")}
           />
-        </div>
+          <ManualSpecSection
+            heading="Grunnfakta"
+            sectionId="vehicle-manual-grunnfakta-heading"
+            visibleKeys={manualSections.grunnfakta}
+            allKeys={manualSpecKeys}
+            initialOpen
+            hasErrors={manualSections.grunnfakta.some((key) => missingManualSpecKeys.has(key))}
+            {...props}
+          />
+        </section>
       )}
 
       <div className="space-y-3 border-t pt-4">
@@ -351,19 +481,35 @@ export function VehicleRegistration(props: WizardSharedProps) {
             <p className="text-sm text-muted-foreground">
               Ingen problem — fyll inn kjøretøyets tekniske opplysninger selv.
             </p>
-            <AttributeFields
-              categoryId={categoryId}
-              categories={categories}
-              value={attributes}
-              onChange={onAttributesChange}
-              showErrors={attributesTouched}
-              hiddenKeys={HIDDEN_KEYS_FOR_MANUAL_SPECS}
-              required
-            />
+            <div className="space-y-4">
+              <ManualSpecSection
+                heading="Drivlinje"
+                sectionId="vehicle-manual-drivlinje-heading"
+                visibleKeys={manualSections.drivlinje}
+                allKeys={manualSpecKeys}
+                hasErrors={manualSections.drivlinje.some((key) => missingManualSpecKeys.has(key))}
+                {...props}
+              />
+              <ManualSpecSection
+                heading="Praktiske opplysninger"
+                sectionId="vehicle-manual-praktiske-heading"
+                visibleKeys={manualSections.praktiske}
+                allKeys={manualSpecKeys}
+                hasErrors={manualSections.praktiske.some((key) => missingManualSpecKeys.has(key))}
+                {...props}
+              />
+              <ManualSpecSection
+                heading="Flere opplysninger"
+                sectionId="vehicle-manual-flere-heading"
+                visibleKeys={manualSections.flere}
+                allKeys={manualSpecKeys}
+                hasErrors={manualSections.flere.some((key) => missingManualSpecKeys.has(key))}
+                {...props}
+              />
+            </div>
           </div>
         )}
       </div>
-
       <AlertDialog open={!!lookup} onOpenChange={() => {}}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -374,6 +520,7 @@ export function VehicleRegistration(props: WizardSharedProps) {
               Dette tilhører en {lookupSummary}
               {lookup?.year ? ` (${lookup.year}-modell)` : ""}. Er dette korrekt?
             </AlertDialogDescription>
+            <p className="text-sm font-medium text-foreground">Kjøretøydata fra Statens vegvesen</p>
           </AlertDialogHeader>
           {categoryMismatch && (
             <Alert variant="warning">
@@ -399,6 +546,10 @@ export function VehicleRegistration(props: WizardSharedProps) {
               <p className="text-sm text-muted-foreground">
                 Kontroller merke og modell. Rett bare hvis opplysningene fra Statens vegvesen ikke
                 stemmer.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Du kan rette merke og modell her. Hvis registreringsnummeret eller underkategorien
+                er feil, trykk «Nei» for å gjøre oppslaget på nytt.
               </p>
               <VehicleBrandField
                 categoryGroup={categoryGroup}

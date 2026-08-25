@@ -335,8 +335,29 @@ describe("resolveWizardPages", () => {
     expect(resolveWizardPages(groups, { native: false })).toEqual(expected);
     expect(resolveWizardPages(groups, { native: true })).toEqual(expected);
   });
-});
+  it("holder registrering, fakta, tilstand og pris som stabile kjøretøysider", () => {
+    const groups = [
+      "photos",
+      "vehicle-registration",
+      "vehicle-facts",
+      "vehicle-condition",
+      "vehicle-price",
+      "review-publish",
+    ];
+    const forceBreakBeforeKeys = new Set(["vehicle-facts", "vehicle-condition"]);
+    const expected = [
+      ["photos"],
+      ["vehicle-registration"],
+      ["vehicle-facts"],
+      ["vehicle-condition"],
+      ["vehicle-price"],
+      ["review-publish"],
+    ];
 
+    expect(resolveWizardPages(groups, { native: false, forceBreakBeforeKeys })).toEqual(expected);
+    expect(resolveWizardPages(groups, { native: true, forceBreakBeforeKeys })).toEqual(expected);
+  });
+});
 describe("withRuntimeFieldGroups", () => {
   const landingFlow = ["photos", "category-attributes", "description-keywords", "review-publish"];
   const vehicleFlow = [

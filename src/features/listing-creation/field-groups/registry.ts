@@ -18,6 +18,10 @@ import { DeliveryGroup, LocationGroup } from "./delivery-location";
 import { ReviewPublishGroup } from "./review-publish";
 import type { ListingFormShape, WizardSharedProps } from "./types";
 import type { CategoryBehavior } from "@/lib/category-behavior";
+import {
+  LISTING_TASK_BY_FIELD_GROUP_KEY,
+  type ListingTask,
+} from "@/features/listing-creation/category-flows";
 import { getAxleConfigOptions } from "@/lib/vehicle/vehicle-options";
 
 /** Context passed to a field-group's `validateExtra`, mirroring what
@@ -294,60 +298,28 @@ export function fieldGroupsForKeys(keys: string[]): FieldGroup[] {
   return keys.map((k) => FIELD_GROUP_REGISTRY[k]).filter((g): g is FieldGroup => !!g);
 }
 
-/**
- * Norwegian step-indicator/next-button label per field-group key, split by
- * platform since e.g. `title-photos` and `delivery-location` read
- * differently depending on how much content shares their page. Reproduces
- * today's hardcoded labels ("Tittel"/"Detaljer"/"Beskrivelse"/"Sted"/
- * "Publiser" on native; "Bilder & tittel"/"Detaljer"/"Lokasjon" on web) for
- * the default flow.
- */
-const FIELD_GROUP_LABEL_NATIVE_NB: Record<string, string> = {
+/** Shared Norwegian task labels for the step indicator, page heading and the
+ * web next-button. Structural category/registration pages keep their own
+ * labels outside the four content tasks. */
+const LISTING_TASK_LABEL_NB: Record<ListingTask, string> = {
+  showcase: "Vis frem",
+  searchable: "Gjør søkbar",
+  trade: "Gjør handelen enkel",
+  review: "Se over",
+};
+
+const STRUCTURAL_PAGE_LABEL_NB: Record<string, string> = {
   "category-select": "Kategori",
   "category-confirm": "Kategori",
   "vehicle-registration": "Registreringsnummer",
-  "vehicle-360": "360°-opptak",
-  photos: "Bilder",
-  title: "Tittel",
-  "category-attributes": "Detaljer",
-  condition: "Detaljer",
-  price: "Detaljer",
-  "vehicle-facts": "Beskrivelse",
-  "vehicle-price": "Pris",
-  "boat-facts": "Båt",
-  "vehicle-condition": "Tilstand",
-  "vehicle-equipment": "Utstyr",
-  "description-keywords": "Beskrivelse",
-  delivery: "Levering",
-  location: "Sted",
-  "review-publish": "Publiser",
 };
 
-const FIELD_GROUP_LABEL_WEB_NB: Record<string, string> = {
-  "category-select": "Kategori",
-  "category-confirm": "Kategori",
-  "vehicle-registration": "Registreringsnummer",
-  "vehicle-360": "360°-opptak",
-  photos: "Bilder",
-  title: "Tittel",
-  "category-attributes": "Detaljer",
-  condition: "Detaljer",
-  price: "Detaljer",
-  "vehicle-facts": "Beskrivelse",
-  "vehicle-price": "Pris",
-  "boat-facts": "Merke & modell",
-  "vehicle-condition": "Tilstand",
-  "vehicle-equipment": "Utstyr",
-  "description-keywords": "Beskrivelse",
-  delivery: "Levering",
-  location: "Lokasjon",
-  "review-publish": "Publiser",
-};
-
-/** Representative label for a wizard page, derived from its first field group. */
-export function pageLabel(groups: FieldGroup[], native: boolean): string {
-  const map = native ? FIELD_GROUP_LABEL_NATIVE_NB : FIELD_GROUP_LABEL_WEB_NB;
-  return (groups[0] && map[groups[0].key]) || "Steg";
+/** Representative label for a wizard page, derived from its semantic task. */
+export function pageLabel(groups: FieldGroup[]): string {
+  const key = groups[0]?.key;
+  if (!key) return "Steg";
+  const task = LISTING_TASK_BY_FIELD_GROUP_KEY[key];
+  return task ? LISTING_TASK_LABEL_NB[task] : (STRUCTURAL_PAGE_LABEL_NB[key] ?? "Steg");
 }
 
 /** Norwegian admin-display labels — distinct from the step-indicator labels above (different audience/purpose). */

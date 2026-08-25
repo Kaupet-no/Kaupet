@@ -2,10 +2,9 @@ import type { CategoryNode } from "@/lib/category-filters";
 
 /**
  * Ordered, reorderable, togglable field-group keys a category's flow is
- * built from (see src/features/listing-creation/field-groups/). Replaces the
- * earlier fixed 4-"canonical step" model, which couldn't represent native's
- * real content boundaries (price is bundled with category/condition, not
- * with location; description is its own native page but inline on web).
+ * built from (see src/features/listing-creation/field-groups/). The configured
+ * order remains authoritative inside the shared task boundaries, while
+ * structural and vehicle-specific solo pages stay explicit.
  */
 export const DEFAULT_FIELD_GROUPS: string[] = [
   "photos",
@@ -19,6 +18,28 @@ export const DEFAULT_FIELD_GROUPS: string[] = [
   "review-publish",
 ];
 export const DEFAULT_MODULES: string[] = ["generic-attributes"];
+
+export type ListingTask = "showcase" | "searchable" | "trade" | "review";
+
+/** Shared semantic task for every content field group. Structural groups are
+ * deliberately absent because they keep their own page labels. */
+export const LISTING_TASK_BY_FIELD_GROUP_KEY: Partial<Record<string, ListingTask>> = {
+  photos: "showcase",
+  title: "showcase",
+  "vehicle-360": "showcase",
+  "category-attributes": "searchable",
+  "description-keywords": "searchable",
+  "boat-facts": "searchable",
+  "vehicle-facts": "searchable",
+  "vehicle-equipment": "searchable",
+  condition: "trade",
+  price: "trade",
+  delivery: "trade",
+  location: "trade",
+  "vehicle-condition": "trade",
+  "vehicle-price": "trade",
+  "review-publish": "review",
+};
 
 export type CategoryFlow = {
   fieldGroups: string[];
@@ -185,18 +206,15 @@ export function withRuntimeFieldGroups(
 }
 
 /**
- * Chunks an ordered list of active field-group keys into wizard "pages" for a
- * given platform. Web keeps the existing positional chunks. Ordinary native
- * flows use four task pages after category entry: show the item, make it
- * searchable, clarify the trade, and review/publish. Category selection and
- * confirmation remain structural solo pages. Bil og MC keeps its existing
- * atomic pages until its dedicated vehicle-flow phases are implemented.
- * `title-photos` is no longer forced first — its position is just whatever
- * order it has in `fieldGroupKeys`, so a category flow can put
- * `category-attributes` (and any vehicle lookup it triggers) before it.
+ * Chunks an ordered list of active field-group keys into wizard pages.
+ * Ordinary flows use the same four task boundaries on web and native: show
+ * the item, make it searchable, clarify the trade, and review/publish.
+ * Category selection and confirmation remain structural solo pages. Bil og
+ * MC keeps its existing platform-specific atomic pages until its dedicated
+ * vehicle-flow phases are implemented.
  *
- * Group order within each native task page still follows the configured flow;
- * only the four established task boundaries are fixed.
+ * Group order within each task page still follows the configured flow; only
+ * the four established task boundaries are fixed.
  */
 /** Field-group keys that always get their own solo page, wherever they land
  * in the ordered array — `category-select` is always first (see
@@ -204,12 +222,12 @@ export function withRuntimeFieldGroups(
  * anywhere in the array (admin-configurable position for the former,
  * runtime-injected for the latter), but must never be bundled
  * with unrelated groups like `condition`/`price`. */
-const SOLO_FIELD_GROUP_KEYS = new Set([
-  "category-select",
-  "category-confirm",
-  "vehicle-registration",
-  "vehicle-price",
-]);
+const SOLO_FIELD_GROUP_KEYS: Record<string, true> = {
+  "category-select": true,
+  "category-confirm": true,
+  "vehicle-registration": true,
+  "vehicle-price": true,
+};
 
 export function resolveWizardPages(
   fieldGroupKeys: string[],
@@ -225,33 +243,31 @@ export function resolveWizardPages(
     forceBreakBeforeKeys?: ReadonlySet<string>;
   },
 ): string[][] {
-  if (options.native) {
-    if (fieldGroupKeys.includes("vehicle-registration")) {
-      return fieldGroupKeys.map((key) => [key]);
+  const isVehicleFlow = fieldGroupKeys.includes("vehicle-registration");
+  if (!isVehicleFlow) {
+    const taskPages: Record<ListingTask, string[]> = {
+      showcase: [],
+      searchable: [],
+      trade: [],
+      review: [],
+    };
+    for (const key of fieldGroupKeys) {
+      const task = LISTING_TASK_BY_FIELD_GROUP_KEY[key];
+      if (task) taskPages[task].push(key);
+      else if (!SOLO_FIELD_GROUP_KEYS[key]) taskPages.searchable.push(key);
     }
-
-    const itemKeys = new Set(["photos", "title"]);
-    const searchableKeys = new Set(["boat-facts", "category-attributes", "description-keywords"]);
-    const tradeKeys = new Set(["condition", "price", "delivery", "location"]);
-    const structuralKeys = new Set(["category-select", "category-confirm", "review-publish"]);
-    const page = (keys: ReadonlySet<string>) => fieldGroupKeys.filter((key) => keys.has(key));
-    const other = fieldGroupKeys.filter(
-      (key) =>
-        !structuralKeys.has(key) &&
-        !itemKeys.has(key) &&
-        !searchableKeys.has(key) &&
-        !tradeKeys.has(key),
-    );
     const pages = [
       ...(fieldGroupKeys.includes("category-select") ? [["category-select"]] : []),
-      page(itemKeys),
+      taskPages.showcase,
       ...(fieldGroupKeys.includes("category-confirm") ? [["category-confirm"]] : []),
-      [...page(searchableKeys), ...other],
-      page(tradeKeys),
-      ...(fieldGroupKeys.includes("review-publish") ? [["review-publish"]] : []),
+      taskPages.searchable,
+      taskPages.trade,
+      taskPages.review,
     ];
     return pages.filter((groups) => groups.length > 0);
   }
+
+  if (options.native) return fieldGroupKeys.map((key) => [key]);
   const chunkSize = 4;
   const forceBreakBeforeKeys = options.forceBreakBeforeKeys;
 
@@ -274,7 +290,7 @@ export function resolveWizardPages(
   };
 
   for (const key of withoutEnds) {
-    if (SOLO_FIELD_GROUP_KEYS.has(key)) {
+    if (SOLO_FIELD_GROUP_KEYS[key]) {
       flush();
       pages.push([key]);
     } else {

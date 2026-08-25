@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 
-import { FIELD_GROUP_REGISTRY } from "./registry";
+import { FIELD_GROUP_REGISTRY, fieldGroupsForKeys, pageLabel } from "./registry";
 
 it("klassifiserer alle feltgrupper etter publiseringsformål", () => {
   expect(
@@ -27,4 +27,25 @@ it("klassifiserer alle feltgrupper etter publiseringsformål", () => {
     location: "recommendedForTrust",
     "review-publish": "requiredToPublish",
   });
+});
+
+it("gir innholdssidene de fire delte oppgavenavnene", () => {
+  const pages = [
+    ["photos", "title"],
+    ["category-attributes", "description-keywords"],
+    ["condition", "price", "delivery", "location"],
+    ["review-publish"],
+  ];
+
+  expect(pages.map((keys) => pageLabel(fieldGroupsForKeys(keys)))).toEqual([
+    "Vis frem",
+    "Gjør søkbar",
+    "Gjør handelen enkel",
+    "Se over",
+  ]);
+});
+
+it("bevarer egne etiketter for strukturelle solosider", () => {
+  expect(pageLabel(fieldGroupsForKeys(["category-confirm"]))).toBe("Kategori");
+  expect(pageLabel(fieldGroupsForKeys(["vehicle-registration"]))).toBe("Registreringsnummer");
 });

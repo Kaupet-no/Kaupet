@@ -30,15 +30,6 @@ export function ComposerStepIndicator({
   );
 }
 
-type DisplayStep = { label: string; startIndex: number; endIndex: number };
-
-function buildDisplaySteps(pages: WizardPage[], native: boolean): DisplayStep[] {
-  return pages.map((p, i) => {
-    const index = i + 1;
-    return { label: pageLabel(p.groups, native), startIndex: index, endIndex: index };
-  });
-}
-
 /**
  * Fast fremdriftslinje + "Steg X av Y" i stedet for én boks per steg — med
  * så mange steg som kjøretøyflyten nå har (se UX-audit), gikk
@@ -47,16 +38,12 @@ function buildDisplaySteps(pages: WizardPage[], native: boolean): DisplayStep[] 
  * telleren, så brukeren fortsatt vet hvor i flyten de er uten å måtte lese
  * en rekke med bokser.
  */
-export function StepIndicator({
-  step,
-  pages,
-  native,
-}: {
-  step: number;
-  pages: WizardPage[];
-  native: boolean;
-}) {
-  const displaySteps = buildDisplaySteps(pages, native);
+export function StepIndicator({ step, pages }: { step: number; pages: WizardPage[] }) {
+  const displaySteps = pages.map((page, index) => ({
+    label: pageLabel(page.groups),
+    startIndex: index + 1,
+    endIndex: index + 1,
+  }));
   const total = displaySteps.length;
   const currentIndex = displaySteps.findIndex((ds) => step >= ds.startIndex && step <= ds.endIndex);
   const current = currentIndex === -1 ? displaySteps[total - 1] : displaySteps[currentIndex];

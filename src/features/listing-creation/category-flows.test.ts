@@ -223,36 +223,23 @@ describe("effectiveFlowForCategory", () => {
 describe("resolveWizardPages", () => {
   const flowWithCategorySelect = ["category-select", ...DEFAULT_FIELD_GROUPS];
 
-  it("reproduces today's web split for the default flow (chunks of 4, ends pinned)", () => {
-    expect(resolveWizardPages(flowWithCategorySelect, { native: false })).toEqual([
-      ["category-select"],
-      ["photos", "title", "category-attributes", "condition", "price"],
-      ["description-keywords"],
-      ["delivery", "location", "review-publish"],
-    ]);
-  });
-
-  it("grupperer en generisk nativeflyt i fire hovedstopp etter kategoriinngangen", () => {
-    expect(resolveWizardPages(flowWithCategorySelect, { native: true })).toEqual([
+  it("bruker de samme fire oppgavesidene på web og native", () => {
+    const expected = [
       ["category-select"],
       ["photos", "title"],
       ["category-attributes", "description-keywords"],
       ["condition", "price", "delivery", "location"],
       ["review-publish"],
-    ]);
+    ];
+    expect(resolveWizardPages(flowWithCategorySelect, { native: false })).toEqual(expected);
+    expect(resolveWizardPages(flowWithCategorySelect, { native: true })).toEqual(expected);
   });
 
   it("produces fewer, smaller pages for a category with fewer groups", () => {
     const groups = ["photos", "title", "category-attributes", "review-publish"];
-    expect(resolveWizardPages(groups, { native: false })).toEqual([
-      ["photos", "title", "category-attributes"],
-      ["review-publish"],
-    ]);
-    expect(resolveWizardPages(groups, { native: true })).toEqual([
-      ["photos", "title"],
-      ["category-attributes"],
-      ["review-publish"],
-    ]);
+    const expected = [["photos", "title"], ["category-attributes"], ["review-publish"]];
+    expect(resolveWizardPages(groups, { native: false })).toEqual(expected);
+    expect(resolveWizardPages(groups, { native: true })).toEqual(expected);
   });
 
   it("handles an empty field-group list", () => {
@@ -313,20 +300,22 @@ describe("resolveWizardPages", () => {
     ];
     const afterConfirmation = beforeConfirmation.filter((key) => key !== "category-confirm");
 
-    expect(resolveWizardPages(beforeConfirmation, { native: true })).toEqual([
-      ["photos"],
-      ["category-confirm"],
-      ["category-attributes", "description-keywords"],
-      ["condition", "price", "delivery", "location"],
-      ["review-publish"],
-    ]);
-    expect(resolveWizardPages(afterConfirmation, { native: true })[1]).toEqual([
-      "category-attributes",
-      "description-keywords",
-    ]);
+    for (const native of [false, true]) {
+      expect(resolveWizardPages(beforeConfirmation, { native })).toEqual([
+        ["photos"],
+        ["category-confirm"],
+        ["category-attributes", "description-keywords"],
+        ["condition", "price", "delivery", "location"],
+        ["review-publish"],
+      ]);
+      expect(resolveWizardPages(afterConfirmation, { native })[1]).toEqual([
+        "category-attributes",
+        "description-keywords",
+      ]);
+    }
   });
 
-  it("grupperer båtflyten i de samme fire native hovedstoppene", () => {
+  it("grupperer båtflyten i de samme oppgavene på web og native", () => {
     const groups = [
       "photos",
       "boat-facts",
@@ -337,12 +326,14 @@ describe("resolveWizardPages", () => {
       "review-publish",
     ];
 
-    expect(resolveWizardPages(groups, { native: true })).toEqual([
+    const expected = [
       ["photos"],
       ["boat-facts", "category-attributes", "description-keywords"],
       ["delivery", "location"],
       ["review-publish"],
-    ]);
+    ];
+    expect(resolveWizardPages(groups, { native: false })).toEqual(expected);
+    expect(resolveWizardPages(groups, { native: true })).toEqual(expected);
   });
 });
 

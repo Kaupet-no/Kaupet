@@ -1330,7 +1330,7 @@ function NewListingPage() {
             "Slår opp kjøretøy…"
           ) : (
             <>
-              {native ? "Fortsett" : `Neste: ${pageLabel(nextGroups, native)}`}{" "}
+              {native ? "Fortsett" : `Neste: ${pageLabel(nextGroups)}`}{" "}
               <ChevronRight className="size-4" aria-hidden />
             </>
           )}
@@ -1374,7 +1374,7 @@ function NewListingPage() {
               : undefined
           }
           pageKey={currentStepKey}
-          pageTitle={pageLabel(groups, native)}
+          pageTitle={pageLabel(groups)}
           native={native}
           backLabel={isFirst ? "Avbryt" : "Tilbake"}
           onBack={
@@ -1410,9 +1410,7 @@ function NewListingPage() {
               </div>
             ) : undefined
           }
-          progress={
-            categoryId ? <StepIndicator step={step} pages={pages} native={native} /> : undefined
-          }
+          progress={categoryId ? <StepIndicator step={step} pages={pages} /> : undefined}
           status={
             draftSaveError ? (
               <p className="mt-1 text-right text-xs text-destructive">Utkast ble ikke lagret</p>

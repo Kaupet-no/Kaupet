@@ -86,6 +86,30 @@ describe("ListingComposerShell", () => {
     expect(screen.getByRole("button", { name: "Fortsett" })).toBeTruthy();
   });
 
+  it("gjør webfooteren sticky på smale flater og statisk fra desktop", () => {
+    const { container } = renderShell({ native: false });
+    const footer = container.querySelector('[data-composer-footer="web"]');
+    expect(footer?.classList.contains("sticky")).toBe(true);
+    expect(footer?.classList.contains("bottom-0")).toBe(true);
+    expect(footer?.classList.contains("md:static")).toBe(true);
+  });
+
+  it("bevarer native safe area og minst 48 piksler treffområde i composerfooteren", () => {
+    const { container } = renderShell();
+    const footer = container.querySelector('[data-composer-footer="native"]');
+    expect(footer?.classList.contains("pb-safe")).toBe(true);
+    expect(footer?.classList.contains("sticky")).toBe(false);
+    expect(footer?.classList.contains("[&_button]:min-h-12")).toBe(true);
+    expect(footer?.classList.contains("[&_button]:min-w-12")).toBe(true);
+  });
+
+  it("gir også mobilweb-knappene minst 48 piksler treffområde", () => {
+    const { container } = renderShell({ native: false });
+    const footer = container.querySelector('[data-composer-footer="web"]');
+    expect(footer?.classList.contains("[&_button]:min-h-12")).toBe(true);
+    expect(footer?.classList.contains("[&_button]:min-w-12")).toBe(true);
+  });
+
   it("viser og nullstiller native valideringsrespons ved animationend", async () => {
     const { rerender } = renderShell();
     rerender(

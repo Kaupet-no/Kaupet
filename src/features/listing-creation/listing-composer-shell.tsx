@@ -184,10 +184,12 @@ export function ListingComposerShell({
       </div>
 
       <div
+        data-composer-footer={native ? "native" : "web"}
         className={cn(
+          "[&_button]:min-h-12 [&_button]:min-w-12",
           native
             ? "px-safe pb-safe shrink-0 border-t border-border bg-background/95 pt-3 backdrop-blur"
-            : "flex flex-wrap items-center gap-3 border-t border-border pt-6",
+            : "sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-3 border-t border-border bg-background/95 px-4 py-3 backdrop-blur md:static md:z-auto md:mx-0 md:bg-transparent md:px-0 md:pb-0 md:pt-6 md:backdrop-blur-none",
           !native && (firstStep ? "justify-end" : "justify-between"),
         )}
       >

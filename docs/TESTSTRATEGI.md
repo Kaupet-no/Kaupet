@@ -680,24 +680,24 @@ tabeller/scenarioer. Kravet er _fullstendig_ dekning av tabellene under.
 
 ### 11.13 Sikkerhet — R4/R13
 
-| ID     | Nivå    | P   | Tittel                                  | Forventet resultat                                                                                                       |
-| ------ | ------- | --- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| SEC-01 | Statisk | P0  | `bun run check:server-boundary`         | Ingen klientmodul importerer `*.server.ts`/`*.functions.ts`-internals i strid med regelen                                |
-| SEC-02 | Statisk | P0  | Hemmeligheter ikke i klientbundle       | Grep i `dist/client` etter service-role-mønstre, `SUPABASE_SERVICE_ROLE`, Vipps-nøkler, HF-token → null treff            |
-| SEC-03 | Statisk | P0  | Kun `VITE_*` er offentlig               | Ingen hemmelighet ligger i en `VITE_`-variabel; sops-secrets er ikke committet i klartekst                               |
-| SEC-04 | U       | P0  | `env.server.ts` / `config.server.ts`    | Manglende obligatorisk variabel feiler tydelig ved oppstart, ikke som `undefined` senere                                 |
-| SEC-05 | E       | P0  | CSRF-beskyttelse på serverfunksjoner    | Kall med feil/uten origin avvises; rammeverkets advarsel er ikke deaktivert                                              |
-| SEC-06 | U       | P0  | Alle serverfunksjoner validerer input   | For hver `*.functions.ts`-eksport: manipulert/uventet payload avvises med Zod-feil før sideeffekt                        |
-| SEC-07 | U       | P0  | Autorisasjon gjentas server-side        | Ingen serverfunksjon stoler på klientsendt bruker-ID/rolle                                                               |
-| SEC-08 | E       | P0  | IDOR-sonde                              | Bytt ut ID i URL/payload med annen brukers ressurs (annonse, samtale, promo, utkast) → avvist, ikke lekket               |
-| SEC-09 | C       | P1  | XSS-sonde                               | Brukertekst med `<script>`, `javascript:`-lenker og markdown-lignende input rendres som tekst                            |
-| SEC-10 | U       | P0  | Ingen PII i `product-analytics`         | Kun kontrollerte nøkler/enums; rå feltverdier avvises av typer eller runtime-sjekk                                       |
-| SEC-11 | U       | P0  | Ingen PII i feillogg                    | Regnr, adresse, e-post, fritekst og tokens filtreres i `error-capture.ts`/`server-error-log.ts`                          |
-| SEC-12 | M       | P1  | Personvernkrav                          | `/personvern` og `/vilkar` er oppdatert mot faktisk databehandling og tredjeparter (Vipps, SVV, Turnstile, Hugging Face) |
-| SEC-13 | CI      | P0  | `bun audit --audit-level=high` + CodeQL | Ingen høy/kritisk sårbarhet; funn trieres innen én uke                                                                   |
-| SEC-14 | U       | P1  | Turnstile-verifisering server-side      | Klientens «ok» alene er aldri tilstrekkelig                                                                              |
-| SEC-15 | U       | P1  | Rate-limiting og bot-beskyttelse        | Rask gjentatt publisering, rapportering, feedback og søk begrenses server-side                                           |
-| SEC-16 | U       | P1  | `category-suggestion-ai.server.ts`      | Kall skjer kun server-side; prompt inneholder ikke PII; feil/timeout faller tilbake til vote-basert forslag              |
+| ID     | Nivå    | P   | Tittel                                  | Forventet resultat                                                                                                  |
+| ------ | ------- | --- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| SEC-01 | Statisk | P0  | `bun run check:server-boundary`         | Ingen klientmodul importerer `*.server.ts`/`*.functions.ts`-internals i strid med regelen                           |
+| SEC-02 | Statisk | P0  | Hemmeligheter ikke i klientbundle       | Grep i `dist/client` etter service-role-mønstre, `SUPABASE_SERVICE_ROLE`, Vipps-nøkler, HF-token → null treff       |
+| SEC-03 | Statisk | P0  | Kun `VITE_*` er offentlig               | Ingen hemmelighet ligger i en `VITE_`-variabel; sops-secrets er ikke committet i klartekst                          |
+| SEC-04 | U       | P0  | `env.server.ts` / `config.server.ts`    | Manglende obligatorisk variabel feiler tydelig ved oppstart, ikke som `undefined` senere                            |
+| SEC-05 | E       | P0  | CSRF-beskyttelse på serverfunksjoner    | Kall med feil/uten origin avvises; rammeverkets advarsel er ikke deaktivert                                         |
+| SEC-06 | U       | P0  | Alle serverfunksjoner validerer input   | For hver `*.functions.ts`-eksport: manipulert/uventet payload avvises med Zod-feil før sideeffekt                   |
+| SEC-07 | U       | P0  | Autorisasjon gjentas server-side        | Ingen serverfunksjon stoler på klientsendt bruker-ID/rolle                                                          |
+| SEC-08 | E       | P0  | IDOR-sonde                              | Bytt ut ID i URL/payload med annen brukers ressurs (annonse, samtale, promo, utkast) → avvist, ikke lekket          |
+| SEC-09 | C       | P1  | XSS-sonde                               | Brukertekst med `<script>`, `javascript:`-lenker og markdown-lignende input rendres som tekst                       |
+| SEC-10 | U       | P0  | Ingen PII i `product-analytics`         | Kun kontrollerte nøkler/enums; rå feltverdier avvises av typer eller runtime-sjekk                                  |
+| SEC-11 | U       | P0  | Ingen PII i feillogg                    | Regnr, adresse, e-post, fritekst og tokens filtreres i `error-capture.ts`/`server-error-log.ts`                     |
+| SEC-12 | M       | P1  | Personvernkrav                          | `/personvern` og `/vilkar` er oppdatert mot faktisk databehandling og tredjeparter (Vipps, SVV, Turnstile, Mistral) |
+| SEC-13 | CI      | P0  | `bun audit --audit-level=high` + CodeQL | Ingen høy/kritisk sårbarhet; funn trieres innen én uke                                                              |
+| SEC-14 | U       | P1  | Turnstile-verifisering server-side      | Klientens «ok» alene er aldri tilstrekkelig                                                                         |
+| SEC-15 | U       | P1  | Rate-limiting og bot-beskyttelse        | Rask gjentatt publisering, rapportering, feedback og søk begrenses server-side                                      |
+| SEC-16 | U       | P1  | `category-suggestion-ai.server.ts`      | Kall skjer kun server-side; prompt inneholder ikke PII; feil/timeout faller tilbake til vote-basert forslag         |
 
 ### 11.14 Ytelse — R10
 

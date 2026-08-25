@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Info } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -47,8 +47,8 @@ export function IntentTitleLanding({
       setError(`Tittelen må være minst ${minTitleLength(intent)} tegn`);
       return;
     }
-    // Kicks off the (cold-start-prone) AI category call now rather than
-    // waiting for the wizard route to mount — see prefetchCategorySuggestion.
+    // Starts the category call before the wizard mounts so the result is ready
+    // when the user reaches the confirmation step.
     prefetchCategorySuggestion(trimmed);
     if (intent === "buy") {
       void navigate({ to: "/ny-ok-annonse", search: { title: trimmed } });
@@ -112,9 +112,17 @@ export function IntentTitleLanding({
           aria-invalid={!!error}
         />
         {error && <p className="text-center text-xs text-destructive">{error}</p>}
-        <p className="text-center text-xs text-muted-foreground">
-          Dette blir tittelen på annonsen din. For Bil og MC og Båt genereres tittelen automatisk.
-        </p>
+        <div className="flex items-center justify-center gap-1 text-center text-xs text-muted-foreground">
+          <span>Dette blir tittelen på annonsen din</span>
+          <button
+            type="button"
+            className="native-touch-target inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            aria-label="Informasjon om automatisk tittel"
+            title="For Bil, MC og Båt genereres tittelen automatisk"
+          >
+            <Info className="size-4" aria-hidden="true" />
+          </button>
+        </div>
       </div>
       <Button type="submit" size="lg" className="w-full">
         Fortsett

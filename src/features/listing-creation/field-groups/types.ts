@@ -97,10 +97,10 @@ export type WizardSharedProps = {
    * change would discard (currently vehicle-registration). */
   onCategoryDeselect?: (parentId: string) => void;
   /** 0-2 candidates — the vote-based RPC always returns a single confident
-   * top match when it has one, but the AI fallback (borealis-1b) may return
-   * two roughly-equally-likely categories (e.g. "Bil" vs. "MC" for an
-   * ambiguous title) instead of forcing a single guess. category-confirm
-   * offers a button per candidate plus "Nei" for the full manual picker. */
+   * top match when it has one, while the Mistral fallback may return two
+   * roughly-equally-likely categories (e.g. "Bil" vs. "MC") instead of
+   * forcing a single guess. category-confirm offers a button per candidate
+   * plus "Nei" for the full manual picker. */
   categorySuggestions: {
     category_id: string;
     parent_id: string | null;

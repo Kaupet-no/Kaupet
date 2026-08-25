@@ -1,3 +1,4 @@
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { z } from "zod";
 
 const inputSchema = z.object({ title: z.string().min(3).max(200) });
@@ -21,8 +22,8 @@ function categoryCandidates(categories: CategoryRow[], title: string) {
     return current;
   }
 
-  // Keep every top-level branch represented: an unknown product name such as
-  // "Nintendo Switch" has no useful lexical overlap with "Elektronikk".
+  // Keep every leaf available: Mistral Small 4 has enough context for the
+  // complete category list, and lexical pruning can hide the correct answer.
   return roots.flatMap((root) =>
     leaves
       .filter((leaf) => rootOf(leaf).id === root.id)
@@ -34,167 +35,131 @@ function categoryCandidates(categories: CategoryRow[], title: string) {
             .match(/[\p{L}\p{N}]+/gu)
             ?.reduce((sum, word) => sum + (titleWords.has(word) ? 1 : 0), 0) ?? 0;
         return score(b) - score(a) || a.name_nb.localeCompare(b.name_nb, "nb");
-      })
-      .slice(0, 12),
+      }),
   );
 }
 
 /**
  * AI fallback for `suggestCategoryForTitle` (category-suggestion.functions.ts),
- * used only when the vote-based RPC has no confident match — e.g. a title
- * with no prior listing history. Prompts the borealis-1b endpoint to pick one
- * or two category names from the full list, then validates the answer(s)
- * against real categories before returning them (never trust model output
- * directly). Returns null if nothing validated, otherwise 1-2 candidates.
+ * used only when the vote-based RPC has no confident match. Prompts Mistral
+ * Small 4 to pick one or two category slugs from the full leaf list, then
+ * validates the answer(s) against real categories before returning them.
+ * Returns null if nothing validated, otherwise 1-2 candidates.
  */
 export async function suggestCategoryForTitleAi(input: unknown) {
   const { title } = inputSchema.parse(input);
 
-  const endpointUrl = process.env.HF_BOREALIS_ENDPOINT_URL;
-  const token = process.env.HF_TOKEN;
-  if (!endpointUrl || !token) return null;
+  const token = process.env.MISTRAL_API_KEY;
+  if (!token) return null;
 
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data: categories, error } = await supabaseAdmin
     .from("categories")
     .select("id, slug, name_nb, parent_id")
     .eq("is_hidden", false);
   if (error || !categories || categories.length === 0) return null;
 
-  // Only leaf categories (no children) are ever a valid category_id target —
-  // CategoryPicker itself only lets a user select one with no children (see
-  // category-picker.tsx's hasChildren check), so a parent/mid-level "container"
-  // category (e.g. "Sittemøbler") was never a real answer to begin with.
-  // This also keeps the prompt within the model's context window: sending the
-  // full category tree (incl. non-leaf nodes) overflows borealis-1b's
-  // 1024-token context as the tree grows; leaf-only fits with headroom today.
+  // Motorsport is intentionally excluded: users normally mean Bil or MC for
+  // these titles, and the confirmation UI handles the Motorsport alternative.
   const parentIds = new Set(
     (categories as CategoryRow[]).map((c) => c.parent_id).filter((id): id is string => !!id),
   );
-  // "Motorsport" (tidl. "Bilsport") holdes utenfor modellens valgmuligheter —
-  // den er ofte "riktig" for en rask bil/MC, men brukeren mener som regel
-  // "Bil"/"MC". category-confirm tilbyr i stedet en egen
-  // "Benytt kategori Motorsport"-knapp når modellen foreslår en av de
-  // vertikalene den lett forveksles med.
   const leafCategories = (categories as CategoryRow[]).filter(
     (c) => !parentIds.has(c.id) && c.name_nb !== "Motorsport",
   );
   if (leafCategories.length === 0) return null;
 
-  // Truncated defensively — the model only needs enough of the title to
-  // classify it, and this keeps a margin against the context limit above as
-  // the leaf category count grows (title itself is already capped at 120
-  // chars by listingSchema/wtbSchema, so this rarely bites in practice).
   const truncatedTitle = title.slice(0, 100);
   const candidates = categoryCandidates(
     (categories as CategoryRow[]).filter((c) => c.name_nb !== "Motorsport"),
     truncatedTitle,
   );
-  const byName = new Map(candidates.map((c) => [c.name_nb, c]));
-  // Few-shot examples target the two failure modes we've actually seen in
-  // testing (a 1B model has no real-world brand knowledge to fall back on):
-  // car/motorcycle brand+model titles getting classified as an unrelated
-  // household category, and cars vs. motorcycles being confused with each
-  // other. Only included when the relevant category exists in this instance's
-  // leaf list, so the examples never reference an invalid answer.
+  const bySlug = new Map(candidates.map((c) => [c.slug, c]));
+  if (candidates.length === 0) return null;
+
   const examples: string[] = [];
-  if (byName.has("Bil")) {
-    examples.push('"Volvo XC40 2019, dieselmotor" -> Bil', '"BMW 320d 2015" -> Bil');
+  if (candidates.some((c) => c.name_nb === "Bil")) {
+    examples.push('"Volvo XC40 2019, dieselmotor" -> bil', '"BMW 320d 2015" -> bil');
   }
-  if (byName.has("Motorsykkel")) {
-    examples.push('"Suzuki GSXR 750" -> Motorsykkel', '"Honda CBR 600RR 2018" -> Motorsykkel');
+  if (candidates.some((c) => c.name_nb === "Motorsykkel")) {
+    examples.push('"Suzuki GSXR 750" -> motorsykkel', '"Honda CBR 600RR 2018" -> motorsykkel');
   }
   const examplesBlock = examples.length ? `\nEksempler:\n${examples.join("\n")}\n` : "";
+  const candidateBlock = candidates.map((c) => `${c.name_nb} [${c.slug}]`).join(", ");
 
-  const prompt = `Du skal klassifisere annonsetitler til riktig kategori for en norsk nettbasert markedsplass.
-Tilgjengelige kandidater (gruppert etter toppkategori): ${candidates.map((c) => `${(categories as CategoryRow[]).find((p) => p.id === c.parent_id)?.name_nb ?? "Annet"} > ${c.name_nb}`).join(", ")}
-Titler som starter med et bilmerke og en modellbetegnelse er nesten alltid kjøretøy, ikke
-husholdningsartikler eller annet elektronikk — se etter merke/modell-mønsteret, ikke
-enkeltord i tittelen.
-${examplesBlock}Annonsetittel: "${truncatedTitle}"
-Svar med det ene kategorinavnet fra listen over som passer best. Hvis to kategorier er
-omtrent like sannsynlige, svar med begge, atskilt med komma. Ingen annen tekst.`;
+  const prompt = `Klassifiser annonsetittelen til én eller to passende bladkategorier på en norsk markedsplass.
+Returner kun JSON på formen {"categories":["slug"]}. Velg bare sluger fra kandidatlisten.
+Hvis to kategorier er omtrent like sannsynlige, returner begge. Ikke forklar valget.
+Kandidater: ${candidateBlock}
+${examplesBlock}Annonsetittel: "${truncatedTitle}"`;
 
-  // Borealis scales to zero between requests (deliberate cost tradeoff at
-  // current traffic). A cold request doesn't hold the connection open until
-  // the model is warm — it answers 503 "loading" near-instantly instead, or
-  // the connection itself fails while the container is still booting — so we
-  // poll until the model comes up or the overall budget (cold start measures
-  // ~20s in practice, so 45s gives headroom) runs out. Each individual
-  // attempt gets its own fixed, generous timeout (round-trip + generation
-  // measured ~9s warm) rather than "whatever's left of the 45s" — otherwise
-  // the attempt that finally lands after a long boot only gets a few seconds
-  // to complete and gets cut off by our own timeout, not the endpoint's.
-  const deadline = Date.now() + 45_000;
-  const PER_ATTEMPT_TIMEOUT_MS = 20_000;
   let response: Response;
-  for (;;) {
-    try {
-      response = await fetch(`${endpointUrl}/v1/chat/completions`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          // 0, not a small-but-nonzero value: this is a closed-set classification
-          // (pick a name off the list), not creative generation, so there's no
-          // upside to sampling randomness — only downside.The 1B model is uncertain
-          // enough that any sampling noise can flip it off a correct greedy pick.
-          messages: [{ role: "user", content: prompt }],
-          max_tokens: 20,
-          temperature: 0,
-        }),
-        signal: AbortSignal.timeout(PER_ATTEMPT_TIMEOUT_MS),
-      });
-    } catch (err) {
-      // Connection-level failures (refused/reset/hang up), and this attempt's
-      // own timeout aborting, are expected while the container is still
-      // booting — not just the 503 the app returns once it can talk HTTP.
-      // Retry those the same way, as long as we're still within budget to
-      // start another attempt.
-      if (Date.now() < deadline) {
-        console.error("[category-suggestion-ai] fetch failed, retrying", err);
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-        continue;
-      }
-      console.error("[category-suggestion-ai] fetch failed", err);
-      // Cold-start budget exhausted without a usable response — a real
-      // failure, not "the model looked and found nothing". Must throw
-      // (not return null) so the caller's retry logic actually retries
-      // instead of caching this as a valid empty answer.
-      throw new Error("category-suggestion-ai: exhausted retry budget", { cause: err });
-    }
-    if (response.status === 503 && Date.now() < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      continue;
-    }
-    if (!response.ok) {
-      console.error("[category-suggestion-ai] non-ok response", response.status);
-      throw new Error(`category-suggestion-ai: non-ok response ${response.status}`);
-    }
-    break;
+  try {
+    response = await fetch("https://api.eu.mistral.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "mistral-small-2603",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 32,
+        reasoning_effort: "none",
+        temperature: 0,
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "category_suggestion",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: {
+                categories: {
+                  type: "array",
+                  items: { type: "string", enum: candidates.map((candidate) => candidate.slug) },
+                  minItems: 1,
+                  maxItems: 2,
+                },
+              },
+              required: ["categories"],
+              additionalProperties: false,
+            },
+          },
+        },
+      }),
+      signal: AbortSignal.timeout(2_000),
+    });
+  } catch (error) {
+    console.error("[category-suggestion-ai] Mistral request failed", error);
+    return null;
   }
 
-  const result = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+  if (!response.ok) {
+    console.error("[category-suggestion-ai] Mistral request failed", response.status);
+    return null;
+  }
+
+  const result = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string | null } }>;
+  };
   const generated = result.choices?.[0]?.message?.content?.trim();
-  if (!generated) {
-    console.error("[category-suggestion-ai] empty model response");
+  if (!generated) return null;
+
+  let output: { categories: string[] };
+  try {
+    output = z
+      .object({ categories: z.array(z.string()).min(1).max(2) })
+      .parse(JSON.parse(generated));
+  } catch {
+    console.error("[category-suggestion-ai] invalid Mistral response");
     return null;
   }
 
-  // Up to 2 candidates — matches the confirm UI's "Er dette kategori X eller
-  // Y?" pattern, offering both instead of forcing a single guess through the
-  // full category list.
   const matches: CategoryRow[] = [];
-  for (const part of generated.split(",")) {
-    const name = part.trim();
-    if (!name) continue;
-    const match = byName.get(name) ?? candidates.find((c) => name.includes(c.name_nb));
-    if (match && !matches.some((m) => m.id === match.id)) matches.push(match);
-    if (matches.length === 2) break;
+  for (const slug of output.categories) {
+    const match = bySlug.get(slug);
+    if (match && !matches.some((candidate) => candidate.id === match.id)) {
+      matches.push(match);
+    }
   }
-  if (matches.length === 0) {
-    console.error("[category-suggestion-ai] no category matched model output", { generated });
-    return null;
-  }
+  if (matches.length === 0) return null;
 
   return matches.map((match) => {
     const parent = match.parent_id

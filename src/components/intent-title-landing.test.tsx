@@ -13,10 +13,13 @@ vi.mock("@/lib/category-suggestion.functions", () => ({
 afterEach(cleanup);
 
 describe("IntentTitleLanding", () => {
-  it("viser tittelunntaket uten hover", () => {
+  it("viser informasjon om automatisk tittel bak en info-knapp", () => {
     render(<IntentTitleLanding />);
 
-    expect(screen.getByText(/For Bil og MC og Båt genereres tittelen automatisk/)).toBeTruthy();
-    expect(screen.queryByRole("tooltip")).toBeNull();
+    const infoButton = screen.getByRole("button", { name: "Informasjon om automatisk tittel" });
+    expect(screen.getByText("Dette blir tittelen på annonsen din")).toBeTruthy();
+    expect(infoButton.getAttribute("title")).toBe(
+      "For Bil, MC og Båt genereres tittelen automatisk",
+    );
   });
 });

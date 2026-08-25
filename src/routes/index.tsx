@@ -14,7 +14,7 @@ import { ChevronLeft } from "lucide-react";
 import { useIsNative } from "@/hooks/use-is-native";
 import { AppLanding } from "@/components/app-landing";
 import { KaupetCodeDialog } from "@/components/kaupet-code-dialog";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { IntentTitleLanding } from "@/components/intent-title-landing";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { findCategorySuggestion } from "@/lib/categories";
@@ -632,9 +632,7 @@ function WebLanding() {
                   </Button>
                   <Dialog open={adPickerOpen} onOpenChange={setAdPickerOpen}>
                     <DialogContent className="sm:max-w-md">
-                      <DialogHeader>
-                        <DialogTitle>Ny annonse</DialogTitle>
-                      </DialogHeader>
+                      <DialogTitle className="sr-only">Opprett annonse</DialogTitle>
                       <IntentTitleLanding onNavigate={() => setAdPickerOpen(false)} />
                     </DialogContent>
                   </Dialog>

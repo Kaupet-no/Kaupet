@@ -13,8 +13,9 @@ export function useComposerHistoryBack(isFirst: boolean, goBack: () => void) {
   useEffect(() => {
     window.history.pushState({ composerGuard: true }, "");
 
-    function onPopState() {
-      if (isFirstRef.current) return;
+    function onPopState(event: PopStateEvent) {
+      if (isFirstRef.current || (event.state as { composerGuard?: boolean } | null)?.composerGuard)
+        return;
       goBackRef.current();
       window.history.pushState({ composerGuard: true }, "");
     }

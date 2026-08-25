@@ -62,7 +62,10 @@ import { formatErrorMessage } from "@/lib/errors";
 import { CONDITIONS } from "@/lib/constants";
 import { isNative } from "@/lib/native";
 
-import { PublishActions } from "@/features/listing-creation/field-groups/review-publish";
+import {
+  PublishActions,
+  ReviewPreview,
+} from "@/features/listing-creation/field-groups/review-publish";
 import type {
   ComposerReviewEditOptions,
   ComposerReviewStatus,
@@ -685,18 +688,85 @@ function NewListingPage() {
       extraFieldError.field,
     );
   }
-  for (const filter of missingFilters) {
-    // eslint-disable-next-line react-hooks/refs -- runs only from review action callbacks
-    addPublishingRequirement(`filter-${filter.key}`, filter.label_nb, `attr-${filter.key}`);
+  const missingPublishingKeys = new Set<string>();
+  for (const requirement of publishingRequirements) {
+    const normalizedKey =
+      requirement.key.startsWith("form-") || requirement.key.startsWith("extra-")
+        ? `field-${requirement.key.slice(requirement.key.indexOf("-") + 1)}`
+        : requirement.key;
+    missingPublishingKeys.add(normalizedKey);
   }
+  const schemaResult = listingSchema.safeParse({
+    title,
+    subtitle,
+    description,
+    category_id: categoryId,
+    condition,
+    is_free: isFree,
+    can_ship: canShip,
+    price_nok: priceNok,
+    postal_code: postalCode,
+    city,
+    known_issues: knownIssues,
+    no_known_issues: !!noKnownIssues,
+    maintenance_history: maintenanceHistory,
+  });
+  if (!schemaResult.success) {
+    for (const issue of schemaResult.error.issues) {
+      const field = issue.path[0];
+      if (typeof field === "string") missingPublishingKeys.add(`field-${field}`);
+    }
+  }
+  for (const filter of missingFilters) missingPublishingKeys.add(`filter-${filter.key}`);
+  const publishingValidationContext = {
+    images,
+    attributes,
+    boatFactsActive,
+    activeModules,
+    missingFilters,
+    isFree,
+    priceNok,
+    categoryId,
+    categories: pickableCategories,
+    bilOgMcCategoryId,
+    vehicleLookupResult,
+    vehicleRegistered,
+    behavior,
+    knownIssues,
+    noKnownIssues: !!noKnownIssues,
+    showMileage,
+  };
+  const missingFilterMessage =
+    missingFilters.length > 0
+      ? `Fyll inn ${missingFilters.map((filter) => filter.label_nb).join(", ")} før du går videre.`
+      : null;
+  for (const group of fieldGroupsForKeys(fieldGroupKeys)) {
+    const result = group.validateExtra?.(publishingValidationContext);
+    if (
+      !result ||
+      result === "SHOW_NO_IMAGE_DIALOG" ||
+      result === "SHOW_NO_PRICE_DIALOG" ||
+      (typeof result === "string" && result === missingFilterMessage)
+    )
+      continue;
+    if (typeof result === "object") {
+      missingPublishingKeys.add(`field-${result.field}`);
+    } else {
+      missingPublishingKeys.add(`group-${group.key}`);
+    }
+  }
+  const missingPublishingCount = missingPublishingKeys.size;
+  const publishingStatus =
+    missingPublishingCount > 0
+      ? `${missingPublishingCount} ${missingPublishingCount === 1 ? "opplysning mangler" : "opplysninger mangler"}`
+      : "Klar til publisering";
+
   const shouldBlockNav =
     publishedId === null &&
     (title.trim().length > 0 || images.length > 0 || vehicleLookupResult !== null);
   const blocker = useBlocker({
-    // `next.pathname === current.pathname` skjer når et overlay (f.eks.
-    // forhåndsvisning) rydder sin egen synthetic history-oppføring med
-    // `history.back()` ved lukking — se useOverlayHistory. Det er ikke en
-    // faktisk sideforlatelse, så den skal ikke trigge "endringer går tapt".
+    // `next.pathname === current.pathname` skjer når et overlay (f.eks. forhåndsvisning) rydder sin egen synthetic history-oppføring med
+    // `history.back()` ved lukking — se useOverlayHistory. Det er ikke en faktisk sideforlatelse, så den skal ikke trigge "endringer går tapt".
     shouldBlockFn: ({ current, next }) => shouldBlockNav && next.pathname !== current.pathname,
     withResolver: true,
     enableBeforeUnload: shouldBlockNav,
@@ -1579,6 +1649,30 @@ function NewListingPage() {
           validationAttempt={validationAttempt}
           footer={composerFooter}
           firstStep={isFirst}
+          aside={
+            !native ? (
+              <>
+                <section aria-labelledby="desktop-publishing-status-title" className="space-y-2">
+                  <h2 id="desktop-publishing-status-title" className="text-lg font-semibold">
+                    Publiseringsstatus
+                  </h2>
+                  <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
+                    {publishingStatus}
+                  </p>
+                </section>
+                <ReviewPreview
+                  headingId="desktop-listing-preview-title"
+                  images={images}
+                  title={title}
+                  subtitle={subtitle}
+                  previewPrice={previewPrice}
+                  city={city}
+                  postalCode={postalCode}
+                  categoryLabel={categoryLabel}
+                />
+              </>
+            ) : undefined
+          }
         >
           {native ? (
             <NativeComposerDeck

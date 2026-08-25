@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import type { ReactNode } from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -14,7 +15,17 @@ const { hapticNotification, hapticSelection } = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/haptics", () => ({ hapticNotification, hapticSelection }));
 
-function renderShell({ firstStep = false, footer = "Fortsett", native = true } = {}) {
+function renderShell({
+  firstStep = false,
+  footer = "Fortsett",
+  native = true,
+  aside = null,
+}: {
+  firstStep?: boolean;
+  footer?: string;
+  native?: boolean;
+  aside?: ReactNode;
+} = {}) {
   const onBack = vi.fn();
   const onCancel = vi.fn();
   const result = render(
@@ -27,6 +38,7 @@ function renderShell({ firstStep = false, footer = "Fortsett", native = true } =
       onCancel={onCancel}
       footer={<button type="button">{footer}</button>}
       firstStep={firstStep}
+      aside={aside}
     >
       Innhold
     </ListingComposerShell>,
@@ -86,12 +98,39 @@ describe("ListingComposerShell", () => {
     expect(screen.getByRole("button", { name: "Fortsett" })).toBeTruthy();
   });
 
-  it("gjør webfooteren sticky på smale flater og statisk fra desktop", () => {
+  it("gjør webfooteren sticky under desktop og statisk fra desktop", () => {
     const { container } = renderShell({ native: false });
     const footer = container.querySelector('[data-composer-footer="web"]');
     expect(footer?.classList.contains("sticky")).toBe(true);
     expect(footer?.classList.contains("bottom-0")).toBe(true);
-    expect(footer?.classList.contains("md:static")).toBe(true);
+    expect(footer?.classList.contains("lg:static")).toBe(true);
+  });
+  it("viser desktop-aside i split layout og holder smale flater uten horisontal scroll", () => {
+    const { container } = renderShell({
+      native: false,
+      aside: <div>Forhåndsvisning</div>,
+    });
+    const aside = container.querySelector('[data-composer-aside="desktop"]');
+    const layout = container.querySelector('[data-composer-layout="split"]');
+    expect(layout?.classList.contains("min-w-0")).toBe(true);
+    expect(aside?.classList.contains("hidden")).toBe(true);
+    expect(aside?.classList.contains("lg:block")).toBe(true);
+    expect(aside?.classList.contains("lg:sticky")).toBe(true);
+    expect(
+      container.querySelector('[data-composer-footer="web"]')?.classList.contains("lg:static"),
+    ).toBe(true);
+  });
+
+  it("utelater desktop-aside i native og beholder én kolonne", () => {
+    const { container } = renderShell({
+      native: true,
+      aside: <div>Forhåndsvisning</div>,
+    });
+    expect(container.querySelector('[data-composer-aside="desktop"]')).toBeNull();
+    expect(container.querySelector('[data-composer-layout="single-column"]')).toBeTruthy();
+    expect(
+      container.querySelector('[data-composer-footer="native"]')?.classList.contains("pb-safe"),
+    ).toBe(true);
   });
 
   it("bevarer native safe area og minst 48 piksler treffområde i composerfooteren", () => {

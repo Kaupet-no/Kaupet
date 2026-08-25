@@ -2,7 +2,6 @@ import { Loader2, MapPin } from "lucide-react";
 import { Turnstile } from "@marsidev/react-turnstile";
 
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import {
   ComposerReview,
@@ -15,7 +14,9 @@ import { Vehicle360Group } from "../vehicle-360";
 type ReviewPreviewProps = Pick<
   WizardSharedProps,
   "images" | "title" | "subtitle" | "previewPrice" | "city" | "postalCode" | "categoryLabel"
->;
+> & {
+  headingId?: string;
+};
 
 /** Preview card showing how the listing will look in the search list. */
 export function ReviewPreview({
@@ -26,10 +27,13 @@ export function ReviewPreview({
   city,
   postalCode,
   categoryLabel,
+  headingId = "listing-preview-title",
 }: ReviewPreviewProps) {
   return (
-    <section className="space-y-2">
-      <Label>Forhåndsvisning</Label>
+    <section aria-labelledby={headingId} className="space-y-2">
+      <h3 id={headingId} className="text-sm font-semibold">
+        Forhåndsvisning
+      </h3>
       <p className="text-xs text-muted-foreground">
         Dette er slik annonsen din vil se ut i søkelisten
       </p>
@@ -39,7 +43,9 @@ export function ReviewPreview({
             <img src={images[0].previewUrl} alt="" className="size-full object-cover" aria-hidden />
           ) : (
             <div className="flex size-full flex-col items-center justify-center gap-1 text-muted-foreground">
-              <span className="text-2xl">📷</span>
+              <span className="text-2xl" aria-hidden>
+                📷
+              </span>
               <span className="text-xs">Ingen bilde</span>
             </div>
           )}
@@ -50,11 +56,11 @@ export function ReviewPreview({
           {previewPrice && <p className="font-display text-base font-semibold">{previewPrice}</p>}
           {(city || postalCode) && (
             <p className="flex items-center gap-1 text-xs text-muted-foreground">
-              <MapPin className="size-3" /> {city || postalCode}
+              <MapPin className="size-3" aria-hidden /> {city || postalCode}
             </p>
           )}
           {categoryLabel && (
-            <p className="text-xs text-muted-foreground truncate">{categoryLabel}</p>
+            <p className="truncate text-xs text-muted-foreground">{categoryLabel}</p>
           )}
         </div>
       </div>

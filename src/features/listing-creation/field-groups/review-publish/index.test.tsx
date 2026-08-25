@@ -4,7 +4,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { WizardSharedProps } from "../types";
-import { PublishActions, ReviewPublishGroup } from ".";
+import { PublishActions, ReviewPreview, ReviewPublishGroup } from ".";
 
 vi.mock("@tanstack/react-start", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@tanstack/react-start")>()),
@@ -94,5 +94,26 @@ describe("ReviewPublishGroup", () => {
     fireEvent.click(screen.getByRole("button", { name: "Ta 360°-opptak" }));
 
     expect(await screen.findByText("360°-opptaket er åpnet")).toBeTruthy();
+  });
+});
+
+describe("ReviewPreview", () => {
+  it("viser en tilgjengelig tom forhåndsvisning uten å feile", () => {
+    render(
+      <ReviewPreview
+        images={[]}
+        title=""
+        subtitle=""
+        previewPrice={null}
+        city=""
+        postalCode=""
+        categoryLabel={null}
+      />,
+    );
+
+    expect(screen.getByRole("region", { name: "Forhåndsvisning" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Forhåndsvisning" })).toBeTruthy();
+    expect(screen.getAllByText("Ingen bilde").length).toBeGreaterThan(0);
+    expect(screen.getByText("—")).toBeTruthy();
   });
 });

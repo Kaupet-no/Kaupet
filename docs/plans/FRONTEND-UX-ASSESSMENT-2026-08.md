@@ -563,6 +563,24 @@ test` (86 filer / 411 tester), `bun run lint` og `bunx tsc --noEmit` er
 - Android font scale 1,3 ble kontrollert uten horisontal overflow. Tilgjengelighetstjenestene sto deaktivert i denne layoutkjøringen; den separate, avgrensede TalkBack-kontrollen er dokumentert nedenfor.
 
 - Android TalkBack med UIAutomator bekreftet semantiske navn i tilgjengelighetstreet for søk, lokasjon, kategori, bunnnavigasjon og dialogkontroller. Etter at Escape lukket lokasjonsdialogen, flyttet Androids accessibility-fokus seg til WebView i stedet for åpneren; browserens DOM-fokusretur er derfor ikke bevis for native AT-fokusretur.
+- 25.08.2026 ble Android-kontrollen gjort varig i den delte
+  staging-instrumentation-targeten. `./gradlew connectedStagingDebugAndroidTest`
+  på `Medium_Phone` besto 1/1: staging-skall → `localhost:3000` → onboarding →
+  native forside → lokasjons-overlay. Testen bekrefter navngitte
+  tilgjengelighetsnoder for søk, lokasjon, kategori, bunnnavigasjon og
+  dialogkontroller; Enter åpner, Escape og Android systemtilbake lukker, og
+  DOM/input-fokus returnerer til lokasjonsåpneren. Android-WebView reserverer
+  Capacitors `localhost`-origin, så skallet beholder brukerens
+  `localhost:3000`-valg, men navigerer til `127.0.0.1` på Android slik at
+  offentlig `adb reverse tcp:3000 tcp:3000` når vertens server.
+- Instrumentation bruker bare offentlige Accessibility/UIAutomator-API-er.
+  Den tvinger ikke `ACTION_ACCESSIBILITY_FOCUS` og hevder ikke TalkBack-tale:
+  den kan skille navngitte noder og `FOCUS_INPUT`, men med
+  tilgjengelighetstjenestene deaktivert under den deterministiske kjøringen er
+  `FOCUS_ACCESSIBILITY` uten node. Den separate TalkBack-observasjonen over —
+  fokus ved WebView-roten, ikke åpneren — står derfor fortsatt som et eksplisitt
+  AT-gap og er ikke kamuflert som DOM-fokusretur. `bun run test --
+src/components/ui/responsive-overlay.test.tsx` besto samtidig 5/5.
 
 Dette er kontrollene som faktisk er utført. XCUITest-resultatet over verifiserer elementer, tilgjengelige navn, treffbarhet og tastaturfokus i XCTest-treet; det verifiserer ikke hva VoiceOver uttaler, rotor-/sveiperekkefølge eller native accessibility-fokus. VoiceOver, en full TalkBack-reise og ekstern maskinvaretastatur ble ikke kjørt. TalkBack-kontrollen var avgrenset til de nevnte semantiske navnene og fokusobservasjonen, ikke fysisk skjermleser-QA. XCTest har ingen støttet handling for iOS edge-swipe/system-tilbake, så denne ble ikke automatisert og gapet står åpent; lokasjons-overlayet ble i stedet lukket med den støttede «Lukk»-handlingen. Android systemtilbake er kontrollert kun for lokasjons-overlayet. Native kjøretøycomposer og faktisk native publisering inngår heller ikke i denne verifiseringen.
 
@@ -636,6 +654,12 @@ Gjennomført:
 - browser semantic E2E — 8/8 bestått på `desktop-web` og `mobile-web`, med tastaturaktivering og DOM-fokusretur etter overlay-lukking;
 - `bun run test:e2e -- e2e/semantic-quality.spec.ts --project=desktop-web --project=mobile-web` mot isolert Docker-backed Supabase — 8/8 bestått; dekker native lokasjonsoverlegg, søkepanel og auth med tastatur samt fokusretur uten fokusfelle;
 - Android TalkBack med UIAutomator — semantiske navn i tilgjengelighetstreet bekreftet for søk, lokasjon, kategori, bunnnavigasjon og dialogkontroller; etter Escape landet accessibility-fokus på WebView, ikke åpneren.
+- Android staging-instrumentation 25.08.2026 —
+  `./gradlew connectedStagingDebugAndroidTest` besto 1/1 på `Medium_Phone`;
+  skallet koblet `localhost:3000`, fullførte onboarding og verifiserte
+  semantiske WebView-navn, Enter/Escape, systemtilbake og DOM/input-fokusretur.
+  Native `FOCUS_ACCESSIBILITY` ble bevisst ikke tvunget; TalkBack-gapet ved
+  WebView-roten består.
 
 Native simulator-QA er dermed utført for de nevnte installasjons-, layout-,
 systemtilbake-, XCUITest-element- og avgrensede TalkBack-scenariene.

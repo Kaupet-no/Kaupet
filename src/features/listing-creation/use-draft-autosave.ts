@@ -1,6 +1,6 @@
 ﻿import { useEffect, useRef, useState } from "react";
 import { showSuccessToast } from "@/lib/toast";
-import { saveDraftListing } from "@/lib/listings.functions";
+import { discardDraftListing, saveDraftListing } from "@/lib/listings.functions";
 import { computeVehicleTitle } from "@/lib/vehicle/vehicle-title";
 import type { AttributeMap } from "@/components/attribute-fields";
 import type { PendingImage } from "@/components/image-uploader";
@@ -84,10 +84,18 @@ export function useDraftAutosave(fields: DraftFields) {
   const [draftSaveError, setDraftSaveError] = useState(false);
   const [hasDraftData, setHasDraftData] = useState<Record<string, unknown> | null>(null);
   const [draftId, setDraftId] = useState<string | null>(null);
+  const draftIdRef = useRef<string | null>(null);
+  const draftRestorePending = useRef(false);
   const draftSaveInProgress = useRef(false);
   const imageStoreReady = useRef(false);
   const restorableImages = useRef<PendingImage[]>([]);
   const latestImages = useRef(images);
+  useEffect(() => {
+    draftRestorePending.current = hasDraftData !== null;
+  }, [hasDraftData]);
+  useEffect(() => {
+    draftIdRef.current = draftId;
+  }, [draftId]);
 
   useEffect(() => {
     latestImages.current = images;
@@ -97,7 +105,10 @@ export function useDraftAutosave(fields: DraftFields) {
   useEffect(() => {
     try {
       const savedId = localStorage.getItem(DRAFT_ID_KEY);
-      if (savedId) setDraftId(savedId);
+      if (savedId) {
+        draftIdRef.current = savedId;
+        setDraftId(savedId);
+      }
       const saved = localStorage.getItem(DRAFT_KEY);
       if (!saved) return;
       const data = JSON.parse(saved) as Record<string, unknown>;
@@ -107,6 +118,8 @@ export function useDraftAutosave(fields: DraftFields) {
       ) {
         localStorage.removeItem(DRAFT_KEY);
         localStorage.removeItem(DRAFT_ID_KEY);
+        draftIdRef.current = null;
+        setDraftId(null);
         return;
       }
       const savedAt = typeof data.saved_at === "number" ? data.saved_at : 0;
@@ -115,6 +128,8 @@ export function useDraftAutosave(fields: DraftFields) {
       } else {
         localStorage.removeItem(DRAFT_KEY);
         localStorage.removeItem(DRAFT_ID_KEY);
+        draftIdRef.current = null;
+        setDraftId(null);
       }
     } catch {
       // ignore
@@ -141,6 +156,7 @@ export function useDraftAutosave(fields: DraftFields) {
   // Scalar/JSON fields live in localStorage. Binary image drafts are stored
   // separately in IndexedDB below.
   useEffect(() => {
+    if (draftRestorePending.current) return;
     const t = window.setTimeout(() => {
       try {
         localStorage.setItem(
@@ -192,8 +208,9 @@ export function useDraftAutosave(fields: DraftFields) {
     knownIssues,
     noKnownIssues,
     maintenanceHistory,
-    images.length,
     stepKey,
+    images.length,
+    hasDraftData,
   ]);
 
   useEffect(() => {
@@ -203,9 +220,10 @@ export function useDraftAutosave(fields: DraftFields) {
     }, 750);
     return () => window.clearTimeout(timeout);
   }, [images]);
-
   async function saveDraftToSupabase(): Promise<string | null> {
-    if (draftSaveInProgress.current) return draftId;
+    if (draftRestorePending.current) return null;
+    const currentDraftId = draftIdRef.current;
+    if (draftSaveInProgress.current) return currentDraftId;
     // For Bil/MC the title is generated from the vehicle lookup (Årsmodell/
     // Merke/Modell) and is only written into the form's `title` field once
     // the user reaches the description step (see VehicleTitleFields), which
@@ -217,7 +235,7 @@ export function useDraftAutosave(fields: DraftFields) {
     try {
       const result = await saveDraftListing({
         data: {
-          ...(draftId ? { id: draftId } : {}),
+          ...(currentDraftId ? { id: currentDraftId } : {}),
           title: effectiveTitle,
           subtitle: (subtitle ?? "").trim() || null,
           description: (description ?? "").trim() || undefined,
@@ -236,6 +254,7 @@ export function useDraftAutosave(fields: DraftFields) {
           attributes,
         },
       });
+      draftIdRef.current = result.id;
       setDraftId(result.id);
       setLastSaved(new Date());
       setDraftSaveError(false);
@@ -254,7 +273,7 @@ export function useDraftAutosave(fields: DraftFields) {
   }
 
   async function ensureDraftId(): Promise<string | null> {
-    if (draftId) return draftId;
+    if (draftIdRef.current) return draftIdRef.current;
     return saveDraftToSupabase();
   }
 
@@ -274,9 +293,8 @@ export function useDraftAutosave(fields: DraftFields) {
     priceNok,
     postalCode,
     city,
-    canShip,
-    coords,
     draftId,
+    hasDraftData,
   ]);
 
   // Save draft when tab becomes hidden (user switches away or closes tab)
@@ -296,9 +314,8 @@ export function useDraftAutosave(fields: DraftFields) {
     priceNok,
     postalCode,
     city,
-    canShip,
-    coords,
     draftId,
+    hasDraftData,
   ]);
 
   async function restoreDraft(target: RestoreTarget) {
@@ -338,14 +355,13 @@ export function useDraftAutosave(fields: DraftFields) {
       setAttributes(hasDraftData.attributes as AttributeMap);
     if (typeof hasDraftData.known_issues === "string")
       setValue("known_issues", hasDraftData.known_issues);
-    if (typeof hasDraftData.no_known_issues === "boolean")
-      setValue("no_known_issues", hasDraftData.no_known_issues);
     if (typeof hasDraftData.maintenance_history === "string")
       setValue("maintenance_history", hasDraftData.maintenance_history);
     const restoredImages = restorableImages.current.length
       ? restorableImages.current
       : await loadDraftImages().catch(() => []);
     if (restoredImages.length > 0) setImages(restoredImages);
+    draftRestorePending.current = false;
     setHasDraftData(null);
     showSuccessToast(
       restoredImages.length > 0
@@ -357,13 +373,24 @@ export function useDraftAutosave(fields: DraftFields) {
   function clearDraftStorage() {
     localStorage.removeItem(DRAFT_KEY);
     localStorage.removeItem(DRAFT_ID_KEY);
+    draftRestorePending.current = false;
+    draftIdRef.current = null;
+    setHasDraftData(null);
+    setDraftId(null);
     void clearDraftImages();
   }
 
-  function discardLocalDraftBanner() {
-    localStorage.removeItem(DRAFT_KEY);
-    setHasDraftData(null);
-    void clearDraftImages();
+  async function discardDraft() {
+    const id = draftIdRef.current ?? localStorage.getItem(DRAFT_ID_KEY);
+    clearDraftStorage();
+    if (!id) return;
+    try {
+      await discardDraftListing({ data: { id } });
+      setDraftSaveError(false);
+    } catch {
+      // Local cleanup is intentional even when the server is unavailable.
+      setDraftSaveError(true);
+    }
   }
 
   return {
@@ -375,6 +402,6 @@ export function useDraftAutosave(fields: DraftFields) {
     ensureDraftId,
     restoreDraft,
     clearDraftStorage,
-    discardLocalDraftBanner,
+    discardDraft,
   };
 }

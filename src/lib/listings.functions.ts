@@ -122,6 +122,20 @@ export const saveDraftListing = createServerFn({ method: "POST" })
     return { id: listing.id as string, kaupet_code: listing.kaupet_code as string };
   });
 
+export const discardDraftListing = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("listings")
+      .delete()
+      .eq("id", data.id)
+      .eq("seller_id", context.userId)
+      .eq("status", "draft");
+    if (error) throw error;
+  });
+
 export const createListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) =>

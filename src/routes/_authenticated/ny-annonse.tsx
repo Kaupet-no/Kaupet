@@ -169,6 +169,7 @@ function NewListingPage() {
   const [validationAttempt, setValidationAttempt] = useState(0);
   const forwardAttemptPendingRef = useRef(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [draftDiscardConfirmOpen, setDraftDiscardConfirmOpen] = useState(false);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const [hasPreviewed, setHasPreviewed] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -607,7 +608,7 @@ function NewListingPage() {
     ensureDraftId,
     restoreDraft: restoreDraftFields,
     clearDraftStorage,
-    discardLocalDraftBanner,
+    discardDraft,
   } = useDraftAutosave({
     title,
     subtitle,
@@ -646,6 +647,10 @@ function NewListingPage() {
       setAttributes,
       setCoords,
     });
+  }
+  async function startNewListing() {
+    setDraftDiscardConfirmOpen(false);
+    await discardDraft();
   }
 
   // `pages` only reflects the restored category/attributes once the field
@@ -986,6 +991,24 @@ function NewListingPage() {
   const savedTimeLabel = lastSaved
     ? `Utkast lagret kl. ${lastSaved.getHours().toString().padStart(2, "0")}:${lastSaved.getMinutes().toString().padStart(2, "0")}`
     : null;
+  const restorableDraftTitle =
+    typeof hasDraftData?.title === "string" && hasDraftData.title.trim()
+      ? hasDraftData.title.trim()
+      : "Utkast";
+  const restorableDraftCategoryId =
+    typeof hasDraftData?.category_id === "string" ? hasDraftData.category_id : null;
+  const restorableDraftCategory = restorableDraftCategoryId
+    ? categoryBreadcrumb(restorableDraftCategoryId, categoriesById) || null
+    : null;
+  const restorableDraftSavedAt =
+    typeof hasDraftData?.saved_at === "number" ? new Date(hasDraftData.saved_at) : null;
+  const restorableDraftSavedAtLabel =
+    restorableDraftSavedAt && !Number.isNaN(restorableDraftSavedAt.getTime())
+      ? restorableDraftSavedAt.toLocaleString("nb-NO", {
+          dateStyle: "short",
+          timeStyle: "short",
+        })
+      : null;
 
   // Derived label for the category picker button
   const categoryLabel = categoryId ? categoryBreadcrumb(categoryId, categoriesById) || null : null;
@@ -1383,30 +1406,39 @@ function NewListingPage() {
           onCancel={() => void navigate({ to: "/" })}
           notice={
             hasDraftData ? (
-              <div className="mt-4 flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
-                <span className="flex-1">
-                  {typeof hasDraftData.title === "string" && hasDraftData.title.trim()
-                    ? `Utkast for annonse "${hasDraftData.title}" er lagret. Vil du fortsette der du slapp?`
-                    : "Du har et ulagret utkast. Vil du fortsette der du slapp?"}
-                </span>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  className="native-touch-target"
-                  onClick={restoreDraft}
-                >
-                  Gjenopprett
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className="native-touch-target"
-                  onClick={discardLocalDraftBanner}
-                >
-                  Forkast
-                </Button>
+              <div className="mt-4 flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
+                <div className="min-w-0 flex-1">
+                  <p>
+                    Lagret utkast: <strong>{restorableDraftTitle}</strong>
+                  </p>
+                  {(restorableDraftCategory || restorableDraftSavedAtLabel) && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {restorableDraftCategory ? `Kategori: ${restorableDraftCategory}` : null}
+                      {restorableDraftCategory && restorableDraftSavedAtLabel ? " · " : null}
+                      {restorableDraftSavedAtLabel ? `Lagret ${restorableDraftSavedAtLabel}` : null}
+                    </p>
+                  )}
+                </div>
+                <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    className="native-touch-target"
+                    onClick={restoreDraft}
+                  >
+                    Fortsett utkastet
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="native-touch-target"
+                    onClick={() => setDraftDiscardConfirmOpen(true)}
+                  >
+                    Start ny annonse
+                  </Button>
+                </div>
               </div>
             ) : undefined
           }
@@ -1671,7 +1703,26 @@ function NewListingPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
+      <AlertDialog open={draftDiscardConfirmOpen} onOpenChange={setDraftDiscardConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Starte ny annonse?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Det lagrede utkastet slettes fra denne enheten og serveren. Informasjonen du allerede
+              har skrevet i denne annonsen beholdes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Fortsett utkastet</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => void startNewListing()}
+            >
+              Start ny annonse
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {/* Cancel confirmation dialog */}
       {fullscreenMapOpen && coords && (
         <ClientOnly>
@@ -1729,8 +1780,8 @@ function NewListingPage() {
         <DiscardListingDialog
           open={blocker.status === "blocked"}
           onReset={() => blocker.reset?.()}
-          onDiscard={() => {
-            clearDraftStorage();
+          onDiscard={async () => {
+            await discardDraft();
             blocker.proceed?.();
           }}
           onSaveDraft={async () => {

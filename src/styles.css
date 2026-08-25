@@ -246,13 +246,14 @@
 
 .native .native-composer-shell {
   --composer-motion-card: 240ms;
-  --composer-motion-error: 500ms;
+  --composer-motion-error: 200ms;
   height: var(--vvh, 100dvh);
   max-height: var(--vvh, 100dvh);
   overflow: hidden;
 }
 
 .native .native-composer-motion {
+  transition-property: transform, opacity;
   transition-duration: var(--composer-motion-card);
   transition-timing-function: ease-out;
 }
@@ -434,14 +435,17 @@
 }
 
 .composer-validation-error-even {
-  animation: composer-validation-error-even var(--composer-motion-error, 500ms) ease-out;
+  animation: composer-validation-error-even var(--composer-motion-error, 200ms) ease-out;
 }
 
 .composer-validation-error-odd {
-  animation: composer-validation-error-odd var(--composer-motion-error, 500ms) ease-out;
+  animation: composer-validation-error-odd var(--composer-motion-error, 200ms) ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .native .native-composer-motion {
+    transition: none;
+  }
   .composer-validation-error-even,
   .composer-validation-error-odd {
     animation: none;

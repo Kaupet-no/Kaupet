@@ -58,12 +58,10 @@ test("logger inn og publiserer en annonse", async ({ page }, testInfo) => {
   // how long that takes.
   await categoryTile.waitFor({ state: "detached" });
 
-  // Tittel, Kategori (already set), Tilstand and Pris all live on the same
-  // "Bilder & tittel" step. The test category has no attributes, so there's
-  // nothing else to fill in here.
+  // The title is part of the "Vis frem" task; condition, price, delivery and
+  // location are grouped into the later "Gjør handelen enkel" task.
   await wizardStep(page, "photos").waitFor();
   await page.getByTestId("listing-title-input").fill("E2E testannonse — Stokke Tripp Trapp");
-  await page.getByRole("checkbox", { name: "Gis bort gratis" }).click();
 
   // No images were added, so the first "Neste" click prompts a "no images"
   // confirmation dialog instead of advancing directly.
@@ -75,6 +73,12 @@ test("logger inn og publiserer en annonse", async ({ page }, testInfo) => {
     testInfo,
     "Automatisk opprettet av en e2e-test. Stol i god stand, lite brukt.",
   );
+
+  // "Gis bort gratis" now belongs to the "Gjør handelen enkel" task, not
+  // "Vis frem". Selecting it satisfies the optional-price validation without
+  // changing the publish contract this golden path proves.
+  await page.getByRole("checkbox", { name: "Gis bort gratis" }).click();
+  await clickNextAndWaitFor(page, wizardStep(page, "review-publish"), testInfo);
 
   await publishAndExpectSuccess(page, testInfo);
 });

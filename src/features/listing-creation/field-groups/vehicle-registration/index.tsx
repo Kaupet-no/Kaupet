@@ -451,12 +451,16 @@ export function VehicleRegistration(props: WizardSharedProps) {
                 />
               </div>
             </div>
-
+            {vehicleLookupLoading && (
+              <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
+                Slår opp kjøretøy…
+              </p>
+            )}
             {vehicleLookupError && (
               <p
                 id="vehicle-reg-nr-error"
-                role="status"
-                aria-live="polite"
+                role="alert"
+                aria-live="assertive"
                 className="text-sm text-destructive"
               >
                 {vehicleLookupError}

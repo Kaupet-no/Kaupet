@@ -70,6 +70,7 @@ test("registrert kjøretøy går fra oppslag til review og publisering", async (
   await clickNextAndWaitFor(page, wizardStep(page, "vehicle-price"), testInfo);
 
   await page.locator("#price_nok").fill("349000");
+  // Delivery, location and review/publish share the final vehicle page.
   await clickNextAndWaitFor(page, wizardStep(page, "location"), testInfo);
 
   await expect(page.getByTestId("wizard-step-vehicle-360")).toHaveCount(0);

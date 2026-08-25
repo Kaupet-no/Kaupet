@@ -119,27 +119,29 @@ export function wizardStep(page: Page, groupKey: string) {
 /**
  * Fills and advances past the Beskrivelse-steget, which is identical
  * between the generic and kjøretøy-flyten. Assumes the wizard is already
- * showing this step (callers differ in how many "Neste"-clicks it takes to
- * get here — the generic flow lands on it directly after the no-image
- * dialog, the vehicle flow needs an explicit prior click past
- * vehicle-condition — so that transition is intentionally each caller's own
- * responsibility, not baked in here).
+ * showing the page containing the description field. The generic flow's
+ * "Gjør søkbar" page may start with category attributes, so the stable
+ * textarea test id—not the page wrapper key—is the boundary used here.
+ * Vehicle callers differ in how many transitions it takes to get to their
+ * vehicle-facts page, so that transition remains each caller's responsibility.
  */
 export async function fillDescriptionAndAdvance(
   page: Page,
   testInfo: TestInfo,
   description: string,
 ) {
-  await wizardStep(page, "description-keywords").waitFor();
+  await page.getByTestId("listing-description-textarea").waitFor();
   await page.getByTestId("listing-description-textarea").fill(description);
-  await clickNextAndWaitFor(page, wizardStep(page, "delivery"), testInfo);
+  await clickNextAndWaitFor(page, wizardStep(page, "condition"), testInfo);
 }
 
 /**
- * Final step: delivery/location + publish confirmation share one page.
+ * Publishes from the flow's final page. Vehicle pages also keep
+ * delivery/location on this page; generic listings arrive here from their
+ * separate "Gjør handelen enkel" page.
+ *
  * Publishing without having opened the preview first prompts a "want to
  * preview before publishing?" dialog rather than publishing immediately.
- *
  * Asserts on the PublishedListingDialog's persistent title, not the
  * success toast — the toast auto-dismisses after a few seconds and was
  * the source of an intermittent CI flake (the toast could already be gone

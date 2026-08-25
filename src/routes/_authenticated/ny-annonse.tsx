@@ -550,6 +550,12 @@ function NewListingPage() {
     section: "category" | "content" | "details" | "location",
     options?: ComposerReviewEditOptions,
   ) => {
+    trackProductEvent("listing_creation_step_completed", {
+      kind: "sell",
+      action: "review_fix",
+      reason: section,
+      step: currentStepKey,
+    });
     returnToReviewRef.current = true;
     pendingReviewFocusRef.current = options?.field ?? null;
     setValidationError(null);
@@ -824,6 +830,7 @@ function NewListingPage() {
     trackProductEvent("listing_creation_step_completed", {
       kind: "sell",
       action: "draft_restored",
+      reason: "existing",
       step: currentStepKey,
     });
     const savedStepKey = hasDraftData?.step_key;
@@ -837,6 +844,12 @@ function NewListingPage() {
     });
   }
   async function startNewListing() {
+    trackProductEvent("listing_creation_step_completed", {
+      kind: "sell",
+      action: "draft_started",
+      reason: "new",
+      step: currentStepKey,
+    });
     setDraftDiscardConfirmOpen(false);
     await discardDraft();
   }
@@ -1144,6 +1157,7 @@ function NewListingPage() {
       clearDraftStorage();
       trackProductEvent("listing_published", {
         kind: "sell",
+        action: "success",
         imageCount: images.length,
         isVehicle,
       });
@@ -1640,9 +1654,21 @@ function NewListingPage() {
           progress={categoryId ? <StepIndicator step={step} pages={pages} /> : undefined}
           status={
             draftSaveError ? (
-              <p className="mt-1 text-right text-xs text-destructive">Utkast ble ikke lagret</p>
+              <p
+                role="alert"
+                aria-live="assertive"
+                className="mt-1 text-right text-xs text-destructive"
+              >
+                Utkast ble ikke lagret
+              </p>
             ) : savedTimeLabel ? (
-              <p className="mt-1 text-right text-xs text-muted-foreground">{savedTimeLabel}</p>
+              <p
+                role="status"
+                aria-live="polite"
+                className="mt-1 text-right text-xs text-muted-foreground"
+              >
+                {savedTimeLabel}
+              </p>
             ) : undefined
           }
           errorSummary={validationError}

@@ -147,6 +147,8 @@ export type WizardSharedProps = {
   onAttributesChange: (next: AttributeMap) => void;
   attributesTouched: boolean;
   activeModules: CategoryModule[];
+  /** True when the boat-specific facts group owns category attributes. */
+  boatFactsActive: boolean;
   /** category_filters keys already reviewed/edited in vehicle-confirm — hidden
    * from category-attributes so the user isn't asked twice. Undefined/empty
    * outside the vehicle-first flow. */

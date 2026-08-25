@@ -419,6 +419,7 @@ function NewListingPage() {
   // still gates vehicle-specific rendering choices like condition options or
   // showMileage, evaluated later once a leaf is genuinely known) does.
   const isVehicleFlow = baseFieldGroupKeys.includes("vehicle-registration");
+  const boatFactsActive = baseFieldGroupKeys.includes("boat-facts");
 
   // category-confirm er aldri en del av en kategoris lagrede field_groups —
   // den avhenger av live wizard-state og injiseres derfor her.
@@ -879,6 +880,7 @@ function NewListingPage() {
     const validateCtx = {
       images,
       attributes,
+      boatFactsActive,
       activeModules,
       missingFilters,
       isFree,
@@ -927,7 +929,8 @@ function NewListingPage() {
           step: currentStepKey,
           reason: group.key,
         });
-        if (group.key === "category-attributes") setAttributesTouched(true);
+        if (group.key === "category-attributes" || group.key === "boat-facts")
+          setAttributesTouched(true);
         setValidationError(result);
         return "blocked";
       }
@@ -938,7 +941,8 @@ function NewListingPage() {
           step: currentStepKey,
           reason: group.key,
         });
-        if (group.key === "category-attributes") setAttributesTouched(true);
+        if (group.key === "category-attributes" || group.key === "boat-facts")
+          setAttributesTouched(true);
         setExtraFieldError(result);
         setValidationError(result.message);
         return "blocked";
@@ -1308,11 +1312,11 @@ function NewListingPage() {
     applyCategorySuggestion: applySuggestedCategory,
     setSuggestionDismissed,
     setCategorySuggestions,
-
     attributes,
     onAttributesChange: setAttributes,
     attributesTouched,
     activeModules,
+    boatFactsActive,
     vehicleAttributeHiddenKeys,
     extraFieldError,
 

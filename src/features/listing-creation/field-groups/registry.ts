@@ -29,6 +29,7 @@ import { getAxleConfigOptions } from "@/lib/vehicle/vehicle-options";
 export type ValidateCtx = {
   images: WizardSharedProps["images"];
   attributes: WizardSharedProps["attributes"];
+  boatFactsActive: boolean;
   activeModules: WizardSharedProps["activeModules"];
   missingFilters: { label_nb: string }[];
   isFree: boolean;
@@ -153,7 +154,7 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
       // vehicle-registration — denne field group-en rendrer ingenting for
       // kjøretøy (se CategoryAttributes), så den skal heller ikke validere
       // noe her.
-      if (!ctx.behavior.showGenericAttributes) return null;
+      if (!ctx.behavior.showGenericAttributes || ctx.boatFactsActive) return null;
       if (ctx.missingFilters.length > 0) {
         return `Fyll inn ${ctx.missingFilters.map((f) => f.label_nb).join(", ")} før du går videre.`;
       }
@@ -232,10 +233,11 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
     key: "boat-facts",
     classification: "requiredToPublish",
     Component: BoatFactsGroup,
-    fieldsToValidate: ["subtitle"],
+    fieldsToValidate: ["subtitle", "description"],
     validateExtra: (ctx) => {
-      // Brand/model live in this group (with autocomplete) and are hidden
-      // from category-attributes, so they must be required here instead.
+      // Brand/model and every boat category filter are rendered by boat-facts;
+      // category-attributes remains present in the stored flow but is a
+      // category-picker-only shell for this vertical.
       const brand = ctx.attributes.brand;
       if (typeof brand !== "string" || !brand.trim()) {
         return { field: "brand", message: "Fyll inn merke før du går videre." };
@@ -243,6 +245,9 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
       const model = ctx.attributes.model;
       if (typeof model !== "string" || !model.trim()) {
         return { field: "model", message: "Fyll inn modell før du går videre." };
+      }
+      if (ctx.missingFilters.length > 0) {
+        return `Fyll inn ${ctx.missingFilters.map((f) => f.label_nb).join(", ")} før du går videre.`;
       }
       return null;
     },

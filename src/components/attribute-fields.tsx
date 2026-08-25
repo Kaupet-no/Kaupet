@@ -62,6 +62,8 @@ export function AttributeFields({
   required = false,
   showErrors = false,
   hiddenKeys,
+  filterKeys,
+  heading = "Egenskaper",
 }: {
   categoryId: string | null;
   categories: CategoryNode[];
@@ -76,6 +78,10 @@ export function AttributeFields({
    * asked to fill them in a second time here. Values already set for a
    * hidden key are left untouched in `value`/`onChange`. */
   hiddenKeys?: readonly string[];
+  /** Optional subset used when a parent groups category fields into sections. */
+  filterKeys?: readonly string[];
+  /** Section heading. Pass null when the parent supplies the semantic heading. */
+  heading?: string | null;
 }) {
   const { data: allFilters } = useAllCategoryFilters();
 
@@ -86,20 +92,26 @@ export function AttributeFields({
   }, [categories]);
 
   const hiddenKeySet = useMemo(() => new Set(hiddenKeys ?? []), [hiddenKeys]);
+  const filterKeySet = useMemo(() => (filterKeys ? new Set(filterKeys) : null), [filterKeys]);
 
   const filters = useMemo(
     () =>
       effectiveFiltersForCategory(categoryId, allFilters ?? [], categoriesById).filter(
-        (f) => !hiddenKeySet.has(f.key) && filterDependencyMet(f, value),
+        (f) =>
+          !hiddenKeySet.has(f.key) &&
+          (!filterKeySet || filterKeySet.has(f.key)) &&
+          filterDependencyMet(f, value),
       ),
-    [categoryId, allFilters, categoriesById, hiddenKeySet, value],
+    [categoryId, allFilters, categoriesById, hiddenKeySet, filterKeySet, value],
   );
 
   const missingKeys = useMemo(() => {
     if (!required || !showErrors) return new Set<string>();
     const missing = getMissingRequiredFilters(categoryId, allFilters ?? [], categoriesById, value);
-    return new Set(missing.map((f) => f.key));
-  }, [required, showErrors, categoryId, allFilters, categoriesById, value]);
+    return new Set(
+      missing.filter((f) => !filterKeySet || filterKeySet.has(f.key)).map((f) => f.key),
+    );
+  }, [required, showErrors, categoryId, allFilters, categoriesById, value, filterKeySet]);
 
   if (!categoryId || filters.length === 0) return null;
 
@@ -112,7 +124,7 @@ export function AttributeFields({
 
   return (
     <div className="space-y-4 rounded-xl border border-border p-4">
-      <p className="text-sm font-medium">Egenskaper</p>
+      {heading && <p className="text-sm font-medium">{heading}</p>}
       {filters.map((f) => {
         if (f.type === "brand_select") {
           return (

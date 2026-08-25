@@ -33,6 +33,7 @@ export function CategoryAttributes({
   attributesTouched,
   vehicleAttributeHiddenKeys,
   behavior,
+  boatFactsActive,
 }: WizardSharedProps) {
   if (!behavior.showGenericAttributes) return null;
 
@@ -105,17 +106,18 @@ export function CategoryAttributes({
         </p>
       )}
 
-      {activeModules.map(({ key, Component }) => (
-        <Component
-          key={key}
-          categoryId={categoryId || null}
-          categories={categories ?? []}
-          value={attributes}
-          onChange={onAttributesChange}
-          showErrors={attributesTouched}
-          hiddenKeys={vehicleAttributeHiddenKeys}
-        />
-      ))}
+      {!boatFactsActive &&
+        activeModules.map(({ key, Component }) => (
+          <Component
+            key={key}
+            categoryId={categoryId || null}
+            categories={categories ?? []}
+            value={attributes}
+            onChange={onAttributesChange}
+            showErrors={attributesTouched}
+            hiddenKeys={vehicleAttributeHiddenKeys}
+          />
+        ))}
     </section>
   );
 }

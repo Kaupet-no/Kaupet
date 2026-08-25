@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 
 const FILTER_QUERY = "e2efilterfixture";
@@ -70,14 +70,22 @@ test("forsiden holder visuell kontrakt", async ({ page }, testInfo) => {
   });
 });
 
-test("det native søkepanelet holder visuell kontrakt", async ({ page }) => {
+test("det native søkepanelet holder visuell kontrakt", async ({ page }, testInfo) => {
   await page.goto("/annonser?sort=price_asc&forcenative=1");
   await waitForHydration(page);
   await page.getByRole("button", { name: "Filtrer", exact: true }).click();
   await page.getByRole("heading", { name: "Søk og filtrer" }).waitFor();
+  const masks: Locator[] = [];
+  if (testInfo.project.name === "visual-web") {
+    const mapRegion = page.locator(".leaflet-container");
+    await expect(mapRegion).toHaveCount(1);
+    await expect(mapRegion).toBeVisible();
+    masks.push(mapRegion);
+  }
   await expect(page).toHaveScreenshot("search-panel.png", {
     animations: "disabled",
     fullPage: true,
+    mask: masks,
   });
 });
 
@@ -97,9 +105,25 @@ test("annonsedetaljen holder visuell kontrakt", async ({ page }, testInfo) => {
     .click();
   await expect(page).toHaveURL(/\/\d{8}(?:\?|$)/);
   await page.getByRole("button", { name: "Logg inn for å sende melding" }).waitFor();
+  const publishedDate = page
+    .locator("dt")
+    .filter({ hasText: /^(?:Publisert|Sist redigert)$/ })
+    .locator("xpath=..")
+    .locator("dd");
+  const profileDate = page
+    .locator('[aria-labelledby="listing-evidence-heading"] time')
+    .filter({ hasText: /^Registrert / });
+  const memberSinceDate = page.locator("p").filter({ hasText: /^Medlem siden / });
+  await expect(publishedDate).toHaveCount(1);
+  await expect(publishedDate).toBeVisible();
+  await expect(profileDate).toHaveCount(1);
+  await expect(profileDate).toBeVisible();
+  await expect(memberSinceDate).toHaveCount(1);
+  await expect(memberSinceDate).toBeVisible();
   await expect(page).toHaveScreenshot("listing-detail.png", {
     animations: "disabled",
     fullPage: true,
+    mask: [publishedDate, profileDate, memberSinceDate],
   });
 });
 

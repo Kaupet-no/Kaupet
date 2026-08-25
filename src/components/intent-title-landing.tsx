@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { prefetchCategorySuggestion } from "@/lib/category-suggestion.functions";
 
@@ -99,7 +100,11 @@ export function IntentTitleLanding({
         <span>:</span>
       </div>
       <div className="w-full space-y-1.5">
+        <Label htmlFor="listing-title" className="block text-left text-sm font-medium">
+          Tittel på annonsen
+        </Label>
         <Input
+          id="listing-title"
           autoFocus
           value={title}
           onChange={(e) => {
@@ -108,7 +113,6 @@ export function IntentTitleLanding({
           }}
           placeholder="Navn eller beskrivelse av objektet"
           className="h-12 text-center text-lg"
-          aria-label="Tittel på annonsen"
           aria-invalid={!!error}
         />
         {error && <p className="text-center text-xs text-destructive">{error}</p>}

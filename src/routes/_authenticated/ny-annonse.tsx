@@ -72,6 +72,7 @@ import { StepIndicator } from "@/features/listing-creation/step-indicator";
 import { ListingComposerShell } from "@/features/listing-creation/listing-composer-shell";
 import { useComposerHistoryBack } from "@/features/listing-creation/use-composer-history";
 import { NativeComposerDeck } from "@/features/listing-creation/native-composer-deck";
+import { NoImageDialog } from "@/features/listing-creation/no-image-dialog";
 import {
   canPreviewDraft,
   reviewSectionSteps,
@@ -1656,30 +1657,14 @@ function NewListingPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* No-image confirmation dialog */}
-      <AlertDialog open={showNoImageDialog} onOpenChange={setShowNoImageDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Ingen bilder lagt til</AlertDialogTitle>
-            <AlertDialogDescription>
-              Annonser med bilder selger mye raskere. Vil du legge til bilder først, eller fortsette
-              uten?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Legg til bilder</AlertDialogCancel>
-            <AlertDialogAction
-              data-testid="continue-without-image-button"
-              onClick={() => {
-                setShowNoImageDialog(false);
-                void goToNextPage({ skipImageCheck: true });
-              }}
-            >
-              Fortsett uten bilde
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <NoImageDialog
+        open={showNoImageDialog}
+        onOpenChange={setShowNoImageDialog}
+        onContinue={() => {
+          setShowNoImageDialog(false);
+          void goToNextPage({ skipImageCheck: true });
+        }}
+      />
 
       {/* No-price confirmation dialog */}
       <AlertDialog open={showNoPriceDialog} onOpenChange={setShowNoPriceDialog}>

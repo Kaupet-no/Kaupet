@@ -1,5 +1,9 @@
 import { expect, it } from "vitest";
 
+import {
+  DEFAULT_FIELD_GROUPS,
+  resolveWizardPages,
+} from "@/features/listing-creation/category-flows";
 import { FIELD_GROUP_REGISTRY, fieldGroupsForKeys, pageLabel } from "./registry";
 
 it("klassifiserer alle feltgrupper etter publiseringsformål", () => {
@@ -30,12 +34,7 @@ it("klassifiserer alle feltgrupper etter publiseringsformål", () => {
 });
 
 it("gir innholdssidene de fire delte oppgavenavnene", () => {
-  const pages = [
-    ["photos", "title"],
-    ["category-attributes", "description-keywords"],
-    ["condition", "price", "delivery", "location"],
-    ["review-publish"],
-  ];
+  const pages = resolveWizardPages(DEFAULT_FIELD_GROUPS, { native: false });
 
   expect(pages.map((keys) => pageLabel(fieldGroupsForKeys(keys)))).toEqual([
     "Vis frem",
@@ -43,6 +42,10 @@ it("gir innholdssidene de fire delte oppgavenavnene", () => {
     "Gjør handelen enkel",
     "Se over",
   ]);
+  expect(pages[1]).toContain("category-attributes");
+  expect(pages.findIndex((keys) => keys.includes("category-attributes"))).toBeLessThan(
+    pages.findIndex((keys) => keys.includes("review-publish")),
+  );
 });
 
 it("bevarer egne etiketter for strukturelle solosider", () => {

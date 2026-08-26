@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   applyAttributeFilters,
   effectiveFiltersForCategory,
+  getMissingRequiredFilters,
   normalizeFilter,
+  NUMERIC_DIGIT_CAPS,
   splitPrimaryFilters,
   type AttributeFilterValue,
   type CategoryFilter,
@@ -76,6 +78,30 @@ describe("effectiveFiltersForCategory", () => {
     expect(effectiveFiltersForCategory("sub", filters, byId).map((x) => x.key)).toEqual(["a", "b"]);
   });
 });
+describe("getMissingRequiredFilters", () => {
+  it("treats zero, negative, non-finite, and string dimensions as invalid", () => {
+    const filters = [
+      f({ category_id: "sub", key: "width_cm", type: "number" }),
+      f({ category_id: "sub", key: "height_cm", type: "number" }),
+      f({ category_id: "sub", key: "depth_cm", type: "number" }),
+    ];
+
+    expect(
+      getMissingRequiredFilters("sub", filters, byId, {
+        width_cm: 0,
+        height_cm: -1,
+        depth_cm: "40",
+      }),
+    ).toHaveLength(3);
+    expect(
+      getMissingRequiredFilters("sub", filters, byId, {
+        width_cm: 120,
+        height_cm: 80,
+        depth_cm: 40,
+      }),
+    ).toEqual([]);
+  });
+});
 
 describe("normalizeFilter", () => {
   it("coerces non-array options to null", () => {
@@ -94,6 +120,14 @@ describe("normalizeFilter", () => {
     expect(normalizeFilter({ ...row, options: [{ value: "a", label_nb: "A" }] }).options).toEqual([
       { value: "a", label_nb: "A" },
     ]);
+  });
+});
+describe("numeric dimension caps", () => {
+  it("limits dimension inputs to four digits", () => {
+    expect(NUMERIC_DIGIT_CAPS.width_cm).toBe(4);
+    expect(NUMERIC_DIGIT_CAPS.height_cm).toBe(4);
+    expect(NUMERIC_DIGIT_CAPS.depth_cm).toBe(4);
+    expect(NUMERIC_DIGIT_CAPS.length_cm).toBe(4);
   });
 });
 

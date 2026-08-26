@@ -58,9 +58,19 @@ export const NUMERIC_DIGIT_CAPS: Record<string, number> = {
   sleeping_places: 2,
   seats: 3,
   width_cm: 4,
+  height_cm: 4,
   depth_cm: 4,
+  length_cm: 4,
   weight_kg: 7,
 };
+
+/** Dimension values describe a physical size and must be greater than zero. */
+export const POSITIVE_NUMERIC_ATTRIBUTE_KEYS: readonly string[] = [
+  "width_cm",
+  "height_cm",
+  "depth_cm",
+  "length_cm",
+];
 
 /** For brand_select filters, `unit` stores which vehicle_brands.category_group to read from. */
 export type VehicleBrandGroup =
@@ -245,6 +255,12 @@ export function getMissingRequiredFilters(
   return filters.filter((f) => {
     const v = attributes[f.key];
     if (v === undefined || v === null) return true;
+    if (
+      POSITIVE_NUMERIC_ATTRIBUTE_KEYS.includes(f.key) &&
+      (typeof v !== "number" || !Number.isFinite(v) || v <= 0)
+    ) {
+      return true;
+    }
     if (typeof v === "string") return v.trim() === "";
     if (Array.isArray(v)) return v.length === 0;
     return false;

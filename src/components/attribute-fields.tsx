@@ -18,6 +18,7 @@ import {
   getMissingRequiredFilters,
   normalizeFilter,
   NUMERIC_DIGIT_CAPS,
+  POSITIVE_NUMERIC_ATTRIBUTE_KEYS,
   type AttributeValue,
   type CategoryFilter,
   type CategoryNode,
@@ -289,6 +290,7 @@ function AttributeField({
   // that never fires. Same for `is_optional` filters.
   const showRequiredMark = required && filter.type !== "range" && !filter.is_optional;
   const digitCap = isNumber ? NUMERIC_DIGIT_CAPS[filter.key] : undefined;
+  const requiresPositiveValue = isNumber && POSITIVE_NUMERIC_ATTRIBUTE_KEYS.includes(filter.key);
   const fieldId = `attr-${filter.key}`;
   return (
     <div className="space-y-2">
@@ -304,6 +306,7 @@ function AttributeField({
         inputMode={isNumber ? "numeric" : undefined}
         aria-invalid={!!error}
         value={value === undefined ? "" : String(value)}
+        min={requiresPositiveValue ? 1 : undefined}
         onChange={(e) => {
           let raw = e.target.value;
           if (isNumber && digitCap) raw = raw.replace(/\D/g, "").slice(0, digitCap);

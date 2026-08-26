@@ -31,6 +31,7 @@ import {
   CONDITIONS,
   VEHICLE_CONDITIONS_BY_SLUG,
 } from "@/lib/constants";
+import { PART_FITMENT_SCOPE_KEY } from "@/lib/category-filters";
 import {
   VEHICLE_LEAF_SLUGS,
   computeOmregistreringsavgift,
@@ -62,6 +63,7 @@ import { VehicleConditionPanel } from "@/components/listing-detail/edit-panels/v
 import { SellerNoKnownIssues } from "@/components/listing-detail/listing-evidence";
 import { VehicleEquipmentPanel } from "@/components/listing-detail/edit-panels/vehicle-equipment-panel";
 import { GenericAttributesPanel } from "@/components/listing-detail/edit-panels/generic-attributes-panel";
+import { PartFitmentSummary } from "@/components/listing-detail/part-fitment-summary";
 
 const ListingDetailMap = lazy(() =>
   import("@/components/listing-detail-map").then((m) => ({ default: m.ListingDetailMap })),
@@ -748,6 +750,9 @@ function ListingDetailViewBody({
             ) : (
               <BoatInfoGrid attributes={attributes} />
             ))}
+          {typeof attributes[PART_FITMENT_SCOPE_KEY] === "string" && (
+            <PartFitmentSummary attributes={attributes} />
+          )}
 
           {nativeSpecLayout && sellerContactSlot && <div className="mt-6">{sellerContactSlot}</div>}
 

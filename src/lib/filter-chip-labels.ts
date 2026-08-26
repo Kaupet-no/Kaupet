@@ -1,6 +1,10 @@
 import { format } from "date-fns";
 import { SORT_OPTIONS, type SortValue, type Category } from "@/lib/categories";
-import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
+import {
+  PART_FITMENT_VEHICLE_IDS_KEY,
+  type AttributeFilterValue,
+  type CategoryFilter,
+} from "@/lib/category-filters";
 import { boundsForFilter } from "@/lib/filter-range-bounds";
 import { parseIsoDate } from "@/lib/vehicle/vehicle-date";
 
@@ -61,18 +65,16 @@ export function getAttributeChipState(
   const fallback = { label: filter.label_nb, active: false };
   if (!value) return fallback;
   switch (value.kind) {
-    case "select": {
-      const option = filter.options?.find((o) => o.value === value.value);
-      return { label: option?.label_nb ?? value.value, active: true };
-    }
     case "multiselect":
       if (value.values.length === 0) return fallback;
       return {
         label:
-          value.values.length === 1
-            ? (filter.options?.find((o) => o.value === value.values[0])?.label_nb ??
-              value.values[0])
-            : `${filter.label_nb} (${value.values.length})`,
+          filter.key === PART_FITMENT_VEHICLE_IDS_KEY
+            ? `${filter.label_nb} (${value.values.length})`
+            : value.values.length === 1
+              ? (filter.options?.find((o) => o.value === value.values[0])?.label_nb ??
+                value.values[0])
+              : `${filter.label_nb} (${value.values.length})`,
         active: true,
       };
     case "boolean":

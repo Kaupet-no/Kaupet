@@ -23,6 +23,7 @@ export const PRICE_BOUNDS: RangeBounds = { min: 0, max: 1_000_000, step: 1000, u
  * stepping by 1 km). Keys match category_filters.key. */
 const BOUNDS_BY_KEY: Record<string, Omit<RangeBounds, "unit">> = {
   year: { min: 1950, max: currentYear(), step: 1, noGrouping: true },
+  part_fitment_year: { min: 1950, max: currentYear(), step: 1, noGrouping: true },
   mileage_km: { min: 0, max: 500_000, step: 1000 },
   hestekrefter: { min: 0, max: 1000, step: 5 },
   effekt_hk: { min: 0, max: 1000, step: 5 },

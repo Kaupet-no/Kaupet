@@ -18,12 +18,16 @@ import {
   getMissingRequiredFilters,
   normalizeFilter,
   NUMERIC_DIGIT_CAPS,
+  PART_FITMENT_SCOPE_KEY,
+  PART_FITMENT_VEHICLE_IDS_KEY,
+  PART_FITMENT_YEAR_KEY,
   POSITIVE_NUMERIC_ATTRIBUTE_KEYS,
   type AttributeValue,
   type CategoryFilter,
   type CategoryNode,
   type VehicleBrandGroup,
 } from "@/lib/category-filters";
+import { PartFitmentField } from "@/components/part-fitment-fields";
 import {
   VehicleBrandField,
   VehicleModelWithClassField,
@@ -127,6 +131,29 @@ export function AttributeFields({
     <div className="space-y-4 rounded-xl border border-border p-4">
       {heading && <p className="text-sm font-medium">{heading}</p>}
       {filters.map((f) => {
+        if (f.key === PART_FITMENT_SCOPE_KEY) {
+          return (
+            <PartFitmentField
+              key={f.id}
+              value={value}
+              onChange={onChange}
+              required={required}
+              scopeError={
+                missingKeys.has(PART_FITMENT_SCOPE_KEY)
+                  ? "Velg hvordan delen passer til kjøretøy."
+                  : undefined
+              }
+              vehicleError={
+                missingKeys.has(PART_FITMENT_VEHICLE_IDS_KEY)
+                  ? "Legg til minst én bilmodell."
+                  : undefined
+              }
+            />
+          );
+        }
+        if (f.key === PART_FITMENT_VEHICLE_IDS_KEY || f.key === PART_FITMENT_YEAR_KEY) {
+          return null;
+        }
         if (f.type === "brand_select") {
           return (
             <VehicleBrandField

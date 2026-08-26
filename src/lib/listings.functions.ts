@@ -4,8 +4,13 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   attributesSchema,
+  effectiveFiltersForCategory,
   getMissingRequiredFilters,
   normalizeFilter,
+  PART_FITMENT_SCOPE_KEY,
+  PART_FITMENT_VEHICLE_IDS_KEY,
+  PART_FITMENT_YEAR_FROM_KEY,
+  PART_FITMENT_YEAR_TO_KEY,
   vehicleCategoryGroupFor,
   VEHICLE_EQUIPMENT_FILTER_KEYS,
   type CategoryNode,
@@ -34,6 +39,39 @@ async function assertUnderHourlyListingLimit(
     .gte("created_at", oneHourAgo);
   if ((count ?? 0) >= MAX_LISTINGS_PER_HOUR) {
     throw new Error(errorMessage);
+  }
+}
+
+function validatePartFitment(
+  categoryId: string,
+  filters: ReturnType<typeof normalizeFilter>[],
+  categoriesById: Map<string, CategoryNode>,
+  attributes: Record<string, string | number | boolean | string[]>,
+) {
+  const isPartCategory = effectiveFiltersForCategory(categoryId, filters, categoriesById).some(
+    (filter) => filter.key === PART_FITMENT_SCOPE_KEY,
+  );
+  if (!isPartCategory) return;
+
+  const scope = attributes[PART_FITMENT_SCOPE_KEY];
+  if (scope !== "universal" && scope !== "specific" && scope !== "unknown") {
+    throw new Error("Velg hvordan delen passer til kjøretøy.");
+  }
+  if (scope !== "specific") return;
+
+  const vehicleIds = attributes[PART_FITMENT_VEHICLE_IDS_KEY];
+  if (
+    !Array.isArray(vehicleIds) ||
+    vehicleIds.length === 0 ||
+    vehicleIds.some((id) => !/^[0-9a-f-]{36}$/iu.test(id))
+  ) {
+    throw new Error("Legg til minst én gyldig bilmodell.");
+  }
+
+  const yearFrom = attributes[PART_FITMENT_YEAR_FROM_KEY];
+  const yearTo = attributes[PART_FITMENT_YEAR_TO_KEY];
+  if (typeof yearFrom === "number" && typeof yearTo === "number" && yearFrom > yearTo) {
+    throw new Error("Årsmodell fra kan ikke være høyere enn årsmodell til.");
   }
 }
 
@@ -223,6 +261,7 @@ export const createListing = createServerFn({ method: "POST" })
     if (missing.length > 0) {
       throw new Error(`Fyll inn: ${missing.map((f) => f.label_nb).join(", ")}`);
     }
+    validatePartFitment(data.category_id, normalizedFilters, categoriesById, data.attributes ?? {});
 
     // category_flows may not exist yet in every environment (pre-migration); degrade to the default flow.
     const flowRows = (flowsResult.data ?? []) as CategoryFlowRow[];

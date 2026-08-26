@@ -5,6 +5,7 @@ import { signListingImageUrls, thumbPathFor } from "@/lib/storage";
 import { formatPrice, displayPriceNok } from "@/lib/format";
 import { FavoriteButton } from "@/components/favorite-button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PART_FITMENT_SCOPE_KEY, PART_FITMENT_VEHICLE_IDS_KEY } from "@/lib/category-filters";
 
 export type ListingCardData = {
   id: string;
@@ -23,6 +24,20 @@ export type ListingCardData = {
   category_slug?: string | null;
   attributes?: Record<string, unknown> | null;
 };
+function partFitmentLabel(attributes: Record<string, unknown> | null | undefined): string | null {
+  const scope = attributes?.[PART_FITMENT_SCOPE_KEY];
+  if (scope === "universal") return "Universal del";
+  if (scope === "unknown") return "Kompatibilitet ikke oppgitt";
+  if (scope === "specific") {
+    const count = Array.isArray(attributes?.[PART_FITMENT_VEHICLE_IDS_KEY])
+      ? attributes[PART_FITMENT_VEHICLE_IDS_KEY].length
+      : 0;
+    return count > 0
+      ? `Selger oppgir ${count} kompatibel${count === 1 ? "" : "e"} bilmodell${count === 1 ? "" : "er"}`
+      : "Selger oppgir kompatibilitet";
+  }
+  return null;
+}
 
 /** Usage metric under the title: kilometers for vehicles, engine hours for
  * boats — whichever the listing's attributes carry. */
@@ -106,6 +121,7 @@ export function ListingCardContent({
     !listing.is_free && displayPrice == null && missingPriceLabel
       ? missingPriceLabel
       : formatPrice({ price_nok: displayPrice, is_free: listing.is_free });
+  const fitmentLabel = partFitmentLabel(listing.attributes);
 
   return (
     <>
@@ -121,6 +137,9 @@ export function ListingCardContent({
         <h3 className="truncate text-sm font-medium leading-snug">{listing.title}</h3>
         {listing.subtitle && (
           <p className="line-clamp-1 text-xs text-muted-foreground">{listing.subtitle}</p>
+        )}
+        {fitmentLabel && (
+          <p className="line-clamp-1 text-xs text-muted-foreground">{fitmentLabel}</p>
         )}
         <div className="flex items-baseline justify-between gap-2">
           <p className="font-display text-lg font-semibold text-primary">{priceLabel}</p>

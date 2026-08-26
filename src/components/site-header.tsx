@@ -65,7 +65,7 @@ export function SiteHeader() {
             </>
           ) : (
             <>
-              <Button asChild size="sm" variant="ghost">
+              <Button asChild size="sm" variant="ghost" className="max-[359px]:hidden">
                 <Link to="/auth">Logg inn</Link>
               </Button>
               <Button asChild size="sm">

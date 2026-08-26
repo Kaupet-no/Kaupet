@@ -23,6 +23,14 @@ export const VEHICLE_EQUIPMENT_FILTER_KEYS = [
   "utstyr_annet",
 ] as const;
 
+/** Attributes stored on bildelannonser for seller-declared fitment. */
+export const PART_FITMENT_SCOPE_KEY = "part_fitment_scope";
+export const PART_FITMENT_VEHICLE_IDS_KEY = "part_fitment_vehicle_ids";
+export const PART_FITMENT_YEAR_KEY = "part_fitment_year";
+export const PART_FITMENT_YEAR_FROM_KEY = "part_fitment_year_from";
+export const PART_FITMENT_YEAR_TO_KEY = "part_fitment_year_to";
+export const PART_NUMBER_KEY = "part_number";
+export const PART_BRAND_KEY = "part_brand";
 export type FilterType =
   | "select"
   | "multiselect"
@@ -431,10 +439,17 @@ export function applyAttributeFilters<T>(
         q = q.contains("attributes", { [key]: f.value });
         break;
       case "multiselect":
-        // Match listings whose attribute equals any of the selected values.
+        // Part fitment is stored as an array of model IDs. The search-side
+        // control intentionally selects one buyer vehicle, so JSONB contains
+        // is the exact predicate needed here; ordinary filters keep their
+        // existing scalar-any behavior.
         if (f.values.length > 0) {
-          const ors = f.values.map((v) => `attributes->>${key}.eq.${v}`).join(",");
-          q = q.or(ors);
+          if (key === PART_FITMENT_VEHICLE_IDS_KEY) {
+            q = q.contains("attributes", { [key]: f.values });
+          } else {
+            const ors = f.values.map((v) => `attributes->>${key}.eq.${v}`).join(",");
+            q = q.or(ors);
+          }
         }
         break;
       case "range":

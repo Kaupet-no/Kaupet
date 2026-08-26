@@ -59,4 +59,20 @@ describe("offentlige annonsekort", () => {
     expect(screen.queryByText("9 876")).toBeNull();
     expect(screen.queryByText(/siste syv dager/)).toBeNull();
   });
+
+  it("viser at selgeroppgitt bildelkompatibilitet", () => {
+    render(
+      <ListingCard
+        listing={{
+          ...listing,
+          attributes: {
+            part_fitment_scope: "specific",
+            part_fitment_vehicle_ids: ["model-1"],
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Selger oppgir 1 kompatibel bilmodell")).toBeTruthy();
+  });
 });

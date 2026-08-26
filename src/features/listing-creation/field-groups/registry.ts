@@ -52,12 +52,7 @@ export type FieldGroup = {
   fieldsToValidate?: (keyof ListingFormShape)[];
   validateExtra?: (
     ctx: ValidateCtx,
-  ) =>
-    | "SHOW_NO_IMAGE_DIALOG"
-    | "SHOW_NO_PRICE_DIALOG"
-    | string
-    | { field: string; message: string }
-    | null;
+  ) => "SHOW_NO_IMAGE_DIALOG" | string | { field: string; message: string } | null;
 };
 
 export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
@@ -173,12 +168,12 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
   },
   price: {
     key: "price",
-    classification: "recommendedForTrust",
+    classification: "requiredToPublish",
     Component: PriceGroup,
     fieldsToValidate: ["price_nok"],
     validateExtra: (ctx) =>
       !ctx.isFree && (ctx.priceNok === "" || ctx.priceNok === undefined)
-        ? "SHOW_NO_PRICE_DIALOG"
+        ? { field: "price_nok", message: "Oppgi en pris før annonsen publiseres." }
         : null,
   },
   "vehicle-facts": {
@@ -221,12 +216,12 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
   },
   "vehicle-price": {
     key: "vehicle-price",
-    classification: "recommendedForTrust",
+    classification: "requiredToPublish",
     Component: VehiclePriceGroup,
     fieldsToValidate: ["price_nok"],
     validateExtra: (ctx) =>
       !ctx.isFree && (ctx.priceNok === "" || ctx.priceNok === undefined)
-        ? "SHOW_NO_PRICE_DIALOG"
+        ? { field: "price_nok", message: "Oppgi en pris før annonsen publiseres." }
         : null,
   },
   "boat-facts": {

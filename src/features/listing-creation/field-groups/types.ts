@@ -110,6 +110,7 @@ export type WizardSharedProps = {
     icon?: string | null;
     color?: string | null;
   })[];
+  categorySlug: string | null;
   categoryLabel: string | null;
   /** Category-specific example for the title input's "F.eks. …" placeholder
    * (nearest ancestor's categories.title_example); null falls back to the
@@ -233,6 +234,7 @@ export type WizardSharedProps = {
   fetchMyLocation: () => void | Promise<void>;
   setFullscreenMapOpen: (open: boolean) => void;
   markerMovedRef: { current: boolean };
+  onPreview: () => void;
   lastEditedRef: { current: "postal_code" | "city" | "map" | null };
 
   // review/publish

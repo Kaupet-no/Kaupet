@@ -163,6 +163,15 @@ export const createListing = createServerFn({ method: "POST" })
         attributes: attributesSchema.optional(),
         turnstileToken: z.string().nullable().optional(),
       })
+      .superRefine((data, ctx) => {
+        if (!data.is_free && data.price_nok == null) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["price_nok"],
+            message: "Oppgi en pris før annonsen publiseres.",
+          });
+        }
+      })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
@@ -294,7 +303,7 @@ export const republishListing = createServerFn({ method: "POST" })
 
     const { data: listing, error: fetchError } = await supabase
       .from("listings")
-      .select("id, seller_id, status")
+      .select("id, seller_id, status, is_free, price_nok")
       .eq("id", data.id)
       .single();
     if (fetchError) throw fetchError;
@@ -303,6 +312,9 @@ export const republishListing = createServerFn({ method: "POST" })
     }
     if (listing.status === "disabled") {
       throw new Error("Denne annonsen er deaktivert av moderator og kan ikke reaktiveres");
+    }
+    if (!listing.is_free && listing.price_nok == null) {
+      throw new Error("Oppgi en pris før annonsen publiseres på nytt");
     }
 
     const now = new Date().toISOString();

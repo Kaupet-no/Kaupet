@@ -6,13 +6,17 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { test } from "./fixtures";
+import { expect, test } from "./fixtures";
 import {
   clickNextAndWaitFor,
   fillDescriptionAndAdvance,
+  fixMissingInformation,
   goToNewListing,
   login,
+  missingInformationDialog,
+  openPublishingStatus,
   publishAndExpectSuccess,
+  publishingStatusButton,
   wizardStep,
 } from "./pages/listing-wizard";
 
@@ -81,4 +85,26 @@ test("logger inn og publiserer en annonse", async ({ page }, testInfo) => {
   await clickNextAndWaitFor(page, wizardStep(page, "review-publish"), testInfo);
 
   await publishAndExpectSuccess(page, testInfo);
+});
+
+test("viser manglende opplysninger med snarvei til feltet", async ({ page }, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop-web",
+    "Publiseringsstatus ligger i desktop-sidepanelet",
+  );
+  const credentials = users[testInfo.project.name];
+  if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);
+
+  await login(page, credentials.email, credentials.password);
+  await goToNewListing(page, "E2E statusannonse");
+  await publishingStatusButton(page).waitFor();
+
+  await expect(publishingStatusButton(page)).toContainText(/opplysninger? mangler/);
+  await openPublishingStatus(page);
+  const dialog = missingInformationDialog(page);
+  await expect(dialog.getByText("Beskrivelse", { exact: true })).toBeVisible();
+  await expect(dialog.getByText("Pris", { exact: true })).toBeVisible();
+
+  await fixMissingInformation(page, "Beskrivelse");
+  await expect(page.getByTestId("listing-description-textarea")).toBeFocused();
 });

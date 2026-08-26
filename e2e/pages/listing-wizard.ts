@@ -31,8 +31,9 @@ export async function login(page: Page, email: string, password: string) {
 }
 
 /** type=sell is required — without it the route redirects to "/". */
-export async function goToNewListing(page: Page) {
-  await page.goto("/ny-annonse?type=sell");
+export async function goToNewListing(page: Page, title?: string) {
+  const suffix = title ? `&title=${encodeURIComponent(title)}` : "";
+  await page.goto(`/ny-annonse?type=sell${suffix}`);
 }
 
 export async function goToNewWantListing(page: Page, native = false) {
@@ -43,6 +44,28 @@ export function composerPage(page: Page, pageKey: string) {
   return page.getByTestId(`composer-page-${pageKey}`);
 }
 
+export function publishingStatusButton(page: Page) {
+  return page.getByTestId("publishing-status-button");
+}
+
+export function missingInformationDialog(page: Page) {
+  return page.getByRole("dialog", { name: "Opplysninger som mangler" });
+}
+
+export async function openPublishingStatus(page: Page) {
+  await publishingStatusButton(page).click();
+  await expect(missingInformationDialog(page)).toBeVisible();
+}
+
+export async function fixMissingInformation(page: Page, label: string) {
+  const dialog = missingInformationDialog(page);
+  await dialog
+    .locator("li")
+    .filter({ hasText: label })
+    .getByRole("button", { name: "Fiks dette" })
+    .click();
+  await expect(dialog).toBeHidden();
+}
 /**
  * Clicks `trigger` and waits for `expected` to appear. Retries the click a
  * bounded number of times if `expected` doesn't show up in time — clicks in

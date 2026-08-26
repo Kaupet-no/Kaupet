@@ -1,6 +1,7 @@
-import { Loader2, MapPin } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Turnstile } from "@marsidev/react-turnstile";
 
+import { ListingCardContent, type ListingCardData } from "@/components/listing-card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -13,22 +14,62 @@ import { Vehicle360Group } from "../vehicle-360";
 
 type ReviewPreviewProps = Pick<
   WizardSharedProps,
-  "images" | "title" | "subtitle" | "previewPrice" | "city" | "postalCode" | "categoryLabel"
+  | "images"
+  | "title"
+  | "subtitle"
+  | "priceNok"
+  | "isFree"
+  | "city"
+  | "postalCode"
+  | "categorySlug"
+  | "attributes"
 > & {
   headingId?: string;
+  onPreview?: () => void;
 };
 
-/** Preview card showing how the listing will look in the search list. */
+/** Preview card using the same presentation as the public listing grid. */
 export function ReviewPreview({
   images,
   title,
   subtitle,
-  previewPrice,
+  priceNok,
+  isFree,
   city,
-  postalCode,
-  categoryLabel,
+  categorySlug,
+  attributes,
   headingId = "listing-preview-title",
+  onPreview,
 }: ReviewPreviewProps) {
+  const listing: ListingCardData = {
+    id: "preview",
+    kaupet_code: "",
+    title: title || "—",
+    subtitle: subtitle || null,
+    price_nok: typeof priceNok === "number" ? priceNok : null,
+    is_free: isFree ?? false,
+    city: city || null,
+    created_at: "",
+    cover_path: null,
+    mileage_km: typeof attributes?.mileage_km === "number" ? attributes.mileage_km : null,
+    engine_hours: typeof attributes?.engine_hours === "number" ? attributes.engine_hours : null,
+    category_slug: categorySlug,
+    attributes,
+  };
+  const card = (
+    <div
+      className={`group w-full overflow-hidden rounded-lg border border-border bg-card text-left transition-[border-color,box-shadow] duration-150 hover:border-primary/70 hover:shadow-sm ${
+        onPreview ? "cursor-pointer hover:bg-primary/5" : ""
+      }`}
+    >
+      <ListingCardContent
+        listing={listing}
+        imgUrl={images[0]?.previewUrl ?? null}
+        missingPriceLabel="Pris er foreløpig ikke satt"
+      />
+    </div>
+  );
+
   return (
     <section aria-labelledby={headingId} className="space-y-2">
       <h3 id={headingId} className="text-sm font-semibold">
@@ -37,33 +78,21 @@ export function ReviewPreview({
       <p className="text-xs text-muted-foreground">
         Dette er slik annonsen din vil se ut i søkelisten
       </p>
-      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm sm:max-w-[220px]">
-        <div className="aspect-square bg-muted">
-          {images[0] ? (
-            <img src={images[0].previewUrl} alt="" className="size-full object-cover" aria-hidden />
-          ) : (
-            <div className="flex size-full flex-col items-center justify-center gap-1 text-muted-foreground">
-              <span className="text-2xl" aria-hidden>
-                📷
-              </span>
-              <span className="text-xs">Ingen bilde</span>
-            </div>
-          )}
-        </div>
-        <div className="space-y-0.5 p-3">
-          <p className="line-clamp-2 text-sm font-medium leading-snug">{title || "—"}</p>
-          {subtitle && <p className="line-clamp-1 text-xs text-muted-foreground">{subtitle}</p>}
-          {previewPrice && <p className="font-display text-base font-semibold">{previewPrice}</p>}
-          {(city || postalCode) && (
-            <p className="flex items-center gap-1 text-xs text-muted-foreground">
-              <MapPin className="size-3" aria-hidden /> {city || postalCode}
-            </p>
-          )}
-          {categoryLabel && (
-            <p className="truncate text-xs text-muted-foreground">{categoryLabel}</p>
-          )}
-        </div>
-      </div>
+      {onPreview ? (
+        <button
+          type="button"
+          onClick={onPreview}
+          aria-label="Trykk for å forhåndsvise annonsen"
+          className="block w-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:max-w-[220px]"
+        >
+          {card}
+        </button>
+      ) : (
+        <div className="sm:max-w-[220px]">{card}</div>
+      )}
+      {onPreview && (
+        <p className="text-xs text-muted-foreground">Trykk for å forhåndsvise annonsen</p>
+      )}
     </section>
   );
 }
@@ -98,7 +127,6 @@ type PublishActionsProps = {
   setTurnstileToken: (token: string | null) => void;
   mutationIsPending: boolean;
   onCancel: () => void;
-  onPreview: () => void;
 };
 
 /**
@@ -241,10 +269,13 @@ export function ReviewPublishGroup(props: WizardSharedProps) {
         images={props.images}
         title={props.title}
         subtitle={props.subtitle}
-        previewPrice={props.previewPrice}
+        priceNok={props.priceNok}
+        isFree={props.isFree}
         city={props.city}
         postalCode={props.postalCode}
-        categoryLabel={props.categoryLabel}
+        categorySlug={props.categorySlug}
+        attributes={props.attributes}
+        onPreview={props.onPreview}
       />
       {props.attributes.vehicle_lookup && (
         <p className="text-xs text-muted-foreground">
@@ -259,14 +290,6 @@ export function ReviewPublishGroup(props: WizardSharedProps) {
     </>
   );
 }
-/**
- * Turnstile + "Avbryt" + "Publiser annonse" submit button — shared verbatim.
- * Renders as flat siblings (not a wrapping div) so the caller's own
- * flex-wrap row controls line breaks: "Avbryt" can wrap up onto "Tilbake"s
- * line, while "Forhåndsvis annonse" + "Publiser annonse" are grouped in one
- * inner (non-wrapping) div so that pair always moves to a new line together
- * instead of splitting across two lines.
- */
 export function PublishActions({
   native,
   turnstileEnabled,
@@ -274,7 +297,6 @@ export function PublishActions({
   setTurnstileToken,
   mutationIsPending,
   onCancel,
-  onPreview,
 }: PublishActionsProps) {
   if (native) {
     return (
@@ -306,9 +328,6 @@ export function PublishActions({
         Avbryt
       </Button>
       <div className="flex items-center gap-3">
-        <Button type="button" variant="outline" onClick={onPreview} disabled={mutationIsPending}>
-          Forhåndsvis annonse
-        </Button>
         {turnstileEnabled && (
           <Turnstile
             siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}

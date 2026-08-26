@@ -20,9 +20,9 @@ it("klassifiserer alle feltgrupper etter publiseringsformål", () => {
     "vehicle-360": "optionalEnhancement",
     "category-attributes": "requiredToPublish",
     condition: "requiredToPublish",
-    price: "recommendedForTrust",
+    price: "requiredToPublish",
     "vehicle-facts": "requiredToPublish",
-    "vehicle-price": "recommendedForTrust",
+    "vehicle-price": "requiredToPublish",
     "boat-facts": "requiredToPublish",
     "vehicle-condition": "requiredToPublish",
     "vehicle-equipment": "optionalEnhancement",
@@ -51,4 +51,15 @@ it("gir innholdssidene de fire delte oppgavenavnene", () => {
 it("bevarer egne etiketter for strukturelle solosider", () => {
   expect(pageLabel(fieldGroupsForKeys(["category-confirm"]))).toBe("Kategori");
   expect(pageLabel(fieldGroupsForKeys(["vehicle-registration"]))).toBe("Registreringsnummer");
+});
+
+it.each(["price", "vehicle-price"])("krever pris for ikke-gratis annonser i %s", (groupKey) => {
+  const validate = FIELD_GROUP_REGISTRY[groupKey].validateExtra;
+
+  expect(validate?.({ isFree: false, priceNok: "" } as never)).toEqual({
+    field: "price_nok",
+    message: "Oppgi en pris før annonsen publiseres.",
+  });
+  expect(validate?.({ isFree: true, priceNok: "" } as never)).toBeNull();
+  expect(validate?.({ isFree: false, priceNok: 0 } as never)).toBeNull();
 });

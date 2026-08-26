@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { WizardSharedProps } from "../types";
 import { PublishActions, ReviewPreview, ReviewPublishGroup } from ".";
@@ -16,6 +16,7 @@ vi.mock("@tanstack/react-query", () => ({
 vi.mock("@/features/vehicle-360-capture/capture-flow", () => ({
   Vehicle360CaptureFlow: () => <p>360°-opptaket er åpnet</p>,
 }));
+afterEach(cleanup);
 
 describe("ReviewPublishGroup", () => {
   it("viser harde publiseringskrav separat og lar anbefalinger passeres når kravene er oppfylt", () => {
@@ -48,7 +49,6 @@ describe("ReviewPublishGroup", () => {
           setTurnstileToken={vi.fn()}
           mutationIsPending={false}
           onCancel={vi.fn()}
-          onPreview={vi.fn()}
         />
       </form>
     );
@@ -85,6 +85,7 @@ describe("ReviewPublishGroup", () => {
           draftId: "draft-1",
           ensureDraftId: vi.fn(),
           onEditReviewSection: vi.fn(),
+          onPreview: vi.fn(),
           improvementGroupKeys: ["photos", "vehicle-price", "location", "vehicle-360"],
           publishingRequirementErrors: [],
         } as unknown as WizardSharedProps)}
@@ -104,10 +105,12 @@ describe("ReviewPreview", () => {
         images={[]}
         title=""
         subtitle=""
-        previewPrice={null}
+        priceNok={undefined}
+        isFree={false}
         city=""
         postalCode=""
-        categoryLabel={null}
+        categorySlug={null}
+        attributes={{}}
       />,
     );
 
@@ -115,5 +118,49 @@ describe("ReviewPreview", () => {
     expect(screen.getByRole("heading", { name: "Forhåndsvisning" })).toBeTruthy();
     expect(screen.getAllByText("Ingen bilde").length).toBeGreaterThan(0);
     expect(screen.getByText("—")).toBeTruthy();
+    expect(screen.getByText("Pris er foreløpig ikke satt")).toBeTruthy();
+    expect(screen.queryByText("Pris ved henvendelse")).toBeNull();
+  });
+  it("gjør hele forhåndsvisningskortet trykkbart med beskrivende navn", () => {
+    const onPreview = vi.fn();
+    render(
+      <ReviewPreview
+        images={[]}
+        title="Volvo V90"
+        subtitle=""
+        priceNok={250_000}
+        isFree={false}
+        city="Oslo"
+        postalCode=""
+        categorySlug="bil"
+        attributes={{}}
+        onPreview={onPreview}
+      />,
+    );
+
+    const previewButton = screen.getByRole("button", {
+      name: "Trykk for å forhåndsvise annonsen",
+    });
+    fireEvent.click(previewButton);
+
+    expect(onPreview).toHaveBeenCalledOnce();
+    expect(screen.getByText("Trykk for å forhåndsvise annonsen")).toBeTruthy();
+  });
+  it("viser kjøretøyets pris inkludert omregistreringsavgift", () => {
+    render(
+      <ReviewPreview
+        images={[]}
+        title="Volvo V90"
+        subtitle=""
+        priceNok={250_000}
+        isFree={false}
+        city="Oslo"
+        postalCode=""
+        categorySlug="bil"
+        attributes={{ omregistreringsavgift_override_kr: 5_000 }}
+      />,
+    );
+
+    expect(screen.getByText("255 000 kr")).toBeTruthy();
   });
 });

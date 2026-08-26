@@ -92,6 +92,52 @@ function ListingImage({
   );
 }
 
+export function ListingCardContent({
+  listing,
+  imgUrl,
+  missingPriceLabel,
+}: {
+  listing: ListingCardData;
+  imgUrl: string | null;
+  missingPriceLabel?: string;
+}) {
+  const displayPrice = displayPriceNok(listing);
+  const priceLabel =
+    !listing.is_free && displayPrice == null && missingPriceLabel
+      ? missingPriceLabel
+      : formatPrice({ price_nok: displayPrice, is_free: listing.is_free });
+
+  return (
+    <>
+      <div className="relative aspect-[4/3] bg-muted" style={{ aspectRatio: "4 / 3" }}>
+        <ListingImage
+          imgUrl={imgUrl}
+          hasCoverPath={!!listing.cover_path}
+          alt={`${listing.title} — ${priceLabel}`}
+          compact={false}
+        />
+      </div>
+      <div className="density-data px-3">
+        <h3 className="truncate text-sm font-medium leading-snug">{listing.title}</h3>
+        {listing.subtitle && (
+          <p className="line-clamp-1 text-xs text-muted-foreground">{listing.subtitle}</p>
+        )}
+        <div className="flex items-baseline justify-between gap-2">
+          <p className="font-display text-lg font-semibold text-primary">{priceLabel}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+          {listing.city && <span>{listing.city}</span>}
+          {typeof listing.mileage_km === "number" ? (
+            <UsageLabel value={listing.mileage_km} unit="km" />
+          ) : typeof listing.engine_hours === "number" ? (
+            <UsageLabel value={listing.engine_hours} unit="t" />
+          ) : null}
+        </div>
+      </div>
+    </>
+  );
+}
+
 export function ListingCard({
   listing,
   highlighted,
@@ -222,31 +268,7 @@ export function ListingCard({
         className={linkClass}
         aria-label={`${listing.title}, ${priceLabel}`}
       >
-        <div className="relative aspect-[4/3] bg-muted" style={{ aspectRatio: "4 / 3" }}>
-          <ListingImage
-            imgUrl={effectiveImageUrl}
-            hasCoverPath={!!listing.cover_path}
-            alt={`${listing.title} — ${priceLabel}`}
-            compact={false}
-          />
-        </div>
-        <div className="density-data px-3">
-          <h3 className="truncate text-sm font-medium leading-snug">{listing.title}</h3>
-          {listing.subtitle && (
-            <p className="line-clamp-1 text-xs text-muted-foreground">{listing.subtitle}</p>
-          )}
-          <div className="flex items-baseline justify-between gap-2">
-            <p className="font-display text-lg font-semibold text-primary">{priceLabel}</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-            {listing.city && <span>{listing.city}</span>}
-            {typeof listing.mileage_km === "number" ? (
-              <UsageLabel value={listing.mileage_km} unit="km" />
-            ) : typeof listing.engine_hours === "number" ? (
-              <UsageLabel value={listing.engine_hours} unit="t" />
-            ) : null}
-          </div>
-        </div>
+        <ListingCardContent listing={listing} imgUrl={effectiveImageUrl} />
       </Link>
       <FavoriteButton
         listingId={listing.id}

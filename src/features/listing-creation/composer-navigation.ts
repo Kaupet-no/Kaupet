@@ -19,6 +19,51 @@ export function reviewSectionSteps(pages: ComposerPage[], groupKeys: readonly st
   );
   return steps.length > 0 ? { first: steps[0], last: steps.at(-1)! } : null;
 }
+
+export type ComposerRequirementTarget = {
+  targetGroupKey?: string;
+  targetField?: string;
+  insertionOrder: number;
+};
+
+/** Keeps missing requirements in the same order as the category-dependent wizard pages. */
+export function sortComposerRequirements<T extends ComposerRequirementTarget>(
+  pages: { groups: { key: string; fieldsToValidate?: readonly string[] }[] }[],
+  requirements: T[],
+) {
+  const position = (requirement: T) => {
+    const pageIndex = requirement.targetGroupKey
+      ? pages.findIndex((page) =>
+          page.groups.some((group) => group.key === requirement.targetGroupKey),
+        )
+      : -1;
+    const groups = pageIndex >= 0 ? pages[pageIndex].groups : [];
+    const groupIndex = requirement.targetGroupKey
+      ? groups.findIndex((group) => group.key === requirement.targetGroupKey)
+      : -1;
+    const group = groupIndex >= 0 ? groups[groupIndex] : undefined;
+    const fieldIndex =
+      requirement.targetField && group?.fieldsToValidate
+        ? group.fieldsToValidate.indexOf(requirement.targetField)
+        : -1;
+    return [
+      pageIndex >= 0 ? pageIndex : Number.MAX_SAFE_INTEGER,
+      groupIndex >= 0 ? groupIndex : Number.MAX_SAFE_INTEGER,
+      fieldIndex >= 0 ? fieldIndex : Number.MAX_SAFE_INTEGER,
+      requirement.insertionOrder,
+    ];
+  };
+
+  return [...requirements].sort((left, right) => {
+    const leftPosition = position(left);
+    const rightPosition = position(right);
+    for (let index = 0; index < leftPosition.length; index += 1) {
+      const difference = leftPosition[index] - rightPosition[index];
+      if (difference !== 0) return difference;
+    }
+    return 0;
+  });
+}
 export function composerFieldId(field: string) {
   const ids: Record<string, string> = {
     category_id: "category-search-input",

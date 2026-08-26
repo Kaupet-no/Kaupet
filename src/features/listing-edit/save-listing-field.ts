@@ -74,6 +74,9 @@ export async function saveListingField(
       return;
     }
     case "price": {
+      if (!patch.is_free && patch.price_nok == null) {
+        throw new Error("Oppgi en pris før annonsen lagres");
+      }
       const { error } = await supabase
         .from("listings")
         .update({

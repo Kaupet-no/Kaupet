@@ -4,9 +4,13 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "./fixtures";
 import {
   clickNextAndWaitFor,
+  fixMissingInformation,
   goToNewListing,
   login,
+  missingInformationDialog,
+  openPublishingStatus,
   publishAndExpectSuccess,
+  publishingStatusButton,
   wizardStep,
 } from "./pages/listing-wizard";
 
@@ -25,6 +29,7 @@ const TEST_REGISTRATION = "AB12345";
 test("registrert kjøretøy går fra oppslag til review og publisering", async ({
   page,
 }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-web", "Statuspanelet ligger i desktop-sidepanelet");
   const credentials = users[testInfo.project.name];
   if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);
 
@@ -68,7 +73,11 @@ test("registrert kjøretøy går fra oppslag til review og publisering", async (
   await page.getByRole("option", { name: "Bruktbil" }).click();
   await page.getByRole("checkbox", { name: "Ingen kjente feil eller mangler" }).check();
   await clickNextAndWaitFor(page, wizardStep(page, "vehicle-price"), testInfo);
-
+  await publishingStatusButton(page).waitFor();
+  await openPublishingStatus(page);
+  await expect(missingInformationDialog(page).getByText("Pris", { exact: true })).toBeVisible();
+  await fixMissingInformation(page, "Pris");
+  await expect(page.locator("#price_nok")).toBeFocused();
   await page.locator("#price_nok").fill("349000");
   // Delivery, location and review/publish share the final vehicle page.
   await clickNextAndWaitFor(page, wizardStep(page, "location"), testInfo);

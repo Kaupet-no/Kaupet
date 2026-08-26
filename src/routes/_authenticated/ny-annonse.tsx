@@ -5,7 +5,7 @@ import { useForm, useWatch, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
-import { ChevronLeft, ChevronRight, Eye } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { createListing } from "@/lib/listings.functions";
@@ -24,6 +24,7 @@ import {
 } from "@/features/listing-creation/category-flows";
 import { useAllCategoryFlows } from "@/features/listing-creation/use-all-category-flows";
 import { useListingSteps, type WizardPage } from "@/features/listing-creation/use-listing-steps";
+import { displayPriceNok, formatPrice } from "@/lib/format";
 import { useDraftAutosave } from "@/features/listing-creation/use-draft-autosave";
 import { useVehicleLookupFlow } from "@/features/listing-creation/use-vehicle-lookup-flow";
 import { useLocationPicker } from "@/features/listing-creation/use-location-picker";
@@ -58,6 +59,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
 import { formatErrorMessage } from "@/lib/errors";
 import { CONDITIONS } from "@/lib/constants";
 import { isNative } from "@/lib/native";
@@ -77,13 +80,15 @@ import { trackProductEvent } from "@/lib/product-analytics";
 import { NewListingError } from "@/features/listing-creation/new-listing-error";
 import { StepIndicator } from "@/features/listing-creation/step-indicator";
 import { ListingComposerShell } from "@/features/listing-creation/listing-composer-shell";
+import { ComposerReviewStatuses } from "@/features/listing-creation/composer-review";
 import { useComposerHistoryBack } from "@/features/listing-creation/use-composer-history";
 import { NativeComposerDeck } from "@/features/listing-creation/native-composer-deck";
 import { NoImageDialog } from "@/features/listing-creation/no-image-dialog";
 import {
-  canPreviewDraft,
   focusComposerField,
   reviewSectionSteps,
+  sortComposerRequirements,
+  type ComposerRequirementTarget,
   type ComposerNavigationResult,
 } from "@/features/listing-creation/composer-navigation";
 
@@ -170,7 +175,7 @@ function NewListingPage() {
   const [reviewJumpRequested, setReviewJumpRequested] = useState(false);
   const pendingRestoreStepKeyRef = useRef<string | null>(null);
   const [showNoImageDialog, setShowNoImageDialog] = useState(false);
-  const [showNoPriceDialog, setShowNoPriceDialog] = useState(false);
+  const [publishingStatusOpen, setPublishingStatusOpen] = useState(false);
   const [extraFieldError, setExtraFieldError] = useState<{
     field: string;
     message: string;
@@ -592,6 +597,12 @@ function NewListingPage() {
     }
     reviewSectionLastStepRef.current = target.last;
     setStep(target.first);
+    if (target.first === step && options?.field) {
+      requestAnimationFrame(() => {
+        focusComposerField(options.field!);
+        pendingReviewFocusRef.current = null;
+      });
+    }
     window.scrollTo({ top: 0 });
   };
 
@@ -631,6 +642,11 @@ function NewListingPage() {
     maintenance_history: "Vedlikeholdshistorikk",
   };
   const reviewGroupKeyForField = (field: string) => {
+    if (field === "category_id") {
+      return ["category-select", "category-confirm"].find((key) =>
+        pages.some((page) => page.groups.some((group) => group.key === key)),
+      );
+    }
     if (field.startsWith("attr-")) {
       return pages.some((page) => page.groups.some((group) => group.key === "vehicle-registration"))
         ? "vehicle-registration"
@@ -663,44 +679,56 @@ function NewListingPage() {
         : groupKey === "delivery" || groupKey === "location"
           ? ("location" as const)
           : ("details" as const);
-  const publishingRequirements: ComposerReviewStatus[] = [];
+  const publishingRequirements: (ComposerReviewStatus & ComposerRequirementTarget)[] = [];
   const requirementKeys = new Set<string>();
-  const addPublishingRequirement = (key: string, label: string, field: string) => {
+  let insertionOrder = 0;
+  const addPublishingRequirement = ({
+    key,
+    label,
+    field,
+    groupKey: explicitGroupKey,
+  }: {
+    key: string;
+    label: string;
+    field?: string;
+    groupKey?: string;
+  }) => {
     if (requirementKeys.has(key)) return;
     requirementKeys.add(key);
-    const groupKey = reviewGroupKeyForField(field);
+    const groupKey = explicitGroupKey ?? (field ? reviewGroupKeyForField(field) : undefined);
     publishingRequirements.push({
       key,
       label,
       classification: "requiredToPublish",
-      onAction: () =>
+      targetGroupKey: groupKey,
+      targetField: field,
+      insertionOrder: insertionOrder++,
+      onAction: () => {
+        setPublishingStatusOpen(false);
         editReviewSection(reviewSectionForGroup(groupKey), {
           field,
           groupKey,
-        }),
+        });
+      },
     });
   };
   for (const [field, error] of Object.entries(errors)) {
     if (typeof error?.message === "string") {
-      // eslint-disable-next-line react-hooks/refs -- runs only from review action callbacks
-      addPublishingRequirement(`form-${field}`, reviewFieldLabels[field] ?? field, field);
+      // eslint-disable-next-line react-hooks/refs -- reflesing skjer først i brukerens onAction
+      addPublishingRequirement({
+        key: `field-${field}`,
+        label: reviewFieldLabels[field] ?? field,
+        field,
+      });
     }
   }
   if (extraFieldError) {
-    // eslint-disable-next-line react-hooks/refs -- runs only from review action callbacks
-    addPublishingRequirement(
-      `extra-${extraFieldError.field}`,
-      reviewFieldLabels[extraFieldError.field] ?? extraFieldError.field,
-      extraFieldError.field,
-    );
-  }
-  const missingPublishingKeys = new Set<string>();
-  for (const requirement of publishingRequirements) {
-    const normalizedKey =
-      requirement.key.startsWith("form-") || requirement.key.startsWith("extra-")
-        ? `field-${requirement.key.slice(requirement.key.indexOf("-") + 1)}`
-        : requirement.key;
-    missingPublishingKeys.add(normalizedKey);
+    // eslint-disable-next-line react-hooks/refs -- reflesing skjer først i brukerens onAction
+    addPublishingRequirement({
+      key: `field-${extraFieldError.field}`,
+      label: reviewFieldLabels[extraFieldError.field] ?? extraFieldError.field,
+      field: extraFieldError.field,
+    });
   }
   const schemaResult = listingSchema.safeParse({
     title,
@@ -720,10 +748,23 @@ function NewListingPage() {
   if (!schemaResult.success) {
     for (const issue of schemaResult.error.issues) {
       const field = issue.path[0];
-      if (typeof field === "string") missingPublishingKeys.add(`field-${field}`);
+      if (typeof field !== "string") continue;
+      // eslint-disable-next-line react-hooks/refs -- reflesing skjer først i brukerens onAction
+      addPublishingRequirement({
+        key: `field-${field}`,
+        label: reviewFieldLabels[field] ?? field,
+        field,
+      });
     }
   }
-  for (const filter of missingFilters) missingPublishingKeys.add(`filter-${filter.key}`);
+  for (const filter of missingFilters) {
+    // eslint-disable-next-line react-hooks/refs -- reflesing skjer først i brukerens onAction
+    addPublishingRequirement({
+      key: `filter-${filter.key}`,
+      label: filter.label_nb,
+      field: `attr-${filter.key}`,
+    });
+  }
   const publishingValidationContext = {
     images,
     attributes,
@@ -751,17 +792,28 @@ function NewListingPage() {
     if (
       !result ||
       result === "SHOW_NO_IMAGE_DIALOG" ||
-      result === "SHOW_NO_PRICE_DIALOG" ||
       (typeof result === "string" && result === missingFilterMessage)
     )
       continue;
     if (typeof result === "object") {
-      missingPublishingKeys.add(`field-${result.field}`);
+      // eslint-disable-next-line react-hooks/refs -- reflesing skjer først i brukerens onAction
+      addPublishingRequirement({
+        key: `field-${result.field}`,
+        label: reviewFieldLabels[result.field] ?? result.field,
+        field: result.field,
+        groupKey: group.key,
+      });
     } else {
-      missingPublishingKeys.add(`group-${group.key}`);
+      // eslint-disable-next-line react-hooks/refs -- reflesing skjer først i brukerens onAction
+      addPublishingRequirement({
+        key: `group-${group.key}`,
+        label: result,
+        groupKey: group.key,
+      });
     }
   }
-  const missingPublishingCount = missingPublishingKeys.size;
+  const sortedPublishingRequirements = sortComposerRequirements(pages, publishingRequirements);
+  const missingPublishingCount = sortedPublishingRequirements.length;
   const publishingStatus =
     missingPublishingCount > 0
       ? `${missingPublishingCount} ${missingPublishingCount === 1 ? "opplysning mangler" : "opplysninger mangler"}`
@@ -916,7 +968,6 @@ function NewListingPage() {
 
   async function goToNextPage(options?: {
     skipImageCheck?: boolean;
-    skipPriceCheck?: boolean;
   }): Promise<ComposerNavigationResult> {
     setValidationError(null);
     const groups = currentPage?.groups ?? [];
@@ -993,18 +1044,6 @@ function NewListingPage() {
         setShowNoImageDialog(true);
         return "blocked";
       }
-      if (result === "SHOW_NO_PRICE_DIALOG") {
-        if (native) continue;
-        if (options?.skipPriceCheck) continue;
-        trackProductEvent("listing_creation_step_completed", {
-          kind: "sell",
-          action: "validation_prompt",
-          step: currentStepKey,
-          reason: "price",
-        });
-        setShowNoPriceDialog(true);
-        return "blocked";
-      }
       if (typeof result === "string") {
         trackProductEvent("listing_creation_step_completed", {
           kind: "sell",
@@ -1050,7 +1089,6 @@ function NewListingPage() {
 
   async function attemptNextPage(options?: {
     skipImageCheck?: boolean;
-    skipPriceCheck?: boolean;
   }): Promise<ComposerNavigationResult> {
     if (forwardAttemptPendingRef.current) return "busy";
     forwardAttemptPendingRef.current = true;
@@ -1186,11 +1224,23 @@ function NewListingPage() {
     : CONDITIONS.find((c) => c.value === condition)?.description;
 
   const parsedPriceNok =
-    typeof priceNok === "number" ? priceNok : priceNok !== "" ? Number(priceNok) : NaN;
+    typeof priceNok === "number"
+      ? priceNok
+      : typeof priceNok === "string" && priceNok.replace(/[^\d]/g, "")
+        ? Number(priceNok.replace(/[^\d]/g, ""))
+        : NaN;
+  const categorySlug = categoryId ? (categoriesById.get(categoryId)?.slug ?? null) : null;
+  const validPriceNok =
+    Number.isFinite(parsedPriceNok) && parsedPriceNok >= 0 ? parsedPriceNok : null;
+  const listingPreviewPriceNok = displayPriceNok({
+    category_slug: categorySlug,
+    price_nok: validPriceNok,
+    attributes,
+  });
   const previewPrice = isFree
-    ? "Gratis"
-    : !isNaN(parsedPriceNok) && parsedPriceNok >= 0
-      ? `${parsedPriceNok.toLocaleString("nb-NO")} kr`
+    ? "Gis bort"
+    : listingPreviewPriceNok != null
+      ? formatPrice({ price_nok: listingPreviewPriceNok, is_free: false })
       : null;
 
   const savedTimeLabel = lastSaved
@@ -1224,7 +1274,7 @@ function NewListingPage() {
       title,
       subtitle: subtitle || null,
       description,
-      priceNok: isFree ? null : typeof priceNok === "number" ? priceNok : null,
+      priceNok: isFree ? null : validPriceNok,
       isFree,
       condition: fieldGroupKeys.includes("condition") ? (condition ?? null) : null,
       city: city || null,
@@ -1385,6 +1435,7 @@ function NewListingPage() {
     maintenanceHistory,
 
     categories: pickableCategories,
+    categorySlug,
     categoryLabel,
     titleExample,
     setCategoryPickerOpen,
@@ -1452,6 +1503,7 @@ function NewListingPage() {
     turnstileToken,
     setTurnstileToken,
     onCancel: () => navigate({ to: "/" }),
+    onPreview: openPreview,
     onEditReviewSection: editReviewSection,
     improvementGroupKeys: fieldGroupsForKeys([
       ...fieldGroupKeys,
@@ -1465,8 +1517,10 @@ function NewListingPage() {
     ])
       .filter((group) => group.classification !== "requiredToPublish")
       .map((group) => ({ key: group.key, classification: group.classification })),
-    publishingRequirementErrors: publishingRequirements.map((requirement) => requirement.label),
-    publishingRequirements,
+    publishingRequirementErrors: sortedPublishingRequirements.map(
+      (requirement) => requirement.label,
+    ),
+    publishingRequirements: sortedPublishingRequirements,
   };
 
   const groups = currentPage?.groups ?? [];
@@ -1483,8 +1537,6 @@ function NewListingPage() {
   // wizard on this step — see applyCategorySelect/applySuggestedCategory —
   // so no separate Next/Back controls are needed or wanted here.
   const isCategoryConfirmPage = groups.length === 1 && groups[0].key === "category-confirm";
-  const showEarlyPreview =
-    !isLast && canPreviewDraft(pages, step, !!categoryId && title.trim().length >= 5);
   const nextGroups = pages[step]?.groups ?? [];
   function handleInvalidSubmit(fields: FieldErrors<ListingForm>) {
     const firstField = Object.keys(fields)[0] as keyof ListingForm | undefined;
@@ -1575,7 +1627,6 @@ function NewListingPage() {
           setTurnstileToken={setTurnstileToken}
           mutationIsPending={mutation.isPending}
           onCancel={() => navigate({ to: "/" })}
-          onPreview={openPreview}
         />
       )}
     </>
@@ -1682,19 +1733,49 @@ function NewListingPage() {
                   <h2 id="desktop-publishing-status-title" className="text-lg font-semibold">
                     Publiseringsstatus
                   </h2>
-                  <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
-                    {publishingStatus}
-                  </p>
+                  {missingPublishingCount > 0 ? (
+                    <button
+                      type="button"
+                      data-testid="publishing-status-button"
+                      aria-haspopup="dialog"
+                      onClick={() => setPublishingStatusOpen(true)}
+                      className="group flex min-h-14 w-full items-center gap-3 rounded-xl border border-border px-3 py-2 text-left transition-[background-color,border-color] duration-150 hover:border-primary/70 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span
+                          role="status"
+                          aria-live="polite"
+                          className="block text-sm font-medium text-foreground"
+                        >
+                          {publishingStatus}
+                        </span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                          Trykk for å se hva som mangler
+                        </span>
+                      </span>
+                      <ChevronRight
+                        className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5"
+                        aria-hidden
+                      />
+                    </button>
+                  ) : (
+                    <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
+                      {publishingStatus}
+                    </p>
+                  )}
                 </section>
                 <ReviewPreview
                   headingId="desktop-listing-preview-title"
                   images={images}
                   title={title}
                   subtitle={subtitle}
-                  previewPrice={previewPrice}
+                  priceNok={priceNok}
+                  isFree={isFree}
                   city={city}
                   postalCode={postalCode}
-                  categoryLabel={categoryLabel}
+                  categorySlug={categorySlug}
+                  attributes={attributes}
+                  onPreview={openPreview}
                 />
               </>
             ) : undefined
@@ -1714,16 +1795,6 @@ function NewListingPage() {
                     : undefined
                 }
               >
-                {showEarlyPreview && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="native-touch-target self-start"
-                    onClick={openPreview}
-                  >
-                    <Eye className="size-4" aria-hidden /> Forhåndsvis annonsen
-                  </Button>
-                )}
                 {groups.map((g) => (
                   <g.Component key={g.key} {...sharedProps} />
                 ))}
@@ -1734,16 +1805,6 @@ function NewListingPage() {
               data-testid={groups[0] ? `wizard-step-${groups[0].key}` : undefined}
               className={isNativeDescriptionSoloPage ? "flex flex-col" : "space-y-6"}
             >
-              {showEarlyPreview && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="self-start"
-                  onClick={openPreview}
-                >
-                  <Eye className="size-4" aria-hidden /> Forhåndsvis annonsen
-                </Button>
-              )}
               {groups.map((g) => (
                 <g.Component key={g.key} {...sharedProps} />
               ))}
@@ -1752,13 +1813,28 @@ function NewListingPage() {
         </ListingComposerShell>
       </form>
 
+      <ResponsiveOverlay open={publishingStatusOpen} onOpenChange={setPublishingStatusOpen}>
+        <ResponsiveOverlayContent
+          className="max-h-[85vh] overflow-y-auto sm:max-w-md"
+          expandable
+          onCloseAutoFocus={(event) => event.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>Opplysninger som mangler</DialogTitle>
+            <DialogDescription>
+              Fyll ut disse opplysningene før annonsen kan publiseres.
+            </DialogDescription>
+          </DialogHeader>
+          <ComposerReviewStatuses items={sortedPublishingRequirements} />
+        </ResponsiveOverlayContent>
+      </ResponsiveOverlay>
+
       <AlertDialog open={previewNudgeOpen} onOpenChange={setPreviewNudgeOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Vil du forhåndsvise annonsen før du publiserer?</AlertDialogTitle>
+            <AlertDialogTitle>Annonsen er ikke forhåndsvist ennå</AlertDialogTitle>
             <AlertDialogDescription>
-              Du har ikke sett hvordan annonsen din vil se ut ennå. Du kan forhåndsvise den nå,
-              eller publisere direkte.
+              Gå tilbake til gjennomgangen for å se forhåndsvisningen, eller publiser direkte.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1779,7 +1855,7 @@ function NewListingPage() {
             >
               Publiser likevel
             </AlertDialogAction>
-            <AlertDialogAction onClick={openPreview}>Forhåndsvis annonse</AlertDialogAction>
+            <AlertDialogCancel>Tilbake</AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -1910,28 +1986,6 @@ function NewListingPage() {
         }}
       />
 
-      {/* No-price confirmation dialog */}
-      <AlertDialog open={showNoPriceDialog} onOpenChange={setShowNoPriceDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Ingen pris satt</AlertDialogTitle>
-            <AlertDialogDescription>
-              Du har ikke satt en pris. Vil du legge til pris, eller publisere uten?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Legg til pris</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setShowNoPriceDialog(false);
-                void goToNextPage({ skipPriceCheck: true });
-              }}
-            >
-              Fortsett uten pris
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
       <AlertDialog open={draftDiscardConfirmOpen} onOpenChange={setDraftDiscardConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

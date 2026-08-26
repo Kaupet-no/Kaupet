@@ -6,6 +6,7 @@ import {
   composerForwardStep,
   composerSwipeDirection,
   reviewSectionSteps,
+  sortComposerRequirements,
 } from "./composer-navigation";
 
 describe("composerForwardStep", () => {
@@ -70,6 +71,41 @@ describe("composerflyt fra preview og review", () => {
       first: 2,
       last: 2,
     });
+  });
+});
+
+describe("sortComposerRequirements", () => {
+  it("sorterer mangler etter side og feltgruppe i veiviseren", () => {
+    const pages = [
+      { groups: [{ key: "category", fieldsToValidate: ["category_id"] }] },
+      { groups: [{ key: "details", fieldsToValidate: ["description", "price_nok"] }] },
+    ];
+    const requirements = [
+      {
+        key: "price",
+        targetGroupKey: "details",
+        targetField: "price_nok",
+        insertionOrder: 0,
+      },
+      {
+        key: "category",
+        targetGroupKey: "category",
+        targetField: "category_id",
+        insertionOrder: 1,
+      },
+      {
+        key: "description",
+        targetGroupKey: "details",
+        targetField: "description",
+        insertionOrder: 2,
+      },
+    ];
+
+    expect(sortComposerRequirements(pages, requirements).map((item) => item.key)).toEqual([
+      "category",
+      "description",
+      "price",
+    ]);
   });
 });
 

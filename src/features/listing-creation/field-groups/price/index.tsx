@@ -172,9 +172,13 @@ export function Price({
           }
         />
       </div>
-      <div className={`flex items-end gap-3 ${heroSize ? "flex-wrap" : ""}`}>
+      <div
+        className={
+          heroSize ? "grid w-full grid-cols-1 gap-3 sm:grid-cols-2" : "flex w-full items-end gap-3"
+        }
+      >
         <div className="space-y-1">
-          <div className={`relative ${heroSize ? "max-w-[280px]" : "max-w-[200px]"}`}>
+          <div className={heroSize ? "relative w-full" : "relative max-w-[200px]"}>
             <Input
               id="price_nok"
               type="text"
@@ -182,7 +186,7 @@ export function Price({
               placeholder="0"
               disabled={isFree}
               className={
-                heroSize ? "h-16 pr-12 text-right text-4xl font-semibold" : "pr-9 text-right"
+                heroSize ? "h-16 w-full pr-12 text-right text-4xl font-semibold" : "pr-9 text-right"
               }
               aria-invalid={!!errors.price_nok}
               aria-describedby={errors.price_nok ? "price-error" : undefined}
@@ -229,7 +233,7 @@ export function Price({
               disabled
               className={
                 heroSize
-                  ? "h-16 max-w-[280px] text-right text-2xl text-muted-foreground"
+                  ? "h-16 w-full text-right text-2xl text-muted-foreground"
                   : "max-w-[200px] text-muted-foreground"
               }
               value={`${totalprisKr.toLocaleString("nb-NO")} kr`}

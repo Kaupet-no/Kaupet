@@ -172,12 +172,8 @@ export function Price({
           }
         />
       </div>
-      <div
-        className={
-          heroSize ? "grid w-full grid-cols-1 gap-3 sm:grid-cols-2" : "flex w-full items-end gap-3"
-        }
-      >
-        <div className="space-y-1">
+      <div className={heroSize ? "flex w-full flex-col gap-3" : "flex w-full items-end gap-3"}>
+        <div className="w-full space-y-1">
           <div className={heroSize ? "relative w-full" : "relative max-w-[200px]"}>
             <Input
               id="price_nok"
@@ -219,7 +215,7 @@ export function Price({
           </div>
         </div>
         {isVehicle && totalprisKr != null && (
-          <div className="space-y-1">
+          <div className="w-full space-y-1">
             <Label
               htmlFor="price-visible-in-listing"
               className={

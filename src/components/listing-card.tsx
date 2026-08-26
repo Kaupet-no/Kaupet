@@ -33,7 +33,9 @@ function partFitmentLabel(attributes: Record<string, unknown> | null | undefined
       ? attributes[PART_FITMENT_VEHICLE_IDS_KEY].length
       : 0;
     return count > 0
-      ? `Selger oppgir ${count} kompatibel${count === 1 ? "" : "e"} bilmodell${count === 1 ? "" : "er"}`
+      ? count === 1
+        ? "Selger oppgir 1 kompatibel bilmodell"
+        : `Selger oppgir ${count} kompatible bilmodeller`
       : "Selger oppgir kompatibilitet";
   }
   return null;

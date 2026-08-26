@@ -1,7 +1,11 @@
 import { describeAttrValue } from "@/components/active-filters";
 import type { LocationValue } from "@/components/location-filter";
 import type { TermGroup } from "@/lib/term-groups";
-import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
+import {
+  PART_FITMENT_VEHICLE_IDS_KEY,
+  type AttributeFilterValue,
+  type CategoryFilter,
+} from "@/lib/category-filters";
 
 type SearchLike = {
   q: string;
@@ -74,7 +78,6 @@ export function buildActiveFilterItems(params: {
       });
     }
   }
-
   for (const [key, value] of Object.entries(attrValues)) {
     const filter = attrFilters.find((f) => f.key === key);
     if (!filter) continue;
@@ -83,7 +86,10 @@ export function buildActiveFilterItems(params: {
         const opt = filter.options?.find((o) => o.value === v);
         items.push({
           key: `${key}:${v}`,
-          label: `${filter.label_nb}: ${opt?.label_nb ?? v}`,
+          label:
+            key === PART_FITMENT_VEHICLE_IDS_KEY
+              ? `${filter.label_nb}: valgt bilmodell`
+              : `${filter.label_nb}: ${opt?.label_nb ?? v}`,
           onRemove: () => onRemoveAttr?.(key, v),
         });
       }

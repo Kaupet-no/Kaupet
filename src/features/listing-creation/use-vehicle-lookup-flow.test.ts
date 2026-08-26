@@ -44,6 +44,7 @@ const lookupResult = {
   classification_code: "M1",
   avgiftsklasse_code: "1",
   body_type_hint: null,
+  body_type: "varebil",
   sleeping_places: null,
   fuel_type: "Bensin",
   weight_kg: 1300,
@@ -59,7 +60,7 @@ const lookupResult = {
   max_total_weight_kg: null,
   length_m: null,
   seats: 5,
-  imported_used: null,
+  imported_used: false,
   first_registration_date: null,
   cylinders: null,
   engine_displacement_cc: null,
@@ -160,6 +161,8 @@ describe("useVehicleLookupFlow", () => {
         model: "Corolla",
         fuel_type: "Bensin",
         weight_kg: 1300,
+        body_type: "varebil",
+        imported_used: false,
       }),
     );
     expect(setCategoryTouchedManually).toHaveBeenCalledWith(true);

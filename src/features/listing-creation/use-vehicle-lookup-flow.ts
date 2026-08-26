@@ -137,6 +137,7 @@ export function useVehicleLookupFlow(params: {
     if (lookup.transmission) next.transmission = lookup.transmission;
     const color = guessColorOption(lookup.color);
     if (color) next.color = color;
+    if (lookup.body_type) next.body_type = lookup.body_type;
     if (lookup.next_eu_control) next.next_eu_control = lookup.next_eu_control;
     if (lookup.power_hk != null) next.power_hk = lookup.power_hk;
     if (lookup.drive_type) next.drive_type = lookup.drive_type;

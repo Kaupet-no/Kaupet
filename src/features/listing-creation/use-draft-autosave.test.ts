@@ -8,8 +8,10 @@ vi.mock("@/lib/toast", () => ({
 }));
 
 const saveDraftListingMock = vi.fn();
+const discardDraftListingMock = vi.fn();
 vi.mock("@/lib/listings.functions", () => ({
   saveDraftListing: (...args: unknown[]) => saveDraftListingMock(...args),
+  discardDraftListing: (...args: unknown[]) => discardDraftListingMock(...args),
 }));
 
 vi.mock("@/lib/vehicle/vehicle-title", () => ({
@@ -51,6 +53,7 @@ const baseFields = {
 beforeEach(() => {
   localStorage.clear();
   saveDraftListingMock.mockReset();
+  discardDraftListingMock.mockReset();
   loadDraftImagesMock.mockReset().mockResolvedValue([]);
   saveDraftImagesMock.mockClear();
   clearDraftImagesMock.mockClear();
@@ -161,18 +164,50 @@ describe("useDraftAutosave", () => {
     expect(localStorage.getItem(DRAFT_ID_KEY)).toBeNull();
   });
 
-  it("discardLocalDraftBanner clears the localStorage draft and hasDraftData, but keeps the draft id", () => {
+  it("discards local and owned server draft state", async () => {
     localStorage.setItem(DRAFT_KEY, JSON.stringify({ title: "Noe", saved_at: Date.now() }));
-    localStorage.setItem(DRAFT_ID_KEY, "keep-me");
+    localStorage.setItem(DRAFT_ID_KEY, "00000000-0000-4000-8000-000000000001");
     const { result } = renderHook(() => useDraftAutosave(baseFields));
 
-    expect(result.current.hasDraftData).not.toBeNull();
-
-    act(() => result.current.discardLocalDraftBanner());
+    await waitFor(() => expect(result.current.hasDraftData).not.toBeNull());
+    await act(() => result.current.discardDraft());
 
     expect(result.current.hasDraftData).toBeNull();
     expect(localStorage.getItem(DRAFT_KEY)).toBeNull();
-    expect(localStorage.getItem(DRAFT_ID_KEY)).toBe("keep-me");
+    expect(localStorage.getItem(DRAFT_ID_KEY)).toBeNull();
+    expect(clearDraftImagesMock).toHaveBeenCalled();
+    expect(discardDraftListingMock).toHaveBeenCalledWith({
+      data: { id: "00000000-0000-4000-8000-000000000001" },
+    });
+  });
+
+  it("keeps local cleanup when server draft deletion fails", async () => {
+    discardDraftListingMock.mockRejectedValue(new Error("network down"));
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ title: "Noe", saved_at: Date.now() }));
+    localStorage.setItem(DRAFT_ID_KEY, "00000000-0000-4000-8000-000000000001");
+    const { result } = renderHook(() => useDraftAutosave(baseFields));
+
+    await waitFor(() => expect(result.current.hasDraftData).not.toBeNull());
+    await act(() => result.current.discardDraft());
+
+    expect(localStorage.getItem(DRAFT_KEY)).toBeNull();
+    expect(localStorage.getItem(DRAFT_ID_KEY)).toBeNull();
+    expect(result.current.draftSaveError).toBe(true);
+  });
+
+  it("does not overwrite a pending restore draft with the new listing title", async () => {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({ title: "Gammel tittel", saved_at: Date.now() }),
+    );
+    localStorage.setItem(DRAFT_ID_KEY, "00000000-0000-4000-8000-000000000001");
+    const { result } = renderHook(() => useDraftAutosave({ ...baseFields, title: "Ny tittel" }));
+
+    await waitFor(() => expect(result.current.hasDraftData).not.toBeNull());
+    const id = await act(() => result.current.saveDraftToSupabase());
+
+    expect(id).toBeNull();
+    expect(saveDraftListingMock).not.toHaveBeenCalled();
   });
 
   it("restoreDraft applies saved fields onto the form and clears hasDraftData", async () => {

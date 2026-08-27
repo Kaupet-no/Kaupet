@@ -27,6 +27,7 @@ export function ListingComposerShell({
   footer,
   firstStep,
   contentClassName,
+  aside,
 }: {
   /** Annonsens egen tittel, oppgitt på landingsskjermen — vist gjennom hele
    * wizarden så brukeren ser hva de holder på med, i stedet for et eget
@@ -58,6 +59,9 @@ export function ListingComposerShell({
   footer: ReactNode;
   firstStep: boolean;
   contentClassName?: string;
+  /** Desktop-only secondary panel. It is deliberately rendered outside the
+   * content column so mobile/native keep the existing one-column composer. */
+  aside?: ReactNode;
 }) {
   const pageHeadingRef = useRef<HTMLHeadingElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -69,6 +73,7 @@ export function ListingComposerShell({
     !!errorSummary &&
     validationAttempt > 0 &&
     validationAttempt !== dismissedValidationAttempt;
+  const showAside = !native && !!aside;
 
   const ensureFocusedFieldVisible = useCallback(() => {
     if (!native) return;
@@ -120,7 +125,7 @@ export function ListingComposerShell({
   return (
     <div
       className={cn(
-        "mx-auto max-w-3xl px-4 pt-6 pb-4",
+        "mx-auto w-full max-w-[1120px] px-4 pt-6 pb-4",
         native && "native-composer-shell flex flex-col",
       )}
     >
@@ -158,69 +163,92 @@ export function ListingComposerShell({
       <ComposerErrorSummary message={errorSummary ?? null} />
 
       <div
-        ref={scrollContainerRef}
-        data-composer-scroll={native || undefined}
-        data-testid={`composer-page-${pageKey}`}
-        aria-invalid={showValidationFeedback || undefined}
+        data-composer-layout={showAside ? "split" : "single-column"}
         className={cn(
-          "mt-8 rounded-2xl pb-24",
-          native &&
-            "native-composer-card overflow-y-auto overscroll-contain border border-border bg-card",
-          showValidationFeedback &&
-            (validationAttempt % 2 === 0
-              ? "composer-validation-error-even"
-              : "composer-validation-error-odd"),
-          contentClassName,
-        )}
-        onAnimationEndCapture={() => {
-          setDismissedValidationAttempt(validationAttempt);
-        }}
-        onInputCapture={() => setDismissedValidationAttempt(validationAttempt)}
-      >
-        <h2 ref={pageHeadingRef} tabIndex={-1} className="sr-only">
-          {pageTitle}
-        </h2>
-        {children}
-      </div>
-
-      <div
-        className={cn(
-          native
-            ? "px-safe pb-safe shrink-0 border-t border-border bg-background/95 pt-3 backdrop-blur"
-            : "flex flex-wrap items-center gap-3 border-t border-border pt-6",
-          !native && (firstStep ? "justify-end" : "justify-between"),
+          showAside
+            ? "grid min-w-0 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] lg:items-start lg:gap-10 lg:mt-2"
+            : "contents",
         )}
       >
-        {native ? (
-          <div className="mx-auto grid w-full max-w-lg grid-cols-[1fr_auto_1fr] items-center gap-3">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={onBack}
-              className={cn(
-                "min-h-12 justify-self-start px-2",
-                (firstStep || !onBack) && "invisible",
-              )}
-              aria-hidden={firstStep || !onBack || undefined}
-              tabIndex={firstStep || !onBack ? -1 : undefined}
-            >
-              <ChevronLeft className="size-5" aria-hidden />
-              Forrige
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="icon"
-              onClick={onCancel}
-              className="size-14 rounded-full"
-              aria-label="Avbryt annonseopprettelse"
-            >
-              <X className="size-6" aria-hidden />
-            </Button>
-            <div className="min-w-0 justify-self-end">{footer}</div>
+        <div className={showAside ? "min-w-0" : "contents"}>
+          <div
+            ref={scrollContainerRef}
+            data-composer-scroll={native || undefined}
+            data-testid={`composer-page-${pageKey}`}
+            aria-invalid={showValidationFeedback || undefined}
+            className={cn(
+              "mt-8 rounded-2xl pb-24",
+              native &&
+                "native-composer-card overflow-y-auto overscroll-contain border border-border bg-card",
+              showValidationFeedback &&
+                (validationAttempt % 2 === 0
+                  ? "composer-validation-error-even"
+                  : "composer-validation-error-odd"),
+              contentClassName,
+            )}
+            onAnimationEndCapture={() => {
+              setDismissedValidationAttempt(validationAttempt);
+            }}
+            onInputCapture={() => setDismissedValidationAttempt(validationAttempt)}
+          >
+            <h2 ref={pageHeadingRef} tabIndex={-1} className="sr-only">
+              {pageTitle}
+            </h2>
+            {children}
           </div>
-        ) : (
-          footer
+
+          <div
+            data-composer-footer={native ? "native" : "web"}
+            className={cn(
+              "[&_button]:min-h-12 [&_button]:min-w-12",
+              native
+                ? "px-safe pb-safe shrink-0 border-t border-border bg-background/95 pt-3 backdrop-blur"
+                : "sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-3 border-t border-border bg-background/95 px-4 py-3 backdrop-blur lg:static lg:z-auto lg:mx-0 lg:bg-transparent lg:px-0 lg:pb-0 lg:pt-6 lg:backdrop-blur-none",
+              !native && (firstStep ? "justify-end" : "justify-between"),
+            )}
+          >
+            {native ? (
+              <div className="mx-auto grid w-full max-w-lg grid-cols-[1fr_auto_1fr] items-center gap-3">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={onBack}
+                  className={cn(
+                    "min-h-12 justify-self-start px-2",
+                    (firstStep || !onBack) && "invisible",
+                  )}
+                  aria-hidden={firstStep || !onBack || undefined}
+                  tabIndex={firstStep || !onBack ? -1 : undefined}
+                >
+                  <ChevronLeft className="size-5" aria-hidden />
+                  Forrige
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="icon"
+                  onClick={onCancel}
+                  className="size-14 rounded-full"
+                  aria-label="Avbryt annonseopprettelse"
+                >
+                  <X className="size-6" aria-hidden />
+                </Button>
+                <div className="min-w-0 justify-self-end">{footer}</div>
+              </div>
+            ) : (
+              footer
+            )}
+          </div>
+        </div>
+
+        {showAside && aside && (
+          <aside
+            aria-label="Forhåndsvisning og publiseringsstatus"
+            data-composer-aside="desktop"
+            className="hidden min-w-0 space-y-6 rounded-2xl border border-border bg-background p-5 lg:sticky lg:top-24 lg:block"
+          >
+            {aside}
+          </aside>
         )}
       </div>
     </div>

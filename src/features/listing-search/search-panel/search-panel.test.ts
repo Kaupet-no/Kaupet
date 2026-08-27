@@ -7,10 +7,11 @@ import { searchDraftMatchesApplied } from "./search-panel-utils";
 
 function results(): SearchPanelResultsContext {
   return {
-    q: "",
-    value: defaultAdvancedSearchValue(),
-    attributeValues: {
-      brand: { kind: "multiselect", values: ["Volvo"] },
+    applied: {
+      value: defaultAdvancedSearchValue(),
+      attributes: {
+        brand: { kind: "multiselect", values: ["Volvo"] },
+      },
     },
     onApply: () => {},
     resultCount: 42,
@@ -22,10 +23,11 @@ describe("searchDraftMatchesApplied", () => {
     const applied = results();
     expect(
       searchDraftMatchesApplied(
-        { ...applied.value },
-        { brand: { kind: "multiselect", values: ["Volvo"] } },
-        applied.value,
-        applied.attributeValues ?? {},
+        {
+          value: { ...applied.applied.value },
+          attributes: { brand: { kind: "multiselect", values: ["Volvo"] } },
+        },
+        applied.applied,
       ),
     ).toBe(true);
   });
@@ -34,10 +36,11 @@ describe("searchDraftMatchesApplied", () => {
     const applied = results();
     expect(
       searchDraftMatchesApplied(
-        { ...applied.value, includeFree: false },
-        { brand: { kind: "multiselect", values: ["Volvo"] } },
-        applied.value,
-        applied.attributeValues ?? {},
+        {
+          value: { ...applied.applied.value, includeFree: false },
+          attributes: { brand: { kind: "multiselect", values: ["Volvo"] } },
+        },
+        applied.applied,
       ),
     ).toBe(false);
   });

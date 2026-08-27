@@ -37,10 +37,28 @@ export function ResponsiveOverlayContent({
   children,
   expandable,
   initialSnapPoint,
+  onOpenAutoFocus,
+  onCloseAutoFocus,
   ...props
 }: React.ComponentPropsWithoutRef<typeof DialogContent> &
   Pick<SheetContentProps, "expandable" | "initialSnapPoint">) {
   const phone = useFormFactor() === "phone";
+  const returnFocusRef = React.useRef<HTMLElement | null>(null);
+  const focusProps = {
+    onOpenAutoFocus: (event: Event) => {
+      returnFocusRef.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      onOpenAutoFocus?.(event);
+    },
+    onCloseAutoFocus: (event: Event) => {
+      onCloseAutoFocus?.(event);
+      if (!event.defaultPrevented && returnFocusRef.current) {
+        event.preventDefault();
+        returnFocusRef.current.focus();
+      }
+    },
+  };
+
   if (phone) {
     return (
       <SheetContent
@@ -48,6 +66,7 @@ export function ResponsiveOverlayContent({
         className={cn("rounded-t-2xl", className)}
         expandable={expandable}
         initialSnapPoint={initialSnapPoint}
+        {...focusProps}
         {...props}
       >
         {children}
@@ -55,7 +74,7 @@ export function ResponsiveOverlayContent({
     );
   }
   return (
-    <DialogContent className={className} {...props}>
+    <DialogContent className={className} {...focusProps} {...props}>
       {children}
     </DialogContent>
   );

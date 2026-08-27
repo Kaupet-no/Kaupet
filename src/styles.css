@@ -106,6 +106,14 @@
   --border: oklch(0.88 0.02 80);
   --input: oklch(0.9 0.018 80);
   --ring: oklch(0.35 0.06 160);
+  /* Semantic density tiers for the editorial, task, and data surfaces. Keep
+     spacing in the existing token layer so web and native use the same rhythm. */
+  --density-editorial-block: clamp(2.5rem, 7vw, 5rem);
+  --density-editorial-gap: 1.5rem;
+  --density-task-block: 1rem;
+  --density-task-gap: 0.75rem;
+  --density-data-block: 0.75rem;
+  --density-data-gap: 0.5rem;
 }
 
 .dark {
@@ -173,6 +181,20 @@
     letter-spacing: -0.01em;
   }
 }
+/* The three density tiers keep visual hierarchy explicit without introducing
+   a second component or token system. */
+.density-editorial {
+  padding-block: var(--density-editorial-block);
+  gap: var(--density-editorial-gap);
+}
+.density-task {
+  padding-block: var(--density-task-block);
+  gap: var(--density-task-gap);
+}
+.density-data {
+  padding-block: var(--density-data-block);
+  gap: var(--density-data-gap);
+}
 
 /* Utility: top padding that respects the device safe area (notch / dynamic island). */
 .pt-safe {
@@ -224,13 +246,14 @@
 
 .native .native-composer-shell {
   --composer-motion-card: 240ms;
-  --composer-motion-error: 500ms;
+  --composer-motion-error: 200ms;
   height: var(--vvh, 100dvh);
   max-height: var(--vvh, 100dvh);
   overflow: hidden;
 }
 
 .native .native-composer-motion {
+  transition-property: transform, opacity;
   transition-duration: var(--composer-motion-card);
   transition-timing-function: ease-out;
 }
@@ -412,16 +435,51 @@
 }
 
 .composer-validation-error-even {
-  animation: composer-validation-error-even var(--composer-motion-error, 500ms) ease-out;
+  animation: composer-validation-error-even var(--composer-motion-error, 200ms) ease-out;
 }
 
 .composer-validation-error-odd {
-  animation: composer-validation-error-odd var(--composer-motion-error, 500ms) ease-out;
+  animation: composer-validation-error-odd var(--composer-motion-error, 200ms) ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .native .native-composer-motion {
+    transition: none;
+  }
   .composer-validation-error-even,
   .composer-validation-error-odd {
     animation: none;
+  }
+}
+
+/* Native boot splash overlay, shown only inside the Capacitor WebView while
+   public/boot.js decides whether to add the "native-boot" class. */
+#native-boot-splash {
+  display: none;
+}
+.native-boot #native-boot-splash {
+  display: flex;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+  background: #fbf9f3;
+  transition: opacity 200ms ease-out;
+}
+#native-boot-splash img {
+  width: 64px;
+  height: 64px;
+  animation: native-boot-pulse 1.6s ease-in-out infinite;
+}
+@keyframes native-boot-pulse {
+  0%,
+  100% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
   }
 }

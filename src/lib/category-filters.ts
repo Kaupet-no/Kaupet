@@ -23,6 +23,14 @@ export const VEHICLE_EQUIPMENT_FILTER_KEYS = [
   "utstyr_annet",
 ] as const;
 
+/** Attributes stored on bildelannonser for seller-declared fitment. */
+export const PART_FITMENT_SCOPE_KEY = "part_fitment_scope";
+export const PART_FITMENT_VEHICLE_IDS_KEY = "part_fitment_vehicle_ids";
+export const PART_FITMENT_YEAR_KEY = "part_fitment_year";
+export const PART_FITMENT_YEAR_FROM_KEY = "part_fitment_year_from";
+export const PART_FITMENT_YEAR_TO_KEY = "part_fitment_year_to";
+export const PART_NUMBER_KEY = "part_number";
+export const PART_BRAND_KEY = "part_brand";
 export type FilterType =
   | "select"
   | "multiselect"
@@ -58,9 +66,19 @@ export const NUMERIC_DIGIT_CAPS: Record<string, number> = {
   sleeping_places: 2,
   seats: 3,
   width_cm: 4,
+  height_cm: 4,
   depth_cm: 4,
+  length_cm: 4,
   weight_kg: 7,
 };
+
+/** Dimension values describe a physical size and must be greater than zero. */
+export const POSITIVE_NUMERIC_ATTRIBUTE_KEYS: readonly string[] = [
+  "width_cm",
+  "height_cm",
+  "depth_cm",
+  "length_cm",
+];
 
 /** For brand_select filters, `unit` stores which vehicle_brands.category_group to read from. */
 export type VehicleBrandGroup =
@@ -245,6 +263,12 @@ export function getMissingRequiredFilters(
   return filters.filter((f) => {
     const v = attributes[f.key];
     if (v === undefined || v === null) return true;
+    if (
+      POSITIVE_NUMERIC_ATTRIBUTE_KEYS.includes(f.key) &&
+      (typeof v !== "number" || !Number.isFinite(v) || v <= 0)
+    ) {
+      return true;
+    }
     if (typeof v === "string") return v.trim() === "";
     if (Array.isArray(v)) return v.length === 0;
     return false;
@@ -415,10 +439,17 @@ export function applyAttributeFilters<T>(
         q = q.contains("attributes", { [key]: f.value });
         break;
       case "multiselect":
-        // Match listings whose attribute equals any of the selected values.
+        // Part fitment is stored as an array of model IDs. The search-side
+        // control intentionally selects one buyer vehicle, so JSONB contains
+        // is the exact predicate needed here; ordinary filters keep their
+        // existing scalar-any behavior.
         if (f.values.length > 0) {
-          const ors = f.values.map((v) => `attributes->>${key}.eq.${v}`).join(",");
-          q = q.or(ors);
+          if (key === PART_FITMENT_VEHICLE_IDS_KEY) {
+            q = q.contains("attributes", { [key]: f.values });
+          } else {
+            const ors = f.values.map((v) => `attributes->>${key}.eq.${v}`).join(",");
+            q = q.or(ors);
+          }
         }
         break;
       case "range":

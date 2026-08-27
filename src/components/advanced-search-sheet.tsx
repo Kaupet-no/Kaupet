@@ -1,10 +1,11 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { X, Plus, Save, Search as SearchIcon, RotateCcw } from "lucide-react";
+import { ChevronDown, X, Plus, Save, Search as SearchIcon, RotateCcw } from "lucide-react";
 
 import { PushEnablePrompt } from "@/components/push-enable-prompt";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -15,22 +16,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
 import { LocationPicker, RadiusPicker } from "@/components/location-filter";
 import { ModeToggle } from "@/components/search-term-mode-toggle";
 import { TermGroupEditor } from "@/components/term-group-editor";
@@ -121,26 +108,21 @@ export function AdvancedSearchSheet({
 
   return (
     <>
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
-          <SheetHeader className="border-b border-border px-5 py-4">
-            <SheetTitle>Avansert søk</SheetTitle>
-            <SheetDescription>
+      <ResponsiveOverlay open={open} onOpenChange={onOpenChange}>
+        <ResponsiveOverlayContent
+          className="flex max-h-[90vh] w-full flex-col gap-0 p-0 sm:max-w-md"
+          expandable
+        >
+          <DialogHeader className="border-b border-border px-5 py-4">
+            <DialogTitle>Avansert søk</DialogTitle>
+            <DialogDescription>
               Kombiner flere kriterier for å finne akkurat det du leter etter.
-            </SheetDescription>
-          </SheetHeader>
-
+            </DialogDescription>
+          </DialogHeader>
           <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
             {/* Søkeord */}
             <section className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <Label className="text-sm font-medium">Søkeord</Label>
-                <ModeToggle
-                  value={v.qMode}
-                  onChange={(m) => setV({ ...v, qMode: m })}
-                  labels={["Alle ord", "Minst ett"]}
-                />
-              </div>
+              <Label className="text-sm font-medium">Søkeord</Label>
               <div className="flex gap-2">
                 <Input
                   value={termDraft}
@@ -179,14 +161,42 @@ export function AdvancedSearchSheet({
               )}
             </section>
 
-            {/* Flere søkelinjer (inkluder/ekskluder) */}
-            <section className="space-y-2">
-              <Label className="text-sm font-medium">Flere søkelinjer</Label>
-              <TermGroupEditor
-                groups={v.extraGroups}
-                onChange={(extraGroups) => setV({ ...v, extraGroups })}
-              />
-            </section>
+            <Collapsible
+              key={v.qMode === "any" || v.extraGroups.length > 0 ? "active" : "default"}
+              defaultOpen={v.qMode === "any" || v.extraGroups.length > 0}
+            >
+              <CollapsibleTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="group gap-1 px-0 text-primary"
+                >
+                  Presist søk
+                  <ChevronDown
+                    className="size-4 transition-transform group-data-[state=open]:rotate-180"
+                    aria-hidden
+                  />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-4 rounded-xl border border-border p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-sm font-medium">Søkeordmodus</Label>
+                  <ModeToggle
+                    value={v.qMode}
+                    onChange={(qMode) => setV({ ...v, qMode })}
+                    labels={["Alle ord", "Minst ett"]}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Flere søkelinjer</Label>
+                  <TermGroupEditor
+                    groups={v.extraGroups}
+                    onChange={(extraGroups) => setV({ ...v, extraGroups })}
+                  />
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
 
             {/* Kategori */}
             <CategoryPicker
@@ -271,7 +281,7 @@ export function AdvancedSearchSheet({
             </section>
           </div>
 
-          <SheetFooter className="flex-row items-center justify-between gap-2 border-t border-border px-5 py-3">
+          <DialogFooter className="flex-row items-center justify-between gap-2 border-t border-border px-5 py-3">
             <Button type="button" variant="ghost" size="sm" onClick={handleReset}>
               <RotateCcw className="size-4" /> Nullstill
             </Button>
@@ -285,9 +295,9 @@ export function AdvancedSearchSheet({
                 <SearchIcon className="size-4" /> {applyLabel}
               </Button>
             </div>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+          </DialogFooter>
+        </ResponsiveOverlayContent>
+      </ResponsiveOverlay>
 
       {!hideSaveAction && (
         <SaveSearchDialog
@@ -712,8 +722,8 @@ export function SaveSearchDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+    <ResponsiveOverlay open={open} onOpenChange={onOpenChange}>
+      <ResponsiveOverlayContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Lagre søk</DialogTitle>
           <DialogDescription>
@@ -753,7 +763,7 @@ export function SaveSearchDialog({
             {saving ? "Lagrer…" : "Lagre"}
           </Button>
         </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveOverlayContent>
+    </ResponsiveOverlay>
   );
 }

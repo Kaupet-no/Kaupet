@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Info } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { prefetchCategorySuggestion } from "@/lib/category-suggestion.functions";
 
@@ -47,8 +48,8 @@ export function IntentTitleLanding({
       setError(`Tittelen må være minst ${minTitleLength(intent)} tegn`);
       return;
     }
-    // Kicks off the (cold-start-prone) AI category call now rather than
-    // waiting for the wizard route to mount — see prefetchCategorySuggestion.
+    // Starts the category call before the wizard mounts so the result is ready
+    // when the user reaches the confirmation step.
     prefetchCategorySuggestion(trimmed);
     if (intent === "buy") {
       void navigate({ to: "/ny-ok-annonse", search: { title: trimmed } });
@@ -99,7 +100,11 @@ export function IntentTitleLanding({
         <span>:</span>
       </div>
       <div className="w-full space-y-1.5">
+        <Label htmlFor="listing-title" className="block text-left text-sm font-medium">
+          Tittel på annonsen
+        </Label>
         <Input
+          id="listing-title"
           autoFocus
           value={title}
           onChange={(e) => {
@@ -108,22 +113,20 @@ export function IntentTitleLanding({
           }}
           placeholder="Navn eller beskrivelse av objektet"
           className="h-12 text-center text-lg"
-          aria-label="Tittel på annonsen"
           aria-invalid={!!error}
         />
         {error && <p className="text-center text-xs text-destructive">{error}</p>}
-        <p className="text-center text-xs text-muted-foreground">
-          Dette blir tittelen på annonsen din.{" "}
-          <span className="group relative inline-block cursor-help">
-            *
-            <span
-              className="pointer-events-none absolute bottom-full left-1/2 z-[10001] mb-1.5 w-56 -translate-x-1/2 rounded-md border bg-popover px-2.5 py-1.5 text-xs text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100"
-              role="tooltip"
-            >
-              Gjelder ikke for annonser i Bil og MC eller Båt, der tittel genereres automatisk
-            </span>
-          </span>
-        </p>
+        <div className="flex items-center justify-center gap-1 text-center text-xs text-muted-foreground">
+          <span>Dette blir tittelen på annonsen din</span>
+          <button
+            type="button"
+            className="native-touch-target inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            aria-label="Informasjon om automatisk tittel"
+            title="For Bil, MC og Båt genereres tittelen automatisk"
+          >
+            <Info className="size-4" aria-hidden="true" />
+          </button>
+        </div>
       </div>
       <Button type="submit" size="lg" className="w-full">
         Fortsett

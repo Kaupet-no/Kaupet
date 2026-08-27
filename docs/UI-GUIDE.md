@@ -244,6 +244,32 @@ lokal variant av valgflaten per filter.
   En gesture, inkludert swipe for fjerning, er aldri eneste måte å gjøre en
   handling på.
 
+## Visuell rytme og konsolidering
+
+Bruk de tre eksisterende tetthetsnivåene fra `src/styles.css` når en flate
+trenger en tydeligere rytme:
+
+- `density-editorial`: hero, overskrift og første søkehandling. Brukes én gang
+  per inngangsflate og gir mest luft.
+- `density-task`: søk, filter og composeroppgaver. Bruk luft og tynne regler
+  før enda en kortflate.
+- `density-data`: pris, metadata, proveniens og kompakte faktalister. La
+  typografi og avstand gjøre grupperingen.
+
+Visuelt uttrykk:
+
+- Bruk sammenhengende papir-/surface-flater i stedet for kort inni kort.
+- En annonsekortflate har én primærhandling, pris i `font-display
+text-primary`, og metadata under tittelen; ikke vis selgerinterne
+  visningstall til kjøpere.
+- Proveniens skal være tekstlig og konkret: «Kjøretøydata fra Statens
+  vegvesen», «Opplysninger gitt av selger» eller «Kontoopplysninger fra
+  Kaupet». Ikke bruk en generell trygghetsbadge.
+- Kategoriens farge er en lokal aksent på valgt ikon eller overskrift. Den skal
+  ikke fargelegge hele heroen eller resultatflaten.
+- Nativeforsiden skal vise søk og første troverdige annonsekort innen første
+  skjermbilde. Behold luft, men ikke bruk hero-høyde som dekorasjon.
+
 ## Skjemavalidering
 
 - `react-hook-form` + `zod` via `zodResolver`. Se `src/routes/auth.tsx` for standardoppsett med `mode: "onTouched"`.
@@ -263,9 +289,9 @@ lokal variant av valgflaten per filter.
 Retningslinjene gjelder innholdsproduksjon som annonseopprettelse på tvers av
 native og web. Den detaljerte målarkitekturen og den levende statusloggen for
 annonser ligger i
-[NATIVE-ANNONSEOPPRETTELSE-KORTFLYT-PLAN.md](NATIVE-ANNONSEOPPRETTELSE-KORTFLYT-PLAN.md).
+[NATIVE-ANNONSEOPPRETTELSE-KORTFLYT-PLAN.md](plans/NATIVE-ANNONSEOPPRETTELSE-KORTFLYT-PLAN.md).
 Historikk fra den tidligere composer-konsolideringen ligger i
-[ANNONSEOPPRETTELSE-UX-PLAN.md](ANNONSEOPPRETTELSE-UX-PLAN.md).
+[ANNONSEOPPRETTELSE-UX-PLAN.md](plans/ANNONSEOPPRETTELSE-UX-PLAN.md).
 
 ### Én gjenkjennelig composer
 

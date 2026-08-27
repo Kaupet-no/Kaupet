@@ -1,5 +1,5 @@
-import { Fragment, lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
+import { Fragment, lazy, Suspense, useCallback, useState, type ReactNode } from "react";
+import { ClientOnly, Link } from "@tanstack/react-router";
 import { Loader2, MapPin, Maximize2 } from "lucide-react";
 
 import { useIsNative } from "@/hooks/use-is-native";
@@ -31,6 +31,7 @@ import {
   CONDITIONS,
   VEHICLE_CONDITIONS_BY_SLUG,
 } from "@/lib/constants";
+import { PART_FITMENT_SCOPE_KEY } from "@/lib/category-filters";
 import {
   VEHICLE_LEAF_SLUGS,
   computeOmregistreringsavgift,
@@ -50,7 +51,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FullscreenLocationPicker } from "@/components/fullscreen-location-picker";
 import {
   ListingEditContext,
   useListingEdit,
@@ -60,11 +60,18 @@ import { EditableField } from "@/features/listing-edit/editable-field";
 import { EditableRegion } from "@/features/listing-edit/editable-region";
 import { VehicleFactsPanel } from "@/components/listing-detail/edit-panels/vehicle-facts-panel";
 import { VehicleConditionPanel } from "@/components/listing-detail/edit-panels/vehicle-condition-panel";
+import { SellerNoKnownIssues } from "@/components/listing-detail/listing-evidence";
 import { VehicleEquipmentPanel } from "@/components/listing-detail/edit-panels/vehicle-equipment-panel";
 import { GenericAttributesPanel } from "@/components/listing-detail/edit-panels/generic-attributes-panel";
+import { PartFitmentSummary } from "@/components/listing-detail/part-fitment-summary";
 
 const ListingDetailMap = lazy(() =>
   import("@/components/listing-detail-map").then((m) => ({ default: m.ListingDetailMap })),
+);
+const FullscreenLocationPicker = lazy(() =>
+  import("@/components/fullscreen-location-picker").then((m) => ({
+    default: m.FullscreenLocationPicker,
+  })),
 );
 const ImageLightbox = lazy(() =>
   import("@/components/listing-detail/image-lightbox").then((m) => ({ default: m.ImageLightbox })),
@@ -200,12 +207,10 @@ export function ListingDetailView({
 }: ListingDetailViewProps) {
   const isNative = useIsNative();
   const [activeImage, setActiveImage] = useState(0);
-  const [mounted, setMounted] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [mapOverlayOpen, setMapOverlayOpen] = useState(false);
   const closeLightbox = useCallback(() => setLightboxIndex(null), []);
   const closeMapOverlay = useCallback(() => setMapOverlayOpen(false), []);
-  useEffect(() => setMounted(true), []);
 
   const sortedImages = images.slice().sort((a, b) => a.sort_order - b.sort_order);
   const has360 = !!vehicle360Frames && vehicle360Frames.length > 0;
@@ -280,7 +285,7 @@ export function ListingDetailView({
       fieldKey="price"
       value={{ isFree, priceNok }}
       render={(v) => (
-        <p className="font-display text-xl leading-none text-primary">
+        <p className="font-display text-lg font-semibold leading-tight text-primary">
           {v.isFree
             ? "Gis bort"
             : v.priceNok != null
@@ -356,7 +361,6 @@ export function ListingDetailView({
       previewBanner={previewBanner}
       activeImage={activeImage}
       setActiveImage={setActiveImage}
-      mounted={mounted}
       lightboxIndex={lightboxIndex}
       setLightboxIndex={setLightboxIndex}
       mapOverlayOpen={mapOverlayOpen}
@@ -429,7 +433,6 @@ function ListingDetailViewBody({
   previewBanner,
   activeImage,
   setActiveImage,
-  mounted,
   lightboxIndex,
   setLightboxIndex,
   mapOverlayOpen,
@@ -481,7 +484,6 @@ function ListingDetailViewBody({
   previewBanner?: ReactNode;
   activeImage: number;
   setActiveImage: (i: number) => void;
-  mounted: boolean;
   lightboxIndex: number | null;
   setLightboxIndex: (i: number | null) => void;
   mapOverlayOpen: boolean;
@@ -748,6 +750,9 @@ function ListingDetailViewBody({
             ) : (
               <BoatInfoGrid attributes={attributes} />
             ))}
+          {typeof attributes[PART_FITMENT_SCOPE_KEY] === "string" && (
+            <PartFitmentSummary attributes={attributes} />
+          )}
 
           {nativeSpecLayout && sellerContactSlot && <div className="mt-6">{sellerContactSlot}</div>}
 
@@ -807,11 +812,13 @@ function ListingDetailViewBody({
                 <Fragment>
                   <section className="mt-8">
                     <h2 className="font-display text-xl">Kjente feil og mangler</h2>
-                    <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
-                      {noKnownIssues
-                        ? "Ingen kjente feil eller mangler oppgitt av selger"
-                        : knownIssues}
-                    </p>
+                    {noKnownIssues ? (
+                      <SellerNoKnownIssues />
+                    ) : (
+                      <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+                        {knownIssues}
+                      </p>
+                    )}
                   </section>
                   {maintenanceHistory && (
                     <section className="mt-8">
@@ -909,7 +916,7 @@ function ListingDetailViewBody({
               isEditedLater && updatedAt ? fmt(updatedAt) : fmt(publishedAt ?? createdAt);
 
             return (
-              <dl className="grid grid-cols-2 gap-3 rounded-xl border border-border bg-card p-4 text-sm @sm:grid-cols-3">
+              <dl className="density-data grid grid-cols-2 gap-3 border-y border-border text-sm @sm:grid-cols-3">
                 {/* Kjøretøy har tilstand fylt ut allerede fra opprettelsen (se
                     VehicleConditionGroup), med kjøretøytype-spesifikke etiketter
                     (se VEHICLE_CONDITIONS_BY_SLUG) — så tilen vises normalt for
@@ -1038,21 +1045,25 @@ function ListingDetailViewBody({
           })()}
 
           {locationPickerOpen && pendingCoords && (
-            <FullscreenLocationPicker
-              lat={pendingCoords.lat}
-              lng={pendingCoords.lng}
-              onConfirm={async (next) => {
-                setLocationPickerOpen(false);
-                await editCtx?.saveField({
-                  group: "location",
-                  postal_code: postalCode ?? null,
-                  city: city ?? null,
-                  lat: next.lat,
-                  lng: next.lng,
-                });
-              }}
-              onClose={() => setLocationPickerOpen(false)}
-            />
+            <ClientOnly>
+              <Suspense fallback={<LightboxLoadingFallback />}>
+                <FullscreenLocationPicker
+                  lat={pendingCoords.lat}
+                  lng={pendingCoords.lng}
+                  onConfirm={async (next) => {
+                    setLocationPickerOpen(false);
+                    await editCtx?.saveField({
+                      group: "location",
+                      postal_code: postalCode ?? null,
+                      city: city ?? null,
+                      lat: next.lat,
+                      lng: next.lng,
+                    });
+                  }}
+                  onClose={() => setLocationPickerOpen(false)}
+                />
+              </Suspense>
+            </ClientOnly>
           )}
 
           {ownerStatsSlot}
@@ -1068,13 +1079,11 @@ function ListingDetailViewBody({
             aria-label="Se kart i fullskjerm"
             className="relative block h-80 w-full cursor-pointer overflow-hidden rounded-2xl border border-border"
           >
-            {mounted ? (
+            <ClientOnly fallback={<Skeleton className="h-full w-full rounded-none" />}>
               <Suspense fallback={<Skeleton className="h-full w-full rounded-none" />}>
                 <ListingDetailMap lat={displayLat} lng={displayLng} interactive={false} />
               </Suspense>
-            ) : (
-              <Skeleton className="h-full w-full rounded-none" />
-            )}
+            </ClientOnly>
             <span className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium shadow-lg">
               <Maximize2 className="size-3.5" />
               Se i fullskjerm
@@ -1102,11 +1111,13 @@ function ListingDetailViewBody({
         </Suspense>
       )}
 
-      {mapOverlayOpen && displayLat != null && displayLng != null && (
-        <Suspense fallback={<LightboxLoadingFallback />}>
-          <MapOverlay lat={displayLat} lng={displayLng} onClose={closeMapOverlay} />
-        </Suspense>
-      )}
+      <ClientOnly>
+        {mapOverlayOpen && displayLat != null && displayLng != null && (
+          <Suspense fallback={<LightboxLoadingFallback />}>
+            <MapOverlay lat={displayLat} lng={displayLng} onClose={closeMapOverlay} />
+          </Suspense>
+        )}
+      </ClientOnly>
 
       {showStickyContact && (
         <div

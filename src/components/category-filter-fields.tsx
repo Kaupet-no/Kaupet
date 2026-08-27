@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  PART_FITMENT_VEHICLE_IDS_KEY,
   SEARCH_MULTISELECT_KEYS,
   type AttributeFilterValue,
   type CategoryFilter,
@@ -22,6 +23,7 @@ import {
   VehicleBrandField,
   VehicleModelMultiField,
 } from "@/features/listing-creation/modules/generic-attributes/vehicle-brand-model-fields";
+import { PartVehicleSearchField } from "@/components/part-fitment-fields";
 import { RangeFilterField } from "@/components/range-filter-field";
 import { boundsForFilter } from "@/lib/filter-range-bounds";
 import { ComboboxMultiContent } from "@/components/combobox-field";
@@ -122,6 +124,16 @@ export function CategoryFilterFields({
     <>
       {filters.map((f) => {
         const current = values[f.key];
+
+        if (f.key === PART_FITMENT_VEHICLE_IDS_KEY) {
+          return (
+            <PartVehicleSearchField
+              key={f.id}
+              value={current}
+              onChange={(next) => onChange(f.key, next)}
+            />
+          );
+        }
 
         if (f.type === "brand_select") {
           return (

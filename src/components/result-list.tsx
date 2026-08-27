@@ -7,8 +7,10 @@ import {
   Image,
   Map as MapIcon,
   SearchX,
+  X,
 } from "lucide-react";
 import { lazy, type ReactNode, Suspense, useEffect, useRef, useState } from "react";
+import { ClientOnly } from "@tanstack/react-router";
 
 import { ListingCard, type ListingCardData } from "@/components/listing-card";
 import { ListingCardExpanded } from "@/components/listing-card-expanded";
@@ -18,20 +20,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NativeSheet } from "@/components/ui/native-sheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { DialogClose, DialogTrigger } from "@/components/ui/dialog";
+import { FullscreenOverlay, FullscreenOverlayContent } from "@/components/ui/fullscreen-overlay";
 import type { MapListing } from "@/components/listings-map";
 import { FeaturedListingsSection } from "@/components/featured-listings-section";
 import { reverseGeocode } from "@/lib/geocode";
 import { hapticImpact } from "@/lib/haptics";
-import { getAttributeChipState, getSortChipState } from "@/lib/filter-chip-labels";
+import { getSortChipState } from "@/lib/filter-chip-labels";
 import { SORT_OPTIONS, type SortValue } from "@/lib/categories";
-import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
+import type { ZeroResultExpansion } from "@/features/listing-search/zero-result-expansion";
 import { useListingCardImages } from "@/hooks/use-listing-card-images";
 import { useListingFavorites } from "@/hooks/use-listing-favorites";
 import { trackProductEvent } from "@/lib/product-analytics";
@@ -52,17 +49,9 @@ type Props = {
   isFetchingNextPage: boolean;
   fetchNextPage: () => void;
   resetFilters: () => void;
-  onClearCategoryFilter?: () => void;
-  /** Re-search with the last word of `q` dropped — offered on zero results
-   * for a multi-word query, since the last word is often the culprit. */
-  onDropLastWord?: (nextQ: string) => void;
-  /** Active category-attribute filters — used on zero results to suggest
-   * dropping the most restrictive one first (attribute/location filters are
-   * a more likely culprit than free-text terms, which already fall back to
-   * trigram matching). */
-  attrFilters?: CategoryFilter[];
-  attrValues?: Record<string, AttributeFilterValue>;
-  onRemoveAttr?: (key: string) => void;
+  zeroResultExpansion?: ZeroResultExpansion;
+  zeroResultExpansionPending?: boolean;
+  onApplyZeroResultExpansion?: (expansion: ZeroResultExpansion) => void;
   mapListings: MapListing[];
   mapCenter: { lat: number; lng: number } | null;
   radiusKm: number;
@@ -94,11 +83,9 @@ export function ResultList({
   isFetchingNextPage,
   fetchNextPage,
   resetFilters,
-  onClearCategoryFilter,
-  onDropLastWord,
-  attrFilters = [],
-  attrValues = {},
-  onRemoveAttr,
+  zeroResultExpansion,
+  zeroResultExpansionPending = false,
+  onApplyZeroResultExpansion,
   mapListings,
   mapCenter,
   radiusKm,
@@ -111,17 +98,6 @@ export function ResultList({
 }: Props) {
   const [sortOpen, setSortOpen] = useState(false);
   const { label: sortLabel } = getSortChipState(sort);
-  const qWords = q.trim().split(/\s+/).filter(Boolean);
-  const lastWord = qWords.length > 1 ? qWords[qWords.length - 1] : null;
-  // Most restrictive active attribute filter, offered as the first recovery
-  // action on zero results — structured filters narrow the result set harder
-  // than a free-text term, which already tolerates typos via trigram fallback.
-  const [mostRestrictiveAttrKey] = Object.keys(attrValues);
-  const mostRestrictiveAttrFilter = attrFilters.find((f) => f.key === mostRestrictiveAttrKey);
-  const mostRestrictiveAttrLabel = mostRestrictiveAttrFilter
-    ? getAttributeChipState(mostRestrictiveAttrFilter, attrValues[mostRestrictiveAttrKey]).label
-    : null;
-  const [mounted, setMounted] = useState(false);
   const [mobileMapOpen, setMobileMapOpen] = useState(false);
   const [bigMapOpen, setBigMapOpen] = useState(false);
   const [desktopMapVisible, setDesktopMapVisible] = useState(true);
@@ -168,8 +144,6 @@ export function ResultList({
     });
   }, [cards.length, effectiveCategories.length, isLoading, q, zeroResultKey]);
 
-  useEffect(() => setMounted(true), []);
-
   useEffect(() => {
     if (!sentinelRef.current) return;
     const el = sentinelRef.current;
@@ -185,8 +159,8 @@ export function ResultList({
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const renderMap = () =>
-    mounted ? (
+  const renderMap = () => (
+    <ClientOnly fallback={<Skeleton className="h-full w-full rounded-2xl" />}>
       <Suspense fallback={<Skeleton className="h-full w-full rounded-2xl" />}>
         <ListingsMap
           center={mapCenter}
@@ -205,9 +179,8 @@ export function ResultList({
           className="h-full w-full"
         />
       </Suspense>
-    ) : (
-      <Skeleton className="h-full w-full rounded-2xl" />
-    );
+    </ClientOnly>
+  );
 
   return (
     <>
@@ -342,32 +315,27 @@ export function ResultList({
               }
               action={
                 <>
-                  {mostRestrictiveAttrFilter && mostRestrictiveAttrLabel && onRemoveAttr && (
-                    <Button variant="outline" onClick={() => onRemoveAttr(mostRestrictiveAttrKey)}>
-                      Fjern «{mostRestrictiveAttrLabel}»
-                    </Button>
-                  )}
-                  {effectiveCategories.length > 0 && onClearCategoryFilter && (
-                    <Button variant="outline" onClick={onClearCategoryFilter}>
-                      Fjern kategorifilter
-                    </Button>
-                  )}
-                  {lastWord && onDropLastWord && (
+                  {zeroResultExpansion && onApplyZeroResultExpansion ? (
                     <Button
                       variant="outline"
-                      onClick={() => onDropLastWord(qWords.slice(0, -1).join(" "))}
+                      onClick={() => onApplyZeroResultExpansion(zeroResultExpansion)}
                     >
-                      Prøv uten «{lastWord}»
+                      Vis {zeroResultExpansion.count.toLocaleString("nb-NO")} treff uten «
+                      {zeroResultExpansion.label}»
+                    </Button>
+                  ) : zeroResultExpansionPending ? (
+                    <span
+                      role="status"
+                      aria-live="polite"
+                      className="text-sm text-muted-foreground"
+                    >
+                      Ser etter en bredere variant …
+                    </span>
+                  ) : (
+                    <Button variant="outline" onClick={resetFilters}>
+                      Nullstill alle filtre
                     </Button>
                   )}
-                  {mapCenter && onMapClearLocation && (
-                    <Button variant="outline" onClick={onMapClearLocation}>
-                      Vis resultater i hele Norge
-                    </Button>
-                  )}
-                  <Button variant="outline" onClick={resetFilters}>
-                    Nullstill alle filtre
-                  </Button>
                 </>
               }
             />
@@ -428,7 +396,7 @@ export function ResultList({
             <div className="sticky top-20 h-[calc(100vh-6rem)]">
               <div className="relative h-full overflow-hidden rounded-2xl border border-border shadow-sm">
                 {renderMap()}
-                <Dialog open={bigMapOpen} onOpenChange={setBigMapOpen}>
+                <FullscreenOverlay open={bigMapOpen} onOpenChange={setBigMapOpen}>
                   <DialogTrigger asChild>
                     <Button
                       type="button"
@@ -439,15 +407,22 @@ export function ResultList({
                       <Expand className="size-4" /> Utvid
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-[95vw] p-0 sm:max-w-[95vw]">
-                    <DialogHeader className="px-4 pt-4">
-                      <DialogTitle>Kart</DialogTitle>
-                    </DialogHeader>
-                    <div className="h-[85vh] w-full p-4 pt-2">
-                      {bigMapOpen ? renderMap() : null}
+                  <FullscreenOverlayContent title="Kart" edgeToEdge>
+                    <div className="flex h-full flex-col bg-background">
+                      <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
+                        <h2 className="text-base font-semibold">Kart</h2>
+                        <DialogClose asChild>
+                          <Button type="button" variant="ghost" size="sm">
+                            <X className="size-4" /> Lukk
+                          </Button>
+                        </DialogClose>
+                      </div>
+                      <div className="min-h-0 flex-1 p-4 pt-2">
+                        {bigMapOpen ? renderMap() : null}
+                      </div>
                     </div>
-                  </DialogContent>
-                </Dialog>
+                  </FullscreenOverlayContent>
+                </FullscreenOverlay>
               </div>
             </div>
           </aside>

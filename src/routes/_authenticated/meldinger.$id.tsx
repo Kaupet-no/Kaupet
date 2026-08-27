@@ -32,6 +32,7 @@ import { ConversationErrorBoundary } from "@/components/meldinger/conversation-e
 import { Skeleton } from "@/components/ui/skeleton";
 import { renderWithDayDividers, type Message } from "@/components/meldinger/message-list";
 import { SalePanel } from "@/components/meldinger/sale-panel";
+import { TradeSafetyAdvice } from "@/components/trade-safety-advice";
 
 export const Route = createFileRoute("/_authenticated/meldinger/$id")({
   head: () => ({
@@ -638,7 +639,7 @@ function ConversationPage() {
               <Skeleton className="h-10 w-3/5" />
             </div>
           ) : (messages ?? []).length === 0 ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">
+            <p className="py-6 text-center text-sm text-muted-foreground">
               {conv?.other?.display_name
                 ? `Send den første meldingen til ${conv.other.display_name}${conv.listing?.title ? ` om «${conv.listing.title}»` : ""}.`
                 : "Send den første meldingen for å starte samtalen."}
@@ -655,6 +656,9 @@ function ConversationPage() {
                 : null,
               attachmentUrls,
             )
+          )}
+          {!messagesLoading && (
+            <TradeSafetyAdvice context="conversation" messageCount={messages?.length ?? 0} />
           )}
         </div>
 

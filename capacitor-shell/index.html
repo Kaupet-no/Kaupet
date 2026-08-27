@@ -179,9 +179,24 @@
         window.location.replace("https://staging.kaupet.no");
       }
 
+      function androidNavigationUrl(url) {
+        if (
+          url.hostname === "localhost" &&
+          window.Capacitor &&
+          window.Capacitor.getPlatform() === "android"
+        ) {
+          var target = new URL(url.href);
+          // Capacitor owns Android WebView's localhost origin. Keep the user's
+          // localhost value, but use loopback so adb reverse reaches the host.
+          target.hostname = "127.0.0.1";
+          return target;
+        }
+        return url;
+      }
+
       function goToLocal(url) {
         localStorage.setItem(STORAGE_KEY, url.href);
-        window.location.replace(url.href);
+        window.location.replace(androidNavigationUrl(url).href);
       }
 
       // DevServerSwitch (Meg-panelet) navigerer hit igjen med ?target=
@@ -217,7 +232,7 @@
           switchBtn.style.display = "block";
           var redirectTimer = setTimeout(function () {
             if (saved === "staging") goToStaging();
-            else window.location.replace(saved);
+            else window.location.replace(androidNavigationUrl(new URL(saved)).href);
           }, 600);
           switchBtn.addEventListener("click", function () {
             clearTimeout(redirectTimer);

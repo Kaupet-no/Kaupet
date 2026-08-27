@@ -3292,3 +3292,68 @@ describe.skipIf(!canRun)(
     });
   },
 );
+
+describe.skipIf(!canRun)("RLS: aktive salgsannonser krever pris", () => {
+  const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+  const email = `rls-price-${Date.now()}@example.com`;
+  let sellerId: string;
+
+  beforeAll(async () => {
+    const { data, error } = await admin.auth.admin.createUser({
+      email,
+      password: PASSWORD,
+      email_confirm: true,
+    });
+    if (error) throw error;
+    sellerId = data.user!.id;
+  });
+
+  afterAll(async () => {
+    if (sellerId) await admin.auth.admin.deleteUser(sellerId);
+  });
+
+  it("avviser aktiv ikke-gratis annonse uten pris", async () => {
+    const { error } = await admin.from("listings").insert({
+      seller_id: sellerId,
+      title: "RLS annonse uten pris",
+      is_free: false,
+      status: "active",
+    });
+
+    expect(error).not.toBeNull();
+  });
+
+  it("tillater aktiv gratisannonse uten pris", async () => {
+    const { error } = await admin.from("listings").insert({
+      seller_id: sellerId,
+      title: "RLS gratisannonse",
+      is_free: true,
+      status: "active",
+    });
+
+    expect(error).toBeNull();
+  });
+
+  it("tillater utkast uten pris", async () => {
+    const { error } = await admin.from("listings").insert({
+      seller_id: sellerId,
+      title: "RLS utkast uten pris",
+      is_free: false,
+      status: "draft",
+    });
+
+    expect(error).toBeNull();
+  });
+
+  it("tillater aktiv ikke-gratis annonse med pris", async () => {
+    const { error } = await admin.from("listings").insert({
+      seller_id: sellerId,
+      title: "RLS annonse med pris",
+      is_free: false,
+      price_nok: 100,
+      status: "active",
+    });
+
+    expect(error).toBeNull();
+  });
+});

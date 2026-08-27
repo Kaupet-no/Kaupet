@@ -28,4 +28,14 @@ describe("useComposerHistoryBack", () => {
 
     expect(goBack).not.toHaveBeenCalled();
   });
+  it("beholder steget når et overlay lukker tilbake til komponistvakten", () => {
+    const goBack = vi.fn();
+    renderHook(() => useComposerHistoryBack(false, goBack));
+
+    act(() =>
+      window.dispatchEvent(new PopStateEvent("popstate", { state: { composerGuard: true } })),
+    );
+
+    expect(goBack).not.toHaveBeenCalled();
+  });
 });

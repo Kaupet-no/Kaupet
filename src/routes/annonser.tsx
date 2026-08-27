@@ -64,6 +64,8 @@ import {
   resolveHeroCategory,
   type Category,
 } from "@/lib/categories";
+import { submitSearch } from "@/features/listing-search/submit-search";
+import { useZeroResultExpansion } from "@/features/listing-search/zero-result-expansion";
 
 export const Route = createFileRoute("/annonser")({
   validateSearch: searchSchema,
@@ -183,7 +185,9 @@ function BrowsePage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("category_filters")
-        .select("id, category_id, key, label_nb, type, unit, options, sort_order, is_primary")
+        .select(
+          "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value, depends_on_not_value, is_optional",
+        )
         .order("sort_order");
       if (error) throw error;
       return (data ?? []).map(normalizeFilter);
@@ -198,7 +202,7 @@ function BrowsePage() {
     attrValues,
     handleAttrValueChange,
     terms,
-    advancedInitial,
+    appliedSearch,
     currentCriteria,
     updateSearch,
     applyPanelDraft,
@@ -315,6 +319,20 @@ function BrowsePage() {
   // its vocabulary lookup, so "cruisecontrol" would just fall through to a
   // plain text search that finds nothing. See matchVehicleBrandPhrase.
   const { data: vehicleBrands } = useAllVehicleBrands();
+  const submitQuery = () => {
+    void hapticImpact("medium");
+    void submitSearch({
+      applied: appliedSearch,
+      query: qDraft,
+      categories: categories ?? [],
+      vehicleBrands: vehicleBrands ?? [],
+      allFilters: allFilters ?? [],
+      commit: (next) => {
+        setQDraft(next.q);
+        navigate({ search: next, resetScroll: false });
+      },
+    });
+  };
   const rawCategoryMatch = useMemo(() => {
     const m =
       matchCategoryPhrase(qDraft, categories ?? []) ??
@@ -468,6 +486,13 @@ function BrowsePage() {
 
   const listings = useMemo(() => listingsData?.pages.flatMap((p) => p.rows), [listingsData]);
   const totalCount = listingsData?.pages[0]?.totalCount ?? null;
+  const { expansion: zeroResultExpansion, isPending: zeroResultExpansionPending } =
+    useZeroResultExpansion({
+      applied: appliedSearch,
+      filters: attrFilters,
+      categories: categories ?? [],
+      enabled: !isLoading && totalCount === 0 && !!categories,
+    });
 
   const { wtbCount, wtbLoading, wtbListings, hasSearchCriteria } = useWtbListings({
     q: search.q,
@@ -528,14 +553,12 @@ function BrowsePage() {
   // launch-mode fallback while this page is showing.
   const searchPanelResults: SearchPanelResultsContext | null = isNative
     ? {
-        q: search.q,
-        value: advancedInitial,
-        onApply: (value, nextAttributes) => {
-          setQDraft(value.terms.join(" "));
-          applyPanelDraft(value, nextAttributes);
+        applied: appliedSearch,
+        onApply: (draft) => {
+          setQDraft(draft.value.terms.join(" "));
+          applyPanelDraft(draft);
         },
         attributeFilters: attrFilters,
-        attributeValues: attrValues,
         attributeCounts: facetCounts,
         resultCount: totalCount ?? cards.length,
       }
@@ -605,11 +628,7 @@ function BrowsePage() {
             <SearchSummaryPill
               q={qDraft}
               onQChange={setQDraft}
-              onSubmitQ={() => {
-                void hapticImpact("medium");
-                if (categoryMatch) applyCategoryMatch();
-                else updateSearch({ q: qDraft });
-              }}
+              onSubmitQ={submitQuery}
               filterCount={activeFilterCount}
               onOpen={() => openPanel("categories")}
             />
@@ -618,14 +637,7 @@ function BrowsePage() {
             <SearchBar
               q={qDraft}
               onQChange={setQDraft}
-              onSubmitQ={() => {
-                void hapticImpact("medium");
-                // Pressing Enter with a pending category match confirms it
-                // (same action as clicking the suggestion chip below)
-                // instead of running a plain text search for it.
-                if (categoryMatch) applyCategoryMatch();
-                else updateSearch({ q: qDraft });
-              }}
+              onSubmitQ={submitQuery}
               qMode={search.qMode}
               onQModeChange={(m) => updateSearch({ qMode: m })}
               showQMode={false}
@@ -784,18 +796,9 @@ function BrowsePage() {
             isFetchingNextPage={isFetchingNextPage}
             fetchNextPage={() => void fetchNextPage()}
             resetFilters={resetFilters}
-            onClearCategoryFilter={
-              effectiveCategories.length > 0
-                ? () => updateSearch({ category: "", categories: [] })
-                : undefined
-            }
-            onDropLastWord={(nextQ) => {
-              setQDraft(nextQ);
-              updateSearch({ q: nextQ });
-            }}
-            attrFilters={attrFilters}
-            attrValues={attrValues}
-            onRemoveAttr={(key) => removeAttrWithRestore(key)}
+            zeroResultExpansion={zeroResultExpansion}
+            zeroResultExpansionPending={zeroResultExpansionPending}
+            onApplyZeroResultExpansion={(expansion) => applyPanelDraft(expansion.applied)}
             mapListings={mapListings}
             mapCenter={mapCenter}
             radiusKm={search.radius ?? 10}

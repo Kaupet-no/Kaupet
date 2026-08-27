@@ -14,7 +14,7 @@ import {
 } from "@/lib/vehicle/vehicle-360.functions";
 
 /**
- * Desktop-only panel on the bildeopplastning-steget for Bil/MC-annonser:
+ * Desktop-only panel on the reviewflaten for Bil/MC-annonser:
  * genererer automatisk en QR-kode brukeren *kan* skanne med Kaupet-appen for
  * å ta opptak av en 360°-bildesekvens av kjøretøyet — helt valgfritt, ingen
  * knapp å trykke for å be om koden. QR-koden er en kortlivet capability og

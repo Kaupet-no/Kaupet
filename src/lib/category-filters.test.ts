@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   applyAttributeFilters,
   effectiveFiltersForCategory,
+  getMissingRequiredFilters,
   normalizeFilter,
+  NUMERIC_DIGIT_CAPS,
   splitPrimaryFilters,
   type AttributeFilterValue,
   type CategoryFilter,
@@ -76,6 +78,58 @@ describe("effectiveFiltersForCategory", () => {
     expect(effectiveFiltersForCategory("sub", filters, byId).map((x) => x.key)).toEqual(["a", "b"]);
   });
 });
+describe("getMissingRequiredFilters", () => {
+  it("treats zero, negative, non-finite, and string dimensions as invalid", () => {
+    const filters = [
+      f({ category_id: "sub", key: "width_cm", type: "number" }),
+      f({ category_id: "sub", key: "height_cm", type: "number" }),
+      f({ category_id: "sub", key: "depth_cm", type: "number" }),
+    ];
+
+    expect(
+      getMissingRequiredFilters("sub", filters, byId, {
+        width_cm: 0,
+        height_cm: -1,
+        depth_cm: "40",
+      }),
+    ).toHaveLength(3);
+    expect(
+      getMissingRequiredFilters("sub", filters, byId, {
+        width_cm: 120,
+        height_cm: 80,
+        depth_cm: 40,
+      }),
+    ).toEqual([]);
+  });
+
+  it("requires compatible models only for a specific-fitment listing", () => {
+    const filters = [
+      f({
+        category_id: "main",
+        key: "part_fitment_scope",
+        type: "select",
+      }),
+      f({
+        category_id: "main",
+        key: "part_fitment_vehicle_ids",
+        type: "multiselect",
+        depends_on_key: "part_fitment_scope",
+        depends_on_value: "specific",
+      }),
+    ];
+    expect(getMissingRequiredFilters("main", filters, byId, {})).toHaveLength(1);
+    expect(
+      getMissingRequiredFilters("main", filters, byId, {
+        part_fitment_scope: "specific",
+      }),
+    ).toHaveLength(1);
+    expect(
+      getMissingRequiredFilters("main", filters, byId, {
+        part_fitment_scope: "universal",
+      }),
+    ).toEqual([]);
+  });
+});
 
 describe("normalizeFilter", () => {
   it("coerces non-array options to null", () => {
@@ -94,6 +148,14 @@ describe("normalizeFilter", () => {
     expect(normalizeFilter({ ...row, options: [{ value: "a", label_nb: "A" }] }).options).toEqual([
       { value: "a", label_nb: "A" },
     ]);
+  });
+});
+describe("numeric dimension caps", () => {
+  it("limits dimension inputs to four digits", () => {
+    expect(NUMERIC_DIGIT_CAPS.width_cm).toBe(4);
+    expect(NUMERIC_DIGIT_CAPS.height_cm).toBe(4);
+    expect(NUMERIC_DIGIT_CAPS.depth_cm).toBe(4);
+    expect(NUMERIC_DIGIT_CAPS.length_cm).toBe(4);
   });
 });
 
@@ -170,6 +232,19 @@ describe("applyAttributeFilters", () => {
     expect(q.calls).toEqual([
       { method: "gte", args: ["attributes->mileage_km", 0] },
       { method: "lte", args: ["attributes->mileage_km", 100000] },
+    ]);
+  });
+
+  it("matches a part listing's vehicle-model array by containment", () => {
+    const filters: Record<string, AttributeFilterValue> = {
+      part_fitment_vehicle_ids: { kind: "multiselect", values: ["model-1"] },
+    };
+    const q = applyAttributeFilters(fakeQuery(), filters);
+    expect(q.calls).toEqual([
+      {
+        method: "contains",
+        args: ["attributes", { part_fitment_vehicle_ids: ["model-1"] }],
+      },
     ]);
   });
 });

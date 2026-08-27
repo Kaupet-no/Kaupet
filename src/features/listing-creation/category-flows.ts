@@ -2,10 +2,9 @@ import type { CategoryNode } from "@/lib/category-filters";
 
 /**
  * Ordered, reorderable, togglable field-group keys a category's flow is
- * built from (see src/features/listing-creation/field-groups/). Replaces the
- * earlier fixed 4-"canonical step" model, which couldn't represent native's
- * real content boundaries (price is bundled with category/condition, not
- * with location; description is its own native page but inline on web).
+ * built from (see src/features/listing-creation/field-groups/). The configured
+ * order remains authoritative inside the shared task boundaries, while
+ * structural and vehicle-specific solo pages stay explicit.
  */
 export const DEFAULT_FIELD_GROUPS: string[] = [
   "photos",
@@ -19,6 +18,28 @@ export const DEFAULT_FIELD_GROUPS: string[] = [
   "review-publish",
 ];
 export const DEFAULT_MODULES: string[] = ["generic-attributes"];
+
+export type ListingTask = "showcase" | "searchable" | "trade" | "review";
+
+/** Shared semantic task for every content field group. Structural groups are
+ * deliberately absent because they keep their own page labels. */
+export const LISTING_TASK_BY_FIELD_GROUP_KEY: Partial<Record<string, ListingTask>> = {
+  photos: "showcase",
+  title: "showcase",
+  "vehicle-360": "showcase",
+  "category-attributes": "searchable",
+  "description-keywords": "searchable",
+  "boat-facts": "searchable",
+  "vehicle-facts": "searchable",
+  "vehicle-equipment": "searchable",
+  condition: "trade",
+  price: "trade",
+  delivery: "trade",
+  location: "trade",
+  "vehicle-condition": "trade",
+  "vehicle-price": "trade",
+  "review-publish": "review",
+};
 
 export type CategoryFlow = {
   fieldGroups: string[];
@@ -157,12 +178,9 @@ function applyLandingEntry(flow: CategoryFlow): CategoryFlow {
  *
  * - `category-confirm` right after `photos`, while the landing-screen entry
  *   still has an unconfirmed AI category suggestion;
- * - `vehicle-360` right after `vehicle-registration`. 360°-opptak only
- *   applies to Bil og MC, so it can't live on the images step — that one is
- *   always step 1, before any category is known;
  * - `vehicle-price` right before `review-publish` — the dedicated, large-
  *   typography Pris + omregistreringsavgift step. Runtime-injected rather
- *   than a stored field group (like `vehicle-360`) so it needs no DB
+ *   than a stored field group so it needs no DB
  *   migration and never shows up as an admin-togglable checkbox: every
  *   vehicle flow gets it, always in the same place, always last before
  *   review/publish (`resolveWizardPages` always pulls `location`/
@@ -181,45 +199,35 @@ export function withRuntimeFieldGroups(
     const insertAt = photosIdx === -1 ? 0 : photosIdx + 1;
     next = [...next.slice(0, insertAt), "category-confirm", ...next.slice(insertAt)];
   }
-  const regIdx = next.indexOf("vehicle-registration");
-  if (regIdx === -1) return next;
-  next = [...next.slice(0, regIdx + 1), "vehicle-360", ...next.slice(regIdx + 1)];
+  if (!next.includes("vehicle-registration")) return next;
   const reviewIdx = next.indexOf("review-publish");
   const priceInsertAt = reviewIdx === -1 ? next.length : reviewIdx;
   return [...next.slice(0, priceInsertAt), "vehicle-price", ...next.slice(priceInsertAt)];
 }
 
 /**
- * Chunks an ordered list of active field-group keys into wizard "pages" for a
- * given platform: web pages hold more groups per page, native pages hold
- * fewer. `category-select` is always solo first (category must be chosen
- * before anything else, including the full title/photo step). Location and
- * review/publish share the final page on both platforms so native users do
- * not have to advance through a separate confirmation-only step.
- * `title-photos` is no longer forced first — its position is just whatever
- * order it has in `fieldGroupKeys`, so a category flow can put
- * `category-attributes` (and any vehicle lookup it triggers) before it.
+ * Chunks an ordered list of active field-group keys into wizard pages.
+ * Ordinary flows use the same four task boundaries on web and native: show
+ * the item, make it searchable, clarify the trade, and review/publish.
+ * Category selection and confirmation remain structural solo pages. Bil og
+ * MC keeps its existing platform-specific atomic pages until its dedicated
+ * vehicle-flow phases are implemented.
  *
- * Chunking is purely positional: it has no notion of "these groups prefer to
- * stay adjacent," so a category that reorders `delivery-location` between
- * `condition` and `price` will split them onto separate native pages purely
- * because of where `delivery-location` landed in the array. This is an
- * accepted limitation (not solved by a second hidden rule), mitigated by a
- * live pagination preview in the admin UI.
+ * Group order within each task page still follows the configured flow; only
+ * the four established task boundaries are fixed.
  */
 /** Field-group keys that always get their own solo page, wherever they land
  * in the ordered array — `category-select` is always first (see
- * prependCategorySelect); `vehicle-registration`/`vehicle-360`/`vehicle-price`
- * can land anywhere in the array (admin-configurable position for the
- * former, runtime-injected for the latter two), but must never be bundled
+ * prependCategorySelect); `vehicle-registration`/`vehicle-price` can land
+ * anywhere in the array (admin-configurable position for the former,
+ * runtime-injected for the latter), but must never be bundled
  * with unrelated groups like `condition`/`price`. */
-const SOLO_FIELD_GROUP_KEYS = new Set([
-  "category-select",
-  "category-confirm",
-  "vehicle-registration",
-  "vehicle-360",
-  "vehicle-price",
-]);
+const SOLO_FIELD_GROUP_KEYS: Record<string, true> = {
+  "category-select": true,
+  "category-confirm": true,
+  "vehicle-registration": true,
+  "vehicle-price": true,
+};
 
 export function resolveWizardPages(
   fieldGroupKeys: string[],
@@ -235,10 +243,32 @@ export function resolveWizardPages(
     forceBreakBeforeKeys?: ReadonlySet<string>;
   },
 ): string[][] {
-  if (options.native) {
-    return fieldGroupKeys.map((key) => [key]);
+  const isVehicleFlow = fieldGroupKeys.includes("vehicle-registration");
+  if (!isVehicleFlow) {
+    const taskPages: Record<ListingTask, string[]> = {
+      showcase: [],
+      searchable: [],
+      trade: [],
+      review: [],
+    };
+    for (const key of fieldGroupKeys) {
+      const task = LISTING_TASK_BY_FIELD_GROUP_KEY[key];
+      if (task) taskPages[task].push(key);
+      else if (!SOLO_FIELD_GROUP_KEYS[key]) taskPages.searchable.push(key);
+    }
+    const pages = [
+      ...(fieldGroupKeys.includes("category-select") ? [["category-select"]] : []),
+      taskPages.showcase,
+      ...(fieldGroupKeys.includes("category-confirm") ? [["category-confirm"]] : []),
+      taskPages.searchable,
+      taskPages.trade,
+      taskPages.review,
+    ];
+    return pages.filter((groups) => groups.length > 0);
   }
-  const chunkSize = options.native ? 3 : 4;
+
+  if (options.native) return fieldGroupKeys.map((key) => [key]);
+  const chunkSize = 4;
   const forceBreakBeforeKeys = options.forceBreakBeforeKeys;
 
   const withoutEnds = fieldGroupKeys.filter(
@@ -260,7 +290,7 @@ export function resolveWizardPages(
   };
 
   for (const key of withoutEnds) {
-    if (SOLO_FIELD_GROUP_KEYS.has(key)) {
+    if (SOLO_FIELD_GROUP_KEYS[key]) {
       flush();
       pages.push([key]);
     } else {

@@ -5,7 +5,11 @@ import { format } from "date-fns";
 import { TermGroupChips } from "@/components/term-group-editor";
 import type { LocationValue } from "@/components/location-filter";
 import type { TermGroup } from "@/lib/term-groups";
-import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
+import {
+  PART_FITMENT_VEHICLE_IDS_KEY,
+  type AttributeFilterValue,
+  type CategoryFilter,
+} from "@/lib/category-filters";
 import { parseIsoDate } from "@/lib/vehicle/vehicle-date";
 
 type SearchLike = {
@@ -120,23 +124,18 @@ export function ActiveFilters({
     allItems.push({
       key: "__q__",
       node: (
-        <div key="__q__" className="rounded-md border border-border p-2">
-          <TermGroupChips
-            group={{ id: "q", mode: search.qMode, exclude: false, terms }}
-            onRemoveTerm={removeLine1Term}
-          />
-        </div>
+        <TermGroupChips
+          key="__q__"
+          group={{ id: "q", mode: search.qMode, exclude: false, terms }}
+          onRemoveTerm={removeLine1Term}
+        />
       ),
     });
   }
   for (const g of search.extraGroups) {
     allItems.push({
       key: g.id,
-      node: (
-        <div key={g.id} className="rounded-md border border-border p-2">
-          <TermGroupChips group={g} onRemoveTerm={(t) => removeGroupTerm(g.id, t)} />
-        </div>
-      ),
+      node: <TermGroupChips key={g.id} group={g} onRemoveTerm={(t) => removeGroupTerm(g.id, t)} />,
     });
   }
   for (const [key, value] of attrEntries) {
@@ -150,7 +149,11 @@ export function ActiveFilters({
           node: (
             <AttrChip
               key={`${key}:${v}`}
-              label={`${filter.label_nb}: ${opt?.label_nb ?? v}`}
+              label={
+                key === PART_FITMENT_VEHICLE_IDS_KEY
+                  ? `${filter.label_nb}: valgt bilmodell`
+                  : `${filter.label_nb}: ${opt?.label_nb ?? v}`
+              }
               onRemove={() => onRemoveAttr?.(key, v)}
               justCreated={justCreatedKeys?.has(`${key}:${v}`)}
             />

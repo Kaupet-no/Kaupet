@@ -23,9 +23,8 @@ Eksterne tredjepartstjenester (kalt kun server-side, se § 3):
 - Vipps/MobilePay for betaling (promoteringer).
 - Cloudflare Turnstile for bot-beskyttelse ved annonsepublisering.
 - Statens Vegvesen (Datautlevering) for kjøretøyoppslag.
-- Hugging Face Inference Endpoints (NB-AI Lab Borealis) for AI-basert
-  kategoriforslag, som fallback når vote-basert forslag mangler treffsikker
-  historikk.
+- Mistral API (Mistral Small 4) for AI-basert kategoriforslag, som fallback
+  når vote-basert forslag mangler treffsikker historikk.
 
 ## 2. Avhengighetsretning
 
@@ -62,12 +61,11 @@ minst to reelle konsumenter trenger samme kontrakt.
   testet alternativ mekanisme.
 - Ikke logg fritekst, registreringsnummer, adresse, token eller andre
   personopplysninger i analyse eller generelle feillogger.
-- Kall mot eksterne tredjeparts-API-er (f.eks. Hugging Face Inference
-  Endpoints for AI-basert kategoriforslag i
-  `category-suggestion-ai.server.ts`) skjer kun fra `*.server.ts`-moduler,
-  aldri fra klientkode. Nøkler/endepunkt-URL-er lagres i sops-secrets
-  (`secrets/`) og som Cloudflare Worker-secrets, aldri i `VITE_*`-variabler
-  eller committet i klartekst.
+- Kall mot eksterne tredjeparts-API-er (f.eks. Mistral API for AI-basert
+  kategoriforslag i `category-suggestion-ai.server.ts`) skjer kun fra
+  `*.server.ts`-moduler, aldri fra klientkode. Nøkler/endepunkt-URL-er lagres
+  i sops-secrets (`secrets/`) og som Cloudflare Worker-secrets, aldri i
+  `VITE_*`-variabler eller committet i klartekst.
 
 ## 4. Domenegrenser for annonser
 

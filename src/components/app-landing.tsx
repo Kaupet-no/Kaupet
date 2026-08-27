@@ -16,7 +16,8 @@ import { ListingCard, type ListingCardData } from "@/components/listing-card";
 import { KaupetCodeDialog } from "@/components/kaupet-code-dialog";
 import { NativeSheet } from "@/components/ui/native-sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
 import { LocationPicker, RadiusPicker } from "@/components/location-filter";
 import { AnimatedSearchPlaceholder } from "@/components/animated-search-placeholder";
 import { useSavedLocation } from "@/hooks/use-saved-location";
@@ -25,6 +26,10 @@ import { useDefaultSearchExamples } from "@/hooks/use-default-search-examples";
 import { useIsNative } from "@/hooks/use-is-native";
 import { useFormFactor } from "@/hooks/use-form-factor";
 import { AppHeroLogo } from "@/components/app-hero-logo";
+import { useLandingCategories } from "@/features/landing/use-landing-categories";
+import { submitSearch } from "@/features/listing-search/submit-search";
+import { defaultAdvancedSearchValue } from "@/components/advanced-search-value";
+import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
 
 type CategoryRow = {
   id: string;
@@ -48,19 +53,8 @@ export function AppLanding() {
   // kaupet.no på desktop, som ikke er en del av denne planen.
   const isTablet = useFormFactor() === "tablet";
 
-  const { data: categories } = useQuery({
-    queryKey: ["categories"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("categories")
-        .select("id, slug, name_nb, parent_id, icon, search_examples")
-        .eq("is_hidden", false)
-        .order("sort_order")
-        .order("name_nb");
-      if (error) throw error;
-      return (data ?? []) as CategoryRow[];
-    },
-  });
+  const { categories, allFilters } = useLandingCategories();
+  const { data: vehicleBrands } = useAllVehicleBrands();
 
   const rootCategories = useMemo(
     () => (categories ?? []).filter((c) => c.parent_id === null),
@@ -100,19 +94,21 @@ export function AppLanding() {
     },
   });
 
-  const submitSearch = (e: React.FormEvent) => {
+  const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    navigate({
-      to: "/annonser",
-      search: {
-        q: q.trim(),
-        category: "",
-        sort: "new",
-        lat: location.lat ?? undefined,
-        lng: location.lng ?? undefined,
-        radius: location.lat != null ? location.radius : undefined,
-        loc: location.label || undefined,
+    void submitSearch({
+      applied: {
+        value: {
+          ...defaultAdvancedSearchValue(),
+          location,
+        },
+        attributes: {},
       },
+      query: q,
+      categories: categories ?? [],
+      vehicleBrands: vehicleBrands ?? [],
+      allFilters: allFilters ?? [],
+      commit: (search) => navigate({ to: "/annonser", search }),
     });
   };
 
@@ -155,9 +151,8 @@ export function AppLanding() {
   const placeholderPaused = focused || q.length > 0;
 
   const tileButtonClass =
-    "flex w-32 flex-col items-center gap-2 rounded-2xl border border-border bg-card px-3 py-4 text-center text-sm font-medium transition active:scale-[0.98]";
-  const tileIconClass =
-    "flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary";
+    "flex w-32 flex-col items-center gap-2 border-b border-border px-3 py-4 text-center text-sm font-medium transition active:opacity-70";
+  const tileIconClass = "flex size-11 items-center justify-center text-primary";
 
   return (
     <div className={isNative ? "pb-3" : "pb-24"}>
@@ -166,14 +161,21 @@ export function AppLanding() {
       {/* Hero — sentrert søkefelt */}
       <section
         className={`flex flex-col items-center justify-center px-5 ${
-          isTablet ? "min-h-[40vh] pt-10" : isNative ? "min-h-[68vh] pt-24" : "min-h-[70vh] pt-8"
+          isTablet
+            ? "min-h-[40vh] density-editorial"
+            : isNative
+              ? "min-h-[52vh] density-editorial"
+              : "min-h-[70vh] pt-8"
         }`}
       >
         <h1 className="mb-6 text-center font-display text-2xl tracking-tight">
           Hva leter du etter i dag?
         </h1>
 
-        <form onSubmit={submitSearch} className={`w-full ${isTablet ? "max-w-xl" : "max-w-md"}`}>
+        <form
+          onSubmit={handleSearchSubmit}
+          className={`w-full ${isTablet ? "max-w-xl" : "max-w-md"}`}
+        >
           <div className="relative">
             <SearchIcon className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
             <input
@@ -213,7 +215,7 @@ export function AppLanding() {
               interaktivt element inne i et annet er ugyldig og leses dårlig av
               skjermlesere (funn 10.2 / tiltak 28). */}
           <div className="mt-4 flex items-center justify-center gap-1">
-            <Dialog open={locOpen} onOpenChange={setLocOpen}>
+            <ResponsiveOverlay open={locOpen} onOpenChange={setLocOpen}>
               <button
                 type="button"
                 onClick={() => setLocOpen(true)}
@@ -246,8 +248,9 @@ export function AppLanding() {
                   <X className="size-4" />
                 </button>
               )}
-              <DialogContent
-                className="w-[calc(100vw-2rem)] max-w-sm rounded-2xl p-6"
+              <ResponsiveOverlayContent
+                className="sm:max-w-sm"
+                aria-labelledby="app-location-title"
                 tabIndex={-1}
                 onOpenAutoFocus={(e) => {
                   e.preventDefault();
@@ -255,7 +258,7 @@ export function AppLanding() {
                 }}
               >
                 <DialogHeader className="text-left">
-                  <DialogTitle>Velg sted</DialogTitle>
+                  <DialogTitle id="app-location-title">Velg sted</DialogTitle>
                 </DialogHeader>
                 <div className="mt-1 space-y-3">
                   <LocationPicker
@@ -271,8 +274,8 @@ export function AppLanding() {
                     />
                   )}
                 </div>
-              </DialogContent>
-            </Dialog>
+              </ResponsiveOverlayContent>
+            </ResponsiveOverlay>
           </div>
 
           {!isNative && (
@@ -528,8 +531,7 @@ export function AppLanding() {
         </section>
       )}
 
-      {/* Populært nå */}
-      <section className="mt-8 pl-5">
+      <section className="mt-6 pl-5">
         <div className="mb-3 flex items-center justify-between pr-5">
           <h2 className="font-display text-lg tracking-tight">Populært nå</h2>
           <Link

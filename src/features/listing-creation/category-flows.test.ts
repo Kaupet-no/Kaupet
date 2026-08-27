@@ -223,42 +223,23 @@ describe("effectiveFlowForCategory", () => {
 describe("resolveWizardPages", () => {
   const flowWithCategorySelect = ["category-select", ...DEFAULT_FIELD_GROUPS];
 
-  it("reproduces today's web split for the default flow (chunks of 4, ends pinned)", () => {
-    expect(resolveWizardPages(flowWithCategorySelect, { native: false })).toEqual([
+  it("bruker de samme fire oppgavesidene på web og native", () => {
+    const expected = [
       ["category-select"],
-      ["photos", "title", "category-attributes", "condition", "price"],
-      ["description-keywords"],
-      ["delivery", "location", "review-publish"],
-    ]);
-  });
-
-  it("gives every atomic field group its own native page", () => {
-    expect(resolveWizardPages(flowWithCategorySelect, { native: true })).toEqual([
-      ["category-select"],
-      ["photos"],
-      ["title"],
-      ["category-attributes"],
-      ["condition"],
-      ["price"],
-      ["description-keywords"],
-      ["delivery"],
-      ["location"],
+      ["photos", "title"],
+      ["category-attributes", "description-keywords"],
+      ["condition", "price", "delivery", "location"],
       ["review-publish"],
-    ]);
+    ];
+    expect(resolveWizardPages(flowWithCategorySelect, { native: false })).toEqual(expected);
+    expect(resolveWizardPages(flowWithCategorySelect, { native: true })).toEqual(expected);
   });
 
   it("produces fewer, smaller pages for a category with fewer groups", () => {
     const groups = ["photos", "title", "category-attributes", "review-publish"];
-    expect(resolveWizardPages(groups, { native: false })).toEqual([
-      ["photos", "title", "category-attributes"],
-      ["review-publish"],
-    ]);
-    expect(resolveWizardPages(groups, { native: true })).toEqual([
-      ["photos"],
-      ["title"],
-      ["category-attributes"],
-      ["review-publish"],
-    ]);
+    const expected = [["photos", "title"], ["category-attributes"], ["review-publish"]];
+    expect(resolveWizardPages(groups, { native: false })).toEqual(expected);
+    expect(resolveWizardPages(groups, { native: true })).toEqual(expected);
   });
 
   it("handles an empty field-group list", () => {
@@ -266,14 +247,50 @@ describe("resolveWizardPages", () => {
     expect(resolveWizardPages([], { native: true })).toEqual([]);
   });
 
-  it("solo-pages vehicle-registration and vehicle-360 wherever they land in the array", () => {
-    const groups = [
-      "category-select",
-      "vehicle-registration",
-      "vehicle-360",
-      "category-attributes",
+  it.each(["bil med oppslag", "uregistrert kjøretøy"])(
+    "holder 360° utenfor Bil og MC-minimumsflyten for %s",
+    () => {
+      const groups = [
+        "category-select",
+        "vehicle-registration",
+        "category-attributes",
+        "photos",
+        "title",
+        "condition",
+        "price",
+        "description-keywords",
+        "delivery",
+        "location",
+        "review-publish",
+      ];
+      expect(resolveWizardPages(groups, { native: false })).toEqual([
+        ["category-select"],
+        ["vehicle-registration"],
+        ["category-attributes", "photos", "title", "condition", "price"],
+        ["description-keywords"],
+        ["delivery", "location", "review-publish"],
+      ]);
+      expect(resolveWizardPages(groups, { native: true })).toEqual([
+        ["category-select"],
+        ["vehicle-registration"],
+        ["category-attributes"],
+        ["photos"],
+        ["title"],
+        ["condition"],
+        ["price"],
+        ["description-keywords"],
+        ["delivery"],
+        ["location"],
+        ["review-publish"],
+      ]);
+    },
+  );
+
+  it("beholder første kategoriside etter bekreftelse når påkrevde attributter finnes", () => {
+    const beforeConfirmation = [
       "photos",
-      "title",
+      "category-confirm",
+      "category-attributes",
       "condition",
       "price",
       "description-keywords",
@@ -281,31 +298,66 @@ describe("resolveWizardPages", () => {
       "location",
       "review-publish",
     ];
-    expect(resolveWizardPages(groups, { native: false })).toEqual([
-      ["category-select"],
-      ["vehicle-registration"],
-      ["vehicle-360"],
-      ["category-attributes", "photos", "title", "condition", "price"],
-      ["description-keywords"],
-      ["delivery", "location", "review-publish"],
-    ]);
-    expect(resolveWizardPages(groups, { native: true })).toEqual([
-      ["category-select"],
-      ["vehicle-registration"],
-      ["vehicle-360"],
-      ["category-attributes"],
+    const afterConfirmation = beforeConfirmation.filter((key) => key !== "category-confirm");
+
+    for (const native of [false, true]) {
+      expect(resolveWizardPages(beforeConfirmation, { native })).toEqual([
+        ["photos"],
+        ["category-confirm"],
+        ["category-attributes", "description-keywords"],
+        ["condition", "price", "delivery", "location"],
+        ["review-publish"],
+      ]);
+      expect(resolveWizardPages(afterConfirmation, { native })[1]).toEqual([
+        "category-attributes",
+        "description-keywords",
+      ]);
+    }
+  });
+
+  it("grupperer båtflyten i de samme oppgavene på web og native", () => {
+    const groups = [
+      "photos",
+      "boat-facts",
+      "category-attributes",
+      "description-keywords",
+      "delivery",
+      "location",
+      "review-publish",
+    ];
+
+    const expected = [
       ["photos"],
-      ["title"],
-      ["condition"],
-      ["price"],
-      ["description-keywords"],
-      ["delivery"],
-      ["location"],
+      ["boat-facts", "category-attributes", "description-keywords"],
+      ["delivery", "location"],
       ["review-publish"],
-    ]);
+    ];
+    expect(resolveWizardPages(groups, { native: false })).toEqual(expected);
+    expect(resolveWizardPages(groups, { native: true })).toEqual(expected);
+  });
+  it("holder registrering, fakta, tilstand og pris som stabile kjøretøysider", () => {
+    const groups = [
+      "photos",
+      "vehicle-registration",
+      "vehicle-facts",
+      "vehicle-condition",
+      "vehicle-price",
+      "review-publish",
+    ];
+    const forceBreakBeforeKeys = new Set(["vehicle-facts", "vehicle-condition"]);
+    const expected = [
+      ["photos"],
+      ["vehicle-registration"],
+      ["vehicle-facts"],
+      ["vehicle-condition"],
+      ["vehicle-price"],
+      ["review-publish"],
+    ];
+
+    expect(resolveWizardPages(groups, { native: false, forceBreakBeforeKeys })).toEqual(expected);
+    expect(resolveWizardPages(groups, { native: true, forceBreakBeforeKeys })).toEqual(expected);
   });
 });
-
 describe("withRuntimeFieldGroups", () => {
   const landingFlow = ["photos", "category-attributes", "description-keywords", "review-publish"];
   const vehicleFlow = [
@@ -332,11 +384,10 @@ describe("withRuntimeFieldGroups", () => {
     );
   });
 
-  it("adds the 360 step right after vehicle-registration and the price step right before review-publish", () => {
+  it("holder 360° utenfor minimumsflyten og legger pris rett før publisering", () => {
     expect(withRuntimeFieldGroups(vehicleFlow, { showCategoryConfirm: false })).toEqual([
       "photos",
       "vehicle-registration",
-      "vehicle-360",
       "category-attributes",
       "vehicle-facts",
       "vehicle-price",

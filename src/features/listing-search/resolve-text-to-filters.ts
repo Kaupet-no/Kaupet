@@ -16,6 +16,15 @@ import {
 } from "@/lib/category-filters";
 import { buildTree, type Category } from "@/lib/categories";
 
+export type InterpretedCriterion =
+  | { kind: "category"; slug: string; source: "text" | "user" }
+  | {
+      kind: "attribute";
+      key: string;
+      value: AttributeFilterValue;
+      source: "text" | "user";
+    };
+
 export type ResolvedTextFilters = {
   /** The remaining free-text query after every recognized phrase/word has
    * been stripped out. */
@@ -26,6 +35,8 @@ export type ResolvedTextFilters = {
   /** Attribute filter values recognized from equipment synonyms and
    * number+unit facts, keyed the same way handleAttrValueChange expects. */
   attrPatch: Record<string, AttributeFilterValue>;
+  /** Structured criteria in the same order they appeared in the input. */
+  criteria: InterpretedCriterion[];
 };
 
 /**
@@ -46,7 +57,12 @@ export async function resolveTextToFilters(params: {
 }): Promise<ResolvedTextFilters> {
   const { categories, vehicleBrands, allFilters } = params;
   let q = params.q.trim();
-  if (!q) return { q, attrPatch: {} };
+  if (!q) return { q, attrPatch: {}, criteria: [] };
+  const criterionPositions = new Map<string, number>();
+  const rememberPosition = (key: string, matchedText: string) => {
+    const position = params.q.toLocaleLowerCase().indexOf(matchedText.toLocaleLowerCase());
+    criterionPositions.set(key, Math.min(criterionPositions.get(key) ?? Infinity, position));
+  };
 
   // "attribute" is last-priority: it infers a category from a body-type
   // option word ("SUV") that only exists on one category (Bil), so a search
@@ -62,6 +78,7 @@ export async function resolveTextToFilters(params: {
   if (categoryMatch?.source === "category") {
     q = removeCategoryMatch(q, categoryMatch);
   }
+  if (categoryMatch) rememberPosition("category", categoryMatch.matchedText);
   // Attribute matches ("SUV") aren't stripped here — the word itself is
   // still valid input to the synonym matcher below, which will now resolve
   // it (and remove it from the free text) as the category-scoped body_type
@@ -77,6 +94,7 @@ export async function resolveTextToFilters(params: {
 
   const numericMatches = parseNumericFilters(q, attrFilters);
   for (const m of numericMatches) {
+    rememberPosition(`attribute:${m.filterKey}`, m.matchedText);
     const current = attrPatch[m.filterKey];
     const currentRange: { min?: number; max?: number } = current?.kind === "range" ? current : {};
     attrPatch[m.filterKey] = {
@@ -109,6 +127,7 @@ export async function resolveTextToFilters(params: {
       attrFilters.find((f) => f.key === m.filterKey) ??
       allFilters.find((f) => f.key === m.filterKey);
     if (!filter) continue;
+    rememberPosition(`attribute:${m.filterKey}`, m.matchedText);
     if (m.negated) {
       if ((filter.type === "select" || filter.type === "multiselect") && m.optionValue) {
         const current = attrPatch[m.filterKey];
@@ -135,5 +154,23 @@ export async function resolveTextToFilters(params: {
 
   q = stripFillerWords(q);
 
-  return { q, categorySlug: categoryMatch?.categorySlug, attrPatch };
+  const criteria: InterpretedCriterion[] = [
+    ...(categoryMatch
+      ? [{ kind: "category" as const, slug: categoryMatch.categorySlug, source: "text" as const }]
+      : []),
+    ...Object.entries(attrPatch).map(([key, value]) => ({
+      kind: "attribute" as const,
+      key,
+      value,
+      source: "text" as const,
+    })),
+  ].sort((a, b) => {
+    const key = (criterion: InterpretedCriterion) =>
+      criterion.kind === "category" ? "category" : `attribute:${criterion.key}`;
+    return (
+      (criterionPositions.get(key(a)) ?? Infinity) - (criterionPositions.get(key(b)) ?? Infinity)
+    );
+  });
+
+  return { q, categorySlug: categoryMatch?.categorySlug, attrPatch, criteria };
 }

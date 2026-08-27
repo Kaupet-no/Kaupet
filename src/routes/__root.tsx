@@ -34,6 +34,7 @@ import { TestEnvBanner } from "@/components/test-env-banner";
 import { TestEnvGate } from "@/components/test-env-gate";
 import { useIsTestEnv } from "@/lib/env";
 import { isComposerRoute } from "@/features/listing-creation/composer-route";
+import { isFocusedRoute } from "@/features/listing-creation/focused-route";
 
 function NotFoundComponent() {
   return (
@@ -192,40 +193,11 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="nb">
       <head>
         <HeadContent />
-        {/* Runs synchronously during parsing, before anything paints. Only
-            ever true inside the Capacitor WebView — real kaupet.no visitors
-            never see this class or the overlay below. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) document.documentElement.classList.add("native-boot");`,
-          }}
-        />
-        {/* Runs before paint so there is no light-mode flash for users who
-            have chosen (or whose system prefers) dark mode. Kept in sync
-            with the resolution logic in src/hooks/use-theme.tsx. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem("kaupet_theme");var d=t==="dark"||((t==="system"||!t)&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(d)document.documentElement.classList.add("dark");}catch(e){}})();`,
-          }}
-        />
-        <style>{`
-          #native-boot-splash { display: none; }
-          .native-boot #native-boot-splash {
-            display: flex;
-            position: fixed;
-            inset: 0;
-            z-index: 9999;
-            align-items: center;
-            justify-content: center;
-            background: #fbf9f3;
-            transition: opacity 200ms ease-out;
-          }
-          #native-boot-splash img { width: 64px; height: 64px; animation: native-boot-pulse 1.6s ease-in-out infinite; }
-          @keyframes native-boot-pulse {
-            0%, 100% { opacity: 0.85; transform: scale(1); }
-            50% { opacity: 1; transform: scale(1.08); }
-          }
-        `}</style>
+        {/* Runs synchronously during parsing, before anything paints (native-boot
+            class detection + dark-mode-flash prevention). Moved to a static,
+            same-origin file so it runs under the CSP's script-src 'self' without
+            needing 'unsafe-inline' or a maintained hash — see public/boot.js. */}
+        <script src="/boot.js" />
       </head>
       <body>
         {/* Same background/logo as capacitor.config.ts SplashScreen + the
@@ -314,6 +286,7 @@ function RootBody({ native }: { native: boolean }) {
   const keyboardVisible = useKeyboardVisible();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const composerRoute = isComposerRoute(pathname);
+  const bottomNavHidden = composerRoute || isFocusedRoute(pathname);
 
   useEffect(() => {
     // Runs after the browser has painted this render — by the time we get
@@ -361,7 +334,7 @@ function RootBody({ native }: { native: boolean }) {
       <ModerationBanner />
       <main
         id="main-content"
-        className={`flex-1${native && !keyboardVisible && !composerRoute ? " pb-bottom-nav" : ""}`}
+        className={`flex-1${native && !keyboardVisible && !bottomNavHidden ? " pb-bottom-nav" : ""}`}
       >
         <Outlet />
       </main>
@@ -408,7 +381,7 @@ function RootBody({ native }: { native: boolean }) {
           </div>
         </footer>
       )}
-      {native && !keyboardVisible && !composerRoute && <AppBottomNav />}
+      {native && !keyboardVisible && !bottomNavHidden && <AppBottomNav />}
       <FeedbackTag />
     </div>
   );

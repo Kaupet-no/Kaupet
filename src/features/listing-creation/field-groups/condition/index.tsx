@@ -54,7 +54,7 @@ export function Condition({
           setValue("condition", v as ListingFormShape["condition"], { shouldValidate: true })
         }
       >
-        <SelectTrigger id="condition-select" aria-label="Tilstand">
+        <SelectTrigger id="condition-select" aria-label="Tilstand" aria-required="true">
           <SelectValue placeholder="Velg tilstand">{selected?.label}</SelectValue>
         </SelectTrigger>
         <SelectContent>

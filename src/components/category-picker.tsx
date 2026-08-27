@@ -224,7 +224,7 @@ export function CategoryPicker({
         disabled={!!pendingSelection}
         data-testid="category-tile"
         data-category-name={cat.name_nb}
-        className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
+        className={`flex min-h-14 w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
           isPending
             ? "bg-primary/15 text-primary font-medium ring-1 ring-primary/40"
             : isSelected

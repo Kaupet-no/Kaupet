@@ -1,10 +1,12 @@
 import { MessageCircle, Share2, ShieldCheck, User as UserIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { FavoriteButton } from "@/components/favorite-button";
 import { ShareListingDialog } from "@/components/share-listing-dialog";
 import { StarRating } from "@/components/star-rating";
+import { ListingEvidence } from "@/components/listing-detail/listing-evidence";
+import { mapListingFactSource } from "@/components/listing-detail/fact-source";
+import { TradeSafetyAdvice } from "@/components/trade-safety-advice";
 
 type Seller = {
   display_name: string | null;
@@ -26,6 +28,7 @@ export function SellerContactPanel({
   shareOpen,
   onShareOpenChange,
   isNative,
+  hasRegistryData,
 }: {
   isLoggedIn: boolean;
   seller: Seller;
@@ -38,7 +41,18 @@ export function SellerContactPanel({
   shareOpen: boolean;
   onShareOpenChange: (open: boolean) => void;
   isNative?: boolean;
+  hasRegistryData: boolean;
 }) {
+  const evidenceSources = [
+    ...(hasRegistryData ? [mapListingFactSource("vehicleLookup")] : []),
+    mapListingFactSource("sellerFields"),
+    ...(seller?.created_at
+      ? [mapListingFactSource("profileAge", seller.created_at)]
+      : seller?.review_count
+        ? [mapListingFactSource("reviews")]
+        : []),
+  ];
+
   return (
     <div className="rounded-xl border border-border bg-card p-4">
       <div className="flex items-center gap-3">
@@ -61,9 +75,7 @@ export function SellerContactPanel({
                 {/* Statisk "Privatperson" inntil vi har forhandlerkontoer —
                     da avgjøres denne av kontotype i stedet for å alltid vise
                     privatperson. */}
-                <Badge variant="secondary" className="text-[10px] font-normal">
-                  Privatperson
-                </Badge>
+                <span className="text-xs text-muted-foreground">Privatperson</span>
               </div>
               {!!seller?.review_count && (
                 <div
@@ -97,15 +109,20 @@ export function SellerContactPanel({
         </div>
       </div>
 
+      <ListingEvidence sources={evidenceSources} />
+
       {!isOwner && (
-        <Button className="mt-4 w-full gap-2" onClick={onContact} disabled={contacting}>
-          <MessageCircle className="size-4" />
-          {contacting
-            ? "Åpner samtale…"
-            : isLoggedIn
-              ? "Send melding til selger"
-              : "Logg inn for å sende melding"}
-        </Button>
+        <div className="mt-4 space-y-3">
+          <TradeSafetyAdvice context="contact" />
+          <Button className="w-full gap-2" onClick={onContact} disabled={contacting}>
+            <MessageCircle className="size-4" />
+            {contacting
+              ? "Åpner samtale…"
+              : isLoggedIn
+                ? "Send melding til selger"
+                : "Logg inn for å sende melding"}
+          </Button>
+        </div>
       )}
       <div className="mt-2 flex flex-col gap-2">
         <FavoriteButton listingId={listingId} variant="full" size="lg" className="w-full" />

@@ -565,30 +565,32 @@ function NewWtbPage() {
         onCancel={() => void navigate({ to: "/" })}
         notice={
           restorableDraft ? (
-            <div className="mt-4 flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
-              <span className="flex-1">
+            <div className="mt-4 flex flex-col items-stretch gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm sm:flex-row sm:items-center">
+              <span className="min-w-0 flex-1">
                 {restorableDraft.title.trim()
                   ? `Utkast for annonse "${restorableDraft.title}" er lagret. Vil du fortsette der du slapp?`
                   : "Du har et lagret utkast. Vil du fortsette der du slapp?"}
               </span>
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                className="native-touch-target"
-                onClick={restoreDraft}
-              >
-                Gjenopprett
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className="native-touch-target"
-                onClick={discardDraft}
-              >
-                Forkast
-              </Button>
+              <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="native-touch-target"
+                  onClick={restoreDraft}
+                >
+                  Gjenopprett
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="native-touch-target"
+                  onClick={discardDraft}
+                >
+                  Forkast
+                </Button>
+              </div>
             </div>
           ) : undefined
         }
@@ -720,6 +722,13 @@ function NewWtbPage() {
                 <div className="space-y-4 py-6 text-center">
                   <div className="mx-auto h-6 w-2/3 animate-pulse rounded bg-muted" />
                   <p className="text-sm text-muted-foreground">{categoryLoadingMessage}</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setCategoryConfirmShowPicker(true)}
+                  >
+                    Velg kategori selv
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-4 py-4 text-center">

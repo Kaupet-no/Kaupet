@@ -1,5 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { MessageCircle, Search } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
@@ -7,6 +9,19 @@ import { NotificationsBell } from "@/components/notifications-bell";
 import { useUnreadConversationsCount } from "@/hooks/use-unread";
 import { useSearchPanel } from "@/features/listing-search/search-panel/search-panel-context";
 import { trackProductEvent } from "@/lib/product-analytics";
+
+const HEADER_SEARCH_SLOT_ID = "header-search-slot";
+
+export function HeaderSearchPortal({ children }: { children: ReactNode }) {
+  const [mounted, setMounted] = useState(false);
+
+  // This post-mount render is the hydration boundary for the client-only portal target.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => setMounted(true), []);
+
+  const slot = mounted ? document.getElementById(HEADER_SEARCH_SLOT_ID) : null;
+  return slot ? createPortal(children, slot) : null;
+}
 
 export function SiteHeader() {
   const { user } = useAuth();
@@ -26,7 +41,7 @@ export function SiteHeader() {
           <span className="font-display text-xl text-muted-foreground">no</span>
         </Link>
 
-        <div id="header-search-slot" className="hidden flex-1 md:block" />
+        <div id={HEADER_SEARCH_SLOT_ID} className="hidden flex-1 md:block" />
 
         <div className="ml-auto flex items-center gap-2">
           <Button
@@ -50,7 +65,7 @@ export function SiteHeader() {
             </>
           ) : (
             <>
-              <Button asChild size="sm" variant="ghost">
+              <Button asChild size="sm" variant="ghost" className="max-[359px]:hidden">
                 <Link to="/auth">Logg inn</Link>
               </Button>
               <Button asChild size="sm">

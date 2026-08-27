@@ -72,7 +72,7 @@ function SortableImageItem({
             Hoved
           </span>
         )}
-        <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent p-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100">
+        <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-black/70 p-1 opacity-100 transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-none sm:opacity-0 sm:group-hover:opacity-100">
           <div className="flex">
             <button
               type="button"
@@ -224,7 +224,7 @@ export function ImageUploader({
         }}
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
-        className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-6 text-center transition ${
+        className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-6 text-center transition-[background-color,border-color,opacity,transform] duration-150 ease-out motion-reduce:transition-none ${
           dragOver
             ? "border-primary bg-primary/5"
             : "border-border bg-surface hover:border-primary/40"

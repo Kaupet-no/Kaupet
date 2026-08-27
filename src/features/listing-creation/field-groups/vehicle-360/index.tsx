@@ -5,14 +5,11 @@ import { Vehicle360CaptureLauncher } from "@/components/vehicle-360-capture-laun
 import type { WizardSharedProps } from "../types";
 
 /**
- * 360°-opptak som eget, valgfritt steg i kjøretøyflyten. Ligger her og ikke
- * på bildesteget fordi bildesteget nå alltid er steg 1 — før kategori er
- * bekreftet — og 360-opptak bare gir mening for Bil og MC. Steget injiseres
- * derfor på runtime rett etter at kjøretøyet er bekreftet (se
- * `fieldGroupKeys`-memoet i ny-annonse.tsx), aldri fra en lagret flow.
+ * Valgfri 360°-forbedring for kjøretøy. Rendres på reviewflaten etter de
+ * ordinære annonseopplysningene, ikke som et eget stopp i minimumsflyten.
  *
  * Har bevisst ingen validering i registry-en: opptaket er et tillegg som
- * gjør annonsen bedre, og skal aldri blokkere "Neste".
+ * gjør annonsen bedre, og skal aldri blokkere publisering.
  */
 export function Vehicle360Group(props: WizardSharedProps) {
   return (

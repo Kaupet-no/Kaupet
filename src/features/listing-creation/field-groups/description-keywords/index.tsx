@@ -55,6 +55,7 @@ export function DescriptionField({
         rows={native ? undefined : 5}
         className={native ? "flex-1 resize-none min-h-0" : undefined}
         placeholder={placeholder}
+        aria-required="true"
         aria-invalid={!!errors.description}
         aria-describedby={errors.description ? "description-error" : undefined}
         {...register("description")}
@@ -122,6 +123,7 @@ export function KeywordChips({
  * rent beskrivelse + nøkkelord for alle kategorier, kjøretøy inkludert.
  */
 export function DescriptionKeywordsGroup(props: WizardSharedProps) {
+  if (props.boatFactsActive) return null;
   return (
     <>
       <DescriptionField {...props} />

@@ -37,6 +37,12 @@ mot [age](https://github.com/FiloSottile/age)-nøkler, og kan trygt committes ti
 - Redigere staging-hemmeligheter: `bun run secrets:edit:staging`
 - Etter at noen er lagt til/fjernet i `.sops.yaml`: `bun run secrets:rekey`
 
+## AI-kategoriforslag
+
+Mistral Small 4 krever `MISTRAL_API_KEY` i lokale miljøer og som Cloudflare
+Worker-secret. Legg den inn med SOPS (`bun run secrets:edit` og
+`bun run secrets:edit:staging`); aldri legg nøkkelen i `VITE_*` eller klartekst.
+
 ## Viktig
 
 - Den private nøkkelen (`keys.txt`) skal **aldri** committes eller deles

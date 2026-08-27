@@ -28,6 +28,7 @@ export type VehicleLookupResult = {
   avgiftsklasse_name: string | null;
   body_type_code: string | null;
   body_type_hint: string | null;
+  body_type: string | null;
 };
 
 /** Filters reviewed directly after an SVV lookup and therefore hidden from
@@ -39,10 +40,11 @@ export const VEHICLE_LOOKUP_FILTER_KEYS = [
   "weight_kg",
   "max_total_weight_kg",
   "length_m",
-  "power_hk",
   "tow_hitch",
   "max_tow_weight_kg",
   "seats",
+  "body_type",
+  "imported_used",
   "color",
   "next_eu_control",
   "eu_control_exempt",

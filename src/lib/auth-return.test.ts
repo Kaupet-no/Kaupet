@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { safeReturnTo } from "./auth-return";
 
+// Dekker AUTH-03 (docs/TESTSTRATEGI.md § 11.1)
 describe("safeReturnTo", () => {
   it("keeps internal paths with search and hash", () => {
     expect(safeReturnTo("/annonser?q=sykkel#treff")).toBe("/annonser?q=sykkel#treff");

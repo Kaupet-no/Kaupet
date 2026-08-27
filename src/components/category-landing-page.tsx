@@ -36,6 +36,7 @@ import { useAnnonserSearchState } from "@/features/listing-search/use-annonser-s
 import { useFilterFacetCounts } from "@/features/listing-search/use-filter-facet-counts";
 import { useListingsQuery } from "@/features/listing-search/use-listings-query";
 import { useTextToFilterPipeline } from "@/features/listing-search/use-text-to-filter-pipeline";
+import { useZeroResultExpansion } from "@/features/listing-search/zero-result-expansion";
 import { useIsNative } from "@/hooks/use-is-native";
 
 type Search = z.infer<typeof searchSchema>;
@@ -126,7 +127,9 @@ export function CategoryLandingPage({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("category_filters")
-        .select("id, category_id, key, label_nb, type, unit, options, sort_order, is_primary")
+        .select(
+          "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value, depends_on_not_value, is_optional",
+        )
         .order("sort_order");
       if (error) throw error;
       return (data ?? []).map(normalizeFilter);
@@ -187,7 +190,7 @@ export function CategoryLandingPage({
     updateSearch,
     handleLocationChange,
     resetFilters,
-    advancedInitial,
+    appliedSearch,
     applyPanelDraft,
   } = useAnnonserSearchState({
     search: effectiveSearch,
@@ -283,6 +286,14 @@ export function CategoryLandingPage({
 
   const listings = useMemo(() => listingsData?.pages.flatMap((p) => p.rows), [listingsData]);
   const totalCount = listingsData?.pages[0]?.totalCount ?? null;
+  const { expansion: zeroResultExpansion, isPending: zeroResultExpansionPending } =
+    useZeroResultExpansion({
+      applied: appliedSearch,
+      filters: attrFilters,
+      categories: categories ?? [],
+      enabled: !isLoading && totalCount === 0 && !!categories,
+      canRemoveCategory: false,
+    });
 
   const cards: ListingCardData[] = (listings ?? []).map((l) => ({
     id: l.id,
@@ -327,14 +338,12 @@ export function CategoryLandingPage({
 
   const searchPanelResults: SearchPanelResultsContext | null = isNative
     ? {
-        q: search.q,
-        value: advancedInitial,
-        onApply: (value, nextAttributes) => {
-          setQDraft(value.terms.join(" "));
-          applyPanelDraft(value, nextAttributes);
+        applied: appliedSearch,
+        onApply: (draft) => {
+          setQDraft(draft.value.terms.join(" "));
+          applyPanelDraft(draft);
         },
         attributeFilters: attrFilters,
-        attributeValues: attrValues,
         attributeCounts: facetCounts,
         resultCount: totalCount ?? cards.length,
       }
@@ -435,13 +444,9 @@ export function CategoryLandingPage({
           isFetchingNextPage={isFetchingNextPage}
           fetchNextPage={() => void fetchNextPage()}
           resetFilters={resetFilters}
-          onDropLastWord={(nextQ) => {
-            setQDraft(nextQ);
-            updateSearch({ q: nextQ });
-          }}
-          attrFilters={attrFilters}
-          attrValues={attrValues}
-          onRemoveAttr={(key) => removeAttrWithRestore(key)}
+          zeroResultExpansion={zeroResultExpansion}
+          zeroResultExpansionPending={zeroResultExpansionPending}
+          onApplyZeroResultExpansion={(expansion) => applyPanelDraft(expansion.applied)}
           mapListings={mapListings}
           mapCenter={mapCenter}
           radiusKm={search.radius ?? 10}

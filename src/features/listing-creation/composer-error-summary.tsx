@@ -13,7 +13,14 @@ export function ComposerErrorSummary({ message }: { message: string | null }) {
   if (!message) return null;
 
   return (
-    <Alert ref={ref} variant="destructive" tabIndex={-1} className="mt-4">
+    <Alert
+      ref={ref}
+      variant="destructive"
+      tabIndex={-1}
+      aria-live="assertive"
+      aria-atomic="true"
+      className="mt-4"
+    >
       <AlertCircle className="size-4" aria-hidden />
       <AlertTitle>Kontroller opplysningene</AlertTitle>
       <AlertDescription>{message}</AlertDescription>

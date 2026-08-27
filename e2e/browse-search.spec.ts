@@ -6,7 +6,7 @@
  * The root marks the document after React hydration, so interactions never
  * race the SSR form before its submit handler is attached.
  */
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 test("søker fra forsiden og lander på annonser-siden med treff", async ({ page }) => {
   await page.goto("/");

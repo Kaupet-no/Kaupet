@@ -1,60 +1,98 @@
-import { Loader2, MapPin } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Turnstile } from "@marsidev/react-turnstile";
 
+import { ListingCardContent, type ListingCardData } from "@/components/listing-card";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ComposerReview } from "@/features/listing-creation/composer-review";
+import {
+  ComposerReview,
+  ComposerReviewStatuses,
+} from "@/features/listing-creation/composer-review";
 
-import type { WizardSharedProps } from "../types";
+import type { WizardSharedProps, ComposerReviewStatus } from "../types";
+import { Vehicle360Group } from "../vehicle-360";
 
 type ReviewPreviewProps = Pick<
   WizardSharedProps,
-  "images" | "title" | "subtitle" | "previewPrice" | "city" | "postalCode" | "categoryLabel"
->;
+  | "images"
+  | "title"
+  | "subtitle"
+  | "priceNok"
+  | "isFree"
+  | "city"
+  | "postalCode"
+  | "categorySlug"
+  | "attributes"
+> & {
+  headingId?: string;
+  onPreview?: () => void;
+};
 
-/** Preview card showing how the listing will look in the search list. */
+/** Preview card using the same presentation as the public listing grid. */
 export function ReviewPreview({
   images,
   title,
   subtitle,
-  previewPrice,
+  priceNok,
+  isFree,
   city,
-  postalCode,
-  categoryLabel,
+  categorySlug,
+  attributes,
+  headingId = "listing-preview-title",
+  onPreview,
 }: ReviewPreviewProps) {
+  const listing: ListingCardData = {
+    id: "preview",
+    kaupet_code: "",
+    title: title || "—",
+    subtitle: subtitle || null,
+    price_nok: typeof priceNok === "number" ? priceNok : null,
+    is_free: isFree ?? false,
+    city: city || null,
+    created_at: "",
+    cover_path: null,
+    mileage_km: typeof attributes?.mileage_km === "number" ? attributes.mileage_km : null,
+    engine_hours: typeof attributes?.engine_hours === "number" ? attributes.engine_hours : null,
+    category_slug: categorySlug,
+    attributes,
+  };
+  const card = (
+    <div
+      className={`group w-full overflow-hidden rounded-lg border border-border bg-card text-left transition-[border-color,box-shadow] duration-150 hover:border-primary/70 hover:shadow-sm ${
+        onPreview ? "cursor-pointer hover:bg-primary/5" : ""
+      }`}
+    >
+      <ListingCardContent
+        listing={listing}
+        imgUrl={images[0]?.previewUrl ?? null}
+        missingPriceLabel="Pris er foreløpig ikke satt"
+      />
+    </div>
+  );
+
   return (
-    <section className="space-y-2">
-      <Label>Forhåndsvisning</Label>
+    <section aria-labelledby={headingId} className="space-y-2">
+      <h3 id={headingId} className="text-sm font-semibold">
+        Forhåndsvisning
+      </h3>
       <p className="text-xs text-muted-foreground">
         Dette er slik annonsen din vil se ut i søkelisten
       </p>
-      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm sm:max-w-[220px]">
-        <div className="aspect-square bg-muted">
-          {images[0] ? (
-            <img src={images[0].previewUrl} alt="" className="size-full object-cover" aria-hidden />
-          ) : (
-            <div className="flex size-full flex-col items-center justify-center gap-1 text-muted-foreground">
-              <span className="text-2xl">📷</span>
-              <span className="text-xs">Ingen bilde</span>
-            </div>
-          )}
-        </div>
-        <div className="space-y-0.5 p-3">
-          <p className="line-clamp-2 text-sm font-medium leading-snug">{title || "—"}</p>
-          {subtitle && <p className="line-clamp-1 text-xs text-muted-foreground">{subtitle}</p>}
-          {previewPrice && <p className="font-display text-base font-semibold">{previewPrice}</p>}
-          {(city || postalCode) && (
-            <p className="flex items-center gap-1 text-xs text-muted-foreground">
-              <MapPin className="size-3" /> {city || postalCode}
-            </p>
-          )}
-          {categoryLabel && (
-            <p className="text-xs text-muted-foreground truncate">{categoryLabel}</p>
-          )}
-        </div>
-      </div>
+      {onPreview ? (
+        <button
+          type="button"
+          onClick={onPreview}
+          aria-label="Trykk for å forhåndsvise annonsen"
+          className="block w-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:max-w-[220px]"
+        >
+          {card}
+        </button>
+      ) : (
+        <div className="sm:max-w-[220px]">{card}</div>
+      )}
+      {onPreview && (
+        <p className="text-xs text-muted-foreground">Trykk for å forhåndsvise annonsen</p>
+      )}
     </section>
   );
 }
@@ -89,7 +127,6 @@ type PublishActionsProps = {
   setTurnstileToken: (token: string | null) => void;
   mutationIsPending: boolean;
   onCancel: () => void;
-  onPreview: () => void;
 };
 
 /**
@@ -99,20 +136,105 @@ type PublishActionsProps = {
  * renders it explicitly on the last page instead of via this wrapper.
  */
 export function ReviewPublishGroup(props: WizardSharedProps) {
-  const missing: string[] = [];
-  if (props.images.length === 0) missing.push("bilde");
-  if (!props.previewPrice) missing.push("pris");
+  const improvementGroups =
+    props.improvementGroups ??
+    props.improvementGroupKeys.map((key) => ({
+      key,
+      classification:
+        key === "vehicle-360" || key === "vehicle-equipment"
+          ? ("optionalEnhancement" as const)
+          : ("recommendedForTrust" as const),
+    }));
+  const improvementClassification = (key: string) =>
+    improvementGroups.find((group) => group.key === key)?.classification ?? "recommendedForTrust";
+  const editGroup = (key: string) => {
+    const section =
+      key === "category-select" || key === "category-confirm"
+        ? "category"
+        : key === "photos" || key === "title"
+          ? "content"
+          : key === "delivery" || key === "location"
+            ? "location"
+            : "details";
+    props.onEditReviewSection(section, { groupKey: key });
+  };
+  const improvements = (
+    [
+      props.improvementGroupKeys.includes("photos") && props.images.length === 0
+        ? {
+            key: "photos",
+            label: "Legg til bilder",
+            classification: improvementClassification("photos"),
+            onAction: () => editGroup("photos"),
+          }
+        : null,
+      props.improvementGroupKeys.some((key) => key === "price" || key === "vehicle-price") &&
+      !props.previewPrice
+        ? {
+            key: "price",
+            label: "Oppgi pris",
+            classification: improvementClassification(
+              props.improvementGroupKeys.includes("price") ? "price" : "vehicle-price",
+            ),
+            onAction: () =>
+              editGroup(props.improvementGroupKeys.includes("price") ? "price" : "vehicle-price"),
+          }
+        : null,
+      props.improvementGroupKeys.includes("location") && !props.city && !props.postalCode
+        ? {
+            key: "location",
+            label: "Oppgi sted",
+            classification: improvementClassification("location"),
+            onAction: () => editGroup("location"),
+          }
+        : null,
+      props.isVehicle && props.improvementGroupKeys.includes("vehicle-360")
+        ? {
+            key: "vehicle-360",
+            label: "Ta 360°-opptak",
+            classification: improvementClassification("vehicle-360"),
+            onAction: () => editGroup("vehicle-360"),
+          }
+        : null,
+    ] as (ComposerReviewStatus | null)[]
+  ).filter((item): item is ComposerReviewStatus => item !== null);
+  const required = (
+    props.publishingRequirements && props.publishingRequirements.length > 0
+      ? props.publishingRequirements
+      : props.publishingRequirementErrors.map((label, index) => ({
+          key: `publishing-requirement-${index}`,
+          label,
+          classification: "requiredToPublish" as const,
+        }))
+  ) as ComposerReviewStatus[];
 
   return (
     <>
-      {props.native && missing.length > 0 && (
-        <Alert variant="warning">
-          <AlertTitle>Kan forbedres før publisering</AlertTitle>
-          <AlertDescription>
-            Annonsen mangler {missing.join(" og ")}. Du kan fortsatt publisere, eller gå tilbake og
-            legge det til.
-          </AlertDescription>
-        </Alert>
+      <section aria-labelledby="publishing-readiness-title" className="space-y-2">
+        <h3 id="publishing-readiness-title" className="text-lg font-semibold">
+          Publiseringsklar
+        </h3>
+        {required.length > 0 ? (
+          <ComposerReviewStatuses items={required} />
+        ) : (
+          <p className="text-sm text-muted-foreground">Alle publiseringskrav er oppfylt.</p>
+        )}
+      </section>
+      {improvements.length > 0 && (
+        <section aria-labelledby="listing-improvements-title" className="space-y-3">
+          <div>
+            <h3 id="listing-improvements-title" className="text-lg font-semibold">
+              Dette vil gi en bedre annonse
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Valgfritt – du kan fortsatt publisere annonsen.
+            </p>
+          </div>
+          <ComposerReviewStatuses items={improvements} />
+          {props.isVehicle && props.improvementGroupKeys.includes("vehicle-360") && (
+            <Vehicle360Group {...props} />
+          )}
+        </section>
       )}
       <ComposerReview
         items={[
@@ -147,10 +269,13 @@ export function ReviewPublishGroup(props: WizardSharedProps) {
         images={props.images}
         title={props.title}
         subtitle={props.subtitle}
-        previewPrice={props.previewPrice}
+        priceNok={props.priceNok}
+        isFree={props.isFree}
         city={props.city}
         postalCode={props.postalCode}
-        categoryLabel={props.categoryLabel}
+        categorySlug={props.categorySlug}
+        attributes={props.attributes}
+        onPreview={props.onPreview}
       />
       {props.attributes.vehicle_lookup && (
         <p className="text-xs text-muted-foreground">
@@ -165,15 +290,6 @@ export function ReviewPublishGroup(props: WizardSharedProps) {
     </>
   );
 }
-
-/**
- * Turnstile + "Avbryt" + "Publiser annonse" submit button — shared verbatim.
- * Renders as flat siblings (not a wrapping div) so the caller's own
- * flex-wrap row controls line breaks: "Avbryt" can wrap up onto "Tilbake"s
- * line, while "Forhåndsvis annonse" + "Publiser annonse" are grouped in one
- * inner (non-wrapping) div so that pair always moves to a new line together
- * instead of splitting across two lines.
- */
 export function PublishActions({
   native,
   turnstileEnabled,
@@ -181,7 +297,6 @@ export function PublishActions({
   setTurnstileToken,
   mutationIsPending,
   onCancel,
-  onPreview,
 }: PublishActionsProps) {
   if (native) {
     return (
@@ -213,9 +328,6 @@ export function PublishActions({
         Avbryt
       </Button>
       <div className="flex items-center gap-3">
-        <Button type="button" variant="outline" onClick={onPreview} disabled={mutationIsPending}>
-          Forhåndsvis annonse
-        </Button>
         {turnstileEnabled && (
           <Turnstile
             siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}

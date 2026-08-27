@@ -63,6 +63,13 @@ mønster for disse filene. Se commit `71fa7bd` for konkret eksempel på buggen
 denne typen drift forårsaket (leveringsvalidering som brøt for kjøretøy fordi
 en `isVehicle`-sjekk manglet ett sted).
 
+## Test
+
+Den normative teststrategien ligger i [docs/TESTSTRATEGI.md](docs/TESTSTRATEGI.md):
+ISTQB-basert testpolicy, risikomatrise, testnivåer, playbooks for AI-agenter
+(§ 10) og en konkret testkatalog for hele repoet (§ 11). Før du skriver eller
+endrer en test: finn riktig nivå i § 3 og følg playbooken i § 10.
+
 ## Kjøretester og typecheck
 
 - `bun run test` — vitest (unit/komponent). `bun run test:coverage` kjører

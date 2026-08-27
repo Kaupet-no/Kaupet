@@ -37,6 +37,7 @@ import { Vehicle360CaptureLauncher } from "@/components/vehicle-360-capture-laun
 import { currentReturnTo } from "@/lib/auth-return";
 import { savePendingAuthIntent, takePendingAuthIntent } from "@/lib/pending-auth-intent";
 import { trackProductEvent } from "@/lib/product-analytics";
+import { parseVehicleLookup } from "@/lib/vehicle/parse-vehicle-lookup";
 
 // crypto.randomUUID() requires a secure context and isn't available in every
 // WebView — fall back to a non-crypto random ID so anonymous view-count
@@ -718,6 +719,7 @@ function ListingDetailPage() {
           shareOpen={shareOpen}
           onShareOpenChange={handleShareOpenChange}
           isNative={isNative}
+          hasRegistryData={parseVehicleLookup(attributes.vehicle_lookup) != null}
         />
       }
       stickyContactSlot={

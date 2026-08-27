@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildTree,
+  resolveCategoryIds,
   resolveHeroCategory,
   selectAllForParent,
   type Category,
@@ -76,5 +77,13 @@ describe("resolveHeroCategory", () => {
 
   it("returns nothing for an unknown slug", () => {
     expect(resolveHeroCategory(["interior", "finnes-ikke"], tree)).toBeNull();
+  });
+});
+
+describe("resolveCategoryIds", () => {
+  it("includes descendants at every depth for a selected hub", () => {
+    expect(resolveCategoryIds(["interior"], categories)).toEqual(["1", "2", "3"]);
+    expect(resolveCategoryIds(["mobler"], categories)).toEqual(["2", "3"]);
+    expect(resolveCategoryIds(["sofa"], categories)).toEqual(["3"]);
   });
 });

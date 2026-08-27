@@ -33,13 +33,14 @@ export function CategoryAttributes({
   attributesTouched,
   vehicleAttributeHiddenKeys,
   behavior,
+  boatFactsActive,
 }: WizardSharedProps) {
   if (!behavior.showGenericAttributes) return null;
 
   return (
     <section className="space-y-2">
       <div className="flex items-center gap-1.5">
-        <Label>
+        <Label id="category-attributes-label">
           Kategori
           <RequiredMark />
         </Label>
@@ -85,9 +86,11 @@ export function CategoryAttributes({
       <button
         type="button"
         onClick={() => setCategoryPickerOpen(true)}
+        aria-label={`Kategori${categoryLabel ? `, ${categoryLabel}` : ""}`}
+        aria-required="true"
         aria-invalid={!!errors.category_id}
         aria-describedby={errors.category_id ? "category-error" : undefined}
-        className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors ${
+        className={`native-touch-target flex min-h-12 w-full items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors ${
           errors.category_id
             ? "border-destructive"
             : categoryLabel
@@ -105,17 +108,18 @@ export function CategoryAttributes({
         </p>
       )}
 
-      {activeModules.map(({ key, Component }) => (
-        <Component
-          key={key}
-          categoryId={categoryId || null}
-          categories={categories ?? []}
-          value={attributes}
-          onChange={onAttributesChange}
-          showErrors={attributesTouched}
-          hiddenKeys={vehicleAttributeHiddenKeys}
-        />
-      ))}
+      {!boatFactsActive &&
+        activeModules.map(({ key, Component }) => (
+          <Component
+            key={key}
+            categoryId={categoryId || null}
+            categories={categories ?? []}
+            value={attributes}
+            onChange={onAttributesChange}
+            showErrors={attributesTouched}
+            hiddenKeys={vehicleAttributeHiddenKeys}
+          />
+        ))}
     </section>
   );
 }

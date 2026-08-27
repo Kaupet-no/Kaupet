@@ -33,7 +33,9 @@ export function useLandingCategories() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("category_filters")
-        .select("id, category_id, key, label_nb, type, unit, options, sort_order, is_primary")
+        .select(
+          "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value, depends_on_not_value, is_optional",
+        )
         .order("sort_order");
       if (error) throw error;
       return (data ?? []).map(normalizeFilter);

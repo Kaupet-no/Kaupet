@@ -18,6 +18,10 @@ import { DeliveryGroup, LocationGroup } from "./delivery-location";
 import { ReviewPublishGroup } from "./review-publish";
 import type { ListingFormShape, WizardSharedProps } from "./types";
 import type { CategoryBehavior } from "@/lib/category-behavior";
+import {
+  LISTING_TASK_BY_FIELD_GROUP_KEY,
+  type ListingTask,
+} from "@/features/listing-creation/category-flows";
 import { getAxleConfigOptions } from "@/lib/vehicle/vehicle-options";
 
 /** Context passed to a field-group's `validateExtra`, mirroring what
@@ -25,8 +29,9 @@ import { getAxleConfigOptions } from "@/lib/vehicle/vehicle-options";
 export type ValidateCtx = {
   images: WizardSharedProps["images"];
   attributes: WizardSharedProps["attributes"];
+  boatFactsActive: boolean;
   activeModules: WizardSharedProps["activeModules"];
-  missingFilters: { label_nb: string }[];
+  missingFilters: { key: string; label_nb: string }[];
   isFree: boolean;
   priceNok: WizardSharedProps["priceNok"];
   categoryId: string;
@@ -42,41 +47,42 @@ export type ValidateCtx = {
 
 export type FieldGroup = {
   key: string;
+  classification: "requiredToPublish" | "recommendedForTrust" | "optionalEnhancement";
   Component: ComponentType<WizardSharedProps>;
   fieldsToValidate?: (keyof ListingFormShape)[];
   validateExtra?: (
     ctx: ValidateCtx,
-  ) =>
-    | "SHOW_NO_IMAGE_DIALOG"
-    | "SHOW_NO_PRICE_DIALOG"
-    | string
-    | { field: string; message: string }
-    | null;
+  ) => "SHOW_NO_IMAGE_DIALOG" | string | { field: string; message: string } | null;
 };
 
 export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
   "category-select": {
     key: "category-select",
+    classification: "requiredToPublish",
     Component: CategorySelect,
     fieldsToValidate: ["category_id"],
   },
   "category-confirm": {
     key: "category-confirm",
+    classification: "requiredToPublish",
     Component: CategoryConfirm,
     fieldsToValidate: ["category_id"],
   },
   photos: {
     key: "photos",
+    classification: "recommendedForTrust",
     Component: PhotosGroup,
     validateExtra: (ctx) => (ctx.images.length === 0 ? "SHOW_NO_IMAGE_DIALOG" : null),
   },
   title: {
     key: "title",
+    classification: "requiredToPublish",
     Component: TitleGroup,
     fieldsToValidate: ["title"],
   },
   "vehicle-registration": {
     key: "vehicle-registration",
+    classification: "requiredToPublish",
     Component: VehicleRegistration,
     fieldsToValidate: ["category_id"],
     validateExtra: (ctx) => {
@@ -87,9 +93,13 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
       if (ctx.categoryId === ctx.bilOgMcCategoryId) {
         return "Velg underkategori før du går videre.";
       }
-      // Merke og modell oppgis av brukeren her (SVV er ikke presis nok på
-      // disse, se VehicleRegistration) og er påkrevd uansett hvilken vei
-      // brukeren tar videre.
+      // Registrert vei fyller merke/modell fra oppslaget og lar brukeren
+      // korrigere dem i samme bekreftelse. Manuell vei må fortsatt fylle dem
+      // inn på siden.
+      if (ctx.vehicleLookupResult) return null;
+      if (ctx.vehicleRegistered) {
+        return "Skriv inn registreringsnummer, eller kryss av for at kjøretøyet ikke er registrert.";
+      }
       const brand = ctx.attributes.brand;
       if (typeof brand !== "string" || !brand.trim()) {
         return { field: "brand", message: "Velg merke før du går videre." };
@@ -117,28 +127,25 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
           message: "Svar på om hengeren er fritatt for EU-kontroll før du går videre.",
         };
       }
-      // Deretter: enten er et oppslag allerede gjort (reg.nr.-popupen tar
-      // over herfra), eller så har brukeren krysset av for at kjøretøyet
-      // ikke er registrert og må ha fylt inn de tekniske feltene selv.
-      // Selve oppslaget trigges av Neste-knappen (se goToNextPage), som
-      // kjører før denne valideringen når regnr er utfylt.
-      if (ctx.vehicleLookupResult) return null;
-      if (ctx.vehicleRegistered) {
-        return "Skriv inn registreringsnummer, eller kryss av for at kjøretøyet ikke er registrert.";
-      }
-      if (ctx.missingFilters.length > 0) {
-        return `Fyll inn ${ctx.missingFilters.map((f) => f.label_nb).join(", ")} før du går videre.`;
+      const firstMissingFilter = ctx.missingFilters[0];
+      if (firstMissingFilter) {
+        return {
+          field: firstMissingFilter.key,
+          message: `Fyll inn ${firstMissingFilter.label_nb.toLowerCase()} før du går videre.`,
+        };
       }
       return null;
     },
   },
   "vehicle-360": {
     key: "vehicle-360",
+    classification: "optionalEnhancement",
     Component: Vehicle360Group,
     // Ingen validering — 360-opptak er valgfritt og skal aldri blokkere.
   },
   "category-attributes": {
     key: "category-attributes",
+    classification: "requiredToPublish",
     Component: CategoryAttributes,
     fieldsToValidate: ["category_id"],
     validateExtra: (ctx) => {
@@ -146,9 +153,13 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
       // vehicle-registration — denne field group-en rendrer ingenting for
       // kjøretøy (se CategoryAttributes), så den skal heller ikke validere
       // noe her.
-      if (!ctx.behavior.showGenericAttributes) return null;
-      if (ctx.missingFilters.length > 0) {
-        return `Fyll inn ${ctx.missingFilters.map((f) => f.label_nb).join(", ")} før du går videre.`;
+      if (!ctx.behavior.showGenericAttributes || ctx.boatFactsActive) return null;
+      const firstMissingFilter = ctx.missingFilters[0];
+      if (firstMissingFilter) {
+        return {
+          field: firstMissingFilter.key,
+          message: `Fyll inn ${firstMissingFilter.label_nb.toLowerCase()} før du går videre.`,
+        };
       }
       for (const mod of ctx.activeModules) {
         const error = mod.validateExtra?.(ctx.attributes);
@@ -159,20 +170,23 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
   },
   condition: {
     key: "condition",
+    classification: "requiredToPublish",
     Component: Condition,
     fieldsToValidate: ["condition"],
   },
   price: {
     key: "price",
+    classification: "requiredToPublish",
     Component: PriceGroup,
     fieldsToValidate: ["price_nok"],
     validateExtra: (ctx) =>
       !ctx.isFree && (ctx.priceNok === "" || ctx.priceNok === undefined)
-        ? "SHOW_NO_PRICE_DIALOG"
+        ? { field: "price_nok", message: "Oppgi en pris før annonsen publiseres." }
         : null,
   },
   "vehicle-facts": {
     key: "vehicle-facts",
+    classification: "requiredToPublish",
     Component: VehicleFactsGroup,
     fieldsToValidate: ["title", "description"],
     validateExtra: (ctx) => {
@@ -210,20 +224,23 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
   },
   "vehicle-price": {
     key: "vehicle-price",
+    classification: "requiredToPublish",
     Component: VehiclePriceGroup,
     fieldsToValidate: ["price_nok"],
     validateExtra: (ctx) =>
       !ctx.isFree && (ctx.priceNok === "" || ctx.priceNok === undefined)
-        ? "SHOW_NO_PRICE_DIALOG"
+        ? { field: "price_nok", message: "Oppgi en pris før annonsen publiseres." }
         : null,
   },
   "boat-facts": {
     key: "boat-facts",
+    classification: "requiredToPublish",
     Component: BoatFactsGroup,
-    fieldsToValidate: ["subtitle"],
+    fieldsToValidate: ["subtitle", "description"],
     validateExtra: (ctx) => {
-      // Brand/model live in this group (with autocomplete) and are hidden
-      // from category-attributes, so they must be required here instead.
+      // Brand/model and every boat category filter are rendered by boat-facts;
+      // category-attributes remains present in the stored flow but is a
+      // category-picker-only shell for this vertical.
       const brand = ctx.attributes.brand;
       if (typeof brand !== "string" || !brand.trim()) {
         return { field: "brand", message: "Fyll inn merke før du går videre." };
@@ -232,11 +249,15 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
       if (typeof model !== "string" || !model.trim()) {
         return { field: "model", message: "Fyll inn modell før du går videre." };
       }
+      if (ctx.missingFilters.length > 0) {
+        return `Fyll inn ${ctx.missingFilters.map((f) => f.label_nb).join(", ")} før du går videre.`;
+      }
       return null;
     },
   },
   "vehicle-condition": {
     key: "vehicle-condition",
+    classification: "requiredToPublish",
     Component: VehicleConditionGroup,
     fieldsToValidate: ["condition"],
     validateExtra: (ctx) => {
@@ -253,24 +274,29 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
   },
   "vehicle-equipment": {
     key: "vehicle-equipment",
+    classification: "optionalEnhancement",
     Component: VehicleEquipmentGroup,
     // Ingen validering — utstyrsliste er valgfri, skal ikke blokkere publisering.
   },
   "description-keywords": {
     key: "description-keywords",
+    classification: "requiredToPublish",
     Component: DescriptionKeywordsGroup,
     fieldsToValidate: ["description"],
   },
   delivery: {
     key: "delivery",
+    classification: "requiredToPublish",
     Component: DeliveryGroup,
   },
   location: {
     key: "location",
+    classification: "recommendedForTrust",
     Component: LocationGroup,
   },
   "review-publish": {
     key: "review-publish",
+    classification: "requiredToPublish",
     Component: ReviewPublishGroup,
   },
 };
@@ -280,67 +306,35 @@ export function fieldGroupsForKeys(keys: string[]): FieldGroup[] {
   return keys.map((k) => FIELD_GROUP_REGISTRY[k]).filter((g): g is FieldGroup => !!g);
 }
 
-/**
- * Norwegian step-indicator/next-button label per field-group key, split by
- * platform since e.g. `title-photos` and `delivery-location` read
- * differently depending on how much content shares their page. Reproduces
- * today's hardcoded labels ("Tittel"/"Detaljer"/"Beskrivelse"/"Sted"/
- * "Publiser" on native; "Bilder & tittel"/"Detaljer"/"Lokasjon" on web) for
- * the default flow.
- */
-const FIELD_GROUP_LABEL_NATIVE_NB: Record<string, string> = {
-  "category-select": "Kategori",
-  "category-confirm": "Kategori",
-  "vehicle-registration": "Merke & modell",
-  "vehicle-360": "360°-opptak",
-  photos: "Bilder",
-  title: "Tittel",
-  "category-attributes": "Detaljer",
-  condition: "Detaljer",
-  price: "Detaljer",
-  "vehicle-facts": "Beskrivelse",
-  "vehicle-price": "Pris",
-  "boat-facts": "Båt",
-  "vehicle-condition": "Tilstand",
-  "vehicle-equipment": "Utstyr",
-  "description-keywords": "Beskrivelse",
-  delivery: "Levering",
-  location: "Sted",
-  "review-publish": "Publiser",
+/** Shared Norwegian task labels for the step indicator, page heading and the
+ * web next-button. Structural category/registration pages keep their own
+ * labels outside the four content tasks. */
+const LISTING_TASK_LABEL_NB: Record<ListingTask, string> = {
+  showcase: "Vis frem",
+  searchable: "Gjør søkbar",
+  trade: "Gjør handelen enkel",
+  review: "Se over",
 };
 
-const FIELD_GROUP_LABEL_WEB_NB: Record<string, string> = {
+const STRUCTURAL_PAGE_LABEL_NB: Record<string, string> = {
   "category-select": "Kategori",
   "category-confirm": "Kategori",
-  "vehicle-registration": "Merke & modell",
-  "vehicle-360": "360°-opptak",
-  photos: "Bilder",
-  title: "Tittel",
-  "category-attributes": "Detaljer",
-  condition: "Detaljer",
-  price: "Detaljer",
-  "vehicle-facts": "Beskrivelse",
-  "vehicle-price": "Pris",
-  "boat-facts": "Merke & modell",
-  "vehicle-condition": "Tilstand",
-  "vehicle-equipment": "Utstyr",
-  "description-keywords": "Beskrivelse",
-  delivery: "Levering",
-  location: "Lokasjon",
-  "review-publish": "Publiser",
+  "vehicle-registration": "Registreringsnummer",
 };
 
-/** Representative label for a wizard page, derived from its first field group. */
-export function pageLabel(groups: FieldGroup[], native: boolean): string {
-  const map = native ? FIELD_GROUP_LABEL_NATIVE_NB : FIELD_GROUP_LABEL_WEB_NB;
-  return (groups[0] && map[groups[0].key]) || "Steg";
+/** Representative label for a wizard page, derived from its semantic task. */
+export function pageLabel(groups: FieldGroup[]): string {
+  const key = groups[0]?.key;
+  if (!key) return "Steg";
+  const task = LISTING_TASK_BY_FIELD_GROUP_KEY[key];
+  return task ? LISTING_TASK_LABEL_NB[task] : (STRUCTURAL_PAGE_LABEL_NB[key] ?? "Steg");
 }
 
 /** Norwegian admin-display labels — distinct from the step-indicator labels above (different audience/purpose). */
 export const FIELD_GROUP_LABELS_NB: Record<string, string> = {
   "category-select": "Kategori",
   "category-confirm": "Bekreft kategori",
-  "vehicle-registration": "Kjøretøy: Merke, modell & registreringsnummer",
+  "vehicle-registration": "Kjøretøyregistrering",
   "vehicle-360": "Kjøretøy: 360°-opptak",
   photos: "Bilder",
   title: "Tittel",
@@ -383,8 +377,8 @@ export const LOCKED_FIELD_GROUP_KEYS: string[] = [
  * on the Bil og MC category's flow row) since an admin may legitimately want
  * to reorder it.
  *
- * `vehicle-price` behaves like `vehicle-360`: runtime-injected right before
- * `review-publish` (see `withRuntimeFieldGroups`) whenever the flow has
+ * `vehicle-price` is runtime-injected right before `review-publish` (see
+ * `withRuntimeFieldGroups`) whenever the flow has
  * `vehicle-registration`, never part of a category's stored `field_groups`,
  * so it never appears in the admin-facing list either.
  */

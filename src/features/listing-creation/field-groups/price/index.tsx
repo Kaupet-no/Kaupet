@@ -97,6 +97,17 @@ export function Price({
     }
     onAttributesChange(next);
   };
+  // Ikke en egen attributt — "kjøper bekoster" er ganske enkelt fraværet av
+  // begge de andre flaggene (standardtilstanden appen alltid har hatt), men
+  // vises nå som en egen, forhåndsavkrysset boks i tredelt radio-lignende
+  // UI i stedet for å være implisitt.
+  const avgiftKjoperBekoster = !avgiftFritatt && !avgiftInkludert;
+  const setAvgiftKjoperBekoster = () => {
+    const next = { ...attributes };
+    delete next.omregistreringsavgift_fritatt;
+    delete next.omregistreringsavgift_inkludert;
+    onAttributesChange(next);
+  };
   // Avgiften kjøper faktisk betaler i tillegg til kjøpesummen — null når
   // fritatt (ingen avgift) eller inkludert i kjøpesummen (allerede betalt av
   // selger), selv om det beregnede/overstyrte beløpet fortsatt vises
@@ -161,9 +172,9 @@ export function Price({
           }
         />
       </div>
-      <div className={`flex items-end gap-3 ${heroSize ? "flex-wrap" : ""}`}>
-        <div className="space-y-1">
-          <div className={`relative ${heroSize ? "max-w-[280px]" : "max-w-[200px]"}`}>
+      <div className={heroSize ? "flex w-full flex-col gap-3" : "flex w-full items-end gap-3"}>
+        <div className="w-full space-y-1">
+          <div className={heroSize ? "relative w-full" : "relative max-w-[200px]"}>
             <Input
               id="price_nok"
               type="text"
@@ -171,8 +182,9 @@ export function Price({
               placeholder="0"
               disabled={isFree}
               className={
-                heroSize ? "h-16 pr-12 text-right text-4xl font-semibold" : "pr-9 text-right"
+                heroSize ? "h-16 w-full pr-12 text-right text-4xl font-semibold" : "pr-9 text-right"
               }
+              aria-required={!isFree}
               aria-invalid={!!errors.price_nok}
               aria-describedby={errors.price_nok ? "price-error" : undefined}
               // Only `name`/`ref` from register() — NOT the full spread.
@@ -204,7 +216,7 @@ export function Price({
           </div>
         </div>
         {isVehicle && totalprisKr != null && (
-          <div className="space-y-1">
+          <div className="w-full space-y-1">
             <Label
               htmlFor="price-visible-in-listing"
               className={
@@ -218,7 +230,7 @@ export function Price({
               disabled
               className={
                 heroSize
-                  ? "h-16 max-w-[280px] text-right text-2xl text-muted-foreground"
+                  ? "h-16 w-full text-right text-2xl text-muted-foreground"
                   : "max-w-[200px] text-muted-foreground"
               }
               value={`${totalprisKr.toLocaleString("nb-NO")} kr`}
@@ -257,8 +269,10 @@ export function Price({
             delete next.omregistreringsavgift_override_kr;
             onAttributesChange(next);
           }}
+          avgiftKjoperBekoster={avgiftKjoperBekoster}
           setAvgiftFritatt={setAvgiftFritatt}
           setAvgiftInkludert={setAvgiftInkludert}
+          setAvgiftKjoperBekoster={setAvgiftKjoperBekoster}
         />
       )}
       {wtbMatch && wtbMatch.count > 0 && (

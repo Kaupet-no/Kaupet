@@ -24,11 +24,6 @@
       "count": 1
     }
   },
-  "src/components/listing-detail/listing-detail-view.tsx": {
-    "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
-  },
   "src/components/listing-detail/vehicle/vehicle-360-viewer.tsx": {
     "react-hooks/set-state-in-effect": {
       "count": 1
@@ -62,16 +57,6 @@
   "src/components/range-filter-field.tsx": {
     "react-hooks/set-state-in-effect": {
       "count": 2
-    }
-  },
-  "src/components/result-list.tsx": {
-    "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
-  },
-  "src/components/search-bar.tsx": {
-    "react-hooks/set-state-in-effect": {
-      "count": 1
     }
   },
   "src/components/share-listing-dialog.tsx": {

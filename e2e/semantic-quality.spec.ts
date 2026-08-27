@@ -1,10 +1,15 @@
-import { expect, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
+
+async function waitForHydration(page: Page) {
+  await page.locator("html[data-kaupet-hydrated='true']").waitFor();
+}
 
 test("kritiske offentlige sider har landemerker og ingen nøstede interaksjoner", async ({
   page,
 }) => {
   await page.goto("/");
-  await page.locator("html[data-kaupet-hydrated='true']").waitFor();
+  await waitForHydration(page);
 
   await expect(page.getByRole("main")).toHaveCount(1);
   await expect(page.getByRole("navigation", { name: "Hovednavigasjon" })).toHaveCount(1);
@@ -18,7 +23,7 @@ test("kritiske offentlige sider har landemerker og ingen nøstede interaksjoner"
   expect(nestedInteractive).toBe(0);
 
   await page.goto("/annonser?q=&category=&sort=new");
-  await page.locator("html[data-kaupet-hydrated='true']").waitFor();
+  await waitForHydration(page);
   await expect(page.getByRole("heading", { level: 1, name: "Annonser" })).toBeVisible();
   expect(
     await page
@@ -27,4 +32,73 @@ test("kritiske offentlige sider har landemerker og ingen nøstede interaksjoner"
       )
       .count(),
   ).toBe(0);
+});
+
+test("native lokasjonsvalg kan åpnes og lukkes med tastatur uten fokusfelle", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("kaupet_onboarding_completed_v1", "true");
+  });
+  await page.goto("/?forcenative=1");
+  await waitForHydration(page);
+
+  const search = page.getByRole("searchbox", { name: "Søk i annonser" });
+  const location = page.getByRole("button", {
+    name: "Velg lokasjon: Hvor som helst",
+  });
+
+  await search.focus();
+  await search.press("Tab");
+  await expect(location).toBeFocused();
+
+  await location.press("Space");
+  const overlay = page.getByRole("dialog", { name: "Velg sted" });
+  await expect(overlay).toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await expect(overlay).not.toBeVisible();
+  await expect(location).toBeFocused();
+
+  await location.press("Shift+Tab");
+  await expect(search).toBeFocused();
+});
+
+test("native søkepanel returnerer fokus til filterknappen etter Escape", async ({ page }) => {
+  await page.goto("/annonser?forcenative=1&q=&category=&sort=new");
+  await waitForHydration(page);
+
+  const search = page.getByRole("searchbox", { name: "Søk i annonser" });
+  const filter = page.getByRole("button", { name: "Filtrer", exact: true });
+
+  await search.focus();
+  await search.press("Tab");
+  await expect(filter).toBeFocused();
+
+  await filter.press("Enter");
+  const panel = page.getByRole("dialog", { name: "Søk og filtrer" });
+  await expect(panel).toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await expect(panel).not.toBeVisible();
+  await expect(filter).toBeFocused();
+
+  await filter.press("Shift+Tab");
+  await expect(search).toBeFocused();
+});
+
+test("innloggingens primærhandling nås og aktiveres med tastatur", async ({ page }) => {
+  await page.goto("/auth?mode=signin");
+  await waitForHydration(page);
+
+  const password = page.getByLabel("Passord");
+  const signUp = page.getByRole("button", { name: "Bli medlem" });
+  const submit = page.getByRole("button", { name: "Logg inn", exact: true });
+  await expect(submit).toBeEnabled();
+
+  await signUp.focus();
+  await signUp.press("Shift+Tab");
+  await expect(submit).toBeFocused();
+
+  await submit.press("Space");
+  await expect(page.getByLabel("E-post")).toHaveAttribute("aria-invalid", "true");
+  await expect(password).toHaveAttribute("aria-invalid", "true");
 });

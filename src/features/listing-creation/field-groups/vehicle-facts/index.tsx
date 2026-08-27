@@ -55,6 +55,7 @@ function MileageField({
           inputMode="numeric"
           placeholder="0"
           className="pr-10 text-right"
+          aria-required="true"
           aria-invalid={!!fieldError}
           aria-describedby={fieldError ? "mileage-error" : undefined}
           value={formatThousands(raw as string | number | undefined, MAX_MILEAGE_KM)}
@@ -119,7 +120,7 @@ function DriveOrAxleField({
           value={value}
           onValueChange={(v) => onAttributesChange({ ...attributes, drive_type: v })}
         >
-          <SelectTrigger id="drive-type-select" aria-label="Hjuldrift">
+          <SelectTrigger id="drive-type-select" aria-label="Hjuldrift" aria-required="true">
             <SelectValue placeholder="Velg hjuldrift" />
           </SelectTrigger>
           <SelectContent>
@@ -150,7 +151,7 @@ function DriveOrAxleField({
           value={value}
           onValueChange={(v) => onAttributesChange({ ...attributes, axle_config: v })}
         >
-          <SelectTrigger id="axle-config-select" aria-label="Akselkombinasjon">
+          <SelectTrigger id="axle-config-select" aria-label="Akselkombinasjon" aria-required="true">
             <SelectValue placeholder="Velg akselkombinasjon" />
           </SelectTrigger>
           <SelectContent>

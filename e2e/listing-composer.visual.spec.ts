@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 import { composerPage, goToNewWantListing, login } from "./pages/listing-wizard";
 
@@ -17,7 +17,10 @@ test("kjøpsønskets startflate holder visuell kontrakt", async ({ page }, testI
   if (!credentials) throw new Error(`Mangler E2E-bruker for prosjektet ${testInfo.project.name}`);
   await login(page, credentials.email, credentials.password);
   await goToNewWantListing(page, !testInfo.project.name.endsWith("web"));
+  await page.locator("html[data-kaupet-hydrated='true']").waitFor();
   await composerPage(page, "category").waitFor();
+  await page.getByTestId("category-tile").first().waitFor();
+  await page.evaluate(() => document.fonts.ready);
 
   await expect(page).toHaveScreenshot("want-listing-category.png", {
     animations: "disabled",

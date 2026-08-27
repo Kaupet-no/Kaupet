@@ -15,6 +15,39 @@ export const productEventNames = [
   "listing_published",
   "onboarding_completed",
 ] as const;
+export const listingCreationActionKeys = [
+  "viewed",
+  "back",
+  "completed",
+  "validation_failed",
+  "validation_prompt",
+  "draft_restored",
+  "draft_started",
+  "review_fix",
+  "publish_started",
+  "publish_failed",
+] as const;
+
+export type ListingCreationAction = (typeof listingCreationActionKeys)[number];
+
+export const listingCreationReasonKeys = [
+  "form",
+  "image",
+  "price",
+  "required_attributes",
+  "publish_form",
+  "new",
+  "existing",
+  "category",
+  "content",
+  "details",
+  "location",
+] as const;
+
+export type ListingCreationReason = (typeof listingCreationReasonKeys)[number];
+export const listingPublishedActionKeys = ["success"] as const;
+
+export type ListingPublishedAction = (typeof listingPublishedActionKeys)[number];
 
 const propertyValueSchema = z.union([
   z.string().max(80),

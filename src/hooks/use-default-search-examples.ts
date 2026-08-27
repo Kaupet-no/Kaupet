@@ -16,9 +16,9 @@ export function useDefaultSearchExamples(): string[] {
         .from("site_settings")
         .select("default_search_examples")
         .eq("id", true)
-        .single();
+        .maybeSingle();
       if (error) throw error;
-      return data.default_search_examples;
+      return data?.default_search_examples ?? [];
     },
     staleTime: 5 * 60 * 1000,
   });

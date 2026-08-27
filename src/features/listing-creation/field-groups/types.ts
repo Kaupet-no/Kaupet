@@ -31,6 +31,32 @@ export type ListingFormShape = {
   maintenance_history?: string | undefined;
 };
 
+export type ComposerReviewClassification =
+  "requiredToPublish" | "recommendedForTrust" | "optionalEnhancement";
+
+export type ComposerReviewStatus = {
+  key: string;
+  label: string;
+  classification: ComposerReviewClassification;
+  onAction?: () => void;
+  actionLabel?: string;
+};
+
+export type ComposerReviewGroup = {
+  key: string;
+  classification: ComposerReviewClassification;
+};
+
+export type ComposerReviewEditOptions = {
+  field?: string;
+  groupKey?: string;
+};
+
+/*
+ * The review screen only needs the status row and its action. Keeping the
+ * target as a callback avoids a second validation/navigation abstraction.
+ */
+
 /**
  * Single shared props bag passed to every field-group component. Each
  * component only destructures what it needs; kept as one type (rather than
@@ -84,6 +110,7 @@ export type WizardSharedProps = {
     icon?: string | null;
     color?: string | null;
   })[];
+  categorySlug: string | null;
   categoryLabel: string | null;
   /** Category-specific example for the title input's "F.eks. …" placeholder
    * (nearest ancestor's categories.title_example); null falls back to the
@@ -97,10 +124,10 @@ export type WizardSharedProps = {
    * change would discard (currently vehicle-registration). */
   onCategoryDeselect?: (parentId: string) => void;
   /** 0-2 candidates — the vote-based RPC always returns a single confident
-   * top match when it has one, but the AI fallback (borealis-1b) may return
-   * two roughly-equally-likely categories (e.g. "Bil" vs. "MC" for an
-   * ambiguous title) instead of forcing a single guess. category-confirm
-   * offers a button per candidate plus "Nei" for the full manual picker. */
+   * top match when it has one, while the Mistral fallback may return two
+   * roughly-equally-likely categories (e.g. "Bil" vs. "MC") instead of
+   * forcing a single guess. category-confirm offers a button per candidate
+   * plus "Nei" for the full manual picker. */
   categorySuggestions: {
     category_id: string;
     parent_id: string | null;
@@ -121,6 +148,8 @@ export type WizardSharedProps = {
   onAttributesChange: (next: AttributeMap) => void;
   attributesTouched: boolean;
   activeModules: CategoryModule[];
+  /** True when the boat-specific facts group owns category attributes. */
+  boatFactsActive: boolean;
   /** category_filters keys already reviewed/edited in vehicle-confirm — hidden
    * from category-attributes so the user isn't asked twice. Undefined/empty
    * outside the vehicle-first flow. */
@@ -205,6 +234,7 @@ export type WizardSharedProps = {
   fetchMyLocation: () => void | Promise<void>;
   setFullscreenMapOpen: (open: boolean) => void;
   markerMovedRef: { current: boolean };
+  onPreview: () => void;
   lastEditedRef: { current: "postal_code" | "city" | "map" | null };
 
   // review/publish
@@ -214,7 +244,14 @@ export type WizardSharedProps = {
   turnstileToken: string | null;
   setTurnstileToken: (token: string | null) => void;
   onCancel: () => void;
-  onEditReviewSection: (section: "category" | "content" | "details" | "location") => void;
+  onEditReviewSection: (
+    section: "category" | "content" | "details" | "location",
+    options?: ComposerReviewEditOptions,
+  ) => void;
+  improvementGroupKeys: string[];
+  improvementGroups?: ComposerReviewGroup[];
+  publishingRequirementErrors: string[];
+  publishingRequirements?: ComposerReviewStatus[];
 
   /** Set from the ny-annonse.tsx `type` search param when the wizard was
    * entered via the intent+title landing screen — locks the price group's

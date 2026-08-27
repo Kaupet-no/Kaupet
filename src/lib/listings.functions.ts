@@ -4,8 +4,13 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   attributesSchema,
+  effectiveFiltersForCategory,
   getMissingRequiredFilters,
   normalizeFilter,
+  PART_FITMENT_SCOPE_KEY,
+  PART_FITMENT_VEHICLE_IDS_KEY,
+  PART_FITMENT_YEAR_FROM_KEY,
+  PART_FITMENT_YEAR_TO_KEY,
   vehicleCategoryGroupFor,
   VEHICLE_EQUIPMENT_FILTER_KEYS,
   type CategoryNode,
@@ -34,6 +39,39 @@ async function assertUnderHourlyListingLimit(
     .gte("created_at", oneHourAgo);
   if ((count ?? 0) >= MAX_LISTINGS_PER_HOUR) {
     throw new Error(errorMessage);
+  }
+}
+
+function validatePartFitment(
+  categoryId: string,
+  filters: ReturnType<typeof normalizeFilter>[],
+  categoriesById: Map<string, CategoryNode>,
+  attributes: Record<string, string | number | boolean | string[]>,
+) {
+  const isPartCategory = effectiveFiltersForCategory(categoryId, filters, categoriesById).some(
+    (filter) => filter.key === PART_FITMENT_SCOPE_KEY,
+  );
+  if (!isPartCategory) return;
+
+  const scope = attributes[PART_FITMENT_SCOPE_KEY];
+  if (scope !== "universal" && scope !== "specific" && scope !== "unknown") {
+    throw new Error("Velg hvordan delen passer til kjøretøy.");
+  }
+  if (scope !== "specific") return;
+
+  const vehicleIds = attributes[PART_FITMENT_VEHICLE_IDS_KEY];
+  if (
+    !Array.isArray(vehicleIds) ||
+    vehicleIds.length === 0 ||
+    vehicleIds.some((id) => !/^[0-9a-f-]{36}$/iu.test(id))
+  ) {
+    throw new Error("Legg til minst én gyldig bilmodell.");
+  }
+
+  const yearFrom = attributes[PART_FITMENT_YEAR_FROM_KEY];
+  const yearTo = attributes[PART_FITMENT_YEAR_TO_KEY];
+  if (typeof yearFrom === "number" && typeof yearTo === "number" && yearFrom > yearTo) {
+    throw new Error("Årsmodell fra kan ikke være høyere enn årsmodell til.");
   }
 }
 
@@ -122,6 +160,20 @@ export const saveDraftListing = createServerFn({ method: "POST" })
     return { id: listing.id as string, kaupet_code: listing.kaupet_code as string };
   });
 
+export const discardDraftListing = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("listings")
+      .delete()
+      .eq("id", data.id)
+      .eq("seller_id", context.userId)
+      .eq("status", "draft");
+    if (error) throw error;
+  });
+
 export const createListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) =>
@@ -148,6 +200,15 @@ export const createListing = createServerFn({ method: "POST" })
         maintenance_history: z.string().trim().max(2000).nullable().optional(),
         attributes: attributesSchema.optional(),
         turnstileToken: z.string().nullable().optional(),
+      })
+      .superRefine((data, ctx) => {
+        if (!data.is_free && data.price_nok == null) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["price_nok"],
+            message: "Oppgi en pris før annonsen publiseres.",
+          });
+        }
       })
       .parse(input),
   )
@@ -180,7 +241,9 @@ export const createListing = createServerFn({ method: "POST" })
     const [{ data: filterRows }, { data: categoryRows }, flowsResult] = await Promise.all([
       supabaseAdmin
         .from("category_filters")
-        .select("id, category_id, key, label_nb, type, unit, options, sort_order, is_primary"),
+        .select(
+          "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value, depends_on_not_value, is_optional",
+        ),
       supabaseAdmin.from("categories").select("id, parent_id"),
       supabaseAdmin
         .from("category_flows")
@@ -200,6 +263,7 @@ export const createListing = createServerFn({ method: "POST" })
     if (missing.length > 0) {
       throw new Error(`Fyll inn: ${missing.map((f) => f.label_nb).join(", ")}`);
     }
+    validatePartFitment(data.category_id, normalizedFilters, categoriesById, data.attributes ?? {});
 
     // category_flows may not exist yet in every environment (pre-migration); degrade to the default flow.
     const flowRows = (flowsResult.data ?? []) as CategoryFlowRow[];
@@ -280,7 +344,7 @@ export const republishListing = createServerFn({ method: "POST" })
 
     const { data: listing, error: fetchError } = await supabase
       .from("listings")
-      .select("id, seller_id, status")
+      .select("id, seller_id, status, is_free, price_nok")
       .eq("id", data.id)
       .single();
     if (fetchError) throw fetchError;
@@ -289,6 +353,9 @@ export const republishListing = createServerFn({ method: "POST" })
     }
     if (listing.status === "disabled") {
       throw new Error("Denne annonsen er deaktivert av moderator og kan ikke reaktiveres");
+    }
+    if (!listing.is_free && listing.price_nok == null) {
+      throw new Error("Oppgi en pris før annonsen publiseres på nytt");
     }
 
     const now = new Date().toISOString();

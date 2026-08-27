@@ -151,7 +151,7 @@ export function ActiveFilters({
               key={`${key}:${v}`}
               label={
                 key === PART_FITMENT_VEHICLE_IDS_KEY
-                  ? `${filter.label_nb}: valgt bilmodell`
+                  ? `${filter.label_nb}: valgt kjøretøymodell`
                   : `${filter.label_nb}: ${opt?.label_nb ?? v}`
               }
               onRemove={() => onRemoveAttr?.(key, v)}

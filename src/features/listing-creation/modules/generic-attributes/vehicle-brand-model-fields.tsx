@@ -24,6 +24,15 @@ import type { VehicleBrandGroup } from "@/lib/category-filters";
 /** One option in a brand/model dropdown. `label` differs from `value` only for
  * a not-yet-approved value, which is suffixed "(venter godkjenning)". */
 export type VehicleOption = { value: string; label: string };
+export type VehicleOptionGroup = {
+  classId: string;
+  className: string;
+  options: VehicleOption[];
+};
+export type VehicleOptionGroupSet = {
+  groups: VehicleOptionGroup[];
+  ungrouped: VehicleOption[];
+};
 
 /**
  * The brand options for a category group. A brand added via the Statens
@@ -415,6 +424,11 @@ export function VehicleModelMultiComboboxContent({
   onChange,
   emptyMessage,
   counts,
+  options: providedOptions,
+  groups: providedGroups,
+  selectAllLabel,
+  allSelected = false,
+  onToggleAll,
 }: {
   categoryGroup: VehicleBrandGroup;
   brandNames: string[];
@@ -423,13 +437,21 @@ export function VehicleModelMultiComboboxContent({
   emptyMessage?: string;
   /** Result counts keyed by model value, e.g. `{ "3-serie": 61 }`. */
   counts?: Record<string, number>;
+  /** Optional pre-resolved options for selectors whose values are IDs. */
+  options?: VehicleOption[];
+  groups?: VehicleOptionGroupSet;
+  selectAllLabel?: string;
+  allSelected?: boolean;
+  onToggleAll?: () => void;
 }) {
   const countLabel = (value: string, label: string) =>
     counts?.[value] != null ? `${label} (${counts[value]})` : label;
   const singleBrand = brandNames.length === 1 ? brandNames[0] : undefined;
   const grouped = useVehicleModelOptionsGrouped(categoryGroup, singleBrand, undefined);
   const flatOptions = useVehicleModelOptionsForBrands(categoryGroup, brandNames, values);
-  const brandKnown = brandNames.length > 0;
+  const optionsForList = providedOptions ?? flatOptions;
+  const groupsForList = providedGroups ?? grouped;
+  const brandKnown = providedOptions ? providedOptions.length > 0 : brandNames.length > 0;
   const [search, setSearch] = useState("");
 
   const toggle = (v: string) => {
@@ -440,7 +462,9 @@ export function VehicleModelMultiComboboxContent({
     else onChange(values.filter((v) => !modelNames.includes(v)));
   };
 
-  const useGrouped = singleBrand != null && grouped.hasClasses;
+  const useGrouped = providedGroups
+    ? groupsForList.groups.length > 0
+    : providedOptions == null && singleBrand != null && grouped.hasClasses;
 
   return (
     <Command shouldFilter>
@@ -452,7 +476,15 @@ export function VehicleModelMultiComboboxContent({
         </CommandEmpty>
         {useGrouped ? (
           <>
-            {grouped.groups.map((g) => {
+            {selectAllLabel && onToggleAll && (
+              <CommandGroup>
+                <CommandItem value={selectAllLabel} className="font-medium" onSelect={onToggleAll}>
+                  <Check className={cn("size-4", allSelected ? "opacity-100" : "opacity-0")} />
+                  {selectAllLabel}
+                </CommandItem>
+              </CommandGroup>
+            )}
+            {groupsForList.groups.map((g) => {
               const modelNames = g.options.map((o) => o.value);
               const allChecked =
                 modelNames.length > 0 && modelNames.every((n) => values.includes(n));
@@ -485,9 +517,9 @@ export function VehicleModelMultiComboboxContent({
                 </CommandGroup>
               );
             })}
-            {grouped.ungrouped.length > 0 && (
+            {groupsForList.ungrouped.length > 0 && (
               <CommandGroup>
-                {grouped.ungrouped.map((o) => (
+                {groupsForList.ungrouped.map((o) => (
                   <CommandItem key={o.value} value={o.label} onSelect={() => toggle(o.value)}>
                     <Check
                       className={cn(
@@ -503,7 +535,13 @@ export function VehicleModelMultiComboboxContent({
           </>
         ) : (
           <CommandGroup>
-            {flatOptions.map((o) => (
+            {selectAllLabel && onToggleAll && (
+              <CommandItem value={selectAllLabel} className="font-medium" onSelect={onToggleAll}>
+                <Check className={cn("size-4", allSelected ? "opacity-100" : "opacity-0")} />
+                {selectAllLabel}
+              </CommandItem>
+            )}
+            {optionsForList.map((o) => (
               <CommandItem key={o.value} value={o.label} onSelect={() => toggle(o.value)}>
                 <Check
                   className={cn("size-4", values.includes(o.value) ? "opacity-100" : "opacity-0")}
@@ -529,6 +567,12 @@ export function VehicleModelMultiField({
   onChange,
   label = "Modell",
   counts,
+  options,
+  groups,
+  selectAllLabel,
+  allSelected = false,
+  onToggleAll,
+  selectedLabel,
 }: {
   categoryGroup: VehicleBrandGroup;
   brandNames: string[];
@@ -536,11 +580,22 @@ export function VehicleModelMultiField({
   onChange: (values: string[]) => void;
   label?: string;
   counts?: Record<string, number>;
+  options?: VehicleOption[];
+  groups?: VehicleOptionGroupSet;
+  selectAllLabel?: string;
+  allSelected?: boolean;
+  onToggleAll?: () => void;
+  selectedLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const brandKnown = brandNames.length > 0;
+  const brandKnown = options ? options.length > 0 : brandNames.length > 0;
   const triggerLabel =
-    values.length === 0 ? undefined : values.length === 1 ? values[0] : `${values.length} valgt`;
+    selectedLabel ??
+    (values.length === 0
+      ? undefined
+      : values.length === 1
+        ? (options?.find((option) => option.value === values[0])?.label ?? values[0])
+        : `${values.length} valgt`);
 
   return (
     <div className="space-y-2">
@@ -552,6 +607,7 @@ export function VehicleModelMultiField({
             variant="outline"
             role="combobox"
             aria-expanded={open}
+            aria-label={label}
             disabled={!brandKnown}
             className="native-touch-target w-full justify-between font-normal hover:text-foreground"
           >
@@ -568,6 +624,11 @@ export function VehicleModelMultiField({
             values={values}
             onChange={onChange}
             counts={counts}
+            options={options}
+            groups={groups}
+            selectAllLabel={selectAllLabel}
+            allSelected={allSelected}
+            onToggleAll={onToggleAll}
           />
         </PopoverContent>
       </Popover>

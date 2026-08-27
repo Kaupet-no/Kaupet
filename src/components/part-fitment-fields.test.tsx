@@ -35,4 +35,20 @@ describe("PartFitmentField", () => {
     expect(screen.getByLabelText("Årsmodell fra (valgfritt)")).toHaveProperty("value", "2010");
     expect(screen.getByLabelText("Årsmodell til (valgfritt)")).toHaveProperty("value", "2016");
   });
+
+  it("viser feil når årsmodellintervallet er snudd", () => {
+    render(
+      <PartFitmentField
+        value={{
+          part_fitment_scope: "specific",
+          part_fitment_vehicle_ids: ["model-1"],
+          part_fitment_year_from: 2018,
+          part_fitment_year_to: 2010,
+        }}
+        onChange={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("Årsmodell fra kan ikke være høyere enn årsmodell til.")).toBeTruthy();
+  });
 });

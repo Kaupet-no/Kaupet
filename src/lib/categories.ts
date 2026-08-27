@@ -16,8 +16,8 @@ export function mainCategories(categories: Category[]): Category[] {
 /**
  * Resolves selected category slugs (e.g. from `/annonser`'s `categories`
  * search param) to concrete category ids to filter listings by — a chosen
- * root category also includes all of its direct children, so picking a hub
- * like "Bil og MC" still matches listings filed under its subcategories.
+ * category includes every descendant, so picking a hub like "Bil og MC" or
+ * "Reservedeler" matches listings filed at any depth below it.
  * Returns `null` when nothing is selected (no category constraint).
  */
 export function resolveCategoryIds(
@@ -26,13 +26,25 @@ export function resolveCategoryIds(
 ): string[] | null {
   if (selectedSlugs.length === 0) return null;
   const slugSet = new Set(selectedSlugs);
-  const selected = categories.filter((c) => slugSet.has(c.slug));
+  const childrenByParent = new Map<string, string[]>();
+  for (const category of categories) {
+    if (!category.parent_id) continue;
+    const children = childrenByParent.get(category.parent_id) ?? [];
+    children.push(category.id);
+    childrenByParent.set(category.parent_id, children);
+  }
+
   const ids = new Set<string>();
-  for (const c of selected) {
-    ids.add(c.id);
-    if (c.parent_id == null) {
-      for (const child of categories) {
-        if (child.parent_id === c.id) ids.add(child.id);
+  for (const category of categories) {
+    if (!slugSet.has(category.slug)) continue;
+    ids.add(category.id);
+    const pending = [category.id];
+    while (pending.length > 0) {
+      const parentId = pending.pop()!;
+      for (const childId of childrenByParent.get(parentId) ?? []) {
+        if (ids.has(childId)) continue;
+        ids.add(childId);
+        pending.push(childId);
       }
     }
   }

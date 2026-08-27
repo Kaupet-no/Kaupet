@@ -62,6 +62,16 @@ export function PartFitmentField({
   const selectedIds = Array.isArray(value[PART_FITMENT_VEHICLE_IDS_KEY])
     ? value[PART_FITMENT_VEHICLE_IDS_KEY]
     : [];
+  const yearFrom =
+    typeof value[PART_FITMENT_YEAR_FROM_KEY] === "number"
+      ? value[PART_FITMENT_YEAR_FROM_KEY]
+      : null;
+  const yearTo =
+    typeof value[PART_FITMENT_YEAR_TO_KEY] === "number" ? value[PART_FITMENT_YEAR_TO_KEY] : null;
+  const yearError =
+    yearFrom != null && yearTo != null && yearFrom > yearTo
+      ? "Årsmodell fra kan ikke være høyere enn årsmodell til."
+      : undefined;
 
   const set = (key: string, next: AttributeValue | undefined) => {
     const values = { ...value };
@@ -120,6 +130,7 @@ export function PartFitmentField({
                 inputMode="numeric"
                 min={1900}
                 max={2100}
+                aria-invalid={!!yearError}
                 value={
                   typeof value[PART_FITMENT_YEAR_FROM_KEY] === "number"
                     ? value[PART_FITMENT_YEAR_FROM_KEY]
@@ -139,6 +150,7 @@ export function PartFitmentField({
                 inputMode="numeric"
                 min={1900}
                 max={2100}
+                aria-invalid={!!yearError}
                 value={
                   typeof value[PART_FITMENT_YEAR_TO_KEY] === "number"
                     ? value[PART_FITMENT_YEAR_TO_KEY]
@@ -151,6 +163,7 @@ export function PartFitmentField({
               />
             </div>
           </div>
+          {yearError && <p className="text-sm text-destructive">{yearError}</p>}
           <p className="text-xs text-muted-foreground">
             Kompatibiliteten er oppgitt av deg. Kontroller delenummer og variant før salg.
           </p>

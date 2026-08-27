@@ -451,3 +451,35 @@
     animation: none;
   }
 }
+
+/* Native boot splash overlay, shown only inside the Capacitor WebView while
+   public/boot.js decides whether to add the "native-boot" class. */
+#native-boot-splash {
+  display: none;
+}
+.native-boot #native-boot-splash {
+  display: flex;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+  background: #fbf9f3;
+  transition: opacity 200ms ease-out;
+}
+#native-boot-splash img {
+  width: 64px;
+  height: 64px;
+  animation: native-boot-pulse 1.6s ease-in-out infinite;
+}
+@keyframes native-boot-pulse {
+  0%,
+  100% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}

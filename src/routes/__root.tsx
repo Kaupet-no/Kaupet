@@ -193,40 +193,11 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="nb">
       <head>
         <HeadContent />
-        {/* Runs synchronously during parsing, before anything paints. Only
-            ever true inside the Capacitor WebView — real kaupet.no visitors
-            never see this class or the overlay below. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) document.documentElement.classList.add("native-boot");`,
-          }}
-        />
-        {/* Runs before paint so there is no light-mode flash for users who
-            have chosen (or whose system prefers) dark mode. Kept in sync
-            with the resolution logic in src/hooks/use-theme.tsx. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem("kaupet_theme");var d=t==="dark"||((t==="system"||!t)&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(d)document.documentElement.classList.add("dark");}catch(e){}})();`,
-          }}
-        />
-        <style>{`
-          #native-boot-splash { display: none; }
-          .native-boot #native-boot-splash {
-            display: flex;
-            position: fixed;
-            inset: 0;
-            z-index: 9999;
-            align-items: center;
-            justify-content: center;
-            background: #fbf9f3;
-            transition: opacity 200ms ease-out;
-          }
-          #native-boot-splash img { width: 64px; height: 64px; animation: native-boot-pulse 1.6s ease-in-out infinite; }
-          @keyframes native-boot-pulse {
-            0%, 100% { opacity: 0.85; transform: scale(1); }
-            50% { opacity: 1; transform: scale(1.08); }
-          }
-        `}</style>
+        {/* Runs synchronously during parsing, before anything paints (native-boot
+            class detection + dark-mode-flash prevention). Moved to a static,
+            same-origin file so it runs under the CSP's script-src 'self' without
+            needing 'unsafe-inline' or a maintained hash — see public/boot.js. */}
+        <script src="/boot.js" />
       </head>
       <body>
         {/* Same background/logo as capacitor.config.ts SplashScreen + the

@@ -11,6 +11,14 @@ export default defineConfig({
   reporter: "list",
   globalSetup: "./e2e/global-setup.ts",
   globalTeardown: "./e2e/global-teardown.ts",
+  // Chromium's text/font anti-aliasing isn't bit-identical across otherwise
+  // identical runs (subpixel hinting varies run to run even on the same
+  // machine/OS/browser build) — a small ratio absorbs that noise without
+  // masking a real layout regression, which moves the diff by orders of
+  // magnitude more (see the stale-baseline fix in this same area).
+  expect: {
+    toHaveScreenshot: { maxDiffPixelRatio: 0.01 },
+  },
   use: {
     baseURL,
     trace: "retain-on-failure",

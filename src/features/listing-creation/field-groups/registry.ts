@@ -31,7 +31,7 @@ export type ValidateCtx = {
   attributes: WizardSharedProps["attributes"];
   boatFactsActive: boolean;
   activeModules: WizardSharedProps["activeModules"];
-  missingFilters: { label_nb: string }[];
+  missingFilters: { key: string; label_nb: string }[];
   isFree: boolean;
   priceNok: WizardSharedProps["priceNok"];
   categoryId: string;
@@ -127,8 +127,12 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
           message: "Svar på om hengeren er fritatt for EU-kontroll før du går videre.",
         };
       }
-      if (ctx.missingFilters.length > 0) {
-        return `Fyll inn ${ctx.missingFilters.map((f) => f.label_nb).join(", ")} før du går videre.`;
+      const firstMissingFilter = ctx.missingFilters[0];
+      if (firstMissingFilter) {
+        return {
+          field: firstMissingFilter.key,
+          message: `Fyll inn ${firstMissingFilter.label_nb.toLowerCase()} før du går videre.`,
+        };
       }
       return null;
     },
@@ -150,8 +154,12 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
       // kjøretøy (se CategoryAttributes), så den skal heller ikke validere
       // noe her.
       if (!ctx.behavior.showGenericAttributes || ctx.boatFactsActive) return null;
-      if (ctx.missingFilters.length > 0) {
-        return `Fyll inn ${ctx.missingFilters.map((f) => f.label_nb).join(", ")} før du går videre.`;
+      const firstMissingFilter = ctx.missingFilters[0];
+      if (firstMissingFilter) {
+        return {
+          field: firstMissingFilter.key,
+          message: `Fyll inn ${firstMissingFilter.label_nb.toLowerCase()} før du går videre.`,
+        };
       }
       for (const mod of ctx.activeModules) {
         const error = mod.validateExtra?.(ctx.attributes);

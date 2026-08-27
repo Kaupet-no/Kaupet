@@ -83,6 +83,7 @@ export function TitleGroup(
         id="title"
         data-testid="listing-title-input"
         placeholder={`F.eks. ${props.titleExample ?? "Trek Marlin 5 sykkel 2022 — sort, lite brukt"}`}
+        aria-required="true"
         aria-invalid={!!props.errors.title}
         aria-describedby={props.errors.title ? "title-error" : undefined}
         {...props.register("title")}

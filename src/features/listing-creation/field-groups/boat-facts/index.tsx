@@ -78,6 +78,7 @@ function SuggestingAttributeInput({
             id={fieldId}
             value={value}
             autoComplete="off"
+            aria-required="true"
             aria-invalid={!!fieldError}
             aria-describedby={fieldError ? `${fieldId}-error` : undefined}
             onFocus={() => setOpen(true)}

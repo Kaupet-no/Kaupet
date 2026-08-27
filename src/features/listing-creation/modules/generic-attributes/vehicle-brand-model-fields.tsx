@@ -185,6 +185,7 @@ export function VehicleBrandField({
             variant="outline"
             role="combobox"
             aria-expanded={open}
+            aria-required={required || undefined}
             aria-invalid={!!error}
             className="native-touch-target w-full justify-between font-normal hover:text-foreground"
           >
@@ -263,6 +264,7 @@ export function VehicleModelField({
         </Label>
         <Input
           id="vehicle-model"
+          aria-required={required || undefined}
           aria-invalid={!!error}
           value={value ?? ""}
           onChange={(e) => onChange(e.target.value || undefined)}
@@ -291,6 +293,7 @@ export function VehicleModelField({
             variant="outline"
             role="combobox"
             aria-expanded={open}
+            aria-required={required || undefined}
             aria-invalid={!!error}
             disabled={!brandKnown}
             className="native-touch-target w-full justify-between font-normal hover:text-foreground"

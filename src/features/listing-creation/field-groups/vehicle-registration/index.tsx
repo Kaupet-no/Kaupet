@@ -443,6 +443,7 @@ export function VehicleRegistration(props: WizardSharedProps) {
                   maxLength={7}
                   placeholder="AB 12345"
                   disabled={vehicleLookupLoading}
+                  aria-required="true"
                   aria-invalid={!!vehicleLookupError}
                   aria-describedby={vehicleLookupError ? "vehicle-reg-nr-error" : undefined}
                   className="w-full flex-1 bg-white px-2 text-center font-mono text-4xl font-bold tracking-[0.08em] text-neutral-900 outline-none placeholder:text-black/20 disabled:opacity-60"

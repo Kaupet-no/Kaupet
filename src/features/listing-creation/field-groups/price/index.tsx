@@ -184,6 +184,7 @@ export function Price({
               className={
                 heroSize ? "h-16 w-full pr-12 text-right text-4xl font-semibold" : "pr-9 text-right"
               }
+              aria-required={!isFree}
               aria-invalid={!!errors.price_nok}
               aria-describedby={errors.price_nok ? "price-error" : undefined}
               // Only `name`/`ref` from register() — NOT the full spread.

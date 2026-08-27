@@ -1002,6 +1002,12 @@ function NewListingPage() {
       .filter((f) => !(isVehicle && f === "title"));
     const valid = fields.length > 0 ? await trigger(fields, { shouldFocus: true }) : true;
     if (!valid) {
+      if (
+        groups.some((group) =>
+          ["category-attributes", "boat-facts", "vehicle-registration"].includes(group.key),
+        )
+      )
+        setAttributesTouched(true);
       setValidationError("Rett feltene som er markert før du fortsetter.");
       trackProductEvent("listing_creation_step_completed", {
         kind: "sell",
@@ -1063,7 +1069,11 @@ function NewListingPage() {
           step: currentStepKey,
           reason: group.key,
         });
-        if (group.key === "category-attributes" || group.key === "boat-facts")
+        if (
+          group.key === "category-attributes" ||
+          group.key === "boat-facts" ||
+          group.key === "vehicle-registration"
+        )
           setAttributesTouched(true);
         setExtraFieldError(result);
         setValidationError(result.message);
@@ -1666,7 +1676,7 @@ function NewListingPage() {
           onCancel={() => void navigate({ to: "/" })}
           notice={
             hasDraftData ? (
-              <div className="mt-4 flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
+              <div className="mt-4 flex flex-col items-stretch gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm sm:flex-row sm:items-start">
                 <div className="min-w-0 flex-1">
                   <p>
                     Lagret utkast: <strong>{restorableDraftTitle}</strong>
@@ -1679,7 +1689,7 @@ function NewListingPage() {
                     </p>
                   )}
                 </div>
-                <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                <div className="flex w-full shrink-0 flex-col justify-end gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
                   <Button
                     type="button"
                     size="sm"
@@ -1702,7 +1712,15 @@ function NewListingPage() {
               </div>
             ) : undefined
           }
-          progress={categoryId ? <StepIndicator step={step} pages={pages} /> : undefined}
+          progress={
+            categoryId ? (
+              <StepIndicator step={step} pages={pages} />
+            ) : (
+              <nav aria-label="Annonseopprettelse">
+                <span className="text-sm font-medium">Kategori</span>
+              </nav>
+            )
+          }
           status={
             draftSaveError ? (
               <p

@@ -213,21 +213,30 @@ function AttributeField({
   error?: string;
 }) {
   const label = filter.unit ? `${filter.label_nb} (${filter.unit})` : filter.label_nb;
+  const fieldId = `attr-${filter.key}`;
+  const errorId = `${fieldId}-error`;
 
   if (filter.type === "boolean") {
     const showRequiredMark = required && !filter.is_optional;
     return (
       <div className="space-y-2">
-        <Label>
+        <Label id={`${fieldId}-label`}>
           {filter.label_nb} {showRequiredMark && <span className="text-destructive">*</span>}
         </Label>
-        <div role="radiogroup" aria-label={filter.label_nb} className="flex gap-2">
+        <div
+          role="radiogroup"
+          aria-labelledby={`${fieldId}-label`}
+          aria-required={showRequiredMark || undefined}
+          aria-invalid={!!error}
+          aria-describedby={error ? errorId : undefined}
+          className="flex gap-2"
+        >
           <button
             type="button"
             role="radio"
             aria-checked={value === true}
             onClick={() => onChange(true)}
-            className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+            className={`min-h-12 rounded-full border px-3 py-1.5 text-sm transition-colors ${
               value === true
                 ? "border-primary bg-primary/10 text-primary font-medium"
                 : "border-border hover:border-primary/40"
@@ -240,7 +249,7 @@ function AttributeField({
             role="radio"
             aria-checked={value === false}
             onClick={() => onChange(false)}
-            className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+            className={`min-h-12 rounded-full border px-3 py-1.5 text-sm transition-colors ${
               value === false
                 ? "border-primary bg-primary/10 text-primary font-medium"
                 : "border-border hover:border-primary/40"
@@ -249,14 +258,17 @@ function AttributeField({
             Nei
           </button>
         </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && (
+          <p id={errorId} className="text-sm text-destructive">
+            {error}
+          </p>
+        )}
       </div>
     );
   }
 
   if (filter.type === "select") {
     const options = filter.options ?? [];
-    const fieldId = `attr-${filter.key}`;
     const showRequiredMark = required && !filter.is_optional;
     return (
       <div className="space-y-2">
@@ -271,7 +283,12 @@ function AttributeField({
           value={typeof value === "string" ? value : ""}
           onValueChange={(v) => onChange(v || undefined)}
         >
-          <SelectTrigger id={fieldId} aria-invalid={!!error}>
+          <SelectTrigger
+            id={fieldId}
+            aria-required={showRequiredMark || undefined}
+            aria-invalid={!!error}
+            aria-describedby={error ? errorId : undefined}
+          >
             <SelectValue placeholder="Velg…" />
           </SelectTrigger>
           <SelectContent>
@@ -282,7 +299,11 @@ function AttributeField({
             ))}
           </SelectContent>
         </Select>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && (
+          <p id={errorId} className="text-sm text-destructive">
+            {error}
+          </p>
+        )}
       </div>
     );
   }
@@ -297,16 +318,23 @@ function AttributeField({
     const showRequiredMark = required && !filter.is_optional;
     return (
       <div className="space-y-2">
-        <Label>
+        <Label id={`${fieldId}-label`}>
           {label}
           {showRequiredMark && <span className="text-destructive"> *</span>}
           {required && filter.is_optional && (
             <span className="font-normal text-muted-foreground"> (valgfritt)</span>
           )}
         </Label>
-        <div className="flex flex-wrap gap-3">
+        <div
+          role="group"
+          aria-labelledby={`${fieldId}-label`}
+          aria-required={showRequiredMark || undefined}
+          aria-invalid={!!error}
+          aria-describedby={error ? errorId : undefined}
+          className="flex flex-wrap gap-3"
+        >
           {options.map((o) => (
-            <label key={o.value} className="flex items-center gap-2 text-sm">
+            <label key={o.value} className="flex min-h-12 items-center gap-2 text-sm">
               <Checkbox
                 checked={selected.includes(o.value)}
                 onCheckedChange={() => toggle(o.value)}
@@ -315,7 +343,11 @@ function AttributeField({
             </label>
           ))}
         </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && (
+          <p id={errorId} className="text-sm text-destructive">
+            {error}
+          </p>
+        )}
       </div>
     );
   }
@@ -328,7 +360,6 @@ function AttributeField({
   const showRequiredMark = required && filter.type !== "range" && !filter.is_optional;
   const digitCap = isNumber ? NUMERIC_DIGIT_CAPS[filter.key] : undefined;
   const requiresPositiveValue = isNumber && POSITIVE_NUMERIC_ATTRIBUTE_KEYS.includes(filter.key);
-  const fieldId = `attr-${filter.key}`;
   return (
     <div className="space-y-2">
       <Label htmlFor={fieldId}>
@@ -342,7 +373,9 @@ function AttributeField({
         id={fieldId}
         type={isNumber ? "number" : "text"}
         inputMode={isNumber ? "numeric" : undefined}
+        aria-required={showRequiredMark || undefined}
         aria-invalid={!!error}
+        aria-describedby={error ? errorId : undefined}
         value={value === undefined ? "" : String(value)}
         min={requiresPositiveValue ? 1 : undefined}
         onChange={(e) => {
@@ -352,7 +385,11 @@ function AttributeField({
           onChange(isNumber ? Number(raw) : raw);
         }}
       />
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && (
+        <p id={errorId} className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

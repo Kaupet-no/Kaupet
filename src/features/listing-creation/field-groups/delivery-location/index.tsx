@@ -59,11 +59,16 @@ export function DeliveryLocation({
     <>
       {showDelivery && behavior.requiresDeliveryMethod && (
         <section className="space-y-3">
-          <Label>
+          <Label id="delivery-label">
             Levering
             <RequiredMark />
           </Label>
-          <div className="grid grid-cols-3 gap-2">
+          <div
+            role="radiogroup"
+            aria-labelledby="delivery-label"
+            aria-required="true"
+            className="grid grid-cols-3 gap-2"
+          >
             {(
               [
                 { value: "pickup", label: "Må hentes", description: "Kjøper henter selv" },
@@ -78,11 +83,13 @@ export function DeliveryLocation({
               <button
                 key={opt.value}
                 type="button"
+                role="radio"
+                aria-checked={canShip === opt.value}
                 onClick={() => setValue("can_ship", opt.value, { shouldValidate: true })}
-                className={`flex flex-col items-center gap-1 rounded-lg border px-3 py-3 text-center text-sm transition-colors ${
+                className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg border px-3 py-3 text-center text-sm transition-colors ${
                   canShip === opt.value
                     ? "border-primary bg-primary/10 font-medium text-primary"
-                    : "border-border bg-card text-foreground hover:border-primary/40 hover:bg-primary/5"
+                    : "border-border bg-card text-foreground hover:border-primary/40"
                 }`}
               >
                 <span className="font-medium">{opt.label}</span>
@@ -193,6 +200,7 @@ export function DeliveryLocation({
                     inputMode="numeric"
                     maxLength={4}
                     placeholder="0150"
+                    aria-required="true"
                     aria-invalid={!!errors.postal_code}
                     aria-describedby={errors.postal_code ? "postal-code-error" : undefined}
                     {...register("postal_code", {

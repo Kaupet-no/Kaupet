@@ -40,6 +40,7 @@ function VehicleConditionDetails({
           rows={3}
           disabled={noKnownIssues}
           placeholder="Beskriv kjente feil eller mangler ved kjøretøyet."
+          aria-required={!noKnownIssues}
           aria-invalid={!!errors.known_issues || !!knownIssuesExtraError}
           aria-describedby={
             errors.known_issues || knownIssuesExtraError ? "known-issues-error" : undefined

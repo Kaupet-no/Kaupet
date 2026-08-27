@@ -100,7 +100,12 @@ export function PartFitmentField({
           Passer til {required && <span className="text-destructive">*</span>}
         </Label>
         <Select value={scope} onValueChange={setScope}>
-          <SelectTrigger id="part-fitment-scope" aria-invalid={!!scopeError}>
+          <SelectTrigger
+            id="part-fitment-scope"
+            aria-required={required || undefined}
+            aria-invalid={!!scopeError}
+            aria-describedby={scopeError ? "part-fitment-scope-error" : undefined}
+          >
             <SelectValue placeholder="Velg kompatibilitet…" />
           </SelectTrigger>
           <SelectContent>
@@ -111,7 +116,11 @@ export function PartFitmentField({
             ))}
           </SelectContent>
         </Select>
-        {scopeError && <p className="text-sm text-destructive">{scopeError}</p>}
+        {scopeError && (
+          <p id="part-fitment-scope-error" className="text-sm text-destructive">
+            {scopeError}
+          </p>
+        )}
       </div>
 
       {scope === "specific" && (

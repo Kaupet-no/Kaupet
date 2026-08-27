@@ -257,10 +257,15 @@ function AttributeField({
   if (filter.type === "select") {
     const options = filter.options ?? [];
     const fieldId = `attr-${filter.key}`;
+    const showRequiredMark = required && !filter.is_optional;
     return (
       <div className="space-y-2">
         <Label htmlFor={fieldId}>
-          {label} {required && <span className="text-destructive">*</span>}
+          {label}
+          {showRequiredMark && <span className="text-destructive"> *</span>}
+          {required && filter.is_optional && (
+            <span className="font-normal text-muted-foreground"> (valgfritt)</span>
+          )}
         </Label>
         <Select
           value={typeof value === "string" ? value : ""}
@@ -289,10 +294,15 @@ function AttributeField({
       const next = selected.includes(val) ? selected.filter((s) => s !== val) : [...selected, val];
       onChange(next.length > 0 ? next : undefined);
     };
+    const showRequiredMark = required && !filter.is_optional;
     return (
       <div className="space-y-2">
         <Label>
-          {label} {required && <span className="text-destructive">*</span>}
+          {label}
+          {showRequiredMark && <span className="text-destructive"> *</span>}
+          {required && filter.is_optional && (
+            <span className="font-normal text-muted-foreground"> (valgfritt)</span>
+          )}
         </Label>
         <div className="flex flex-wrap gap-3">
           {options.map((o) => (
@@ -322,7 +332,8 @@ function AttributeField({
   return (
     <div className="space-y-2">
       <Label htmlFor={fieldId}>
-        {label} {showRequiredMark && <span className="text-destructive">*</span>}
+        {label}
+        {showRequiredMark && <span className="text-destructive"> *</span>}
         {required && filter.is_optional && (
           <span className="font-normal text-muted-foreground"> (valgfritt)</span>
         )}

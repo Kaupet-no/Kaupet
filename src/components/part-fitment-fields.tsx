@@ -213,7 +213,16 @@ function PartVehiclePicker({ selectedIds, onChange, single = false }: VehiclePic
   const [brandId, setBrandId] = useState("");
   const [modelOpen, setModelOpen] = useState(false);
   const [modelSearch, setModelSearch] = useState("");
-
+  // PartVehicleSearchField renders this inside an already-open filter-chip
+  // Popover (see category-filter-fields.tsx). Two independent Radix Popover
+  // portals share the same document.body root and the same hardcoded
+  // z-[10001] (ui/popover.tsx), so which one paints on top depends on
+  // mount order rather than nesting — exactly the stacking footgun
+  // docs/UI-GUIDE.md warns about for Dialog/Sheet/FullscreenOverlay.
+  // Portaling into this component's own subtree keeps the model list a
+  // strict DOM descendant of whatever container (if any) already wraps it,
+  // so it always paints above and never gets clipped by that container.
+  const [rootNode, setRootNode] = useState<HTMLDivElement | null>(null);
   const carBrands = useMemo(
     () => (brands ?? []).filter((brand) => brand.category_group === "bil"),
     [brands],
@@ -232,7 +241,7 @@ function PartVehiclePicker({ selectedIds, onChange, single = false }: VehiclePic
   );
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" ref={setRootNode}>
       <Label>Velg bilmodell</Label>
       <div className="grid gap-3 sm:grid-cols-2">
         <Select
@@ -267,7 +276,11 @@ function PartVehiclePicker({ selectedIds, onChange, single = false }: VehiclePic
               <ChevronDown className="size-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
+          <PopoverContent
+            className="w-(--radix-popover-trigger-width) p-0"
+            align="start"
+            container={rootNode}
+          >
             <Command shouldFilter>
               <CommandInput
                 placeholder="Søk modell…"

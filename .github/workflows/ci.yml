@@ -139,17 +139,20 @@ jobs:
       # hvis filen mangler — bygget lykkes, men APK-en mangler Firebase-
       # oppsett og appen krasjer så snart push-varslinger aktiveres.
       - name: Skriv google-services.json fra secret
+        if: steps.filter.outputs.android == 'true'
         working-directory: android/app
         run: echo "$GOOGLE_SERVICES_JSON" > google-services.json
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON }}
 
       - name: Sync Android project
+        if: steps.filter.outputs.android == 'true'
         run: bunx cap sync android
         env:
           CAPACITOR_ENV: ${{ steps.env.outputs.flavor }}
 
       - name: Run Android tests
+        if: steps.filter.outputs.android == 'true'
         working-directory: android
         run: ./gradlew test${{ steps.env.outputs.flavorCap }}DebugUnitTest
 
@@ -192,7 +195,7 @@ jobs:
 
       - name: Publish APK as GitHub release preview
         if: steps.filter.outputs.android == 'true' && github.event_name == 'push'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: android-preview-${{ github.ref_name }}
           name: >-

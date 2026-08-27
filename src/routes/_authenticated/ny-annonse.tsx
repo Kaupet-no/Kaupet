@@ -508,6 +508,11 @@ function NewListingPage() {
   }, [pages.length, reviewJumpRequested, setStep]);
 
   const currentStepKey = currentPage?.groups[0]?.key ?? "unknown";
+  // Category selection (suggestion click or manual pick) auto-advances the
+  // wizard on this step — see applyCategorySelect/applySuggestedCategory —
+  // so no separate Next/Back controls are needed or wanted here.
+  const isCategoryConfirmPage =
+    currentPage?.groups.length === 1 && currentPage.groups[0]?.key === "category-confirm";
   useEffect(() => {
     trackProductEvent("listing_creation_step_completed", {
       kind: "sell",
@@ -521,7 +526,7 @@ function NewListingPage() {
     // Mirrors the hidden Tilbake/Forrige buttons on category-confirm — this
     // is the single function behind the footer button, the shell's header
     // arrow, the native swipe deck, AND the browser/hardware back button (via
-    // useComposerHistoryBack below — this
+    // useComposerHistoryBack below) — this
     // is what keeps all four consistent instead of just the visible buttons.
     returnToReviewRef.current = false;
     reviewSectionLastStepRef.current = null;
@@ -534,7 +539,7 @@ function NewListingPage() {
     });
     goBackStep();
   }
-  useComposerHistoryBack(isFirst, goBack);
+  useComposerHistoryBack(isFirst || isCategoryConfirmPage, goBack);
 
   /** Clear a confirmed lookup when navigation returns to registration, so
    * the registration number can be changed and looked up again. */
@@ -1543,10 +1548,6 @@ function NewListingPage() {
     native &&
     groups.length === 1 &&
     (groups[0].key === "description-keywords" || groups[0].key === "vehicle-facts");
-  // Category selection (suggestion click or manual pick) auto-advances the
-  // wizard on this step — see applyCategorySelect/applySuggestedCategory —
-  // so no separate Next/Back controls are needed or wanted here.
-  const isCategoryConfirmPage = groups.length === 1 && groups[0].key === "category-confirm";
   const nextGroups = pages[step]?.groups ?? [];
   function handleInvalidSubmit(fields: FieldErrors<ListingForm>) {
     const firstField = Object.keys(fields)[0] as keyof ListingForm | undefined;

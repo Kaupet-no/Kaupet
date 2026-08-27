@@ -467,8 +467,9 @@ export function AttributeFilterChips({
       );
     }
 
-    // Bildelmodeller bruker samme ankret, søkbar meny som de andre
-    // filterfeltene. Modell-listen i PartVehicleSearchField har eget søk.
+    // Bilmodellisten er søkbar og kan bli høyere enn plassen rundt chipen.
+    // Bruk et modal-overlay i stedet for en ankret popover, ellers kan
+    // Radix flippe menyen opp over filterpanelet (særlig på forsiden).
     if (f.key === PART_FITMENT_VEHICLE_IDS_KEY) {
       const selected = current?.kind === "multiselect" ? current.values : [];
       const chip = (
@@ -476,27 +477,33 @@ export function AttributeFilterChips({
           label={label}
           active={active}
           values={selected}
-          onClick={isNative ? () => openField(f.key) : undefined}
+          onClick={() => {
+            if (isNative) void hapticImpact("light");
+            openField(f.key);
+          }}
           variant={fieldProps.variant}
           fieldLabel={f.label_nb}
         />
       );
       if (isNative) return <span key={f.id}>{chip}</span>;
       return (
-        <Popover
+        <ResponsiveOverlay
           key={f.id}
           open={openKey === f.key}
           onOpenChange={(o) => openField(o ? f.key : null)}
         >
-          <PopoverTrigger asChild>{chip}</PopoverTrigger>
-          <PopoverContent align="start" className="w-80 p-3">
+          {chip}
+          <ResponsiveOverlayContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>{f.label_nb}</DialogTitle>
+            </DialogHeader>
             <PartVehicleSearchField
               value={values[f.key]}
               onChange={(next) => onChange(f.key, next)}
               contentOnly
             />
-          </PopoverContent>
-        </Popover>
+          </ResponsiveOverlayContent>
+        </ResponsiveOverlay>
       );
     }
 

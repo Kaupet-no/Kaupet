@@ -75,6 +75,20 @@ describe("PartFitmentField", () => {
     expect(screen.getByPlaceholderText("Søk modell…")).toBeTruthy();
   });
 
+  it("kan velge modell direkte i en åpen filtermeny", () => {
+    const onChange = vi.fn();
+    render(<PartVehicleSearchField value={undefined} onChange={onChange} contentOnly />);
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Merke" }));
+    fireEvent.click(screen.getByRole("option", { name: "Volvo" }));
+    fireEvent.click(screen.getByRole("option", { name: "V70" }));
+
+    expect(onChange).toHaveBeenCalledWith({
+      kind: "multiselect",
+      values: ["model-1"],
+    });
+  });
+
   it("kan velge alle modeller for et merke", () => {
     const onChange = vi.fn();
     render(<PartVehicleSearchField value={undefined} onChange={onChange} />);

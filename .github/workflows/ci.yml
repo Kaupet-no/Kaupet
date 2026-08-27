@@ -39,6 +39,41 @@ jobs:
       - name: Build
         run: bun run build
 
+      # Ingen av de andre stegene (tsc, vitest, `vite dev`) kjører faktisk den
+      # bygde SSR-outputen slik Cloudflare Workers laster den (separate
+      # ES-moduler pga. `no_bundle: true`). En vite/rolldown-oppgradering
+      # (se commit som fikser produksjonsutfallet 2026-08-27) sendte SSR-
+      # bygget i to sirkulære chunks som kun feilet i workerd — build,
+      # typecheck og enhetstester så helt normale ut. Denne smoke-testen
+      # kjører den faktiske worker-outputen i workerd via `wrangler dev` og
+      # ville fanget akkurat den regresjonen.
+      - name: Smoke test built Worker in workerd
+        run: |
+          bunx wrangler dev --config dist/server/wrangler.json --port 8788 &
+          WRANGLER_PID=$!
+
+          ok=false
+          for _ in $(seq 1 30); do
+            if body=$(curl -sS -f http://localhost:8788/ 2>/dev/null); then
+              ok=true
+              break
+            fi
+            sleep 1
+          done
+
+          kill "$WRANGLER_PID" 2>/dev/null || true
+          wait "$WRANGLER_PID" 2>/dev/null || true
+
+          if [ "$ok" != "true" ]; then
+            echo "Worker svarte aldri med 200 på http://localhost:8788/" >&2
+            exit 1
+          fi
+
+          if echo "$body" | grep -q "Siden lastet ikke"; then
+            echo "Worker returnerte 200, men med SSR-fallback-feilsiden som body." >&2
+            exit 1
+          fi
+
       - name: Bundle budget
         run: bun run check:bundle
 

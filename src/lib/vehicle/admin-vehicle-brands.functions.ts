@@ -4,7 +4,17 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const uuid = z.string().uuid();
-const categoryGroup = z.enum(["bil", "motorsykkel", "moped_atv", "bobil_campingvogn", "henger"]);
+const categoryGroup = z.enum([
+  "bil",
+  "motorsykkel",
+  "moped_atv",
+  "bobil_campingvogn",
+  "henger",
+  "lastebil",
+  "buss",
+  "traktor",
+  "anleggsmaskin",
+]);
 
 export const adminListVehicleBrandsWithModels = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

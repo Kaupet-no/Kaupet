@@ -22,7 +22,17 @@ export const createVehicleBrand = createServerFn({ method: "POST" })
     z
       .object({
         name: z.string().trim().min(1).max(80),
-        categoryGroup: z.enum(["bil", "motorsykkel", "moped_atv", "bobil_campingvogn", "henger"]),
+        categoryGroup: z.enum([
+          "bil",
+          "motorsykkel",
+          "moped_atv",
+          "bobil_campingvogn",
+          "henger",
+          "lastebil",
+          "buss",
+          "traktor",
+          "anleggsmaskin",
+        ]),
       })
       .parse(input),
   )

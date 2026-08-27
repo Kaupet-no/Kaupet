@@ -75,7 +75,17 @@ export const matchVehicleBrandModel = createServerFn({ method: "POST" })
       .object({
         brand: z.string().nullable(),
         model: z.string().nullable(),
-        categoryGroup: z.enum(["bil", "motorsykkel", "moped_atv", "bobil_campingvogn", "henger"]),
+        categoryGroup: z.enum([
+          "bil",
+          "motorsykkel",
+          "moped_atv",
+          "bobil_campingvogn",
+          "henger",
+          "lastebil",
+          "buss",
+          "traktor",
+          "anleggsmaskin",
+        ]),
       })
       .parse(input),
   )

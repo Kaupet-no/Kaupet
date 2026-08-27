@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { SlidersHorizontal, RotateCcw } from "lucide-react";
 
@@ -22,6 +22,8 @@ import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FilterChip } from "@/components/filter-chip";
 import { CategoryFilterFields } from "@/components/category-filter-fields";
+import { PartVehicleSearchField } from "@/components/part-fitment-fields";
+import { useAllVehicleBrands, useAllVehicleModels } from "@/lib/vehicle/vehicle-brands";
 import { RangeFilterField } from "@/components/range-filter-field";
 import { CONDITIONS } from "@/components/advanced-search-value";
 import { PRICE_BOUNDS } from "@/lib/filter-range-bounds";
@@ -39,6 +41,7 @@ import {
 import { splitPrimaryFilters } from "@/lib/category-filters";
 import { hapticImpact } from "@/lib/haptics";
 import {
+  PART_FITMENT_VEHICLE_IDS_KEY,
   SEARCH_MULTISELECT_KEYS,
   type AttributeFilterValue,
   type CategoryFilter,
@@ -461,6 +464,46 @@ export function AttributeFilterChips({
           }}
           {...fieldProps}
         />
+      );
+    }
+
+    // Bilmodellisten er søkbar og kan bli høyere enn plassen rundt chipen.
+    // Bruk et modal-overlay i stedet for en ankret popover, ellers kan
+    // Radix flippe menyen opp over filterpanelet (særlig på forsiden).
+    if (f.key === PART_FITMENT_VEHICLE_IDS_KEY) {
+      const selected = current?.kind === "multiselect" ? current.values : [];
+      const chip = (
+        <PartVehicleFilterChip
+          label={label}
+          active={active}
+          values={selected}
+          onClick={() => {
+            if (isNative) void hapticImpact("light");
+            openField(f.key);
+          }}
+          variant={fieldProps.variant}
+          fieldLabel={f.label_nb}
+        />
+      );
+      if (isNative) return <span key={f.id}>{chip}</span>;
+      return (
+        <ResponsiveOverlay
+          key={f.id}
+          open={openKey === f.key}
+          onOpenChange={(o) => openField(o ? f.key : null)}
+        >
+          {chip}
+          <ResponsiveOverlayContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>{f.label_nb}</DialogTitle>
+            </DialogHeader>
+            <PartVehicleSearchField
+              value={values[f.key]}
+              onChange={(next) => onChange(f.key, next)}
+              contentOnly
+            />
+          </ResponsiveOverlayContent>
+        </ResponsiveOverlay>
       );
     }
 
@@ -1090,5 +1133,46 @@ function ModelMultiChip({
         />
       </PopoverContent>
     </Popover>
+  );
+}
+
+function PartVehicleFilterChip({
+  label,
+  active,
+  values,
+  onClick,
+  variant,
+  fieldLabel,
+}: {
+  label: string;
+  active: boolean;
+  values: string[];
+  onClick?: () => void;
+  variant?: "pill" | "field";
+  fieldLabel?: string;
+}) {
+  const { data: brands } = useAllVehicleBrands();
+  const { data: models } = useAllVehicleModels();
+  const allBrandLabel = useMemo(() => {
+    if (!brands || !models || values.length === 0) return null;
+    const selectedModels = models.filter((model) => values.includes(model.id));
+    const brandIds = new Set(selectedModels.map((model) => model.brand_id));
+    if (selectedModels.length !== values.length || brandIds.size !== 1) return null;
+    const brandId = selectedModels[0]?.brand_id;
+    const brandModels = models.filter((model) => model.brand_id === brandId);
+    if (brandModels.length !== values.length) return null;
+    if (!brandModels.every((model) => values.includes(model.id))) return null;
+    const brandName = brands.find((brand) => brand.id === brandId)?.name;
+    return brandName ? `${brandName} (alle)` : null;
+  }, [brands, models, values]);
+
+  return (
+    <FilterChip
+      label={allBrandLabel ?? label}
+      active={active}
+      onClick={onClick}
+      variant={variant}
+      fieldLabel={fieldLabel}
+    />
   );
 }

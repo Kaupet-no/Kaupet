@@ -80,16 +80,28 @@ export const POSITIVE_NUMERIC_ATTRIBUTE_KEYS: readonly string[] = [
   "length_cm",
 ];
 
-/** For brand_select filters, `unit` stores which vehicle_brands.category_group to read from. */
+/** Vehicle reference groups available to vehicle and parts selectors. */
 export type VehicleBrandGroup =
-  "bil" | "motorsykkel" | "moped_atv" | "bobil_campingvogn" | "henger";
+  | "bil"
+  | "motorsykkel"
+  | "moped_atv"
+  | "bobil_campingvogn"
+  | "henger"
+  | "lastebil"
+  | "buss"
+  | "traktor"
+  | "anleggsmaskin";
 
 export const VEHICLE_BRAND_GROUP_LABELS_NB: Record<VehicleBrandGroup, string> = {
   bil: "Bil",
   motorsykkel: "Motorsykkel",
-  moped_atv: "Moped/ATV",
+  moped_atv: "Moped/ATV/snøscooter",
   bobil_campingvogn: "Bobil/campingvogn",
   henger: "Tilhenger",
+  lastebil: "Lastebil",
+  buss: "Buss/minibuss",
+  traktor: "Traktor/redskap",
+  anleggsmaskin: "Anleggsmaskin",
 };
 
 export type CategoryFilter = {

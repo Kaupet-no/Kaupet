@@ -17,7 +17,17 @@ export const lookupVehicleByRegNumber = createServerFn({ method: "POST" })
         // is deferred to matchVehicleBrandModel once the user confirms the
         // auto-detected vehicle type.
         categoryGroup: z
-          .enum(["bil", "motorsykkel", "moped_atv", "bobil_campingvogn", "henger"])
+          .enum([
+            "bil",
+            "motorsykkel",
+            "moped_atv",
+            "bobil_campingvogn",
+            "henger",
+            "lastebil",
+            "buss",
+            "traktor",
+            "anleggsmaskin",
+          ])
           .optional(),
       })
       .parse(input),

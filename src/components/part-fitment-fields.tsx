@@ -1,18 +1,8 @@
 import { useMemo, useState } from "react";
-import { Check, ChevronDown, X } from "lucide-react";
+import { X } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import {
   Select,
   SelectContent,
@@ -27,8 +17,20 @@ import {
   PART_FITMENT_YEAR_TO_KEY,
   type AttributeFilterValue,
   type AttributeValue,
+  VEHICLE_BRAND_GROUP_LABELS_NB,
+  type VehicleBrandGroup,
 } from "@/lib/category-filters";
-import { useAllVehicleBrands, useAllVehicleModels } from "@/lib/vehicle/vehicle-brands";
+import {
+  useAllVehicleBrands,
+  useAllVehicleModelClasses,
+  useAllVehicleModels,
+} from "@/lib/vehicle/vehicle-brands";
+import {
+  VehicleBrandField,
+  VehicleModelMultiComboboxContent,
+  VehicleModelMultiField,
+  type VehicleOptionGroupSet,
+} from "@/features/listing-creation/modules/generic-attributes/vehicle-brand-model-fields";
 
 const FITMENT_SCOPE_OPTIONS = [
   { value: "universal", label: "Universal del" },
@@ -41,7 +43,6 @@ type AttributeValues = Record<string, AttributeValue>;
 type VehiclePickerProps = {
   selectedIds: string[];
   onChange: (ids: string[]) => void;
-  single?: boolean;
 };
 
 export function PartFitmentField({
@@ -185,147 +186,186 @@ export function PartFitmentField({
 export function PartVehicleSearchField({
   value,
   onChange,
+  contentOnly = false,
 }: {
   value: AttributeFilterValue | undefined;
   onChange: (value: AttributeFilterValue | undefined) => void;
+  contentOnly?: boolean;
 }) {
   const selectedIds = value?.kind === "multiselect" ? value.values : [];
+  const picker = (
+    <PartVehiclePicker
+      selectedIds={selectedIds}
+      onChange={(ids) =>
+        onChange(ids.length > 0 ? { kind: "multiselect", values: ids } : undefined)
+      }
+      contentOnly={contentOnly}
+    />
+  );
+  if (contentOnly) return picker;
   return (
-    <div className="space-y-2">
-      <Label>Bilmodell</Label>
-      <PartVehiclePicker
-        selectedIds={selectedIds}
-        single
-        onChange={(ids) =>
-          onChange(ids.length > 0 ? { kind: "multiselect", values: ids } : undefined)
-        }
-      />
+    <>
+      {picker}
       <p className="text-xs text-muted-foreground">
         Vis deler som selgeren oppgir passer til valgt modell.
       </p>
-    </div>
+    </>
   );
 }
 
-function PartVehiclePicker({ selectedIds, onChange, single = false }: VehiclePickerProps) {
+function PartVehiclePicker({
+  selectedIds,
+  onChange,
+  contentOnly = false,
+}: VehiclePickerProps & { contentOnly?: boolean }) {
   const { data: brands } = useAllVehicleBrands();
+  const { data: classes } = useAllVehicleModelClasses();
   const { data: models } = useAllVehicleModels();
-  const [brandId, setBrandId] = useState("");
-  const [modelOpen, setModelOpen] = useState(false);
-  const [modelSearch, setModelSearch] = useState("");
+  const [categoryGroup, setCategoryGroup] = useState<VehicleBrandGroup>("bil");
+  const [brandName, setBrandName] = useState<string>();
 
-  const carBrands = useMemo(
-    () => (brands ?? []).filter((brand) => brand.category_group === "bil"),
-    [brands],
+  const brandsForGroup = useMemo(
+    () => (brands ?? []).filter((brand) => brand.category_group === categoryGroup),
+    [brands, categoryGroup],
+  );
+  const brandId = useMemo(
+    () => brandsForGroup.find((brand) => brand.name === brandName)?.id,
+    [brandsForGroup, brandName],
   );
   const modelsForBrand = useMemo(
     () => (models ?? []).filter((model) => model.brand_id === brandId),
     [models, brandId],
   );
-  const brandNames = useMemo(
-    () => new Map(carBrands.map((brand) => [brand.id, brand.name])),
-    [carBrands],
+  const modelOptions = useMemo(
+    () => modelsForBrand.map((model) => ({ value: model.id, label: model.name })),
+    [modelsForBrand],
   );
-  const modelNames = useMemo(
-    () => new Map((models ?? []).map((model) => [model.id, model.name])),
+  const modelGroups = useMemo<VehicleOptionGroupSet>(() => {
+    const groupedModelIds = new Set(
+      modelsForBrand.filter((model) => model.class_id != null).map((model) => model.id),
+    );
+    return {
+      groups: (classes ?? [])
+        .filter((vehicleClass) => vehicleClass.brand_id === brandId)
+        .map((vehicleClass) => ({
+          classId: vehicleClass.id,
+          className: vehicleClass.name,
+          options: modelsForBrand
+            .filter((model) => model.class_id === vehicleClass.id)
+            .map((model) => ({ value: model.id, label: model.name })),
+        })),
+      ungrouped: modelOptions.filter((option) => !groupedModelIds.has(option.value)),
+    };
+  }, [brandId, classes, modelOptions, modelsForBrand]);
+  const modelById = useMemo(
+    () => new Map((models ?? []).map((model) => [model.id, model])),
     [models],
+  );
+  const allModelIds = modelsForBrand.map((model) => model.id);
+  const allSelected =
+    allModelIds.length > 0 &&
+    allModelIds.every((id) => selectedIds.includes(id)) &&
+    selectedIds.every((id) => allModelIds.includes(id));
+  const selectedLabel = allSelected && brandName ? `${brandName} (alle)` : undefined;
+  const selectAllLabel = brandName && allModelIds.length > 0 ? `${brandName} (alle)` : undefined;
+  const groupOptions = Object.entries(VEHICLE_BRAND_GROUP_LABELS_NB) as [
+    VehicleBrandGroup,
+    string,
+  ][];
+
+  const handleGroupChange = (next: VehicleBrandGroup) => {
+    setCategoryGroup(next);
+    setBrandName(undefined);
+    if (selectedIds.length > 0) onChange([]);
+  };
+  const handleBrandChange = (next: string | undefined) => {
+    setBrandName(next);
+    if (selectedIds.length > 0) onChange([]);
+  };
+  const toggleAllModels = () => {
+    onChange(allSelected ? [] : allModelIds);
+  };
+
+  const modelField = contentOnly ? (
+    <div className="rounded-md border border-border">
+      <VehicleModelMultiComboboxContent
+        categoryGroup={categoryGroup}
+        brandNames={brandName ? [brandName] : []}
+        options={modelOptions}
+        groups={modelGroups}
+        values={selectedIds}
+        onChange={onChange}
+        selectAllLabel={selectAllLabel}
+        allSelected={allSelected}
+        onToggleAll={toggleAllModels}
+      />
+    </div>
+  ) : (
+    <VehicleModelMultiField
+      categoryGroup={categoryGroup}
+      brandNames={brandName ? [brandName] : []}
+      label="Bilmodell"
+      options={modelOptions}
+      groups={modelGroups}
+      values={selectedIds}
+      selectedLabel={selectedLabel}
+      selectAllLabel={selectAllLabel}
+      allSelected={allSelected}
+      onToggleAll={toggleAllModels}
+      onChange={onChange}
+    />
   );
 
   return (
     <div className="space-y-3">
-      <Label>Velg bilmodell</Label>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="space-y-2">
+        <Label htmlFor="part-vehicle-group">Kjøretøytype</Label>
         <Select
-          value={brandId}
-          onValueChange={(next) => {
-            setBrandId(next);
-            setModelOpen(false);
-          }}
+          value={categoryGroup}
+          onValueChange={(value) => handleGroupChange(value as VehicleBrandGroup)}
         >
-          <SelectTrigger aria-label="Bilmerke">
-            <SelectValue placeholder="Velg merke…" />
+          <SelectTrigger id="part-vehicle-group">
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {carBrands.map((brand) => (
-              <SelectItem key={brand.id} value={brand.id}>
-                {brand.name}
+            {groupOptions.map(([value, label]) => (
+              <SelectItem key={value} value={value}>
+                {label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <Popover open={modelOpen} onOpenChange={setModelOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              type="button"
-              variant="outline"
-              role="combobox"
-              aria-expanded={modelOpen}
-              disabled={!brandId}
-              className="w-full justify-between font-normal"
-            >
-              {brandId ? "Velg modell…" : "Velg merke først"}
-              <ChevronDown className="size-4 shrink-0 opacity-50" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
-            <Command shouldFilter>
-              <CommandInput
-                placeholder="Søk modell…"
-                value={modelSearch}
-                onValueChange={setModelSearch}
-              />
-              <CommandList>
-                <CommandEmpty>Ingen modeller funnet.</CommandEmpty>
-                <CommandGroup>
-                  {modelsForBrand.map((model) => (
-                    <CommandItem
-                      key={model.id}
-                      value={model.name}
-                      onSelect={() => {
-                        const next = selectedIds.includes(model.id)
-                          ? selectedIds.filter((id) => id !== model.id)
-                          : single
-                            ? [model.id]
-                            : [...selectedIds, model.id];
-                        onChange(next);
-                        setModelSearch("");
-                        if (single) setModelOpen(false);
-                      }}
-                    >
-                      <Check
-                        className={`size-4 ${selectedIds.includes(model.id) ? "opacity-100" : "opacity-0"}`}
-                      />
-                      {model.name}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
       </div>
-
+      <VehicleBrandField
+        categoryGroup={categoryGroup}
+        value={brandName}
+        onChange={handleBrandChange}
+      />
+      {modelField}
       {selectedIds.length > 0 && (
-        <div className="flex flex-wrap gap-2" aria-label="Valgte bilmodeller">
-          {selectedIds.map((id) => (
-            <span
-              key={id}
-              className="inline-flex max-w-full items-center gap-1 rounded-full bg-muted px-3 py-1.5 text-sm"
-            >
-              <span className="truncate">
-                {brandNames.get(models?.find((model) => model.id === id)?.brand_id ?? "") ?? "Bil"}{" "}
-                {modelNames.get(id) ?? "Ukjent modell"}
-              </span>
-              <button
-                type="button"
-                className="rounded-full p-0.5 hover:bg-background focus-visible:ring-2 focus-visible:ring-ring"
-                aria-label={`Fjern ${modelNames.get(id) ?? "valgt modell"}`}
-                onClick={() => onChange(selectedIds.filter((selectedId) => selectedId !== id))}
+        <div className="flex flex-wrap gap-2" aria-label="Valgte kjøretøymodeller">
+          {selectedIds.map((id) => {
+            const model = modelById.get(id);
+            const brand = brands?.find((entry) => entry.id === model?.brand_id)?.name;
+            return (
+              <span
+                key={id}
+                className="inline-flex max-w-full items-center gap-1 rounded-full bg-muted px-3 py-1.5 text-sm"
               >
-                <X className="size-3.5" />
-              </button>
-            </span>
-          ))}
+                <span className="truncate">
+                  {brand ?? "Kjøretøy"} {model?.name ?? "Ukjent modell"}
+                </span>
+                <button
+                  type="button"
+                  className="rounded-full p-0.5 hover:bg-background focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label={`Fjern ${model?.name ?? "valgt modell"}`}
+                  onClick={() => onChange(selectedIds.filter((selectedId) => selectedId !== id))}
+                >
+                  <X className="size-3.5" />
+                </button>
+              </span>
+            );
+          })}
         </div>
       )}
     </div>

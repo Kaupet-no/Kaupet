@@ -39,6 +39,7 @@ import {
 import { splitPrimaryFilters } from "@/lib/category-filters";
 import { hapticImpact } from "@/lib/haptics";
 import {
+  PART_FITMENT_VEHICLE_IDS_KEY,
   SEARCH_MULTISELECT_KEYS,
   type AttributeFilterValue,
   type CategoryFilter,
@@ -461,6 +462,46 @@ export function AttributeFilterChips({
           }}
           {...fieldProps}
         />
+      );
+    }
+
+    // The bilmodell-picker's brand + searchable model list can run well
+    // past what a small anchored Popover can show without collision — at
+    // narrower widths this chip sits directly below the subcategory sidebar
+    // (routes/index.tsx's md:grid-cols-[240px_1fr]), so a Popover forced to
+    // flip upward for space ends up floating over and obscuring that list.
+    // ResponsiveOverlay's backdrop makes it unambiguous the sidebar is
+    // temporarily inert instead of silently covering it — same primitive
+    // "Flere filter" already uses below for the same "too much content for
+    // a chip popover" reason.
+    if (f.key === PART_FITMENT_VEHICLE_IDS_KEY) {
+      const chip = (
+        <FilterChip
+          label={label}
+          active={active}
+          onClick={() => {
+            if (isNative) void hapticImpact("light");
+            openField(f.key);
+          }}
+          {...fieldProps}
+          fieldLabel={f.label_nb}
+        />
+      );
+      if (isNative) return <span key={f.id}>{chip}</span>;
+      return (
+        <ResponsiveOverlay
+          key={f.id}
+          open={openKey === f.key}
+          onOpenChange={(o) => openField(o ? f.key : null)}
+        >
+          {chip}
+          <ResponsiveOverlayContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>{f.label_nb}</DialogTitle>
+            </DialogHeader>
+            {fieldFor(f)}
+          </ResponsiveOverlayContent>
+        </ResponsiveOverlay>
       );
     }
 

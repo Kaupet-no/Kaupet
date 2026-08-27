@@ -1,10 +1,8 @@
 import { useMemo, useState } from "react";
-import { Check, ChevronDown, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Command,
   CommandEmpty,
@@ -211,18 +209,8 @@ function PartVehiclePicker({ selectedIds, onChange, single = false }: VehiclePic
   const { data: brands } = useAllVehicleBrands();
   const { data: models } = useAllVehicleModels();
   const [brandId, setBrandId] = useState("");
-  const [modelOpen, setModelOpen] = useState(false);
   const [modelSearch, setModelSearch] = useState("");
-  // PartVehicleSearchField renders this inside an already-open filter-chip
-  // Popover (see category-filter-fields.tsx). Two independent Radix Popover
-  // portals share the same document.body root and the same hardcoded
-  // z-[10001] (ui/popover.tsx), so which one paints on top depends on
-  // mount order rather than nesting — exactly the stacking footgun
-  // docs/UI-GUIDE.md warns about for Dialog/Sheet/FullscreenOverlay.
-  // Portaling into this component's own subtree keeps the model list a
-  // strict DOM descendant of whatever container (if any) already wraps it,
-  // so it always paints above and never gets clipped by that container.
-  const [rootNode, setRootNode] = useState<HTMLDivElement | null>(null);
+
   const carBrands = useMemo(
     () => (brands ?? []).filter((brand) => brand.category_group === "bil"),
     [brands],
@@ -241,82 +229,73 @@ function PartVehiclePicker({ selectedIds, onChange, single = false }: VehiclePic
   );
 
   return (
-    <div className="space-y-3" ref={setRootNode}>
+    <div className="space-y-3">
       <Label>Velg bilmodell</Label>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Select
-          value={brandId}
-          onValueChange={(next) => {
-            setBrandId(next);
-            setModelOpen(false);
-          }}
-        >
-          <SelectTrigger aria-label="Bilmerke">
-            <SelectValue placeholder="Velg merke…" />
-          </SelectTrigger>
-          <SelectContent>
-            {carBrands.map((brand) => (
-              <SelectItem key={brand.id} value={brand.id}>
-                {brand.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Popover open={modelOpen} onOpenChange={setModelOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              type="button"
-              variant="outline"
-              role="combobox"
-              aria-expanded={modelOpen}
-              disabled={!brandId}
-              className="w-full justify-between font-normal"
-            >
-              {brandId ? "Velg modell…" : "Velg merke først"}
-              <ChevronDown className="size-4 shrink-0 opacity-50" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent
-            className="w-(--radix-popover-trigger-width) p-0"
-            align="start"
-            container={rootNode}
-          >
-            <Command shouldFilter>
-              <CommandInput
-                placeholder="Søk modell…"
-                value={modelSearch}
-                onValueChange={setModelSearch}
-              />
-              <CommandList>
-                <CommandEmpty>Ingen modeller funnet.</CommandEmpty>
-                <CommandGroup>
-                  {modelsForBrand.map((model) => (
-                    <CommandItem
-                      key={model.id}
-                      value={model.name}
-                      onSelect={() => {
-                        const next = selectedIds.includes(model.id)
-                          ? selectedIds.filter((id) => id !== model.id)
-                          : single
-                            ? [model.id]
-                            : [...selectedIds, model.id];
-                        onChange(next);
-                        setModelSearch("");
-                        if (single) setModelOpen(false);
-                      }}
-                    >
-                      <Check
-                        className={`size-4 ${selectedIds.includes(model.id) ? "opacity-100" : "opacity-0"}`}
-                      />
-                      {model.name}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
-      </div>
+      <Select
+        value={brandId}
+        onValueChange={(next) => {
+          setBrandId(next);
+          setModelSearch("");
+        }}
+      >
+        <SelectTrigger aria-label="Bilmerke">
+          <SelectValue placeholder="Velg merke…" />
+        </SelectTrigger>
+        <SelectContent>
+          {carBrands.map((brand) => (
+            <SelectItem key={brand.id} value={brand.id}>
+              {brand.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {/* Modell-listen rendres direkte i flyten i stedet for i en egen
+       * nestet Popover — PartVehicleSearchField rendres allerede inne i en
+       * åpen filter-chip-popover (category-filter-fields.tsx), og et andre
+       * flytende lag der ville enten stables tilfeldig mot det første
+       * (samme z-[10001], monteringsrekkefølge avgjør) eller, når det må
+       * snu oppover pga. plassmangel, dekke sidepanelet med underkategorier
+       * ved siden av (routes/index.tsx sitt `md:grid-cols-[240px_1fr]`).
+       * Samme mønster som MultiSelectPopoverBody i attribute-filter-chips.tsx
+       * (Merke/Modell-sjekklistene): én flate, ingen nesting. */}
+      {brandId ? (
+        <div className="rounded-md border border-border">
+          <Command shouldFilter>
+            <CommandInput
+              placeholder="Søk modell…"
+              value={modelSearch}
+              onValueChange={setModelSearch}
+            />
+            <CommandList className="max-h-64">
+              <CommandEmpty>Ingen modeller funnet.</CommandEmpty>
+              <CommandGroup>
+                {modelsForBrand.map((model) => (
+                  <CommandItem
+                    key={model.id}
+                    value={model.name}
+                    onSelect={() => {
+                      const next = selectedIds.includes(model.id)
+                        ? selectedIds.filter((id) => id !== model.id)
+                        : single
+                          ? [model.id]
+                          : [...selectedIds, model.id];
+                      onChange(next);
+                      setModelSearch("");
+                    }}
+                  >
+                    <Check
+                      className={`size-4 ${selectedIds.includes(model.id) ? "opacity-100" : "opacity-0"}`}
+                    />
+                    {model.name}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">Velg merke for å se modeller.</p>
+      )}
 
       {selectedIds.length > 0 && (
         <div className="flex flex-wrap gap-2" aria-label="Valgte bilmodeller">

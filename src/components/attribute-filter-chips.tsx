@@ -867,7 +867,7 @@ function PriceUpToField({
       <div className="relative">
         <Input
           inputMode="numeric"
-          placeholder="Alle"
+          placeholder="Ingen grense"
           value={formatThousands(draft, PRICE_UPTO_MAX * 10)}
           onChange={(e) => setDraft(digitsOnlyClamped(e.target.value, PRICE_UPTO_MAX * 10))}
           onBlur={commit}

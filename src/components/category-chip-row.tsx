@@ -18,14 +18,12 @@ type Props = {
  * takes over from there for narrowing further).
  *
  * Styled to match the homepage's category row (icon over label) and, like
- * it, kept to a single scrollable line with side arrows rather than wrapping
- * — see `renderCategoryIcon` in routes/index.tsx. Panels sit flush against
- * each other (no gap in the row) with the icon/label spacing carried as
- * padding inside each panel instead, so the hover tint reads as one
- * continuous block per category rather than leaving gaps between them.
- * Hover text/icon color is always white regardless of the category's own
- * tint — varying it per category (picking black or white for contrast)
- * looked inconsistent panel to panel.
+ * it, kept to a single scrollable line with side arrows rather than wrapping.
+ * A small gap and a slightly wider tile keep long Norwegian category names
+ * readable instead of making adjacent labels run together.
+ * Hover text/icon color is always white regardless of the category's own tint
+ * — varying it per category (picking black or white for contrast) looked
+ * inconsistent panel to panel.
  */
 export function CategoryChipRow({ tree, onSelectRoot, isNative = false }: Props) {
   const press = () => {
@@ -33,7 +31,7 @@ export function CategoryChipRow({ tree, onSelectRoot, isNative = false }: Props)
   };
 
   return (
-    <ScrollArrowRow gapClassName="gap-0">
+    <ScrollArrowRow gapClassName="gap-1">
       {tree.roots.map((root) => {
         const Icon = getCategoryIcon(root.icon);
         return (
@@ -45,7 +43,7 @@ export function CategoryChipRow({ tree, onSelectRoot, isNative = false }: Props)
               onSelectRoot(root);
             }}
             style={{ "--cat-tint": root.color ?? "var(--primary)" } as React.CSSProperties}
-            className="group flex w-20 shrink-0 flex-col items-center gap-1.5 rounded-xl px-2 py-2 text-center transition hover:bg-[var(--cat-tint)]"
+            className="group flex w-24 shrink-0 flex-col items-center gap-1.5 rounded-xl px-2 py-2 text-center transition hover:bg-[var(--cat-tint)]"
           >
             <span className="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground transition group-hover:bg-transparent group-hover:text-white">
               <Icon className="size-4" />

@@ -15,7 +15,7 @@ export function PullToRefreshIndicator({
   if (pullDistance <= 0 && !refreshing) return null;
   return (
     <div
-      className="flex items-center justify-center overflow-hidden transition-all duration-150"
+      className="flex items-center justify-center overflow-hidden transition-[height] duration-150"
       style={{ height: refreshing ? 48 : Math.min(pullDistance, 48) }}
     >
       <div

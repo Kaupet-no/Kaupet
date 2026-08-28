@@ -112,7 +112,11 @@ export function usePushStatus(): PushStatus {
       window.removeEventListener("focus", handleRefresh);
       document.removeEventListener("visibilitychange", onVisibility);
       permCancelled = true;
-      permStatus?.removeEventListener("change", handleRefresh);
+      try {
+        permStatus?.removeEventListener("change", handleRefresh);
+      } catch {
+        // Some WebViews expose an unbound PermissionStatus cleanup method.
+      }
     };
   }, [refreshBrowser]);
 

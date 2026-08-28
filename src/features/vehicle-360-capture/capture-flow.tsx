@@ -441,7 +441,7 @@ export function Vehicle360CaptureFlow({
           </p>
           <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
             <div
-              className="h-full rounded-full bg-primary transition-all duration-300 ease-out"
+              className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
               style={{
                 width: `${totalCount > 0 ? (processedCount / totalCount) * 100 : 0}%`,
               }}

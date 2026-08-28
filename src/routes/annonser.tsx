@@ -617,7 +617,7 @@ function BrowsePage() {
         <div
           className={
             isNative
-              ? `sticky top-0 z-40 -mx-4 space-y-2 px-4 pb-2 pt-safe transition-all duration-200 bg-background/95 backdrop-blur ${scrollDir === "down" ? "shadow-sm" : ""}`
+              ? `sticky top-0 z-40 -mx-4 space-y-2 px-4 pb-2 pt-safe transition-[background-color,box-shadow] duration-200 bg-background/95 backdrop-blur ${scrollDir === "down" ? "shadow-sm" : ""}`
               : "mt-6 space-y-2"
           }
         >

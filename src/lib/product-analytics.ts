@@ -32,18 +32,23 @@ export function trackProductEvent(
   properties: ProductEventProperties = {},
 ): void {
   if (typeof window === "undefined") return;
-  const sessionId = getProductSessionId();
-  if (!sessionId) return;
-  void logProductEvent({
-    data: {
-      sessionId,
-      eventName,
-      platform: getProductPlatform(),
-      path: window.location.pathname.slice(0, 160) || "/",
-      properties,
-    },
-  }).catch(() => {
-    // The migration may not be deployed yet or the client may be offline.
-    // Telemetry is never a product dependency.
-  });
+  try {
+    const sessionId = getProductSessionId();
+    if (!sessionId) return;
+    void logProductEvent({
+      data: {
+        sessionId,
+        eventName,
+        platform: getProductPlatform(),
+        path: window.location.pathname.slice(0, 160) || "/",
+        properties,
+      },
+    }).catch(() => {
+      // The migration may not be deployed yet or the client may be offline.
+      // Telemetry is never a product dependency.
+    });
+  } catch {
+    // A client/server bridge can fail synchronously (for example in a
+    // browser-based native emulation). Telemetry must never break the action.
+  }
 }

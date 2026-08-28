@@ -22,7 +22,7 @@ const EARTH_RADIUS_KM = 6371;
 
 const centerIcon = L.divIcon({
   className: "",
-  html: `<div style="width:18px;height:18px;border-radius:9999px;background:var(--primary);border:3px solid white;box-shadow:0 0 0 2px var(--primary),0 4px 14px var(--primary);"></div>`,
+  html: `<div style="width:18px;height:18px;border-radius:9999px;background:var(--primary);border:3px solid white;box-shadow:0 0 0 2px var(--primary),0 2px 8px hsl(0 0% 0% / 0.28);"></div>`,
   iconSize: [18, 18],
   iconAnchor: [9, 9],
 });
@@ -313,6 +313,7 @@ export function ListingsMap({
             <Marker
               position={[center.lat, center.lng]}
               icon={centerIcon}
+              title="Flytt søkesenter"
               draggable
               eventHandlers={{
                 dragend: (e) => {
@@ -329,6 +330,7 @@ export function ListingsMap({
                   clearIconPosition(center, radiusKm).lng,
                 ]}
                 icon={clearIcon}
+                title="Fjern sted"
                 eventHandlers={{
                   click: (e) => {
                     L.DomEvent.stop(e);
@@ -353,7 +355,7 @@ export function ListingsMap({
       {onRadiusChange && (
         <div className="absolute left-3 top-3 z-[400]">
           <div
-            className={`rounded-2xl border border-border bg-card/95 shadow-lg backdrop-blur transition-all ${
+            className={`rounded-2xl border border-border bg-card/95 shadow-lg backdrop-blur transition-[width,padding] duration-200 ${
               isTouchDevice || isSliderInteracting
                 ? "w-56 p-3"
                 : "w-9 p-2 group-hover:w-56 group-hover:p-3"
@@ -467,6 +469,7 @@ function PriceMarker({
     <Marker
       position={[listing.lat, listing.lng]}
       icon={icon}
+      title={`Åpne annonse: ${listing.title}`}
       eventHandlers={{
         mouseover: () => onHover?.(listing.id),
         mouseout: () => onHover?.(null),

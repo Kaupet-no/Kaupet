@@ -284,7 +284,7 @@ export function OnboardingFlow({ onComplete }: Props) {
                 scrollTo(i);
               }}
               aria-label={`Gå til kort ${i + 1}`}
-              className={`h-2 rounded-full transition-all duration-300 ${
+              className={`h-2 rounded-full transition-[width,background-color] duration-300 ${
                 i === currentIndex ? "w-6 bg-primary" : "w-2 bg-muted-foreground/30"
               }`}
             />

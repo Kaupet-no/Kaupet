@@ -576,17 +576,18 @@ function ListingDetailViewBody({
                     </Link>
                   )
                 );
-              if (!editCtx?.editMode) return crumb;
-              return (
-                <span
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => editCtx.openCategoryModal()}
-                  className="inline-block cursor-pointer rounded-md border border-dashed border-border/60 transition-colors hover:border-primary/50 hover:bg-primary/5"
-                >
-                  {crumb}
-                </span>
-              );
+              if (editCtx?.editMode) {
+                return (
+                  <button
+                    type="button"
+                    onClick={() => editCtx.openCategoryModal()}
+                    className="rounded-md border border-dashed border-border/60 px-2 py-1 text-left text-xs uppercase tracking-wide transition-colors hover:border-primary/50 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {breadcrumb?.map((c) => c.name_nb).join(" › ") ?? category?.name_nb}
+                  </button>
+                );
+              }
+              return crumb;
             })()}
             <div className="mt-1 flex items-center justify-between gap-3">
               {isVehicleListing ? (

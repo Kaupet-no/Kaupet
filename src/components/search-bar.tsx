@@ -156,7 +156,7 @@ export function SearchBar({
         <Button
           type="submit"
           size="sm"
-          className="h-9 shrink-0 rounded-full px-3 sm:px-5"
+          className="h-10 shrink-0 rounded-full px-3 sm:px-5"
           aria-label="Søk"
         >
           <SearchIcon className="size-4" /> <span className="hidden sm:inline">Søk</span>

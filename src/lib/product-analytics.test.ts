@@ -37,4 +37,12 @@ describe("product analytics", () => {
       }),
     });
   });
+
+  it("does not break the user action when telemetry throws synchronously", () => {
+    logProductEvent.mockImplementationOnce(() => {
+      throw new TypeError("Illegal invocation");
+    });
+
+    expect(() => trackProductEvent("onboarding_completed")).not.toThrow();
+  });
 });

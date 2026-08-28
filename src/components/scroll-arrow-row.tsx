@@ -109,7 +109,7 @@ export function ScrollArrowRow({ children, className, gapClassName = "gap-2" }: 
           rather than another category panel at the same height. */}
       {!isNative && (
         <div
-          className={`pointer-events-none absolute -top-2 -bottom-2 left-0 z-10 flex w-10 items-center bg-gradient-to-r from-background to-transparent transition-opacity ${
+          className={`pointer-events-none absolute -top-2 -bottom-2 left-0 z-10 flex w-10 items-center bg-background/95 transition-opacity ${
             canLeft ? "opacity-100" : "opacity-0"
           }`}
         >
@@ -143,7 +143,7 @@ export function ScrollArrowRow({ children, className, gapClassName = "gap-2" }: 
       </div>
       {!isNative && (
         <div
-          className={`pointer-events-none absolute -top-2 -bottom-2 right-0 z-10 flex w-10 items-center justify-end bg-gradient-to-l from-background to-transparent transition-opacity ${
+          className={`pointer-events-none absolute -top-2 -bottom-2 right-0 z-10 flex w-10 items-center justify-end bg-background/95 transition-opacity ${
             canRight ? "opacity-100" : "opacity-0"
           }`}
         >

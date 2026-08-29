@@ -82,11 +82,20 @@ function expectedCompleteReport() {
       search: [
         {
           platform: "web",
+          pageViewed: 0,
           opened: 5,
           submitted: 5,
           submissionRate: 1,
+          filterOpened: 0,
+          filterApplied: 0,
+          filterCancelled: 0,
+          suggestions: 0,
           zeroResults: 5,
           zeroResultRate: 1,
+          zeroResultRecovery: 0,
+          mapOpened: 0,
+          saved: 0,
+          resultOpened: 0,
           listingOpened: 5,
           listingOpenRate: 1,
           contactStarted: 5,
@@ -115,6 +124,37 @@ function expectedCompleteReport() {
     limitations: ["environment_marker_missing", "journey_id_missing"],
   };
 }
+it("summerer de nye søkehandlingssignalene per unik sesjon", () => {
+  const rows = [
+    ...completeRows(),
+    ...Array.from({ length: SMALL_CELL_THRESHOLD }, (_, index) => {
+      const session = `raw-session-${index}`;
+      return [
+        event(session, "search_page_viewed"),
+        event(session, "search_filter_opened"),
+        event(session, "search_filter_applied"),
+        event(session, "search_filter_cancelled"),
+        event(session, "search_suggestion_selected"),
+        event(session, "search_zero_results_recovered"),
+        event(session, "search_map_opened"),
+        event(session, "search_saved"),
+        event(session, "search_result_opened"),
+      ];
+    }).flat(),
+  ];
+
+  expect(aggregateWeeklyFunnel(rows, OPTIONS).funnels.search[0]).toMatchObject({
+    pageViewed: 5,
+    filterOpened: 5,
+    filterApplied: 5,
+    filterCancelled: 5,
+    suggestions: 5,
+    zeroResultRecovery: 5,
+    mapOpened: 5,
+    saved: 5,
+    resultOpened: 5,
+  });
+});
 
 describe("weekly funnel aggregation", () => {
   it("aggregates a normal journey and merges controlled old/new step keys", () => {

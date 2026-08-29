@@ -160,6 +160,7 @@ export function SecondaryCategoryFilters({
   queryText,
   isNative = false,
   includePrimary = false,
+  autoFocusSearch,
 }: {
   /** Full filter set for the category — split into primary/secondary here,
    * same as `AttributeFilterChips`. */
@@ -174,6 +175,13 @@ export function SecondaryCategoryFilters({
    * Søkepanelet (fase 9) er eneste vei til kategorifiltrene på native etter at
    * chip-raden ble erstattet av sammendrag-pillen, så der må hele settet med. */
   includePrimary?: boolean;
+  /** Autofokuser søkefeltet på mount. Standard `!isNative`, som passer når
+   * dette rendres inne i en overlay brukeren nettopp åpnet (f.eks. "Flere
+   * filter"-dialogen) — der er fokus forventet. I sidekolonnen (`expanded`
+   * layout i `filter-sections.tsx`) rendres komponenten derimot alltid synlig
+   * med `isNative={!expanded}`, så autofokus der ville rykket siden ned til
+   * feltet hver gang en hovedkategori velges. Send `false` eksplisitt der. */
+  autoFocusSearch?: boolean;
 }) {
   const [search, setSearch] = useState("");
   const { secondary: secondaryOnly } = splitPrimaryFilters(filters);
@@ -208,13 +216,15 @@ export function SecondaryCategoryFilters({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Søk etter filter…"
-          autoFocus={!isNative}
+          autoFocus={autoFocusSearch ?? !isNative}
         />
       )}
       {visible.length === 0 ? (
         <p className="text-sm text-muted-foreground">Ingen filter matcher «{search}».</p>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        /* Beholderbredde, ikke vindusbredde: samme liste rendres både i en
+           290px sidekolonne og i en 512px dialog. */
+        <div className="grid grid-cols-1 gap-4 @md:grid-cols-2">
           <CategoryFilterFields
             filters={visible}
             brandLookupFilters={filters}

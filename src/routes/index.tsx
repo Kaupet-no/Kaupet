@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, FolderOpen, Hash, Search } from "lucide-react";
+import { ArrowRight, FolderOpen, Search } from "lucide-react";
 import { z } from "zod";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Autoplay from "embla-carousel-autoplay";
@@ -337,17 +337,10 @@ function WebLanding() {
               <>
                 <Button asChild variant="outline" size="lg">
                   <Link to="/auth" search={{ mode: "signup" }}>
-                    Selg noe
+                    Opprett en annonse
                   </Link>
                 </Button>
-                <KaupetCodeDialog
-                  trigger={
-                    <Button variant="ghost" size="lg" className="gap-2">
-                      <Hash className="size-4" />
-                      Har du en Kaupet-kode?
-                    </Button>
-                  }
-                />
+                <KaupetCodeDialog />
               </>
             )}
           </div>

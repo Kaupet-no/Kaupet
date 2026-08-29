@@ -1,4 +1,4 @@
-import type { Locator, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 
 const FILTER_QUERY = "e2efilterfixture";
@@ -70,22 +70,14 @@ test("forsiden holder visuell kontrakt", async ({ page }, testInfo) => {
   });
 });
 
-test("det native søkepanelet holder visuell kontrakt", async ({ page }, testInfo) => {
+test("det native søkepanelet holder visuell kontrakt", async ({ page }) => {
   await page.goto("/annonser?sort=price_asc&forcenative=1");
   await waitForHydration(page);
   await page.getByRole("button", { name: "Filtrer", exact: true }).click();
   await page.getByRole("heading", { name: "Søk og filtrer" }).waitFor();
-  const masks: Locator[] = [];
-  if (testInfo.project.name === "visual-web") {
-    const mapRegion = page.locator(".leaflet-container");
-    await expect(mapRegion).toHaveCount(1);
-    await expect(mapRegion).toBeVisible();
-    masks.push(mapRegion);
-  }
   await expect(page).toHaveScreenshot("search-panel.png", {
     animations: "disabled",
     fullPage: true,
-    mask: masks,
   });
 });
 

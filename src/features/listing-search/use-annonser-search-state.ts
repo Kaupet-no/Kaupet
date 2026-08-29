@@ -121,16 +121,20 @@ export function useAnnonserSearchState(params: {
     // a category chosen (see useTextToFilterPipeline), so any key that
     // exists on *some* category is allowed to stick around rather than
     // being wiped the instant it's set.
-    const allowedKeys =
-      effectiveCategories.length === 0
-        ? new Set(allFilters.map((f) => f.key))
-        : new Set(attrFilters.map((f) => f.key));
-    const hasStale = Object.keys(attrValues).some((k) => !allowedKeys.has(k));
+    const allowedFilters = effectiveCategories.length === 0 ? allFilters : attrFilters;
+    // Nøkkelen må finnes i den nye kategorien *og* verdien må være en av det
+    // filterets egne opsjoner: to kategorier kan dele nøkkel med helt ulikt
+    // vokabular ("fuel_type" er el/diesel på Bil, gass/kull på Grill), og en
+    // verdi fra den forrige kategorien ville ellers blitt liggende og
+    // filtrert bort alt uten å vises noe sted.
+    const isAllowed = (key: string, value: AttributeFilterValue) =>
+      allowedFilters.some((f) => f.key === key && filterMatchesValue(f, value));
+    const hasStale = Object.entries(attrValues).some(([k, v]) => !isAllowed(k, v));
     if (!hasStale) return;
 
     const pruned: Record<string, AttributeFilterValue> = {};
     for (const [k, v] of Object.entries(attrValues)) {
-      if (allowedKeys.has(k)) pruned[k] = v;
+      if (isAllowed(k, v)) pruned[k] = v;
     }
     const nextAttrs = encodeAttrFilters(pruned);
     if (nextAttrs === search.attrs) return;
@@ -171,9 +175,10 @@ export function useAnnonserSearchState(params: {
   const currentCriteria = useMemo(
     () => ({
       ...valueToCriteria(appliedSearch.value),
+      attributes: appliedSearch.attributes,
       sort: search.sort === "relevance" ? "new" : search.sort,
     }),
-    [appliedSearch.value, search.sort],
+    [appliedSearch.attributes, appliedSearch.value, search.sort],
   );
 
   const updateSearch = (patch: Partial<z.infer<typeof searchSchema>>) => {

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { ChevronDown, Search as SearchIcon } from "lucide-react";
+import { ChevronDown, FolderOpen, Search as SearchIcon, SlidersHorizontal } from "lucide-react";
+import { ANNONSER_SEARCH_INPUT_ID } from "@/features/listing-search/search-input-id";
+import { trackProductEvent } from "@/lib/product-analytics";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
@@ -34,11 +36,13 @@ type Props = {
    * relevant once the advanced search panel is open, since that's where the
    * extra search lines that make the distinction matter live. */
   showQMode?: boolean;
-  /** Extra search lines ("Flere søkelinjer") — optional so callers that don't
+  /** Extra search rules ("Ekstra regler") — optional so callers that don't
    * need them (none currently) aren't forced to wire up empty state. When
-   * provided, "Presist søk" reveals both this and `qMode`. */
+   * provided, "Flere søkevalg" reveals both this and `qMode`. */
   extraGroups?: TermGroup[];
   onExtraGroupsChange?: (groups: TermGroup[]) => void;
+  categorySuggestion?: { label: string; onSelect: () => void };
+  filterSuggestions?: Array<{ id: string; label: string; onSelect: () => void }>;
 };
 
 /**
@@ -59,6 +63,8 @@ export function SearchBar({
   showQMode = false,
   extraGroups,
   onExtraGroupsChange,
+  categorySuggestion,
+  filterSuggestions = [],
 }: Props) {
   const [qFocused, setQFocused] = useState(false);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
@@ -85,7 +91,13 @@ export function SearchBar({
   }, [q, qFocused, placeholderExamples.length]);
 
   const { data: listingSuggestions } = useSearchSuggestions(q);
-  const hasDropdown = qFocused && !!listingSuggestions?.length;
+  const hasSubmitSuggestion = q.trim().length >= 2;
+  const hasDropdown =
+    qFocused &&
+    (hasSubmitSuggestion ||
+      !!listingSuggestions?.length ||
+      !!categorySuggestion ||
+      filterSuggestions.length > 0);
 
   return (
     <form
@@ -114,42 +126,150 @@ export function SearchBar({
               }
             }}
             placeholder={placeholderExamples[placeholderIndex % placeholderExamples.length]}
+            id={ANNONSER_SEARCH_INPUT_ID}
             className="h-8 border-0 bg-transparent p-0 shadow-none focus-visible:ring-0 focus-visible:outline-none"
             aria-autocomplete="list"
+            aria-label="Søk i annonser"
             aria-expanded={hasDropdown}
+            aria-controls="annonser-search-suggestions"
             aria-haspopup="listbox"
           />
           {hasDropdown && (
             <div
               role="listbox"
+              id="annonser-search-suggestions"
               aria-label="Søkeforslag"
-              className="absolute left-0 top-[calc(100%+0.5rem)] z-50 w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-card p-1 shadow-md"
+              className="absolute left-0 top-[calc(100%+0.5rem)] z-50 w-[min(380px,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-card p-1 shadow-md"
             >
-              {listingSuggestions?.map((s, i) => (
-                <Link
-                  key={s.id}
-                  ref={
-                    i === 0 ? (firstSuggestionRef as React.RefObject<HTMLAnchorElement>) : undefined
-                  }
-                  to="/$kaupetCode"
-                  params={{ kaupetCode: s.kaupet_code }}
-                  role="option"
-                  aria-selected="false"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => setQFocused(false)}
-                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
-                  <span className="truncate">{s.title}</span>
-                </Link>
-              ))}
+              {hasSubmitSuggestion && (
+                <>
+                  <div className="px-3 pb-1 pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Søk etter
+                  </div>
+                  <button
+                    ref={firstSuggestionRef as React.RefObject<HTMLButtonElement>}
+                    type="button"
+                    role="option"
+                    aria-selected="false"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      trackProductEvent("search_suggestion_selected", {
+                        suggestionType: "query",
+                        position: 1,
+                      });
+                      onSubmitQ();
+                      setQFocused(false);
+                    }}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <SearchIcon className="size-4 shrink-0 text-primary" />
+                    <span className="truncate">Søk etter «{q.trim()}»</span>
+                  </button>
+                </>
+              )}
+              {categorySuggestion && (
+                <>
+                  <div className="px-3 pb-1 pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Kategori
+                  </div>
+                  <button
+                    ref={firstSuggestionRef as React.RefObject<HTMLButtonElement>}
+                    type="button"
+                    role="option"
+                    aria-selected="false"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      trackProductEvent("search_suggestion_selected", {
+                        suggestionType: "category",
+                        position: 2,
+                      });
+                      categorySuggestion.onSelect();
+                      setQFocused(false);
+                    }}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <FolderOpen className="size-4 shrink-0 text-primary" />
+                    <span className="truncate">{categorySuggestion.label}</span>
+                  </button>
+                </>
+              )}
+              {filterSuggestions.length > 0 && (
+                <>
+                  <div className="px-3 pb-1 pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Filter
+                  </div>
+                  {filterSuggestions.map((suggestion, index) => (
+                    <button
+                      key={suggestion.id}
+                      ref={
+                        !categorySuggestion && index === 0
+                          ? (firstSuggestionRef as React.RefObject<HTMLButtonElement>)
+                          : undefined
+                      }
+                      type="button"
+                      role="option"
+                      aria-selected="false"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        trackProductEvent("search_suggestion_selected", {
+                          suggestionType: "filter",
+                          position: index + 3,
+                        });
+                        suggestion.onSelect();
+                        setQFocused(false);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <SlidersHorizontal className="size-4 shrink-0 text-primary" />
+                      <span className="truncate">{suggestion.label}</span>
+                    </button>
+                  ))}
+                </>
+              )}
+              {listingSuggestions && listingSuggestions.length > 0 && (
+                <>
+                  <div className="px-3 pb-1 pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Annonser
+                  </div>
+                  {listingSuggestions.map((s, i) => (
+                    <Link
+                      key={s.id}
+                      ref={
+                        !categorySuggestion && filterSuggestions.length === 0 && i === 0
+                          ? (firstSuggestionRef as React.RefObject<HTMLAnchorElement>)
+                          : undefined
+                      }
+                      to="/$kaupetCode"
+                      params={{ kaupetCode: s.kaupet_code }}
+                      role="option"
+                      aria-selected="false"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        trackProductEvent("search_suggestion_selected", {
+                          suggestionType: "listing",
+                          position: i + 1,
+                        });
+                        setQFocused(false);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
+                      <span className="truncate">{s.title}</span>
+                    </Link>
+                  ))}
+                </>
+              )}
             </div>
           )}
         </div>
 
         {showQMode && (
           <div className="shrink-0">
-            <ModeToggle value={qMode} onChange={onQModeChange} labels={["Alle ord", "Minst ett"]} />
+            <ModeToggle
+              value={qMode}
+              onChange={onQModeChange}
+              labels={["Alle ordene", "Minst ett ord"]}
+            />
           </div>
         )}
 
@@ -176,7 +296,7 @@ export function SearchBar({
               size="sm"
               className="group gap-1 px-0 text-primary"
             >
-              Presist søk{moreCount > 0 ? ` (${moreCount})` : ""}
+              Flere søkevalg{moreCount > 0 ? ` (${moreCount})` : ""}
               <ChevronDown
                 className="size-4 transition-transform group-data-[state=open]:rotate-180"
                 aria-hidden
@@ -185,15 +305,15 @@ export function SearchBar({
           </CollapsibleTrigger>
           <CollapsibleContent className="density-task mt-2 space-y-4 border-t border-border px-4">
             <div className="flex items-center justify-between gap-2">
-              <Label className="text-sm font-medium">Søkeordmodus</Label>
+              <Label className="text-sm font-medium">Søket skal matche</Label>
               <ModeToggle
                 value={qMode}
                 onChange={onQModeChange}
-                labels={["Alle ord", "Minst ett"]}
+                labels={["Alle ordene", "Minst ett ord"]}
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Flere søkelinjer</Label>
+              <Label className="text-sm font-medium">Ekstra regler</Label>
               <TermGroupEditor groups={extraGroups ?? []} onChange={onExtraGroupsChange!} />
             </div>
           </CollapsibleContent>

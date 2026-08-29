@@ -378,7 +378,7 @@ export function CategoryFilterFields({
                   <ChevronDown className="size-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
                 </Button>
               </CollapsibleTrigger>
-              <CollapsibleContent className="grid grid-cols-1 gap-x-4 gap-y-1.5 rounded-md border border-border p-3 sm:grid-cols-2 lg:grid-cols-3">
+              <CollapsibleContent className="grid grid-cols-1 gap-x-4 gap-y-1.5 rounded-md border border-border p-3 @sm:grid-cols-2 @lg:grid-cols-3">
                 {(f.options ?? []).map((o) => (
                   <label key={o.value} className="flex items-center gap-2 text-sm">
                     <Checkbox

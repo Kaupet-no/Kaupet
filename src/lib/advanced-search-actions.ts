@@ -14,7 +14,13 @@ import { summarizeCriteria, type SearchCriteria } from "@/lib/saved-searches";
  * them here.
  */
 export function resetAdvancedSearchValue(v: AdvancedSearchValue): AdvancedSearchValue {
-  return { ...defaultAdvancedSearchValue(), terms: v.terms, location: v.location, sort: v.sort };
+  return {
+    ...defaultAdvancedSearchValue(),
+    terms: v.terms,
+    location: v.location,
+    sort: v.sort,
+    attributes: v.attributes,
+  };
 }
 
 /** Merges duplicate/overlapping extra search-term groups before handing the

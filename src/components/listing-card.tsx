@@ -68,6 +68,7 @@ type Props = {
   onHoverChange?: (id: string | null) => void;
   compact?: boolean;
   linkState?: Record<string, unknown>;
+  onOpen?: () => void;
   /** Pre-signed by a result-list batch. Undefined keeps the standalone-card
    * fallback; null means the batch found no usable image. */
   signedImageUrl?: string | null;
@@ -101,7 +102,7 @@ function ListingImage({
   }
   return (
     <div
-      className={`flex size-full flex-col items-center justify-center gap-1 text-muted-foreground ${compact ? "" : "text-xs"}`}
+      className={`flex size-full flex-col items-center justify-center gap-1 bg-muted text-muted-foreground ${compact ? "" : "text-xs"}`}
     >
       <ImageOff className={compact ? "size-4" : "size-5"} strokeWidth={1.5} />
       <span className={compact ? "text-[11px]" : ""}>Ingen bilde</span>
@@ -165,6 +166,7 @@ export function ListingCard({
   onHoverChange,
   compact = false,
   linkState,
+  onOpen,
   signedImageUrl,
   knownFavorite,
   favoriteStateReady,
@@ -205,7 +207,7 @@ export function ListingCard({
   const cardClass = `group relative overflow-hidden rounded-lg border bg-card transition-[border-color,box-shadow] duration-150 ${
     highlighted
       ? "border-primary shadow-sm ring-2 ring-primary/20"
-      : "border-border hover:border-primary/70"
+      : "border-border hover:border-primary/70 hover:shadow-md"
   }`;
   const linkClass =
     "block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";
@@ -224,6 +226,7 @@ export function ListingCard({
           to="/$kaupetCode"
           params={{ kaupetCode: listing.kaupet_code }}
           state={linkState}
+          onClick={onOpen}
           className={`${linkClass} flex min-w-0 flex-1 gap-3 p-2`}
         >
           <div
@@ -286,6 +289,7 @@ export function ListingCard({
         to="/$kaupetCode"
         params={{ kaupetCode: listing.kaupet_code }}
         state={linkState}
+        onClick={onOpen}
         className={linkClass}
         aria-label={`${listing.title}, ${priceLabel}`}
       >

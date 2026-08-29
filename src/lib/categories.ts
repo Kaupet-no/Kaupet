@@ -207,6 +207,23 @@ export function selectAllForParent(parent: Category, tree: CatTree): string[] {
 }
 
 /**
+ * Er kategorivalget "ferdig" — en hovedkategori er valgt, og hvis den har
+ * underkategorier, er minst én av dem også valgt (eller ingen finnes).
+ * Brukes til å avgjøre når kategorivelgeren kan kollapse til en oppsummering.
+ */
+export function isCategorySelectionComplete(selectedSlugs: string[], tree: CatTree): boolean {
+  const selectedCats = selectedSlugs
+    .map((s) => tree.bySlug.get(s))
+    .filter((c): c is Category => !!c);
+  const firstSel = selectedCats[0];
+  if (!firstSel) return false;
+  const mainCat = breadcrumbPath(firstSel, tree)[0];
+  const hasSubs = (tree.childrenByParent.get(mainCat.id) ?? []).length > 0;
+  const hasSubSelected = selectedCats.some((c) => c.parent_id != null);
+  return !hasSubs || hasSubSelected;
+}
+
+/**
  * Finds the best category to suggest for a free-text search query, e.g. for
  * an autocomplete hint while the user types in a search field.
  *

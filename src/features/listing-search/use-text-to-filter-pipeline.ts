@@ -4,7 +4,7 @@ import { parseNumericFilters, removeNumericMatches } from "@/lib/search-number-p
 import { stripFillerWords } from "@/lib/search-stopwords";
 import { negateSynonymMatches } from "@/lib/search-negation";
 import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
-
+import type { InterpretedCriterion } from "./resolve-text-to-filters";
 /**
  * Single coordination point for every "recognize this typed word as a
  * structured filter" matcher (equipment/attribute synonyms, number+unit
@@ -33,6 +33,8 @@ export function useTextToFilterPipeline({
   handleAttrValueChange,
   categoryId,
   onApplied,
+  onInterpreted,
+  ignoredInterpretations,
 }: {
   qDraft: string;
   setQDraft: (q: string) => void;
@@ -50,9 +52,13 @@ export function useTextToFilterPipeline({
   handleAttrValueChange: (key: string, value: AttributeFilterValue | undefined) => void;
   categoryId: string | null;
   /** Composite "filterKey:optionValue" ("filterKey:" for single-value
-   * filters) -> the original matched text, for callers that track
-   * reversibility (autoAppliedText) and/or a just-applied flash animation. */
+   * filters) -> the original matched text, for reversible UI state. */
   onApplied?: (applied: Record<string, string>) => void;
+  /** Structured criteria recognized from the query, kept separate from the
+   * mutation callback so the UI can explain and undo interpretation. */
+  onInterpreted?: (criteria: InterpretedCriterion[]) => void;
+  /** Phrases the user explicitly removed; they remain text until edited. */
+  ignoredInterpretations?: Set<string>;
 }) {
   const { data: rawSynonymMatches, debouncedQ: matchedQ } = useSearchSynonymMatches(
     categoryId,
@@ -70,16 +76,31 @@ export function useTextToFilterPipeline({
     () => parseNumericFilters(matchedQ, attrFilters),
     [matchedQ, attrFilters],
   );
+  const activeSynonymMatches = useMemo(
+    () =>
+      synonymMatches?.filter(
+        (match) => !ignoredInterpretations?.has(match.matchedText.toLocaleLowerCase()),
+      ),
+    [ignoredInterpretations, synonymMatches],
+  );
+  const activeNumericMatches = useMemo(
+    () =>
+      numericMatches.filter(
+        (match) => !ignoredInterpretations?.has(match.matchedText.toLocaleLowerCase()),
+      ),
+    [ignoredInterpretations, numericMatches],
+  );
 
   useEffect(() => {
-    const hasSynonyms = !!synonymMatches && synonymMatches.length > 0;
-    const hasNumeric = numericMatches.length > 0;
+    const hasSynonyms = !!activeSynonymMatches && activeSynonymMatches.length > 0;
+    const hasNumeric = activeNumericMatches.length > 0;
     if (!hasSynonyms && !hasNumeric) return;
 
     const applied: Record<string, string> = {};
+    const criteria: InterpretedCriterion[] = [];
 
     if (hasSynonyms) {
-      for (const m of synonymMatches!) {
+      for (const m of activeSynonymMatches!) {
         const filter =
           attrFilters.find((f) => f.key === m.filterKey) ??
           allFilters.find((f) => f.key === m.filterKey);
@@ -95,15 +116,36 @@ export function useTextToFilterPipeline({
               });
             }
             applied[`${m.filterKey}:!${m.optionValue}`] = m.matchedText;
+            criteria.push({
+              kind: "attribute",
+              key: m.filterKey,
+              value: { kind: "exclude", values: [m.optionValue] },
+              source: "text",
+              matchedText: m.matchedText,
+            });
           }
           continue;
         }
         if (filter.type === "boolean") {
           handleAttrValueChange(m.filterKey, { kind: "boolean", value: true });
           applied[`${m.filterKey}:`] = m.matchedText;
+          criteria.push({
+            kind: "attribute",
+            key: m.filterKey,
+            value: { kind: "boolean", value: true },
+            source: "text",
+            matchedText: m.matchedText,
+          });
         } else if (filter.type === "select" && m.optionValue) {
           handleAttrValueChange(m.filterKey, { kind: "select", value: m.optionValue });
           applied[`${m.filterKey}:`] = m.matchedText;
+          criteria.push({
+            kind: "attribute",
+            key: m.filterKey,
+            value: { kind: "select", value: m.optionValue },
+            source: "text",
+            matchedText: m.matchedText,
+          });
         } else if (filter.type === "multiselect" && m.optionValue) {
           const current = attrValues[m.filterKey];
           const values = current?.kind === "multiselect" ? current.values : [];
@@ -114,31 +156,47 @@ export function useTextToFilterPipeline({
             });
           }
           applied[`${m.filterKey}:${m.optionValue}`] = m.matchedText;
+          criteria.push({
+            kind: "attribute",
+            key: m.filterKey,
+            value: { kind: "multiselect", values: [m.optionValue] },
+            source: "text",
+            matchedText: m.matchedText,
+          });
         }
       }
     }
 
     if (hasNumeric) {
-      for (const m of numericMatches) {
+      for (const m of activeNumericMatches) {
         const current = attrValues[m.filterKey];
         const currentRange: { min?: number; max?: number } =
           current?.kind === "range" ? current : {};
-        handleAttrValueChange(m.filterKey, {
-          kind: "range",
+        const value = {
+          kind: "range" as const,
           min: m.min ?? currentRange.min,
           max: m.max ?? currentRange.max,
-        });
+        };
+        handleAttrValueChange(m.filterKey, value);
         applied[`${m.filterKey}:`] = m.matchedText;
+        criteria.push({
+          kind: "attribute",
+          key: m.filterKey,
+          value,
+          source: "text",
+          matchedText: m.matchedText,
+        });
       }
     }
 
+    onInterpreted?.(criteria);
     if (Object.keys(applied).length > 0) onApplied?.(applied);
 
-    // Both removals run against the same `qDraft` snapshot in one pass, so
+    // Both removals run against the same qDraft snapshot in one pass, so
     // neither can clobber the other's result.
     let nextQ = qDraft;
-    if (hasSynonyms) nextQ = removeMatchedWords(nextQ, synonymMatches!);
-    if (hasNumeric) nextQ = removeNumericMatches(nextQ, numericMatches);
+    if (hasSynonyms) nextQ = removeMatchedWords(nextQ, activeSynonymMatches!);
+    if (hasNumeric) nextQ = removeNumericMatches(nextQ, activeNumericMatches);
     nextQ = stripFillerWords(nextQ);
     if (nextQ !== qDraft) {
       setQDraft(nextQ);
@@ -147,5 +205,5 @@ export function useTextToFilterPipeline({
     // Runs once per resolved match set; re-triggers naturally once qDraft
     // changes again as a result of applying it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [synonymMatches, numericMatches]);
+  }, [activeSynonymMatches, activeNumericMatches]);
 }

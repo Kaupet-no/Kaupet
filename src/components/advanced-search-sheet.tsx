@@ -21,7 +21,7 @@ import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/res
 import { LocationPicker, RadiusPicker } from "@/components/location-filter";
 import { ModeToggle } from "@/components/search-term-mode-toggle";
 import { TermGroupEditor } from "@/components/term-group-editor";
-import type { Category } from "@/lib/categories";
+import { buildTree, isCategorySelectionComplete, type Category } from "@/lib/categories";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { useAuth } from "@/hooks/use-auth";
 import { useAdvancedSearchValue } from "@/hooks/use-advanced-search-value";
@@ -30,7 +30,8 @@ import {
   mergeAdvancedSearchGroups,
   resetAdvancedSearchValue,
 } from "@/lib/advanced-search-actions";
-import { createSavedSearch, type SearchCriteria } from "@/lib/saved-searches";
+import { createSavedSearch, summarizeCriteria, type SearchCriteria } from "@/lib/saved-searches";
+import { trackProductEvent } from "@/lib/product-analytics";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
 
@@ -38,7 +39,7 @@ export { ModeToggle };
 
 import {
   BIL_OG_MC_SLUG,
-  CONDITIONS,
+  conditionOptionsFor,
   type AdvancedSearchValue,
 } from "@/components/advanced-search-value";
 
@@ -105,6 +106,7 @@ export function AdvancedSearchSheet({
   };
 
   const { criteria, defaultName } = buildAdvancedSearchCriteria(v, currentSort);
+  const conditionOptions = conditionOptionsFor(v.categories);
 
   return (
     <>
@@ -172,7 +174,7 @@ export function AdvancedSearchSheet({
                   size="sm"
                   className="group gap-1 px-0 text-primary"
                 >
-                  Presist søk
+                  Flere søkevalg
                   <ChevronDown
                     className="size-4 transition-transform group-data-[state=open]:rotate-180"
                     aria-hidden
@@ -181,15 +183,15 @@ export function AdvancedSearchSheet({
               </CollapsibleTrigger>
               <CollapsibleContent className="space-y-4 rounded-xl border border-border p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <Label className="text-sm font-medium">Søkeordmodus</Label>
+                  <Label className="text-sm font-medium">Søket skal matche</Label>
                   <ModeToggle
                     value={v.qMode}
                     onChange={(qMode) => setV({ ...v, qMode })}
-                    labels={["Alle ord", "Minst ett"]}
+                    labels={["Alle ordene", "Minst ett ord"]}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">Flere søkelinjer</Label>
+                  <Label className="text-sm font-medium">Ekstra regler</Label>
                   <TermGroupEditor
                     groups={v.extraGroups}
                     onChange={(extraGroups) => setV({ ...v, extraGroups })}
@@ -242,7 +244,7 @@ export function AdvancedSearchSheet({
             <section className="space-y-2">
               <Label className="text-sm font-medium">Tilstand</Label>
               <div className="grid grid-cols-1 gap-1 rounded-md border border-border p-2 sm:grid-cols-2">
-                {CONDITIONS.map((c) => (
+                {conditionOptions.map((c) => (
                   <label
                     key={c.value}
                     className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted"
@@ -397,12 +399,13 @@ export function CategoryPicker({
   const hasSubs = !!mainCat && (childrenByParent.get(mainCat.id) ?? []).length > 0;
   const selectedSubCats = selectedCats.filter((c) => c.parent_id != null);
 
+  const tree = useMemo(() => buildTree(categories), [categories]);
   // Native (ikon-varianten): kategori- og underkategorivalget skjules bak en
   // "Endre kategori"-knapp så snart valget er komplett, siden hele
   // ikonraden + underkategori-dropdownen tar mye plass når brukeren egentlig
   // bare vil se resten av filtrene. "Komplett" betyr en hovedkategori er
   // valgt, og — hvis den har underkategorier — minst én av dem også.
-  const isSelectionComplete = !!mainSlug && (!hasSubs || selectedSubCats.length > 0);
+  const isSelectionComplete = isCategorySelectionComplete(selected, tree);
   const [expanded, setExpanded] = useState(!isSelectionComplete);
   const wasCompleteRef = useRef(isSelectionComplete);
   useEffect(() => {
@@ -712,6 +715,7 @@ export function SaveSearchDialog({
     setSaving(true);
     try {
       await createSavedSearch(name.trim(), criteria, notify);
+      trackProductEvent("search_saved", { notify });
       showSuccessToast("Søk lagret");
       onSaved();
     } catch (e) {
@@ -726,10 +730,12 @@ export function SaveSearchDialog({
       <ResponsiveOverlayContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Lagre søk</DialogTitle>
-          <DialogDescription>
-            Du finner lagrede søk under "Mine søk" og vil bli varslet om nye treff.
-          </DialogDescription>
+          <DialogDescription>Lagre søket og få beskjed når nye annonser matcher.</DialogDescription>
         </DialogHeader>
+        <div className="rounded-lg bg-muted/60 px-3 py-2.5">
+          <p className="text-xs font-medium text-muted-foreground">Dette lagres</p>
+          <p className="mt-1 text-sm">{summarizeCriteria(criteria)}</p>
+        </div>
         <div className="space-y-3">
           <div>
             <Label htmlFor="saved-search-name">Navn</Label>

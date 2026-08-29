@@ -6,6 +6,7 @@ type Props = {
   q: string;
   onQChange: (q: string) => void;
   onSubmitQ: () => void;
+  inputId?: string;
   /** Antall aktive filtre utenom fritekst — se `countActiveFilters`. */
   filterCount: number;
   onOpen: () => void;
@@ -18,13 +19,21 @@ type Props = {
  * inngangen til søkepanelet. Fritekstdelen er et ekte inndatafelt (ikke bare
  * en trigger for panelet) — filterikonet er den separate inngangen til panelet.
  */
-export function SearchSummaryPill({ q, onQChange, onSubmitQ, filterCount, onOpen }: Props) {
+export function SearchSummaryPill({
+  q,
+  onQChange,
+  onSubmitQ,
+  inputId,
+  filterCount,
+  onOpen,
+}: Props) {
   const filterText = `${filterCount} ${filterCount === 1 ? "filter" : "filtre"}`;
   return (
     <div className="flex min-h-11 w-full items-center gap-2.5 rounded-full border border-border bg-card px-4 shadow-sm">
       <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
       <input
         type="search"
+        id={inputId}
         value={q}
         onChange={(e) => onQChange(e.target.value)}
         onKeyDown={(e) => {

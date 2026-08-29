@@ -9,6 +9,15 @@ const RELEVANT_EVENT_NAMES = [
   "search_opened",
   "search_submitted",
   "search_zero_results",
+  "search_page_viewed",
+  "search_filter_opened",
+  "search_filter_applied",
+  "search_filter_cancelled",
+  "search_suggestion_selected",
+  "search_zero_results_recovered",
+  "search_map_opened",
+  "search_saved",
+  "search_result_opened",
   "listing_opened",
   "contact_started",
   "listing_creation_started",
@@ -67,8 +76,17 @@ type Environment = "local" | "production" | "staging";
 type Window = { from: string; to: string; fromMs: number; toMs: number };
 type SearchState = {
   opened: Set<string>;
+  pageViewed: Set<string>;
   submitted: Set<string>;
   zeroResults: Set<string>;
+  zeroResultRecovery: Set<string>;
+  filterOpened: Set<string>;
+  filterApplied: Set<string>;
+  filterCancelled: Set<string>;
+  suggestions: Set<string>;
+  mapOpened: Set<string>;
+  saved: Set<string>;
+  resultOpened: Set<string>;
   listingOpened: Set<string>;
   contactStarted: Set<string>;
 };
@@ -115,8 +133,17 @@ function normalizeStep(value: unknown): string | null {
 function searchState(): SearchState {
   return {
     opened: new Set(),
+    pageViewed: new Set(),
     submitted: new Set(),
     zeroResults: new Set(),
+    zeroResultRecovery: new Set(),
+    filterOpened: new Set(),
+    filterApplied: new Set(),
+    filterCancelled: new Set(),
+    suggestions: new Set(),
+    mapOpened: new Set(),
+    saved: new Set(),
+    resultOpened: new Set(),
     listingOpened: new Set(),
     contactStarted: new Set(),
   };
@@ -175,16 +202,34 @@ export function aggregateWeeklyFunnel(
     const session = row.session_id;
     if (
       row.event_name === "search_opened" ||
+      row.event_name === "search_page_viewed" ||
       row.event_name === "search_submitted" ||
       row.event_name === "search_zero_results" ||
+      row.event_name === "search_filter_opened" ||
+      row.event_name === "search_filter_applied" ||
+      row.event_name === "search_filter_cancelled" ||
+      row.event_name === "search_suggestion_selected" ||
+      row.event_name === "search_zero_results_recovered" ||
+      row.event_name === "search_map_opened" ||
+      row.event_name === "search_saved" ||
+      row.event_name === "search_result_opened" ||
       row.event_name === "listing_opened" ||
       row.event_name === "contact_started"
     ) {
       const state = search.get(row.platform) ?? searchState();
       search.set(row.platform, state);
       if (row.event_name === "search_opened") state.opened.add(session);
+      if (row.event_name === "search_page_viewed") state.pageViewed.add(session);
       if (row.event_name === "search_submitted") state.submitted.add(session);
       if (row.event_name === "search_zero_results") state.zeroResults.add(session);
+      if (row.event_name === "search_zero_results_recovered") state.zeroResultRecovery.add(session);
+      if (row.event_name === "search_filter_opened") state.filterOpened.add(session);
+      if (row.event_name === "search_filter_applied") state.filterApplied.add(session);
+      if (row.event_name === "search_filter_cancelled") state.filterCancelled.add(session);
+      if (row.event_name === "search_suggestion_selected") state.suggestions.add(session);
+      if (row.event_name === "search_map_opened") state.mapOpened.add(session);
+      if (row.event_name === "search_saved") state.saved.add(session);
+      if (row.event_name === "search_result_opened") state.resultOpened.add(session);
       if (row.event_name === "listing_opened") state.listingOpened.add(session);
       if (row.event_name === "contact_started") state.contactStarted.add(session);
       continue;
@@ -221,9 +266,18 @@ export function aggregateWeeklyFunnel(
   const searchReport = PLATFORMS.flatMap((platform) => {
     const state = search.get(platform);
     if (!state) return [];
-    const opened = state.opened;
+    const pageViewed = state.pageViewed;
+    const opened = new Set([...state.opened, ...pageViewed]);
     const submitted = intersection(opened, state.submitted);
     const zeroResults = intersection(submitted, state.zeroResults);
+    const filterOpened = intersection(submitted, state.filterOpened);
+    const filterApplied = intersection(submitted, state.filterApplied);
+    const filterCancelled = intersection(submitted, state.filterCancelled);
+    const suggestions = intersection(submitted, state.suggestions);
+    const zeroResultRecovery = intersection(submitted, state.zeroResultRecovery);
+    const mapOpened = intersection(submitted, state.mapOpened);
+    const saved = intersection(submitted, state.saved);
+    const resultOpened = intersection(submitted, state.resultOpened);
     const listingOpened = intersection(submitted, state.listingOpened);
     const contactStarted = intersection(listingOpened, state.contactStarted);
     const counts = [
@@ -241,11 +295,20 @@ export function aggregateWeeklyFunnel(
     return [
       {
         platform,
+        pageViewed: pageViewed.size,
         opened: opened.size,
         submitted: submitted.size,
         submissionRate: rate(submitted.size, opened.size),
+        filterOpened: filterOpened.size,
+        filterApplied: filterApplied.size,
+        filterCancelled: filterCancelled.size,
+        suggestions: suggestions.size,
         zeroResults: zeroResults.size,
         zeroResultRate: rate(zeroResults.size, submitted.size),
+        zeroResultRecovery: zeroResultRecovery.size,
+        mapOpened: mapOpened.size,
+        saved: saved.size,
+        resultOpened: resultOpened.size,
         listingOpened: listingOpened.size,
         listingOpenRate: rate(listingOpened.size, submitted.size),
         contactStarted: contactStarted.size,

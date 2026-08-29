@@ -17,12 +17,13 @@ import {
 import { buildTree, type Category } from "@/lib/categories";
 
 export type InterpretedCriterion =
-  | { kind: "category"; slug: string; source: "text" | "user" }
+  | { kind: "category"; slug: string; source: "text" | "user"; matchedText?: string }
   | {
       kind: "attribute";
       key: string;
       value: AttributeFilterValue;
       source: "text" | "user";
+      matchedText?: string;
     };
 
 export type ResolvedTextFilters = {

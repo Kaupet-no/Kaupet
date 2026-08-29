@@ -50,6 +50,7 @@ type Props = {
   fetchNextPage: () => void;
   resetFilters: () => void;
   zeroResultExpansion?: ZeroResultExpansion;
+  zeroResultExpansions?: ZeroResultExpansion[];
   zeroResultExpansionPending?: boolean;
   onApplyZeroResultExpansion?: (expansion: ZeroResultExpansion) => void;
   mapListings: MapListing[];
@@ -84,6 +85,7 @@ export function ResultList({
   fetchNextPage,
   resetFilters,
   zeroResultExpansion,
+  zeroResultExpansions = [],
   zeroResultExpansionPending = false,
   onApplyZeroResultExpansion,
   mapListings,
@@ -100,7 +102,7 @@ export function ResultList({
   const { label: sortLabel } = getSortChipState(sort);
   const [mobileMapOpen, setMobileMapOpen] = useState(false);
   const [bigMapOpen, setBigMapOpen] = useState(false);
-  const [desktopMapVisible, setDesktopMapVisible] = useState(true);
+  const [desktopMapVisible, setDesktopMapVisible] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -181,12 +183,18 @@ export function ResultList({
       </Suspense>
     </ClientOnly>
   );
+  const expansionOptions =
+    zeroResultExpansions.length > 0
+      ? zeroResultExpansions
+      : zeroResultExpansion
+        ? [zeroResultExpansion]
+        : [];
 
   return (
     <>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
         <div className="flex items-center gap-2">
-          <span>
+          <span role="status" aria-live="polite" aria-atomic="true">
             {isLoading
               ? "Søker…"
               : `${(totalCount ?? cards.length).toLocaleString("nb-NO")} annonse${(totalCount ?? cards.length) === 1 ? "" : "r"}`}
@@ -252,7 +260,13 @@ export function ResultList({
               titleVisible
               className="h-[88vh] p-4"
               trigger={
-                <Button type="button" variant="outline" size="sm" className="gap-1.5">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => trackProductEvent("search_map_opened", { source: "map_button" })}
+                >
                   <MapIcon className="size-4" /> Kart
                 </Button>
               }
@@ -266,7 +280,10 @@ export function ResultList({
               variant="outline"
               size="sm"
               className="gap-1.5"
-              onClick={() => setDesktopMapVisible((v) => !v)}
+              onClick={() => {
+                trackProductEvent("search_map_opened", { source: "map_button" });
+                setDesktopMapVisible((v) => !v);
+              }}
               aria-pressed={desktopMapVisible}
             >
               <MapIcon className="size-4" /> {desktopMapVisible ? "Skjul kart" : "Vis kart"}
@@ -277,7 +294,9 @@ export function ResultList({
       </div>
 
       <div
-        className={`mt-4 grid gap-6 ${isDesktop && desktopMapVisible ? "lg:grid-cols-[1fr_420px]" : ""}`}
+        className={`mt-4 grid gap-6 ${
+          isDesktop && desktopMapVisible && cards.length > 0 ? "lg:grid-cols-[1fr_420px]" : ""
+        }`}
       >
         <div>
           {!isLoading && (
@@ -288,7 +307,7 @@ export function ResultList({
             />
           )}
           {isLoading ? (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
               {Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="overflow-hidden rounded-xl border border-border bg-card">
                   <Skeleton className="aspect-[4/3] rounded-none" />
@@ -315,14 +334,18 @@ export function ResultList({
               }
               action={
                 <>
-                  {zeroResultExpansion && onApplyZeroResultExpansion ? (
-                    <Button
-                      variant="outline"
-                      onClick={() => onApplyZeroResultExpansion(zeroResultExpansion)}
-                    >
-                      Vis {zeroResultExpansion.count.toLocaleString("nb-NO")} treff uten «
-                      {zeroResultExpansion.label}»
-                    </Button>
+                  {expansionOptions.length > 0 && onApplyZeroResultExpansion ? (
+                    <div className="flex flex-wrap justify-center gap-2">
+                      {expansionOptions.map((option) => (
+                        <Button
+                          key={option.key}
+                          variant="outline"
+                          onClick={() => onApplyZeroResultExpansion(option)}
+                        >
+                          Vis {option.count.toLocaleString("nb-NO")} treff uten «{option.label}»
+                        </Button>
+                      ))}
+                    </div>
                   ) : zeroResultExpansionPending ? (
                     <span
                       role="status"
@@ -344,15 +367,25 @@ export function ResultList({
               className={
                 viewMode === "list" || viewMode === "card" || viewMode === "images"
                   ? "flex flex-col gap-3"
-                  : `grid grid-cols-2 gap-4 sm:grid-cols-3 ${isDesktop && !desktopMapVisible ? "lg:grid-cols-4" : ""}`
+                  : `grid grid-cols-2 gap-4 sm:grid-cols-3 ${
+                      isDesktop && !desktopMapVisible
+                        ? "lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+                        : ""
+                    }`
               }
             >
-              {cards.map((l) =>
+              {cards.map((l, index) =>
                 viewMode === "card" ? (
                   <ListingCardExpanded
                     key={l.id}
                     listing={l}
                     linkState={{ fromSearch: true }}
+                    onOpen={() =>
+                      trackProductEvent("search_result_opened", {
+                        position: index + 1,
+                        resultCount: totalCount ?? cards.length,
+                      })
+                    }
                     coverImageUrl={signedImageUrls[l.id] ?? null}
                     knownFavorite={favoriteIds.has(l.id)}
                     favoriteStateReady={favoriteStateReady}
@@ -362,6 +395,12 @@ export function ResultList({
                     key={l.id}
                     listing={l}
                     linkState={{ fromSearch: true }}
+                    onOpen={() =>
+                      trackProductEvent("search_result_opened", {
+                        position: index + 1,
+                        resultCount: totalCount ?? cards.length,
+                      })
+                    }
                     coverImageUrl={signedImageUrls[l.id] ?? null}
                     knownFavorite={favoriteIds.has(l.id)}
                     favoriteStateReady={favoriteStateReady}
@@ -374,6 +413,12 @@ export function ResultList({
                     onHoverChange={setHoveredId}
                     compact={viewMode === "list"}
                     linkState={{ fromSearch: true }}
+                    onOpen={() =>
+                      trackProductEvent("search_result_opened", {
+                        position: index + 1,
+                        resultCount: totalCount ?? cards.length,
+                      })
+                    }
                     signedImageUrl={signedImageUrls[l.id] ?? null}
                     knownFavorite={favoriteIds.has(l.id)}
                     favoriteStateReady={favoriteStateReady}
@@ -391,7 +436,7 @@ export function ResultList({
           )}
         </div>
 
-        {isDesktop && desktopMapVisible && (
+        {isDesktop && desktopMapVisible && cards.length > 0 && (
           <aside>
             <div className="sticky top-20 h-[calc(100vh-6rem)]">
               <div className="relative h-full overflow-hidden rounded-2xl border border-border shadow-sm">
@@ -447,6 +492,7 @@ export function ResultList({
             type="button"
             onClick={() => {
               void hapticImpact("medium");
+              trackProductEvent("search_map_opened", { source: "map_button" });
               setMobileMapOpen(true);
             }}
             className="fixed bottom-[calc(var(--app-bottom-nav-h)+1rem)] right-4 z-50 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg active:scale-95 transition"

@@ -66,6 +66,7 @@ import {
   type SavedSearch,
   type SearchCriteria,
 } from "@/lib/saved-searches";
+import { encodeAttrFilters } from "@/features/listing-search/search-schema";
 import { formatErrorMessage } from "@/lib/errors";
 
 export const Route = createFileRoute("/_authenticated/mine-sok")({
@@ -192,7 +193,7 @@ function MineSokPage() {
         sort: c.sort ?? "new",
         lat: c.lat ?? undefined,
         lng: c.lng ?? undefined,
-        radius: c.radius ?? undefined,
+        attrs: encodeAttrFilters(c.attributes ?? {}),
         loc: c.loc,
       } as never,
     });

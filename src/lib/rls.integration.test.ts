@@ -652,6 +652,83 @@ describe.skipIf(!canRun)(
   },
 );
 
+describe.skipIf(!canRun)("Saved search matches persisted attributes before notifying", () => {
+  const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+  const suffix = Date.now();
+  const emails = {
+    owner: `rls-attribute-search-owner-${suffix}@example.com`,
+    seller: `rls-attribute-search-seller-${suffix}@example.com`,
+  };
+  const userIds: string[] = [];
+  let ownerId: string;
+  let searchId: string;
+
+  beforeAll(async () => {
+    const createUser = async (email: string) => {
+      const { data, error } = await admin.auth.admin.createUser({
+        email,
+        password: PASSWORD,
+        email_confirm: true,
+      });
+      if (error) throw error;
+      userIds.push(data.user!.id);
+      return data.user!.id;
+    };
+
+    ownerId = await createUser(emails.owner);
+    const sellerId = await createUser(emails.seller);
+    const { data, error } = await admin
+      .from("saved_searches")
+      .insert({
+        user_id: ownerId,
+        name: "RLS attribute search",
+        notify: true,
+        criteria: {
+          attributes: {
+            fuel_type: { kind: "select", value: "electric" },
+          },
+        },
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    searchId = data.id;
+
+    const { error: matchingError } = await admin.from("listings").insert({
+      seller_id: sellerId,
+      title: "RLS electric listing",
+      price_nok: 100,
+      status: "active",
+      attributes: { fuel_type: "electric" },
+    });
+    if (matchingError) throw matchingError;
+
+    const { error: nonMatchingError } = await admin.from("listings").insert({
+      seller_id: sellerId,
+      title: "RLS diesel listing",
+      price_nok: 100,
+      status: "active",
+      attributes: { fuel_type: "diesel" },
+    });
+    if (nonMatchingError) throw nonMatchingError;
+  });
+
+  afterAll(async () => {
+    if (!canRun) return;
+    await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+  });
+
+  it("notifies only for the listing matching the saved attribute", async () => {
+    const { data, error } = await admin
+      .from("saved_search_notifications")
+      .select("listing_id, listings!inner(title)")
+      .eq("saved_search_id", searchId);
+    expect(error).toBeNull();
+    expect(data).toHaveLength(1);
+    expect(data?.[0]?.listings).toMatchObject({ title: "RLS electric listing" });
+  });
+});
+
 describe.skipIf(!canRun)("RLS: push_subscriptions are private to their owner", () => {
   const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
   const suffix = Date.now();

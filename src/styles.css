@@ -22,6 +22,9 @@
 }
 
 @custom-variant dark (&:is(.dark *));
+/* Touch-idiomer (trykk-krymping o.l.) hører hjemme i appen, ikke i
+   nettleseren — `.native` settes på <html> av native-oppstarten. */
+@custom-variant native (&:is(.native *));
 
 /*
  * Kaupet.no design system

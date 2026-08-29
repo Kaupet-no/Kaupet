@@ -52,6 +52,14 @@ const fuelFilter: CategoryFilter = {
   depends_on_not_value: null,
   is_optional: false,
 };
+const bodyFilter: CategoryFilter = {
+  ...fuelFilter,
+  id: "body",
+  key: "body",
+  label_nb: "Karosseri",
+  options: [{ value: "suv", label_nb: "SUV" }],
+  sort_order: 1,
+};
 
 function setup(
   section: "price" | "location" | "attributes" = "price",
@@ -123,6 +131,28 @@ describe("SearchFilterSections", () => {
     );
     expect((getByRole("button", { name: /Inntil 250.000/ }) as HTMLButtonElement).disabled).toBe(
       false,
+    );
+  });
+  it("prioriterer filteret som matcher det aktive søket", () => {
+    const value = { ...defaultAdvancedSearchValue(), categories: ["mobler"] };
+    const { getByText, getAllByRole } = render(
+      <SearchFilterSections
+        value={value}
+        setValue={() => {}}
+        categories={categories}
+        section="price"
+        queryText="SUV"
+        attributeFilters={[fuelFilter, bodyFilter]}
+        attributeValues={{}}
+        onAttributeChange={() => {}}
+        includePrimary
+      />,
+    );
+
+    fireEvent.click(getByText("Tilbake til filteroversikt"));
+    const names = getAllByRole("button").map((button) => button.textContent ?? "");
+    expect(names.findIndex((name) => name.includes("Karosseri"))).toBeLessThan(
+      names.findIndex((name) => name.includes("Drivstoff")),
     );
   });
 });

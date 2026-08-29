@@ -103,7 +103,9 @@ function FilterPage() {
 
   // Client-side nav from a longer page (e.g. /annonser's result list) keeps
   // the browser's scroll offset, landing this short page mid-way down.
-  useEffect(() => window.scrollTo(0, 0), []);
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -273,7 +275,7 @@ function FilterPage() {
                   size="sm"
                   className="group gap-1 px-0 text-primary"
                 >
-                  Presist søk
+                  Flere søkevalg
                   <ChevronDown
                     className="size-4 transition-transform group-data-[state=open]:rotate-180"
                     aria-hidden
@@ -282,15 +284,15 @@ function FilterPage() {
               </CollapsibleTrigger>
               <CollapsibleContent className="space-y-4 rounded-xl border border-border p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <Label className="text-sm font-medium">Søkeordmodus</Label>
+                  <Label className="text-sm font-medium">Søket skal matche</Label>
                   <ModeToggle
                     value={search.qMode}
                     onChange={(m) => updateSearch({ qMode: m })}
-                    labels={["Alle ord", "Minst ett"]}
+                    labels={["Alle ordene", "Minst ett ord"]}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">Flere søkelinjer</Label>
+                  <Label className="text-sm font-medium">Ekstra regler</Label>
                   <TermGroupEditor
                     groups={search.extraGroups ?? []}
                     onChange={(extraGroups) => updateSearch({ extraGroups })}

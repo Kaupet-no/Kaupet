@@ -5,7 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
  * + sticky map sidebar) so there's no layout shift once real content lands. */
 export function BrowsePageSkeleton() {
   return (
-    <div className="mx-auto max-w-7xl px-4 py-10" aria-busy="true" aria-live="polite">
+    <div className="mx-auto max-w-6xl px-4 py-10" aria-busy="true" aria-live="polite">
       <h1 className="font-display text-3xl tracking-tight">Annonser</h1>
       <span className="sr-only">Laster…</span>
       <Skeleton className="mt-6 h-14 w-full rounded-full" />

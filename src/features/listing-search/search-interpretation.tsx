@@ -25,12 +25,15 @@ export function SearchInterpretation({
   filters,
   onCategoryChange,
   onAttributeChange,
+  onAttributeRemove,
 }: {
   criteria: InterpretedCriterion[];
   categories: Category[];
   filters: CategoryFilter[];
   onCategoryChange: (slug: string | undefined) => void;
   onAttributeChange: (key: string, value: AttributeFilterValue | undefined) => void;
+  /** Optional precise removal hook for multiselect/exclude criteria. */
+  onAttributeRemove?: (key: string, value?: string, matchedText?: string) => void;
 }) {
   if (criteria.length === 0) return null;
 
@@ -61,11 +64,19 @@ export function SearchInterpretation({
             icon={<X className="size-3.5" aria-hidden="true" />}
             aria-label={`Fjern ${label} fra søket`}
             data-source={criterion.source}
-            onClick={() =>
-              criterion.kind === "category"
-                ? onCategoryChange(undefined)
-                : onAttributeChange(criterion.key, undefined)
-            }
+            onClick={() => {
+              if (criterion.kind === "category") {
+                onCategoryChange(undefined);
+                return;
+              }
+              const option =
+                criterion.value.kind === "multiselect" || criterion.value.kind === "exclude"
+                  ? criterion.value.values[0]
+                  : undefined;
+              if (onAttributeRemove)
+                onAttributeRemove(criterion.key, option, criterion.matchedText);
+              else onAttributeChange(criterion.key, undefined);
+            }}
           />
         );
       })}

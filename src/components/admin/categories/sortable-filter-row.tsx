@@ -13,12 +13,17 @@ const SYNONYM_ELIGIBLE_TYPES: CategoryFilter["type"][] = ["select", "multiselect
 
 export function SortableFilterRow({
   filter,
+  inheritedFrom,
   onTogglePrimary,
   onEdit,
   onDelete,
   onEditSynonyms,
 }: {
   filter: CategoryFilter;
+  /** Navnet på kategorien filteret er definert på, når det ikke er denne.
+   * Arvede filtre kan flyttes (rekkefølgen er global), men ikke redigeres
+   * eller slettes herfra — de eies av kategorien over. */
+  inheritedFrom?: string;
   onTogglePrimary: (checked: boolean) => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -54,43 +59,52 @@ export function SortableFilterRow({
             {FILTER_TYPE_LABELS[filter.type]}
             {filter.unit ? ` · ${filter.unit}` : ""} · {filter.key}
           </span>
+          {inheritedFrom && (
+            <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+              Arvet fra {inheritedFrom}
+            </span>
+          )}
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <Label
-          htmlFor={`primary-${filter.id}`}
-          className="flex items-center gap-1.5 text-xs font-normal text-muted-foreground"
-        >
-          <Checkbox
-            id={`primary-${filter.id}`}
-            checked={filter.is_primary}
-            onCheckedChange={(c) => onTogglePrimary(c === true)}
-          />
-          Vis alltid
-        </Label>
-        {SYNONYM_ELIGIBLE_TYPES.includes(filter.type) && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onEditSynonyms}
-            aria-label="Synonymer for søk"
-            title="Synonymer for søk"
-          >
-            <Languages className="size-4" />
-          </Button>
+        {inheritedFrom ? null : (
+          <>
+            <Label
+              htmlFor={`primary-${filter.id}`}
+              className="flex items-center gap-1.5 text-xs font-normal text-muted-foreground"
+            >
+              <Checkbox
+                id={`primary-${filter.id}`}
+                checked={filter.is_primary}
+                onCheckedChange={(c) => onTogglePrimary(c === true)}
+              />
+              Vis alltid
+            </Label>
+            {SYNONYM_ELIGIBLE_TYPES.includes(filter.type) && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onEditSynonyms}
+                aria-label="Synonymer for søk"
+                title="Synonymer for søk"
+              >
+                <Languages className="size-4" />
+              </Button>
+            )}
+            <Button variant="ghost" size="icon" onClick={onEdit} aria-label="Rediger">
+              <Pencil className="size-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onDelete}
+              aria-label="Slett"
+              className="text-destructive hover:text-destructive"
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          </>
         )}
-        <Button variant="ghost" size="icon" onClick={onEdit} aria-label="Rediger">
-          <Pencil className="size-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onDelete}
-          aria-label="Slett"
-          className="text-destructive hover:text-destructive"
-        >
-          <Trash2 className="size-4" />
-        </Button>
       </div>
     </li>
   );

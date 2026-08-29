@@ -142,6 +142,17 @@ export function FeedbackTag() {
   const [overlapping, setOverlapping] = useState(false);
   const tagRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (tagRef.current && !tagRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
   // Hide the collapsed button whenever page content (e.g. a ScrollArrowRow's
   // right-edge arrow in a hero near the top of the page) sits under its
   // corners — a full-bleed wrapper spanning most of the viewport width

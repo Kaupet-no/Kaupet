@@ -591,7 +591,7 @@ export function VehicleRegistration(props: WizardSharedProps) {
             </AlertDialogCancel>
             <AlertDialogAction
               disabled={!lookupReadyToConfirm}
-              onClick={() => confirmVehicleData(categoryId)}
+              onClick={() => confirmVehicleData(categoryId, categoryGroup)}
             >
               Ja
             </AlertDialogAction>

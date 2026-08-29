@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useVehicleLookupFlow } from "./use-vehicle-lookup-flow";
 
@@ -13,6 +13,25 @@ vi.mock("@tanstack/react-start", () => ({
 const lookupVehicleByRegNumberMock = vi.fn();
 vi.mock("@/lib/vehicle/vehicle-lookup.functions", () => ({
   lookupVehicleByRegNumber: (...args: unknown[]) => lookupVehicleByRegNumberMock(...args),
+}));
+
+const createVehicleBrandMock = vi.fn();
+const createVehicleModelMock = vi.fn();
+vi.mock("@/lib/vehicle/vehicle-brands.functions", () => ({
+  createVehicleBrand: (...args: unknown[]) => createVehicleBrandMock(...args),
+  createVehicleModel: (...args: unknown[]) => createVehicleModelMock(...args),
+}));
+
+const useAllVehicleBrandsMock = vi.fn();
+const useAllVehicleModelsMock = vi.fn();
+vi.mock("@/lib/vehicle/vehicle-brands", () => ({
+  useAllVehicleBrands: () => useAllVehicleBrandsMock(),
+  useAllVehicleModels: () => useAllVehicleModelsMock(),
+}));
+
+const invalidateQueriesMock = vi.fn();
+vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({ invalidateQueries: invalidateQueriesMock }),
 }));
 
 vi.mock("@/lib/toast", () => ({
@@ -69,6 +88,15 @@ const lookupResult = {
 
 beforeEach(() => {
   lookupVehicleByRegNumberMock.mockReset();
+  createVehicleBrandMock
+    .mockReset()
+    .mockResolvedValue({ id: "brand-1", name: "x", status: "pending" });
+  createVehicleModelMock
+    .mockReset()
+    .mockResolvedValue({ id: "model-1", name: "y", status: "pending" });
+  useAllVehicleBrandsMock.mockReset().mockReturnValue({ data: [] });
+  useAllVehicleModelsMock.mockReset().mockReturnValue({ data: [] });
+  invalidateQueriesMock.mockReset();
 });
 
 describe("useVehicleLookupFlow", () => {
@@ -117,7 +145,7 @@ describe("useVehicleLookupFlow", () => {
       useVehicleLookupFlow(makeParams({ setAttributes, goNext })),
     );
 
-    act(() => result.current.confirmVehicleData(CAR_CATEGORY_ID));
+    act(() => result.current.confirmVehicleData(CAR_CATEGORY_ID, "bil"));
 
     expect(setAttributes).not.toHaveBeenCalled();
     expect(goNext).not.toHaveBeenCalled();
@@ -150,7 +178,7 @@ describe("useVehicleLookupFlow", () => {
     );
     await act(() => result.current.runVehicleLookup("EK12345"));
 
-    act(() => result.current.confirmVehicleData(CAR_CATEGORY_ID));
+    act(() => result.current.confirmVehicleData(CAR_CATEGORY_ID, "bil"));
 
     expect(setAttributes).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -182,7 +210,7 @@ describe("useVehicleLookupFlow", () => {
     const { result } = renderHook(() => useVehicleLookupFlow(makeParams({ setAttributes })));
     await act(() => result.current.runVehicleLookup("EK12345"));
 
-    act(() => result.current.confirmVehicleData(CAR_CATEGORY_ID));
+    act(() => result.current.confirmVehicleData(CAR_CATEGORY_ID, "bil"));
 
     expect(setAttributes).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -211,5 +239,77 @@ describe("useVehicleLookupFlow", () => {
 
     expect(result.current.vehicleLookupResult).toBeNull();
     expect(result.current.vehicleClassification).toBeNull();
+  });
+
+  it("confirmVehicleData proposes an unknown brand/model to the admin queue", async () => {
+    window.scrollTo = vi.fn();
+    lookupVehicleByRegNumberMock.mockResolvedValue({
+      lookup: lookupResult,
+      previousClassificationMismatch: null,
+    });
+    const { result } = renderHook(() => useVehicleLookupFlow(makeParams()));
+    await act(() => result.current.runVehicleLookup("EK12345"));
+
+    act(() => result.current.confirmVehicleData(CAR_CATEGORY_ID, "bil"));
+
+    // createBrandFn is invoked synchronously (the mock records the call
+    // before its promise resolves); createModelFn only runs after that
+    // promise resolves with the new brand id, so it needs waitFor.
+    expect(createVehicleBrandMock).toHaveBeenCalledWith({
+      data: { name: "Toyota", categoryGroup: "bil" },
+    });
+    await waitFor(() => {
+      expect(createVehicleModelMock).toHaveBeenCalledWith({
+        data: { brandId: "brand-1", name: "Corolla" },
+      });
+    });
+    await waitFor(() => {
+      expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["vehicle-models", "all"] });
+    });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["vehicle-brands", "all"] });
+  });
+
+  it("confirmVehicleData does not propose a brand/model already in the catalog", async () => {
+    window.scrollTo = vi.fn();
+    lookupVehicleByRegNumberMock.mockResolvedValue({
+      lookup: lookupResult,
+      previousClassificationMismatch: null,
+    });
+    useAllVehicleBrandsMock.mockReturnValue({
+      data: [{ id: "known-brand", name: "Toyota", category_group: "bil" }],
+    });
+    useAllVehicleModelsMock.mockReturnValue({
+      data: [{ id: "known-model", brand_id: "known-brand", name: "Corolla", class_id: null }],
+    });
+    const { result } = renderHook(() => useVehicleLookupFlow(makeParams()));
+    await act(() => result.current.runVehicleLookup("EK12345"));
+
+    act(() => result.current.confirmVehicleData(CAR_CATEGORY_ID, "bil"));
+
+    // Both brand and model already resolve synchronously from the cached
+    // catalog in this case (no server round-trip needed), so this holds
+    // without any extra flush.
+    expect(createVehicleBrandMock).not.toHaveBeenCalled();
+    expect(createVehicleModelMock).not.toHaveBeenCalled();
+  });
+
+  it("confirmVehicleData still advances the wizard when the brand proposal fails", async () => {
+    window.scrollTo = vi.fn();
+    lookupVehicleByRegNumberMock.mockResolvedValue({
+      lookup: lookupResult,
+      previousClassificationMismatch: null,
+    });
+    createVehicleBrandMock.mockRejectedValue(new Error("network blip"));
+    const goNext = vi.fn();
+    const { result } = renderHook(() => useVehicleLookupFlow(makeParams({ goNext })));
+    await act(() => result.current.runVehicleLookup("EK12345"));
+
+    act(() => result.current.confirmVehicleData(CAR_CATEGORY_ID, "bil"));
+
+    // goNext runs synchronously in confirmVehicleData, before the
+    // fire-and-forget proposal's rejection is even caught — the rejection
+    // never reaches confirmVehicleData's caller (swallowed inside
+    // proposeUnknownVehicle's own try/catch), so it can never block this.
+    expect(goNext).toHaveBeenCalled();
   });
 });

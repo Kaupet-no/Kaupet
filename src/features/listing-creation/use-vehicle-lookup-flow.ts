@@ -1,9 +1,12 @@
 ﻿import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { useQueryClient } from "@tanstack/react-query";
 import { showErrorToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
-import type { CategoryNode } from "@/lib/category-filters";
+import type { CategoryNode, VehicleBrandGroup } from "@/lib/category-filters";
 import { lookupVehicleByRegNumber } from "@/lib/vehicle/vehicle-lookup.functions";
+import { createVehicleBrand, createVehicleModel } from "@/lib/vehicle/vehicle-brands.functions";
+import { useAllVehicleBrands, useAllVehicleModels } from "@/lib/vehicle/vehicle-brands";
 import {
   classifyVehicleCategory,
   avgiftskodeGruppeFromCode,
@@ -80,6 +83,48 @@ export function useVehicleLookupFlow(params: {
     useState<{ slug: string | null; lookedUpAt: string } | null>(null);
   const [vehicleRegNrInput, setVehicleRegNrInput] = useState("");
   const lookupVehicleFn = useServerFn(lookupVehicleByRegNumber);
+  const qc = useQueryClient();
+  const createBrandFn = useServerFn(createVehicleBrand);
+  const createModelFn = useServerFn(createVehicleModel);
+  const { data: allBrands } = useAllVehicleBrands();
+  const { data: allModels } = useAllVehicleModels();
+
+  /** Best-effort: registers a brand/model Statens vegvesen returned but that
+   * isn't in Kaupet's approved catalog yet, so it lands in the admin
+   * moderation queue (see VehicleBrandsTab) instead of silently vanishing.
+   * Fire-and-forget from the caller — never blocks listing creation, since
+   * the user's own listing already has the free-text value in
+   * attributes.brand/.model regardless of whether this registration
+   * succeeds (see createVehicleBrand/createVehicleModel's docstrings). */
+  async function proposeUnknownVehicle(
+    categoryGroup: VehicleBrandGroup,
+    brandName: string,
+    modelName: string | undefined,
+  ) {
+    try {
+      const knownBrand = allBrands?.find(
+        (b) =>
+          b.category_group === categoryGroup && b.name.toLowerCase() === brandName.toLowerCase(),
+      );
+      let brandId = knownBrand?.id;
+      if (!brandId) {
+        const created = await createBrandFn({ data: { name: brandName, categoryGroup } });
+        brandId = created.id;
+      }
+      if (modelName && brandId) {
+        const knownModel = allModels?.find(
+          (m) => m.brand_id === brandId && m.name.toLowerCase() === modelName.toLowerCase(),
+        );
+        if (!knownModel) {
+          await createModelFn({ data: { brandId, name: modelName } });
+        }
+      }
+      qc.invalidateQueries({ queryKey: ["vehicle-brands", "all"] });
+      qc.invalidateQueries({ queryKey: ["vehicle-models", "all"] });
+    } catch {
+      // Best effort — a failed proposal must never block listing creation.
+    }
+  }
 
   async function runVehicleLookup(registrationNumber: string): Promise<boolean> {
     setVehicleLookupLoading(true);
@@ -114,8 +159,10 @@ export function useVehicleLookupFlow(params: {
 
   /** Skriver rå SVV-data til attributes etter at brukeren har kontrollert
    * merke/modell i vehicle-registration-popupen. Eksisterende korreksjoner
-   * vinner; ellers brukes oppslagsverdiene uten en ekstra registreringsrunde. */
-  function confirmVehicleData(leafCategoryId: string) {
+   * vinner; ellers brukes oppslagsverdiene uten en ekstra registreringsrunde.
+   * `categoryGroup` avgjør hvilken merke-/modelltabell et ukjent merke/modell
+   * (fra SVV) foreslås inn i — se proposeUnknownVehicle over. */
+  function confirmVehicleData(leafCategoryId: string, categoryGroup: VehicleBrandGroup) {
     const lookup = vehicleLookupResult;
     if (!lookup) return;
 
@@ -168,6 +215,13 @@ export function useVehicleLookupFlow(params: {
       lookup.classification_code,
     );
     if (avgiftskodeGruppe) next.avgiftskode_gruppe = avgiftskodeGruppe;
+    if (typeof next.brand === "string" && next.brand.trim()) {
+      void proposeUnknownVehicle(
+        categoryGroup,
+        next.brand,
+        typeof next.model === "string" && next.model.trim() ? next.model : undefined,
+      );
+    }
 
     setAttributes(next);
     setCategoryTouchedManually(true);

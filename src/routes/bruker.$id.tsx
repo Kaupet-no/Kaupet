@@ -6,7 +6,6 @@ import { useServerFn } from "@tanstack/react-start";
 import { User as UserIcon } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
-import type { Json } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { StarRating } from "@/components/star-rating";
@@ -18,6 +17,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { getPublicProfile, listUserReviews } from "@/lib/reviews.functions";
 import { formatErrorMessage } from "@/lib/errors";
 import { ProfilePageSkeleton } from "@/components/profile-page-skeleton";
+import { toListingCardData } from "@/lib/listing-card-data";
 
 export const Route = createFileRoute("/bruker/$id")({
   loader: async ({ params }) => {
@@ -94,42 +94,7 @@ function PublicProfilePage() {
         .order("created_at", { ascending: false })
         .limit(24);
       if (error) throw error;
-      type ListingImage = { storage_path: string; sort_order: number };
-      type ListingRow = {
-        id: string;
-        kaupet_code: string;
-        title: string;
-        subtitle: string | null;
-        price_nok: number | null;
-        is_free: boolean;
-        city: string | null;
-        created_at: string;
-        listing_images: ListingImage[] | null;
-        attributes: Json;
-        categories: { slug: string } | { slug: string }[] | null;
-      };
-      return (data ?? []).map((l: ListingRow) => {
-        const imgs = (l.listing_images ?? [])
-          .slice()
-          .sort((a: ListingImage, b: ListingImage) => a.sort_order - b.sort_order);
-        const attrs = l.attributes as Record<string, unknown> | null;
-        const mileageRaw = attrs?.mileage_km;
-        const category = Array.isArray(l.categories) ? l.categories[0] : l.categories;
-        return {
-          id: l.id,
-          kaupet_code: l.kaupet_code,
-          title: l.title,
-          subtitle: l.subtitle,
-          price_nok: l.price_nok,
-          is_free: l.is_free,
-          city: l.city,
-          created_at: l.created_at,
-          cover_path: imgs[0]?.storage_path ?? null,
-          mileage_km: typeof mileageRaw === "number" ? mileageRaw : null,
-          category_slug: category?.slug ?? null,
-          attributes: attrs,
-        };
-      });
+      return (data ?? []).map(toListingCardData);
     },
   });
 

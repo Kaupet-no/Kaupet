@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatErrorMessage } from "@/lib/errors";
+import { toListingCardData } from "@/lib/listing-card-data";
 
 export const Route = createFileRoute("/_authenticated/favoritter")({
   head: () => ({
@@ -60,31 +61,10 @@ function FavoritesPage() {
         if (l.status !== "active") {
           return { kind: "unavailable", listing_id: row.listing_id, reason: "archived" };
         }
-        const imgs = (l.listing_images ?? [])
-          .slice()
-          .sort(
-            (a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order,
-          );
-        const attrs = l.attributes as Record<string, unknown> | null;
-        const mileageRaw = attrs?.mileage_km;
-        const category = Array.isArray(l.categories) ? l.categories[0] : l.categories;
         return {
           kind: "available",
           listing_id: row.listing_id,
-          card: {
-            id: l.id,
-            kaupet_code: l.kaupet_code,
-            title: l.title,
-            subtitle: l.subtitle,
-            price_nok: l.price_nok,
-            is_free: l.is_free,
-            city: l.city,
-            created_at: l.created_at,
-            cover_path: imgs[0]?.storage_path ?? null,
-            mileage_km: typeof mileageRaw === "number" ? mileageRaw : null,
-            category_slug: category?.slug ?? null,
-            attributes: attrs,
-          },
+          card: toListingCardData(l),
         };
       });
     },

@@ -28,6 +28,7 @@ import { ListingDetailView } from "@/components/listing-detail/listing-detail-vi
 import { getCategoryBehavior } from "@/lib/category-behavior";
 import { genericBrandFilterFor, vehicleCategoryGroupFor } from "@/lib/category-filters";
 import { useAllCategoryFilters } from "@/components/attribute-fields";
+import { useCategories } from "@/hooks/use-categories";
 import { useListingEditMutations } from "@/features/listing-edit/use-listing-edit-mutations";
 import { VehiclePlateEditDialog } from "@/features/listing-edit/vehicle-plate-edit-dialog";
 import { CategoryChangeDialog } from "@/features/listing-edit/category-change-dialog";
@@ -372,19 +373,7 @@ function ListingDetailPage() {
     },
   });
 
-  // Full category tree, only for building the listing's breadcrumb — shares
-  // the ["categories"] queryKey with annonser.tsx so React Query serves it
-  // from cache on normal in-app navigation instead of refetching.
-  const { data: allCategories } = useQuery({
-    queryKey: ["categories"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("categories")
-        .select("id, slug, name_nb, parent_id");
-      if (error) throw error;
-      return data as Category[];
-    },
-  });
+  const { data: allCategories } = useCategories();
 
   const listingId = data?.id;
   const isOwner = !!user && !!data && user.id === data.seller_id;

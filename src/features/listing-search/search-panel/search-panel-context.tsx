@@ -10,11 +10,9 @@ import {
   useState,
 } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 
-import { supabase } from "@/integrations/supabase/client";
-import { normalizeFilter } from "@/lib/category-filters";
-import type { Category } from "@/lib/categories";
+import { useCategories, visibleCategories } from "@/hooks/use-categories";
+import { useAllCategoryFilters } from "@/components/attribute-fields";
 import type { SearchPanelResultsContext } from "./search-panel";
 import type { SearchFilterSection } from "./filter-sections";
 
@@ -56,36 +54,13 @@ export function SearchPanelProvider({ children }: { children: React.ReactNode })
   // which rebuilds the object and registers again: an infinite loop.
   const hasResultsRef = useRef(false);
 
-  // Samme queryKey som de tre sidene som tidligere hentet dette selv
-  // (annonser.tsx, category-landing-page.tsx, app-landing.tsx) — én delt
-  // cache i stedet for en fjerde uavhengig henting.
-  const { data: categories } = useQuery({
-    queryKey: ["categories", "with-color"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("categories")
-        .select("id, slug, name_nb, parent_id, icon, color, heading_font")
-        .eq("is_hidden", false)
-        .order("sort_order")
-        .order("name_nb");
-      if (error) throw error;
-      return (data ?? []) as Category[];
-    },
-  });
+  const { data: allCategoriesRaw } = useCategories();
+  const categories = useMemo(
+    () => visibleCategories(allCategoriesRaw ?? [], false),
+    [allCategoriesRaw],
+  );
 
-  const { data: allFilters } = useQuery({
-    queryKey: ["category-filters", "all"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("category_filters")
-        .select(
-          "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value, depends_on_not_value, is_optional",
-        )
-        .order("sort_order");
-      if (error) throw error;
-      return (data ?? []).map(normalizeFilter);
-    },
-  });
+  const { data: allFilters } = useAllCategoryFilters();
 
   const openPanel = useCallback(
     (s?: SearchFilterSection) => {

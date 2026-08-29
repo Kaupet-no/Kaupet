@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { usePushStatus } from "@/hooks/use-push-status";
-import { supabase } from "@/integrations/supabase/client";
+import { useCategories } from "@/hooks/use-categories";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -96,18 +96,7 @@ function MineSokPage() {
     queryFn: listUnreadCountsBySearch,
   });
 
-  const { data: categories } = useQuery({
-    queryKey: ["categories"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("categories")
-        .select("id, slug, name_nb, parent_id")
-        .order("sort_order")
-        .order("name_nb");
-      if (error) throw error;
-      return data;
-    },
-  });
+  const { data: categories } = useCategories();
 
   const searches = data ?? [];
   const hasActiveNotify = searches.some((s) => s.notify);

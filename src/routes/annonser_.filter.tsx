@@ -1,9 +1,9 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ChevronDown, Search as SearchIcon } from "lucide-react";
 
-import { supabase } from "@/integrations/supabase/client";
+import { useCategories, visibleCategories } from "@/hooks/use-categories";
+import { useAllCategoryFilters } from "@/components/attribute-fields";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -19,12 +19,8 @@ import { searchSchema, conditionEnum } from "@/features/listing-search/search-sc
 import { z } from "zod";
 import { useAnnonserSearchState } from "@/features/listing-search/use-annonser-search-state";
 import { useFilterFacetCounts } from "@/features/listing-search/use-filter-facet-counts";
-import {
-  normalizeFilter,
-  splitPrimaryFilters,
-  VEHICLE_EQUIPMENT_FILTER_KEYS,
-} from "@/lib/category-filters";
-import { resolveCategoryIds, type Category } from "@/lib/categories";
+import { splitPrimaryFilters, VEHICLE_EQUIPMENT_FILTER_KEYS } from "@/lib/category-filters";
+import { resolveCategoryIds } from "@/lib/categories";
 
 export const Route = createFileRoute("/annonser_/filter")({
   validateSearch: searchSchema,
@@ -46,33 +42,13 @@ function FilterPage() {
   const [, setQDraft] = useState(search.q);
   const preciseActive = search.qMode === "any" || (search.extraGroups?.length ?? 0) > 0;
 
-  const { data: categories } = useQuery({
-    queryKey: ["categories", "with-color"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("categories")
-        .select("id, slug, name_nb, parent_id, icon, color, heading_font")
-        .eq("is_hidden", false)
-        .order("sort_order")
-        .order("name_nb");
-      if (error) throw error;
-      return (data ?? []) as Category[];
-    },
-  });
+  const { data: allCategoriesRaw } = useCategories();
+  const categories = useMemo(
+    () => visibleCategories(allCategoriesRaw ?? [], false),
+    [allCategoriesRaw],
+  );
 
-  const { data: allFilters } = useQuery({
-    queryKey: ["category-filters", "all"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("category_filters")
-        .select(
-          "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value, depends_on_not_value, is_optional",
-        )
-        .order("sort_order");
-      if (error) throw error;
-      return (data ?? []).map(normalizeFilter);
-    },
-  });
+  const { data: allFilters } = useAllCategoryFilters();
 
   const {
     location,

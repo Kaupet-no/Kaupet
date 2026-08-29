@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
 
 import { useListingEdit } from "@/features/listing-edit/edit-mode-context";
 import { AttributeFields, type AttributeMap } from "@/components/attribute-fields";
-import { supabase } from "@/integrations/supabase/client";
+import { useCategories } from "@/hooks/use-categories";
 import { Button } from "@/components/ui/button";
 
 /** Inline panel for generic (non-vehicle) category attributes — reuses
@@ -21,14 +20,7 @@ export function GenericAttributesPanel({
   const editCtx = useListingEdit();
   const [values, setValues] = useState<AttributeMap>(attributes as AttributeMap);
   const [saving, setSaving] = useState(false);
-  const { data: categories } = useQuery({
-    queryKey: ["categories"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("categories").select("id, parent_id");
-      if (error) throw error;
-      return data;
-    },
-  });
+  const { data: categories } = useCategories();
 
   async function save() {
     setSaving(true);

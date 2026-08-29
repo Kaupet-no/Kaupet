@@ -1,9 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { FolderOpen, Save, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { supabase } from "@/integrations/supabase/client";
+import { useCategories, visibleCategories } from "@/hooks/use-categories";
+import { useAllCategoryFilters } from "@/components/attribute-fields";
 import { Button } from "@/components/ui/button";
 import { SearchBar } from "@/components/search-bar";
 import { SaveSearchDialog } from "@/components/advanced-search-sheet";
@@ -34,7 +35,6 @@ import { useBrandCategoryCandidate } from "@/features/listing-search/use-brand-c
 import { stripFillerWords } from "@/lib/search-stopwords";
 import { parseNumericFilters } from "@/lib/search-number-parser";
 import {
-  normalizeFilter,
   vehicleCategoryGroupFor,
   vehicleCategoriesForBrandGroup,
   genericBrandFilterFor,
@@ -52,7 +52,7 @@ import { PullToRefreshIndicator } from "@/components/pull-to-refresh-indicator";
 import { useHeroCategoryActions } from "@/features/listing-search/use-hero-category-actions";
 import { CategoryBreadcrumb } from "@/components/category-hero";
 import { BrowsePageSkeleton } from "@/components/browse-page-skeleton";
-import { breadcrumbPath, resolveHeroCategory, type Category } from "@/lib/categories";
+import { breadcrumbPath, resolveHeroCategory } from "@/lib/categories";
 import { submitSearch } from "@/features/listing-search/submit-search";
 
 export const Route = createFileRoute("/annonser")({
@@ -127,35 +127,13 @@ function BrowsePage() {
   useEffect(() => setMounted(true), []);
   useEffect(() => setQDraft(search.q), [search.q]);
 
-  // Same key/shape as the category landing pages so the two share one cache —
-  // `color`/`icon`/`heading_font` are what the category hero presents with.
-  const { data: categories } = useQuery({
-    queryKey: ["categories", "with-color"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("categories")
-        .select("id, slug, name_nb, parent_id, icon, color, heading_font")
-        .eq("is_hidden", false)
-        .order("sort_order")
-        .order("name_nb");
-      if (error) throw error;
-      return (data ?? []) as Category[];
-    },
-  });
+  const { data: allCategoriesRaw } = useCategories();
+  const categories = useMemo(
+    () => visibleCategories(allCategoriesRaw ?? [], false),
+    [allCategoriesRaw],
+  );
 
-  const { data: allFilters } = useQuery({
-    queryKey: ["category-filters", "all"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("category_filters")
-        .select(
-          "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value, depends_on_not_value, is_optional",
-        )
-        .order("sort_order");
-      if (error) throw error;
-      return (data ?? []).map(normalizeFilter);
-    },
-  });
+  const { data: allFilters } = useAllCategoryFilters();
 
   const {
     location,

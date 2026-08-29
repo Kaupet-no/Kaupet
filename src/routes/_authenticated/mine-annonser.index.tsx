@@ -32,6 +32,7 @@ import { getMyWtbListings, deleteWtbListing } from "@/lib/wtb-listings.functions
 import { formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
 import { useAllCategoryFilters } from "@/components/attribute-fields";
+import { useCategories } from "@/hooks/use-categories";
 import { isVehicleCategory } from "@/lib/category-filters";
 
 import { NativePageHeader } from "@/components/native-page-header";
@@ -78,14 +79,7 @@ function MyListingsPage() {
   });
 
   const { data: allFilters } = useAllCategoryFilters();
-  const { data: allCategories } = useQuery({
-    queryKey: ["categories"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("categories").select("id, parent_id");
-      if (error) throw error;
-      return data;
-    },
-  });
+  const { data: allCategories } = useCategories();
   const categoriesById = new Map((allCategories ?? []).map((c) => [c.id, c]));
   const isVehicleRow = (categoryId: string | null) =>
     isVehicleCategory(categoryId, allFilters ?? [], categoriesById);

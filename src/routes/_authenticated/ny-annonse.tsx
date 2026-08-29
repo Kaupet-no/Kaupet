@@ -1,6 +1,6 @@
 ﻿import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { ClientOnly, createFileRoute, useNavigate, useBlocker } from "@tanstack/react-router";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useForm, useWatch, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -16,6 +16,7 @@ import { PromoteListingDialog } from "@/components/promote-listing-dialog";
 import { PublishedListingDialog } from "@/components/published-listing-dialog";
 import { CategoryPicker } from "@/components/category-picker";
 import { useAllCategoryFilters, type AttributeMap } from "@/components/attribute-fields";
+import { useCategories, visibleCategories } from "@/hooks/use-categories";
 import { modulesForKeys } from "@/features/listing-creation/modules/registry";
 import {
   effectiveFlowForCategory,
@@ -224,21 +225,12 @@ function NewListingPage() {
   const [categoryEditConfirmOpen, setCategoryEditConfirmOpen] = useState(false);
   const [editingCategoryViaTitle, setEditingCategoryViaTitle] = useState(false);
 
-  const { data: categories } = useQuery({
-    queryKey: ["categories", "with-parent"],
-    queryFn: async () => {
-      // select("*") rather than a column list so the query keeps working in
-      // the window before the title_example migration is applied.
-      const { data, error } = await supabase.from("categories").select("*").order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-  });
+  const { data: categories } = useCategories();
 
   // Hidden categories (e.g. the E2E test category) are only pickable for
   // demo/admin users — mirrors the is_hidden filtering on the browse surfaces.
   const pickableCategories = useMemo(
-    () => (categories ?? []).filter((c) => isDemo || !c.is_hidden),
+    () => visibleCategories(categories ?? [], isDemo),
     [categories, isDemo],
   );
 

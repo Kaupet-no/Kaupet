@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
-import { supabase } from "@/integrations/supabase/client";
+import { useCategories, visibleCategories } from "@/hooks/use-categories";
+import { useAllCategoryFilters } from "@/components/attribute-fields";
 import { ActiveFilters } from "@/components/active-filters";
 import { ResultList } from "@/components/result-list";
 import { useSearchPanel } from "@/features/listing-search/search-panel/search-panel-context";
@@ -10,11 +10,7 @@ import { SearchResultsBody } from "@/features/listing-search/search-panel/search
 import { AttributeFilterChips } from "@/components/attribute-filter-chips";
 import { CategoryHero } from "@/components/category-hero";
 import { buildTree, descendants, pathFromAncestor, type Category } from "@/lib/categories";
-import {
-  normalizeFilter,
-  vehicleCategoryGroupFor,
-  genericBrandFilterFor,
-} from "@/lib/category-filters";
+import { vehicleCategoryGroupFor, genericBrandFilterFor } from "@/lib/category-filters";
 import { getCategoryBehavior } from "@/lib/category-behavior";
 import { SearchBar } from "@/components/search-bar";
 import { searchSchema, conditionEnum } from "@/features/listing-search/search-schema";
@@ -69,33 +65,13 @@ export function CategoryLandingPage({
 
   useEffect(() => setQDraft(search.q), [search.q]);
 
-  const { data: categories } = useQuery({
-    queryKey: ["categories", "with-color"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("categories")
-        .select("id, slug, name_nb, parent_id, icon, color, heading_font")
-        .eq("is_hidden", false)
-        .order("sort_order")
-        .order("name_nb");
-      if (error) throw error;
-      return (data ?? []) as Category[];
-    },
-  });
+  const { data: allCategoriesRaw } = useCategories();
+  const categories = useMemo(
+    () => visibleCategories(allCategoriesRaw ?? [], false),
+    [allCategoriesRaw],
+  );
 
-  const { data: allFilters } = useQuery({
-    queryKey: ["category-filters", "all"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("category_filters")
-        .select(
-          "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value, depends_on_not_value, is_optional",
-        )
-        .order("sort_order");
-      if (error) throw error;
-      return (data ?? []).map(normalizeFilter);
-    },
-  });
+  const { data: allFilters } = useAllCategoryFilters();
 
   const tree = useMemo(() => buildTree(categories ?? []), [categories]);
 

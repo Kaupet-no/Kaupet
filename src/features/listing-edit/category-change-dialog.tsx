@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle } from "lucide-react";
 
-import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +20,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { CategoryPicker } from "@/components/category-picker";
+import { useCategories, visibleCategories } from "@/hooks/use-categories";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
 import { saveListingField } from "./save-listing-field";
@@ -51,21 +51,11 @@ export function CategoryChangeDialog({
   const [pendingCategoryId, setPendingCategoryId] = useState<string | null>(null);
 
   const { data: isDemo = false } = useIsDemo();
-  const { data: categories } = useQuery({
-    queryKey: ["categories", "with-hidden-flag"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("categories")
-        .select("id, name_nb, slug, parent_id, icon, color, is_hidden")
-        .order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-    enabled: open,
-    // Hidden categories (e.g. the E2E test category) are only pickable for
-    // demo/admin users.
-    select: (rows) => rows.filter((c) => isDemo || !c.is_hidden),
-  });
+  const { data: categoriesRaw } = useCategories();
+  const categories = useMemo(
+    () => visibleCategories(categoriesRaw ?? [], isDemo),
+    [categoriesRaw, isDemo],
+  );
 
   // Only subcategories may be changed inline — switching main category is a
   // bigger structural change (different field groups, attributes, wizard

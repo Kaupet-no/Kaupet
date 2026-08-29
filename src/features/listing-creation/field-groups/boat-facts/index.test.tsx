@@ -49,7 +49,7 @@ function props(overrides: Partial<WizardSharedProps> = {}): WizardSharedProps {
     attributes: {},
     onAttributesChange: vi.fn(),
     attributesTouched: false,
-    activeModules: [],
+    genericAttributesActive: true,
     boatFactsActive: true,
     vehicleAttributeHiddenKeys: [],
     extraFieldError: null,
@@ -105,17 +105,16 @@ describe("BoatFactsGroup", () => {
   });
 
   it("lar boat-facts eie kategoriattributtene uten å spørre generic attributes på nytt", () => {
-    const GenericAttributes = () => <div data-testid="generic-attributes" />;
     render(
       <CategoryAttributes
         {...props({
-          activeModules: [{ key: "generic-attributes", Component: GenericAttributes } as never],
+          genericAttributesActive: true,
           errors: {},
         })}
       />,
     );
 
     expect(screen.getByRole("button", { name: /Båter/ })).toBeTruthy();
-    expect(screen.queryByTestId("generic-attributes")).toBeNull();
+    expect(screen.queryByTestId(/^attribute-fields-/)).toBeNull();
   });
 });

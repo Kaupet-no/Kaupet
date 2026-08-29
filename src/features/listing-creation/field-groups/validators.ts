@@ -2,10 +2,10 @@ import { getCategoryBehavior, type CategoryBehavior } from "@/lib/category-behav
 
 /**
  * Server-side authority for which listing fields a category's flow actually
- * requires, mirroring modules/validators.ts. The client never fully trusts
- * itself here: createListing re-derives requiredness from the same resolved
- * flow (effectiveFlowForCategory) instead of trusting whatever the client
- * sent, so a buggy/malicious client can't submit condition: null for a
+ * requires. The client never fully trusts itself here: createListing
+ * re-derives requiredness from the same resolved flow
+ * (effectiveFlowForCategory) instead of trusting whatever the client sent,
+ * so a buggy/malicious client can't submit condition: null for a
  * category whose flow still includes the "condition" group.
  */
 export function validateRequiredFieldGroups(

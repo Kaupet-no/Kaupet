@@ -17,7 +17,6 @@ import { PublishedListingDialog } from "@/components/published-listing-dialog";
 import { CategoryPicker } from "@/components/category-picker";
 import { useAllCategoryFilters, type AttributeMap } from "@/components/attribute-fields";
 import { useCategories, visibleCategories } from "@/hooks/use-categories";
-import { modulesForKeys } from "@/features/listing-creation/modules/registry";
 import {
   effectiveFlowForCategory,
   withRuntimeFieldGroups,
@@ -343,12 +342,14 @@ function NewListingPage() {
     return !VEHICLE_LEAF_SLUGS_WITHOUT_MILEAGE.includes(slug as VehicleLeafSlug);
   }, [isVehicle, categoryId, categoriesById]);
 
-  const activeModules = useMemo(
+  const genericAttributesActive = useMemo(
     () =>
-      modulesForKeys(
-        effectiveFlowForCategory(categoryId || null, allFlows ?? [], categoriesById, fromLanding)
-          .modules,
-      ),
+      effectiveFlowForCategory(
+        categoryId || null,
+        allFlows ?? [],
+        categoriesById,
+        fromLanding,
+      ).modules.includes("generic-attributes"),
     [categoryId, allFlows, categoriesById, fromLanding],
   );
 
@@ -766,7 +767,6 @@ function NewListingPage() {
     images,
     attributes,
     boatFactsActive,
-    activeModules,
     missingFilters,
     isFree,
     priceNok,
@@ -990,7 +990,8 @@ function NewListingPage() {
       return "busy";
     }
 
-    // For kjøretøy rendrer title-photos kun bilder (se TitlePhotos) — feltet
+    // For kjøretøy rendrer photos-steget kun bilder (title-steget rendrer
+    // ikke for kjøretøy, se field-groups/registry.ts) — feltet
     // "title" fylles først på vehicle-facts-steget (VehicleTitleFields), så
     // det skal ikke valideres her, ellers blokkeres Neste stille uten
     // synlig feilmelding.
@@ -1018,7 +1019,6 @@ function NewListingPage() {
       images,
       attributes,
       boatFactsActive,
-      activeModules,
       missingFilters,
       isFree,
       priceNok,
@@ -1457,7 +1457,7 @@ function NewListingPage() {
     attributes,
     onAttributesChange: setAttributes,
     attributesTouched,
-    activeModules,
+    genericAttributesActive,
     boatFactsActive,
     vehicleAttributeHiddenKeys,
     extraFieldError,

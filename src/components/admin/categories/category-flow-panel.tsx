@@ -29,14 +29,11 @@ import {
   resolveWizardPages,
   toStoredFieldGroupKeys,
 } from "@/features/listing-creation/category-flows";
-import { MODULE_LABELS_NB, MODULE_REGISTRY } from "@/features/listing-creation/modules/registry";
 import {
   FIELD_GROUP_LABELS_NB,
   LOCKED_FIELD_GROUP_KEYS,
 } from "@/features/listing-creation/field-groups/registry";
 import { MIDDLE_FIELD_GROUP_KEYS, type Category } from "./shared";
-
-const MODULE_KEYS = Object.keys(MODULE_REGISTRY);
 
 function SortableFieldGroupRow({
   id,
@@ -384,17 +381,15 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
           <div className="space-y-1">
             <p className="text-xs font-medium text-muted-foreground">Moduler</p>
             <ul className="space-y-2">
-              {MODULE_KEYS.map((key) => (
-                <li key={key}>
-                  <label className="flex items-center gap-2 text-sm">
-                    <Checkbox
-                      checked={activeModules.includes(key)}
-                      onCheckedChange={() => toggle(key)}
-                    />
-                    {MODULE_LABELS_NB[key] ?? key}
-                  </label>
-                </li>
-              ))}
+              <li>
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={activeModules.includes("generic-attributes")}
+                    onCheckedChange={() => toggle("generic-attributes")}
+                  />
+                  Kategoriegenskaper
+                </label>
+              </li>
             </ul>
           </div>
         </div>

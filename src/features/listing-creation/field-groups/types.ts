@@ -8,7 +8,6 @@
 
 import type { AttributeMap } from "@/components/attribute-fields";
 import type { CategoryNode } from "@/lib/category-filters";
-import type { CategoryModule } from "@/features/listing-creation/modules/registry";
 import type { PendingImage } from "@/components/image-uploader";
 import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.types";
 import type { VehicleClassification } from "@/lib/vehicle/vehicle-classification";
@@ -143,11 +142,14 @@ export type WizardSharedProps = {
   setSuggestionDismissed: (v: boolean) => void;
   setCategorySuggestions: (v: []) => void;
 
-  // category attributes (modules)
+  // category attributes
   attributes: AttributeMap;
   onAttributesChange: (next: AttributeMap) => void;
   attributesTouched: boolean;
-  activeModules: CategoryModule[];
+  /** Whether the category's flow includes generic (non-vehicle) category
+   * attributes — false when boat/vehicle-specific field groups already own
+   * category attributes for this category. */
+  genericAttributesActive: boolean;
   /** True when the boat-specific facts group owns category attributes. */
   boatFactsActive: boolean;
   /** category_filters keys already reviewed/edited in vehicle-confirm — hidden

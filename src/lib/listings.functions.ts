@@ -20,7 +20,6 @@ import {
   effectiveFlowForCategory,
   type CategoryFlowRow,
 } from "@/features/listing-creation/category-flows";
-import { validateModules } from "@/features/listing-creation/modules/validators";
 import { validateRequiredFieldGroups } from "@/features/listing-creation/field-groups/validators";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -267,13 +266,7 @@ export const createListing = createServerFn({ method: "POST" })
 
     // category_flows may not exist yet in every environment (pre-migration); degrade to the default flow.
     const flowRows = (flowsResult.data ?? []) as CategoryFlowRow[];
-    const { fieldGroups, modules } = effectiveFlowForCategory(
-      data.category_id,
-      flowRows,
-      categoriesById,
-    );
-    const moduleError = validateModules(modules, data.attributes ?? {});
-    if (moduleError) throw new Error(moduleError);
+    const { fieldGroups } = effectiveFlowForCategory(data.category_id, flowRows, categoriesById);
     const fieldGroupError = validateRequiredFieldGroups(
       fieldGroups,
       {

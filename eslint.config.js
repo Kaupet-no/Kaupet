@@ -99,7 +99,6 @@ export default tseslint.config(
             // still surface instead of disabling Fast Refresh validation.
             "describeAttrValue",
             "useAllCategoryFilters",
-            "secondaryFilterCount",
             "isBoatAttributes",
             "clampToBounds",
             "scaleAround",
@@ -107,7 +106,6 @@ export default tseslint.config(
             "CIRCLE_STYLE",
             "LISTING_REPORT_REASONS",
             "USER_REPORT_REASONS",
-            "genericAttributesModule",
             "useVehicleBrandOptions",
             "useVehicleModelOptionsGrouped",
             "useVehicleModelOptionsForBrands",

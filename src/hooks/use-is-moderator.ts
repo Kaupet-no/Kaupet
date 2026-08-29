@@ -20,10 +20,3 @@ export function useIsModerator() {
     },
   });
 }
-
-export function useIsAdminOrModerator(
-  isAdmin: boolean | undefined,
-  isModerator: boolean | undefined,
-) {
-  return !!(isAdmin || isModerator);
-}

@@ -26,13 +26,3 @@ export function isWtbRangeValue(v: WtbAttributeValue | undefined): v is WtbRange
 export function isWtbDateMinValue(v: WtbAttributeValue | undefined): v is WtbDateMinValue {
   return typeof v === "object" && v !== null && !Array.isArray(v) && "minDate" in v;
 }
-
-/** Keys the user has activated (checkbox) without filling a value — these
- * block the wizard's "Neste" until filled or deactivated. Empty values are
- * always deleted from the map, so "in the map" means "has a value". */
-export function wtbInvalidCheckedKeys(
-  checkedKeys: readonly string[],
-  attributes: WtbAttributeMap,
-): string[] {
-  return checkedKeys.filter((k) => !(k in attributes));
-}

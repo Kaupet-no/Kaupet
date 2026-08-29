@@ -221,27 +221,3 @@ export const adminResolveReport = createServerFn({ method: "POST" })
     if (error) throw error;
     return { ok: true };
   });
-
-export const adminGrantModeratorRole = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .validator((i: unknown) => z.object({ userId: uuid }).parse(i))
-  .handler(async ({ data, context }) => {
-    await requireAdmin(context.supabase, context.userId);
-    const { error } = await context.supabase.rpc("admin_grant_moderator_role", {
-      _user_id: data.userId,
-    });
-    if (error) throw error;
-    return { ok: true };
-  });
-
-export const adminRevokeModeratorRole = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .validator((i: unknown) => z.object({ userId: uuid }).parse(i))
-  .handler(async ({ data, context }) => {
-    await requireAdmin(context.supabase, context.userId);
-    const { error } = await context.supabase.rpc("admin_revoke_moderator_role", {
-      _user_id: data.userId,
-    });
-    if (error) throw error;
-    return { ok: true };
-  });

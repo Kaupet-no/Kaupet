@@ -13,9 +13,8 @@ export const lookupVehicleByRegNumber = createServerFn({ method: "POST" })
       .object({
         registrationNumber: z.string().trim().min(2).max(10),
         // Optional: at the "Bil og MC"-first lookup, the leaf category (and
-        // therefore the brand group) isn't known yet — brand/model matching
-        // is deferred to matchVehicleBrandModel once the user confirms the
-        // auto-detected vehicle type.
+        // therefore the brand group) isn't known yet, so brand/model
+        // matching below is skipped — brandMatch/modelMatch come back null.
         categoryGroup: z
           .enum([
             "bil",

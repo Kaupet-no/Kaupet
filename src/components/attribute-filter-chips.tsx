@@ -239,16 +239,6 @@ export function SecondaryCategoryFilters({
   );
 }
 
-/** Count of secondary (non-primary) filters with an active value — shared by
- * `AttributeFilterChips`' own "Flere filter" badge and the native panel's
- * "Mer" chip, so the two never show a different number for the same state. */
-export function secondaryFilterCount(
-  filters: CategoryFilter[],
-  values: Record<string, AttributeFilterValue>,
-): number {
-  return splitPrimaryFilters(filters).secondary.filter((f) => values[f.key] !== undefined).length;
-}
-
 /**
  * The category-dependent filter row on the search results page: the category's
  * primary filters (Merke, Modell, Drivstoff, Årsmodell …) each get their own

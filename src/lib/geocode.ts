@@ -163,38 +163,3 @@ export async function lookupPostalCode(postal: string): Promise<{
     return null;
   }
 }
-
-/**
- * Slå opp et norsk stedsnavn → postnummer + koordinater (best-effort).
- */
-export async function lookupCity(city: string): Promise<{
-  postal_code: string;
-  lat: number;
-  lng: number;
-} | null> {
-  const c = city.trim();
-  if (c.length < 2) return null;
-  try {
-    const url = new URL("https://nominatim.openstreetmap.org/search");
-    url.searchParams.set("city", c);
-    url.searchParams.set("country", "Norway");
-    url.searchParams.set("format", "json");
-    url.searchParams.set("addressdetails", "1");
-    url.searchParams.set("limit", "1");
-    const res = await fetch(url.toString(), { headers: { "Accept-Language": "nb" } });
-    if (!res.ok) return null;
-    const data: Array<{
-      lat: string;
-      lon: string;
-      address?: { postcode?: string };
-    }> = await res.json();
-    if (data.length === 0) return null;
-    const postal_code = (data[0].address?.postcode ?? "").trim();
-    const lat = parseFloat(data[0].lat);
-    const lng = parseFloat(data[0].lon);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-    return { postal_code, lat, lng };
-  } catch {
-    return null;
-  }
-}

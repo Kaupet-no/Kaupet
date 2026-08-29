@@ -8,11 +8,6 @@ export type Category = {
   heading_font?: string | null;
 };
 
-/** Main categories are colored root categories presented as Kaupet sub-sites. */
-export function mainCategories(categories: Category[]): Category[] {
-  return categories.filter((c) => c.parent_id == null && !!c.color);
-}
-
 /**
  * Resolves selected category slugs (e.g. from `/annonser`'s `categories`
  * search param) to concrete category ids to filter listings by — a chosen
@@ -174,31 +169,6 @@ export function resolveHeroCategory(
   const candidate = common[common.length - 1];
 
   return { selected: candidate, main };
-}
-
-export function categoryLabel(selectedSlugs: string[], tree: CatTree): string {
-  if (selectedSlugs.length === 0) return "Alle kategorier";
-  const set = new Set(selectedSlugs);
-
-  // "Alle i parent": parent slug + every descendant slug (at any depth) present
-  for (const root of tree.roots) {
-    const kids = descendants(root, tree);
-    if (kids.length === 0) continue;
-    const allChildrenSlugs = kids.map((k) => k.slug);
-    const hasAll =
-      set.has(root.slug) &&
-      allChildrenSlugs.every((s) => set.has(s)) &&
-      set.size === 1 + allChildrenSlugs.length;
-    if (hasAll) return root.name_nb;
-  }
-
-  if (selectedSlugs.length === 1) {
-    const c = tree.bySlug.get(selectedSlugs[0]);
-    if (!c) return "1 kategori";
-    const path = breadcrumbPath(c, tree);
-    return path.map((p) => p.name_nb).join(" › ");
-  }
-  return `${selectedSlugs.length} kategorier`;
 }
 
 export function selectAllForParent(parent: Category, tree: CatTree): string[] {

@@ -12,13 +12,3 @@ export function saveLastSearchContext(ctx: LastSearchContext) {
     // sessionStorage unavailable (e.g. private mode) — ignore, fallback handles it
   }
 }
-
-export function readLastSearchContext(): LastSearchContext | null {
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as LastSearchContext;
-  } catch {
-    return null;
-  }
-}

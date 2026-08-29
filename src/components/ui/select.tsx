@@ -8,8 +8,6 @@ import { cn } from "@/lib/utils";
 
 const Select = SelectPrimitive.Root;
 
-const SelectGroup = SelectPrimitive.Group;
-
 const SelectValue = SelectPrimitive.Value;
 
 /** Unstyled trigger for callers that supply their own trigger element via
@@ -145,7 +143,6 @@ SelectSeparator.displayName = SelectPrimitive.Separator.displayName;
 
 export {
   Select,
-  SelectGroup,
   SelectValue,
   SelectTrigger,
   SelectTriggerBare,

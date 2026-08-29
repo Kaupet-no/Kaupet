@@ -104,7 +104,6 @@ export default tseslint.config(
             "clampToBounds",
             "scaleAround",
             "defaultMarkerIcon",
-            "CARTO_TILE_LAYER",
             "CIRCLE_STYLE",
             "LISTING_REPORT_REASONS",
             "USER_REPORT_REASONS",

@@ -2,7 +2,7 @@ import { MapContainer, TileLayer, Circle, useMap } from "react-leaflet";
 import { useEffect } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { useTheme } from "@/hooks/use-theme";
+import { KARTVERKET_TILE_LAYER } from "@/lib/kartverket-map";
 
 const AREA_RADIUS_M = 500;
 
@@ -22,7 +22,6 @@ type Props = {
 };
 
 export function ListingDetailMap({ lat, lng, interactive = true }: Props) {
-  const { resolvedTheme } = useTheme();
   return (
     <MapContainer
       center={[lat, lng]}
@@ -34,11 +33,7 @@ export function ListingDetailMap({ lat, lng, interactive = true }: Props) {
       zoomControl={false}
       className="h-full w-full rounded-2xl"
     >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-        url={`https://{s}.basemaps.cartocdn.com/${resolvedTheme === "dark" ? "dark_all" : "light_all"}/{z}/{x}/{y}{r}.png`}
-        subdomains="abcd"
-      />
+      <TileLayer {...KARTVERKET_TILE_LAYER} />
       <Circle
         center={[lat, lng]}
         radius={AREA_RADIUS_M}

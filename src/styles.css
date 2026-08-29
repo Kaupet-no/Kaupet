@@ -146,13 +146,6 @@
   --ring: oklch(0.78 0.09 160);
 }
 
-/* CARTO's dark_all tiles are near-black by default (~33/255 avg brightness);
-   lighten slightly so the map doesn't read as a black void against the
-   app's own (lighter) dark surface tones. */
-.dark .leaflet-tile {
-  filter: brightness(1.6) contrast(0.9);
-}
-
 @layer base {
   * {
     border-color: var(--color-border);
@@ -366,6 +359,16 @@
 .leaflet-container {
   isolation: isolate;
   z-index: 0;
+}
+
+/* Kartverkets gråtonefliser har transparent bakgrunn. I mørk modus inverterer
+   vi kun selve rasterflisene, slik at kartet følger Kaupets mørke overflate
+   uten å endre markører eller Kartverkets attribusjon. */
+.dark .leaflet-container {
+  background-color: var(--color-background);
+}
+.dark .leaflet-tile {
+  filter: invert(1) grayscale(1) brightness(0.78) contrast(0.82);
 }
 
 @keyframes fab-icon-in {

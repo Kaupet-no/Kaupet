@@ -5,11 +5,8 @@ import "leaflet/dist/leaflet.css";
 import { X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FullscreenOverlay, FullscreenOverlayContent } from "@/components/ui/fullscreen-overlay";
-import {
-  defaultMarkerIcon,
-  CARTO_TILE_LAYER,
-  CIRCLE_STYLE,
-} from "@/components/listing-location-picker";
+import { defaultMarkerIcon, CIRCLE_STYLE } from "@/components/listing-location-picker";
+import { KARTVERKET_TILE_LAYER } from "@/lib/kartverket-map";
 
 const AREA_RADIUS_M = 500;
 
@@ -94,7 +91,7 @@ export function FullscreenLocationPicker({ lat, lng, onConfirm, onClose }: Props
             touchZoom
             className="h-full w-full"
           >
-            <TileLayer {...CARTO_TILE_LAYER} />
+            <TileLayer {...KARTVERKET_TILE_LAYER} />
             <Circle
               center={[draft.lat, draft.lng]}
               radius={AREA_RADIUS_M}

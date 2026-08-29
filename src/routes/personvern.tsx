@@ -32,7 +32,7 @@ function PersonvernPage() {
           <h1 className="mt-2 font-display text-4xl leading-tight tracking-tight">
             Personvernerklæring
           </h1>
-          <p className="mt-3 text-sm text-muted-foreground">Sist oppdatert 3. august 2026</p>
+          <p className="mt-3 text-sm text-muted-foreground">Sist oppdatert 29. august 2026</p>
         </header>
       )}
 
@@ -359,9 +359,10 @@ function PersonvernPage() {
               .
             </li>
             <li>
-              <strong>OpenStreetMap / CARTO</strong> — kartfliser og adressesøk (Nominatim) for
-              visning og geokoding av lokasjon på annonser. IP-adressen din blir synlig for disse
-              tjenestene når kart eller adressesøk brukes.
+              <strong>Kartverket og OpenStreetMap</strong> — Kartverket leverer kartfliser, mens
+              adressesøk bruker Nominatim fra OpenStreetMap, for visning og geokoding av lokasjon på
+              annonser. IP-adressen din blir synlig for disse tjenestene når kart eller adressesøk
+              brukes.
             </li>
           </ul>
         </section>

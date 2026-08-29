@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { signListingImageUrls } from "@/lib/storage";
 import { useNominatimSearch, type NominatimResult } from "@/hooks/use-nominatim-search";
-import { useTheme } from "@/hooks/use-theme";
+import { isValidMapCoordinate, KARTVERKET_TILE_LAYER } from "@/lib/kartverket-map";
 
 const EARTH_RADIUS_KM = 6371;
 
@@ -237,23 +237,22 @@ export function ListingsMap({
   onClearLocation,
   className,
 }: Props) {
-  const { resolvedTheme } = useTheme();
-  const initial = center ?? NORWAY_CENTER;
-  const zoom = center ? 11 : 5;
+  const initial = isValidMapCoordinate(center) ? center : NORWAY_CENTER;
+  const mapCenter = isValidMapCoordinate(center) ? center : null;
+  const validListings = listings.filter(isValidMapCoordinate);
   const [previewRadiusKm, setPreviewRadiusKm] = useState(radiusKm);
   const [radiusManuallySet, setRadiusManuallySet] = useState(false);
   const [isSliderInteracting, setIsSliderInteracting] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [locQuery, setLocQuery] = useState("");
   const { results: locResults, loading: locLoading } = useNominatimSearch(locQuery);
-
   useEffect(() => {
     // Når et filter allerede er aktivt (eller brukeren har justert slideren
     // selv), er radiusKm-propen fasit. Før noe filter er satt følger radiusen
     // i stedet dynamisk kartets zoom (se ZoomRadiusSync), så vi skal ikke
     // overskrive den med en statisk standardverdi her.
-    if (center || radiusManuallySet) setPreviewRadiusKm(radiusKm);
-  }, [radiusKm, center, radiusManuallySet]);
+    if (mapCenter || radiusManuallySet) setPreviewRadiusKm(radiusKm);
+  }, [radiusKm, mapCenter, radiusManuallySet]);
 
   useEffect(() => {
     setIsTouchDevice(window.matchMedia("(hover: none)").matches);
@@ -272,7 +271,9 @@ export function ListingsMap({
   };
 
   const pickLocResult = (r: NominatimResult) => {
-    commitCenter({ lat: parseFloat(r.lat), lng: parseFloat(r.lon) });
+    const next = { lat: Number.parseFloat(r.lat), lng: Number.parseFloat(r.lon) };
+    if (!isValidMapCoordinate(next)) return;
+    commitCenter(next);
     setLocQuery("");
   };
 
@@ -280,27 +281,23 @@ export function ListingsMap({
     <div className={`group relative ${className ?? ""}`}>
       <MapContainer
         center={[initial.lat, initial.lng]}
-        zoom={zoom}
+        zoom={mapCenter ? 11 : 5}
         scrollWheelZoom
         zoomControl={false}
         className="h-full w-full rounded-2xl"
       >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url={`https://{s}.basemaps.cartocdn.com/${resolvedTheme === "dark" ? "dark_all" : "light_all"}/{z}/{x}/{y}{r}.png`}
-          subdomains="abcd"
-        />
-        <CenterUpdater center={center} radiusKm={radiusKm} />
+        <TileLayer {...KARTVERKET_TILE_LAYER} />
+        <CenterUpdater center={mapCenter} radiusKm={radiusKm} />
         <ClickHandler onClick={commitCenter} />
         <ZoomRadiusSync
-          active={!center && !radiusManuallySet}
+          active={!mapCenter && !radiusManuallySet}
           onDefaultRadius={setPreviewRadiusKm}
         />
-        {!center && <HoverRadiusPreview radiusKm={previewRadiusKm} />}
-        {center && (
+        {!mapCenter && <HoverRadiusPreview radiusKm={previewRadiusKm} />}
+        {mapCenter && (
           <>
             <Circle
-              center={[center.lat, center.lng]}
+              center={[mapCenter.lat, mapCenter.lng]}
               radius={radiusKm * 1000}
               pathOptions={{
                 color: "hsl(var(--primary))",
@@ -311,7 +308,7 @@ export function ListingsMap({
               }}
             />
             <Marker
-              position={[center.lat, center.lng]}
+              position={[mapCenter.lat, mapCenter.lng]}
               icon={centerIcon}
               title="Flytt søkesenter"
               draggable
@@ -326,8 +323,8 @@ export function ListingsMap({
             {onClearLocation && (
               <Marker
                 position={[
-                  clearIconPosition(center, radiusKm).lat,
-                  clearIconPosition(center, radiusKm).lng,
+                  clearIconPosition(mapCenter, radiusKm).lat,
+                  clearIconPosition(mapCenter, radiusKm).lng,
                 ]}
                 icon={clearIcon}
                 title="Fjern sted"
@@ -341,7 +338,7 @@ export function ListingsMap({
             )}
           </>
         )}
-        {listings.map((l) => (
+        {validListings.map((l) => (
           <PriceMarker
             key={l.id}
             listing={l}

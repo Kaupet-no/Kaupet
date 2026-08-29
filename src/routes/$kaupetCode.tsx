@@ -647,6 +647,7 @@ function ListingDetailPage() {
       categoryId={data.category_id}
       canShip={data.can_ship}
       breadcrumb={breadcrumb}
+      enableBackToSearch
       images={images}
       imgUrls={imgUrls}
       vehicle360Frames={vehicle360Frames}

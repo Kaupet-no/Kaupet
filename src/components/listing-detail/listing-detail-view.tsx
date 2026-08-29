@@ -1,9 +1,10 @@
 import { Fragment, lazy, Suspense, useCallback, useState, type ReactNode } from "react";
 import { ClientOnly, Link } from "@tanstack/react-router";
-import { Loader2, MapPin, Maximize2 } from "lucide-react";
+import { ChevronLeft, Loader2, MapPin, Maximize2 } from "lucide-react";
 
 import { useIsNative } from "@/hooks/use-is-native";
 import { NativePageHeader } from "@/components/native-page-header";
+import { readLastSearchContext } from "@/lib/last-search-context";
 import { ImageGallery } from "@/components/listing-detail/image-gallery";
 import { type Vehicle360Frame } from "@/components/listing-detail/vehicle/vehicle-360-viewer";
 import { VehicleEquipmentList } from "@/components/listing-detail/vehicle/vehicle-equipment-list";
@@ -93,6 +94,26 @@ function LightboxLoadingFallback() {
   );
 }
 
+/** Link back to the last /annonser search this session, read from
+ * sessionStorage (see last-search-context.ts) — rendered inside
+ * `ClientOnly` since sessionStorage isn't available during SSR. Renders
+ * nothing when the visitor didn't arrive from a search this session
+ * (fresh tab, shared link, notification, ...). */
+function BackToSearchLink() {
+  const ctx = readLastSearchContext();
+  if (!ctx) return null;
+  return (
+    <Link
+      to="/annonser"
+      search={ctx.search}
+      className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+    >
+      <ChevronLeft className="size-4" aria-hidden />
+      Tilbake til {ctx.label}
+    </Link>
+  );
+}
+
 export type ListingDetailViewCategory = { name_nb: string; slug: string | null } | null;
 
 /** A single crumb in the ancestor chain from a root category down to the
@@ -164,6 +185,11 @@ export type ListingDetailViewProps = {
   stickyContactSlot?: ReactNode;
   /** Sticky banner shown instead of the above when this is a pre-publish preview. */
   previewBanner?: ReactNode;
+  /** Shows a "Tilbake til {label}" link above the breadcrumb, reading the
+   * last saved /annonser search context for this session (see
+   * last-search-context.ts). Only set by the real listing detail route —
+   * omitted by the pre-publish preview, which isn't reached from a search. */
+  enableBackToSearch?: boolean;
   /** Extra nodes rendered at the end of the view — used by `$kaupetCode.tsx`
    * for the owner-only vehicle-plate/category edit modals, which need
    * `ListingDetailView`'s children slot rather than a named prop since they
@@ -202,6 +228,7 @@ export function ListingDetailView({
   sellerContactSlot,
   stickyContactSlot,
   previewBanner,
+  enableBackToSearch,
   editMode,
   children,
 }: ListingDetailViewProps) {
@@ -359,6 +386,7 @@ export function ListingDetailView({
       sellerContactSlot={sellerContactSlot}
       stickyContactSlot={stickyContactSlot}
       previewBanner={previewBanner}
+      enableBackToSearch={enableBackToSearch}
       activeImage={activeImage}
       setActiveImage={setActiveImage}
       lightboxIndex={lightboxIndex}
@@ -431,6 +459,7 @@ function ListingDetailViewBody({
   sellerContactSlot,
   stickyContactSlot,
   previewBanner,
+  enableBackToSearch,
   activeImage,
   setActiveImage,
   lightboxIndex,
@@ -482,6 +511,7 @@ function ListingDetailViewBody({
   sellerContactSlot?: ReactNode;
   stickyContactSlot?: ReactNode;
   previewBanner?: ReactNode;
+  enableBackToSearch?: boolean;
   activeImage: number;
   setActiveImage: (i: number) => void;
   lightboxIndex: number | null;
@@ -527,6 +557,11 @@ function ListingDetailViewBody({
           headeren — headertittelen toner inn først når den er scrollet vekk. */}
       <NativePageHeader title={title} titleFadesIn />
       {previewBanner}
+      {enableBackToSearch && (
+        <ClientOnly>
+          <BackToSearchLink />
+        </ClientOnly>
+      )}
 
       <header className="mt-4">
         <div className="flex items-start justify-between gap-2">

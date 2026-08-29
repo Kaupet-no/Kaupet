@@ -187,15 +187,3 @@ export async function initUniversalLinkNavigation(navigate: (url: string) => voi
     }
   });
 }
-
-/** Open a URL in an in-app browser on native; on web, opens a new tab. */
-export async function openExternal(url: string): Promise<void> {
-  if (isNative()) {
-    const { Browser } = await import("@capacitor/browser");
-    await Browser.open({ url });
-    return;
-  }
-  if (typeof window !== "undefined") {
-    window.open(url, "_blank", "noopener,noreferrer");
-  }
-}

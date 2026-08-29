@@ -16,12 +16,6 @@ type CategorySuggestion = {
  * already up" hints, WTB (want-to-buy) price match, and keyword suggestions
  * from useTitleBasedListingHints. Pulled out of ny-annonse.tsx, same pattern
  * as useDraftAutosave / useVehicleLookupFlow / useLocationPicker.
- *
- * Note: mine-annonser.$id.rediger.tsx uses useEditListingHints instead,
- * which shares the same title-based-hints core but skips the category
- * suggestion (editing an already-published listing shouldn't suggest a
- * different category off a title tweak) and excludes the listing itself
- * from its own similar-listings search.
  */
 export function useListingTitleHints(params: {
   title: string;

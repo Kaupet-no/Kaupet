@@ -5,10 +5,9 @@ import type { searchSchema } from "@/features/listing-search/search-schema";
 
 type UpdateSearch = (patch: Partial<z.infer<typeof searchSchema>>) => void;
 
-/** Category-selection handlers for the `/annonser` hero + always-visible
- * chip row — pulled out of BrowsePage since they're pure closures over
- * search state with no hooks of their own. See CategoryHero/CategoryChipRow
- * for where each is wired up. */
+/** Category-selection handlers for the `/annonser` hero — pulled out of
+ * BrowsePage since they're pure closures over search state with no hooks
+ * of their own. See CategoryHero for where each is wired up. */
 export function useHeroCategoryActions({
   hero,
   categoryTree,

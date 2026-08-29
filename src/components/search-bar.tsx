@@ -47,7 +47,7 @@ type Props = {
 
 /**
  * Pure text-query search field. Category selection lives in
- * CategoryHero/CategoryChipRow and in the automatic category-match effect
+ * CategoryHero and in the automatic category-match effect
  * (see search-category-match.ts) — this bar used to also show a "Gå til
  * kategori" suggestion in its own dropdown, but that duplicated the
  * automatic matcher and could fire out of step with it (the automatic one

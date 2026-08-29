@@ -44,16 +44,6 @@
       "count": 1
     }
   },
-  "src/components/promote-listing-dialog.tsx": {
-    "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
-  },
-  "src/components/published-listing-dialog.tsx": {
-    "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
-  },
   "src/components/range-filter-field.tsx": {
     "react-hooks/set-state-in-effect": {
       "count": 2
@@ -87,11 +77,6 @@
   "src/features/listing-creation/use-draft-autosave.ts": {
     "react-hooks/set-state-in-effect": {
       "count": 1
-    }
-  },
-  "src/features/listing-creation/use-edit-location-picker.ts": {
-    "react-hooks/set-state-in-effect": {
-      "count": 2
     }
   },
   "src/features/listing-creation/use-listing-title-hints.ts": {

@@ -2,21 +2,30 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { ListingCardData } from "@/components/listing-card";
 
-/** "Populært akkurat nå" carousel data — most-viewed listings in the last week. */
-export function usePopularListings() {
+/**
+ * "Populært akkurat nå" carousel data — most-viewed listings in the last
+ * week. `limit` is part of the query key: AppLanding (native) and
+ * WebLanding previously shared one `["popular-listings-last-week"]` cache
+ * entry while requesting different row counts (10 vs 8), so whichever
+ * request resolved first silently capped the other at its own limit.
+ */
+export function usePopularListings(limit = 8) {
   const {
     data: popular,
     isError: popularIsError,
     refetch: refetchPopular,
   } = useQuery({
-    queryKey: ["popular-listings-last-week"],
+    queryKey: ["popular-listings-last-week", limit],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("popular_listings_last_week", { _limit: 8 });
+      const { data, error } = await supabase.rpc("popular_listings_last_week", {
+        _limit: limit,
+      });
       if (error) throw error;
       return (data ?? []).map<ListingCardData>((l) => ({
         id: l.listing_id,
         kaupet_code: l.kaupet_code,
         title: l.title,
+        subtitle: l.subtitle,
         price_nok: l.price_nok,
         is_free: l.is_free,
         city: l.city,

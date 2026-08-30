@@ -104,7 +104,7 @@ export function AppLanding() {
         </div>
         {popular && popular.length > 0 ? (
           isTablet ? (
-            <div className="grid grid-cols-3 gap-4 pb-2 pr-5">
+            <div className="grid grid-cols-3 gap-4 pb-2 pr-5 lg:grid-cols-4 xl:grid-cols-5">
               {popular.map((listing) => (
                 <ListingCard key={listing.id} listing={listing} />
               ))}

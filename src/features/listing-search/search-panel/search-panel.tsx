@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 import { Drawer } from "vaul";
-import { useNavigate } from "@tanstack/react-router";
-import { Clock, FolderOpen, RotateCcw, Save, Search as SearchIcon, X } from "lucide-react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import {
+  Clock,
+  FolderOpen,
+  RotateCcw,
+  Save,
+  Search as SearchIcon,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -17,13 +25,18 @@ import { findCategorySuggestion, type Category } from "@/lib/categories";
 import type { LocationValue } from "@/components/location-filter";
 import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
 import { hapticImpact } from "@/lib/haptics";
+import type { AppliedSearchState } from "@/features/listing-search/search-schema";
+import { resolveAppliedSearch, submitSearch } from "@/features/listing-search/submit-search";
+import {
+  useSearchSuggestions,
+  type ListingSuggestion,
+} from "@/features/listing-search/use-search-suggestions";
+import { buildStructuredSearchSuggestions } from "@/features/listing-search/structured-search-suggestions";
+import { summarizeCriteria } from "@/lib/saved-searches";
 import { useAuth } from "@/hooks/use-auth";
 import { useFormFactor } from "@/hooks/use-form-factor";
 import { useOverlayHistory } from "@/hooks/use-overlay-history";
 import { useSheetDragGate } from "@/hooks/use-sheet-drag-gate";
-import type { AppliedSearchState } from "@/features/listing-search/search-schema";
-import { submitSearch } from "@/features/listing-search/submit-search";
-import { summarizeCriteria } from "@/lib/saved-searches";
 import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
 import { SearchFilterSections, type SearchFilterSection } from "./filter-sections";
 import { getSearchHistory, saveSearchToHistory, clearSearchHistory } from "./search-history";
@@ -32,6 +45,7 @@ import { trackProductEvent } from "@/lib/product-analytics";
 import { expandSheetBeforeScroll } from "@/lib/sheet-gestures";
 import { useDraftResultCount } from "@/features/listing-search/use-draft-result-count";
 import { searchDraftMatchesApplied } from "./search-panel-utils";
+import type { InterpretedCriterion } from "@/features/listing-search/resolve-text-to-filters";
 
 export type SearchPanelSection = SearchFilterSection | "query";
 
@@ -44,7 +58,7 @@ const SNAP_POINTS = [0.6, 1];
  * half-applied search behind. */
 export type SearchPanelResultsContext = {
   applied: AppliedSearchState;
-  onApply: (applied: AppliedSearchState) => void;
+  onApply: (applied: AppliedSearchState, criteria?: InterpretedCriterion[]) => void;
   attributeFilters?: CategoryFilter[];
   attributeCounts?: Record<string, Record<string, number>>;
   resultCount?: number;
@@ -145,8 +159,7 @@ export function SearchPanel({
 
   useEffect(() => {
     if (!open) return;
-    setDraft(results ? cloneSearchState(results.applied) : createLaunchState(savedLocation));
-    setLaunchQueryDraft("");
+    setLaunchQueryDraft(results ? results.applied.value.terms.join(" ") : "");
     setSection(initialSection);
     setSnap(SNAP_POINTS[0]);
     setHistory(getSearchHistory());
@@ -163,7 +176,17 @@ export function SearchPanel({
       launchQueryDraft.length >= 2 ? findCategorySuggestion(categories, launchQueryDraft) : null,
     [launchQueryDraft, categories],
   );
-
+  const queryMode = section === "query";
+  const { data: listingSuggestions = [] } = useSearchSuggestions(queryMode ? launchQueryDraft : "");
+  const structuredSuggestions = useMemo(
+    () =>
+      buildStructuredSearchSuggestions(
+        launchQueryDraft,
+        results?.attributeFilters ?? allFilters,
+        draft.attributes,
+      ),
+    [allFilters, draft.attributes, launchQueryDraft, results?.attributeFilters],
+  );
   const updateDraftAttribute = (key: string, value: AttributeFilterValue | undefined) => {
     setDraft((previous) => {
       const next = { ...previous.attributes };
@@ -270,8 +293,23 @@ export function SearchPanel({
     saveSearchToHistory(trimmed);
 
     setSubmitting(true);
+    if (results) {
+      const resolved = await resolveAppliedSearch({
+        applied: results.applied,
+        query: trimmed,
+        categories,
+        vehicleBrands: vehicleBrands ?? [],
+        allFilters,
+      });
+      results.onApply(resolved.applied, resolved.criteria);
+      setSubmitting(false);
+      close("apply");
+      return;
+    }
+
     await submitSearch({
       query: trimmed,
+      applied: draft,
       categories,
       vehicleBrands: vehicleBrands ?? [],
       allFilters,
@@ -295,12 +333,48 @@ export function SearchPanel({
     else navigate({ to: "/annonser", search: { q: "", category: cat.slug, sort: "new" } });
     close();
   };
+  const applyStructuredSuggestion = (
+    suggestion: ReturnType<typeof buildStructuredSearchSuggestions>[number],
+  ) => {
+    const current = draft.attributes[suggestion.filterKey];
+    const value =
+      current?.kind === "multiselect" && suggestion.value.kind === "multiselect"
+        ? {
+            kind: "multiselect" as const,
+            values: [...new Set([...current.values, ...suggestion.value.values])],
+          }
+        : suggestion.value;
+    updateDraftAttribute(suggestion.filterKey, value);
+    const escaped = suggestion.matchedText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    setLaunchQueryDraft((previous) =>
+      previous.replace(new RegExp(`\\b${escaped}\\b`, "i"), " ").trim(),
+    );
+  };
+
+  const queryContent = (
+    <QueryBrowseContent
+      q={launchQueryDraft}
+      history={history}
+      categories={categories}
+      categorySuggestion={categorySuggestion}
+      filterSuggestions={structuredSuggestions}
+      listingSuggestions={listingSuggestions}
+      onSubmit={() => void submitText(launchQueryDraft)}
+      onPickHistory={(item) => void submitText(item)}
+      onPickCategory={goToCategory}
+      onPickFilter={applyStructuredSuggestion}
+      onClearHistory={() => {
+        clearSearchHistory();
+        setHistory([]);
+      }}
+    />
+  );
 
   const panelContent = (
     <>
       {/* Fritekstfeltet brukes i launch-modus. Et stedspanel viser bare
           lokasjonskontrollen, slik at triggeren åpner riktig oppgave. */}
-      {results ? (
+      {results && !queryMode ? (
         hasDraftCriteria && (
           <div className="flex items-center justify-between gap-2 px-4 pb-3 pt-3">
             {user ? (
@@ -370,7 +444,7 @@ export function SearchPanel({
         </div>
       ) : null}
 
-      {categorySuggestion && !launchFilterMode && (
+      {categorySuggestion && !launchFilterMode && !queryMode && (
         <button
           type="button"
           onClick={() => goToCategory(categorySuggestion)}
@@ -384,13 +458,15 @@ export function SearchPanel({
         </button>
       )}
 
-      {results || launchFilterMode ? (
+      {queryMode ? (
+        queryContent
+      ) : results || launchFilterMode ? (
         <SearchFilterSections
           key={`${open}-${section}`}
           value={draft.value}
           categories={categories}
           setValue={setDraftValue}
-          section={section === "query" ? "categories" : section}
+          section={section}
           queryText={draft.value.terms.join(" ")}
           attributeFilters={results?.attributeFilters ?? allFilters}
           attributeValues={draft.attributes}
@@ -518,8 +594,114 @@ export function SearchPanel({
   );
 }
 
-/** Historikk + kategoriliste — panelets innhold når det ikke står over en
- * resultatflate. Uendret fra `NativeSearchOverlay`, som denne erstatter. */
+/** Forslag og historikk i query-modus. */
+function QueryBrowseContent({
+  q,
+  history,
+  categories,
+  categorySuggestion,
+  filterSuggestions,
+  listingSuggestions,
+  onSubmit,
+  onPickHistory,
+  onPickCategory,
+  onPickFilter,
+  onClearHistory,
+}: {
+  q: string;
+  history: string[];
+  categories: Category[];
+  categorySuggestion: Category | null;
+  filterSuggestions: ReturnType<typeof buildStructuredSearchSuggestions>;
+  listingSuggestions: ListingSuggestion[];
+  onSubmit: () => void;
+  onPickHistory: (item: string) => void;
+  onPickCategory: (category: Category) => void;
+  onPickFilter: (suggestion: ReturnType<typeof buildStructuredSearchSuggestions>[number]) => void;
+  onClearHistory: () => void;
+}) {
+  if (!q.trim()) {
+    return (
+      <BrowseContent
+        q={q}
+        history={history}
+        categories={categories}
+        onPickHistory={onPickHistory}
+        onClearHistory={onClearHistory}
+        onPickCategory={onPickCategory}
+      />
+    );
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <div className="mt-2">
+        <button
+          type="button"
+          onClick={onSubmit}
+          className="native-touch-target flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left text-base hover:bg-muted"
+        >
+          <SearchIcon className="size-4 shrink-0 text-primary" />
+          <span className="truncate">Søk etter «{q.trim()}»</span>
+        </button>
+      </div>
+      {categorySuggestion && (
+        <div className="mt-4">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Kategori
+          </p>
+          <button
+            type="button"
+            onClick={() => onPickCategory(categorySuggestion)}
+            className="native-touch-target flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left text-sm hover:bg-muted"
+          >
+            <FolderOpen className="size-4 shrink-0 text-primary" />
+            <span className="truncate">Gå til {categorySuggestion.name_nb}</span>
+          </button>
+        </div>
+      )}
+      {filterSuggestions.length > 0 && (
+        <div className="mt-4">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Filter
+          </p>
+          {filterSuggestions.map((suggestion) => (
+            <button
+              key={suggestion.id}
+              type="button"
+              onClick={() => onPickFilter(suggestion)}
+              className="native-touch-target flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left text-sm hover:bg-muted"
+            >
+              <SlidersHorizontal className="size-4 shrink-0 text-primary" />
+              <span className="truncate">{suggestion.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {listingSuggestions.length > 0 && (
+        <div className="mt-4">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Annonser
+          </p>
+          {listingSuggestions.map((suggestion) => (
+            <Link
+              key={suggestion.id}
+              to="/$kaupetCode"
+              params={{ kaupetCode: suggestion.kaupet_code }}
+              onClick={() => undefined}
+              className="native-touch-target flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left text-sm hover:bg-muted"
+            >
+              <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
+              <span className="truncate">{suggestion.title}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Historikk og kategoriliste når panelet ikke viser resultater. */
 function BrowseContent({
   q,
   history,

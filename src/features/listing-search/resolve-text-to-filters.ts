@@ -60,9 +60,13 @@ export async function resolveTextToFilters(params: {
   let q = params.q.trim();
   if (!q) return { q, attrPatch: {}, criteria: [] };
   const criterionPositions = new Map<string, number>();
+  const criterionMatchedText = new Map<string, string>();
   const rememberPosition = (key: string, matchedText: string) => {
     const position = params.q.toLocaleLowerCase().indexOf(matchedText.toLocaleLowerCase());
-    criterionPositions.set(key, Math.min(criterionPositions.get(key) ?? Infinity, position));
+    if (position < (criterionPositions.get(key) ?? Infinity)) {
+      criterionPositions.set(key, position);
+      criterionMatchedText.set(key, matchedText);
+    }
   };
 
   // "attribute" is last-priority: it infers a category from a body-type
@@ -152,18 +156,24 @@ export async function resolveTextToFilters(params: {
     }
   }
   q = removeMatchedWords(q, synonymMatches);
-
   q = stripFillerWords(q);
-
   const criteria: InterpretedCriterion[] = [
     ...(categoryMatch
-      ? [{ kind: "category" as const, slug: categoryMatch.categorySlug, source: "text" as const }]
+      ? [
+          {
+            kind: "category" as const,
+            slug: categoryMatch.categorySlug,
+            source: "text" as const,
+            matchedText: categoryMatch.matchedText,
+          },
+        ]
       : []),
     ...Object.entries(attrPatch).map(([key, value]) => ({
       kind: "attribute" as const,
       key,
       value,
       source: "text" as const,
+      matchedText: criterionMatchedText.get(`attribute:${key}`),
     })),
   ].sort((a, b) => {
     const key = (criterion: InterpretedCriterion) =>

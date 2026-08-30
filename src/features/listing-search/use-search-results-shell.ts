@@ -232,9 +232,10 @@ export function useSearchResultsShell({
   // Det globale panelet redigerer samme URL-drevne draft på web og native.
   const searchPanelResults: SearchPanelResultsContext = {
     applied: appliedSearch,
-    onApply: (draft) => {
+    onApply: (draft, criteria) => {
       setQDraft(draft.value.terms.join(" "));
       applyPanelDraft(draft);
+      if (criteria) onInterpreted?.(criteria);
     },
     attributeFilters: attrFilters,
     attributeCounts: facetCounts,

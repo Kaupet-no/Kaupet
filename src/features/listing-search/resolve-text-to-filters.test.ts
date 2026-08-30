@@ -67,18 +67,20 @@ describe("resolveTextToFilters", () => {
 
     expect(resolved.q).toBe("klassiker");
     expect(resolved.criteria).toEqual([
-      { kind: "category", slug: "sofa", source: "text" },
+      { kind: "category", slug: "sofa", source: "text", matchedText: "Sofa" },
       {
         kind: "attribute",
         key: "length_cm",
         value: { kind: "range", max: 300 },
         source: "text",
+        matchedText: "under 300 cm",
       },
       {
         kind: "attribute",
         key: "gearbox",
         value: { kind: "select", value: "automatic" },
         source: "text",
+        matchedText: "automat",
       },
     ]);
   });

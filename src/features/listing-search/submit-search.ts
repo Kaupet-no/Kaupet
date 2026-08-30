@@ -1,47 +1,50 @@
 import { defaultAdvancedSearchValue } from "@/components/advanced-search-value";
 import type { Category } from "@/lib/categories";
 import type { CategoryFilter, VehicleBrandGroup } from "@/lib/category-filters";
-import { resolveTextToFilters } from "./resolve-text-to-filters";
+import { resolveTextToFilters, type InterpretedCriterion } from "./resolve-text-to-filters";
 import {
   writeAppliedSearchState,
   type AppliedSearchState,
   type SearchParams,
 } from "./search-schema";
 
-type SubmitSearchParams = {
+type SearchResolutionParams = {
   applied?: AppliedSearchState;
   query?: string;
   categories?: Category[];
   vehicleBrands?: { name: string; category_group: VehicleBrandGroup }[];
   allFilters?: CategoryFilter[];
-  commit: (search: SearchParams) => void;
 };
 
-/** Resolves optional text and commits the complete applied search to the URL once. */
-export async function submitSearch({
+export type ResolvedAppliedSearch = {
+  applied: AppliedSearchState;
+  criteria: InterpretedCriterion[];
+};
+
+/** Resolves optional text into the complete applied state without committing it. */
+export async function resolveAppliedSearch({
   applied = { value: defaultAdvancedSearchValue(), attributes: {} },
   query,
   categories = [],
   vehicleBrands = [],
   allFilters = [],
-  commit,
-}: SubmitSearchParams): Promise<void> {
-  let next = applied;
+}: SearchResolutionParams): Promise<ResolvedAppliedSearch> {
+  if (query === undefined) return { applied, criteria: [] };
 
-  if (query !== undefined) {
-    const resolved = await resolveTextToFilters({
-      q: query,
-      categories,
-      vehicleBrands,
-      allFilters,
-    }).catch(() => ({
-      q: query.trim(),
-      categorySlug: undefined,
-      attrPatch: {},
-      criteria: [],
-    }));
+  const resolved = await resolveTextToFilters({
+    q: query,
+    categories,
+    vehicleBrands,
+    allFilters,
+  }).catch(() => ({
+    q: query.trim(),
+    categorySlug: undefined,
+    attrPatch: {},
+    criteria: [],
+  }));
 
-    next = {
+  return {
+    applied: {
       value: {
         ...applied.value,
         terms: resolved.q.split(/\s+/).filter(Boolean),
@@ -53,8 +56,22 @@ export async function submitSearch({
               : [],
       },
       attributes: { ...applied.attributes, ...resolved.attrPatch },
-    };
-  }
+    },
+    criteria: resolved.criteria,
+  };
+}
 
-  commit(writeAppliedSearchState(next));
+type SubmitSearchParams = SearchResolutionParams & {
+  commit: (search: SearchParams) => void;
+};
+
+/** Resolves optional text and commits the complete applied search to the URL once. */
+export async function submitSearch({ commit, ...params }: SubmitSearchParams): Promise<void> {
+  if (params.query === undefined) {
+    const applied = params.applied ?? { value: defaultAdvancedSearchValue(), attributes: {} };
+    commit(writeAppliedSearchState(applied));
+    return;
+  }
+  const { applied } = await resolveAppliedSearch(params);
+  commit(writeAppliedSearchState(applied));
 }

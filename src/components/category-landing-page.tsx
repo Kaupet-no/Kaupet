@@ -294,6 +294,9 @@ export function CategoryLandingPage({
             onMapClearLocation={() =>
               updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
             }
+            onMapApplyViewport={(c, radius, label) =>
+              updateSearch({ lat: c.lat, lng: c.lng, radius, loc: label ?? "" })
+            }
             sort={search.sort}
             onSortChange={(s) => updateSearch({ sort: s })}
           />

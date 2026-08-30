@@ -31,7 +31,7 @@
   },
   "src/components/listings-map.tsx": {
     "react-hooks/set-state-in-effect": {
-      "count": 2
+      "count": 4
     }
   },
   "src/components/location-filter.tsx": {

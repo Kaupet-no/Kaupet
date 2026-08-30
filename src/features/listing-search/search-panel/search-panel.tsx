@@ -139,8 +139,8 @@ export function SearchPanel({
       return { ...previous, value };
     });
   const formFactor = useFormFactor();
-  // Nettleser (smal eller bred) får dialog/sidekolonne, native får skuffen.
-  const isWeb = formFactor === "web" || formFactor === "desktop";
+  // Web og native nettbrett får dialog; native telefon får dratt skuff.
+  const isWeb = formFactor === "web" || formFactor === "desktop" || formFactor === "tablet";
   const isTablet = formFactor === "tablet";
   const inputRef = useRef<HTMLInputElement>(null);
   const close = (reason: "cancel" | "apply" = "cancel") => {

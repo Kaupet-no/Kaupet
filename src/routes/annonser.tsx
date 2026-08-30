@@ -805,6 +805,9 @@ function BrowsePage() {
                     loc: undefined,
                   })
                 }
+                onMapApplyViewport={(c, radius, label) =>
+                  updateSearch({ lat: c.lat, lng: c.lng, radius, loc: label ?? "" })
+                }
                 sort={search.sort}
                 onSortChange={(s) => updateSearch({ sort: s })}
                 // Native (fase 12): "Lagre søk" flyttet inn i søkepanelet.

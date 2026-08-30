@@ -27,6 +27,7 @@ import type { MapListing } from "@/components/listings-map";
 import { FeaturedListingsSection } from "@/components/featured-listings-section";
 import { reverseGeocode } from "@/lib/geocode";
 import { hapticImpact } from "@/lib/haptics";
+import { useFormFactor } from "@/hooks/use-form-factor";
 import { getSortChipState } from "@/lib/filter-chip-labels";
 import { SORT_OPTIONS, type SortValue } from "@/lib/categories";
 import type { ZeroResultExpansion } from "@/features/listing-search/zero-result-expansion";
@@ -62,6 +63,11 @@ type Props = {
   onMapCenterChange: (c: { lat: number; lng: number }, label: string | null) => void;
   onMapRadiusChange?: (km: number) => void;
   onMapClearLocation?: () => void;
+  onMapApplyViewport?: (
+    c: { lat: number; lng: number },
+    radiusKm: number,
+    label: string | null,
+  ) => void;
   /** Sorting is a view setting, not a search criterion, so it lives here next
    * to "Skjul kart"/"Lagre søk" instead of in the filter-chip row. */
   sort: SortValue;
@@ -95,6 +101,7 @@ export function ResultList({
   onBrowseCategories,
   mapListings,
   mapCenter,
+  onMapApplyViewport,
   radiusKm,
   onMapCenterChange,
   onMapRadiusChange,
@@ -103,6 +110,9 @@ export function ResultList({
   onSortChange,
   toolbarExtra,
 }: Props) {
+  const formFactor = useFormFactor();
+  const nativePhone = isNative && formFactor === "phone";
+  const nativeTablet = isNative && formFactor === "tablet";
   const [sortOpen, setSortOpen] = useState(false);
   const { label: sortLabel } = getSortChipState(sort);
   const [mobileMapOpen, setMobileMapOpen] = useState(false);
@@ -178,11 +188,21 @@ export function ResultList({
           onMarkerHover={setHoveredId}
           onMarkerSelect={setActiveId}
           onCenterChange={(c) => {
+            if (isNative) return;
             onMapCenterChange(c, "Henter sted…");
             void reverseGeocode(c).then((name) => onMapCenterChange(c, name ?? "Valgt punkt"));
           }}
+          onApplyViewport={(c, radius) => {
+            if (!onMapApplyViewport) return;
+            void reverseGeocode(c).then((name) =>
+              onMapApplyViewport(c, radius, name ?? "Valgt punkt"),
+            );
+          }}
           onRadiusChange={onMapRadiusChange}
           onClearLocation={onMapClearLocation}
+          deferViewport={isNative}
+          edgeToEdge={nativePhone}
+          compactTouchControls={nativePhone}
           className="h-full w-full"
         />
       </Suspense>
@@ -340,7 +360,7 @@ export function ResultList({
               <div className="mt-3 h-[calc(100%-3rem)]">{mobileMapOpen ? renderMap() : null}</div>
             </NativeSheet>
           )}
-          {isDesktop && (
+          {(isDesktop || nativeTablet) && (
             <Button
               type="button"
               variant="outline"
@@ -361,7 +381,11 @@ export function ResultList({
 
       <div
         className={`mt-4 grid gap-6 ${
-          isDesktop && desktopMapVisible && cards.length > 0 ? "lg:grid-cols-[1fr_420px]" : ""
+          isDesktop && desktopMapVisible && cards.length > 0
+            ? "lg:grid-cols-[1fr_420px]"
+            : nativeTablet && desktopMapVisible && cards.length > 0
+              ? "grid-cols-[minmax(320px,1fr)_minmax(320px,0.8fr)]"
+              : ""
         }`}
       >
         <div>
@@ -438,7 +462,7 @@ export function ResultList({
                 viewMode === "list" || viewMode === "card" || viewMode === "images"
                   ? "flex flex-col gap-3"
                   : `grid grid-cols-2 gap-4 sm:grid-cols-3 ${
-                      isDesktop && !desktopMapVisible
+                      (isDesktop || nativeTablet) && !desktopMapVisible
                         ? "lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
                         : ""
                     }`
@@ -506,7 +530,7 @@ export function ResultList({
           )}
         </div>
 
-        {isDesktop && desktopMapVisible && cards.length > 0 && (
+        {(isDesktop || nativeTablet) && desktopMapVisible && cards.length > 0 && (
           <aside>
             <div className="sticky top-20 h-[calc(100vh-6rem)]">
               <div className="relative h-full overflow-hidden rounded-2xl border border-border shadow-sm">
@@ -544,20 +568,35 @@ export function ResultList({
         )}
       </div>
 
-      {/* Native kart-FAB + Sheet */}
+      {/* Native kart åpnes som en fullskjerm takeover, slik at kartet får
+          samme edge-to-edge-opplevelse som andre native medieflater. */}
       {isNative && (
         <>
-          <NativeSheet
-            open={mobileMapOpen}
-            onOpenChange={setMobileMapOpen}
-            title="Kart"
-            titleVisible
-            expandable
-            initialSnapPoint={1}
-            className="h-full p-4"
-          >
-            <div className="mt-3 h-[calc(100%-3rem)]">{mobileMapOpen ? renderMap() : null}</div>
-          </NativeSheet>
+          <FullscreenOverlay open={mobileMapOpen} onOpenChange={setMobileMapOpen}>
+            <FullscreenOverlayContent title="Kart over søkeresultater" edgeToEdge>
+              <div className="flex h-full flex-col bg-background">
+                <div className="pt-safe flex shrink-0 items-center justify-between border-b border-border px-4 pb-3">
+                  <div>
+                    <h2 className="text-base font-semibold">Kart</h2>
+                    <p className="text-xs text-muted-foreground">
+                      {mapListings.length} mulige treff
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="native-touch-target"
+                    onClick={() => setMobileMapOpen(false)}
+                    aria-label="Lukk kart"
+                  >
+                    <X className="size-5" />
+                  </Button>
+                </div>
+                <div className="min-h-0 flex-1">{mobileMapOpen ? renderMap() : null}</div>
+              </div>
+            </FullscreenOverlayContent>
+          </FullscreenOverlay>
           <button
             type="button"
             onClick={() => {
@@ -565,12 +604,12 @@ export function ResultList({
               trackProductEvent("search_map_opened", { source: "map_button" });
               setMobileMapOpen(true);
             }}
-            className="fixed bottom-[calc(var(--app-bottom-nav-h)+1rem)] right-4 z-50 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg active:scale-95 transition"
+            className="fixed bottom-[calc(var(--app-bottom-nav-h)+1rem)] right-4 z-50 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition active:scale-95"
             aria-label="Vis kart"
           >
             <MapIcon className="size-6" />
             {mapListings.length > 0 && (
-              <span className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white">
+              <span className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-accent-foreground">
                 {mapListings.length > 99 ? "99+" : mapListings.length}
               </span>
             )}

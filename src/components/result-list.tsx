@@ -607,7 +607,7 @@ export function ResultList({
           >
             <MapIcon className="size-6" />
             {mapListings.length > 0 && (
-              <span className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-accent-foreground">
+              <span className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-accent text-2xs font-bold text-accent-foreground">
                 {mapListings.length > 99 ? "99+" : mapListings.length}
               </span>
             )}

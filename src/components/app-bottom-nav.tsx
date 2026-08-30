@@ -93,7 +93,7 @@ export function AppBottomNav() {
             />
           </span>
           <span
-            className={`text-[11px] ${isOnHome ? "font-medium text-primary" : "text-muted-foreground"}`}
+            className={`native-nav-label ${isOnHome ? "font-medium text-primary" : "text-muted-foreground"}`}
           >
             Hjem
           </span>
@@ -116,7 +116,7 @@ export function AppBottomNav() {
             <Search className="size-6" />
           </button>
           <span
-            className={`text-[11px] ${isOnSearch ? "font-medium text-primary" : "text-muted-foreground"}`}
+            className={`native-nav-label ${isOnSearch ? "font-medium text-primary" : "text-muted-foreground"}`}
           >
             Søk
           </span>
@@ -157,7 +157,7 @@ export function AppBottomNav() {
               <Plus className="size-8" />
             </Link>
           )}
-          <span className="text-[11px] text-muted-foreground">
+          <span className="native-nav-label text-muted-foreground">
             {isOnNewAdPage ? "Avbryt" : "Ny annonse"}
           </span>
         </div>
@@ -179,7 +179,7 @@ export function AppBottomNav() {
             </button>
           )}
           <span
-            className={`text-[11px] ${isOnMeldinger ? "font-medium text-primary" : "text-muted-foreground"}`}
+            className={`native-nav-label ${isOnMeldinger ? "font-medium text-primary" : "text-muted-foreground"}`}
           >
             Meldinger
           </span>
@@ -199,7 +199,7 @@ export function AppBottomNav() {
             </Link>
           )}
           <span
-            className={`text-[11px] ${isOnMeg ? "font-medium text-primary" : "text-muted-foreground"}`}
+            className={`native-nav-label ${isOnMeg ? "font-medium text-primary" : "text-muted-foreground"}`}
           >
             {user ? "Meg" : "Logg inn"}
           </span>

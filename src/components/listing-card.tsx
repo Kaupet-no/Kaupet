@@ -105,7 +105,7 @@ function ListingImage({
       className={`flex size-full flex-col items-center justify-center gap-1 bg-muted text-muted-foreground ${compact ? "" : "text-xs"}`}
     >
       <ImageOff className={compact ? "size-4" : "size-5"} strokeWidth={1.5} />
-      <span className={compact ? "text-[11px]" : ""}>Ingen bilde</span>
+      <span className={compact ? "text-xs" : ""}>Ingen bilde</span>
     </div>
   );
 }

@@ -278,7 +278,7 @@ export function InboxPage() {
               </p>
             </div>
             {unreadSystemCount > 0 && (
-              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[10px] font-semibold text-accent-foreground">
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-2xs font-semibold text-accent-foreground">
                 {unreadSystemCount}
               </span>
             )}
@@ -356,7 +356,7 @@ export function InboxPage() {
                   </div>
                   {g.unreadCount > 0 && (
                     <span
-                      className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[10px] font-semibold text-accent-foreground"
+                      className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-2xs font-semibold text-accent-foreground"
                       aria-label={`${g.unreadCount} uleste`}
                     >
                       {g.unreadCount}

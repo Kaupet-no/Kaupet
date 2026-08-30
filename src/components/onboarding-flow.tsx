@@ -158,7 +158,7 @@ export function OnboardingFlow({ onComplete }: Props) {
       >
         {/* Cards container */}
         <div
-          className={`flex-1 transition-opacity duration-700 ${finishing ? "opacity-0" : "opacity-100"}`}
+          className={`min-h-0 flex-1 transition-opacity duration-700 ${finishing ? "opacity-0" : "opacity-100"}`}
         >
           <div
             ref={scrollRef}
@@ -167,7 +167,7 @@ export function OnboardingFlow({ onComplete }: Props) {
           >
             {/* Card 1: Welcome */}
             <div
-              className="flex h-full w-full flex-none snap-center flex-col items-center justify-center px-8 text-center"
+              className="flex h-full w-full flex-none snap-center flex-col items-center justify-center overflow-y-auto px-8 py-8 text-center"
               aria-hidden={activeCard !== "welcome"}
               inert={activeCard !== "welcome"}
             >
@@ -215,7 +215,7 @@ export function OnboardingFlow({ onComplete }: Props) {
             {/* Card 2: Notifications */}
             {showPushOffer && (
               <div
-                className="flex h-full w-full flex-none snap-center flex-col items-center justify-center px-8 text-center"
+                className="flex h-full w-full flex-none snap-center flex-col items-center justify-center overflow-y-auto px-8 py-8 text-center"
                 aria-hidden={activeCard !== "notifications"}
                 inert={activeCard !== "notifications"}
               >
@@ -244,7 +244,7 @@ export function OnboardingFlow({ onComplete }: Props) {
             {/* Card 3: Location */}
             {user && (
               <div
-                className="flex h-full w-full flex-none snap-center flex-col items-center justify-center px-8 text-center"
+                className="flex h-full w-full flex-none snap-center flex-col items-center justify-center overflow-y-auto px-8 py-8 text-center"
                 aria-hidden={activeCard !== "location"}
                 inert={activeCard !== "location"}
               >

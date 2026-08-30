@@ -51,7 +51,7 @@ export function renderWithDayDividers(
       out.push(
         <div
           key={`d-${m.id}`}
-          className="my-2 text-center text-[11px] uppercase tracking-wide text-muted-foreground"
+          className="my-2 text-center text-xs uppercase tracking-wide text-muted-foreground"
         >
           {day}
         </div>,

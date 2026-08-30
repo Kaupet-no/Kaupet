@@ -44,6 +44,13 @@
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
 
+  /* Nytt, mindre trinn for kompakte etiketter (bunnnav, ulest-merker) som
+     tidligere brukte faste text-[10px]/text-[11px] og dermed aldri fulgte
+     brukerens Dynamic Type-innstilling. Må stå i @theme (ikke bare :root)
+     for at Tailwind skal generere text-2xs-utiliteten i det hele tatt. */
+  --text-2xs: calc(0.625rem * var(--kaupet-text-scale));
+  --text-2xs--line-height: calc(1 / 0.625);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -117,6 +124,33 @@
   --density-task-gap: 0.75rem;
   --density-data-block: 0.75rem;
   --density-data-gap: 0.5rem;
+
+  /* Dynamic Type-skala satt av src/lib/text-scale.ts (kun iOS-native).
+     Standard er 1 — uendret oppførsel på web og Android. */
+  --kaupet-text-scale: 1;
+}
+
+/* Overstyrer Tailwinds egne `--text-*`-temavariabler (xs–7xl) med Dynamic
+   Type-skalaen (src/lib/text-scale.ts). Dette er en vanlig, ulaget
+   `:root`-regel, ikke en `@theme`-blokk — Tailwinds egne standardtokens
+   ligger i @layer theme, og ulagede regler vinner alltid over lagede regler
+   i kaskaden uansett rekkefølge/spesifisitet (verifisert i devtools).
+   `--text-*--line-height` er allerede enhetsløse forhold (f.eks.
+   `calc(1.25 / .875)`), så de holder riktig proporsjon automatisk uten å
+   måtte skaleres separat her. `--text-2xs` er registrert i @theme inline
+   over (nødvendig for at utiliteten skal genereres), ikke her. */
+:root {
+  --text-xs: calc(0.75rem * var(--kaupet-text-scale));
+  --text-sm: calc(0.875rem * var(--kaupet-text-scale));
+  --text-base: calc(1rem * var(--kaupet-text-scale));
+  --text-lg: calc(1.125rem * var(--kaupet-text-scale));
+  --text-xl: calc(1.25rem * var(--kaupet-text-scale));
+  --text-2xl: calc(1.5rem * var(--kaupet-text-scale));
+  --text-3xl: calc(1.875rem * var(--kaupet-text-scale));
+  --text-4xl: calc(2.25rem * var(--kaupet-text-scale));
+  --text-5xl: calc(3rem * var(--kaupet-text-scale));
+  --text-6xl: calc(3.75rem * var(--kaupet-text-scale));
+  --text-7xl: calc(4.5rem * var(--kaupet-text-scale));
 }
 
 .dark {
@@ -339,6 +373,18 @@
 .native .native-touch-target {
   min-width: 3rem;
   min-height: 3rem;
+}
+
+/* Bunnnavigasjonens etiketter (5 kolonner i en fast bredde pille) tåler ikke
+   full Dynamic Type-skalering uten å bryte sammen eller overlappe — samme
+   avveining Apples egen UITabBar gjør ved å dempe skaleringstaket for
+   kompakt chrome-tekst i stedet for å følge brødtekstens fulle skala.
+   Demper derfor til maks 1,3x her, i stedet for `text-2xs`/`text-xs` sin
+   fulle 2x. Reelt Dynamic Type-vekst (om enn dempet) er fortsatt bedre enn
+   den tidligere faste `text-[11px]` som aldri fulgte brukerens valg. */
+.native-nav-label {
+  font-size: calc(0.6875rem * clamp(1, var(--kaupet-text-scale, 1), 1.3));
+  line-height: 1.2;
 }
 
 .native .native-hit-area {

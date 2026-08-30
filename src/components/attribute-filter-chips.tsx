@@ -581,7 +581,7 @@ export function AttributeFilterChips({
         <FilterChip
           label={condLabel}
           active={condActive}
-          icon={!isCard ? <span className="text-[11px]">✦</span> : undefined}
+          icon={!isCard ? <span className="text-xs">✦</span> : undefined}
           {...fieldProps}
           fieldLabel="Tilstand"
         />
@@ -650,8 +650,8 @@ export function AttributeFilterChips({
         <span
           className={
             isCard
-              ? "flex size-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white"
-              : "absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white"
+              ? "flex size-4 items-center justify-center rounded-full bg-accent text-2xs font-bold text-white"
+              : "absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full bg-accent text-2xs font-bold text-white"
           }
         >
           {secondaryCount}

@@ -168,14 +168,12 @@ export function OwnerStatsPanel({
         <div className="rounded-lg bg-card p-2">
           <Eye className="mx-auto size-4 text-muted-foreground" />
           <dd className="mt-1 font-display text-lg leading-none">{stats?.total_views ?? "–"}</dd>
-          <dt className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-            Visninger
-          </dt>
+          <dt className="mt-1 text-2xs uppercase tracking-wide text-muted-foreground">Visninger</dt>
         </div>
         <div className="rounded-lg bg-card p-2">
           <Heart className="mx-auto size-4 text-muted-foreground" />
           <dd className="mt-1 font-display text-lg leading-none">{stats?.favorite_count ?? "–"}</dd>
-          <dt className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+          <dt className="mt-1 text-2xs uppercase tracking-wide text-muted-foreground">
             Favoritter
           </dt>
         </div>
@@ -214,7 +212,7 @@ export function OwnerStatsPanel({
                 </span>
               </li>
             </ul>
-            <p className="mt-3 rounded-md bg-muted/60 p-2 text-[11px] leading-relaxed">
+            <p className="mt-3 rounded-md bg-muted/60 p-2 text-xs leading-relaxed">
               Tallene kan være noe unøyaktige fordi vi ikke sporer brukere på tvers av nettlesere
               eller økter. Bytter noen nettleser eller rydder data, telles de på nytt.
             </p>

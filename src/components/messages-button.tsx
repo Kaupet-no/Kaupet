@@ -195,7 +195,7 @@ export function MessagesButton() {
       <MessageCircle className="size-5" />
       {unreadCount > 0 && (
         <span
-          className="pointer-events-none absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-accent-foreground"
+          className="pointer-events-none absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-2xs font-semibold text-accent-foreground"
           aria-hidden="true"
         >
           {unreadCount > 9 ? "9+" : unreadCount}

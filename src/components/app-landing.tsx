@@ -11,7 +11,7 @@ import { useSearchPanel } from "@/features/listing-search/search-panel/search-pa
 
 export function AppLanding() {
   const { openPanel, savedLocation } = useSearchPanel();
-  const { popular } = usePopularListings(10);
+  const { popular, hasPopularitySignal } = usePopularListings(10);
   const isTablet = useFormFactor() === "tablet";
   const searchExamples = useDefaultSearchExamples();
   const hasLocation = savedLocation.lat != null && savedLocation.lng != null;
@@ -92,7 +92,7 @@ export function AppLanding() {
       <section className="mt-2 pl-5" aria-labelledby="popular-heading">
         <div className="mb-3 flex items-center justify-between pr-5">
           <h2 id="popular-heading" className="font-display text-lg tracking-tight">
-            Populært nå
+            {hasPopularitySignal ? "Populært nå" : "Nye annonser"}
           </h2>
           <button
             type="button"

@@ -215,7 +215,7 @@ function WebLanding() {
     () => findCategorySuggestion(categories ?? [], qDraft),
     [qDraft, categories],
   );
-  const { popular, popularIsError, refetchPopular } = usePopularListings();
+  const { popular, popularIsError, refetchPopular, hasPopularitySignal } = usePopularListings();
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -681,6 +681,7 @@ function WebLanding() {
               isError={popularIsError}
               onRetry={() => void refetchPopular()}
               autoplay={autoplay}
+              hasPopularitySignal={hasPopularitySignal}
             />
           </section>
 

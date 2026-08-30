@@ -40,5 +40,11 @@ export function usePopularListings(limit = 8) {
     },
   });
 
-  return { popular, popularIsError, refetchPopular };
+  // Ikke reell popularitet før minst én annonse faktisk har blitt sett i
+  // løpet av uken — helt i starten (eller ved lavt volum) vil listen bare
+  // være nyeste-først (RPC-ens egen NULLS LAST-fallback), og da skal
+  // overskriften si "Nye annonser", ikke late som noe er "populært".
+  const hasPopularitySignal = (popular ?? []).some((l) => (l.views_last_week ?? 0) > 0);
+
+  return { popular, popularIsError, refetchPopular, hasPopularitySignal };
 }

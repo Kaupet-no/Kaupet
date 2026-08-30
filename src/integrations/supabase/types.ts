@@ -915,6 +915,7 @@ export type Database = {
           display_lng: number | null
           draft_expiry_notified_at: string | null
           expires_at: string | null
+          hidden_from_home: boolean
           id: string
           is_free: boolean
           kaupet_code: string
@@ -949,6 +950,7 @@ export type Database = {
           display_lng?: number | null
           draft_expiry_notified_at?: string | null
           expires_at?: string | null
+          hidden_from_home?: boolean
           id?: string
           is_free?: boolean
           kaupet_code?: string
@@ -983,6 +985,7 @@ export type Database = {
           display_lng?: number | null
           draft_expiry_notified_at?: string | null
           expires_at?: string | null
+          hidden_from_home?: boolean
           id?: string
           is_free?: boolean
           kaupet_code?: string
@@ -2178,6 +2181,7 @@ export type Database = {
         Args: { _limit?: number; _query?: string; _status?: string }
         Returns: {
           created_at: string
+          hidden_from_home: boolean
           id: string
           kaupet_code: string
           seller_id: string
@@ -2185,6 +2189,10 @@ export type Database = {
           status: Database["public"]["Enums"]["listing_status"]
           title: string
         }[]
+      }
+      admin_set_listing_home_visibility: {
+        Args: { _hidden: boolean; _id: string }
+        Returns: undefined
       }
       admin_suspend_user: {
         Args: { _days?: number; _reason: string; _user_id: string }

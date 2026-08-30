@@ -23,11 +23,16 @@ export function PopularCarousel({
   isError,
   onRetry,
   autoplay,
+  hasPopularitySignal,
 }: {
   popular: ListingCardData[] | undefined;
   isError: boolean;
   onRetry: () => void;
   autoplay: React.RefObject<ReturnType<typeof Autoplay>>;
+  /** Vis "Nye annonser" i stedet for "Populært akkurat nå" når ingen av
+   * annonsene faktisk har reelle visninger ennå (tidlig fase / lavt volum) —
+   * se usePopularListings. */
+  hasPopularitySignal: boolean;
 }) {
   const isLoading = popular === undefined;
 
@@ -38,7 +43,9 @@ export function PopularCarousel({
   return (
     <div>
       <div className="mb-6 flex items-end justify-between gap-4">
-        <h2 className="font-display text-2xl tracking-tight">Populært akkurat nå</h2>
+        <h2 className="font-display text-2xl tracking-tight">
+          {hasPopularitySignal ? "Populært akkurat nå" : "Nye annonser"}
+        </h2>
         <Link
           to="/annonser"
           search={{ q: "", category: "", sort: "new" }}

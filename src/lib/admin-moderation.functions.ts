@@ -34,6 +34,19 @@ export const adminEnableListing = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const adminSetListingHomeVisibility = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((i: unknown) => z.object({ id: uuid, hidden: z.boolean() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    const { error } = await context.supabase.rpc("admin_set_listing_home_visibility", {
+      _id: data.id,
+      _hidden: data.hidden,
+    });
+    if (error) throw error;
+    return { ok: true };
+  });
+
 export const adminBanUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((i: unknown) => z.object({ userId: uuid, reason }).parse(i))

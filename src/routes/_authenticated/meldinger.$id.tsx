@@ -711,6 +711,13 @@ function ConversationPage() {
             value={body}
             onChange={(e) => setBody(e.target.value)}
             onKeyDown={(e) => {
+              // Enter-for-å-sende er en tastatursnarvei for fysisk tastatur
+              // (desktop/web), der Shift+Enter gir linjeskift. Native
+              // mobiltastaturer har ingen pålitelig Shift-tilstand å skille
+              // på, og retur-tasten er brukerens eneste måte å skrive en
+              // flerlinjers melding på - der skal Enter derfor gi linjeskift
+              // som normalt, og Send-knappen sender.
+              if (native) return;
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 if (!sendMutation.isPending && !disabled && (body.trim() || attachment)) {

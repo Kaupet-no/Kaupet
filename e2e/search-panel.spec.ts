@@ -53,6 +53,43 @@ test("søker fra native hjem og lander på delbar resultat-URL", async ({ page }
   await expect(page).toHaveURL(/\/annonser\?.*q=sykkel/);
   await expect(page.getByRole("button", { name: /sykkel/ })).toBeVisible();
 });
+test("søker i nytt kartområde uten å endre URL før eksplisitt handling", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route("**/nominatim.openstreetmap.org/reverse**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ address: { city: "Oslo", country_code: "no" } }),
+    });
+  });
+  await page.goto(`/annonser?forcenative&q=${filterFixture.query}&sort=new`);
+  await page.locator("html[data-kaupet-hydrated='true']").waitFor();
+
+  const mapButton = page.getByRole("button", { name: "Vis kart" });
+  await expect(mapButton).toBeVisible();
+  await mapButton.click();
+
+  const mapDialog = page.getByRole("dialog", { name: "Kart over søkeresultater" });
+  await expect(mapDialog).toBeVisible();
+  await expect(mapDialog.getByText("Kartverket")).toBeVisible();
+  const map = mapDialog.locator(".leaflet-container");
+  await expect(map).toBeVisible();
+  const box = await map.boundingBox();
+  expect(box).not.toBeNull();
+  const startX = box!.x + box!.width / 2;
+  const startY = box!.y + box!.height / 2;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + 48, startY + 24);
+  await page.mouse.up();
+
+  const searchAreaButton = mapDialog.getByRole("button", { name: "Søk i dette området" });
+  await expect(searchAreaButton).toBeVisible();
+  const before = page.url();
+  await searchAreaButton.click();
+  await expect(page).not.toHaveURL(before);
+  await expect(page).toHaveURL(/[?&]lat=/);
+});
 
 test("holder filter som utkast frem til brukeren anvender dem", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });

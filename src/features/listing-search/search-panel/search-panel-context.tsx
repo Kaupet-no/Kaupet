@@ -6,15 +6,14 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
-import { useNavigate, useRouterState } from "@tanstack/react-router";
 
 import { useCategories, visibleCategories } from "@/hooks/use-categories";
 import { useAllCategoryFilters } from "@/components/attribute-fields";
-import type { SearchPanelResultsContext } from "./search-panel";
-import type { SearchFilterSection } from "./filter-sections";
+import { useSavedLocation } from "@/hooks/use-saved-location";
+import type { LocationValue } from "@/components/location-filter";
+import type { SearchPanelResultsContext, SearchPanelSection } from "./search-panel";
 
 const SearchPanel = lazy(() =>
   import("./search-panel").then((module) => ({ default: module.SearchPanel })),
@@ -22,13 +21,12 @@ const SearchPanel = lazy(() =>
 
 type Ctx = {
   open: boolean;
-  /** Åpner det globale panelet. Uten en registrert resultatkontekst og uten
-   * å allerede stå på /annonser, navigerer den dit først — panelet lever i
-   * root og blir stående gjennom rutebyttet, og bytter selv fra
-   * lanserings- til resultatmodus når /annonser registrerer seg. */
-  openPanel: (section?: SearchFilterSection) => void;
+  /** Åpner det globale panelet uten å navigere eller anvende et utkast. */
+  openPanel: (section?: SearchPanelSection) => void;
   closePanel: () => void;
   registerResults: (ctx: SearchPanelResultsContext | null) => void;
+  savedLocation: LocationValue;
+  setSavedLocation: (location: LocationValue) => void;
 };
 
 const SearchPanelCtx = createContext<Ctx | null>(null);
@@ -39,20 +37,11 @@ const SearchPanelCtx = createContext<Ctx | null>(null);
  * åpne, så panelet må leve over rutene, i `__root.tsx`.
  */
 export function SearchPanelProvider({ children }: { children: React.ReactNode }) {
-  const navigate = useNavigate();
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [open, setOpen] = useState(false);
   const [panelRequested, setPanelRequested] = useState(false);
-  const [section, setSection] = useState<SearchFilterSection>("categories");
+  const [section, setSection] = useState<SearchPanelSection>("query");
   const [results, setResults] = useState<SearchPanelResultsContext | null>(null);
-  // Mirrors `results` for `openPanel`'s "is a page already showing results"
-  // check, kept out of that callback's own dependency array — otherwise
-  // `openPanel`'s identity would change every time a page re-registers (which
-  // happens on essentially every re-render, since the registered object is
-  // rebuilt each time), which changes the memoized context value, which
-  // re-renders every consumer — including the page that just registered —
-  // which rebuilds the object and registers again: an infinite loop.
-  const hasResultsRef = useRef(false);
+  const [savedLocation, setSavedLocation] = useSavedLocation();
 
   const { data: allCategoriesRaw } = useCategories();
   const categories = useMemo(
@@ -62,26 +51,26 @@ export function SearchPanelProvider({ children }: { children: React.ReactNode })
 
   const { data: allFilters } = useAllCategoryFilters();
 
-  const openPanel = useCallback(
-    (s?: SearchFilterSection) => {
-      if (s) setSection(s);
-      setPanelRequested(true);
-      if (!hasResultsRef.current && pathname !== "/annonser") {
-        void navigate({ to: "/annonser", search: { q: "", category: "", sort: "new" } });
-      }
-      setOpen(true);
-    },
-    [pathname, navigate],
-  );
+  const openPanel = useCallback((s: SearchPanelSection = "query") => {
+    setSection(s);
+    setPanelRequested(true);
+    setOpen(true);
+  }, []);
   const closePanel = useCallback(() => setOpen(false), []);
   const registerResults = useCallback((ctx: SearchPanelResultsContext | null) => {
-    hasResultsRef.current = ctx != null;
     setResults(ctx);
   }, []);
 
   const value = useMemo<Ctx>(
-    () => ({ open, openPanel, closePanel, registerResults }),
-    [open, openPanel, closePanel, registerResults],
+    () => ({
+      open,
+      openPanel,
+      closePanel,
+      registerResults,
+      savedLocation,
+      setSavedLocation,
+    }),
+    [open, openPanel, closePanel, registerResults, savedLocation, setSavedLocation],
   );
 
   return (
@@ -96,6 +85,8 @@ export function SearchPanelProvider({ children }: { children: React.ReactNode })
             allFilters={allFilters ?? []}
             initialSection={section}
             results={results ?? undefined}
+            savedLocation={savedLocation}
+            onSavedLocationChange={setSavedLocation}
           />
         </Suspense>
       )}

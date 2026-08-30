@@ -59,7 +59,7 @@ export function SiteHeader() {
                 input.focus({ preventScroll: true });
                 return;
               }
-              openPanel("categories");
+              openPanel("query");
             }}
           >
             <Search className="size-5" />

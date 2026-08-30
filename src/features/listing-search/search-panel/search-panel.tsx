@@ -14,6 +14,7 @@ import {
   type AdvancedSearchValue,
 } from "@/components/advanced-search-value";
 import { findCategorySuggestion, type Category } from "@/lib/categories";
+import type { LocationValue } from "@/components/location-filter";
 import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
 import { hapticImpact } from "@/lib/haptics";
 import { useAuth } from "@/hooks/use-auth";
@@ -31,6 +32,8 @@ import { trackProductEvent } from "@/lib/product-analytics";
 import { expandSheetBeforeScroll } from "@/lib/sheet-gestures";
 import { useDraftResultCount } from "@/features/listing-search/use-draft-result-count";
 import { searchDraftMatchesApplied } from "./search-panel-utils";
+
+export type SearchPanelSection = SearchFilterSection | "query";
 
 /** Panelet har to detents: delvis høyde (resultatlisten er fortsatt synlig
  * bak) og fullskjerm. Brukeren drar mellom dem. */
@@ -63,14 +66,24 @@ function cloneSearchState(applied: AppliedSearchState): AppliedSearchState {
   return { value: cloneValue(applied.value), attributes: { ...applied.attributes } };
 }
 
+function createLaunchState(location?: LocationValue): AppliedSearchState {
+  const value = defaultAdvancedSearchValue();
+  return {
+    value: { ...value, location: location ?? value.location },
+    attributes: {},
+  };
+}
+
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   categories: Category[];
   allFilters: CategoryFilter[];
   /** Fanen panelet åpner på — lar sammendrag-pillen hoppe rett til Pris/Sted. */
-  initialSection?: SearchFilterSection;
+  initialSection?: SearchPanelSection;
   results?: SearchPanelResultsContext;
+  savedLocation?: LocationValue;
+  onSavedLocationChange?: (location: LocationValue) => void;
 };
 
 /**
@@ -88,8 +101,10 @@ export function SearchPanel({
   onOpenChange,
   categories,
   allFilters,
-  initialSection = "categories",
+  initialSection = "query",
   results,
+  savedLocation,
+  onSavedLocationChange,
 }: Props) {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -98,18 +113,17 @@ export function SearchPanel({
   const [history, setHistory] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
-  const [section, setSection] = useState<SearchFilterSection>(initialSection);
+  const [section, setSection] = useState<SearchPanelSection>(initialSection);
   const [snap, setSnap] = useState<number | string | null>(SNAP_POINTS[0]);
   const [draft, setDraft] = useState<AppliedSearchState>(() =>
-    results
-      ? cloneSearchState(results.applied)
-      : { value: defaultAdvancedSearchValue(), attributes: {} },
+    results ? cloneSearchState(results.applied) : createLaunchState(savedLocation),
   );
   const setDraftValue = (next: SetStateAction<AdvancedSearchValue>) =>
-    setDraft((previous) => ({
-      ...previous,
-      value: typeof next === "function" ? next(previous.value) : next,
-    }));
+    setDraft((previous) => {
+      const value = typeof next === "function" ? next(previous.value) : next;
+      if (!results) onSavedLocationChange?.(value.location);
+      return { ...previous, value };
+    });
   const formFactor = useFormFactor();
   // Nettleser (smal eller bred) får dialog/sidekolonne, native får skuffen.
   const isWeb = formFactor === "web" || formFactor === "desktop";
@@ -131,9 +145,8 @@ export function SearchPanel({
 
   useEffect(() => {
     if (!open) return;
-    if (results) {
-      setDraft(cloneSearchState(results.applied));
-    }
+    setDraft(results ? cloneSearchState(results.applied) : createLaunchState(savedLocation));
+    setLaunchQueryDraft("");
     setSection(initialSection);
     setSnap(SNAP_POINTS[0]);
     setHistory(getSearchHistory());
@@ -358,9 +371,9 @@ export function SearchPanel({
         <SearchFilterSections
           key={`${open}-${section}`}
           value={draft.value}
-          setValue={setDraftValue}
           categories={categories}
-          section={section}
+          setValue={setDraftValue}
+          section={section === "query" ? "categories" : section}
           queryText={draft.value.terms.join(" ")}
           attributeFilters={results.attributeFilters}
           attributeValues={draft.attributes}

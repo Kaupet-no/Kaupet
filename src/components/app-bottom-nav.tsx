@@ -106,7 +106,7 @@ export function AppBottomNav() {
             onClick={() => {
               void hapticImpact("light");
               trackProductEvent("search_opened", { source: "bottom_nav" });
-              openPanel("categories");
+              openPanel("query");
             }}
             className={`flex h-11 w-11 items-center justify-center rounded-full ${
               isOnSearch ? "text-primary" : "text-muted-foreground"

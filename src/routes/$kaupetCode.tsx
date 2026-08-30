@@ -675,13 +675,17 @@ function ListingDetailPage() {
       stickyContactSlot={
         !isOwner ? (
           <Button
-            size="sm"
-            className="gap-2"
+            size="native"
+            className="flex-1 gap-2 sm:flex-none"
             onClick={() => contactMutation.mutate()}
             disabled={contactMutation.isPending}
           >
             <MessageCircle className="size-4" />
-            {contactMutation.isPending ? "Åpner…" : "Send melding"}
+            {contactMutation.isPending
+              ? "Åpner…"
+              : user
+                ? "Send melding"
+                : "Logg inn for å sende melding"}
           </Button>
         ) : undefined
       }

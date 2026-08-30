@@ -241,7 +241,12 @@ export function ListingDetailView({
 
   const sortedImages = images.slice().sort((a, b) => a.sort_order - b.sort_order);
   const has360 = !!vehicle360Frames && vehicle360Frames.length > 0;
-  const showStickyContact = !isNative && !!stickyContactSlot;
+  // Persistent kontakthandling er kjøperreisens primære konvertering — skal
+  // ikke avhenge av at brukeren scroller forbi bilder/spesifikasjoner for å
+  // finne selgerkortet. Vist på både native og mobilweb (samme fysiske
+  // formfaktor); desktop web har allerede kontaktpanelet synlig i
+  // sidekolonnen uten scroll, se md:hidden på selve baren under.
+  const showStickyContact = !!stickyContactSlot;
 
   const priceLabel = isFree
     ? "Gis bort"
@@ -1157,8 +1162,16 @@ function ListingDetailViewBody({
 
       {showStickyContact && (
         <div
-          className="px-safe fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 py-3 backdrop-blur md:hidden"
-          style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}
+          className="px-safe fixed inset-x-0 z-40 border-t border-border bg-background/95 py-3 backdrop-blur md:hidden"
+          style={
+            isNative
+              ? // Bunnavigasjonen (AppBottomNav) ligger fast under denne
+                // siden med z-50 — baren må stå over den, ikke bak den, og
+                // trenger ikke egen safe-area-padding siden tab-baren
+                // allerede reserverer den.
+                { bottom: "var(--app-bottom-nav-h)" }
+              : { bottom: 0, paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }
+          }
         >
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
             <p className="font-display text-lg leading-none text-primary">{priceLabel}</p>

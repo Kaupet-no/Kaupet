@@ -246,7 +246,7 @@ function MineSokPage() {
                           {unread > 0 && (
                             <Link
                               to="/varsler"
-                              className="inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-accent-foreground hover:opacity-90"
+                              className="inline-flex items-center gap-1 rounded-full bg-brand px-2 py-0.5 text-xs font-semibold text-brand-foreground hover:opacity-90"
                             >
                               {unread} {unread === 1 ? "nytt treff" : "nye treff"}
                             </Link>

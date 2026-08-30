@@ -57,7 +57,7 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
         </DialogHeader>
 
         {/* Preview card */}
-        <div className="rounded-2xl border border-accent/30 bg-accent/5 p-3">
+        <div className="rounded-2xl border border-brand/30 bg-brand/5 p-3">
           <div className="mb-2 flex items-center gap-2">
             <p className="font-display text-xs uppercase tracking-wide text-muted-foreground">
               Promoterte annonser

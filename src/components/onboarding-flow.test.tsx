@@ -52,7 +52,11 @@ beforeEach(() => {
   mocks.requestLocationPermission.mockClear();
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
-    value: vi.fn().mockReturnValue({ matches: true }),
+    value: vi.fn().mockReturnValue({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }),
   });
   Object.defineProperty(HTMLElement.prototype, "scrollTo", {
     configurable: true,

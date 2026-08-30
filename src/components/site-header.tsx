@@ -38,7 +38,7 @@ export function SiteHeader() {
           <span className="font-display text-2xl font-semibold tracking-tight text-primary">
             kaupet
           </span>
-          <span className="font-display text-2xl text-accent">.</span>
+          <span className="font-display text-2xl text-brand">.</span>
           <span className="font-display text-xl text-muted-foreground">no</span>
         </Link>
 
@@ -92,12 +92,16 @@ function MessagesIconLink() {
   const unread = useUnreadConversationsCount();
   return (
     <Button asChild variant="ghost" size="icon">
-      <Link to="/meldinger" aria-label="Meldinger" className="relative">
+      <Link
+        to="/meldinger"
+        aria-label={unread > 0 ? `Meldinger, ${unread} uleste` : "Meldinger"}
+        className="relative"
+      >
         <MessageCircle className="size-5" />
         {unread > 0 && (
           <span
-            className="pointer-events-none absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-2xs font-semibold text-accent-foreground"
-            aria-label={`${unread} uleste samtaler`}
+            className="pointer-events-none absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-2xs font-semibold text-brand-foreground"
+            aria-hidden="true"
           >
             {unread > 9 ? "9+" : unread}
           </span>

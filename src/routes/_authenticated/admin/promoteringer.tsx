@@ -405,7 +405,7 @@ function AdminPromotionsPage() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="size-5 text-accent" /> Gi gratis fremheving
+              <Sparkles className="size-5 text-brand" /> Gi gratis fremheving
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">

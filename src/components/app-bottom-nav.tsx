@@ -85,7 +85,7 @@ export function AppBottomNav() {
           aria-label="Hjem"
           aria-current={isOnHome ? "page" : undefined}
         >
-          <span className="flex h-11 w-11 items-center justify-center">
+          <span className="flex h-12 w-12 items-center justify-center">
             <img
               src={logoIcon}
               alt=""
@@ -100,7 +100,7 @@ export function AppBottomNav() {
         </Link>
 
         {/* Søk er en primær handling og er tilgjengelig uten konto. */}
-        <div className={itemClass} aria-current={isOnSearch ? "page" : undefined}>
+        <div className={itemClass}>
           <button
             type="button"
             onClick={() => {
@@ -108,10 +108,11 @@ export function AppBottomNav() {
               trackProductEvent("search_opened", { source: "bottom_nav" });
               openPanel("query");
             }}
-            className={`flex h-11 w-11 items-center justify-center rounded-full ${
+            className={`flex h-12 w-12 items-center justify-center rounded-full ${
               isOnSearch ? "text-primary" : "text-muted-foreground"
             }`}
             aria-label="Søk"
+            aria-current={isOnSearch ? "page" : undefined}
           >
             <Search className="size-6" />
           </button>
@@ -163,17 +164,18 @@ export function AppBottomNav() {
         </div>
 
         {/* Meldinger */}
-        <div className={itemClass} aria-current={isOnMeldinger ? "page" : undefined}>
+        <div className={itemClass}>
           {user ? (
-            <div className="relative flex h-11 w-11 items-center justify-center">
-              <MessagesButton />
+            <div className="relative flex h-12 w-12 items-center justify-center">
+              <MessagesButton isActive={isOnMeldinger} />
             </div>
           ) : (
             <button
               type="button"
               onClick={() => navigate({ to: "/auth" })}
-              className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground"
+              className="flex h-12 w-12 items-center justify-center rounded-full text-muted-foreground"
               aria-label="Meldinger (logg inn)"
+              aria-current={isOnMeldinger ? "page" : undefined}
             >
               <MessageCircle className="size-6" />
             </button>
@@ -186,14 +188,15 @@ export function AppBottomNav() {
         </div>
 
         {/* Bruker */}
-        <div className={itemClass} aria-current={isOnMeg ? "page" : undefined}>
+        <div className={itemClass}>
           {user ? (
-            <UserAvatarButton userId={user.id} email={user.email ?? null} />
+            <UserAvatarButton userId={user.id} email={user.email ?? null} isActive={isOnMeg} />
           ) : (
             <Link
               to="/auth"
-              className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground"
+              className="flex h-12 w-12 items-center justify-center rounded-full text-muted-foreground"
               aria-label="Logg inn"
+              aria-current={isOnMeg ? "page" : undefined}
             >
               <LogIn className="size-6" />
             </Link>
@@ -219,7 +222,15 @@ export function AppBottomNav() {
   );
 }
 
-function UserAvatarButton({ userId, email }: { userId: string; email: string | null }) {
+function UserAvatarButton({
+  userId,
+  email,
+  isActive,
+}: {
+  userId: string;
+  email: string | null;
+  isActive?: boolean;
+}) {
   const navigate = useNavigate();
 
   const { data: profile } = useQuery({
@@ -241,8 +252,9 @@ function UserAvatarButton({ userId, email }: { userId: string; email: string | n
     <button
       type="button"
       aria-label="Meg"
+      aria-current={isActive ? "page" : undefined}
       onClick={() => void navigate({ to: "/meg" })}
-      className="flex h-10 w-10 items-center justify-center"
+      className="flex h-12 w-12 items-center justify-center"
     >
       <Avatar className="size-8">
         {profile?.avatar_url && <AvatarImage src={profile.avatar_url} alt={displayName} />}

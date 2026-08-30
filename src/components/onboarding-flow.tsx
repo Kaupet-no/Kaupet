@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePushStatus } from "@/hooks/use-push-status";
 import { trackProductEvent } from "@/lib/product-analytics";
 import { listSavedSearches } from "@/lib/saved-searches";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
 type Props = {
   onComplete: () => void;
@@ -43,11 +44,7 @@ export function OnboardingFlow({ onComplete }: Props) {
   const activeCard = cards[currentIndex];
   const [finishing, setFinishing] = useState(false);
   const finishTimer = useRef<number | null>(null);
-  const [reduceMotion] = useState(() =>
-    typeof window !== "undefined"
-      ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
-      : false,
-  );
+  const reduceMotion = useReducedMotion();
 
   useEffect(
     () => () => {
@@ -175,9 +172,7 @@ export function OnboardingFlow({ onComplete }: Props) {
                 <span className="font-display text-4xl font-bold tracking-tight text-primary">
                   kaupet
                 </span>
-                <span className="font-display text-4xl font-bold tracking-tight text-accent">
-                  .
-                </span>
+                <span className="font-display text-4xl font-bold tracking-tight text-brand">.</span>
                 <span className="font-display text-3xl font-bold tracking-tight text-muted-foreground">
                   no
                 </span>
@@ -303,7 +298,7 @@ export function OnboardingFlow({ onComplete }: Props) {
               <span className="font-display text-3xl font-bold tracking-tight text-primary">
                 kaupet
               </span>
-              <span className="font-display text-3xl font-bold tracking-tight text-accent">.</span>
+              <span className="font-display text-3xl font-bold tracking-tight text-brand">.</span>
               <span className="font-display text-2xl font-bold tracking-tight text-muted-foreground">
                 no
               </span>

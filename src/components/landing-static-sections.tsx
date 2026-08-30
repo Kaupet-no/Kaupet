@@ -13,7 +13,7 @@ export function HowItWorksSection() {
       <div className="mx-auto max-w-6xl px-4 py-16">
         <div className="grid items-center gap-10 md:grid-cols-[1.1fr_1fr]">
           <div>
-            <span className="text-accent-text mb-3 block text-xs font-semibold tracking-wide uppercase">
+            <span className="text-brand-text mb-3 block text-xs font-semibold tracking-wide uppercase">
               En litt annerledes markedsplass
             </span>
             <h2 className="font-display text-3xl tracking-tight md:text-4xl">
@@ -27,7 +27,7 @@ export function HowItWorksSection() {
             <ul className="mt-6 flex flex-col gap-3">
               {PRIVACY_POINTS.map((point) => (
                 <li key={point} className="flex items-start gap-2.5 text-sm">
-                  <Check className="text-accent-text mt-0.5 size-4 shrink-0" />
+                  <Check className="text-brand-text mt-0.5 size-4 shrink-0" />
                   <span>{point}</span>
                 </li>
               ))}
@@ -45,13 +45,13 @@ export function HowItWorksSection() {
             <pre className="overflow-x-auto px-5 py-5 font-mono text-[13px] leading-7 text-foreground">
               <span className="text-muted-foreground">{"// analytics.ts"}</span>
               {"\n"}
-              <span className="text-accent-text">export const</span> trackers = [];
+              <span className="text-brand-text">export const</span> trackers = [];
               {"\n"}
               <span className="text-muted-foreground">{"// ingen tredjeparts sporing"}</span>
               {"\n\n"}
-              <span className="text-accent-text">export function</span> collectPersonalData() {"{"}
+              <span className="text-brand-text">export function</span> collectPersonalData() {"{"}
               {"\n  "}
-              <span className="text-accent-text">return</span> null;{" "}
+              <span className="text-brand-text">return</span> null;{" "}
               <span className="text-muted-foreground">
                 {"// vi lagrer kun det vi må, ikke mer"}
               </span>

@@ -20,7 +20,7 @@ export function AppHeroLogo() {
         <span className="font-display text-4xl font-semibold tracking-tight text-primary">
           kaupet
         </span>
-        <span className="font-display text-4xl text-accent">.</span>
+        <span className="font-display text-4xl text-brand">.</span>
         <span className="font-display text-3xl text-muted-foreground">no</span>
       </span>
     </div>

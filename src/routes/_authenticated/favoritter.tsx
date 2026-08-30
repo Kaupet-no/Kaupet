@@ -93,7 +93,7 @@ function FavoritesPage() {
       <div className="mx-auto max-w-6xl px-4 py-6">
         {!native && (
           <div className="flex items-center gap-3 max-sm:hidden">
-            <Heart className="size-6 text-accent" />
+            <Heart className="size-6 text-brand" />
             <h1 className="font-display text-3xl tracking-tight">Mine favoritter</h1>
           </div>
         )}

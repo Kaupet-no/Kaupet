@@ -62,7 +62,7 @@ export const FilterChip = React.forwardRef<
             </span>
             {!hideChevron && <ChevronDown className="size-4 shrink-0 opacity-60" />}
             {badge != null && badge > 0 && (
-              <span className="absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full bg-accent text-2xs font-bold text-white">
+              <span className="absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full bg-brand text-2xs font-bold text-white">
                 {badge}
               </span>
             )}
@@ -85,7 +85,7 @@ export const FilterChip = React.forwardRef<
         <span className="max-w-[160px] truncate">{label}</span>
         {!hideChevron && <ChevronDown className="size-3.5 opacity-60" />}
         {badge != null && badge > 0 && (
-          <span className="absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full bg-accent text-2xs font-bold text-white">
+          <span className="absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full bg-brand text-2xs font-bold text-white">
             {badge}
           </span>
         )}

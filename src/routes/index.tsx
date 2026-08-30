@@ -274,7 +274,7 @@ function WebLanding() {
       <section className="bg-surface">
         <div className="density-editorial mx-auto max-w-3xl px-4 text-center">
           <h1 className="font-display text-5xl leading-[1.05] tracking-tight md:text-6xl">
-            Gi tingene dine <span className="italic text-accent">et nytt liv</span>.
+            Gi tingene dine <span className="italic text-brand">et nytt liv</span>.
           </h1>
           <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
             Finn noe du trenger, eller gi noe videre.
@@ -350,7 +350,7 @@ function WebLanding() {
       <section aria-labelledby="category-heading" className="mx-auto max-w-6xl px-4 py-10 md:py-14">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-accent-text text-xs font-semibold tracking-wide uppercase">
+            <p className="text-brand-text text-xs font-semibold tracking-wide uppercase">
               Finn raskere
             </p>
             <h2 id="category-heading" className="mt-1 font-display text-3xl tracking-tight">

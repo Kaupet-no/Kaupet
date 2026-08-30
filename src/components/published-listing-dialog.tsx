@@ -88,7 +88,7 @@ export function PublishedListingDialog({
             <Button
               variant="outline"
               onClick={onPromote}
-              className="flex-1 border-accent/40 text-accent-text hover:bg-accent/10 hover:text-accent-text"
+              className="flex-1 border-brand/40 text-brand-text hover:bg-brand/10 hover:text-brand-text"
             >
               Fremhev annonse
             </Button>

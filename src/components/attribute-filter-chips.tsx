@@ -650,8 +650,8 @@ export function AttributeFilterChips({
         <span
           className={
             isCard
-              ? "flex size-4 items-center justify-center rounded-full bg-accent text-2xs font-bold text-white"
-              : "absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full bg-accent text-2xs font-bold text-white"
+              ? "flex size-4 items-center justify-center rounded-full bg-brand text-2xs font-bold text-white"
+              : "absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full bg-brand text-2xs font-bold text-white"
           }
         >
           {secondaryCount}

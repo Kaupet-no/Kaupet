@@ -65,7 +65,13 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
-  --color-accent-text: var(--accent-text);
+  /* Merkevareterrakotta, atskilt fra --accent (se forklaring ved :root
+     under). --color-brand-text dekker terrakotta brukt SOM tekstfarge på
+     krembakgrunn (eyebrows, ikoner, lenker); --color-brand/-foreground
+     dekker terrakotta brukt SOM flate (merker, prikker, kort). */
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-text: var(--brand-text);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
@@ -101,20 +107,37 @@
   --muted: oklch(0.94 0.015 80);
   --muted-foreground: oklch(0.5 0.02 140);
 
-  /* Terracotta accent */
-  --accent: oklch(0.66 0.16 45);
-  --accent-foreground: oklch(0.99 0 0);
-  /* Darker terracotta for normal/small-size text — --accent itself is ~3.2:1
-     against the cream background, which clears the 3:1 UI/large-text bar but
-     not the 4.5:1 normal-text bar. Use this instead of --accent whenever
-     terracotta is the *text* color at body/label sizes. */
-  --accent-text: oklch(0.48 0.15 45);
+  /* shadcn/ui-konvensjon: --accent er en NØYTRAL hover-/valgt-flate (samme
+     familie som --muted), ikke merkevarefargen — brukes av
+     ghost/outline-knapper, dropdown-/select-elementer og admin-radhover.
+     Frem til denne endringen pekte --accent på terrakotta, som gjorde at
+     ALLE hover:bg-accent-knapper (bl.a. «Flere søkevalg» på /annonser)
+     lyste opp i sterk oransje ved hover — verifisert i nettleser. */
+  --accent: oklch(0.94 0.015 80);
+  --accent-foreground: oklch(0.22 0.025 150);
+
+  /* Merkevareterrakotta — brukes bevisst (badges, ulest-prikker, favoritt-
+     hjerte, logo-punktum, promotert-kant), aldri som generisk hover-tilstand.
+     --brand-foreground er mørk tekst (5,2:1 mot --brand), ikke hvit
+     (~3,2:1, under WCAG 4,5:1-kravet for normal tekst — målt i nettleser). */
+  --brand: oklch(0.66 0.16 45);
+  --brand-foreground: oklch(0.22 0.025 150);
+  /* Enda mørkere terrakotta for når merkevarefargen selv er tekstfargen på
+     krembakgrunn (eyebrows, lenker, ikoner) — --brand er ~3,16:1 mot
+     bakgrunnen, --brand-text er ~5,67:1. */
+  --brand-text: oklch(0.48 0.15 45);
 
   --destructive: oklch(0.55 0.22 27);
   --destructive-foreground: oklch(0.99 0 0);
 
-  --border: oklch(0.88 0.02 80);
-  --input: oklch(0.9 0.018 80);
+  /* Hevet fra 0.88/0.9 for å bedre ikke-tekst-kontrasten på kontroller som
+     kun bruker kant for å definere formen (inputfelt, outline-knapper) —
+     ~1,38:1 → ~1,8-1,9:1 mot bakgrunnen. Når til WCAG 1.4.11s 3:1-krav
+     krever en bredere designbeslutning (tyngre kanter endrer hele appens
+     «papir»-uttrykk), så dette er en delvis, målt forbedring, ikke full
+     compliance. */
+  --border: oklch(0.8 0.02 80);
+  --input: oklch(0.78 0.02 80);
   --ring: oklch(0.35 0.06 160);
   /* Semantic density tiers for the editorial, task, and data surfaces. Keep
      spacing in the existing token layer so web and native use the same rhythm. */
@@ -168,15 +191,22 @@
   --secondary-foreground: oklch(0.96 0.01 80);
   --muted: oklch(0.28 0.03 150);
   --muted-foreground: oklch(0.7 0.02 80);
-  --accent: oklch(0.72 0.15 45);
-  --accent-foreground: oklch(0.18 0.02 150);
-  /* Dark mode's --accent already clears 4.5:1 against --background (~7.2:1),
-     so no separate darker text variant is needed here. */
-  --accent-text: var(--accent);
+  /* Nøytral hover-/valgt-flate, samme familie som --muted (dark) — se
+     forklaring i :root over. */
+  --accent: oklch(0.28 0.03 150);
+  --accent-foreground: oklch(0.96 0.01 80);
+
+  --brand: oklch(0.72 0.15 45);
+  /* Mørk tekst er allerede riktig her (7,17:1 mot --brand) — omvendt av lys
+     modus, siden --brand er lysere (0,72) enn den mørke bakgrunnen. */
+  --brand-foreground: oklch(0.18 0.02 150);
+  /* --brand er allerede lys nok mot mørk bakgrunn til å brukes direkte som
+     tekstfarge (~7,17:1), så ingen egen mørkere variant trengs her. */
+  --brand-text: var(--brand);
   --destructive: oklch(0.65 0.2 27);
   --destructive-foreground: oklch(0.99 0 0);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 15%);
+  --border: oklch(1 0 0 / 16%);
+  --input: oklch(1 0 0 / 20%);
   --ring: oklch(0.78 0.09 160);
 }
 

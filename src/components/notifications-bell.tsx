@@ -224,12 +224,17 @@ export function NotificationsBell() {
   };
 
   const bellTrigger = (
-    <Button variant="ghost" size="icon" aria-label="Varsler" className="relative">
+    <Button
+      variant="ghost"
+      size="icon"
+      aria-label={unread > 0 ? `Varsler, ${unread} uleste` : "Varsler"}
+      className="relative"
+    >
       <Bell className="size-5" />
       {unread > 0 && (
         <span
-          className="pointer-events-none absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-2xs font-semibold text-accent-foreground"
-          aria-label={`${unread} uleste varsler`}
+          className="pointer-events-none absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-2xs font-semibold text-brand-foreground"
+          aria-hidden="true"
         >
           {unread > 9 ? "9+" : unread}
         </span>
@@ -280,15 +285,18 @@ export function NotificationsBell() {
                 >
                   <div className="flex items-start gap-2">
                     {!n.read_at && (
-                      <span className="mt-1.5 size-2 shrink-0 rounded-full bg-accent" />
+                      <span
+                        className="mt-1.5 size-2 shrink-0 rounded-full bg-brand"
+                        aria-label="Ulest"
+                      />
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="line-clamp-1 text-sm font-medium">
                         {n.kind === "price_drop" && (
-                          <TrendingDown className="mr-1 inline size-3.5 text-accent" />
+                          <TrendingDown className="mr-1 inline size-3.5 text-brand" />
                         )}
                         {n.kind === "wtb_match" && (
-                          <ShoppingBag className="mr-1 inline size-3.5 text-accent" />
+                          <ShoppingBag className="mr-1 inline size-3.5 text-brand" />
                         )}
                         {n.listing_title ??
                           (n.kind === "price_drop" ? "Favoritten din" : "Ny annonse")}

@@ -131,7 +131,7 @@ async function fetchConversationPreviews(userId: string): Promise<ConvPreview[]>
   });
 }
 
-export function MessagesButton() {
+export function MessagesButton({ isActive }: { isActive?: boolean } = {}) {
   const { user } = useAuth();
   const qc = useQueryClient();
   const native = useIsNative();
@@ -190,12 +190,13 @@ export function MessagesButton() {
       variant="ghost"
       size="icon"
       aria-label={unreadCount > 0 ? `Meldinger, ${unreadCount} uleste` : "Meldinger"}
-      className="relative"
+      aria-current={isActive ? "page" : undefined}
+      className="native-touch-target relative"
     >
       <MessageCircle className="size-5" />
       {unreadCount > 0 && (
         <span
-          className="pointer-events-none absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-2xs font-semibold text-accent-foreground"
+          className="pointer-events-none absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-2xs font-semibold text-brand-foreground"
           aria-hidden="true"
         >
           {unreadCount > 9 ? "9+" : unreadCount}
@@ -268,7 +269,7 @@ export function MessagesButton() {
                     >
                       {unread && (
                         <span
-                          className="mt-2 size-2 shrink-0 rounded-full bg-accent"
+                          className="mt-2 size-2 shrink-0 rounded-full bg-brand"
                           aria-hidden="true"
                         />
                       )}

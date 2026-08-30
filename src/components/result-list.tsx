@@ -603,11 +603,16 @@ export function ResultList({
               setMobileMapOpen(true);
             }}
             className="fixed bottom-[calc(var(--app-bottom-nav-h)+1rem)] right-4 z-50 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition active:scale-95"
-            aria-label="Vis kart"
+            aria-label={
+              mapListings.length > 0 ? `Vis kart, ${mapListings.length} treff` : "Vis kart"
+            }
           >
             <MapIcon className="size-6" />
             {mapListings.length > 0 && (
-              <span className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-accent text-2xs font-bold text-accent-foreground">
+              <span
+                className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-brand text-2xs font-bold text-brand-foreground"
+                aria-hidden="true"
+              >
                 {mapListings.length > 99 ? "99+" : mapListings.length}
               </span>
             )}

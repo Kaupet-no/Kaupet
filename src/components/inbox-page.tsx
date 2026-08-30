@@ -253,7 +253,7 @@ export function InboxPage() {
       {native && <PullToRefreshIndicator pullDistance={pullDistance} refreshing={refreshing} />}
       {!native && (
         <div className="flex items-center gap-3">
-          <MessageCircle className="size-6 text-accent" />
+          <MessageCircle className="size-6 text-brand" />
           <h1 className="font-display text-3xl tracking-tight">Meldinger</h1>
         </div>
       )}
@@ -278,7 +278,7 @@ export function InboxPage() {
               </p>
             </div>
             {unreadSystemCount > 0 && (
-              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-2xs font-semibold text-accent-foreground">
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-2xs font-semibold text-brand-foreground">
                 {unreadSystemCount}
               </span>
             )}
@@ -356,7 +356,7 @@ export function InboxPage() {
                   </div>
                   {g.unreadCount > 0 && (
                     <span
-                      className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-2xs font-semibold text-accent-foreground"
+                      className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-2xs font-semibold text-brand-foreground"
                       aria-label={`${g.unreadCount} uleste`}
                     >
                       {g.unreadCount}
@@ -386,7 +386,7 @@ export function InboxPage() {
                             <Link
                               to="/meldinger/$id"
                               params={{ id: c.id }}
-                              className={`flex items-center gap-3 p-3 hover:bg-muted/40 data-[status=active]:bg-accent/10 ${unread ? "bg-accent/5" : ""}`}
+                              className={`flex items-center gap-3 p-3 hover:bg-muted/40 data-[status=active]:bg-accent/10 ${unread ? "bg-brand/5" : ""}`}
                             >
                               {other?.avatar_url ? (
                                 <img
@@ -419,7 +419,7 @@ export function InboxPage() {
                               </div>
                               {unread && (
                                 <span
-                                  className="size-2 shrink-0 rounded-full bg-accent"
+                                  className="size-2 shrink-0 rounded-full bg-brand"
                                   aria-label="Ulest"
                                 />
                               )}
@@ -454,7 +454,7 @@ function SystemMessageRow({ msg, onRead }: { msg: SystemMessage; onRead: () => v
       <button
         type="button"
         onClick={handleOpen}
-        className={`flex w-full items-start gap-3 p-3 text-left hover:bg-muted/40 ${!msg.read_at ? "bg-accent/5" : ""}`}
+        className={`flex w-full items-start gap-3 p-3 text-left hover:bg-muted/40 ${!msg.read_at ? "bg-brand/5" : ""}`}
       >
         <div className="min-w-0 flex-1 pl-1">
           <p className={`truncate text-sm ${!msg.read_at ? "font-semibold" : "font-medium"}`}>
@@ -464,7 +464,7 @@ function SystemMessageRow({ msg, onRead }: { msg: SystemMessage; onRead: () => v
           <p className="mt-0.5 text-xs text-muted-foreground">{formatRelative(msg.created_at)}</p>
         </div>
         {!msg.read_at && (
-          <span className="mt-1 size-2 shrink-0 rounded-full bg-accent" aria-label="Ulest" />
+          <span className="mt-1 size-2 shrink-0 rounded-full bg-brand" aria-label="Ulest" />
         )}
       </button>
       {open && (

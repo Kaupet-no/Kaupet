@@ -27,7 +27,7 @@ export function AppLanding() {
       <AppHeroLogo />
 
       <section
-        className={`flex flex-col items-center justify-center px-5 pb-8 pt-6 density-editorial ${
+        className={`flex flex-col items-center justify-center gap-4 px-5 pb-6 pt-4 density-task ${
           isTablet ? "min-h-[36vh]" : ""
         }`}
       >

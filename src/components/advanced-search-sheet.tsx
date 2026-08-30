@@ -445,6 +445,10 @@ function NativeCategoryDrilldown({
     return map;
   }, [categories]);
   const selectedSet = useMemo(() => new Set(selected), [selected]);
+  const selectedCategories = useMemo(
+    () => categories.filter((category) => selectedSet.has(category.slug)),
+    [categories, selectedSet],
+  );
   const currentParent = path.at(-1) ?? null;
   const currentLevel = childrenByParent.get(currentParent?.id ?? null) ?? [];
   const filteredLevel = query.trim()
@@ -488,6 +492,27 @@ function NativeCategoryDrilldown({
           className="h-12 pl-9"
         />
       </div>
+      {selectedCategories.length > 0 && (
+        <div className="space-y-1" aria-label="Valgte kategorier">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Valgt</p>
+          {selectedCategories.map((category) => (
+            <div
+              key={category.id}
+              className="flex min-h-12 items-center gap-3 rounded-xl bg-primary/10 px-4 text-sm"
+            >
+              <span className="min-w-0 flex-1">{category.name_nb}</span>
+              <button
+                type="button"
+                className="native-touch-target shrink-0 px-2 text-primary"
+                aria-label={`Fjern ${category.name_nb}`}
+                onClick={() => onChange(selected.filter((slug) => slug !== category.slug))}
+              >
+                Fjern
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       {path.length > 0 && (
         <div className="flex items-center gap-2">
           <button
@@ -507,6 +532,7 @@ function NativeCategoryDrilldown({
       {path.length > 0 && (
         <button
           type="button"
+          aria-pressed={selectedSet.has(mainCategory!.slug)}
           onClick={() => onChange([mainCategory!.slug])}
           className="native-touch-target flex min-h-14 w-full items-center justify-between rounded-xl border border-dashed border-primary/50 px-4 text-left text-sm font-medium text-primary"
         >
@@ -521,6 +547,7 @@ function NativeCategoryDrilldown({
             <button
               key={category.id}
               type="button"
+              aria-pressed={!hasChildren(category.id) ? isSelected : undefined}
               onClick={() => toggleCategory(category)}
               className={`native-touch-target flex min-h-14 w-full items-center gap-3 rounded-xl px-4 text-left text-base ${
                 isSelected ? "bg-primary/10 font-medium text-primary" : "bg-muted"

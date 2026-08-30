@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NativeSheet } from "@/components/ui/native-sheet";
+import { NativeChoiceSheet } from "@/components/ui/native-choice-sheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DialogClose, DialogTrigger } from "@/components/ui/dialog";
 import { FullscreenOverlay, FullscreenOverlayContent } from "@/components/ui/fullscreen-overlay";
@@ -53,6 +54,8 @@ type Props = {
   zeroResultExpansions?: ZeroResultExpansion[];
   zeroResultExpansionPending?: boolean;
   onApplyZeroResultExpansion?: (expansion: ZeroResultExpansion) => void;
+  hasActiveCriteria?: boolean;
+  onBrowseCategories?: () => void;
   mapListings: MapListing[];
   mapCenter: { lat: number; lng: number } | null;
   radiusKm: number;
@@ -88,6 +91,8 @@ export function ResultList({
   zeroResultExpansions = [],
   zeroResultExpansionPending = false,
   onApplyZeroResultExpansion,
+  hasActiveCriteria,
+  onBrowseCategories,
   mapListings,
   mapCenter,
   radiusKm,
@@ -189,6 +194,8 @@ export function ResultList({
       : zeroResultExpansion
         ? [zeroResultExpansion]
         : [];
+  const criteriaActive =
+    hasActiveCriteria ?? (q.trim().length > 0 || effectiveCategories.length > 0);
 
   return (
     <>
@@ -201,57 +208,116 @@ export function ResultList({
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <Popover open={viewModeOpen} onOpenChange={setViewModeOpen}>
-            <PopoverTrigger asChild>
-              <Button type="button" variant="outline" size="sm" className="gap-1.5">
+          {isNative ? (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5 shadow-none"
+                aria-expanded={viewModeOpen}
+                onClick={() => setViewModeOpen(true)}
+              >
                 <ViewModeIcon className="size-4" /> {viewModeLabel}
               </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-40 p-1">
-              {(Object.keys(VIEW_MODE_META) as Array<keyof typeof VIEW_MODE_META>).map((mode) => {
-                const { icon: Icon, label } = VIEW_MODE_META[mode];
-                return (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => {
-                      changeViewMode(mode);
-                      setViewModeOpen(false);
-                    }}
-                    className={`flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-muted ${
-                      viewMode === mode ? "bg-muted font-medium" : ""
-                    }`}
-                  >
-                    <Icon className="size-4" /> {label}
-                  </button>
-                );
-              })}
-            </PopoverContent>
-          </Popover>
-          <Popover open={sortOpen} onOpenChange={setSortOpen}>
-            <PopoverTrigger asChild>
-              <Button type="button" variant="outline" size="sm" className="gap-1.5">
+              <NativeChoiceSheet
+                open={viewModeOpen}
+                onOpenChange={setViewModeOpen}
+                title="Visning"
+                options={[
+                  { value: "grid", label: "Fliser" },
+                  { value: "list", label: "Liste" },
+                ]}
+                value={[viewMode === "grid" || viewMode === "list" ? viewMode : "grid"]}
+                onChange={(next) => {
+                  const mode = next[0];
+                  if (mode === "grid" || mode === "list") changeViewMode(mode);
+                  setViewModeOpen(false);
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5 shadow-none"
+                aria-expanded={sortOpen}
+                onClick={() => setSortOpen(true)}
+              >
                 <ArrowUpDown className="size-4" /> {sortLabel}
               </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-56 p-1">
-              {SORT_OPTIONS.map((s) => (
-                <button
-                  key={s.value}
-                  type="button"
-                  onClick={() => {
-                    onSortChange(s.value);
-                    setSortOpen(false);
-                  }}
-                  className={`block w-full rounded px-3 py-2 text-left text-sm hover:bg-muted ${
-                    sort === s.value ? "bg-muted font-medium" : ""
-                  }`}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </PopoverContent>
-          </Popover>
+              <NativeChoiceSheet
+                open={sortOpen}
+                onOpenChange={setSortOpen}
+                title="Sorter annonser"
+                options={SORT_OPTIONS.map((option) => ({
+                  value: option.value,
+                  label: option.label,
+                }))}
+                value={[sort]}
+                onChange={(next) => {
+                  const value = next[0];
+                  if (value) onSortChange(value as SortValue);
+                  setSortOpen(false);
+                }}
+              />
+            </>
+          ) : (
+            <>
+              <Popover open={viewModeOpen} onOpenChange={setViewModeOpen}>
+                <PopoverTrigger asChild>
+                  <Button type="button" variant="outline" size="sm" className="gap-1.5">
+                    <ViewModeIcon className="size-4" /> {viewModeLabel}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-40 p-1">
+                  {(Object.keys(VIEW_MODE_META) as Array<keyof typeof VIEW_MODE_META>).map(
+                    (mode) => {
+                      const { icon: Icon, label } = VIEW_MODE_META[mode];
+                      return (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() => {
+                            changeViewMode(mode);
+                            setViewModeOpen(false);
+                          }}
+                          className={`flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-muted ${
+                            viewMode === mode ? "bg-muted font-medium" : ""
+                          }`}
+                        >
+                          <Icon className="size-4" /> {label}
+                        </button>
+                      );
+                    },
+                  )}
+                </PopoverContent>
+              </Popover>
+              <Popover open={sortOpen} onOpenChange={setSortOpen}>
+                <PopoverTrigger asChild>
+                  <Button type="button" variant="outline" size="sm" className="gap-1.5">
+                    <ArrowUpDown className="size-4" /> {sortLabel}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-56 p-1">
+                  {SORT_OPTIONS.map((s) => (
+                    <button
+                      key={s.value}
+                      type="button"
+                      onClick={() => {
+                        onSortChange(s.value);
+                        setSortOpen(false);
+                      }}
+                      className={`block w-full rounded px-3 py-2 text-left text-sm hover:bg-muted ${
+                        sort === s.value ? "bg-muted font-medium" : ""
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </PopoverContent>
+              </Popover>
+            </>
+          )}
           {!isDesktop && !isNative && (
             <NativeSheet
               open={mobileMapOpen}
@@ -354,11 +420,15 @@ export function ResultList({
                     >
                       Ser etter en bredere variant …
                     </span>
-                  ) : (
+                  ) : criteriaActive ? (
                     <Button variant="outline" onClick={resetFilters}>
                       Nullstill alle filtre
                     </Button>
-                  )}
+                  ) : onBrowseCategories ? (
+                    <Button variant="outline" onClick={onBrowseCategories}>
+                      Utforsk kategorier
+                    </Button>
+                  ) : null}
                 </>
               }
             />

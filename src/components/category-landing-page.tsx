@@ -190,13 +190,11 @@ export function CategoryLandingPage({
       <div className="mx-auto max-w-6xl px-4 py-8">
         <div className="space-y-2">
           {isNative ? (
-            // Samme sammendrag-pille som /annonser (fase 9, tiltak 26).
             <SearchSummaryPill
               q={qDraft}
-              onQChange={setQDraft}
-              onSubmitQ={() => updateSearch({ q: qDraft })}
               filterCount={activeFilterCount}
-              onOpen={() => openPanel("price")}
+              onOpenQuery={() => openPanel("query")}
+              onOpenFilters={() => openPanel("price")}
             />
           ) : (
             <SearchBar
@@ -274,6 +272,14 @@ export function CategoryLandingPage({
             hasNextPage={!!hasNextPage}
             isFetchingNextPage={isFetchingNextPage}
             fetchNextPage={() => void fetchNextPage()}
+            hasActiveCriteria={
+              search.q.trim().length > 0 ||
+              search.min != null ||
+              search.max != null ||
+              (search.conditions?.length ?? 0) > 0 ||
+              Object.keys(attrValues).length > 0 ||
+              search.lat != null
+            }
             resetFilters={resetFilters}
             zeroResultExpansion={zeroResultExpansion}
             zeroResultExpansionPending={zeroResultExpansionPending}

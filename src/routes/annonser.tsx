@@ -489,14 +489,16 @@ function BrowsePage() {
               {isNative ? (
                 <SearchSummaryPill
                   q={qDraft}
-                  onQChange={(q) => {
-                    setInterpretedCriteria([]);
-                    setIgnoredInterpretations(new Set());
-                    setQDraft(q);
-                  }}
-                  onSubmitQ={submitQuery}
                   filterCount={activeFilterCount}
-                  onOpen={() => {
+                  onOpenQuery={() => {
+                    trackProductEvent("search_filter_opened", {
+                      section: "query",
+                      source: "summary",
+                      filterCount: activeFilterCount,
+                    });
+                    openPanel("query");
+                  }}
+                  onOpenFilters={() => {
                     trackProductEvent("search_filter_opened", {
                       section: "categories",
                       source: "summary",
@@ -772,6 +774,12 @@ function BrowsePage() {
                 isFetchingNextPage={isFetchingNextPage}
                 fetchNextPage={() => void fetchNextPage()}
                 resetFilters={resetFilters}
+                hasActiveCriteria={
+                  activeFilterCount > 0 ||
+                  qDraft.trim().length > 0 ||
+                  effectiveCategories.length > 0
+                }
+                onBrowseCategories={() => openPanel("categories")}
                 zeroResultExpansion={zeroResultExpansion}
                 zeroResultExpansionPending={zeroResultExpansionPending}
                 zeroResultExpansions={zeroResultExpansions}

@@ -454,10 +454,6 @@ function NativeCategoryDrilldown({
     : currentLevel;
   const breadcrumb = path.map((category) => category.name_nb).join(" › ");
   const hasChildren = (id: string) => (childrenByParent.get(id) ?? []).length > 0;
-  const descendants = (id: string): Category[] => {
-    const direct = childrenByParent.get(id) ?? [];
-    return direct.flatMap((category) => [category, ...descendants(category.id)]);
-  };
   const mainCategory = path[0] ?? null;
   const isBilOgMc = mainCategory?.slug === BIL_OG_MC_SLUG;
 

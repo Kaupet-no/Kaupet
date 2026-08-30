@@ -117,3 +117,55 @@ export function useUnreadConversationsCount(): number {
 
   return conversationUnread + (systemUnread ?? 0);
 }
+
+/**
+ * Lett antall-uleste for varselklokken (lagrede søk, prisfall, ønskes
+ * kjøpt-treff) — samme tre tabeller som NotificationsBell viser, men uten
+ * dens joins mot annonser/søk/wtb-annonser. Brukes til badgen på
+ * bunnavigasjonens Meg-fane, som er den eneste inngangen til varsler i den
+ * native informasjonsarkitekturen (se app-bottom-nav.tsx).
+ */
+export function useUnreadNotificationsCount(): number {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+
+  const { data } = useQuery({
+    queryKey: ["notifications-unread-count", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const countUnread = async (
+        table: "saved_search_notifications" | "favorite_price_drops" | "wtb_match_notifications",
+      ) => {
+        const { count, error } = await supabase
+          .from(table)
+          .select("id", { count: "exact", head: true })
+          .is("read_at", null);
+        if (error) return 0;
+        return count ?? 0;
+      };
+      const [notifs, drops, wtbMatches] = await Promise.all([
+        countUnread("saved_search_notifications"),
+        countUnread("favorite_price_drops"),
+        countUnread("wtb_match_notifications"),
+      ]);
+      return notifs + drops + wtbMatches;
+    },
+    refetchInterval: 60_000,
+  });
+
+  useEffect(() => {
+    if (!user) return;
+    const onFocus = () => qc.invalidateQueries({ queryKey: ["notifications-unread-count"] });
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") onFocus();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [user, qc]);
+
+  return data ?? 0;
+}

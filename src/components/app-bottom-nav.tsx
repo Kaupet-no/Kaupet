@@ -4,6 +4,7 @@ import { IntentTitleLanding } from "@/components/intent-title-landing";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/hooks/use-auth";
+import { useUnreadNotificationsCount } from "@/hooks/use-unread";
 import { useFormFactor } from "@/hooks/use-form-factor";
 import { hapticImpact } from "@/lib/haptics";
 import { isNative } from "@/lib/native";
@@ -222,7 +223,7 @@ export function AppBottomNav() {
   );
 }
 
-function UserAvatarButton({
+export function UserAvatarButton({
   userId,
   email,
   isActive,
@@ -232,7 +233,7 @@ function UserAvatarButton({
   isActive?: boolean;
 }) {
   const navigate = useNavigate();
-
+  const unreadCount = useUnreadNotificationsCount();
   const { data: profile } = useQuery({
     queryKey: ["profile-menu", userId],
     queryFn: async () => {
@@ -251,10 +252,10 @@ function UserAvatarButton({
   return (
     <button
       type="button"
-      aria-label="Meg"
+      aria-label={unreadCount > 0 ? `Meg, ${unreadCount} nye varsler` : "Meg"}
       aria-current={isActive ? "page" : undefined}
       onClick={() => void navigate({ to: "/meg" })}
-      className="flex h-12 w-12 items-center justify-center"
+      className="relative flex h-12 w-12 items-center justify-center"
     >
       <Avatar className="size-8">
         {profile?.avatar_url && <AvatarImage src={profile.avatar_url} alt={displayName} />}
@@ -262,6 +263,14 @@ function UserAvatarButton({
           {initials(profile?.display_name, email ?? "")}
         </AvatarFallback>
       </Avatar>
+      {unreadCount > 0 && (
+        <span
+          className="pointer-events-none absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-2xs font-semibold text-brand-foreground"
+          aria-hidden="true"
+        >
+          {unreadCount > 9 ? "9+" : unreadCount}
+        </span>
+      )}
     </button>
   );
 }

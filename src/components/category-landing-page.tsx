@@ -287,10 +287,6 @@ export function CategoryLandingPage({
             mapListings={mapListings}
             mapCenter={mapCenter}
             radiusKm={search.radius ?? 10}
-            onMapCenterChange={(c, label) =>
-              updateSearch({ lat: c.lat, lng: c.lng, loc: label ?? "" })
-            }
-            onMapRadiusChange={(km) => updateSearch({ radius: km })}
             onMapClearLocation={() =>
               updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
             }

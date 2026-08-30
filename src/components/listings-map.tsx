@@ -82,10 +82,9 @@ type Props = {
   activeId?: string | null;
   onMarkerHover?: (id: string | null) => void;
   onMarkerSelect?: (id: string | null) => void;
-  onCenterChange?: (c: { lat: number; lng: number }) => void;
-  onRadiusChange?: (km: number) => void;
+  onApplyViewport: (c: { lat: number; lng: number }, radiusKm: number) => void | Promise<void>;
   onClearLocation?: () => void;
-  onApplyViewport?: (c: { lat: number; lng: number }, radiusKm: number) => void;
+  viewportApplying?: boolean;
   deferViewport?: boolean;
   edgeToEdge?: boolean;
   compactTouchControls?: boolean;
@@ -256,10 +255,9 @@ export function ListingsMap({
   activeId,
   onMarkerHover,
   onMarkerSelect,
-  onCenterChange,
-  onRadiusChange,
-  onClearLocation,
   onApplyViewport,
+  onClearLocation,
+  viewportApplying = false,
   deferViewport = false,
   edgeToEdge = false,
   compactTouchControls = false,
@@ -324,20 +322,19 @@ export function ListingsMap({
       setPendingCenter(c);
       return;
     }
-    onCenterChange?.(c);
-    if (previewRadiusKm !== radiusKm) onRadiusChange?.(previewRadiusKm);
+    onApplyViewport(c, previewRadiusKm);
   };
 
   const commitRadius = (km: number) => {
     setPreviewRadiusKm(km);
     setRadiusManuallySet(true);
     if (deferViewport) setPendingCenter((previous) => previous ?? mapCenter);
-    else if (mapCenter) onRadiusChange?.(km);
+    else if (mapCenter) onApplyViewport(mapCenter, km);
   };
 
-  const applyPendingViewport = () => {
-    if (!pendingCenter || !onApplyViewport) return;
-    onApplyViewport(pendingCenter, previewRadiusKm);
+  const applyPendingViewport = async () => {
+    if (!pendingCenter || viewportApplying) return;
+    await onApplyViewport(pendingCenter, previewRadiusKm);
   };
 
   const pickLocResult = (r: NominatimResult) => {
@@ -421,7 +418,7 @@ export function ListingsMap({
           />
         ))}
       </MapContainer>
-      {onRadiusChange && !compactTouchControls && (
+      {!compactTouchControls && (
         <div className="absolute left-3 top-3 z-[400]">
           <div
             className={`rounded-2xl border border-border bg-card/95 shadow-lg backdrop-blur transition-[width,padding] duration-200 ${
@@ -528,7 +525,7 @@ export function ListingsMap({
           )}
         </div>
       )}
-      {compactTouchControls && onRadiusChange && (
+      {compactTouchControls && (
         <>
           <Button
             type="button"
@@ -563,25 +560,27 @@ export function ListingsMap({
                 type="button"
                 size="native"
                 className="w-full"
-                onClick={() => {
-                  applyPendingViewport();
-                  setLocationSheetOpen(false);
+                disabled={viewportApplying || pendingCenter == null}
+                onClick={async () => {
+                  await applyPendingViewport();
+                  if (!viewportApplying) setLocationSheetOpen(false);
                 }}
               >
-                Bruk
+                {viewportApplying ? "Henter sted …" : "Bruk"}
               </Button>
             </div>
           </NativeSheet>
         </>
       )}
-      {deferViewport && pendingCenter && onApplyViewport && (
+      {deferViewport && pendingCenter && (
         <Button
           type="button"
           size="native"
           className="absolute inset-x-4 bottom-4 z-[400] shadow-lg"
+          disabled={viewportApplying}
           onClick={applyPendingViewport}
         >
-          Søk i dette området
+          {viewportApplying ? "Henter sted …" : "Søk i dette området"}
         </Button>
       )}
     </div>

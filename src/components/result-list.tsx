@@ -60,14 +60,12 @@ type Props = {
   mapListings: MapListing[];
   mapCenter: { lat: number; lng: number } | null;
   radiusKm: number;
-  onMapCenterChange: (c: { lat: number; lng: number }, label: string | null) => void;
-  onMapRadiusChange?: (km: number) => void;
-  onMapClearLocation?: () => void;
-  onMapApplyViewport?: (
+  onMapApplyViewport: (
     c: { lat: number; lng: number },
     radiusKm: number,
     label: string | null,
-  ) => void;
+  ) => void | Promise<void>;
+  onMapClearLocation?: () => void;
   /** Sorting is a view setting, not a search criterion, so it lives here next
    * to "Skjul kart"/"Lagre søk" instead of in the filter-chip row. */
   sort: SortValue;
@@ -103,8 +101,6 @@ export function ResultList({
   mapCenter,
   onMapApplyViewport,
   radiusKm,
-  onMapCenterChange,
-  onMapRadiusChange,
   onMapClearLocation,
   sort,
   onSortChange,
@@ -118,6 +114,7 @@ export function ResultList({
   const [mobileMapOpen, setMobileMapOpen] = useState(false);
   const [bigMapOpen, setBigMapOpen] = useState(false);
   const [desktopMapVisible, setDesktopMapVisible] = useState(false);
+  const [viewportApplying, setViewportApplying] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -176,6 +173,17 @@ export function ResultList({
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
+  const applyMapViewport = async (center: { lat: number; lng: number }, radius: number) => {
+    if (viewportApplying) return;
+    setViewportApplying(true);
+    try {
+      const label = await reverseGeocode(center);
+      await onMapApplyViewport(center, radius, label ?? "Valgt punkt");
+    } finally {
+      setViewportApplying(false);
+    }
+  };
+
   const renderMap = () => (
     <ClientOnly fallback={<Skeleton className="h-full w-full rounded-2xl" />}>
       <Suspense fallback={<Skeleton className="h-full w-full rounded-2xl" />}>
@@ -187,19 +195,9 @@ export function ResultList({
           activeId={activeId}
           onMarkerHover={setHoveredId}
           onMarkerSelect={setActiveId}
-          onCenterChange={(c) => {
-            if (isNative) return;
-            onMapCenterChange(c, "Henter sted…");
-            void reverseGeocode(c).then((name) => onMapCenterChange(c, name ?? "Valgt punkt"));
-          }}
-          onApplyViewport={(c, radius) => {
-            if (!onMapApplyViewport) return;
-            void reverseGeocode(c).then((name) =>
-              onMapApplyViewport(c, radius, name ?? "Valgt punkt"),
-            );
-          }}
-          onRadiusChange={onMapRadiusChange}
+          onApplyViewport={applyMapViewport}
           onClearLocation={onMapClearLocation}
+          viewportApplying={viewportApplying}
           deferViewport={isNative}
           edgeToEdge={nativePhone}
           compactTouchControls={nativePhone}

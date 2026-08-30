@@ -793,10 +793,6 @@ function BrowsePage() {
                 mapListings={mapListings}
                 mapCenter={mapCenter}
                 radiusKm={search.radius ?? 10}
-                onMapCenterChange={(c, label) =>
-                  updateSearch({ lat: c.lat, lng: c.lng, loc: label ?? "" })
-                }
-                onMapRadiusChange={(km) => updateSearch({ radius: km })}
                 onMapClearLocation={() =>
                   updateSearch({
                     lat: undefined,

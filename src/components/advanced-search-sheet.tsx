@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, X, Plus, Save, Search as SearchIcon, RotateCcw } from "lucide-react";
 
 import { PushEnablePrompt } from "@/components/push-enable-prompt";
@@ -21,8 +21,7 @@ import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/res
 import { LocationPicker, RadiusPicker } from "@/components/location-filter";
 import { ModeToggle } from "@/components/search-term-mode-toggle";
 import { TermGroupEditor } from "@/components/term-group-editor";
-import { buildTree, isCategorySelectionComplete, type Category } from "@/lib/categories";
-import { getCategoryIcon } from "@/lib/category-icons";
+import { type Category } from "@/lib/categories";
 import { useAuth } from "@/hooks/use-auth";
 import { useAdvancedSearchValue } from "@/hooks/use-advanced-search-value";
 import {
@@ -370,259 +369,195 @@ export function CategoryPicker({
     if (val === ALL) onChange([]);
     else onChange([val]);
   };
-
-  // Kontrollert åpen-tilstand for underkategori-dropdownen: Radix Select sin
-  // egen toggle-på-trigger-klikk er upålitelig på touch (kjent Radix-kvirk),
-  // så vi lukker den eksplisitt selv når den allerede er åpen — se
-  // `onClick` på triggeren nedenfor.
-  const [subOpen, setSubOpen] = useState(false);
-
   const isBilOgMc = mainSlug === BIL_OG_MC_SLUG;
-
   const toggleSub = (slug: string) => {
     if (isBilOgMc) {
-      // A listing in Bil og MC only ever belongs to one subcategory, so
-      // picking a new one replaces the previous selection instead of adding
-      // to it.
       onChange(selectedSubSlugs.has(slug) ? (mainSlug ? [mainSlug] : []) : [slug]);
       return;
     }
     const next = new Set(selectedSubSlugs);
     if (next.has(slug)) next.delete(slug);
     else next.add(slug);
-    // When at least one sub is selected, store only sub slugs (drop the main).
-    // When none, fall back to just the main slug (= "all subs").
-    if (next.size === 0) onChange(mainSlug ? [mainSlug] : []);
-    else onChange(Array.from(next));
+    onChange(next.size === 0 ? (mainSlug ? [mainSlug] : []) : [...next]);
   };
-
   const hasSubs = !!mainCat && (childrenByParent.get(mainCat.id) ?? []).length > 0;
-  const selectedSubCats = selectedCats.filter((c) => c.parent_id != null);
-
-  const tree = useMemo(() => buildTree(categories), [categories]);
-  // Native (ikon-varianten): kategori- og underkategorivalget skjules bak en
-  // "Endre kategori"-knapp så snart valget er komplett, siden hele
-  // ikonraden + underkategori-dropdownen tar mye plass når brukeren egentlig
-  // bare vil se resten av filtrene. "Komplett" betyr en hovedkategori er
-  // valgt, og — hvis den har underkategorier — minst én av dem også.
-  const isSelectionComplete = isCategorySelectionComplete(selected, tree);
-  const [expanded, setExpanded] = useState(!isSelectionComplete);
-  const wasCompleteRef = useRef(isSelectionComplete);
-  useEffect(() => {
-    if (isSelectionComplete && !wasCompleteRef.current) setExpanded(false);
-    wasCompleteRef.current = isSelectionComplete;
-  }, [isSelectionComplete]);
-
-  // Popup for underkategori dukker automatisk opp idet en hovedkategori med
-  // underkategorier velges, i stedet for å kreve et ekstra trykk på
-  // dropdownen.
-  useEffect(() => {
-    if (variant === "icons" && mainSlug && hasSubs && selectedSubSlugs.size === 0) {
-      setSubOpen(true);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mainSlug]);
 
   return (
     <section className="space-y-2">
       <Label className="text-sm font-medium">Kategori</Label>
       {variant === "icons" ? (
-        mainCat && !expanded ? (
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium">{mainCat.name_nb}</p>
-              {selectedSubCats.length > 0 && (
-                <p className="truncate text-xs text-muted-foreground">
-                  {selectedSubCats.map((c) => c.name_nb).join(", ")}
-                </p>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={() => setExpanded(true)}
-              className="native-touch-target shrink-0 px-2 text-sm font-medium text-primary"
-            >
-              Endre kategori
-            </button>
-          </div>
-        ) : (
-          <div
-            className={`space-y-3 ${mainCat ? "duration-200 animate-in fade-in slide-in-from-top-2" : ""}`}
-          >
-            <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <button
-                type="button"
-                onClick={() => onMainChange(ALL)}
-                className="group flex w-16 shrink-0 snap-start flex-col items-center gap-1.5 active:opacity-80"
-              >
-                <span
-                  className={`flex size-14 items-center justify-center rounded-2xl text-sm font-medium transition ${
-                    !mainSlug
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground"
-                  }`}
-                >
-                  Alle
-                </span>
-              </button>
-              {parents.map((p) => {
-                const Icon = getCategoryIcon(p.icon ?? null);
-                const active = mainSlug === p.slug;
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => onMainChange(active ? ALL : p.slug)}
-                    className="group flex w-16 shrink-0 snap-start flex-col items-center gap-1.5 active:opacity-80"
-                  >
-                    <span
-                      className={`flex size-14 items-center justify-center rounded-2xl transition ${
-                        active
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground"
-                      }`}
-                    >
-                      <Icon className="size-6" />
-                    </span>
-                    <span className="line-clamp-2 text-pretty text-center text-xs font-medium leading-tight">
-                      {p.name_nb}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {mainCat && hasSubs && (
-              <div className="space-y-2">
-                {/* Dropdown i stedet for avkrysningsliste (fase 13): åpner ved
-                    trykk (eller automatisk idet hovedkategorien velges, se
-                    effekten over), lukker seg selv igjen straks en
-                    underkategori velges (Radix Selects normale oppførsel) —
-                    verdien holdes alltid tom slik at samme dropdown kan
-                    brukes til å legge til flere, én om gangen, med valgte
-                    vist som fjernbare tagger under. */}
-                <Select value="" onValueChange={toggleSub} open={subOpen} onOpenChange={setSubOpen}>
-                  <SelectTrigger
-                    onClick={(e) => {
-                      if (subOpen) {
-                        e.preventDefault();
-                        setSubOpen(false);
-                      }
-                    }}
-                  >
-                    <SelectValue placeholder="Legg til underkategori" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SubcategoryOptions
-                      parentId={mainCat.id}
-                      depth={0}
-                      childrenByParent={childrenByParent}
-                      selectedSubSlugs={selectedSubSlugs}
-                    />
-                  </SelectContent>
-                </Select>
-                {selectedSubCats.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedSubCats.map((c) => (
-                      <span
-                        key={c.id}
-                        className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs"
-                      >
-                        {c.name_nb}
-                        <button
-                          type="button"
-                          onClick={() => toggleSub(c.slug)}
-                          className="native-hit-area text-muted-foreground hover:text-foreground"
-                          aria-label={`Fjern ${c.name_nb}`}
-                        >
-                          <X className="size-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {isSelectionComplete && (
-              <button
-                type="button"
-                onClick={() => setExpanded(false)}
-                className="native-touch-target px-2 text-sm font-medium text-primary"
-              >
-                Skjul kategorivalg
-              </button>
-            )}
-          </div>
-        )
+        <NativeCategoryDrilldown categories={categories} selected={selected} onChange={onChange} />
       ) : (
-        <Select value={mainSlug || ALL} onValueChange={onMainChange}>
-          <SelectTrigger>
-            <SelectValue placeholder="Alle hovedkategorier" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>Alle hovedkategorier</SelectItem>
-            {parents.map((p) => (
-              <SelectItem key={p.id} value={p.slug}>
-                {p.name_nb}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-      {variant === "select" && mainCat && hasSubs && (
-        <div className="space-y-1.5">
-          <p className="text-xs text-muted-foreground">
-            Underkategorier (velg én eller flere — tomt = alle)
-          </p>
-          <div className="max-h-56 overflow-y-auto rounded-md border border-border p-2">
-            <CategoryLevelList
-              parentId={mainCat.id}
-              depth={0}
-              childrenByParent={childrenByParent}
-              selectedSubSlugs={selectedSubSlugs}
-              toggleSub={toggleSub}
-            />
-          </div>
-        </div>
+        <>
+          <Select value={mainSlug || ALL} onValueChange={onMainChange}>
+            <SelectTrigger>
+              <SelectValue placeholder="Alle hovedkategorier" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>Alle hovedkategorier</SelectItem>
+              {parents.map((p) => (
+                <SelectItem key={p.id} value={p.slug}>
+                  {p.name_nb}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {mainCat && hasSubs && (
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground">
+                Underkategorier (velg én eller flere — tomt = alle)
+              </p>
+              <div className="max-h-56 overflow-y-auto rounded-md border border-border p-2">
+                <CategoryLevelList
+                  parentId={mainCat.id}
+                  depth={0}
+                  childrenByParent={childrenByParent}
+                  selectedSubSlugs={selectedSubSlugs}
+                  toggleSub={toggleSub}
+                />
+              </div>
+            </div>
+          )}
+        </>
       )}
     </section>
   );
 }
 
-/** Flat option list for the native filter panel's subcategory dropdown —
- * every descendant level, indented by depth, with already-selected ones
- * left out since picking is one-at-a-time (see `CategoryPicker`). */
-function SubcategoryOptions({
-  parentId,
-  depth,
-  childrenByParent,
-  selectedSubSlugs,
+function NativeCategoryDrilldown({
+  categories,
+  selected,
+  onChange,
 }: {
-  parentId: string;
-  depth: number;
-  childrenByParent: Map<string, Category[]>;
-  selectedSubSlugs: Set<string>;
+  categories: Category[];
+  selected: string[];
+  onChange: (slugs: string[]) => void;
 }) {
-  const items = childrenByParent.get(parentId) ?? [];
+  const [path, setPath] = useState<Category[]>([]);
+  const [query, setQuery] = useState("");
+  const childrenByParent = useMemo(() => {
+    const map = new Map<string | null, Category[]>();
+    for (const category of categories) {
+      const siblings = map.get(category.parent_id) ?? [];
+      siblings.push(category);
+      map.set(category.parent_id, siblings);
+    }
+    return map;
+  }, [categories]);
+  const selectedSet = useMemo(() => new Set(selected), [selected]);
+  const currentParent = path.at(-1) ?? null;
+  const currentLevel = childrenByParent.get(currentParent?.id ?? null) ?? [];
+  const filteredLevel = query.trim()
+    ? categories.filter((category) =>
+        category.name_nb.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
+      )
+    : currentLevel;
+  const breadcrumb = path.map((category) => category.name_nb).join(" › ");
+  const hasChildren = (id: string) => (childrenByParent.get(id) ?? []).length > 0;
+  const descendants = (id: string): Category[] => {
+    const direct = childrenByParent.get(id) ?? [];
+    return direct.flatMap((category) => [category, ...descendants(category.id)]);
+  };
+  const mainCategory = path[0] ?? null;
+  const isBilOgMc = mainCategory?.slug === BIL_OG_MC_SLUG;
+
+  const toggleCategory = (category: Category) => {
+    if (hasChildren(category.id)) {
+      setPath((previous) => [...previous, category]);
+      setQuery("");
+      return;
+    }
+    if (isBilOgMc) {
+      onChange(selectedSet.has(category.slug) ? [mainCategory.slug] : [category.slug]);
+      return;
+    }
+    const next = new Set(selected.filter((slug) => slug !== mainCategory?.slug));
+    if (next.has(category.slug)) next.delete(category.slug);
+    else next.add(category.slug);
+    onChange(next.size > 0 ? [...next] : mainCategory ? [mainCategory.slug] : []);
+  };
+
   return (
-    <>
-      {items.map((s) => (
-        <Fragment key={s.id}>
-          {!selectedSubSlugs.has(s.slug) && (
-            <SelectItem value={s.slug} style={{ paddingLeft: `${depth * 16 + 8}px` }}>
-              {s.name_nb}
-            </SelectItem>
-          )}
-          <SubcategoryOptions
-            parentId={s.id}
-            depth={depth + 1}
-            childrenByParent={childrenByParent}
-            selectedSubSlugs={selectedSubSlugs}
-          />
-        </Fragment>
-      ))}
-    </>
+    <div className="space-y-3">
+      <div className="relative">
+        <SearchIcon
+          className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+          aria-hidden
+        />
+        <Input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Søk i kategorier"
+          aria-label="Søk i kategorier"
+          className="h-12 pl-9"
+        />
+      </div>
+      {path.length > 0 && (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setPath((previous) => previous.slice(0, -1));
+              setQuery("");
+            }}
+            className="native-touch-target flex items-center gap-1 rounded-lg px-2 text-sm font-medium text-primary"
+          >
+            <ChevronDown className="size-4 rotate-90" aria-hidden />
+            Tilbake
+          </button>
+          <span className="truncate text-sm text-muted-foreground">{breadcrumb}</span>
+        </div>
+      )}
+      {path.length > 0 && (
+        <button
+          type="button"
+          onClick={() => onChange([mainCategory!.slug])}
+          className="native-touch-target flex min-h-14 w-full items-center justify-between rounded-xl border border-dashed border-primary/50 px-4 text-left text-sm font-medium text-primary"
+        >
+          <span>Alt i {mainCategory!.name_nb}</span>
+          <span>Velg</span>
+        </button>
+      )}
+      <div className="space-y-1">
+        {filteredLevel.map((category) => {
+          const isSelected = selectedSet.has(category.slug);
+          return (
+            <button
+              key={category.id}
+              type="button"
+              onClick={() => toggleCategory(category)}
+              className={`native-touch-target flex min-h-14 w-full items-center gap-3 rounded-xl px-4 text-left text-base ${
+                isSelected ? "bg-primary/10 font-medium text-primary" : "bg-muted"
+              }`}
+            >
+              <span className="min-w-0 flex-1">{category.name_nb}</span>
+              {isSelected ? (
+                <span aria-hidden>✓</span>
+              ) : hasChildren(category.id) ? (
+                <ChevronDown className="size-4 -rotate-90" aria-hidden />
+              ) : null}
+            </button>
+          );
+        })}
+        {filteredLevel.length === 0 && (
+          <p className="py-4 text-center text-sm text-muted-foreground">Ingen kategorier funnet</p>
+        )}
+      </div>
+      <div className="flex items-center justify-between border-t border-border pt-3 text-sm">
+        <span className="text-muted-foreground">
+          {selected.length > 0 ? `${selected.length} valgt` : "Alle kategorier"}
+        </span>
+        {selected.length > 0 && (
+          <button
+            type="button"
+            onClick={() => onChange([])}
+            className="native-touch-target px-2 text-primary"
+          >
+            Nullstill
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 

@@ -6,7 +6,7 @@
   },
   "src/components/advanced-search-sheet.tsx": {
     "react-hooks/set-state-in-effect": {
-      "count": 3
+      "count": 2
     }
   },
   "src/components/attribute-filter-chips.tsx": {

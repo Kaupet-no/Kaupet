@@ -23,14 +23,36 @@ beforeEach(() => {
 });
 
 describe("IntentTitleLanding", () => {
-  it("viser informasjon om automatisk tittel bak en info-knapp", () => {
+  it("viser tre eksplisitte valg for annonseintensjon som radioknapper", () => {
     render(<IntentTitleLanding />);
 
-    const infoButton = screen.getByRole("button", { name: "Informasjon om automatisk tittel" });
-    expect(screen.getByText("Dette blir tittelen på annonsen din")).toBeTruthy();
-    expect(infoButton.getAttribute("title")).toBe(
-      "For Bil, MC og Båt genereres tittelen automatisk",
+    const group = screen.getByRole("radiogroup", { name: "Jeg ønsker å" });
+    const sell = screen.getByRole("radio", { name: "Selge" });
+    const buy = screen.getByRole("radio", { name: "Ønskes kjøpt" });
+    const free = screen.getByRole("radio", { name: "Gi bort" });
+    expect(group.contains(sell)).toBe(true);
+    expect(group.contains(buy)).toBe(true);
+    expect(group.contains(free)).toBe(true);
+    expect(sell.getAttribute("aria-checked")).toBe("true");
+    expect(buy.getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("bytter intensjon og navigasjonsmål ved klikk på et annet valg", () => {
+    render(<IntentTitleLanding />);
+
+    fireEvent.click(screen.getByRole("radio", { name: "Ønskes kjøpt" }));
+    expect(screen.getByRole("radio", { name: "Ønskes kjøpt" }).getAttribute("aria-checked")).toBe(
+      "true",
     );
+
+    const input = screen.getByRole("textbox", { name: "Tittel på annonsen" });
+    fireEvent.change(input, { target: { value: "sykkel" } });
+    fireEvent.submit(input.closest("form")!);
+
+    expect(mocks.navigate).toHaveBeenCalledWith({
+      to: "/ny-ok-annonse",
+      search: { title: "sykkel" },
+    });
   });
 
   it("har en synlig etikett som peker til tittel-feltet", () => {

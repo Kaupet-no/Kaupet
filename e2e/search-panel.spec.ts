@@ -32,9 +32,9 @@ test("bevarer native søkeopplevelse etter intern ruting", async ({ page }) => {
   await page.locator("html[data-kaupet-hydrated='true']").waitFor();
 
   await page.getByRole("button", { name: "Søk", exact: true }).last().click();
-  await expect(page).toHaveURL(/\/annonser\?/);
+  await expect(page).toHaveURL(/\/\?forcenative=1/);
   await expect(page.getByRole("dialog", { name: "Søk og filtrer" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Kategori/ })).toBeVisible();
+  await expect(page.getByRole("searchbox", { name: "Søk i annonser" })).toBeVisible();
   await expect(page.locator("html")).toHaveClass(/native/);
 });
 
@@ -69,7 +69,10 @@ test("holder filter som utkast frem til brukeren anvender dem", async ({ page })
   await page.getByRole("button", { name: /^Pris/ }).click();
   await page.getByRole("checkbox", { name: "Inkluder gratis-annonser" }).click();
   await expect(page).not.toHaveURL(/includeFree=false/);
-  await expect(applyButton).toHaveText("Beregner treff …");
+  await expect(
+    page.getByRole("status").filter({ hasText: "Beregner nytt antall treff" }),
+  ).toBeVisible();
+  await expect(applyButton).toHaveText(/Vis \d+ annonser?/);
   await expect(applyButton).toHaveText(`Vis ${filterFixture.paid} annonser`, { timeout: 10_000 });
 
   await applyButton.click();

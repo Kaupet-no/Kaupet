@@ -118,7 +118,7 @@ describe("SearchPanel", () => {
       />,
     );
 
-    const input = screen.getByRole("textbox", { name: "Søk i annonser" });
+    const input = screen.getByRole("searchbox", { name: "Søk i annonser" });
     fireEvent.change(input, { target: { value: "sykkel" } });
     fireEvent.click(screen.getByRole("button", { name: "Søk etter «sykkel»" }));
 

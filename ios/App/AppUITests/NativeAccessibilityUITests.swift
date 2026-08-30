@@ -37,7 +37,7 @@ final class NativeAccessibilityUITests: XCTestCase {
         let homeTab = app.links["Hjem"]
         let searchButton = app.buttons["Søk"]
         let newListingLink = app.links["Ny annonse"]
-        let locationOpener = app.buttons["Velg lokasjon: Hvor som helst"]
+        let locationOpener = app.buttons["Velg lokasjon: Hele Norge"]
 
         XCTAssertTrue(locationOpener.waitForExistence(timeout: 30))
         XCTAssertEqual(homeTab.label, "Hjem")
@@ -46,27 +46,24 @@ final class NativeAccessibilityUITests: XCTestCase {
         XCTAssertTrue(searchButton.isHittable)
         XCTAssertEqual(newListingLink.label, "Ny annonse")
         XCTAssertTrue(newListingLink.isHittable)
-        XCTAssertEqual(locationOpener.label, "Velg lokasjon: Hvor som helst")
+        XCTAssertEqual(locationOpener.label, "Velg lokasjon: Hele Norge")
         XCTAssertTrue(locationOpener.isHittable)
         locationOpener.tap()
 
-        let locationDialog = app.otherElements["Velg sted"]
+        let searchPanel = app.otherElements["Søk og filtrer"]
         let locationSearch = app.textFields["Søk etter sted"]
         let useLocationButton = app.buttons["Bruk min posisjon"]
-        let closeButton = app.buttons["Lukk"]
 
-        XCTAssertTrue(locationDialog.waitForExistence(timeout: 5))
-        XCTAssertTrue(locationDialog.isHittable)
-        XCTAssertTrue(locationDialog.hasFocus)
+        XCTAssertTrue(searchPanel.waitForExistence(timeout: 5))
+        XCTAssertTrue(searchPanel.isHittable)
+        XCTAssertTrue(locationSearch.waitForExistence(timeout: 5))
         XCTAssertEqual(locationSearch.label, "Søk etter sted")
         XCTAssertTrue(locationSearch.isHittable)
         XCTAssertEqual(useLocationButton.label, "Bruk min posisjon")
         XCTAssertTrue(useLocationButton.isHittable)
-        XCTAssertEqual(closeButton.label, "Lukk")
-        XCTAssertTrue(closeButton.isHittable)
-        closeButton.tap()
+        app.buttons["Lukk"].tap()
 
-        XCTAssertTrue(locationDialog.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(searchPanel.waitForNonExistence(timeout: 5))
         XCTAssertTrue(locationOpener.isHittable)
     }
 }

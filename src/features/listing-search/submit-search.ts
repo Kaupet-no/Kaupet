@@ -39,6 +39,8 @@ export async function resolveAppliedSearch({
   }).catch(() => ({
     q: query.trim(),
     categorySlug: undefined,
+    minPrice: undefined,
+    maxPrice: undefined,
     attrPatch: {},
     criteria: [],
   }));
@@ -54,6 +56,8 @@ export async function resolveAppliedSearch({
             : resolved.categorySlug
               ? [resolved.categorySlug]
               : [],
+        min: resolved.minPrice ?? applied.value.min,
+        max: resolved.maxPrice ?? applied.value.max,
       },
       attributes: { ...applied.attributes, ...resolved.attrPatch },
     },

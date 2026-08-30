@@ -14,7 +14,6 @@ export const logProductEvent = createServerFn({ method: "POST" })
     ]);
     const { error } = await supabaseAdmin.rpc("log_product_event_rate_limited", {
       _key_hash: await hashRequestIp(),
-      _session_id: data.sessionId,
       _event_name: data.eventName,
       _platform: data.platform,
       _path: data.path,

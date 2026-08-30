@@ -133,9 +133,12 @@ export const saveWtbDraft = createServerFn({ method: "POST" })
     };
 
     if (data.id) {
+      // Re-editing a draft that already got the "expires in 7 days" system
+      // message must reset the flag — otherwise a second dormancy period
+      // (edit, then go quiet again) would delete it without a fresh warning.
       const { data: row, error } = await supabaseAdmin
         .from("wtb_listings")
-        .update(fields)
+        .update({ ...fields, draft_expiry_notified_at: null })
         .eq("id", data.id)
         .eq("user_id", context.userId)
         .eq("status", "draft")

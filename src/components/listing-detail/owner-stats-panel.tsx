@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Check, ChevronDown, Eye, Heart, Info, Loader2, Pencil, Send, Users } from "lucide-react";
+import { Check, ChevronDown, Eye, Heart, Info, Loader2, Pencil, Send } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ import { republishListing } from "@/lib/listings.functions";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
 
-type Stats = { total_views: number; unique_visitors: number; favorite_count: number } | undefined;
+type Stats = { total_views: number; favorite_count: number } | undefined;
 type ActivePromotion = { id: string; status: string; expires_at: string | null } | null | undefined;
 
 export function OwnerStatsPanel({
@@ -164,21 +164,12 @@ export function OwnerStatsPanel({
         open={promoteOpen}
         onOpenChange={onPromoteOpenChange}
       />
-      <dl className="mt-4 grid grid-cols-3 gap-3 text-center">
+      <dl className="mt-4 grid grid-cols-2 gap-3 text-center">
         <div className="rounded-lg bg-card p-2">
           <Eye className="mx-auto size-4 text-muted-foreground" />
           <dd className="mt-1 font-display text-lg leading-none">{stats?.total_views ?? "–"}</dd>
           <dt className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">
             Visninger
-          </dt>
-        </div>
-        <div className="rounded-lg bg-card p-2">
-          <Users className="mx-auto size-4 text-muted-foreground" />
-          <dd className="mt-1 font-display text-lg leading-none">
-            {stats?.unique_visitors ?? "–"}
-          </dd>
-          <dt className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-            Unike besøk
           </dt>
         </div>
         <div className="rounded-lg bg-card p-2">
@@ -212,15 +203,7 @@ export function OwnerStatsPanel({
                 <span className="mt-0.5 shrink-0 text-primary">•</span>
                 <span>
                   <strong className="text-foreground">Visninger</strong> — antall ganger annonsen er
-                  åpnet (ett oppslag per time).
-                </span>
-              </li>
-              <li className="flex gap-2">
-                <span className="mt-0.5 shrink-0 text-primary">•</span>
-                <span>
-                  <strong className="text-foreground">Unike besøk</strong> — antall distinkte
-                  besøkende. Vi skiller brukere ved innlogget bruker-ID eller en tilfeldig nøkkel i
-                  nettleseren. Samme person telles bare én gang.
+                  åpnet, begrenset til én telling per nettverk per 30 minutter.
                 </span>
               </li>
               <li className="flex gap-2">

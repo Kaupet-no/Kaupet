@@ -19,6 +19,13 @@ function attributeLabel(filter: CategoryFilter, value: AttributeFilterValue) {
     : `${filter.label_nb}: ${describeAttrValue(filter, value)}`;
 }
 
+function priceLabel(min: number | undefined, max: number | undefined) {
+  const format = (value: number) => `${value.toLocaleString("nb-NO")} kr`;
+  if (min != null && max != null) return `${format(min)}–${format(max)}`;
+  if (min != null) return `Fra ${format(min)}`;
+  return `Under ${format(max ?? 0)}`;
+}
+
 export function SearchInterpretation({
   criteria,
   categories,
@@ -26,6 +33,7 @@ export function SearchInterpretation({
   onCategoryChange,
   onAttributeChange,
   onAttributeRemove,
+  onPriceRemove,
 }: {
   criteria: InterpretedCriterion[];
   categories: Category[];
@@ -34,9 +42,8 @@ export function SearchInterpretation({
   onAttributeChange: (key: string, value: AttributeFilterValue | undefined) => void;
   /** Optional precise removal hook for multiselect/exclude criteria. */
   onAttributeRemove?: (key: string, value?: string, matchedText?: string) => void;
+  onPriceRemove?: (matchedText?: string) => void;
 }) {
-  if (criteria.length === 0) return null;
-
   return (
     <div
       className="flex flex-wrap items-center gap-2"
@@ -49,11 +56,18 @@ export function SearchInterpretation({
           criterion.kind === "category"
             ? (categories.find((category) => category.slug === criterion.slug)?.name_nb ??
               criterion.slug)
-            : (() => {
-                const filter = filters.find((candidate) => candidate.key === criterion.key);
-                return filter ? attributeLabel(filter, criterion.value) : criterion.key;
-              })();
-        const key = criterion.kind === "category" ? "category" : `attribute:${criterion.key}`;
+            : criterion.kind === "price"
+              ? priceLabel(criterion.min, criterion.max)
+              : (() => {
+                  const filter = filters.find((candidate) => candidate.key === criterion.key);
+                  return filter ? attributeLabel(filter, criterion.value) : criterion.key;
+                })();
+        const key =
+          criterion.kind === "category"
+            ? "category"
+            : criterion.kind === "price"
+              ? "price"
+              : `attribute:${criterion.key}`;
 
         return (
           <FilterChip
@@ -67,6 +81,10 @@ export function SearchInterpretation({
             onClick={() => {
               if (criterion.kind === "category") {
                 onCategoryChange(undefined);
+                return;
+              }
+              if (criterion.kind === "price") {
+                onPriceRemove?.(criterion.matchedText);
                 return;
               }
               const option =

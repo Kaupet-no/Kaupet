@@ -7,7 +7,10 @@ import type { CategoryFilter } from "@/lib/category-filters";
 import { searchSchema } from "@/features/listing-search/search-schema";
 import { useAnnonserSearchState } from "@/features/listing-search/use-annonser-search-state";
 import { useFilterFacetCounts } from "@/features/listing-search/use-filter-facet-counts";
-import { useListingsQuery } from "@/features/listing-search/use-listings-query";
+import {
+  useListingsPriceMax,
+  useListingsQuery,
+} from "@/features/listing-search/use-listings-query";
 import { useTextToFilterPipeline } from "@/features/listing-search/use-text-to-filter-pipeline";
 import { useZeroResultExpansion } from "@/features/listing-search/zero-result-expansion";
 import { useRegisterSearchPanelResults } from "@/features/listing-search/search-panel/search-panel-context";
@@ -121,6 +124,8 @@ export function useSearchResultsShell({
     attrValues,
     handleAttrValueChange,
     categoryId: resolveCategoryId(effectiveCategories, categoryTree),
+    min: search.min,
+    max: search.max,
     onApplied: (applied) => {
       setAutoAppliedText((prev) => ({ ...prev, ...applied }));
       flashKeys(Object.keys(applied));
@@ -184,6 +189,12 @@ export function useSearchResultsShell({
     hasNextPage,
     isFetchingNextPage,
   } = useListingsQuery({ search, categories, effectiveCategories, terms });
+  const { data: availablePriceMax } = useListingsPriceMax({
+    search,
+    categories,
+    effectiveCategories,
+    terms,
+  });
 
   const listings = useMemo(() => listingsData?.pages.flatMap((p) => p.rows), [listingsData]);
   const totalCount = listingsData?.pages[0]?.totalCount ?? null;
@@ -240,6 +251,7 @@ export function useSearchResultsShell({
     attributeFilters: attrFilters,
     attributeCounts: facetCounts,
     resultCount: totalCount ?? cards.length,
+    availablePriceMax,
   };
   useRegisterSearchPanelResults(searchPanelResults);
 

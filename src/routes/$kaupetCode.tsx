@@ -38,17 +38,8 @@ import { Vehicle360CaptureLauncher } from "@/components/vehicle-360-capture-laun
 import { currentReturnTo } from "@/lib/auth-return";
 import { savePendingAuthIntent, takePendingAuthIntent } from "@/lib/pending-auth-intent";
 import { trackProductEvent } from "@/lib/product-analytics";
+import { logListingView } from "@/lib/listing-views.functions";
 import { parseVehicleLookup } from "@/lib/vehicle/parse-vehicle-lookup";
-
-// crypto.randomUUID() requires a secure context and isn't available in every
-// WebView — fall back to a non-crypto random ID so anonymous view-count
-// tracking still works there.
-function randomVisitorId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return `v-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-}
 
 export const Route = createFileRoute("/$kaupetCode")({
   validateSearch: searchSchema.extend({
@@ -270,6 +261,7 @@ function ListingDetailPage() {
   const [shareOpen, setShareOpen] = useState(false);
 
   const reconcilePromotion = useServerFn(reconcilePromotionPayment);
+  const logView = useServerFn(logListingView);
   useEffect(() => {
     if (search.promotion !== "success" || !search.promo_id) return;
     const promoId = search.promo_id;
@@ -431,7 +423,6 @@ function ListingDetailPage() {
       const row = Array.isArray(rows) ? rows[0] : rows;
       return {
         total_views: Number(row?.total_views ?? 0),
-        unique_visitors: Number(row?.unique_visitors ?? 0),
         favorite_count: Number(row?.favorite_count ?? 0),
       };
     },
@@ -533,43 +524,12 @@ function ListingDetailPage() {
     signVehicle360FrameUrls(vehicle360Frames.map((f) => f.storage_path)).then(setVehicle360ImgUrls);
   }, [vehicle360Frames]);
 
-  // Logg visning (databasens unike constraint sørger for at samme besøkende
-  // kun telles én gang per annonse)
   useEffect(() => {
-    if (!data?.id) return;
-    if (user && user.id === data.seller_id) return; // ikke tell egne visninger
-    // crypto.randomUUID() kun tilgjengelig i secure context — utilgjengelig i
-    // enkelte WebView-oppsett (eldre Android System WebView, evt. usikker
-    // origin). View-telling er ren analytics og skal aldri kunne krasje
-    // annonsesiden, så hele blokken er try/catch-et med en ikke-crypto-basert
-    // fallback for visitor-ID.
-    try {
-      let visitorKey = user?.id ?? null;
-      if (!visitorKey) {
-        const k = "kaupet_visitor_id";
-        try {
-          visitorKey = localStorage.getItem(k);
-        } catch {
-          visitorKey = null;
-        }
-        if (!visitorKey) {
-          visitorKey = randomVisitorId();
-          try {
-            localStorage.setItem(k, visitorKey);
-          } catch {
-            /* ignore — privat nettlesing e.l. */
-          }
-        }
-      }
-      supabase
-        .rpc("log_listing_view", { _listing_id: data.id, _visitor_key: visitorKey })
-        .then(({ error }) => {
-          if (error) console.warn("[listing_views] log failed", error);
-        });
-    } catch (e) {
-      console.warn("[listing_views] log failed", e);
-    }
-  }, [data?.id, data?.seller_id, user]);
+    if (!data?.id || user?.id === data.seller_id) return;
+    void logView({ data: { listingId: data.id } }).catch((error: unknown) => {
+      console.warn("[listing_views] log failed", error);
+    });
+  }, [data?.id, data?.seller_id, logView, user?.id]);
 
   if (isLoading) {
     return (

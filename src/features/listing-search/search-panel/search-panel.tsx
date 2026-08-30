@@ -47,6 +47,7 @@ import { expandSheetBeforeScroll } from "@/lib/sheet-gestures";
 import { useDraftResultCount } from "@/features/listing-search/use-draft-result-count";
 import { searchDraftMatchesApplied } from "./search-panel-utils";
 import type { InterpretedCriterion } from "@/features/listing-search/resolve-text-to-filters";
+import { priceBoundsForMax } from "@/lib/filter-range-bounds";
 
 export type SearchPanelSection = SearchFilterSection | "query";
 
@@ -63,6 +64,8 @@ export type SearchPanelResultsContext = {
   attributeFilters?: CategoryFilter[];
   attributeCounts?: Record<string, Record<string, number>>;
   resultCount?: number;
+  /** Highest matching listing price before the user's own maximum is applied. */
+  availablePriceMax?: number | null;
 };
 
 function cloneValue(value: AdvancedSearchValue): AdvancedSearchValue {
@@ -480,6 +483,14 @@ export function SearchPanel({
           attributeValues={draft.attributes}
           onAttributeChange={updateDraftAttribute}
           attributeCounts={results?.attributeCounts}
+          priceBounds={
+            results
+              ? priceBoundsForMax(results.availablePriceMax, {
+                  min: draft.value.min ?? undefined,
+                  max: draft.value.max ?? undefined,
+                })
+              : undefined
+          }
           activeItems={results ? draftItems : undefined}
           includePrimary={!!results}
         />

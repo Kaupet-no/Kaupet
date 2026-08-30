@@ -646,6 +646,21 @@ function BrowsePage() {
                 );
                 removeAttrWithRestore(key, value, matchedText ?? criterion?.matchedText);
               }}
+              onPriceRemove={(matchedText) => {
+                setInterpretedCriteria((previous) =>
+                  previous.filter((item) => item.kind !== "price"),
+                );
+                if (!matchedText) {
+                  updateSearch({ min: undefined, max: undefined });
+                  return;
+                }
+                setIgnoredInterpretations(
+                  (previous) => new Set([...previous, matchedText.toLocaleLowerCase()]),
+                );
+                const nextQ = qDraft ? `${qDraft} ${matchedText}` : matchedText;
+                setQDraft(nextQ);
+                updateSearch({ q: nextQ, min: undefined, max: undefined });
+              }}
             />
           </div>
         )}

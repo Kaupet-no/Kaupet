@@ -107,11 +107,6 @@
       "count": 1
     }
   },
-  "src/hooks/use-nominatim-search.ts": {
-    "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
-  },
   "src/hooks/use-push-status.ts": {
     "react-hooks/set-state-in-effect": {
       "count": 1

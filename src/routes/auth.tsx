@@ -59,7 +59,8 @@ const signUpSchema = signInSchema.extend({
   displayName: z.string().trim().max(50, "Maks 50 tegn").optional().or(z.literal("")),
   password: passwordSchema,
   acceptedTerms: z.boolean().refine((v) => v === true, {
-    message: "Du må godta brukervilkårene og personvernerklæringen for å opprette konto.",
+    message:
+      "Du må godta brukervilkårene og bekrefte at du har lest personvernerklæringen for å opprette konto.",
   }),
 });
 
@@ -420,7 +421,7 @@ function AuthPage() {
                     className="mt-0.5"
                   />
                   <span>
-                    Jeg har lest og godtar{" "}
+                    Jeg godtar{" "}
                     <Link
                       to="/vilkar"
                       target="_blank"
@@ -428,7 +429,7 @@ function AuthPage() {
                     >
                       brukervilkårene
                     </Link>{" "}
-                    og{" "}
+                    og bekrefter at jeg har lest{" "}
                     <Link
                       to="/personvern"
                       target="_blank"

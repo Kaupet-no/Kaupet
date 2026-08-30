@@ -41,4 +41,22 @@ describe("submitSearch", () => {
       attrs: "condition_note:t:pent%20brukt",
     });
   });
+  it("flytter prisgrensen til makspris og lar Volvo stå som søkeord", async () => {
+    let committed: Record<string, unknown> | undefined;
+
+    await submitSearch({
+      query: "Volvo under 300000kr",
+      categories: [{ id: "bil-og-mc", slug: "bil-og-mc", name_nb: "Bil og MC", parent_id: null }],
+      vehicleBrands: [{ name: "Volvo", category_group: "bil" }],
+      commit: (search) => {
+        committed = search;
+      },
+    });
+
+    expect(committed).toMatchObject({
+      q: "Volvo",
+      categories: ["bil-og-mc"],
+      max: 300000,
+    });
+  });
 });

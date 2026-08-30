@@ -13,7 +13,7 @@ import { SecondaryCategoryFilters } from "@/components/attribute-filter-chips";
 import { CategoryFilterFields } from "@/components/category-filter-fields";
 import { describeAttrValue } from "@/components/active-filters";
 import { RangeFilterField } from "@/components/range-filter-field";
-import { PRICE_BOUNDS } from "@/lib/filter-range-bounds";
+import { PRICE_BOUNDS, type RangeBounds } from "@/lib/filter-range-bounds";
 import { conditionOptionsFor, type AdvancedSearchValue } from "@/components/advanced-search-value";
 import { buildTree, isCategorySelectionComplete, type Category } from "@/lib/categories";
 import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/location-filter";
@@ -50,6 +50,8 @@ type Props = {
   attributeValues?: Record<string, AttributeFilterValue>;
   onAttributeChange?: (key: string, value: AttributeFilterValue | undefined) => void;
   attributeCounts?: Record<string, Record<string, number>>;
+  /** Result-aware bounds for the first-class price column. */
+  priceBounds?: RangeBounds;
   /** Se `SecondaryCategoryFilters`: søkepanelet må vise hele filtersettet,
    * siden det er eneste vei dit på native etter fase 9. */
   includePrimary?: boolean;
@@ -84,6 +86,7 @@ export function SearchFilterSections({
   attributeValues,
   onAttributeChange,
   attributeCounts,
+  priceBounds = PRICE_BOUNDS,
   includePrimary = false,
   layout = "drilldown",
   activeItems,
@@ -266,29 +269,31 @@ export function SearchFilterSections({
                 "Pris (NOK)"-label rett under. */}
             <RangeFilterField
               label="Pris (NOK)"
-              bounds={PRICE_BOUNDS}
+              bounds={priceBounds}
               value={{ min: v.min ?? undefined, max: v.max ?? undefined }}
               onChange={({ min, max }) =>
                 setV((prev) => ({ ...prev, min: min ?? null, max: max ?? null }))
               }
             />
             <div className="grid grid-cols-3 gap-2">
-              {[50_000, 100_000, 250_000].map((max) => (
-                <Button
-                  key={max}
-                  type="button"
-                  variant={v.max === max ? "default" : "outline"}
-                  size="default"
-                  className={expanded ? "px-1 text-xs" : "min-h-13 px-2 text-xs"}
-                  disabled={v.min != null && max < v.min}
-                  onClick={() => setV((previous) => ({ ...previous, max }))}
-                  aria-label={`Inntil ${max.toLocaleString("nb-NO")}`}
-                >
-                  {/* Sidekolonnen er smal — «≤» i stedet for «Inntil». */}
-                  {expanded ? "≤ " : "Inntil "}
-                  {max.toLocaleString("nb-NO")}
-                </Button>
-              ))}
+              {[50_000, 100_000, 250_000]
+                .filter((max) => max <= priceBounds.max)
+                .map((max) => (
+                  <Button
+                    key={max}
+                    type="button"
+                    variant={v.max === max ? "default" : "outline"}
+                    size="default"
+                    className={expanded ? "px-1 text-xs" : "min-h-13 px-2 text-xs"}
+                    disabled={v.min != null && max < v.min}
+                    onClick={() => setV((previous) => ({ ...previous, max }))}
+                    aria-label={`Inntil ${max.toLocaleString("nb-NO")}`}
+                  >
+                    {/* Sidekolonnen er smal — «≤» i stedet for «Inntil». */}
+                    {expanded ? "≤ " : "Inntil "}
+                    {max.toLocaleString("nb-NO")}
+                  </Button>
+                ))}
             </div>
             <label
               className={`flex cursor-pointer items-center gap-3 ${expanded ? "" : "min-h-11"}`}

@@ -3,7 +3,6 @@ import { z } from "zod";
 
 const MIN_TOTAL_VOTES = 8;
 const MIN_SHARE = 0.55;
-
 type CategorySuggestion = {
   category_id: string;
   slug: string;
@@ -12,7 +11,6 @@ type CategorySuggestion = {
   parent_name_nb: string | null;
   confidence: number;
 };
-
 type CategorySuggestionResult = { suggestions: CategorySuggestion[] };
 
 export const suggestCategoryForTitle = createServerFn({ method: "GET" })
@@ -41,7 +39,6 @@ export const suggestCategoryForTitle = createServerFn({ method: "GET" })
           confidence: share,
         }
       : null;
-
     if (!top || totalVotes < MIN_TOTAL_VOTES || share < MIN_SHARE) {
       // Keep this dynamic import at the server boundary: this module is also
       // imported by client components, while the AI provider must stay server-only.

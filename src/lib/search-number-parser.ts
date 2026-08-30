@@ -8,6 +8,8 @@ export type NumericFilterMatch = {
   max?: number;
 };
 
+export type PriceFilterMatch = Omit<NumericFilterMatch, "filterKey">;
+
 const MIN_MODIFIERS = ["over", "mer enn", "fra", "minst"];
 const MAX_MODIFIERS = ["under", "mindre enn", "opptil", "maks", "maksimalt", "til"];
 const MODIFIER_PATTERN = [...MIN_MODIFIERS, ...MAX_MODIFIERS].join("|");
@@ -17,6 +19,26 @@ const NUMBER_PATTERN = String.raw`\d+(?:[ .]\d{3})*`;
 
 function parseNumber(raw: string): number {
   return Number(raw.replace(/[ .]/g, ""));
+}
+
+function parseRangeMatch(matchedText: string, modifier: string | undefined, value: number) {
+  const normalizedModifier = modifier?.toLowerCase();
+  const isMin = normalizedModifier ? MIN_MODIFIERS.includes(normalizedModifier) : false;
+  const isMax = normalizedModifier ? MAX_MODIFIERS.includes(normalizedModifier) : true;
+  return {
+    matchedText,
+    min: isMin ? value : undefined,
+    max: isMax ? value : undefined,
+  };
+}
+
+export function parsePriceFilters(query: string): PriceFilterMatch[] {
+  const matches: PriceFilterMatch[] = [];
+  const re = new RegExp(`(?:\\b(${MODIFIER_PATTERN})\\s+)?(${NUMBER_PATTERN})\\s*kr\\b`, "gi");
+  for (const m of query.matchAll(re)) {
+    matches.push(parseRangeMatch(m[0], m[1], parseNumber(m[2])));
+  }
+  return matches;
 }
 
 function escapeRegExp(s: string): string {
@@ -57,14 +79,9 @@ export function parseNumericFilters(
       const end = start + m[0].length;
       if (overlaps(start, end)) continue;
       const value = parseNumber(m[2]);
-      const modifier = m[1]?.toLowerCase();
-      const isMin = modifier ? MIN_MODIFIERS.includes(modifier) : false;
-      const isMax = modifier ? MAX_MODIFIERS.includes(modifier) : true; // bare number defaults to max
       matches.push({
-        matchedText: m[0],
         filterKey: filter.key,
-        min: isMin ? value : undefined,
-        max: isMax ? value : undefined,
+        ...parseRangeMatch(m[0], m[1], value),
       });
       consumedRanges.push([start, end]);
     }

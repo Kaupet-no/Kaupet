@@ -132,9 +132,12 @@ export const saveDraftListing = createServerFn({ method: "POST" })
     };
 
     if (data.id) {
+      // Re-editing a draft that already got the "expires in 7 days" system
+      // message must reset the flag — otherwise a second dormancy period
+      // (edit, then go quiet again) would delete it without a fresh warning.
       const { data: updated, error } = await supabaseAdmin
         .from("listings")
-        .update(fields)
+        .update({ ...fields, draft_expiry_notified_at: null })
         .eq("id", data.id)
         .eq("seller_id", userId)
         .eq("status", "draft")

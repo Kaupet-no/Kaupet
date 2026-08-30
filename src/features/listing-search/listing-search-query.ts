@@ -17,6 +17,8 @@ type SearchRequestInput = {
   offset: number;
 };
 
+type SearchScopeInput = Omit<SearchRequestInput, "limit" | "offset">;
+
 /** Builds the one canonical argument set for `search_listings_page` so the
  * result list and draft result count cannot drift as filters evolve. `null`
  * means the selected category slugs resolve to no category IDs. */
@@ -76,6 +78,18 @@ export function buildListingsSearchRpcArgs({
     _limit: limit,
     _offset: offset,
   };
+}
+
+/** Reuses the canonical listing search to find the highest priced matching
+ * listing. The selected maximum is deliberately omitted so lowering the
+ * filter never makes the slider unable to expand again. */
+export function buildListingsPriceMaxRpcArgs(input: SearchScopeInput) {
+  return buildListingsSearchRpcArgs({
+    ...input,
+    search: { ...input.search, max: undefined, sort: "price_desc" },
+    limit: 1,
+    offset: 0,
+  });
 }
 
 export async function runListingsSearch(

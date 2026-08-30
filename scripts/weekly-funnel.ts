@@ -56,11 +56,10 @@ const LEGACY_STEP_ALIASES: Readonly<Record<string, string>> = {
   "vehicle-confirm": "vehicle-registration",
 };
 
-/** A group is emitted only when every non-zero cell has at least this many sessions. */
+/** A group is emitted only when its raw event count reaches this many. */
 export const SMALL_CELL_THRESHOLD = 5;
 
 export type ProductEventRow = {
-  session_id: unknown;
   event_name: unknown;
   platform: unknown;
   created_at: unknown;
@@ -74,27 +73,27 @@ type Platform = (typeof PLATFORMS)[number];
 type Kind = (typeof KINDS)[number];
 type Environment = "local" | "production" | "staging";
 type Window = { from: string; to: string; fromMs: number; toMs: number };
-type SearchState = {
-  opened: Set<string>;
-  pageViewed: Set<string>;
-  submitted: Set<string>;
-  zeroResults: Set<string>;
-  zeroResultRecovery: Set<string>;
-  filterOpened: Set<string>;
-  filterApplied: Set<string>;
-  filterCancelled: Set<string>;
-  suggestions: Set<string>;
-  mapOpened: Set<string>;
-  saved: Set<string>;
-  resultOpened: Set<string>;
-  listingOpened: Set<string>;
-  contactStarted: Set<string>;
+type SearchCounts = {
+  opened: number;
+  pageViewed: number;
+  submitted: number;
+  zeroResults: number;
+  zeroResultRecovery: number;
+  filterOpened: number;
+  filterApplied: number;
+  filterCancelled: number;
+  suggestions: number;
+  mapOpened: number;
+  saved: number;
+  resultOpened: number;
+  listingOpened: number;
+  contactStarted: number;
 };
-type ComposerStepState = { viewed: Set<string>; completed: Set<string> };
-type ComposerState = {
-  started: Set<string>;
-  published: Set<string>;
-  steps: Map<string, ComposerStepState>;
+type ComposerStepCounts = { viewed: number; completed: number };
+type ComposerCounts = {
+  started: number;
+  published: number;
+  steps: Map<string, ComposerStepCounts>;
 };
 
 function parseWindow(from: string, to: string): Window {
@@ -130,38 +129,27 @@ function normalizeStep(value: unknown): string | null {
   return ALLOWED_STEPS.has(normalized) ? normalized : null;
 }
 
-function searchState(): SearchState {
+function searchCounts(): SearchCounts {
   return {
-    opened: new Set(),
-    pageViewed: new Set(),
-    submitted: new Set(),
-    zeroResults: new Set(),
-    zeroResultRecovery: new Set(),
-    filterOpened: new Set(),
-    filterApplied: new Set(),
-    filterCancelled: new Set(),
-    suggestions: new Set(),
-    mapOpened: new Set(),
-    saved: new Set(),
-    resultOpened: new Set(),
-    listingOpened: new Set(),
-    contactStarted: new Set(),
+    opened: 0,
+    pageViewed: 0,
+    submitted: 0,
+    zeroResults: 0,
+    zeroResultRecovery: 0,
+    filterOpened: 0,
+    filterApplied: 0,
+    filterCancelled: 0,
+    suggestions: 0,
+    mapOpened: 0,
+    saved: 0,
+    resultOpened: 0,
+    listingOpened: 0,
+    contactStarted: 0,
   };
 }
 
-function composerState(): ComposerState {
-  return { started: new Set(), published: new Set(), steps: new Map() };
-}
-
-function intersection(...sets: ReadonlySet<string>[]): Set<string> {
-  const result = new Set<string>();
-  const first = sets[0];
-  if (!first) return result;
-  const rest = sets.slice(1);
-  for (const value of first) {
-    if (rest.every((set) => set.has(value))) result.add(value);
-  }
-  return result;
+function composerCounts(): ComposerCounts {
+  return { started: 0, published: 0, steps: new Map() };
 }
 
 function rate(numerator: number, denominator: number): number {
@@ -179,27 +167,24 @@ function inWindow(createdAt: unknown, window: Window): boolean {
 }
 
 /**
- * Counts distinct anonymous sessions by safe dimensions. Receive order is deliberately ignored:
- * fire-and-forget events can arrive out of order, and duplicate rows collapse into the same sets.
+ * Counts raw, anonymous events by safe dimensions. Events carry no session or
+ * user identifier (removed so client-side telemetry storage needs no cookie
+ * consent under ekomloven § 3-15), so this reports event-volume ratios
+ * ("of N search submissions, M opened a listing") rather than distinct-
+ * session conversion rates. A user who repeats an action within the window
+ * is counted once per event, not once per session.
  */
 export function aggregateWeeklyFunnel(
   rows: readonly ProductEventRow[],
   options: { environment: Environment; from: string; to: string },
 ) {
   const window = parseWindow(options.from, options.to);
-  const search = new Map<Platform, SearchState>();
-  const composer = new Map<string, { platform: Platform; kind: Kind; state: ComposerState }>();
+  const search = new Map<Platform, SearchCounts>();
+  const composer = new Map<string, { platform: Platform; kind: Kind; state: ComposerCounts }>();
 
   for (const row of rows) {
-    if (
-      typeof row.session_id !== "string" ||
-      !isPlatform(row.platform) ||
-      !inWindow(row.created_at, window)
-    ) {
-      continue;
-    }
+    if (!isPlatform(row.platform) || !inWindow(row.created_at, window)) continue;
 
-    const session = row.session_id;
     if (
       row.event_name === "search_opened" ||
       row.event_name === "search_page_viewed" ||
@@ -216,22 +201,22 @@ export function aggregateWeeklyFunnel(
       row.event_name === "listing_opened" ||
       row.event_name === "contact_started"
     ) {
-      const state = search.get(row.platform) ?? searchState();
+      const state = search.get(row.platform) ?? searchCounts();
       search.set(row.platform, state);
-      if (row.event_name === "search_opened") state.opened.add(session);
-      if (row.event_name === "search_page_viewed") state.pageViewed.add(session);
-      if (row.event_name === "search_submitted") state.submitted.add(session);
-      if (row.event_name === "search_zero_results") state.zeroResults.add(session);
-      if (row.event_name === "search_zero_results_recovered") state.zeroResultRecovery.add(session);
-      if (row.event_name === "search_filter_opened") state.filterOpened.add(session);
-      if (row.event_name === "search_filter_applied") state.filterApplied.add(session);
-      if (row.event_name === "search_filter_cancelled") state.filterCancelled.add(session);
-      if (row.event_name === "search_suggestion_selected") state.suggestions.add(session);
-      if (row.event_name === "search_map_opened") state.mapOpened.add(session);
-      if (row.event_name === "search_saved") state.saved.add(session);
-      if (row.event_name === "search_result_opened") state.resultOpened.add(session);
-      if (row.event_name === "listing_opened") state.listingOpened.add(session);
-      if (row.event_name === "contact_started") state.contactStarted.add(session);
+      if (row.event_name === "search_opened") state.opened += 1;
+      if (row.event_name === "search_page_viewed") state.pageViewed += 1;
+      if (row.event_name === "search_submitted") state.submitted += 1;
+      if (row.event_name === "search_zero_results") state.zeroResults += 1;
+      if (row.event_name === "search_zero_results_recovered") state.zeroResultRecovery += 1;
+      if (row.event_name === "search_filter_opened") state.filterOpened += 1;
+      if (row.event_name === "search_filter_applied") state.filterApplied += 1;
+      if (row.event_name === "search_filter_cancelled") state.filterCancelled += 1;
+      if (row.event_name === "search_suggestion_selected") state.suggestions += 1;
+      if (row.event_name === "search_map_opened") state.mapOpened += 1;
+      if (row.event_name === "search_saved") state.saved += 1;
+      if (row.event_name === "search_result_opened") state.resultOpened += 1;
+      if (row.event_name === "listing_opened") state.listingOpened += 1;
+      if (row.event_name === "contact_started") state.contactStarted += 1;
       continue;
     }
 
@@ -248,46 +233,33 @@ export function aggregateWeeklyFunnel(
     const group = composer.get(key) ?? {
       platform: row.platform,
       kind: row.kind,
-      state: composerState(),
+      state: composerCounts(),
     };
     composer.set(key, group);
-    if (row.event_name === "listing_creation_started") group.state.started.add(session);
-    if (row.event_name === "listing_published") group.state.published.add(session);
+    if (row.event_name === "listing_creation_started") group.state.started += 1;
+    if (row.event_name === "listing_published") group.state.published += 1;
     if (row.event_name !== "listing_creation_step_completed") continue;
 
     const step = normalizeStep(row.step);
     if (!step || (row.action !== "viewed" && row.action !== "completed")) continue;
-    const stepState = group.state.steps.get(step) ?? { viewed: new Set(), completed: new Set() };
+    const stepState = group.state.steps.get(step) ?? { viewed: 0, completed: 0 };
     group.state.steps.set(step, stepState);
-    stepState[row.action].add(session);
+    stepState[row.action] += 1;
   }
 
   let suppressedSearchGroups = 0;
   const searchReport = PLATFORMS.flatMap((platform) => {
     const state = search.get(platform);
     if (!state) return [];
-    const pageViewed = state.pageViewed;
-    const opened = new Set([...state.opened, ...pageViewed]);
-    const submitted = intersection(opened, state.submitted);
-    const zeroResults = intersection(submitted, state.zeroResults);
-    const filterOpened = intersection(submitted, state.filterOpened);
-    const filterApplied = intersection(submitted, state.filterApplied);
-    const filterCancelled = intersection(submitted, state.filterCancelled);
-    const suggestions = intersection(submitted, state.suggestions);
-    const zeroResultRecovery = intersection(submitted, state.zeroResultRecovery);
-    const mapOpened = intersection(submitted, state.mapOpened);
-    const saved = intersection(submitted, state.saved);
-    const resultOpened = intersection(submitted, state.resultOpened);
-    const listingOpened = intersection(submitted, state.listingOpened);
-    const contactStarted = intersection(listingOpened, state.contactStarted);
+    const opened = state.opened + state.pageViewed;
     const counts = [
-      opened.size,
-      submitted.size,
-      zeroResults.size,
-      listingOpened.size,
-      contactStarted.size,
+      opened,
+      state.submitted,
+      state.zeroResults,
+      state.listingOpened,
+      state.contactStarted,
     ];
-    if (opened.size === 0) return [];
+    if (opened === 0) return [];
     if (isSmallCell(counts)) {
       suppressedSearchGroups += 1;
       return [];
@@ -295,24 +267,24 @@ export function aggregateWeeklyFunnel(
     return [
       {
         platform,
-        pageViewed: pageViewed.size,
-        opened: opened.size,
-        submitted: submitted.size,
-        submissionRate: rate(submitted.size, opened.size),
-        filterOpened: filterOpened.size,
-        filterApplied: filterApplied.size,
-        filterCancelled: filterCancelled.size,
-        suggestions: suggestions.size,
-        zeroResults: zeroResults.size,
-        zeroResultRate: rate(zeroResults.size, submitted.size),
-        zeroResultRecovery: zeroResultRecovery.size,
-        mapOpened: mapOpened.size,
-        saved: saved.size,
-        resultOpened: resultOpened.size,
-        listingOpened: listingOpened.size,
-        listingOpenRate: rate(listingOpened.size, submitted.size),
-        contactStarted: contactStarted.size,
-        contactStartRate: rate(contactStarted.size, listingOpened.size),
+        pageViewed: state.pageViewed,
+        opened,
+        submitted: state.submitted,
+        submissionRate: rate(state.submitted, opened),
+        filterOpened: state.filterOpened,
+        filterApplied: state.filterApplied,
+        filterCancelled: state.filterCancelled,
+        suggestions: state.suggestions,
+        zeroResults: state.zeroResults,
+        zeroResultRate: rate(state.zeroResults, state.submitted),
+        zeroResultRecovery: state.zeroResultRecovery,
+        mapOpened: state.mapOpened,
+        saved: state.saved,
+        resultOpened: state.resultOpened,
+        listingOpened: state.listingOpened,
+        listingOpenRate: rate(state.listingOpened, state.submitted),
+        contactStarted: state.contactStarted,
+        contactStartRate: rate(state.contactStarted, state.listingOpened),
       },
     ];
   });
@@ -325,9 +297,9 @@ export function aggregateWeeklyFunnel(
     )
     .flatMap(({ platform, kind, state }) => {
       const started = state.started;
-      const published = intersection(started, state.published);
-      if (started.size === 0) return [];
-      if (isSmallCell([started.size, published.size])) {
+      const published = state.published;
+      if (started === 0) return [];
+      if (isSmallCell([started, published])) {
         suppressedComposerGroups += 1;
         return [];
       }
@@ -335,20 +307,19 @@ export function aggregateWeeklyFunnel(
       const steps = [...state.steps.entries()]
         .sort(([left], [right]) => left.localeCompare(right))
         .flatMap(([step, stepState]) => {
-          const viewed = intersection(started, stepState.viewed);
-          const completed = intersection(viewed, stepState.completed);
-          if (viewed.size === 0) return [];
-          if (isSmallCell([viewed.size, completed.size])) {
+          const { viewed, completed } = stepState;
+          if (viewed === 0) return [];
+          if (isSmallCell([viewed, completed])) {
             suppressedComposerStepGroups += 1;
             return [];
           }
           return [
             {
               step,
-              viewed: viewed.size,
-              viewRate: rate(viewed.size, started.size),
-              completed: completed.size,
-              completionRate: rate(completed.size, viewed.size),
+              viewed,
+              viewRate: rate(viewed, started),
+              completed,
+              completionRate: rate(completed, viewed),
             },
           ];
         });
@@ -357,16 +328,16 @@ export function aggregateWeeklyFunnel(
         {
           platform,
           kind,
-          started: started.size,
-          published: published.size,
-          publishRate: rate(published.size, started.size),
+          started,
+          published,
+          publishRate: rate(published, started),
           steps,
         },
       ];
     });
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     environment: options.environment,
     window: { from: window.from, to: window.to, timezone: "UTC" as const },
     privacy: {
@@ -378,7 +349,11 @@ export function aggregateWeeklyFunnel(
       },
     },
     funnels: { search: searchReport, composer: composerReport },
-    limitations: ["environment_marker_missing", "journey_id_missing"] as const,
+    limitations: [
+      "environment_marker_missing",
+      "journey_id_missing",
+      "session_correlation_removed",
+    ] as const,
   };
 }
 
@@ -403,7 +378,7 @@ async function fetchProductEvents(environment: Environment, window: Window) {
     const { data, error } = await client
       .from("product_events")
       .select(
-        "session_id,event_name,platform,created_at,kind:properties->>kind,action:properties->>action,step:properties->>step",
+        "event_name,platform,created_at,kind:properties->>kind,action:properties->>action,step:properties->>step",
       )
       .in("event_name", [...RELEVANT_EVENT_NAMES])
       .gte("created_at", `${window.from}T00:00:00.000Z`)

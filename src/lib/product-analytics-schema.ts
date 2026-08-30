@@ -59,7 +59,6 @@ const propertiesSchema = z
   });
 
 export const productEventSchema = z.object({
-  sessionId: z.string().uuid(),
   eventName: z.enum(productEventNames),
   platform: z.enum(["web", "ios", "android"]),
   path: z.string().startsWith("/").max(160),

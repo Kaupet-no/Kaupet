@@ -53,11 +53,11 @@ export function DeleteAccountSection({ currentEmail }: { currentEmail: string })
     <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6">
       <h2 className="text-lg font-medium text-destructive">Slett konto</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Sletter kontoen din og dine personopplysninger. Annonsene dine fjernes helt. Tidligere
-        meldinger du har sendt vil fortsatt være synlige for mottakerne, men avsendernavnet endres
-        til «Slettet bruker». Av sikkerhetshensyn settes kontoen først inaktiv i 7 dager. Logger du
-        inn igjen innen denne perioden, avbrytes slettingen automatisk. Etter 7 dager slettes
-        kontoen permanent og kan ikke gjenopprettes.
+        Sletter kontoen din og dine personopplysninger. Salgsannonsene og «ønskes kjøpt»-annonsene
+        dine fjernes helt. Tidligere meldinger du har sendt vil fortsatt være synlige for
+        mottakerne, men avsendernavnet endres til «Slettet bruker». Av sikkerhetshensyn settes
+        kontoen først inaktiv i 7 dager. Logger du inn igjen innen denne perioden, avbrytes
+        slettingen automatisk. Etter 7 dager slettes kontoen permanent og kan ikke gjenopprettes.
       </p>
       <div className="mt-4 flex justify-end">
         <AlertDialog
@@ -78,8 +78,9 @@ export function DeleteAccountSection({ currentEmail }: { currentEmail: string })
               <AlertDialogDescription asChild>
                 <div className="space-y-3 text-sm text-muted-foreground">
                   <p>
-                    Kontoen din blir satt inaktiv umiddelbart, og du logges ut. Alle dine annonser
-                    arkiveres og blir ikke lenger synlige for andre.
+                    Kontoen din blir satt inaktiv umiddelbart, og du logges ut. Alle salgsannonsene
+                    og «ønskes kjøpt»-annonsene dine arkiveres og blir ikke lenger synlige for
+                    andre.
                   </p>
                   <p>
                     Innen <strong>7 dager</strong> kan du gjenopprette kontoen ved å logge inn på

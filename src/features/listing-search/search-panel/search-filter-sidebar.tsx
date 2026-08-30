@@ -7,6 +7,7 @@ import {
 } from "@/components/advanced-search-value";
 import type { Category } from "@/lib/categories";
 import type { AttributeFilterValue } from "@/lib/category-filters";
+import { priceBoundsForMax } from "@/lib/filter-range-bounds";
 import { trackProductEvent } from "@/lib/product-analytics";
 import { SearchFilterSections } from "./filter-sections";
 import type { SearchPanelResultsContext } from "./search-panel";
@@ -41,6 +42,10 @@ export function SearchFilterSidebar({ results, categories, onSaveSearch }: Props
     else attributes[key] = value;
     onApply({ ...applied, attributes });
   };
+  const priceBounds = priceBoundsForMax(results.availablePriceMax, {
+    min: applied.value.min ?? undefined,
+    max: applied.value.max ?? undefined,
+  });
 
   const activeCount =
     Object.keys(applied.attributes).length +
@@ -93,6 +98,7 @@ export function SearchFilterSidebar({ results, categories, onSaveSearch }: Props
           attributeValues={applied.attributes}
           onAttributeChange={onAttributeChange}
           attributeCounts={results.attributeCounts}
+          priceBounds={priceBounds}
           includePrimary
         />
         {onSaveSearch && (

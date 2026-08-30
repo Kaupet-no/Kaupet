@@ -56,4 +56,27 @@ describe("SearchInterpretation", () => {
     expect(onCategoryChange).toHaveBeenCalledWith(undefined);
     expect(onAttributeChange).toHaveBeenCalledWith("fuel_type", undefined);
   });
+  it("viser prisgrense og kan fjerne den", () => {
+    const onPriceRemove = vi.fn();
+    const { getByRole } = render(
+      <SearchInterpretation
+        criteria={[
+          {
+            kind: "price",
+            max: 300000,
+            source: "text",
+            matchedText: "under 300000kr",
+          },
+        ]}
+        categories={[]}
+        filters={[]}
+        onCategoryChange={vi.fn()}
+        onAttributeChange={vi.fn()}
+        onPriceRemove={onPriceRemove}
+      />,
+    );
+
+    fireEvent.click(getByRole("button", { name: /Fjern Under .*søket/ }));
+    expect(onPriceRemove).toHaveBeenCalledWith("under 300000kr");
+  });
 });

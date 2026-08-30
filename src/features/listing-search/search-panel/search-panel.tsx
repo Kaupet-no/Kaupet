@@ -368,6 +368,7 @@ export function SearchPanel({
       onPickHistory={(item) => void submitText(item)}
       onPickCategory={goToCategory}
       onPickFilter={applyStructuredSuggestion}
+      onPickListing={() => onOpenChange(false)}
       onClearHistory={() => {
         clearSearchHistory();
         setHistory([]);
@@ -619,6 +620,7 @@ function QueryBrowseContent({
   onPickHistory,
   onPickCategory,
   onPickFilter,
+  onPickListing,
   onClearHistory,
 }: {
   q: string;
@@ -631,6 +633,7 @@ function QueryBrowseContent({
   onPickHistory: (item: string) => void;
   onPickCategory: (category: Category) => void;
   onPickFilter: (suggestion: ReturnType<typeof buildStructuredSearchSuggestions>[number]) => void;
+  onPickListing: (position: number) => void;
   onClearHistory: () => void;
 }) {
   if (!q.trim()) {
@@ -696,12 +699,18 @@ function QueryBrowseContent({
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Annonser
           </p>
-          {listingSuggestions.map((suggestion) => (
+          {listingSuggestions.map((suggestion, index) => (
             <Link
               key={suggestion.id}
               to="/$kaupetCode"
               params={{ kaupetCode: suggestion.kaupet_code }}
-              onClick={() => undefined}
+              onClick={() => {
+                trackProductEvent("search_suggestion_selected", {
+                  suggestionType: "listing",
+                  position: index + 1,
+                });
+                onPickListing(index + 1);
+              }}
               className="native-touch-target flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left text-sm hover:bg-muted"
             >
               <SearchIcon className="size-4 shrink-0 text-muted-foreground" />

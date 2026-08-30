@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Bell, MapPin, ChevronRight } from "lucide-react";
+import { Bell, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { requestLocationPermission } from "@/lib/native";
 import { hapticImpact } from "@/lib/haptics";
 import { setBackOverride } from "@/lib/native-offline";
 import { FullscreenOverlay, FullscreenOverlayContent } from "@/components/ui/fullscreen-overlay";
@@ -17,7 +16,7 @@ type Props = {
   onComplete: () => void;
 };
 
-type Card = "welcome" | "notifications" | "location";
+type Card = "welcome" | "notifications";
 
 export function OnboardingFlow({ onComplete }: Props) {
   const { user, loading: authLoading } = useAuth();
@@ -38,7 +37,6 @@ export function OnboardingFlow({ onComplete }: Props) {
   const showPushOffer = !!user && (pushOfferEligible || pushOfferVisited);
   const cards: Card[] = ["welcome"];
   if (showPushOffer) cards.push("notifications");
-  if (user) cards.push("location");
   const scrollRef = useRef<HTMLDivElement>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const activeCard = cards[currentIndex];
@@ -134,15 +132,6 @@ export function OnboardingFlow({ onComplete }: Props) {
     next();
   };
 
-  const handleLocation = async () => {
-    try {
-      await requestLocationPermission();
-    } catch {
-      // User denied or error — continue anyway
-    }
-    finish();
-  };
-
   return (
     // historyBack={false}: onboardingen blokkerer bevisst Escape og klikk
     // utenfor, og skal heller ikke kunne lukkes med Android-tilbake.
@@ -177,10 +166,12 @@ export function OnboardingFlow({ onComplete }: Props) {
                   no
                 </span>
               </div>
-              <h1 className="font-display text-3xl font-semibold tracking-tight">Velkommen!</h1>
+              <h1 className="font-display text-3xl font-semibold tracking-tight">
+                Finn, kjøp og selg brukt
+              </h1>
               <p className="mt-4 max-w-xs text-base text-muted-foreground">
-                Kaupet er bygget for å være en litt annerledes markedsplass. Minst mulig
-                datainnsamling om deg, ingen reklame og 100% fri kildekode.
+                Enkelt og lokalt: gode annonser, direkte kontakt med selger og konkret informasjon
+                om det du kjøper. Ingen reklame, minst mulig sporing og 100% åpen kildekode.
               </p>
               {user ? (
                 <button
@@ -189,7 +180,9 @@ export function OnboardingFlow({ onComplete }: Props) {
                   className="mt-12 flex flex-col items-center gap-2 text-sm text-muted-foreground"
                 >
                   <span>Kom i gang</span>
-                  <ChevronRight className="size-5 animate-[swipe-hint_1.2s_ease-in-out_infinite]" />
+                  <ChevronRight
+                    className={`size-5 ${reduceMotion ? "" : "animate-[swipe-hint_1.2s_ease-in-out_infinite]"}`}
+                  />
                 </button>
               ) : (
                 <div className="mt-10 flex w-full max-w-xs flex-col gap-3">
@@ -231,34 +224,6 @@ export function OnboardingFlow({ onComplete }: Props) {
                   </Button>
                   <Button variant="ghost" onClick={next} className="w-full text-muted-foreground">
                     Ikke nå
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Card 3: Location */}
-            {user && (
-              <div
-                className="flex h-full w-full flex-none snap-center flex-col items-center justify-center overflow-y-auto px-8 py-8 text-center"
-                aria-hidden={activeCard !== "location"}
-                inert={activeCard !== "location"}
-              >
-                <div className="mb-6 flex size-20 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <MapPin className="size-10" />
-                </div>
-                <h2 className="font-display text-2xl font-semibold tracking-tight">
-                  Ønsker du å dele lokasjonsdata?
-                </h2>
-                <p className="mt-3 max-w-xs text-sm text-muted-foreground">
-                  Vi trenger dette for å kunne vise annonser i nærheten av deg, slik at du enkelt
-                  kan finne det du leter etter lokalt.
-                </p>
-                <div className="mt-10 flex w-full max-w-xs flex-col gap-3">
-                  <Button onClick={handleLocation} className="w-full">
-                    Del lokasjonsdata
-                  </Button>
-                  <Button variant="ghost" onClick={finish} className="w-full text-muted-foreground">
-                    Hopp over
                   </Button>
                 </div>
               </div>

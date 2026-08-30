@@ -297,7 +297,7 @@ export function SearchPanel({
     setSubmitting(true);
     if (results) {
       const resolved = await resolveAppliedSearch({
-        applied: results.applied,
+        applied: draft,
         query: trimmed,
         categories,
         vehicleBrands: vehicleBrands ?? [],
@@ -327,13 +327,16 @@ export function SearchPanel({
       position: 1,
     });
     void hapticImpact("medium");
-    if (results)
+    if (results) {
       setDraft((previous) => ({
         ...previous,
         value: { ...previous.value, categories: [cat.slug] },
       }));
-    else navigate({ to: "/annonser", search: { q: "", category: cat.slug, sort: "new" } });
-    close();
+      setLaunchQueryDraft((previous) => previous.trim());
+      return;
+    }
+    navigate({ to: "/annonser", search: { q: "", category: cat.slug, sort: "new" } });
+    close("apply");
   };
   const applyStructuredSuggestion = (
     suggestion: ReturnType<typeof buildStructuredSearchSuggestions>[number],

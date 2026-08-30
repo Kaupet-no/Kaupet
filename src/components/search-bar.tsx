@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "@tanstack/react-router";
 import { ChevronDown, FolderOpen, Search as SearchIcon, SlidersHorizontal } from "lucide-react";
+import { useSearchSuggestions } from "@/features/listing-search/use-search-suggestions";
 import { ANNONSER_SEARCH_INPUT_ID } from "@/features/listing-search/search-input-id";
 import { trackProductEvent } from "@/lib/product-analytics";
 import { Button } from "@/components/ui/button";
@@ -10,8 +10,11 @@ import { Label } from "@/components/ui/label";
 import { ModeToggle } from "@/components/search-term-mode-toggle";
 import { TermGroupEditor } from "@/components/term-group-editor";
 import { describeTermGroup, type TermGroup } from "@/lib/term-groups";
-import { useSearchSuggestions } from "@/features/listing-search/use-search-suggestions";
 import { useDefaultSearchExamples } from "@/hooks/use-default-search-examples";
+import {
+  SearchSuggestionList,
+  type SearchSuggestionGroup,
+} from "@/features/listing-search/search-suggestion-list";
 
 /** Teaches newcomers that the search box understands more than plain
  * keywords (exclusion, price, condition) — kept as fixed syntax examples
@@ -98,6 +101,96 @@ export function SearchBar({
       !!listingSuggestions?.length ||
       !!categorySuggestion ||
       filterSuggestions.length > 0);
+  const suggestionGroups: SearchSuggestionGroup[] = [
+    ...(hasSubmitSuggestion
+      ? [
+          {
+            label: "Søk etter",
+            items: [
+              {
+                id: "query",
+                label: `Søk etter «${q.trim()}»`,
+                icon: <SearchIcon className="size-4 shrink-0 text-primary" aria-hidden="true" />,
+                onSelect: () => {
+                  trackProductEvent("search_suggestion_selected", {
+                    suggestionType: "query",
+                    position: 1,
+                  });
+                  onSubmitQ();
+                  setQFocused(false);
+                },
+              },
+            ],
+          },
+        ]
+      : []),
+    ...(categorySuggestion
+      ? [
+          {
+            label: "Kategori",
+            items: [
+              {
+                id: "category",
+                label: categorySuggestion.label,
+                icon: <FolderOpen className="size-4 shrink-0 text-primary" aria-hidden="true" />,
+                onSelect: () => {
+                  trackProductEvent("search_suggestion_selected", {
+                    suggestionType: "category",
+                    position: 2,
+                  });
+                  categorySuggestion.onSelect();
+                  setQFocused(false);
+                },
+              },
+            ],
+          },
+        ]
+      : []),
+    ...(filterSuggestions.length > 0
+      ? [
+          {
+            label: "Filter",
+            items: filterSuggestions.map((suggestion, index) => ({
+              id: suggestion.id,
+              label: suggestion.label,
+              icon: (
+                <SlidersHorizontal className="size-4 shrink-0 text-primary" aria-hidden="true" />
+              ),
+              onSelect: () => {
+                trackProductEvent("search_suggestion_selected", {
+                  suggestionType: "filter",
+                  position: index + 3,
+                });
+                suggestion.onSelect();
+                setQFocused(false);
+              },
+            })),
+          },
+        ]
+      : []),
+    ...(listingSuggestions && listingSuggestions.length > 0
+      ? [
+          {
+            label: "Annonser",
+            items: listingSuggestions.map((suggestion, index) => ({
+              id: suggestion.id,
+              label: suggestion.title,
+              icon: (
+                <SearchIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              ),
+              kaupetCode: suggestion.kaupet_code,
+              onSelect: () => {
+                trackProductEvent("search_suggestion_selected", {
+                  suggestionType: "listing",
+                  position: index + 1,
+                });
+                setQFocused(false);
+              },
+            })),
+          },
+        ]
+      : []),
+  ];
 
   return (
     <form
@@ -135,131 +228,12 @@ export function SearchBar({
             aria-haspopup="listbox"
           />
           {hasDropdown && (
-            <div
-              role="listbox"
+            <SearchSuggestionList
+              groups={suggestionGroups}
+              variant="dropdown"
+              firstSuggestionRef={firstSuggestionRef}
               id="annonser-search-suggestions"
-              aria-label="Søkeforslag"
-              className="absolute left-0 top-[calc(100%+0.5rem)] z-50 w-[min(380px,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-card p-1 shadow-md"
-            >
-              {hasSubmitSuggestion && (
-                <>
-                  <div className="px-3 pb-1 pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Søk etter
-                  </div>
-                  <button
-                    ref={firstSuggestionRef as React.RefObject<HTMLButtonElement>}
-                    type="button"
-                    role="option"
-                    aria-selected="false"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                      trackProductEvent("search_suggestion_selected", {
-                        suggestionType: "query",
-                        position: 1,
-                      });
-                      onSubmitQ();
-                      setQFocused(false);
-                    }}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <SearchIcon className="size-4 shrink-0 text-primary" />
-                    <span className="truncate">Søk etter «{q.trim()}»</span>
-                  </button>
-                </>
-              )}
-              {categorySuggestion && (
-                <>
-                  <div className="px-3 pb-1 pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Kategori
-                  </div>
-                  <button
-                    ref={firstSuggestionRef as React.RefObject<HTMLButtonElement>}
-                    type="button"
-                    role="option"
-                    aria-selected="false"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                      trackProductEvent("search_suggestion_selected", {
-                        suggestionType: "category",
-                        position: 2,
-                      });
-                      categorySuggestion.onSelect();
-                      setQFocused(false);
-                    }}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <FolderOpen className="size-4 shrink-0 text-primary" />
-                    <span className="truncate">{categorySuggestion.label}</span>
-                  </button>
-                </>
-              )}
-              {filterSuggestions.length > 0 && (
-                <>
-                  <div className="px-3 pb-1 pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Filter
-                  </div>
-                  {filterSuggestions.map((suggestion, index) => (
-                    <button
-                      key={suggestion.id}
-                      ref={
-                        !categorySuggestion && index === 0
-                          ? (firstSuggestionRef as React.RefObject<HTMLButtonElement>)
-                          : undefined
-                      }
-                      type="button"
-                      role="option"
-                      aria-selected="false"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => {
-                        trackProductEvent("search_suggestion_selected", {
-                          suggestionType: "filter",
-                          position: index + 3,
-                        });
-                        suggestion.onSelect();
-                        setQFocused(false);
-                      }}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <SlidersHorizontal className="size-4 shrink-0 text-primary" />
-                      <span className="truncate">{suggestion.label}</span>
-                    </button>
-                  ))}
-                </>
-              )}
-              {listingSuggestions && listingSuggestions.length > 0 && (
-                <>
-                  <div className="px-3 pb-1 pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Annonser
-                  </div>
-                  {listingSuggestions.map((s, i) => (
-                    <Link
-                      key={s.id}
-                      ref={
-                        !categorySuggestion && filterSuggestions.length === 0 && i === 0
-                          ? (firstSuggestionRef as React.RefObject<HTMLAnchorElement>)
-                          : undefined
-                      }
-                      to="/$kaupetCode"
-                      params={{ kaupetCode: s.kaupet_code }}
-                      role="option"
-                      aria-selected="false"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => {
-                        trackProductEvent("search_suggestion_selected", {
-                          suggestionType: "listing",
-                          position: i + 1,
-                        });
-                        setQFocused(false);
-                      }}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
-                      <span className="truncate">{s.title}</span>
-                    </Link>
-                  ))}
-                </>
-              )}
-            </div>
+            />
           )}
         </div>
 

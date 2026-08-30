@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 import { Drawer } from "vaul";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import {
   Clock,
   FolderOpen,
@@ -40,6 +40,7 @@ import { useSheetDragGate } from "@/hooks/use-sheet-drag-gate";
 import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
 import { SearchFilterSections, type SearchFilterSection } from "./filter-sections";
 import { getSearchHistory, saveSearchToHistory, clearSearchHistory } from "./search-history";
+import { SearchSuggestionList, type SearchSuggestionGroup } from "../search-suggestion-list";
 import { buildActiveFilterItems } from "./active-filter-items";
 import { trackProductEvent } from "@/lib/product-analytics";
 import { expandSheetBeforeScroll } from "@/lib/sheet-gestures";
@@ -649,76 +650,75 @@ function QueryBrowseContent({
     );
   }
 
-  return (
-    <div className="flex-1 overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-      <div className="mt-2">
-        <button
-          type="button"
-          onClick={onSubmit}
-          className="native-touch-target flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left text-base hover:bg-muted"
-        >
-          <SearchIcon className="size-4 shrink-0 text-primary" />
-          <span className="truncate">Søk etter «{q.trim()}»</span>
-        </button>
-      </div>
-      {categorySuggestion && (
-        <div className="mt-4">
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Kategori
-          </p>
-          <button
-            type="button"
-            onClick={() => onPickCategory(categorySuggestion)}
-            className="native-touch-target flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left text-sm hover:bg-muted"
-          >
-            <FolderOpen className="size-4 shrink-0 text-primary" />
-            <span className="truncate">Gå til {categorySuggestion.name_nb}</span>
-          </button>
-        </div>
-      )}
-      {filterSuggestions.length > 0 && (
-        <div className="mt-4">
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Filter
-          </p>
-          {filterSuggestions.map((suggestion) => (
-            <button
-              key={suggestion.id}
-              type="button"
-              onClick={() => onPickFilter(suggestion)}
-              className="native-touch-target flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left text-sm hover:bg-muted"
-            >
-              <SlidersHorizontal className="size-4 shrink-0 text-primary" />
-              <span className="truncate">{suggestion.label}</span>
-            </button>
-          ))}
-        </div>
-      )}
-      {listingSuggestions.length > 0 && (
-        <div className="mt-4">
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Annonser
-          </p>
-          {listingSuggestions.map((suggestion, index) => (
-            <Link
-              key={suggestion.id}
-              to="/$kaupetCode"
-              params={{ kaupetCode: suggestion.kaupet_code }}
-              onClick={() => {
+  const groups: SearchSuggestionGroup[] = [
+    {
+      label: "Søk etter",
+      items: [
+        {
+          id: "query",
+          label: `Søk etter «${q.trim()}»`,
+          icon: <SearchIcon className="size-4 shrink-0 text-primary" aria-hidden="true" />,
+          onSelect: onSubmit,
+        },
+      ],
+    },
+    ...(categorySuggestion
+      ? [
+          {
+            label: "Kategori",
+            items: [
+              {
+                id: `category:${categorySuggestion.id}`,
+                label: `Gå til ${categorySuggestion.name_nb}`,
+                icon: <FolderOpen className="size-4 shrink-0 text-primary" aria-hidden="true" />,
+                onSelect: () => onPickCategory(categorySuggestion),
+              },
+            ],
+          },
+        ]
+      : []),
+    ...(filterSuggestions.length > 0
+      ? [
+          {
+            label: "Filter",
+            items: filterSuggestions.map((suggestion) => ({
+              id: suggestion.id,
+              label: suggestion.label,
+              icon: (
+                <SlidersHorizontal className="size-4 shrink-0 text-primary" aria-hidden="true" />
+              ),
+              onSelect: () => onPickFilter(suggestion),
+            })),
+          },
+        ]
+      : []),
+    ...(listingSuggestions.length > 0
+      ? [
+          {
+            label: "Annonser",
+            items: listingSuggestions.map((suggestion, index) => ({
+              id: suggestion.id,
+              label: suggestion.title,
+              icon: (
+                <SearchIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              ),
+              kaupetCode: suggestion.kaupet_code,
+              onSelect: () => {
                 trackProductEvent("search_suggestion_selected", {
                   suggestionType: "listing",
                   position: index + 1,
                 });
                 onPickListing(index + 1);
-              }}
-              className="native-touch-target flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left text-sm hover:bg-muted"
-            >
-              <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
-              <span className="truncate">{suggestion.title}</span>
-            </Link>
-          ))}
-        </div>
-      )}
+              },
+            })),
+          },
+        ]
+      : []),
+  ];
+
+  return (
+    <div className="flex-1 overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <SearchSuggestionList groups={groups} variant="inline" />
     </div>
   );
 }

@@ -23,6 +23,20 @@ async function expectNativeTouchTarget(locator: Locator) {
   expect(box!.width).toBeGreaterThanOrEqual(48);
   expect(box!.height).toBeGreaterThanOrEqual(48);
 }
+test("bevarer native søkeopplevelse etter intern ruting", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    window.localStorage.setItem("kaupet_onboarding_completed_v1", "true");
+  });
+  await page.goto("/?forcenative=1");
+  await page.locator("html[data-kaupet-hydrated='true']").waitFor();
+
+  await page.getByRole("button", { name: "Søk", exact: true }).last().click();
+  await expect(page).toHaveURL(/\/annonser\?/);
+  await expect(page.getByRole("dialog", { name: "Søk og filtrer" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Kategori/ })).toBeVisible();
+  await expect(page.locator("html")).toHaveClass(/native/);
+});
 
 test("holder filter som utkast frem til brukeren anvender dem", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });

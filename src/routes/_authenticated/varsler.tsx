@@ -209,7 +209,7 @@ function VarslerPage() {
               description="Lagre et søk for å bli varslet om nye treff."
               action={
                 <Link to="/mine-sok">
-                  <Button>Mine søk</Button>
+                  <Button>Gå til mine søk</Button>
                 </Link>
               }
             />

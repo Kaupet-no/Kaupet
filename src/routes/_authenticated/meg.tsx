@@ -252,7 +252,7 @@ function MegPage() {
             <div className="flex items-start gap-3">
               <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" />
               <p className="text-sm text-muted-foreground">
-                Som bruker av Kaupet.no er du med på å bygge en litt andreledes markedsplass, uten
+                Som bruker av Kaupet.no er du med på å bygge en litt annerledes markedsplass, uten
                 sporingscookies eller eksterne analyseverktøy. Les vår{" "}
                 <Link to="/personvern" className="underline hover:text-foreground">
                   personvernerklæring her

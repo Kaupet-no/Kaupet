@@ -224,7 +224,7 @@ function MineSokPage() {
           ) : searches.length === 0 ? (
             <EmptyState
               title="Ingen lagrede søk ennå"
-              description="Gjør et søk på annonse-siden og lagre kriteriene dine."
+              description="Gå til annonser og lagre kriteriene dine."
               action={
                 <Link to="/annonser" search={{ q: "", category: "", sort: "new" } as never}>
                   <Button>

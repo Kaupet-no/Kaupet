@@ -536,14 +536,14 @@ function ConversationPage() {
               <p className="text-xs text-muted-foreground">
                 {priceLabel} · med{" "}
                 {conv.otherDeleted || !otherId ? (
-                  <span>{conv.otherDeleted ? "Slettet bruker" : "ukjent bruker"}</span>
+                  <span>{conv.otherDeleted ? "Slettet bruker" : "Ukjent bruker"}</span>
                 ) : (
                   <Link
                     to="/bruker/$id"
                     params={{ id: otherId }}
                     className="underline-offset-2 hover:underline"
                   >
-                    {conv.other?.display_name ?? "ukjent bruker"}
+                    {conv.other?.display_name ?? "Ukjent bruker"}
                   </Link>
                 )}
               </p>

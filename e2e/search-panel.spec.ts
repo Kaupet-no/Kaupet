@@ -37,6 +37,22 @@ test("bevarer native søkeopplevelse etter intern ruting", async ({ page }) => {
   await expect(page.getByRole("searchbox", { name: "Søk i annonser" })).toBeVisible();
   await expect(page.locator("html")).toHaveClass(/native/);
 });
+test("søker fra native hjem og lander på delbar resultat-URL", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    window.localStorage.setItem("kaupet_onboarding_completed_v1", "true");
+  });
+  await page.goto("/?forcenative=1");
+  await page.locator("html[data-kaupet-hydrated='true']").waitFor();
+
+  await page.getByRole("button", { name: "Åpne søk i annonser" }).click();
+  const input = page.getByRole("searchbox", { name: "Søk i annonser" });
+  await input.fill("sykkel");
+  await page.getByRole("button", { name: "Søk etter «sykkel»" }).click();
+
+  await expect(page).toHaveURL(/\/annonser\?.*q=sykkel/);
+  await expect(page.getByRole("button", { name: /sykkel/ })).toBeVisible();
+});
 
 test("holder filter som utkast frem til brukeren anvender dem", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });

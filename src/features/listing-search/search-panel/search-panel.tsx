@@ -258,7 +258,9 @@ export function SearchPanel({
     categories,
     enabled: open && draftChanged,
   });
-  const buttonResultCount = draftChanged ? draftCount.count : visibleResultCount;
+  const buttonResultCount = draftChanged
+    ? (draftCount.count ?? results?.resultCount)
+    : visibleResultCount;
   const launchFilterMode = !results && section === "location";
 
   const applyLaunchFilters = async () => {
@@ -515,16 +517,23 @@ export function SearchPanel({
             className="h-14 w-full gap-2 rounded-xl text-base"
           >
             <SearchIcon className="size-4" />
-            {results && draftChanged && draftCount.isPending
-              ? "Beregner treff …"
-              : results && buttonResultCount != null
-                ? buttonResultCount === 1
-                  ? "Vis 1 annonse"
-                  : `Vis ${buttonResultCount.toLocaleString("nb-NO")} annonser`
-                : submitting
-                  ? "Søker…"
-                  : "Vis annonser"}
+            {results && buttonResultCount != null
+              ? buttonResultCount === 1
+                ? "Vis 1 annonse"
+                : `Vis ${buttonResultCount.toLocaleString("nb-NO")} annonser`
+              : submitting
+                ? "Søker…"
+                : "Vis annonser"}
           </Button>
+          {results && draftChanged && draftCount.isPending && (
+            <div
+              className="pt-2 text-center text-xs text-muted-foreground"
+              role="status"
+              aria-live="polite"
+            >
+              Beregner nytt antall treff …
+            </div>
+          )}
         </div>
       )}
     </>

@@ -204,7 +204,7 @@ export function SearchFilterSections({
       {activeItems && activeItems.length > 0 && (
         <p className="mb-6 text-sm text-muted-foreground">{activeItems.length} filtre valgt</p>
       )}
-      <div className="space-y-2">
+      <div className="overflow-hidden rounded-2xl border border-border bg-card">
         <FilterOverviewRow
           label="Kategori"
           value={categorySummary}
@@ -220,17 +220,19 @@ export function SearchFilterSections({
           label="Tilstand"
           value={v.conditions.length ? `${v.conditions.length} valgt` : "Alle"}
           onClick={() => setConditionsOpen(true)}
+          last={primaryFilters.length === 0}
         />
-      </div>
-      <div className="mt-6 space-y-2">
-        {primaryFilters.map((filter) => (
+        {primaryFilters.map((filter, index) => (
           <FilterOverviewRow
             key={filter.id}
             label={filter.label_nb}
             value={attributeSummary(filter)}
             onClick={() => openSection("attributes", filter.key)}
+            last={index === primaryFilters.length - 1}
           />
         ))}
+      </div>
+      <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-card">
         <FilterOverviewRow
           label="Alle filtre"
           value={advancedFilterCount ? `${advancedFilterCount} aktive` : "Ingen"}
@@ -240,6 +242,7 @@ export function SearchFilterSections({
           label="Flere søkevalg"
           value={advancedSearchSummary || "Ingen"}
           onClick={() => openSection("search")}
+          last
         />
       </div>
     </div>
@@ -588,16 +591,20 @@ function FilterOverviewRow({
   label,
   value,
   onClick,
+  last,
 }: {
   label: string;
   value: string;
   onClick: () => void;
+  last?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="native-touch-target flex min-h-14 w-full items-center gap-3 rounded-xl bg-muted px-4 py-3 text-left"
+      className={`native-touch-target flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left transition active:bg-muted ${
+        last ? "" : "border-b border-border"
+      }`}
     >
       <span className="min-w-0 flex-1">
         <span className="block text-base font-medium">{label}</span>

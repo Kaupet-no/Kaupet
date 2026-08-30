@@ -1,48 +1,39 @@
 // @vitest-environment jsdom
 
-import type { ReactNode } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AppLanding } from "./app-landing";
+
+const openPanel = vi.fn();
 
 vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({ data: [] }),
 }));
-vi.mock("@tanstack/react-router", () => ({
-  Link: ({ children }: { children: ReactNode }) => <a href="#">{children}</a>,
-  useNavigate: () => vi.fn(),
-}));
-vi.mock("@/hooks/use-is-native", () => ({ useIsNative: () => true }));
 vi.mock("@/hooks/use-form-factor", () => ({ useFormFactor: () => "phone" }));
-vi.mock("@/hooks/use-saved-location", () => ({
-  useSavedLocation: () => [{ lat: null, lng: null, radius: 20, label: "" }, vi.fn()],
+vi.mock("@/features/listing-search/search-panel/search-panel-context", () => ({
+  useSearchPanel: () => ({
+    openPanel,
+    savedLocation: { lat: null, lng: null, radius: 25, label: "" },
+  }),
 }));
 vi.mock("@/components/animated-search-placeholder", () => ({
   AnimatedSearchPlaceholder: () => null,
 }));
 vi.mock("@/components/app-hero-logo", () => ({ AppHeroLogo: () => null }));
 vi.mock("@/components/kaupet-code-dialog", () => ({ KaupetCodeDialog: () => null }));
-vi.mock("@/components/ui/native-sheet", () => ({ NativeSheet: () => null }));
-vi.mock("@/components/location-filter", () => ({
-  LocationPicker: () => (
-    <label>
-      Sted
-      <input />
-    </label>
-  ),
-  RadiusPicker: () => null,
-}));
 
+beforeEach(() => openPanel.mockReset());
 afterEach(cleanup);
 
 describe("AppLanding", () => {
-  it("åpner lokasjonsvalget som en navngitt dialog i native bunn-sheet", async () => {
-    const { baseElement } = render(<AppLanding />);
+  it("åpner søk, lokasjon og kategorier gjennom samme panel", () => {
+    render(<AppLanding />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Velg lokasjon: Hvor som helst" }));
+    fireEvent.click(screen.getByRole("button", { name: "Åpne søk i annonser" }));
+    fireEvent.click(screen.getByRole("button", { name: "Velg lokasjon: Hele Norge" }));
+    fireEvent.click(screen.getByRole("button", { name: "Alle kategorier" }));
 
-    expect(await screen.findByRole("dialog", { name: "Velg sted" })).toBeTruthy();
-    expect(baseElement.querySelector("[data-vaul-drawer]")).not.toBeNull();
+    expect(openPanel.mock.calls).toEqual([["query"], ["location"], ["categories"]]);
   });
 });

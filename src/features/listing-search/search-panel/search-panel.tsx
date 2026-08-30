@@ -236,6 +236,22 @@ export function SearchPanel({
     enabled: open && draftChanged,
   });
   const buttonResultCount = draftChanged ? draftCount.count : visibleResultCount;
+  const launchFilterMode = !results && section === "location";
+
+  const applyLaunchFilters = async () => {
+    if (submitting) return;
+    void hapticImpact("medium");
+    setSubmitting(true);
+    await submitSearch({
+      applied: draft,
+      categories,
+      vehicleBrands: vehicleBrands ?? [],
+      allFilters,
+      commit: (search) => navigate({ to: "/annonser", search }),
+    });
+    setSubmitting(false);
+    close("apply");
+  };
   function handleOpenChange(next: boolean) {
     if (!next && results && draftChanged) {
       trackProductEvent("search_filter_cancelled", { changed: true, section });
@@ -279,10 +295,11 @@ export function SearchPanel({
     else navigate({ to: "/annonser", search: { q: "", category: cat.slug, sort: "new" } });
     close();
   };
+
   const panelContent = (
     <>
-      {/* Fritekstfeltet brukes bare når panelet åpnes uten resultatflate. På
-          resultatflater ligger søket allerede synlig bak panelet. */}
+      {/* Fritekstfeltet brukes i launch-modus. Et stedspanel viser bare
+          lokasjonskontrollen, slik at triggeren åpner riktig oppgave. */}
       {results ? (
         hasDraftCriteria && (
           <div className="flex items-center justify-between gap-2 px-4 pb-3 pt-3">
@@ -305,7 +322,7 @@ export function SearchPanel({
                   void hapticImpact("light");
                   setDraft({ value: defaultAdvancedSearchValue(), attributes: {} });
                 }}
-                className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                className="native-touch-target flex shrink-0 items-center gap-1.5 rounded-full px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 <RotateCcw className="size-3.5" />
                 Nullstill
@@ -313,7 +330,7 @@ export function SearchPanel({
             )}
           </div>
         )
-      ) : (
+      ) : !launchFilterMode ? (
         <div className="flex items-center gap-2 px-4 pb-3 pt-3">
           <div className="relative flex-1">
             <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -345,15 +362,15 @@ export function SearchPanel({
               type="button"
               onClick={() => void submitText(launchQueryDraft)}
               disabled={submitting}
-              className="min-h-11 shrink-0 px-2 text-sm font-medium text-primary disabled:opacity-50"
+              className="native-touch-target shrink-0 px-2 text-sm font-medium text-primary disabled:opacity-50"
             >
               {submitting ? "Søker…" : "Søk"}
             </button>
           )}
         </div>
-      )}
+      ) : null}
 
-      {categorySuggestion && (
+      {categorySuggestion && !launchFilterMode && (
         <button
           type="button"
           onClick={() => goToCategory(categorySuggestion)}
@@ -367,7 +384,7 @@ export function SearchPanel({
         </button>
       )}
 
-      {results ? (
+      {results || launchFilterMode ? (
         <SearchFilterSections
           key={`${open}-${section}`}
           value={draft.value}
@@ -375,12 +392,12 @@ export function SearchPanel({
           setValue={setDraftValue}
           section={section === "query" ? "categories" : section}
           queryText={draft.value.terms.join(" ")}
-          attributeFilters={results.attributeFilters}
+          attributeFilters={results?.attributeFilters ?? allFilters}
           attributeValues={draft.attributes}
           onAttributeChange={updateDraftAttribute}
-          attributeCounts={results.attributeCounts}
-          activeItems={draftItems}
-          includePrimary
+          attributeCounts={results?.attributeCounts}
+          activeItems={results ? draftItems : undefined}
+          includePrimary={!!results}
         />
       ) : (
         <BrowseContent
@@ -395,35 +412,42 @@ export function SearchPanel({
           onPickCategory={goToCategory}
         />
       )}
-      {results && (
+
+      {(results || launchFilterMode) && (
         <div className="shrink-0 border-t border-border bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <Button
             type="button"
             data-testid="search-filter-apply-button"
             size="lg"
             onClick={() => {
-              trackProductEvent("search_filter_applied", {
-                section,
-                filterCount: draftItems.length,
-                resultCount: buttonResultCount ?? null,
-              });
-              results.onApply(draft);
-              trackProductEvent("search_submitted", {
-                hasCategory: draft.value.categories.length > 0,
-                filterCount: draftItems.length,
-              });
-              close("apply");
+              if (results) {
+                trackProductEvent("search_filter_applied", {
+                  section,
+                  filterCount: draftItems.length,
+                  resultCount: buttonResultCount ?? null,
+                });
+                results.onApply(draft);
+                trackProductEvent("search_submitted", {
+                  hasCategory: draft.value.categories.length > 0,
+                  filterCount: draftItems.length,
+                });
+                close("apply");
+              } else {
+                void applyLaunchFilters();
+              }
             }}
             className="h-14 w-full gap-2 rounded-xl text-base"
           >
             <SearchIcon className="size-4" />
-            {draftChanged && draftCount.isPending
+            {results && draftChanged && draftCount.isPending
               ? "Beregner treff …"
-              : buttonResultCount == null
-                ? "Vis annonser"
-                : buttonResultCount === 1
+              : results && buttonResultCount != null
+                ? buttonResultCount === 1
                   ? "Vis 1 annonse"
-                  : `Vis ${buttonResultCount.toLocaleString("nb-NO")} annonser`}
+                  : `Vis ${buttonResultCount.toLocaleString("nb-NO")} annonser`
+                : submitting
+                  ? "Søker…"
+                  : "Vis annonser"}
           </Button>
         </div>
       )}

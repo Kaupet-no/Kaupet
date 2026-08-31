@@ -37,7 +37,12 @@ END $$;
 REVOKE ALL ON FUNCTION public.admin_set_listing_home_visibility(uuid, boolean) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.admin_set_listing_home_visibility(uuid, boolean) TO authenticated;
 
-CREATE OR REPLACE FUNCTION public.admin_search_listings(_query text DEFAULT ''::text, _status text DEFAULT NULL::text, _limit integer DEFAULT 50)
+-- Returtypen får en ny kolonne (hidden_from_home) — Postgres tillater ikke
+-- CREATE OR REPLACE FUNCTION når RETURNS TABLE-kolonnelisten endres, så den
+-- gamle signaturen må droppes eksplisitt først.
+DROP FUNCTION IF EXISTS public.admin_search_listings(text, text, integer);
+
+CREATE FUNCTION public.admin_search_listings(_query text DEFAULT ''::text, _status text DEFAULT NULL::text, _limit integer DEFAULT 50)
 RETURNS TABLE(id uuid, kaupet_code character, title text, status public.listing_status, seller_id uuid, seller_name text, created_at timestamp with time zone, hidden_from_home boolean)
 LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path TO 'public'

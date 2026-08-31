@@ -1160,8 +1160,12 @@ function NewListingPage() {
               ? values.price_nok
               : null,
           postal_code: values.postal_code || null,
+          city: values.city || null,
+          lat: finalCoords?.lat ?? null,
           can_ship:
-            fieldGroupKeys.includes("delivery") && behavior.requiresDeliveryMethod
+            fieldGroupKeys.includes("delivery") &&
+            behavior.requiresDeliveryMethod &&
+            values.can_ship != null
               ? values.can_ship !== "pickup"
               : null,
           lng: finalCoords?.lng ?? null,

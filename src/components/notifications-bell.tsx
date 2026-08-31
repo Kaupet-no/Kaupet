@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, CheckCheck, ShoppingBag, TrendingDown, X } from "lucide-react";
@@ -57,6 +57,10 @@ function formatKr(n: number) {
 export function NotificationsBell() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const invalidateNotifications = useCallback(() => {
+    qc.invalidateQueries({ queryKey: ["notifications"] });
+    qc.invalidateQueries({ queryKey: ["notifications-unread-count"] });
+  }, [qc]);
 
   const { data, refetch } = useQuery({
     queryKey: ["notifications", user?.id],
@@ -138,7 +142,7 @@ export function NotificationsBell() {
           filter: `user_id=eq.${userId}`,
         },
         () => {
-          qc.invalidateQueries({ queryKey: ["notifications"] });
+          invalidateNotifications();
           void refetch();
         },
       )
@@ -151,7 +155,7 @@ export function NotificationsBell() {
           filter: `user_id=eq.${userId}`,
         },
         () => {
-          qc.invalidateQueries({ queryKey: ["notifications"] });
+          invalidateNotifications();
           void refetch();
         },
       )
@@ -164,7 +168,7 @@ export function NotificationsBell() {
           filter: `user_id=eq.${userId}`,
         },
         () => {
-          qc.invalidateQueries({ queryKey: ["notifications"] });
+          invalidateNotifications();
           void refetch();
         },
       )
@@ -172,13 +176,13 @@ export function NotificationsBell() {
     return () => {
       supabase.removeChannel(ch);
     };
-  }, [userId, refetch, qc]);
+  }, [userId, refetch, invalidateNotifications]);
 
   // Fallback: refresh når fanen får fokus igjen
   useEffect(() => {
     if (!user) return;
     const onFocus = () => {
-      qc.invalidateQueries({ queryKey: ["notifications"] });
+      invalidateNotifications();
     };
     const onVisibility = () => {
       if (document.visibilityState === "visible") onFocus();
@@ -189,7 +193,7 @@ export function NotificationsBell() {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [user, qc]);
+  }, [user, invalidateNotifications]);
 
   const native = useIsNative();
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -205,7 +209,7 @@ export function NotificationsBell() {
       markAllPriceDropsRead(),
       markAllWtbMatchNotificationsRead(),
     ]);
-    qc.invalidateQueries({ queryKey: ["notifications"] });
+    invalidateNotifications();
   };
 
   const handleClick = async (n: Item) => {
@@ -213,14 +217,14 @@ export function NotificationsBell() {
     if (n.kind === "search") await markNotificationRead(n.id);
     else if (n.kind === "price_drop") await markPriceDropRead(n.id);
     else await markWtbMatchNotificationRead(n.id);
-    qc.invalidateQueries({ queryKey: ["notifications"] });
+    invalidateNotifications();
   };
 
   const handleDelete = async (n: Item) => {
     if (n.kind === "search") await deleteNotification(n.id);
     else if (n.kind === "price_drop") await deletePriceDrop(n.id);
     else await deleteWtbMatchNotification(n.id);
-    qc.invalidateQueries({ queryKey: ["notifications"] });
+    invalidateNotifications();
   };
 
   const bellTrigger = (

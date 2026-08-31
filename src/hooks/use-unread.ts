@@ -161,9 +161,23 @@ export function useUnreadNotificationsCount(): number {
     };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibility);
+
+    // På native fungerer ikke focus/visibilitychange pålitelig i Capacitor WebView
+    let removeAppStateListener: (() => void) | undefined;
+    if (isNative()) {
+      void import("@capacitor/app").then(({ App }) => {
+        void App.addListener("appStateChange", ({ isActive }) => {
+          if (isActive) onFocus();
+        }).then((handle) => {
+          removeAppStateListener = () => void handle.remove();
+        });
+      });
+    }
+
     return () => {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
+      removeAppStateListener?.();
     };
   }, [user, qc]);
 

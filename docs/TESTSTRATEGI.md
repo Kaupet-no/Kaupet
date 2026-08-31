@@ -11,7 +11,7 @@ Dokumentet har to lesere:
    (testkatalog). En agent skal kunne løse en oppgave ved å lese
    _én_ playbook og _ett_ testcase-avsnitt, uten å lese resten.
 
-Ved motstrid: `docs/ARCHITECTURE.md` er normativ for arkitektur, `CLAUDE.md`
+Ved motstrid: `docs/ARCHITECTURE.md` er normativ for arkitektur, `AGENTS.md`
 for arbeidsvaner, dette dokumentet for test.
 
 ---
@@ -36,7 +36,7 @@ Testmål, prioritert:
 
 **Testprinsipp som gjelder over alt annet:** en feilrapport beskriver et
 symptom. Testen skrives mot _årsaken i den laveste delte grensen_, ikke mot
-symptomet i den ene ruten der det ble observert (se `CLAUDE.md`, ARCHITECTURE
+symptomet i den ene ruten der det ble observert (se `AGENTS.md`, ARCHITECTURE
 § 9).
 
 ## 2. Kvalitetsegenskaper i scope (ISO 25010)
@@ -242,7 +242,7 @@ Hver playbook er selvstendig. En agent som får en oppgave skal:
 - G4. En test som ikke kan feile er verre enn ingen test. Verifiser ved å
   midlertidig bryte koden og se testen feile; nevn dette i rapporten.
 - G5. Ikke endre produksjonskode for å gjøre en test enklere, med unntak av
-  `data-testid` etter konvensjonen i `CLAUDE.md` (kun når `getByRole`/
+  `data-testid` etter konvensjonen i `AGENTS.md` (kun når `getByRole`/
   `getByLabel` er tvetydig).
 - G6. Ikke commit hemmeligheter, ekte e-postadresser, regnr eller
   produksjons-ID-er i testdata.
@@ -302,7 +302,7 @@ Hver playbook er selvstendig. En agent som får en oppgave skal:
    flersides reiser, ekte navigasjon eller publisering.
 2. Gjenbruk page objects i e2e/pages/ (listing-wizard.ts,
    want-listing-wizard.ts). Legg ny delt handling i page object, ikke i spec.
-3. Følg testid-konvensjonen i CLAUDE.md: wizard-step-<group-key>,
+3. Følg testid-konvensjonen i AGENTS.md: wizard-step-<group-key>,
    wizard-next-button, publish-listing-button osv.
 4. Ingen faste sleep-kall. Bruk Playwrights auto-waiting og web-first
    assertions (expect(locator).toBeVisible()).
@@ -901,7 +901,7 @@ dårlig spesifisert (§ 16). `test-explorer` har ikke skrivetilgang til kode —
 den rapporterer, og `test-author` implementerer regresjonsvernet for funnene. Endres playbookene
 eller katalogen, skal agentfilene oppdateres i samme PR.
 
-**Avslutningskrav for enhver agentleveranse** (jf. `CLAUDE.md`): avslutt med
+**Avslutningskrav for enhver agentleveranse** (jf. `AGENTS.md`): avslutt med
 en kort seksjon som lister det du er minst sikker på eller ikke har
 verifisert. Er alt verifisert, si det i én linje.
 
@@ -935,7 +935,7 @@ til det manglende punktet.
 Uansett hvor fornuftig det virker underveis:
 
 - Ikke endre produksjonskode (unntak: `data-testid` etter konvensjonen i
-  `CLAUDE.md`, og kun når `getByRole`/`getByLabel` er dokumentert tvetydig).
+  `AGENTS.md`, og kun når `getByRole`/`getByLabel` er dokumentert tvetydig).
 - Ikke installer avhengigheter eller innfør nye testrammeverk, hjelpere,
   fabrikker eller mock-lag. Gjenbruk mønsteret i nabotestene.
 - Ikke refaktorer koden du tester, og ikke rydd urelaterte filer.
@@ -1087,7 +1087,7 @@ npm run app && open "build/Røn Agents.app"
 
 Appen oppdager oppsettet selv: testkatalogen (dette dokumentet), agentene i
 `.claude/agents/`, testrøttene `src/` og `e2e/`, rapportmappen `test-results/`
-og instruksjonsfilene `CLAUDE.md`, `AGENTS.md`, `docs/ARCHITECTURE.md`.
+og instruksjonsfilene `AGENTS.md`, `docs/ARCHITECTURE.md`.
 
 Hva den gir:
 

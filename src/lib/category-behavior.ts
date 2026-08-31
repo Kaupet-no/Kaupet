@@ -37,7 +37,7 @@ export type CategoryBreadcrumbContext = {
  * flag only needs to be added in one place.
  */
 export type CategoryBehavior = {
-  /** Whether the listing must declare a delivery method (pickup/ship/both). Vehicles can't be shipped, so this is false for them. */
+  /** Whether the listing must declare a delivery method (pickup/ship/both). Bil/MC and Båt opt out. */
   requiresDeliveryMethod: boolean;
   /** Whether the generic category-attributes field group should render. False for vehicles, whose attributes are captured via the vehicle-* field groups instead. */
   showGenericAttributes: boolean;

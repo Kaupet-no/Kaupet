@@ -247,7 +247,7 @@ export function useDraftAutosave(fields: DraftFields) {
           city: city || null,
           lat: coords?.lat ?? null,
           lng: coords?.lng ?? null,
-          can_ship: canShip !== "pickup",
+          can_ship: canShip == null ? null : canShip !== "pickup",
           known_issues: knownIssues?.trim() || null,
           no_known_issues: !!noKnownIssues,
           maintenance_history: maintenanceHistory?.trim() || null,

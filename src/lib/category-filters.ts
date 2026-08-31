@@ -371,6 +371,18 @@ export function genericBrandFilterFor(
     filters.find((f) => f.key === "brand" && (f.type === "text" || f.type === "select")) ?? null
   );
 }
+/** Båt-kategorier arver `boat_type` fra Båter-flyten. Filteret er kategoriens
+ * autoritative kilde; lagrede annonseattributter og feltgrupperekkefølge kan
+ * være ufullstendige. */
+export function isBoatCategory(
+  categoryId: string | null,
+  allFilters: CategoryFilter[],
+  categoriesById: Map<string, CategoryNode>,
+): boolean {
+  return effectiveFiltersForCategory(categoryId, allFilters, categoriesById).some(
+    (filter) => filter.key === "boat_type",
+  );
+}
 
 /** Convenience boolean wrapper around `vehicleCategoryGroupFor`, for call
  * sites that only need to know "is this a vehicle category?" without caring

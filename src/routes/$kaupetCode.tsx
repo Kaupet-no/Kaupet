@@ -26,7 +26,11 @@ import { OwnerStatsPanel } from "@/components/listing-detail/owner-stats-panel";
 import { SellerContactPanel } from "@/components/listing-detail/seller-contact-panel";
 import { ListingDetailView } from "@/components/listing-detail/listing-detail-view";
 import { getCategoryBehavior } from "@/lib/category-behavior";
-import { genericBrandFilterFor, vehicleCategoryGroupFor } from "@/lib/category-filters";
+import {
+  genericBrandFilterFor,
+  isBoatCategory,
+  vehicleCategoryGroupFor,
+} from "@/lib/category-filters";
 import { useAllCategoryFilters } from "@/components/attribute-fields";
 import { useCategories } from "@/hooks/use-categories";
 import { useListingEditMutations } from "@/features/listing-edit/use-listing-edit-mutations";
@@ -366,10 +370,6 @@ function ListingDetailPage() {
   });
 
   const { data: allCategories } = useCategories();
-  const listingAttributes = (data?.attributes ?? {}) as Record<string, unknown>;
-
-  const isBoatListing =
-    typeof listingAttributes.boat_type === "string" && !!listingAttributes.boat_type;
   const listingId = data?.id;
   const isOwner = !!user && !!data && user.id === data.seller_id;
 
@@ -388,7 +388,12 @@ function ListingDetailPage() {
   const genericBrandFilter = data?.category_id
     ? genericBrandFilterFor(data.category_id, allFilters ?? [], categoriesByIdForBehavior)
     : null;
-  const behavior = getCategoryBehavior(vehicleGroup, isBoatListing);
+  const behavior = getCategoryBehavior(
+    vehicleGroup,
+    data?.category_id
+      ? isBoatCategory(data.category_id, allFilters ?? [], categoriesByIdForBehavior)
+      : false,
+  );
   const { saveField, fieldStatus } = useListingEditMutations({
     listingId: listingId ?? "",
     kaupetCode,
@@ -608,6 +613,7 @@ function ListingDetailPage() {
       category={category ?? null}
       categoryId={data.category_id}
       canShip={data.can_ship}
+      requiresDeliveryMethod={behavior.requiresDeliveryMethod}
       breadcrumb={breadcrumb}
       enableBackToSearch
       images={images}

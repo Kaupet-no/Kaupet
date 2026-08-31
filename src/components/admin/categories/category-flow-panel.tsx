@@ -117,7 +117,6 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
     ...storedFieldGroups.filter((k) => MIDDLE_FIELD_GROUP_KEYS.includes(k)),
     ...MIDDLE_FIELD_GROUP_KEYS.filter((k) => !storedFieldGroups.includes(k)),
   ];
-  const deliveryActive = storedFieldGroups.includes("delivery");
   // vehicle-registration (Statens vegvesen-oppslag for Bil og MC) isn't part
   // of MIDDLE_FIELD_GROUP_KEYS — this simple editor doesn't support letting
   // admins reorder/toggle it yet — but it must survive a save if the
@@ -150,7 +149,8 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
         !(hasVehicleFacts && k === "description-keywords") &&
         (LOCKED_FIELD_GROUP_KEYS.includes(k) || storedFieldGroups.includes(k)),
     ),
-    ...(deliveryActive ? ["delivery", "location"] : ["location"]),
+    "delivery",
+    "location",
     "review-publish",
   ];
 
@@ -240,7 +240,8 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
           !(hasVehicleFacts && k === "description-keywords") &&
           (LOCKED_FIELD_GROUP_KEYS.includes(k) || storedFieldGroups.includes(k)),
       ),
-      ...(deliveryActive ? ["delivery", "location"] : ["location"]),
+      "delivery",
+      "location",
       "review-publish",
     ]);
   }
@@ -347,15 +348,11 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
               </ul>
             )}
             <ul>
-              <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm">
+              <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm text-muted-foreground">
                 <span className="inline-block size-4 shrink-0" aria-hidden />
-                <label className="flex items-center gap-2 text-sm">
-                  <Checkbox
-                    checked={deliveryActive}
-                    onCheckedChange={() => toggleFieldGroup("delivery")}
-                  />
-                  {FIELD_GROUP_LABELS_NB.delivery}
-                </label>
+                <Checkbox checked disabled />
+                {FIELD_GROUP_LABELS_NB.delivery}
+                <span className="text-xs">(påkrevd for relevante kategorier)</span>
               </li>
               <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm text-muted-foreground">
                 <span className="inline-block size-4 shrink-0" aria-hidden />

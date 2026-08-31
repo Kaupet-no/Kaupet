@@ -34,6 +34,7 @@ import { getCategoryBehavior } from "@/lib/category-behavior";
 import {
   categoryBreadcrumb,
   getMissingRequiredFilters,
+  isBoatCategory,
   vehicleCategoryGroupFor,
   VEHICLE_EQUIPMENT_FILTER_KEYS,
   type CategoryNode,
@@ -269,7 +270,7 @@ function NewListingPage() {
       category_id: "",
       condition: "good",
       is_free: typeParam === "free",
-      can_ship: "pickup" as const,
+      can_ship: null,
       price_nok: "",
       postal_code: "",
       city: "",
@@ -389,11 +390,15 @@ function NewListingPage() {
         .fieldGroups,
     [categoryId, allFlows, categoriesById, fromLanding],
   );
-  const boatFactsActive = baseFieldGroupKeys.includes("boat-facts");
-  const behavior = useMemo(
-    () => getCategoryBehavior(vehicleGroup, boatFactsActive),
-    [vehicleGroup, boatFactsActive],
+  const boatCategory = useMemo(
+    () => isBoatCategory(categoryId || null, allFilters ?? [], categoriesById),
+    [categoryId, allFilters, categoriesById],
   );
+  const behavior = useMemo(
+    () => getCategoryBehavior(vehicleGroup, boatCategory),
+    [vehicleGroup, boatCategory],
+  );
+  const boatFactsActive = baseFieldGroupKeys.includes("boat-facts");
 
   const vehicleAttributeHiddenKeys = [
     ...(vehicleLookupResult ? VEHICLE_LOOKUP_FILTER_KEYS : []),
@@ -444,17 +449,30 @@ function NewListingPage() {
   // category_filters matcher, men det hindrer ikke en tom side fra å ta sin
   // egen steg-plass i wizarden — samme grunn som category-attributes over).
   const isCarLeaf = categoriesById.get(categoryId)?.slug === "bil";
-  const fieldGroupKeys = useMemo(
-    () =>
-      withRuntimeFieldGroups(baseFieldGroupKeys, {
-        showCategoryConfirm: fromLanding && !categoryConfirmed,
-      }).filter(
-        (key) =>
-          (key !== "category-attributes" || !isVehicleFlow) &&
-          (key !== "vehicle-equipment" || isCarLeaf),
-      ),
-    [baseFieldGroupKeys, fromLanding, categoryConfirmed, isVehicleFlow, isCarLeaf],
-  );
+  const fieldGroupKeys = useMemo(() => {
+    let keys = withRuntimeFieldGroups(baseFieldGroupKeys, {
+      showCategoryConfirm: fromLanding && !categoryConfirmed,
+    });
+    if (behavior.requiresDeliveryMethod && !keys.includes("delivery")) {
+      const insertAt = keys.indexOf("location");
+      keys = [...keys];
+      keys.splice(insertAt >= 0 ? insertAt : keys.length, 0, "delivery");
+    } else if (!behavior.requiresDeliveryMethod) {
+      keys = keys.filter((key) => key !== "delivery");
+    }
+    return keys.filter(
+      (key) =>
+        (key !== "category-attributes" || !isVehicleFlow) &&
+        (key !== "vehicle-equipment" || isCarLeaf),
+    );
+  }, [
+    baseFieldGroupKeys,
+    fromLanding,
+    categoryConfirmed,
+    behavior.requiresDeliveryMethod,
+    isVehicleFlow,
+    isCarLeaf,
+  ]);
 
   const pages: WizardPage[] = useMemo(
     () =>
@@ -1287,6 +1305,8 @@ function NewListingPage() {
       priceNok: isFree ? null : validPriceNok,
       isFree,
       condition: fieldGroupKeys.includes("condition") ? (condition ?? null) : null,
+      canShip: behavior.requiresDeliveryMethod && canShip != null ? canShip !== "pickup" : null,
+      requiresDeliveryMethod: behavior.requiresDeliveryMethod,
       city: city || null,
       postalCode: postalCode || null,
       displayLat: coords?.lat ?? null,

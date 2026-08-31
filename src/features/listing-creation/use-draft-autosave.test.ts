@@ -38,7 +38,7 @@ const baseFields = {
   categoryId: "",
   condition: null,
   isFree: false,
-  canShip: "pickup",
+  canShip: null,
   priceNok: "",
   postalCode: "",
   city: "",
@@ -122,7 +122,9 @@ describe("useDraftAutosave", () => {
     expect(result.current.draftSaveError).toBe(false);
     expect(localStorage.getItem(DRAFT_ID_KEY)).toBe("new-draft-id");
     expect(saveDraftListingMock).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ title: "En fin sykkel" }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ title: "En fin sykkel", can_ship: null }),
+      }),
     );
   });
 

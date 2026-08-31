@@ -161,9 +161,10 @@ export type ListingDetailViewProps = {
   images: { storage_path: string; sort_order: number; caption?: string | null }[];
   imgUrls: Record<string, string>;
   attributes: Record<string, unknown>;
-  /** Delivery method for non-vehicle/non-boat listings. Shown read-only to
-   * buyers and inline-editable for the owner. */
-  canShip?: boolean | null;
+  /** Whether this category uses delivery choices. False for Bil/MC and Båt. */
+  requiresDeliveryMethod: boolean;
+  /** Persisted delivery capability for categories that use delivery choices. */
+  canShip: boolean | null;
   /** Enables owner inline-editing: wraps the view in `ListingEditContext` and
    * turns editable regions into dashed-border/click-to-edit affordances.
    * Omitted (buyer view / no `editMode` prop) renders byte-for-byte
@@ -220,6 +221,7 @@ export function ListingDetailView({
   images,
   imgUrls,
   attributes,
+  requiresDeliveryMethod,
   canShip,
   vehicle360Frames,
   vehicle360ImgUrls,
@@ -384,6 +386,7 @@ export function ListingDetailView({
       imgUrls={imgUrls}
       attributes={attributes}
       canShip={canShip ?? null}
+      requiresDeliveryMethod={requiresDeliveryMethod}
       vehicle360Frames={vehicle360Frames}
       vehicle360ImgUrls={vehicle360ImgUrls}
       actionsMenuSlot={actionsMenuSlot}
@@ -456,6 +459,7 @@ function ListingDetailViewBody({
   breadcrumb,
   imgUrls,
   attributes,
+  requiresDeliveryMethod,
   canShip,
   vehicle360Frames,
   vehicle360ImgUrls,
@@ -508,6 +512,7 @@ function ListingDetailViewBody({
   breadcrumb?: ListingDetailBreadcrumbItem[];
   imgUrls: Record<string, string>;
   attributes: Record<string, unknown>;
+  requiresDeliveryMethod: boolean;
   canShip: boolean | null;
   vehicle360Frames?: Vehicle360Frame[];
   vehicle360ImgUrls?: Record<string, string>;
@@ -1043,12 +1048,12 @@ function ListingDetailViewBody({
                   <dt className="text-muted-foreground">{label}</dt>
                   <dd className="font-medium">{dateStr}</dd>
                 </div>
-                {!isVehicleListing && !isBoatListing && !editCtx?.editMode && (
+                {requiresDeliveryMethod && !editCtx?.editMode && (
                   <div>
                     <dt className="text-muted-foreground">Levering</dt>
                     <dd className="font-medium">
                       {canShip === true
-                        ? "Frakt"
+                        ? "Kan sendes"
                         : canShip === false
                           ? "Kun henting"
                           : "Ikke oppgitt"}
@@ -1063,7 +1068,7 @@ function ListingDetailViewBody({
                       <div>
                         <dt className="text-muted-foreground">Levering</dt>
                         <dd className="font-medium">
-                          {v === true ? "Frakt" : v === false ? "Kun henting" : "Ikke satt"}
+                          {v === true ? "Kan sendes" : v === false ? "Kun henting" : "Ikke satt"}
                         </dd>
                       </div>
                     )}

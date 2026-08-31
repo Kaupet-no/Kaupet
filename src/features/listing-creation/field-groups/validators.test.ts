@@ -39,15 +39,17 @@ describe("validateRequiredFieldGroups", () => {
     const flow = DEFAULT_FLOW.filter((k) => k !== "condition");
     expect(validateRequiredFieldGroups(flow, { condition: null, can_ship: true })).toBeNull();
   });
-
-  it("allows can_ship: null when the flow omits the delivery-location group", () => {
+  it("requires can_ship for ordinary categories even when a stored flow omits delivery", () => {
     const flow = DEFAULT_FLOW.filter((k) => k !== "delivery");
-    expect(validateRequiredFieldGroups(flow, { condition: "good", can_ship: null })).toBeNull();
+    expect(validateRequiredFieldGroups(flow, { condition: "good", can_ship: null })).toEqual(
+      expect.any(String),
+    );
   });
-
-  it("allows both to be null when the flow omits both groups", () => {
+  it("allows condition to be null but still requires delivery when both groups are omitted", () => {
     const flow = DEFAULT_FLOW.filter((k) => k !== "condition" && k !== "delivery");
-    expect(validateRequiredFieldGroups(flow, { condition: null, can_ship: null })).toBeNull();
+    expect(validateRequiredFieldGroups(flow, { condition: null, can_ship: null })).toBe(
+      "Velg en leveringsmetode for annonsen.",
+    );
   });
 
   it("allows can_ship: null for vehicle and boat categories", () => {

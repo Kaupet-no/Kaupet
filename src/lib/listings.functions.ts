@@ -7,6 +7,7 @@ import {
   effectiveFiltersForCategory,
   getMissingRequiredFilters,
   normalizeFilter,
+  isBoatCategory,
   PART_FITMENT_SCOPE_KEY,
   PART_FITMENT_VEHICLE_IDS_KEY,
   PART_FITMENT_YEAR_FROM_KEY,
@@ -278,7 +279,7 @@ export const createListing = createServerFn({ method: "POST" })
       },
       getCategoryBehavior(
         vehicleCategoryGroupFor(data.category_id, normalizedFilters, categoriesById),
-        fieldGroups.includes("boat-facts"),
+        isBoatCategory(data.category_id, normalizedFilters, categoriesById),
       ),
     );
     if (fieldGroupError) throw new Error(fieldGroupError);

@@ -334,7 +334,6 @@ function NewListingPage() {
     [categoryId, allFilters, categoriesById],
   );
   const isVehicle = vehicleGroup !== null;
-  const behavior = useMemo(() => getCategoryBehavior(vehicleGroup), [vehicleGroup]);
 
   const showMileage = useMemo(() => {
     if (!isVehicle) return false;
@@ -390,6 +389,11 @@ function NewListingPage() {
         .fieldGroups,
     [categoryId, allFlows, categoriesById, fromLanding],
   );
+  const boatFactsActive = baseFieldGroupKeys.includes("boat-facts");
+  const behavior = useMemo(
+    () => getCategoryBehavior(vehicleGroup, boatFactsActive),
+    [vehicleGroup, boatFactsActive],
+  );
 
   const vehicleAttributeHiddenKeys = [
     ...(vehicleLookupResult ? VEHICLE_LOOKUP_FILTER_KEYS : []),
@@ -420,7 +424,6 @@ function NewListingPage() {
   // still gates vehicle-specific rendering choices like condition options or
   // showMileage, evaluated later once a leaf is genuinely known) does.
   const isVehicleFlow = baseFieldGroupKeys.includes("vehicle-registration");
-  const boatFactsActive = baseFieldGroupKeys.includes("boat-facts");
 
   // category-confirm er aldri en del av en kategoris lagrede field_groups —
   // den avhenger av live wizard-state og injiseres derfor her.
@@ -1139,11 +1142,11 @@ function NewListingPage() {
               ? values.price_nok
               : null,
           postal_code: values.postal_code || null,
-          city: values.city || null,
-          lat: finalCoords?.lat ?? null,
-          lng: finalCoords?.lng ?? null,
           can_ship:
-            fieldGroupKeys.includes("delivery") && !isVehicle ? values.can_ship !== "pickup" : null,
+            fieldGroupKeys.includes("delivery") && behavior.requiresDeliveryMethod
+              ? values.can_ship !== "pickup"
+              : null,
+          lng: finalCoords?.lng ?? null,
           known_issues: isVehicle ? values.known_issues || null : null,
           no_known_issues: isVehicle ? !!values.no_known_issues : null,
           maintenance_history: isVehicle ? values.maintenance_history || null : null,

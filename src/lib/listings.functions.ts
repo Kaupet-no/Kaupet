@@ -278,6 +278,7 @@ export const createListing = createServerFn({ method: "POST" })
       },
       getCategoryBehavior(
         vehicleCategoryGroupFor(data.category_id, normalizedFilters, categoriesById),
+        fieldGroups.includes("boat-facts"),
       ),
     );
     if (fieldGroupError) throw new Error(fieldGroupError);

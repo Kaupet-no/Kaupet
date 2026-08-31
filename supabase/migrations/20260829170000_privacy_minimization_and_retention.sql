@@ -468,8 +468,12 @@ END;
 $$;
 
 -- Material privacy changes are announced in the existing in-app inbox.
+-- Skips orphaned profile rows with no matching auth.users row (recipient_id
+-- has a FK to auth.users) — such a profile can't receive an in-app message
+-- anyway, and would otherwise abort this whole migration.
 INSERT INTO public.system_messages (recipient_id, body)
 SELECT p.id,
   'Vi har oppdatert personvernerklæringen: klientbaserte måle-ID-er og lagring av rå søkefraser er fjernet, og slettefrister er tydeliggjort.'
 FROM public.profiles p
-WHERE p.deleted_at IS NULL;
+WHERE p.deleted_at IS NULL
+  AND EXISTS (SELECT 1 FROM auth.users u WHERE u.id = p.id);

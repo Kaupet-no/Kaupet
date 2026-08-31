@@ -41,9 +41,11 @@ test("native lokasjonsvalg kan åpnes og lukkes med tastatur uten fokusfelle", a
   await page.goto("/?forcenative=1");
   await waitForHydration(page);
 
-  const search = page.getByRole("searchbox", { name: "Søk i annonser" });
+  // Søk og lokasjon er nå egne knapper som åpner det delte søkepanelet
+  // ("Søk og filtrer"), ikke et frittstående søkefelt lenger.
+  const search = page.getByRole("button", { name: "Åpne søk i annonser" });
   const location = page.getByRole("button", {
-    name: "Velg lokasjon: Hvor som helst",
+    name: "Velg lokasjon: Hele Norge",
   });
 
   await search.focus();
@@ -51,7 +53,7 @@ test("native lokasjonsvalg kan åpnes og lukkes med tastatur uten fokusfelle", a
   await expect(location).toBeFocused();
 
   await location.press("Space");
-  const overlay = page.getByRole("dialog", { name: "Velg sted" });
+  const overlay = page.getByRole("dialog", { name: "Søk og filtrer" });
   await expect(overlay).toBeVisible();
 
   await page.keyboard.press("Escape");
@@ -66,7 +68,9 @@ test("native søkepanel returnerer fokus til filterknappen etter Escape", async 
   await page.goto("/annonser?forcenative=1&q=&category=&sort=new");
   await waitForHydration(page);
 
-  const search = page.getByRole("searchbox", { name: "Søk i annonser" });
+  // Søket er en knapp (SearchSummaryPill) på native resultatflater, ikke et
+  // frittstående søkefelt — samme mønster som landingssiden over.
+  const search = page.getByRole("button", { name: "Søk i annonser" });
   const filter = page.getByRole("button", { name: "Filtrer", exact: true });
 
   await search.focus();

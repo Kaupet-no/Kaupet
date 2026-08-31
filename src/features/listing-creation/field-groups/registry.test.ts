@@ -63,3 +63,20 @@ it.each(["price", "vehicle-price"])("krever pris for ikke-gratis annonser i %s",
   expect(validate?.({ isFree: true, priceNok: "" } as never)).toBeNull();
   expect(validate?.({ isFree: false, priceNok: 0 } as never)).toBeNull();
 });
+
+it("krever leveringsmetode når kategorien krever det", () => {
+  const validate = FIELD_GROUP_REGISTRY.delivery.validateExtra;
+
+  expect(
+    validate?.({ behavior: { requiresDeliveryMethod: true }, canShip: null } as never),
+  ).toEqual({
+    field: "can_ship",
+    message: "Velg en leveringsmetode før du går videre.",
+  });
+  expect(
+    validate?.({ behavior: { requiresDeliveryMethod: true }, canShip: "pickup" } as never),
+  ).toBeNull();
+  expect(
+    validate?.({ behavior: { requiresDeliveryMethod: false }, canShip: null } as never),
+  ).toBeNull();
+});

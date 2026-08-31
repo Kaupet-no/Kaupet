@@ -800,6 +800,7 @@ function NewListingPage() {
     knownIssues,
     noKnownIssues: !!noKnownIssues,
     showMileage,
+    canShip,
   };
   const missingFilterMessage =
     missingFilters.length > 0
@@ -1052,6 +1053,7 @@ function NewListingPage() {
       knownIssues,
       noKnownIssues: !!noKnownIssues,
       showMileage,
+      canShip,
     };
     setExtraFieldError(null);
     for (const group of groups) {

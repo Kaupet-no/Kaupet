@@ -42,6 +42,7 @@ export type ValidateCtx = {
   knownIssues: WizardSharedProps["knownIssues"];
   noKnownIssues: WizardSharedProps["noKnownIssues"];
   showMileage: WizardSharedProps["showMileage"];
+  canShip: WizardSharedProps["canShip"];
 };
 
 export type FieldGroup = {
@@ -283,6 +284,11 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
     key: "delivery",
     classification: "requiredToPublish",
     Component: DeliveryGroup,
+    fieldsToValidate: ["can_ship"],
+    validateExtra: (ctx) =>
+      ctx.behavior.requiresDeliveryMethod && ctx.canShip == null
+        ? { field: "can_ship", message: "Velg en leveringsmetode før du går videre." }
+        : null,
   },
   location: {
     key: "location",

@@ -4,20 +4,96 @@
 [![CI](https://github.com/Kaupet-no/Kaupet/actions/workflows/ci.yml/badge.svg)](https://github.com/Kaupet-no/Kaupet/actions/workflows/ci.yml)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-support-ff5f5f.svg?logo=ko-fi&logoColor=white)](https://ko-fi.com/sprudlevann)
 
-**Kaupet.no** en markedsplass for kjøp og salg av brukte ting, bygget på **åpen** og **fri** kode.
+**Kaupet.no** er en norsk markedsplass for kjøp og salg av brukte ting, bygget på **åpen** og **fri** kode.
 
-![Kaupet.no — søkefeltet på forsiden](docs/images/hero-demo.gif)
+![Kaupet.no — forsiden](docs/images/forside.png)
 
-Dette repoet består av den produksjonssatte kildekoden, og du er velkommen til å laste ned, modifisere og distribuere det som del av en egen løsning om du ønsker det.
+## Hva er Kaupet?
 
-Det eneste kravet er at du respekterer vilkårene i lisensavtalen [GNU Affero General Public License v3.0](LICENSE), som betyr at all kode, også kode du selv modifiserer eller legger til, skal tilgjengeliggjøres åpent med de samme betingelsene.
+Kaupet er en alternativ markedsplass der det skal være enkelt å kjøpe, få, selge og gi bort brukte gjenstander.
 
-#### Våre viktigste utviklingsprinsipper:
+Det som skiller Kaupet fra andre markedsplasser er hvordan den er bygget:
 
-- Ingen sporing, ingen lukket plattform.
-- Personvern skal være førende for alle designvalg.
-- All kildekode skal forbli åpen og fri.
-- Alle forbedringer skal komme fellesskapet til gode — ingen unntak.
+- **Ingen sporing.** Ingen tredjeparts analyseverktøy, ingen sporingsinformasjonskapsler, ingen adferds- eller markedsføringsdata å selge videre.
+- **Personvern først.** Kaupet er bygget for å samle inn minst mulig informasjon om brukerne, og det som ikke samles inn kan heller ikke mistes, selges eller misbrukes. Se [personvernerklæringen](https://kaupet.no/personvern) og [behandlingsprotokollen](docs/PERSONVERN-BEHANDLINGSPROTOKOLL.md).
+- **All kode er åpen.** Hele den produksjonssatte kildekoden ligger i dette repoet under [AGPL-3.0](LICENSE). Du kan lese den, kjøre den selv, endre den og distribuere den videre, så lenge endringene dine deles tilbake på samme vilkår.
+- **Forbedringer kommer fellesskapet til gode.** Ingen unntak.
+
+Kaupet finnes både som nettside og som app for iOS og Android.
+
+## Funksjoner
+
+### Søk du kan skrive med vanlige ord
+
+Søkefeltet forstår hva du faktisk spør etter. Skriver du `elbil automat under 150000 kr`, plukker Kaupet ut drivstoff, girkasse og prisgrense som ekte filtre. Resten blir stående som fritekst.
+
+![Søket tolker fritekst til filtre](docs/images/sok-tolkning.png)
+
+Søket håndterer blant annet:
+
+- **Egenskaper og synonymer** — `automat`, `hengerfeste`, `4x4` og lignende ord kobles til de riktige filterverdiene i kategorien.
+- **Tall med enhet** — `under 150000 kr`, `over 100 hk`, `maks 12000 mil` blir til pris- og tallintervaller.
+- **Kategorier og bilmerker** — skriver du et kategorinavn eller et merke, foreslår Kaupet å navigere dit i stedet for å bare søke på ordet.
+- **Negasjon** — `sykkel unntatt elsykkel` fjerner treffene du ikke vil ha.
+- **Alle tolkninger er synlige og kan fjernes.** Hver tolkning vises som en brikke du kan klikke bort — ingenting skjer i det skjulte.
+
+I tillegg finnes et fullt filterpanel med kategori, tilstand, pris, kategorispesifikke felter, kart og stedssøk med radius (via OpenStreetMap), og «Alle filtre» for avanserte regler. Søk du bruker ofte kan du lagre under [Mine søk](https://kaupet.no/mine-sok) og få **varsel når det kommer nye annonser** som treffer.
+
+Finner du ikke det du leter etter, kan du legge ut et **kjøpsønske** i stedet, med en annonse som beskriver hva du vil ha, slik at selgere kan finne deg.
+
+### Annonseopprettelse med automatisk kategorigjenkjenning
+
+Du starter med å skrive tittelen. Kaupet foreslår kategori automatisk:
+
+1. Først brukes tidligere annonser: har nok folk plassert lignende titler i samme kategori, foreslås den direkte.
+2. Mangler et treffsikkert historisk grunnlag, spør serveren en språkmodell (Mistral Small 4) om å velge kategori fra den faktiske kategorilisten. Svaret valideres mot ekte kategorier før det vises.
+
+Kategorien styrer resten av flyten: hvilke steg du får, hvilke felter som er relevante, og hvilke verdier som kan velges. En sykkel spør om rammestørrelse, en bil om girkasse og kilometerstand. Underveis får du:
+
+- **Automatisk lagring av utkast**, så du kan gå ut av flyten og fortsette senere.
+- **Bilder med komprimering** i nettleseren før opplasting, og kamera direkte i appen.
+- **Sted** valgt i kart (kart fra Kartverket) med den presisjonen du selv velger.
+- **Gjennomgang før publisering**, der «Endre» tar deg til riktig steg og tilbake igjen uten å miste data.
+- **Bot-beskyttelse** ved publisering (Cloudflare Turnstile).
+
+### Kjøretøysoppslag mot Statens Vegvesen
+
+Skal du selge et kjøretøy, skriver du registreringsnummeret. Kaupet henter dataene fra Statens vegvesens åpne Enkeltoppslag-API og fyller ut annonsen for deg:
+
+- merke, modell, årsmodell og første registrering
+- drivstoff, girkasse, effekt (hk), sylindre, slagvolum og motorkode
+- hjuldrift, karosseritype, antall seter, farge og vekt
+- hengerfeste, bruktimport og frist for neste EU-kontroll
+
+Kjøretøygruppen fra Vegvesenet brukes til å velge riktig kategori i Kaupet (personbil, moped, campingvogn og så videre), slik at annonsen havner der kjøperne leter. Alt som hentes kan overstyres manuelt av brukeren før publisering.
+
+For kjøretøy er det også mulig å ta opp en **360°-visning** ved å gå rundt kjøretøyet med telefonen, appen fanger bilder automatisk mens brukeren beveger seg, og kjøperen kan snurre kjøretøyet rundt i annonsen.
+
+### Meldinger mellom kjøper og selger
+
+Kontakt skjer inne i Kaupet. Ingen grunn til å dele telefonnummer eller e-postadresse med fremmede.
+
+- Én samtale per annonse, med bilde, tittel og pris i innboksen.
+- Uleste meldinger markeres, og lest-status ligger i databasen slik at den er lik på tvers av enheter.
+- **Push-varsler** på web og i appen ved svar.
+- **Blokkering** og rapportering av brukere.
+- Når handelen er gjennomført kan selger markere annonsen som solgt, og partene kan **gi hverandre en vurdering**.
+
+Du kan også dele en annonse med en **Kaupet-kode**. Dette er et åttesifret nummer som tar mottakeren rett til annonsen, praktisk å lese opp over telefon eller skrive på en lapp.
+
+### App for iOS og Android
+
+<img src="docs/images/app-hjem.png" alt="Forsiden i Kaupet-appen, med bunnavigasjon" width="320">
+
+Appene deler kode med nettsiden, men er ikke en innpakket nettside: i native kjøring får du en egen layout med bunnavigasjon, egne sidetopper og native flyt for annonseopprettelse. Skallet er bygget med [Capacitor](https://capacitorjs.com), og oppførselen er native der det betyr noe:
+
+- kamera og bildevalg, inkludert 360°-opptak av kjøretøy
+- push-varsler for meldinger, lagrede søk og annen aktivitet
+- haptisk tilbakemelding, dra-for-å-oppdatere og native navigasjon
+- Android systemtilbake og iOS kantsveip følger samme historikk som knappene i appen
+- respekterer safe area, skjermrotasjon og systemets tekststørrelse
+
+Se [README-CAPACITOR.md](README-CAPACITOR.md) for hvordan du bygger appene selv.
 
 ## Slik kjører du prosjektet lokalt på din egen PC
 
@@ -44,7 +120,7 @@ bun run env:local     # genererer .env med lokale Supabase-nøkler + tomme place
 bun dev
 ```
 
-`supabase start` drar opp en komplett, isolert Docker Compose-stack og kjører migrasjonene i [supabase/migrations](supabase/migrations) automatisk. Nøklene som settes i `.env` er Supabase sine offentlig kjente lokale dev-defaults. Funksjonalitet som er avhengig av tredjeparter (Vipps, Resend, push-varsler) vil ikke virke før du eventuelt fyller inn egne nøkler manuelt i `.env`.
+`supabase start` drar opp en komplett, isolert Docker Compose-stack og kjører migrasjonene i [supabase/migrations](supabase/migrations) automatisk. Nøklene som settes i `.env` er Supabase sine offentlig kjente lokale dev-defaults. Funksjonalitet som er avhengig av tredjeparter (kjøretøyoppslag, AI-kategoriforslag, Vipps, Resend, push-varsler) vil ikke virke før du eventuelt fyller inn egne nøkler manuelt i `.env`.
 
 Stopp stacken med `bunx supabase stop` når du er ferdig. Supabase Studio (lokalt admin-UI) er tilgjengelig på `http://localhost:54323`.
 
@@ -58,21 +134,25 @@ VITE_SUPABASE_PUBLISHABLE_KEY=...
 VITE_SUPABASE_PROJECT_ID=...
 ```
 
-## Teknologi
+## Teknologi som benyttes
 
 - [TanStack Start](https://tanstack.com/start) (React 19, SSR) + Vite 8
 - [Tailwind CSS v4](https://tailwindcss.com)
 - [shadcn/ui](https://ui.shadcn.com) komponenter
-- [Supabase](https://supabase.com) — database, auth, storage
+- [Supabase](https://supabase.com) — database, auth, storage, realtime og RLS
 - [Cloudflare Workers](https://www.cloudflare.com/products/workers/) for hosting
 - [Capacitor](https://capacitorjs.com) for native iOS og Android-app — se [README-CAPACITOR.md](README-CAPACITOR.md) for oppsett av native build
-- [NB-AI Lab Borealis](https://huggingface.co/collections/NbAiLab/borealis) — norsk språkmodell utviklet av Nasjonalbiblioteket. Denne benyttes for kategoriforslag ved opprettelse av annonser, som fallback når vote-basert forslag mangler treffsikker historikk.
+- [Statens vegvesen (Datautlevering)](https://www.vegvesen.no/om-oss/om-organisasjonen/apne-data/) for kjøretøyoppslag
+- [Mistral Small 4](https://mistral.ai) for AI-basert kategoriforslag, som fallback når vote-basert forslag mangler treffsikker historikk
+- [Vipps/MobilePay](https://vipps.no) for betaling av promoteringer, og [Cloudflare Turnstile](https://www.cloudflare.com/products/turnstile/) for bot-beskyttelse
+
+Alle kall mot tredjeparter skjer server-side. Arkitekturen er beskrevet i [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Bidra
 
 Vi tar gjerne imot bidrag — store og små. Les [CONTRIBUTING.md](CONTRIBUTING.md) for hvordan du kommer i gang, og [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for hvordan vi snakker sammen.
 
-- Testing: `bun run test` kjører unittester. Se [docs/STAGING.md](docs/STAGING.md) for e2e-tester, RLS-tester og hvordan staging-miljøet fungerer.
+- Testing: `bun run test` kjører unittester. Se [docs/STAGING.md](docs/STAGING.md) for e2e-tester, RLS-tester og hvordan staging-miljøet fungerer, og [docs/TESTSTRATEGI.md](docs/TESTSTRATEGI.md) for teststrategien.
 - Endringer testes aldri direkte i produksjon — push til `staging`-branchen for å teste på **https://staging.kaupet.no**. Detaljer i [docs/STAGING.md](docs/STAGING.md).
 
 Funnet en sårbarhet? Se [SECURITY.md](SECURITY.md) — ikke åpne en offentlig issue.

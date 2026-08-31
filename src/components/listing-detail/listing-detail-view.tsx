@@ -161,8 +161,8 @@ export type ListingDetailViewProps = {
   images: { storage_path: string; sort_order: number; caption?: string | null }[];
   imgUrls: Record<string, string>;
   attributes: Record<string, unknown>;
-  /** Delivery method — not shown to buyers today, only used as an inline-
-   * editable field for the owner (edit mode). */
+  /** Delivery method for non-vehicle/non-boat listings. Shown read-only to
+   * buyers and inline-editable for the owner. */
   canShip?: boolean | null;
   /** Enables owner inline-editing: wraps the view in `ListingEditContext` and
    * turns editable regions into dashed-border/click-to-edit affordances.
@@ -1043,6 +1043,18 @@ function ListingDetailViewBody({
                   <dt className="text-muted-foreground">{label}</dt>
                   <dd className="font-medium">{dateStr}</dd>
                 </div>
+                {!isVehicleListing && !isBoatListing && !editCtx?.editMode && (
+                  <div>
+                    <dt className="text-muted-foreground">Levering</dt>
+                    <dd className="font-medium">
+                      {canShip === true
+                        ? "Frakt"
+                        : canShip === false
+                          ? "Kun henting"
+                          : "Ikke oppgitt"}
+                    </dd>
+                  </div>
+                )}
                 {editCtx?.editMode && editCtx.behavior.requiresDeliveryMethod && (
                   <EditableField
                     fieldKey="delivery"

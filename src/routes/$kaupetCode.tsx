@@ -366,7 +366,10 @@ function ListingDetailPage() {
   });
 
   const { data: allCategories } = useCategories();
+  const listingAttributes = (data?.attributes ?? {}) as Record<string, unknown>;
 
+  const isBoatListing =
+    typeof listingAttributes.boat_type === "string" && !!listingAttributes.boat_type;
   const listingId = data?.id;
   const isOwner = !!user && !!data && user.id === data.seller_id;
 
@@ -385,7 +388,7 @@ function ListingDetailPage() {
   const genericBrandFilter = data?.category_id
     ? genericBrandFilterFor(data.category_id, allFilters ?? [], categoriesByIdForBehavior)
     : null;
-  const behavior = getCategoryBehavior(vehicleGroup);
+  const behavior = getCategoryBehavior(vehicleGroup, isBoatListing);
   const { saveField, fieldStatus } = useListingEditMutations({
     listingId: listingId ?? "",
     kaupetCode,
@@ -556,7 +559,6 @@ function ListingDetailPage() {
     );
   }
   if (!data) return null;
-
   const seller = data.seller;
   const category = Array.isArray(data.categories) ? data.categories[0] : data.categories;
   const attributes = (data.attributes ?? {}) as Record<string, unknown>;

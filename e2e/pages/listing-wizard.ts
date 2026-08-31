@@ -25,7 +25,7 @@ export async function login(page: Page, email: string, password: string) {
   await page.goto("/auth?mode=signin");
   await page.locator("html[data-kaupet-hydrated='true']").waitFor();
   await page.getByLabel("E-post").fill(email);
-  await page.getByLabel("Passord").fill(password);
+  await page.getByLabel("Passord", { exact: true }).fill(password);
   await page.getByRole("main").getByRole("button", { name: "Logg inn" }).click();
   await expect(page).toHaveURL("/", { timeout: 10_000 });
 }

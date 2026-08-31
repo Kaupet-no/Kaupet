@@ -93,7 +93,7 @@ test("innloggingens primærhandling nås og aktiveres med tastatur", async ({ pa
   await page.goto("/auth?mode=signin");
   await waitForHydration(page);
 
-  const password = page.getByLabel("Passord");
+  const password = page.getByLabel("Passord", { exact: true });
   const signUp = page.getByRole("button", { name: "Bli medlem" });
   const submit = page.getByRole("button", { name: "Logg inn", exact: true });
   await expect(submit).toBeEnabled();

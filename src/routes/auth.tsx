@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Turnstile } from "@marsidev/react-turnstile";
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 import { isNative } from "@/lib/native";
 import { useIsNative } from "@/hooks/use-is-native";
 import { NativePageHeader } from "@/components/native-page-header";
@@ -74,7 +74,7 @@ function AuthPage() {
   const [authMode, setAuthMode] = useState<AuthMode>(mode);
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileInstance | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const turnstileEnabled = !!import.meta.env.VITE_TURNSTILE_SITE_KEY;
   const isSignUp = authMode === "signup";
@@ -124,7 +124,6 @@ function AuthPage() {
   // Feltkrav endres når modusen byttes; fjern gamle feilmeldinger.
   useEffect(() => {
     clearErrors();
-    setTurnstileToken(null);
     setShowPassword(false);
   }, [authMode, clearErrors]);
 
@@ -168,13 +167,16 @@ function AuthPage() {
   };
 
   const onSubmit = async (values: AuthForm) => {
-    if (turnstileEnabled && !turnstileToken) {
-      showErrorToast("Vent til bot-sjekken er fullført, og prøv igjen.");
-      return;
-    }
     setLoading(true);
     trackProductEvent("auth_started", { mode: isSignUp ? "signup" : "signin" });
     try {
+      // Bot-sjekken kjører i bakgrunnen fra siden lastes, og er nesten alltid
+      // ferdig før noen rekker å fylle ut skjemaet. Vi venter på token her i
+      // stedet for å låse knappen, slik at ventingen (om den skjer) foregår
+      // etter klikk med vanlig lastetilstand.
+      const turnstileToken = turnstileEnabled
+        ? await turnstileRef.current?.getResponsePromise()
+        : undefined;
       if (isSignUp) {
         const { error } = await supabase.auth.signUp({
           email: values.email,
@@ -205,7 +207,8 @@ function AuthPage() {
       }
     } catch (err: unknown) {
       showErrorToast(formatErrorMessage(err, "Noe gikk galt. Prøv igjen."));
-      setTurnstileToken(null);
+      // Tokenet er engangsbruk — hent et nytt så neste forsøk ikke henger.
+      turnstileRef.current?.reset();
     } finally {
       setLoading(false);
     }
@@ -339,7 +342,11 @@ function AuthPage() {
             </p>
           </>
         ) : (
-          <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4" noValidate>
+          <form
+            onSubmit={(e) => void handleSubmit(onSubmit)(e)}
+            className="mt-6 space-y-4"
+            noValidate
+          >
             {isSignUp && (
               <div className="space-y-1.5">
                 <Label htmlFor="name">Visningsnavn</Label>
@@ -491,23 +498,15 @@ function AuthPage() {
             )}
             {turnstileEnabled && (
               <Turnstile
+                ref={turnstileRef}
                 siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-                onSuccess={(token) => setTurnstileToken(token)}
-                onExpire={() => setTurnstileToken(null)}
                 options={{ size: "invisible" }}
               />
-            )}
-            {turnstileEnabled && !turnstileToken && !loading && (
-              <p role="status" aria-live="polite" className="text-xs text-muted-foreground">
-                Bekrefter at du ikke er en robot …
-              </p>
             )}
             <Button
               type="submit"
               className="w-full gap-2"
-              disabled={
-                loading || (isSignUp && !acceptedTerms) || (turnstileEnabled && !turnstileToken)
-              }
+              disabled={loading || (isSignUp && !acceptedTerms)}
             >
               {loading && <Loader2 className="size-4 animate-spin" />}
               {isSignUp ? "Opprett konto" : "Logg inn"}

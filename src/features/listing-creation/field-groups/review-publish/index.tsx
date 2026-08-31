@@ -1,5 +1,6 @@
+import type { RefObject } from "react";
 import { Loader2 } from "lucide-react";
-import { Turnstile } from "@marsidev/react-turnstile";
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 
 import { ListingCardContent, type ListingCardData } from "@/components/listing-card";
 import { Button } from "@/components/ui/button";
@@ -123,8 +124,7 @@ export function UploadProgress({ mutationIsPending, uploadProgress }: UploadProg
 type PublishActionsProps = {
   native: boolean;
   turnstileEnabled: boolean;
-  turnstileToken: string | null;
-  setTurnstileToken: (token: string | null) => void;
+  turnstileRef: RefObject<TurnstileInstance | null>;
   mutationIsPending: boolean;
   onCancel: () => void;
 };
@@ -293,8 +293,7 @@ export function ReviewPublishGroup(props: WizardSharedProps) {
 export function PublishActions({
   native,
   turnstileEnabled,
-  turnstileToken,
-  setTurnstileToken,
+  turnstileRef,
   mutationIsPending,
   onCancel,
 }: PublishActionsProps) {
@@ -303,16 +302,15 @@ export function PublishActions({
       <>
         {turnstileEnabled && (
           <Turnstile
+            ref={turnstileRef}
             siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-            onSuccess={(token) => setTurnstileToken(token)}
-            onExpire={() => setTurnstileToken(null)}
             options={{ size: "invisible" }}
           />
         )}
         <Button
           type="submit"
           data-testid="publish-listing-button"
-          disabled={mutationIsPending || (turnstileEnabled && !turnstileToken)}
+          disabled={mutationIsPending}
           className="min-h-12 min-w-24 rounded-xl px-3 text-base"
         >
           {mutationIsPending && <Loader2 className="size-4 animate-spin" />}
@@ -330,17 +328,12 @@ export function PublishActions({
       <div className="flex items-center gap-3">
         {turnstileEnabled && (
           <Turnstile
+            ref={turnstileRef}
             siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-            onSuccess={(token) => setTurnstileToken(token)}
-            onExpire={() => setTurnstileToken(null)}
             options={{ size: "invisible" }}
           />
         )}
-        <Button
-          type="submit"
-          data-testid="publish-listing-button"
-          disabled={mutationIsPending || (turnstileEnabled && !turnstileToken)}
-        >
+        <Button type="submit" data-testid="publish-listing-button" disabled={mutationIsPending}>
           {mutationIsPending && <Loader2 className="size-4 animate-spin" />}
           Publiser annonse
         </Button>

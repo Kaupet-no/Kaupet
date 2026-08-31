@@ -192,15 +192,11 @@ export async function fillDescriptionAndAdvance(
  * by the time this assertion ran, even though publishing had succeeded).
  */
 export async function publishAndExpectSuccess(page: Page, testInfo: TestInfo) {
-  // Root cause of the flake this retry logic was papering over (see trace
-  // from the 2026-08-31 CI run): the publish button stays disabled until the
-  // invisible Turnstile widget resolves (`turnstileEnabled && !turnstileToken`
-  // in review-publish/index.tsx), and loading Turnstile's challenge iframe
-  // from Cloudflare can take longer than clickAndWaitFor's per-attempt
-  // budget (5s click + 8s wait, x3 = 39s, already over the 30s test
-  // timeout). Waiting for the button to actually become enabled first — on
-  // its own, generous budget — means the click-retry loop below only has to
-  // absorb an actual missed click, not Turnstile's network-bound solve time.
+  // Publiseringsknappen låses ikke lenger av Turnstile — tokenet ventes ut
+  // inne i publiseringsmutasjonen (se review-publish/index.tsx og
+  // ny-annonse.tsx). Ekstra tidsbudsjett beholdes fordi den ventingen nå
+  // skjer etter klikket, og Turnstiles utfordringsiframe fortsatt kan være
+  // nettverkstreg i CI.
   testInfo.setTimeout(testInfo.timeout + 20_000);
   await expect(page.getByTestId("publish-listing-button")).toBeEnabled({ timeout: 20_000 });
   await clickAndWaitFor(

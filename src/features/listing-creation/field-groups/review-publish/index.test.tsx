@@ -45,8 +45,7 @@ describe("ReviewPublishGroup", () => {
         <PublishActions
           native
           turnstileEnabled={false}
-          turnstileToken={null}
-          setTurnstileToken={vi.fn()}
+          turnstileRef={{ current: null }}
           mutationIsPending={false}
           onCancel={vi.fn()}
         />

@@ -44,6 +44,7 @@ import {
   VEHICLE_LOOKUP_FILTER_KEYS,
   VEHICLE_WIZARD_MANAGED_KEYS,
 } from "@/lib/vehicle/vehicle-lookup.types";
+import type { TurnstileInstance } from "@marsidev/react-turnstile";
 import type { VehicleLeafSlug } from "@/lib/vehicle/vehicle-classification";
 
 import { useIsDemo } from "@/hooks/use-is-demo";
@@ -202,7 +203,7 @@ function NewListingPage() {
   const native = isNative();
   const { data: isDemo = false } = useIsDemo();
   const turnstileEnabled = !!import.meta.env.VITE_TURNSTILE_SITE_KEY;
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileInstance | null>(null);
   const { type: typeParam, title: titleParam } = Route.useSearch();
   const listingType = typeParam ?? null;
   // Set once from the initial search params (mirrors the useForm defaultValues
@@ -1144,8 +1145,13 @@ function NewListingPage() {
           city: values.city,
         }));
 
-      if (turnstileEnabled && !turnstileToken)
-        throw new Error("Sikkerhetskontroll ikke fullført. Prøv igjen.");
+      // Bot-sjekken kjører i bakgrunnen så snart oppsummeringssiden vises, og
+      // er normalt ferdig lenge før publiseringsklikket. Vi venter på tokenet
+      // her i stedet for å låse Publiser-knappen, slik at en eventuell venting
+      // skjer under den vanlige lastetilstanden.
+      const turnstileToken = turnstileEnabled
+        ? await turnstileRef.current?.getResponsePromise()
+        : null;
 
       const listing = await createListing({
         data: {
@@ -1246,6 +1252,8 @@ function NewListingPage() {
         step: currentStepKey,
       });
       setUploadProgress(null);
+      // Tokenet er engangsbruk — hent et nytt så neste forsøk ikke henger.
+      turnstileRef.current?.reset();
       void import("@/lib/haptics").then((m) => m.hapticNotification("error"));
       showErrorToast(formatErrorMessage(err, "Kunne ikke publisere annonsen"));
     },
@@ -1536,8 +1544,7 @@ function NewListingPage() {
     previewPrice,
     mutationIsPending: mutation.isPending,
     turnstileEnabled,
-    turnstileToken,
-    setTurnstileToken,
+    turnstileRef,
     onCancel: () => navigate({ to: "/" }),
     onPreview: openPreview,
     onEditReviewSection: editReviewSection,
@@ -1655,8 +1662,7 @@ function NewListingPage() {
         <PublishActions
           native={native}
           turnstileEnabled={turnstileEnabled}
-          turnstileToken={turnstileToken}
-          setTurnstileToken={setTurnstileToken}
+          turnstileRef={turnstileRef}
           mutationIsPending={mutation.isPending}
           onCancel={() => navigate({ to: "/" })}
         />

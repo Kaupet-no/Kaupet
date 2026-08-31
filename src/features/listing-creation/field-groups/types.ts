@@ -1,4 +1,6 @@
-﻿import type {
+﻿import type { RefObject } from "react";
+import type { TurnstileInstance } from "@marsidev/react-turnstile";
+import type {
   UseFormRegister,
   UseFormSetValue,
   UseFormWatch,
@@ -243,8 +245,7 @@ export type WizardSharedProps = {
   previewPrice: string | null;
   mutationIsPending: boolean;
   turnstileEnabled: boolean;
-  turnstileToken: string | null;
-  setTurnstileToken: (token: string | null) => void;
+  turnstileRef: RefObject<TurnstileInstance | null>;
   onCancel: () => void;
   onEditReviewSection: (
     section: "category" | "content" | "details" | "location",

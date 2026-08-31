@@ -1,5 +1,6 @@
 import { ChevronDown, Sparkles } from "lucide-react";
 
+import { AttributeFields } from "@/components/attribute-fields";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 
@@ -8,12 +9,12 @@ import { FieldValid } from "../field-valid";
 import { RequiredMark } from "../required-mark";
 
 /**
- * Category picker + suggestion banner + activeModules (vehicle-lookup/
- * generic-attributes). For Bil og MC (`!behavior.showGenericAttributes`),
- * category and Egenskaper are already locked in via vehicle-registration/
- * vehicle-confirm earlier in the flow, so this group renders nothing — it
- * stays in the flow (it's a `LOCKED_FIELD_GROUP_KEYS` entry) but is a no-op
- * page for vehicle listings.
+ * Category picker + suggestion banner + generic category attributes. For
+ * Bil og MC (`!behavior.showGenericAttributes`), category and Egenskaper
+ * are already locked in via vehicle-registration/vehicle-confirm earlier
+ * in the flow, so this group renders nothing — it stays in the flow (it's
+ * a `LOCKED_FIELD_GROUP_KEYS` entry) but is a no-op page for vehicle
+ * listings.
  */
 export function CategoryAttributes({
   errors,
@@ -25,7 +26,7 @@ export function CategoryAttributes({
   applyCategorySuggestion,
   setSuggestionDismissed,
   setCategorySuggestions,
-  activeModules,
+  genericAttributesActive,
   categoryId,
   categories,
   attributes,
@@ -108,18 +109,17 @@ export function CategoryAttributes({
         </p>
       )}
 
-      {!boatFactsActive &&
-        activeModules.map(({ key, Component }) => (
-          <Component
-            key={key}
-            categoryId={categoryId || null}
-            categories={categories ?? []}
-            value={attributes}
-            onChange={onAttributesChange}
-            showErrors={attributesTouched}
-            hiddenKeys={vehicleAttributeHiddenKeys}
-          />
-        ))}
+      {!boatFactsActive && genericAttributesActive && (
+        <AttributeFields
+          categoryId={categoryId || null}
+          categories={categories ?? []}
+          value={attributes}
+          onChange={onAttributesChange}
+          showErrors={attributesTouched}
+          hiddenKeys={vehicleAttributeHiddenKeys}
+          required
+        />
+      )}
     </section>
   );
 }

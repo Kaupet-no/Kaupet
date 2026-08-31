@@ -1,10 +1,20 @@
-﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Check, ClipboardCheck, Loader2, X } from "lucide-react";
+import { Check, ClipboardCheck, Loader2, Pencil, X } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -21,6 +31,9 @@ import {
   adminRejectVehicleModel,
   adminApproveVehicleModelClass,
   adminRejectVehicleModelClass,
+  adminUpdateVehicleBrand,
+  adminUpdateVehicleModel,
+  adminUpdateVehicleModelClass,
 } from "@/lib/vehicle/admin-vehicle-brands.functions";
 import { formatErrorMessage } from "@/lib/errors";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -31,10 +44,103 @@ type PendingRow = {
   name: string;
   category_group: string;
   brand_name: string | null;
+  /** Only set for `kind === "model"`; passed back unchanged on rename so
+   * editing the name never silently clears an already-assigned class. */
+  class_id: string | null;
   submitted_by: string | null;
   submitted_by_name: string | null;
   created_at: string;
 };
+
+/** Lets an admin fix the free-text name Statens vegvesen returned (casing,
+ * spacing, typos) before approving it into the shared catalog — the same
+ * `adminUpdate*` functions used for already-approved entries in
+ * `admin/kjoretoy.tsx`, reused here instead of a parallel update path. Only
+ * renames; reassigning a model's brand or class isn't exposed here since
+ * that needs a full brand-scoped picker, not requested by this flow. */
+function EditPendingEntryDialog({
+  row,
+  onClose,
+  onSaved,
+}: {
+  row: PendingRow;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [name, setName] = useState(row.name);
+  const updateBrandFn = useServerFn(adminUpdateVehicleBrand);
+  const updateModelFn = useServerFn(adminUpdateVehicleModel);
+  const updateClassFn = useServerFn(adminUpdateVehicleModelClass);
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const trimmed = name.trim();
+      if (row.kind === "brand") {
+        await updateBrandFn({ data: { id: row.id, name: trimmed } });
+      } else if (row.kind === "class") {
+        await updateClassFn({ data: { id: row.id, name: trimmed } });
+      } else {
+        await updateModelFn({
+          data: { id: row.id, name: trimmed, classId: row.class_id ?? undefined },
+        });
+      }
+    },
+    onSuccess: () => {
+      showSuccessToast("Forslag oppdatert");
+      onSaved();
+      onClose();
+    },
+    onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke oppdatere forslaget")),
+  });
+
+  const kindLabel =
+    row.kind === "brand"
+      ? "merkeforslaget"
+      : row.kind === "class"
+        ? "klasseforslaget"
+        : "modellforslaget";
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Rediger {kindLabel}</DialogTitle>
+        </DialogHeader>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!name.trim()) {
+              showErrorToast("Navn er påkrevd");
+              return;
+            }
+            save.mutate();
+          }}
+          className="space-y-4"
+        >
+          <div className="space-y-2">
+            <Label htmlFor="pending-entry-name">Navn</Label>
+            <Input
+              id="pending-entry-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={80}
+              autoFocus
+              required
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Avbryt
+            </Button>
+            <Button type="submit" disabled={save.isPending}>
+              {save.isPending ? <Loader2 className="size-4 animate-spin" /> : "Lagre"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export function VehicleBrandsTab() {
   const qc = useQueryClient();
@@ -45,6 +151,7 @@ export function VehicleBrandsTab() {
   const rejectModelFn = useServerFn(adminRejectVehicleModel);
   const approveClassFn = useServerFn(adminApproveVehicleModelClass);
   const rejectClassFn = useServerFn(adminRejectVehicleModelClass);
+  const [editingRow, setEditingRow] = useState<PendingRow | null>(null);
 
   const {
     data: entries,
@@ -166,6 +273,17 @@ export function VehicleBrandsTab() {
                       variant="ghost"
                       className="gap-1.5"
                       disabled={pending}
+                      onClick={() => setEditingRow(r)}
+                      aria-label={`Rediger ${r.name}`}
+                    >
+                      <Pencil className="size-3.5" />
+                      Rediger
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="gap-1.5"
+                      disabled={pending}
                       onClick={() => approveMut.mutate(r)}
                     >
                       <Check className="size-3.5" />
@@ -187,6 +305,14 @@ export function VehicleBrandsTab() {
             </TableBody>
           </Table>
         </div>
+      )}
+
+      {editingRow && (
+        <EditPendingEntryDialog
+          row={editingRow}
+          onClose={() => setEditingRow(null)}
+          onSaved={invalidate}
+        />
       )}
     </div>
   );

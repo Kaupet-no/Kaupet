@@ -29,14 +29,11 @@ import {
   resolveWizardPages,
   toStoredFieldGroupKeys,
 } from "@/features/listing-creation/category-flows";
-import { MODULE_LABELS_NB, MODULE_REGISTRY } from "@/features/listing-creation/modules/registry";
 import {
   FIELD_GROUP_LABELS_NB,
   LOCKED_FIELD_GROUP_KEYS,
 } from "@/features/listing-creation/field-groups/registry";
 import { MIDDLE_FIELD_GROUP_KEYS, type Category } from "./shared";
-
-const MODULE_KEYS = Object.keys(MODULE_REGISTRY);
 
 function SortableFieldGroupRow({
   id,
@@ -120,7 +117,6 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
     ...storedFieldGroups.filter((k) => MIDDLE_FIELD_GROUP_KEYS.includes(k)),
     ...MIDDLE_FIELD_GROUP_KEYS.filter((k) => !storedFieldGroups.includes(k)),
   ];
-  const deliveryActive = storedFieldGroups.includes("delivery");
   // vehicle-registration (Statens vegvesen-oppslag for Bil og MC) isn't part
   // of MIDDLE_FIELD_GROUP_KEYS — this simple editor doesn't support letting
   // admins reorder/toggle it yet — but it must survive a save if the
@@ -153,7 +149,8 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
         !(hasVehicleFacts && k === "description-keywords") &&
         (LOCKED_FIELD_GROUP_KEYS.includes(k) || storedFieldGroups.includes(k)),
     ),
-    ...(deliveryActive ? ["delivery", "location"] : ["location"]),
+    "delivery",
+    "location",
     "review-publish",
   ];
 
@@ -243,7 +240,8 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
           !(hasVehicleFacts && k === "description-keywords") &&
           (LOCKED_FIELD_GROUP_KEYS.includes(k) || storedFieldGroups.includes(k)),
       ),
-      ...(deliveryActive ? ["delivery", "location"] : ["location"]),
+      "delivery",
+      "location",
       "review-publish",
     ]);
   }
@@ -350,15 +348,11 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
               </ul>
             )}
             <ul>
-              <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm">
+              <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm text-muted-foreground">
                 <span className="inline-block size-4 shrink-0" aria-hidden />
-                <label className="flex items-center gap-2 text-sm">
-                  <Checkbox
-                    checked={deliveryActive}
-                    onCheckedChange={() => toggleFieldGroup("delivery")}
-                  />
-                  {FIELD_GROUP_LABELS_NB.delivery}
-                </label>
+                <Checkbox checked disabled />
+                {FIELD_GROUP_LABELS_NB.delivery}
+                <span className="text-xs">(påkrevd for relevante kategorier)</span>
               </li>
               <li className="flex items-center gap-2 rounded-md px-1 py-1 text-sm text-muted-foreground">
                 <span className="inline-block size-4 shrink-0" aria-hidden />
@@ -384,17 +378,15 @@ export function CategoryFlowPanel({ category }: { category: Category }) {
           <div className="space-y-1">
             <p className="text-xs font-medium text-muted-foreground">Moduler</p>
             <ul className="space-y-2">
-              {MODULE_KEYS.map((key) => (
-                <li key={key}>
-                  <label className="flex items-center gap-2 text-sm">
-                    <Checkbox
-                      checked={activeModules.includes(key)}
-                      onCheckedChange={() => toggle(key)}
-                    />
-                    {MODULE_LABELS_NB[key] ?? key}
-                  </label>
-                </li>
-              ))}
+              <li>
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={activeModules.includes("generic-attributes")}
+                    onCheckedChange={() => toggle("generic-attributes")}
+                  />
+                  Kategoriegenskaper
+                </label>
+              </li>
             </ul>
           </div>
         </div>

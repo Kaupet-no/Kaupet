@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NativeSheet } from "@/components/ui/native-sheet";
+import { NativeChoiceSheet } from "@/components/ui/native-choice-sheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DialogClose, DialogTrigger } from "@/components/ui/dialog";
 import { FullscreenOverlay, FullscreenOverlayContent } from "@/components/ui/fullscreen-overlay";
@@ -26,6 +27,7 @@ import type { MapListing } from "@/components/listings-map";
 import { FeaturedListingsSection } from "@/components/featured-listings-section";
 import { reverseGeocode } from "@/lib/geocode";
 import { hapticImpact } from "@/lib/haptics";
+import { useFormFactor } from "@/hooks/use-form-factor";
 import { getSortChipState } from "@/lib/filter-chip-labels";
 import { SORT_OPTIONS, type SortValue } from "@/lib/categories";
 import type { ZeroResultExpansion } from "@/features/listing-search/zero-result-expansion";
@@ -50,13 +52,19 @@ type Props = {
   fetchNextPage: () => void;
   resetFilters: () => void;
   zeroResultExpansion?: ZeroResultExpansion;
+  zeroResultExpansions?: ZeroResultExpansion[];
   zeroResultExpansionPending?: boolean;
   onApplyZeroResultExpansion?: (expansion: ZeroResultExpansion) => void;
+  hasActiveCriteria?: boolean;
+  onBrowseCategories?: () => void;
   mapListings: MapListing[];
   mapCenter: { lat: number; lng: number } | null;
   radiusKm: number;
-  onMapCenterChange: (c: { lat: number; lng: number }, label: string | null) => void;
-  onMapRadiusChange?: (km: number) => void;
+  onMapApplyViewport: (
+    c: { lat: number; lng: number },
+    radiusKm: number,
+    label: string | null,
+  ) => void | Promise<void>;
   onMapClearLocation?: () => void;
   /** Sorting is a view setting, not a search criterion, so it lives here next
    * to "Skjul kart"/"Lagre søk" instead of in the filter-chip row. */
@@ -84,23 +92,29 @@ export function ResultList({
   fetchNextPage,
   resetFilters,
   zeroResultExpansion,
+  zeroResultExpansions = [],
   zeroResultExpansionPending = false,
   onApplyZeroResultExpansion,
+  hasActiveCriteria,
+  onBrowseCategories,
   mapListings,
   mapCenter,
+  onMapApplyViewport,
   radiusKm,
-  onMapCenterChange,
-  onMapRadiusChange,
   onMapClearLocation,
   sort,
   onSortChange,
   toolbarExtra,
 }: Props) {
+  const formFactor = useFormFactor();
+  const nativePhone = isNative && formFactor === "phone";
+  const nativeTablet = isNative && formFactor === "tablet";
   const [sortOpen, setSortOpen] = useState(false);
   const { label: sortLabel } = getSortChipState(sort);
   const [mobileMapOpen, setMobileMapOpen] = useState(false);
   const [bigMapOpen, setBigMapOpen] = useState(false);
-  const [desktopMapVisible, setDesktopMapVisible] = useState(true);
+  const [desktopMapVisible, setDesktopMapVisible] = useState(false);
+  const [viewportApplying, setViewportApplying] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -159,6 +173,17 @@ export function ResultList({
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
+  const applyMapViewport = async (center: { lat: number; lng: number }, radius: number) => {
+    if (viewportApplying) return;
+    setViewportApplying(true);
+    try {
+      const label = await reverseGeocode(center);
+      await onMapApplyViewport(center, radius, label ?? "Valgt punkt");
+    } finally {
+      setViewportApplying(false);
+    }
+  };
+
   const renderMap = () => (
     <ClientOnly fallback={<Skeleton className="h-full w-full rounded-2xl" />}>
       <Suspense fallback={<Skeleton className="h-full w-full rounded-2xl" />}>
@@ -170,80 +195,147 @@ export function ResultList({
           activeId={activeId}
           onMarkerHover={setHoveredId}
           onMarkerSelect={setActiveId}
-          onCenterChange={(c) => {
-            onMapCenterChange(c, "Henter sted…");
-            void reverseGeocode(c).then((name) => onMapCenterChange(c, name ?? "Valgt punkt"));
-          }}
-          onRadiusChange={onMapRadiusChange}
+          onApplyViewport={applyMapViewport}
           onClearLocation={onMapClearLocation}
+          viewportApplying={viewportApplying}
+          deferViewport={isNative}
+          edgeToEdge={nativePhone}
+          compactTouchControls={nativePhone}
           className="h-full w-full"
         />
       </Suspense>
     </ClientOnly>
   );
+  const expansionOptions =
+    zeroResultExpansions.length > 0
+      ? zeroResultExpansions
+      : zeroResultExpansion
+        ? [zeroResultExpansion]
+        : [];
+  const criteriaActive =
+    hasActiveCriteria ?? (q.trim().length > 0 || effectiveCategories.length > 0);
 
   return (
     <>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
         <div className="flex items-center gap-2">
-          <span>
+          <span role="status" aria-live="polite" aria-atomic="true">
             {isLoading
               ? "Søker…"
               : `${(totalCount ?? cards.length).toLocaleString("nb-NO")} annonse${(totalCount ?? cards.length) === 1 ? "" : "r"}`}
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <Popover open={viewModeOpen} onOpenChange={setViewModeOpen}>
-            <PopoverTrigger asChild>
-              <Button type="button" variant="outline" size="sm" className="gap-1.5">
+          {isNative ? (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5 shadow-none"
+                aria-expanded={viewModeOpen}
+                onClick={() => setViewModeOpen(true)}
+              >
                 <ViewModeIcon className="size-4" /> {viewModeLabel}
               </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-40 p-1">
-              {(Object.keys(VIEW_MODE_META) as Array<keyof typeof VIEW_MODE_META>).map((mode) => {
-                const { icon: Icon, label } = VIEW_MODE_META[mode];
-                return (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => {
-                      changeViewMode(mode);
-                      setViewModeOpen(false);
-                    }}
-                    className={`flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-muted ${
-                      viewMode === mode ? "bg-muted font-medium" : ""
-                    }`}
-                  >
-                    <Icon className="size-4" /> {label}
-                  </button>
-                );
-              })}
-            </PopoverContent>
-          </Popover>
-          <Popover open={sortOpen} onOpenChange={setSortOpen}>
-            <PopoverTrigger asChild>
-              <Button type="button" variant="outline" size="sm" className="gap-1.5">
+              <NativeChoiceSheet
+                open={viewModeOpen}
+                onOpenChange={setViewModeOpen}
+                title="Visning"
+                options={[
+                  { value: "grid", label: "Fliser" },
+                  { value: "list", label: "Liste" },
+                ]}
+                value={[viewMode === "grid" || viewMode === "list" ? viewMode : "grid"]}
+                onChange={(next) => {
+                  const mode = next[0];
+                  if (mode === "grid" || mode === "list") changeViewMode(mode);
+                  setViewModeOpen(false);
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5 shadow-none"
+                aria-expanded={sortOpen}
+                onClick={() => setSortOpen(true)}
+              >
                 <ArrowUpDown className="size-4" /> {sortLabel}
               </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-56 p-1">
-              {SORT_OPTIONS.map((s) => (
-                <button
-                  key={s.value}
-                  type="button"
-                  onClick={() => {
-                    onSortChange(s.value);
-                    setSortOpen(false);
-                  }}
-                  className={`block w-full rounded px-3 py-2 text-left text-sm hover:bg-muted ${
-                    sort === s.value ? "bg-muted font-medium" : ""
-                  }`}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </PopoverContent>
-          </Popover>
+              <NativeChoiceSheet
+                open={sortOpen}
+                onOpenChange={setSortOpen}
+                title="Sorter annonser"
+                options={SORT_OPTIONS.map((option) => ({
+                  value: option.value,
+                  label: option.label,
+                }))}
+                value={[sort]}
+                onChange={(next) => {
+                  const value = next[0];
+                  if (value) onSortChange(value as SortValue);
+                  setSortOpen(false);
+                }}
+              />
+            </>
+          ) : (
+            <>
+              <Popover open={viewModeOpen} onOpenChange={setViewModeOpen}>
+                <PopoverTrigger asChild>
+                  <Button type="button" variant="outline" size="sm" className="gap-1.5">
+                    <ViewModeIcon className="size-4" /> {viewModeLabel}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-40 p-1">
+                  {(Object.keys(VIEW_MODE_META) as Array<keyof typeof VIEW_MODE_META>).map(
+                    (mode) => {
+                      const { icon: Icon, label } = VIEW_MODE_META[mode];
+                      return (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() => {
+                            changeViewMode(mode);
+                            setViewModeOpen(false);
+                          }}
+                          className={`flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-muted ${
+                            viewMode === mode ? "bg-muted font-medium" : ""
+                          }`}
+                        >
+                          <Icon className="size-4" /> {label}
+                        </button>
+                      );
+                    },
+                  )}
+                </PopoverContent>
+              </Popover>
+              <Popover open={sortOpen} onOpenChange={setSortOpen}>
+                <PopoverTrigger asChild>
+                  <Button type="button" variant="outline" size="sm" className="gap-1.5">
+                    <ArrowUpDown className="size-4" /> {sortLabel}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-56 p-1">
+                  {SORT_OPTIONS.map((s) => (
+                    <button
+                      key={s.value}
+                      type="button"
+                      onClick={() => {
+                        onSortChange(s.value);
+                        setSortOpen(false);
+                      }}
+                      className={`block w-full rounded px-3 py-2 text-left text-sm hover:bg-muted ${
+                        sort === s.value ? "bg-muted font-medium" : ""
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </PopoverContent>
+              </Popover>
+            </>
+          )}
           {!isDesktop && !isNative && (
             <NativeSheet
               open={mobileMapOpen}
@@ -252,7 +344,13 @@ export function ResultList({
               titleVisible
               className="h-[88vh] p-4"
               trigger={
-                <Button type="button" variant="outline" size="sm" className="gap-1.5">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => trackProductEvent("search_map_opened", { source: "map_button" })}
+                >
                   <MapIcon className="size-4" /> Kart
                 </Button>
               }
@@ -260,13 +358,16 @@ export function ResultList({
               <div className="mt-3 h-[calc(100%-3rem)]">{mobileMapOpen ? renderMap() : null}</div>
             </NativeSheet>
           )}
-          {isDesktop && (
+          {(isDesktop || nativeTablet) && (
             <Button
               type="button"
               variant="outline"
               size="sm"
               className="gap-1.5"
-              onClick={() => setDesktopMapVisible((v) => !v)}
+              onClick={() => {
+                trackProductEvent("search_map_opened", { source: "map_button" });
+                setDesktopMapVisible((v) => !v);
+              }}
               aria-pressed={desktopMapVisible}
             >
               <MapIcon className="size-4" /> {desktopMapVisible ? "Skjul kart" : "Vis kart"}
@@ -277,7 +378,13 @@ export function ResultList({
       </div>
 
       <div
-        className={`mt-4 grid gap-6 ${isDesktop && desktopMapVisible ? "lg:grid-cols-[1fr_420px]" : ""}`}
+        className={`mt-4 grid gap-6 ${
+          isDesktop && desktopMapVisible && cards.length > 0
+            ? "lg:grid-cols-[1fr_420px]"
+            : nativeTablet && desktopMapVisible && cards.length > 0
+              ? "grid-cols-[minmax(320px,1fr)_minmax(320px,0.8fr)]"
+              : ""
+        }`}
       >
         <div>
           {!isLoading && (
@@ -288,7 +395,7 @@ export function ResultList({
             />
           )}
           {isLoading ? (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
               {Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="overflow-hidden rounded-xl border border-border bg-card">
                   <Skeleton className="aspect-[4/3] rounded-none" />
@@ -315,14 +422,18 @@ export function ResultList({
               }
               action={
                 <>
-                  {zeroResultExpansion && onApplyZeroResultExpansion ? (
-                    <Button
-                      variant="outline"
-                      onClick={() => onApplyZeroResultExpansion(zeroResultExpansion)}
-                    >
-                      Vis {zeroResultExpansion.count.toLocaleString("nb-NO")} treff uten «
-                      {zeroResultExpansion.label}»
-                    </Button>
+                  {expansionOptions.length > 0 && onApplyZeroResultExpansion ? (
+                    <div className="flex flex-wrap justify-center gap-2">
+                      {expansionOptions.map((option) => (
+                        <Button
+                          key={option.key}
+                          variant="outline"
+                          onClick={() => onApplyZeroResultExpansion(option)}
+                        >
+                          Vis {option.count.toLocaleString("nb-NO")} treff uten «{option.label}»
+                        </Button>
+                      ))}
+                    </div>
                   ) : zeroResultExpansionPending ? (
                     <span
                       role="status"
@@ -331,11 +442,15 @@ export function ResultList({
                     >
                       Ser etter en bredere variant …
                     </span>
-                  ) : (
+                  ) : criteriaActive ? (
                     <Button variant="outline" onClick={resetFilters}>
                       Nullstill alle filtre
                     </Button>
-                  )}
+                  ) : onBrowseCategories ? (
+                    <Button variant="outline" onClick={onBrowseCategories}>
+                      Utforsk kategorier
+                    </Button>
+                  ) : null}
                 </>
               }
             />
@@ -344,15 +459,25 @@ export function ResultList({
               className={
                 viewMode === "list" || viewMode === "card" || viewMode === "images"
                   ? "flex flex-col gap-3"
-                  : `grid grid-cols-2 gap-4 sm:grid-cols-3 ${isDesktop && !desktopMapVisible ? "lg:grid-cols-4" : ""}`
+                  : `grid grid-cols-2 gap-4 sm:grid-cols-3 ${
+                      (isDesktop || nativeTablet) && !desktopMapVisible
+                        ? "lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+                        : ""
+                    }`
               }
             >
-              {cards.map((l) =>
+              {cards.map((l, index) =>
                 viewMode === "card" ? (
                   <ListingCardExpanded
                     key={l.id}
                     listing={l}
                     linkState={{ fromSearch: true }}
+                    onOpen={() =>
+                      trackProductEvent("search_result_opened", {
+                        position: index + 1,
+                        resultCount: totalCount ?? cards.length,
+                      })
+                    }
                     coverImageUrl={signedImageUrls[l.id] ?? null}
                     knownFavorite={favoriteIds.has(l.id)}
                     favoriteStateReady={favoriteStateReady}
@@ -362,6 +487,12 @@ export function ResultList({
                     key={l.id}
                     listing={l}
                     linkState={{ fromSearch: true }}
+                    onOpen={() =>
+                      trackProductEvent("search_result_opened", {
+                        position: index + 1,
+                        resultCount: totalCount ?? cards.length,
+                      })
+                    }
                     coverImageUrl={signedImageUrls[l.id] ?? null}
                     knownFavorite={favoriteIds.has(l.id)}
                     favoriteStateReady={favoriteStateReady}
@@ -374,6 +505,12 @@ export function ResultList({
                     onHoverChange={setHoveredId}
                     compact={viewMode === "list"}
                     linkState={{ fromSearch: true }}
+                    onOpen={() =>
+                      trackProductEvent("search_result_opened", {
+                        position: index + 1,
+                        resultCount: totalCount ?? cards.length,
+                      })
+                    }
                     signedImageUrl={signedImageUrls[l.id] ?? null}
                     knownFavorite={favoriteIds.has(l.id)}
                     favoriteStateReady={favoriteStateReady}
@@ -391,7 +528,7 @@ export function ResultList({
           )}
         </div>
 
-        {isDesktop && desktopMapVisible && (
+        {(isDesktop || nativeTablet) && desktopMapVisible && cards.length > 0 && (
           <aside>
             <div className="sticky top-20 h-[calc(100vh-6rem)]">
               <div className="relative h-full overflow-hidden rounded-2xl border border-border shadow-sm">
@@ -429,32 +566,53 @@ export function ResultList({
         )}
       </div>
 
-      {/* Native kart-FAB + Sheet */}
+      {/* Native kart åpnes som en fullskjerm takeover, slik at kartet får
+          samme edge-to-edge-opplevelse som andre native medieflater. */}
       {isNative && (
         <>
-          <NativeSheet
-            open={mobileMapOpen}
-            onOpenChange={setMobileMapOpen}
-            title="Kart"
-            titleVisible
-            expandable
-            initialSnapPoint={1}
-            className="h-full p-4"
-          >
-            <div className="mt-3 h-[calc(100%-3rem)]">{mobileMapOpen ? renderMap() : null}</div>
-          </NativeSheet>
+          <FullscreenOverlay open={mobileMapOpen} onOpenChange={setMobileMapOpen}>
+            <FullscreenOverlayContent title="Kart over søkeresultater" edgeToEdge>
+              <div className="flex h-full flex-col bg-background">
+                <div className="pt-safe flex shrink-0 items-center justify-between border-b border-border px-4 pb-3">
+                  <div>
+                    <h2 className="text-base font-semibold">Kart</h2>
+                    <p className="text-xs text-muted-foreground">
+                      {mapListings.length} mulige treff
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="native-touch-target"
+                    onClick={() => setMobileMapOpen(false)}
+                    aria-label="Lukk kart"
+                  >
+                    <X className="size-5" />
+                  </Button>
+                </div>
+                <div className="min-h-0 flex-1">{mobileMapOpen ? renderMap() : null}</div>
+              </div>
+            </FullscreenOverlayContent>
+          </FullscreenOverlay>
           <button
             type="button"
             onClick={() => {
               void hapticImpact("medium");
+              trackProductEvent("search_map_opened", { source: "map_button" });
               setMobileMapOpen(true);
             }}
-            className="fixed bottom-[calc(var(--app-bottom-nav-h)+1rem)] right-4 z-50 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg active:scale-95 transition"
-            aria-label="Vis kart"
+            className="fixed bottom-[calc(var(--app-bottom-nav-h)+1rem)] right-4 z-50 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition active:scale-95"
+            aria-label={
+              mapListings.length > 0 ? `Vis kart, ${mapListings.length} treff` : "Vis kart"
+            }
           >
             <MapIcon className="size-6" />
             {mapListings.length > 0 && (
-              <span className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white">
+              <span
+                className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-brand text-2xs font-bold text-brand-foreground"
+                aria-hidden="true"
+              >
                 {mapListings.length > 99 ? "99+" : mapListings.length}
               </span>
             )}

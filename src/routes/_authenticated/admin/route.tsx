@@ -8,7 +8,6 @@ import {
   Webhook,
   Car,
   MessageSquareHeart,
-  Search,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsAdmin } from "@/hooks/use-is-admin";
@@ -53,7 +52,6 @@ function AdminLayout() {
               label="Kategorier"
             />
             <NavTab to="/admin/kjoretoy" icon={<Car className="size-4" />} label="Kjøretøy" />
-            <NavTab to="/admin/sok" icon={<Search className="size-4" />} label="Søk" />
           </>
         )}
         <NavTab

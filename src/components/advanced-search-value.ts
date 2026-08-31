@@ -1,7 +1,10 @@
+import type { AttributeFilterValue } from "@/lib/category-filters";
 import type { LocationValue } from "@/components/location-filter";
 import type { SortValue } from "@/lib/categories";
 import type { TermGroup } from "@/lib/term-groups";
 import type { SearchCriteria } from "@/lib/saved-searches";
+import { VEHICLE_CONDITIONS_BY_SLUG } from "@/lib/constants";
+import type { VehicleLeafSlug } from "@/lib/vehicle/vehicle-classification";
 
 /** Root category slug for Bil og MC, which only lets a listing belong to one
  * subcategory at a time — unlike other categories, where an ad can carry
@@ -17,6 +20,20 @@ export const CONDITIONS: Array<{ value: string; label: string }> = [
   { value: "for_parts", label: "Må repareres" },
 ];
 
+/** Bil og MC tillater kun én valgt underkategori om gangen (se
+ * `BIL_OG_MC_SLUG` over), så "nøyaktig én valgt kategori, og den er en
+ * kjøretøy-leaf" er riktig betingelse for å bytte til kjøretøyets egne
+ * tilstandsetiketter — ellers vises det generiske settet. */
+export function conditionOptionsFor(
+  selectedCategorySlugs: string[],
+): { value: string; label: string }[] {
+  const vehicleOptions =
+    selectedCategorySlugs.length === 1
+      ? VEHICLE_CONDITIONS_BY_SLUG[selectedCategorySlugs[0] as VehicleLeafSlug]
+      : undefined;
+  return vehicleOptions ?? CONDITIONS;
+}
+
 export type AdvancedSearchValue = {
   terms: string[];
   qMode: "all" | "any";
@@ -29,6 +46,7 @@ export type AdvancedSearchValue = {
   location: LocationValue;
   sort: SortValue;
   extraGroups: TermGroup[];
+  attributes?: Record<string, AttributeFilterValue>;
 };
 
 export function defaultAdvancedSearchValue(): AdvancedSearchValue {
@@ -42,6 +60,7 @@ export function defaultAdvancedSearchValue(): AdvancedSearchValue {
     max: null,
     includeFree: true,
     location: { lat: null, lng: null, radius: 10, label: "" },
+    attributes: {},
     sort: "new",
     extraGroups: [],
   };
@@ -63,6 +82,7 @@ export function valueToCriteria(v: AdvancedSearchValue): SearchCriteria {
     extraGroups: v.extraGroups,
     lat: v.location.lat,
     lng: v.location.lng,
+    attributes: v.attributes ?? {},
     radius: v.location.lat != null ? v.location.radius : null,
     loc: v.location.label || undefined,
   };
@@ -81,6 +101,7 @@ export function criteriaToValue(c: SearchCriteria): AdvancedSearchValue {
     includeFree: c.includeFree ?? true,
     sort: c.sort ?? "new",
     extraGroups: c.extraGroups ?? [],
+    attributes: c.attributes ?? {},
     location: {
       lat: c.lat ?? null,
       lng: c.lng ?? null,

@@ -7,8 +7,7 @@
 } from "react-hook-form";
 
 import type { AttributeMap } from "@/components/attribute-fields";
-import type { CategoryNode } from "@/lib/category-filters";
-import type { CategoryModule } from "@/features/listing-creation/modules/registry";
+import type { CategoryNode, VehicleBrandGroup } from "@/lib/category-filters";
 import type { PendingImage } from "@/components/image-uploader";
 import type { VehicleLookupResult } from "@/lib/vehicle/vehicle-lookup.types";
 import type { VehicleClassification } from "@/lib/vehicle/vehicle-classification";
@@ -143,11 +142,14 @@ export type WizardSharedProps = {
   setSuggestionDismissed: (v: boolean) => void;
   setCategorySuggestions: (v: []) => void;
 
-  // category attributes (modules)
+  // category attributes
   attributes: AttributeMap;
   onAttributesChange: (next: AttributeMap) => void;
   attributesTouched: boolean;
-  activeModules: CategoryModule[];
+  /** Whether the category's flow includes generic (non-vehicle) category
+   * attributes — false when boat/vehicle-specific field groups already own
+   * category attributes for this category. */
+  genericAttributesActive: boolean;
   /** True when the boat-specific facts group owns category attributes. */
   boatFactsActive: boolean;
   /** category_filters keys already reviewed/edited in vehicle-confirm — hidden
@@ -182,7 +184,7 @@ export type WizardSharedProps = {
   runVehicleLookup: (registrationNumber: string) => Promise<boolean>;
   /** Writes the raw (unedited) SVV lookup data into `attributes` and advances
    * the wizard — called when the user confirms the reg-nr popup with "Ja". */
-  confirmVehicleData: (leafCategoryId: string) => void;
+  confirmVehicleData: (leafCategoryId: string, categoryGroup: VehicleBrandGroup) => void;
   /** Clears the current lookup so the reg-nr field is editable again — called
    * when the user answers "Nei" to the reg-nr confirmation popup. */
   resetLookupOnReturnToRegistration: () => void;

@@ -13,6 +13,8 @@ export type PreviewDraft = {
   priceNok: number | null;
   isFree: boolean;
   condition: string | null;
+  canShip: boolean | null;
+  requiresDeliveryMethod: boolean;
   city: string | null;
   postalCode: string | null;
   displayLat: number | null;

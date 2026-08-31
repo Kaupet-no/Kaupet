@@ -21,13 +21,6 @@ export type InlineImageItem = {
   uploading?: boolean;
 };
 
-type ListingImageRow = {
-  id: string;
-  storage_path: string;
-  sort_order: number;
-  caption: string | null;
-};
-
 /**
  * Each action (add/remove/reorder/caption) writes immediately instead of
  * collecting a batch for one big save, mirroring `EditableField`'s
@@ -212,5 +205,3 @@ export function useInlineListingImages(params: {
 
   return { items, imgUrls, fileInputRef, addFiles, removeItem, move, setCaption };
 }
-
-export type { ListingImageRow };

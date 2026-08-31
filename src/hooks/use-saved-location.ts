@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { LocationValue } from "@/components/location-filter";
 
 const KEY = "kaupet.app.location";
@@ -30,14 +30,14 @@ export function useSavedLocation(): [LocationValue, (v: LocationValue) => void] 
     setValue(read());
   }, []);
 
-  const update = (v: LocationValue) => {
+  const update = useCallback((v: LocationValue) => {
     setValue(v);
     try {
       window.localStorage.setItem(KEY, JSON.stringify(v));
     } catch {
       /* ignore */
     }
-  };
+  }, []);
 
   return [value, update];
 }

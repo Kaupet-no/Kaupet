@@ -49,20 +49,6 @@ export function flattenTree<T extends CategoryNode>(
   return result;
 }
 
-/** Returns id + all descendant ids (DFS order) rooted at id. */
-export function getSubtreeIds<T extends CategoryNode>(categories: T[], id: string): string[] {
-  const parentMap = byParentMap(categories);
-  const result: string[] = [id];
-  function walk(parentId: string) {
-    for (const child of parentMap.get(parentId) ?? []) {
-      result.push(child.id);
-      walk(child.id);
-    }
-  }
-  walk(id);
-  return result;
-}
-
 /** Depth of a category within the tree (0 for root-level items). */
 export function depthOf<T extends CategoryNode>(id: string, categories: T[]): number {
   const byId = new Map(categories.map((c) => [c.id, c]));

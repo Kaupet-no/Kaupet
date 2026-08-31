@@ -44,7 +44,10 @@ export function EditableRegion<C extends BaseEditContextValue = BaseEditContextV
         tabIndex={0}
         onClick={onOpen}
         onKeyDown={(e) => {
-          if (e.key === "Enter") onOpen();
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onOpen();
+          }
         }}
         className={cn(
           "cursor-pointer rounded-md border border-dashed border-border/60 transition-colors hover:border-primary/50 hover:bg-primary/5",
@@ -66,7 +69,10 @@ export function EditableRegion<C extends BaseEditContextValue = BaseEditContextV
       tabIndex={0}
       onClick={() => setOpen(true)}
       onKeyDown={(e) => {
-        if (e.key === "Enter") setOpen(true);
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setOpen(true);
+        }
       }}
       className={cn(
         "cursor-pointer rounded-md border border-dashed border-border/60 transition-colors hover:border-primary/50 hover:bg-primary/5",

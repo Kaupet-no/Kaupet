@@ -8,11 +8,6 @@ export type Category = {
   heading_font?: string | null;
 };
 
-/** Main categories are colored root categories presented as Kaupet sub-sites. */
-export function mainCategories(categories: Category[]): Category[] {
-  return categories.filter((c) => c.parent_id == null && !!c.color);
-}
-
 /**
  * Resolves selected category slugs (e.g. from `/annonser`'s `categories`
  * search param) to concrete category ids to filter listings by — a chosen
@@ -176,34 +171,26 @@ export function resolveHeroCategory(
   return { selected: candidate, main };
 }
 
-export function categoryLabel(selectedSlugs: string[], tree: CatTree): string {
-  if (selectedSlugs.length === 0) return "Alle kategorier";
-  const set = new Set(selectedSlugs);
-
-  // "Alle i parent": parent slug + every descendant slug (at any depth) present
-  for (const root of tree.roots) {
-    const kids = descendants(root, tree);
-    if (kids.length === 0) continue;
-    const allChildrenSlugs = kids.map((k) => k.slug);
-    const hasAll =
-      set.has(root.slug) &&
-      allChildrenSlugs.every((s) => set.has(s)) &&
-      set.size === 1 + allChildrenSlugs.length;
-    if (hasAll) return root.name_nb;
-  }
-
-  if (selectedSlugs.length === 1) {
-    const c = tree.bySlug.get(selectedSlugs[0]);
-    if (!c) return "1 kategori";
-    const path = breadcrumbPath(c, tree);
-    return path.map((p) => p.name_nb).join(" › ");
-  }
-  return `${selectedSlugs.length} kategorier`;
-}
-
 export function selectAllForParent(parent: Category, tree: CatTree): string[] {
   const kids = descendants(parent, tree);
   return [parent.slug, ...kids.map((k) => k.slug)];
+}
+
+/**
+ * Er kategorivalget "ferdig" — en hovedkategori er valgt, og hvis den har
+ * underkategorier, er minst én av dem også valgt (eller ingen finnes).
+ * Brukes til å avgjøre når kategorivelgeren kan kollapse til en oppsummering.
+ */
+export function isCategorySelectionComplete(selectedSlugs: string[], tree: CatTree): boolean {
+  const selectedCats = selectedSlugs
+    .map((s) => tree.bySlug.get(s))
+    .filter((c): c is Category => !!c);
+  const firstSel = selectedCats[0];
+  if (!firstSel) return false;
+  const mainCat = breadcrumbPath(firstSel, tree)[0];
+  const hasSubs = (tree.childrenByParent.get(mainCat.id) ?? []).length > 0;
+  const hasSubSelected = selectedCats.some((c) => c.parent_id != null);
+  return !hasSubs || hasSubSelected;
 }
 
 /**

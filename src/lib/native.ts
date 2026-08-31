@@ -5,11 +5,24 @@
 import { Capacitor } from "@capacitor/core";
 
 export function isNative(): boolean {
-  // Dev-only: `?forcenative` slår på native-grenene i vanlig nettleser, slik at
-  // de kan verifiseres uten simulator. `import.meta.env.DEV` er false i bygget,
-  // så hele blokken strippes bort i produksjon.
+  // Dev-only: `?forcenative` slår på native-grenene i vanlig nettleser. Flagget
+  // lagres per fane, slik at interne ruteoverganger ikke faller tilbake til web.
+  // `?forcenative=0` nullstiller overstyringen. Hele blokken strippes i prod.
   if (import.meta.env.DEV && typeof window !== "undefined") {
-    if (window.location.search.includes("forcenative")) return true;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.has("forcenative")) {
+        const value = params.get("forcenative");
+        if (value === "0" || value === "false") {
+          window.sessionStorage.removeItem("kaupet.forceNative");
+        } else {
+          window.sessionStorage.setItem("kaupet.forceNative", "true");
+        }
+      }
+      if (window.sessionStorage.getItem("kaupet.forceNative") === "true") return true;
+    } catch {
+      // Storage can be unavailable in restricted webviews; use Capacitor below.
+    }
   }
   try {
     return Capacitor.isNativePlatform();
@@ -186,16 +199,4 @@ export async function initUniversalLinkNavigation(navigate: (url: string) => voi
       // Ugyldig URL — ignorer i stedet for å krasje appen.
     }
   });
-}
-
-/** Open a URL in an in-app browser on native; on web, opens a new tab. */
-export async function openExternal(url: string): Promise<void> {
-  if (isNative()) {
-    const { Browser } = await import("@capacitor/browser");
-    await Browser.open({ url });
-    return;
-  }
-  if (typeof window !== "undefined") {
-    window.open(url, "_blank", "noopener,noreferrer");
-  }
 }

@@ -68,7 +68,7 @@ function SortableImageItem({
           draggable={false}
         />
         {idx === 0 && (
-          <span className="absolute left-2 top-2 rounded bg-primary/90 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary-foreground">
+          <span className="absolute left-2 top-2 rounded bg-primary/90 px-1.5 py-0.5 text-2xs font-medium uppercase tracking-wide text-primary-foreground">
             Hoved
           </span>
         )}

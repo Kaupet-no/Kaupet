@@ -1,43 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
-import { supabase } from "@/integrations/supabase/client";
+import { useCategories, visibleCategories } from "@/hooks/use-categories";
+import { useAllCategoryFilters } from "@/components/attribute-fields";
 import { ActiveFilters } from "@/components/active-filters";
-import type { ListingCardData } from "@/components/listing-card";
-import type { MapListing } from "@/components/listings-map";
 import { ResultList } from "@/components/result-list";
-import {
-  useRegisterSearchPanelResults,
-  useSearchPanel,
-} from "@/features/listing-search/search-panel/search-panel-context";
-import type { SearchPanelResultsContext } from "@/features/listing-search/search-panel/search-panel";
-import {
-  SearchSummaryPill,
-  countActiveFilters,
-} from "@/features/listing-search/search-panel/search-summary-pill";
+import { useSearchPanel } from "@/features/listing-search/search-panel/search-panel-context";
+import { SearchSummaryPill } from "@/features/listing-search/search-panel/search-summary-pill";
+import { SearchResultsBody } from "@/features/listing-search/search-panel/search-results-body";
 import { AttributeFilterChips } from "@/components/attribute-filter-chips";
 import { CategoryHero } from "@/components/category-hero";
-import {
-  buildTree,
-  descendants,
-  pathFromAncestor,
-  resolveCategoryIds,
-  type Category,
-} from "@/lib/categories";
-import {
-  normalizeFilter,
-  vehicleCategoryGroupFor,
-  genericBrandFilterFor,
-} from "@/lib/category-filters";
+import { buildTree, descendants, pathFromAncestor, type Category } from "@/lib/categories";
+import { vehicleCategoryGroupFor, genericBrandFilterFor } from "@/lib/category-filters";
 import { getCategoryBehavior } from "@/lib/category-behavior";
 import { SearchBar } from "@/components/search-bar";
 import { searchSchema, conditionEnum } from "@/features/listing-search/search-schema";
-import { useAnnonserSearchState } from "@/features/listing-search/use-annonser-search-state";
-import { useFilterFacetCounts } from "@/features/listing-search/use-filter-facet-counts";
-import { useListingsQuery } from "@/features/listing-search/use-listings-query";
-import { useTextToFilterPipeline } from "@/features/listing-search/use-text-to-filter-pipeline";
-import { useZeroResultExpansion } from "@/features/listing-search/zero-result-expansion";
+import { useSearchResultsShell } from "@/features/listing-search/use-search-results-shell";
 import { useIsNative } from "@/hooks/use-is-native";
+import { useIsDesktop } from "@/hooks/use-form-factor";
 
 type Search = z.infer<typeof searchSchema>;
 
@@ -81,60 +60,18 @@ export function CategoryLandingPage({
 }: Props) {
   const isNative = useIsNative();
   const [qDraft, setQDraft] = useState(search.q);
-  const [isDesktop, setIsDesktop] = useState(false);
+  const isDesktop = useIsDesktop();
   const { openPanel } = useSearchPanel();
-  // See annonser.tsx's identical field for why this exists — keyed by
-  // "filterKey:optionValue" ("filterKey:" for single-value filters).
-  const [autoAppliedText, setAutoAppliedText] = useState<Record<string, string>>({});
-  const [justCreatedKeys, setJustCreatedKeys] = useState<Set<string>>(new Set());
-  const flashKeys = (keys: string[]) => {
-    if (keys.length === 0) return;
-    setJustCreatedKeys((prev) => new Set([...prev, ...keys]));
-    setTimeout(() => {
-      setJustCreatedKeys((prev) => {
-        const next = new Set(prev);
-        for (const k of keys) next.delete(k);
-        return next;
-      });
-    }, 1500);
-  };
 
   useEffect(() => setQDraft(search.q), [search.q]);
-  useEffect(() => {
-    const mql = window.matchMedia("(min-width: 1024px)");
-    const update = () => setIsDesktop(mql.matches);
-    update();
-    mql.addEventListener("change", update);
-    return () => mql.removeEventListener("change", update);
-  }, []);
 
-  const { data: categories } = useQuery({
-    queryKey: ["categories", "with-color"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("categories")
-        .select("id, slug, name_nb, parent_id, icon, color, heading_font")
-        .eq("is_hidden", false)
-        .order("sort_order")
-        .order("name_nb");
-      if (error) throw error;
-      return (data ?? []) as Category[];
-    },
-  });
+  const { data: allCategoriesRaw } = useCategories();
+  const categories = useMemo(
+    () => visibleCategories(allCategoriesRaw ?? [], false),
+    [allCategoriesRaw],
+  );
 
-  const { data: allFilters } = useQuery({
-    queryKey: ["category-filters", "all"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("category_filters")
-        .select(
-          "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value, depends_on_not_value, is_optional",
-        )
-        .order("sort_order");
-      if (error) throw error;
-      return (data ?? []).map(normalizeFilter);
-    },
-  });
+  const { data: allFilters } = useAllCategoryFilters();
 
   const tree = useMemo(() => buildTree(categories ?? []), [categories]);
 
@@ -182,7 +119,6 @@ export function CategoryLandingPage({
 
   const {
     location,
-    effectiveCategories,
     attrFilters,
     attrValues,
     handleAttrValueChange,
@@ -190,69 +126,34 @@ export function CategoryLandingPage({
     updateSearch,
     handleLocationChange,
     resetFilters,
-    appliedSearch,
+    justCreatedKeys,
+    removeAttrWithRestore,
+    activeFilterCount,
+    facetCounts,
     applyPanelDraft,
-  } = useAnnonserSearchState({
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    totalCount,
+    zeroResultExpansion,
+    zeroResultExpansionPending,
+    cards,
+    mapListings,
+    mapCenter,
+    searchPanelResults,
+  } = useSearchResultsShell({
     search: effectiveSearch,
     navigate,
     categories: categories ?? undefined,
     allFilters,
-    setQDraft,
-  });
-
-  const { data: facetCounts } = useFilterFacetCounts({
-    filters: attrFilters,
-    values: attrValues,
-    categoryIds: resolveCategoryIds(effectiveCategories, categories ?? []),
-    conditions: search.conditions ?? [],
-    min: search.min,
-    max: search.max,
-    includeFree: search.includeFree ?? true,
-  });
-
-  // Recognizes category-attribute vocabulary (e.g. "ryggekamera") and
-  // number+unit facts typed into the search box — see
-  // use-text-to-filter-pipeline.ts. This page always has a stable selected
-  // category, so matching can run unconditionally.
-  useTextToFilterPipeline({
     qDraft,
     setQDraft,
-    updateSearch,
-    attrFilters,
-    allFilters: allFilters ?? [],
-    attrValues,
-    handleAttrValueChange,
-    categoryId: selected.id,
-    onApplied: (applied) => {
-      setAutoAppliedText((prev) => ({ ...prev, ...applied }));
-      flashKeys(Object.keys(applied));
-    },
+    // This page's category is fixed by the route, not derived from filter
+    // state — no need to consult the resolver's own params.
+    resolveCategoryId: () => selected.id,
+    canRemoveCategoryInZeroResultExpansion: false,
   });
-
-  const removeAttrWithRestore = (key: string, value?: string) => {
-    const composite = `${key}:${value ?? ""}`;
-    const restoreText = autoAppliedText[composite];
-    const current = attrValues[key];
-    if (value !== undefined && current?.kind === "multiselect") {
-      const next = current.values.filter((v) => v !== value);
-      handleAttrValueChange(
-        key,
-        next.length > 0 ? { kind: "multiselect", values: next } : undefined,
-      );
-    } else {
-      handleAttrValueChange(key, undefined);
-    }
-    if (restoreText) {
-      setAutoAppliedText((prev) => {
-        const next = { ...prev };
-        delete next[composite];
-        return next;
-      });
-      const nextQ = qDraft ? `${qDraft} ${restoreText}` : restoreText;
-      setQDraft(nextQ);
-      updateSearch({ q: nextQ });
-    }
-  };
 
   // Merke/Modell selected in the attribute filters get appended as extra
   // brødsmuler after the category chain, matching the ad-detail page's
@@ -271,85 +172,6 @@ export function CategoryLandingPage({
     });
   }, [attrValues, allFilters, tree, selected, breadcrumb, category]);
 
-  const {
-    data: listingsData,
-    isLoading,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  } = useListingsQuery({
-    search: effectiveSearch,
-    categories: categories ?? undefined,
-    effectiveCategories,
-    terms,
-  });
-
-  const listings = useMemo(() => listingsData?.pages.flatMap((p) => p.rows), [listingsData]);
-  const totalCount = listingsData?.pages[0]?.totalCount ?? null;
-  const { expansion: zeroResultExpansion, isPending: zeroResultExpansionPending } =
-    useZeroResultExpansion({
-      applied: appliedSearch,
-      filters: attrFilters,
-      categories: categories ?? [],
-      enabled: !isLoading && totalCount === 0 && !!categories,
-      canRemoveCategory: false,
-    });
-
-  const cards: ListingCardData[] = (listings ?? []).map((l) => ({
-    id: l.id,
-    kaupet_code: l.kaupet_code,
-    title: l.title,
-    subtitle: l.subtitle,
-    price_nok: l.price_nok,
-    is_free: l.is_free,
-    city: l.city,
-    created_at: l.created_at,
-    cover_path: l.cover_path,
-    category_slug: l.category_slug,
-    attributes: l.attributes,
-  }));
-
-  const mapListings: MapListing[] = (listings ?? [])
-    .filter((l): l is typeof l & { lat: number; lng: number } => l.lat != null && l.lng != null)
-    .map((l) => ({
-      id: l.id,
-      kaupet_code: l.kaupet_code,
-      title: l.title,
-      price_nok: l.price_nok,
-      is_free: l.is_free,
-      lat: l.lat,
-      lng: l.lng,
-      cover_path: l.cover_path,
-    }));
-
-  const mapCenter =
-    search.lat != null && search.lng != null ? { lat: search.lat, lng: search.lng } : null;
-
-  const activeFilterCount = countActiveFilters({
-    min: search.min,
-    max: search.max,
-    includeFree: search.includeFree,
-    conditions: search.conditions,
-    hasLocation: location.lat != null,
-    attrCount: Object.keys(attrValues).length,
-    extraGroupCount: search.extraGroups?.length ?? 0,
-    qModeAny: search.qMode === "any",
-  });
-
-  const searchPanelResults: SearchPanelResultsContext | null = isNative
-    ? {
-        applied: appliedSearch,
-        onApply: (draft) => {
-          setQDraft(draft.value.terms.join(" "));
-          applyPanelDraft(draft);
-        },
-        attributeFilters: attrFilters,
-        attributeCounts: facetCounts,
-        resultCount: totalCount ?? cards.length,
-      }
-    : null;
-  useRegisterSearchPanelResults(searchPanelResults);
-
   return (
     <div>
       {/* Entries before this page's own category are real ancestor pages with
@@ -365,16 +187,14 @@ export function CategoryLandingPage({
         linkUntilIndex={breadcrumb.length - 1}
       />
 
-      <div className="mx-auto max-w-7xl px-4 py-8">
+      <div className="mx-auto max-w-6xl px-4 py-8">
         <div className="space-y-2">
           {isNative ? (
-            // Samme sammendrag-pille som /annonser (fase 9, tiltak 26).
             <SearchSummaryPill
               q={qDraft}
-              onQChange={setQDraft}
-              onSubmitQ={() => updateSearch({ q: qDraft })}
               filterCount={activeFilterCount}
-              onOpen={() => openPanel("price")}
+              onOpenQuery={() => openPanel("query")}
+              onOpenFilters={() => openPanel("price")}
             />
           ) : (
             <SearchBar
@@ -388,7 +208,10 @@ export function CategoryLandingPage({
               onExtraGroupsChange={(extraGroups) => updateSearch({ extraGroups })}
             />
           )}
-          {isNative ? null : (
+          {/* Desktop web bruker SearchFilterSidebar (se under, samme som
+              /annonser); denne inline-kortlayouten er kun for mobil web, der
+              siden ikke har plass til en fast sidekolonne. */}
+          {!isNative && !isDesktop && (
             <AttributeFilterChips
               filters={attrFilters}
               values={attrValues}
@@ -432,34 +255,48 @@ export function CategoryLandingPage({
           )}
         </div>
 
-        <ResultList
+        <SearchResultsBody
           isNative={isNative}
           isDesktop={isDesktop}
-          q={search.q}
-          effectiveCategories={[selected.slug]}
-          cards={cards}
-          totalCount={totalCount}
-          isLoading={isLoading}
-          hasNextPage={!!hasNextPage}
-          isFetchingNextPage={isFetchingNextPage}
-          fetchNextPage={() => void fetchNextPage()}
-          resetFilters={resetFilters}
-          zeroResultExpansion={zeroResultExpansion}
-          zeroResultExpansionPending={zeroResultExpansionPending}
-          onApplyZeroResultExpansion={(expansion) => applyPanelDraft(expansion.applied)}
-          mapListings={mapListings}
-          mapCenter={mapCenter}
-          radiusKm={search.radius ?? 10}
-          onMapCenterChange={(c, label) =>
-            updateSearch({ lat: c.lat, lng: c.lng, loc: label ?? "" })
-          }
-          onMapRadiusChange={(km) => updateSearch({ radius: km })}
-          onMapClearLocation={() =>
-            updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
-          }
-          sort={search.sort}
-          onSortChange={(s) => updateSearch({ sort: s })}
-        />
+          searchPanelResults={searchPanelResults}
+          categories={categories ?? []}
+        >
+          <ResultList
+            isNative={isNative}
+            isDesktop={isDesktop}
+            q={search.q}
+            effectiveCategories={[selected.slug]}
+            cards={cards}
+            totalCount={totalCount}
+            isLoading={isLoading}
+            hasNextPage={!!hasNextPage}
+            isFetchingNextPage={isFetchingNextPage}
+            fetchNextPage={() => void fetchNextPage()}
+            hasActiveCriteria={
+              search.q.trim().length > 0 ||
+              search.min != null ||
+              search.max != null ||
+              (search.conditions?.length ?? 0) > 0 ||
+              Object.keys(attrValues).length > 0 ||
+              search.lat != null
+            }
+            resetFilters={resetFilters}
+            zeroResultExpansion={zeroResultExpansion}
+            zeroResultExpansionPending={zeroResultExpansionPending}
+            onApplyZeroResultExpansion={(expansion) => applyPanelDraft(expansion.applied)}
+            mapListings={mapListings}
+            mapCenter={mapCenter}
+            radiusKm={search.radius ?? 10}
+            onMapClearLocation={() =>
+              updateSearch({ lat: undefined, lng: undefined, radius: undefined, loc: undefined })
+            }
+            onMapApplyViewport={(c, radius, label) =>
+              updateSearch({ lat: c.lat, lng: c.lng, radius, loc: label ?? "" })
+            }
+            sort={search.sort}
+            onSortChange={(s) => updateSearch({ sort: s })}
+          />
+        </SearchResultsBody>
       </div>
     </div>
   );

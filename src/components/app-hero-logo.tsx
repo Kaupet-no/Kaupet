@@ -9,7 +9,7 @@ export function AppHeroLogo() {
 
   return (
     <div
-      className="pointer-events-none relative z-30 flex justify-center pb-4 pt-safe"
+      className="pointer-events-none relative z-30 flex justify-center pb-2 pt-safe"
       style={{
         opacity,
         transition: "opacity 150ms ease",
@@ -17,11 +17,11 @@ export function AppHeroLogo() {
       }}
     >
       <span className="flex items-baseline gap-1">
-        <span className="font-display text-4xl font-semibold tracking-tight text-primary">
+        <span className="font-display text-3xl font-semibold tracking-tight text-primary">
           kaupet
         </span>
-        <span className="font-display text-4xl text-accent">.</span>
-        <span className="font-display text-3xl text-muted-foreground">no</span>
+        <span className="font-display text-3xl text-brand">.</span>
+        <span className="font-display text-2xl text-muted-foreground">no</span>
       </span>
     </div>
   );

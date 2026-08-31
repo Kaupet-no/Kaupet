@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
 type Props = {
   words: string[];
@@ -24,9 +25,13 @@ export function AnimatedSearchPlaceholder({
 }: Props) {
   const [index, setIndex] = useState(0);
   const [visible, setVisible] = useState(true);
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
-    if (paused) return;
+    // Redusert bevegelse: fryser på første eksempel i stedet for å
+    // kryssfade kontinuerlig gjennom listen — WCAG 2.2.2 ber om at
+    // brukeren skal kunne skru av vedvarende, automatisk bevegelse.
+    if (paused || reducedMotion) return;
     let cancelled = false;
     const tick = () => {
       if (cancelled) return;
@@ -42,19 +47,25 @@ export function AnimatedSearchPlaceholder({
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [paused, hold, fade, words.length]);
+  }, [paused, reducedMotion, hold, fade, words.length]);
 
   if (paused) return null;
 
   return (
     <span
       aria-hidden="true"
-      className={`pointer-events-none select-none truncate text-muted-foreground transition-opacity ${className}`}
-      style={{
-        opacity: visible ? 1 : 0,
-        transitionDuration: `${fade}ms`,
-        transitionTimingFunction: "ease-in-out",
-      }}
+      className={`pointer-events-none select-none truncate text-muted-foreground ${
+        reducedMotion ? "" : "transition-opacity"
+      } ${className}`}
+      style={
+        reducedMotion
+          ? undefined
+          : {
+              opacity: visible ? 1 : 0,
+              transitionDuration: `${fade}ms`,
+              transitionTimingFunction: "ease-in-out",
+            }
+      }
     >
       {words[index]}
     </span>

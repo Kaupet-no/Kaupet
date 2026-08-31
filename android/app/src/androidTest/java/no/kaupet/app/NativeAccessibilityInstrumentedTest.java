@@ -67,24 +67,24 @@ public class NativeAccessibilityInstrumentedTest {
         completeOnboarding();
 
         assertNamedControl("Søk i annonser");
-        assertNamedControl("Velg lokasjon: Hvor som helst");
+        assertNamedControl("Velg lokasjon: Hele Norge");
         assertNamedControl("Alle kategorier");
         assertNamedControl("Hjem");
         assertNamedControl("Søk");
         assertNamedControl("Ny annonse");
 
-        focusInputNode("Velg lokasjon: Hvor som helst");
+        focusInputNode("Velg lokasjon: Hele Norge");
         device.pressKeyCode(KeyEvent.KEYCODE_ENTER);
-        assertLocationDialog();
+        assertSearchPanel();
         device.pressKeyCode(KeyEvent.KEYCODE_ESCAPE);
-        assertTrue("Escape must close the location dialog", waitUntilDialogClosed());
-        assertInputFocus("Velg lokasjon: Hvor som helst");
+        assertTrue("Escape must close the search panel", waitUntilSearchPanelClosed());
+        assertInputFocus("Velg lokasjon: Hele Norge");
 
         device.pressKeyCode(KeyEvent.KEYCODE_ENTER);
-        assertLocationDialog();
+        assertSearchPanel();
         device.pressBack();
-        assertTrue("Android system back must close the location dialog", waitUntilDialogClosed());
-        assertInputFocus("Velg lokasjon: Hvor som helst");
+        assertTrue("Android system back must close the search panel", waitUntilSearchPanelClosed());
+        assertInputFocus("Velg lokasjon: Hele Norge");
 
         AccessibilityNodeInfo root = automation.getRootInActiveWindow();
         assertNotNull("WebView accessibility root must remain available after close", root);
@@ -93,6 +93,12 @@ public class NativeAccessibilityInstrumentedTest {
             "TalkBack focus at the WebView boundary remains a separate manual observation",
             root.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
         );
+    }
+
+    private void assertSearchPanel() {
+        assertNamedControl("Søk og filtrer");
+        assertNamedControl("Søk etter sted");
+        assertNamedControl("Bruk min posisjon");
     }
 
     private void connectStagingShellToLocalServer() {
@@ -169,9 +175,9 @@ public class NativeAccessibilityInstrumentedTest {
         );
     }
 
-    private boolean waitUntilDialogClosed() {
+    private boolean waitUntilSearchPanelClosed() {
         return waitForCondition(
-            () -> findNodeByName(automation.getRootInActiveWindow(), "Velg sted") == null,
+            () -> findNodeByName(automation.getRootInActiveWindow(), "Søk og filtrer") == null,
             SHORT_TIMEOUT
         );
     }

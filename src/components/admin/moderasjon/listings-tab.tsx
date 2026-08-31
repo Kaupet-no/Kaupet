@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Ban, Loader2, PackageSearch, Search } from "lucide-react";
+import { Ban, EyeOff, Eye, Loader2, PackageSearch, Search } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -28,7 +28,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { adminDisableListing, adminEnableListing } from "@/lib/admin-moderation.functions";
+import {
+  adminDisableListing,
+  adminEnableListing,
+  adminSetListingHomeVisibility,
+} from "@/lib/admin-moderation.functions";
 import { formatErrorMessage } from "@/lib/errors";
 import { EmptyState } from "@/components/ui/empty-state";
 
@@ -41,6 +45,7 @@ export function ListingsTab() {
 
   const disableFn = useServerFn(adminDisableListing);
   const enableFn = useServerFn(adminEnableListing);
+  const setHomeVisibilityFn = useServerFn(adminSetListingHomeVisibility);
 
   const search = useQuery({
     queryKey: ["admin-listings", q, status],
@@ -73,6 +78,18 @@ export function ListingsTab() {
       qc.invalidateQueries({ queryKey: ["admin-listings"] });
     },
     onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke aktivere annonsen")),
+  });
+  const homeVisibilityMut = useMutation({
+    mutationFn: (v: { id: string; hidden: boolean }) =>
+      setHomeVisibilityFn({ data: { id: v.id, hidden: v.hidden } }),
+    onSuccess: (_data, v) => {
+      showSuccessToast(
+        v.hidden ? "Annonsen er skjult fra forsiden" : "Annonsen kan igjen vises på forsiden",
+      );
+      qc.invalidateQueries({ queryKey: ["admin-listings"] });
+    },
+    onError: (e: Error) =>
+      showErrorToast(formatErrorMessage(e, "Kunne ikke endre forsidesynlighet")),
   });
 
   return (
@@ -112,19 +129,20 @@ export function ListingsTab() {
                 <TableHead>Tittel</TableHead>
                 <TableHead>Selger</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Forside</TableHead>
                 <TableHead className="text-right">Handling</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {search.isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="py-8 text-center">
+                  <TableCell colSpan={5} className="py-8 text-center">
                     <Loader2 className="mx-auto size-5 animate-spin text-muted-foreground" />
                   </TableCell>
                 </TableRow>
               ) : search.isError ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="py-8 text-center">
+                  <TableCell colSpan={5} className="py-8 text-center">
                     <p className="text-sm text-destructive">
                       {formatErrorMessage(search.error, "Kunne ikke laste annonser")}
                     </p>
@@ -132,7 +150,7 @@ export function ListingsTab() {
                 </TableRow>
               ) : (search.data ?? []).length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="py-8">
+                  <TableCell colSpan={5} className="py-8">
                     <EmptyState
                       icon={PackageSearch}
                       title="Ingen treff"
@@ -150,6 +168,7 @@ export function ListingsTab() {
                     status: string;
                     seller_id: string;
                     seller_name: string | null;
+                    hidden_from_home: boolean;
                   }>
                 ).map((l) => (
                   <TableRow key={l.id}>
@@ -176,25 +195,53 @@ export function ListingsTab() {
                         {l.status}
                       </Badge>
                     </TableCell>
+                    <TableCell>
+                      {l.hidden_from_home ? (
+                        <Badge variant="secondary">Skjult</Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Synlig</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">
-                      {l.status === "disabled" ? (
+                      <div className="flex justify-end gap-2">
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => enableMut.mutate(l.id)}
-                          disabled={enableMut.isPending}
+                          onClick={() =>
+                            homeVisibilityMut.mutate({ id: l.id, hidden: !l.hidden_from_home })
+                          }
+                          disabled={homeVisibilityMut.isPending}
+                          aria-label={
+                            l.hidden_from_home
+                              ? `Vis «${l.title}» på forsiden igjen`
+                              : `Skjul «${l.title}» fra forsiden`
+                          }
                         >
-                          Aktiver
+                          {l.hidden_from_home ? (
+                            <Eye className="size-4" />
+                          ) : (
+                            <EyeOff className="size-4" />
+                          )}
                         </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => setConfirm({ id: l.id, title: l.title })}
-                        >
-                          <Ban className="size-4" /> Deaktiver
-                        </Button>
-                      )}
+                        {l.status === "disabled" ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => enableMut.mutate(l.id)}
+                            disabled={enableMut.isPending}
+                          >
+                            Aktiver
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => setConfirm({ id: l.id, title: l.title })}
+                          >
+                            <Ban className="size-4" /> Deaktiver
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

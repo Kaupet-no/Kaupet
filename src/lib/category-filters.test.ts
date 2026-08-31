@@ -4,6 +4,7 @@ import {
   applyAttributeFilters,
   effectiveFiltersForCategory,
   getMissingRequiredFilters,
+  isBoatCategory,
   normalizeFilter,
   NUMERIC_DIGIT_CAPS,
   splitPrimaryFilters,
@@ -76,6 +77,16 @@ describe("effectiveFiltersForCategory", () => {
       f({ category_id: "sub", key: "a", sort_order: 10 }),
     ];
     expect(effectiveFiltersForCategory("sub", filters, byId).map((x) => x.key)).toEqual(["a", "b"]);
+  });
+});
+
+describe("isBoatCategory", () => {
+  it("identifies a category through its inherited boat_type filter", () => {
+    const filters = [f({ category_id: "main", key: "boat_type" })];
+
+    expect(isBoatCategory("sub", filters, byId)).toBe(true);
+    expect(isBoatCategory("other", filters, byId)).toBe(false);
+    expect(isBoatCategory(null, filters, byId)).toBe(false);
   });
 });
 describe("getMissingRequiredFilters", () => {

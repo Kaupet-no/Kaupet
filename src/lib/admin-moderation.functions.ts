@@ -34,6 +34,19 @@ export const adminEnableListing = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const adminSetListingHomeVisibility = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((i: unknown) => z.object({ id: uuid, hidden: z.boolean() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    const { error } = await context.supabase.rpc("admin_set_listing_home_visibility", {
+      _id: data.id,
+      _hidden: data.hidden,
+    });
+    if (error) throw error;
+    return { ok: true };
+  });
+
 export const adminBanUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((i: unknown) => z.object({ userId: uuid, reason }).parse(i))
@@ -218,30 +231,6 @@ export const adminResolveReport = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await requireAdminOrModeratorRole(context.supabase, context.userId);
     const { error } = await context.supabase.rpc("admin_resolve_report", { _id: data.id });
-    if (error) throw error;
-    return { ok: true };
-  });
-
-export const adminGrantModeratorRole = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .validator((i: unknown) => z.object({ userId: uuid }).parse(i))
-  .handler(async ({ data, context }) => {
-    await requireAdmin(context.supabase, context.userId);
-    const { error } = await context.supabase.rpc("admin_grant_moderator_role", {
-      _user_id: data.userId,
-    });
-    if (error) throw error;
-    return { ok: true };
-  });
-
-export const adminRevokeModeratorRole = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .validator((i: unknown) => z.object({ userId: uuid }).parse(i))
-  .handler(async ({ data, context }) => {
-    await requireAdmin(context.supabase, context.userId);
-    const { error } = await context.supabase.rpc("admin_revoke_moderator_role", {
-      _user_id: data.userId,
-    });
     if (error) throw error;
     return { ok: true };
   });

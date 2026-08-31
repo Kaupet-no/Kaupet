@@ -97,16 +97,26 @@ export function buildZeroResultCandidates(
   return candidates.slice(0, 12);
 }
 
+export function bestZeroResultExpansions(
+  candidates: Candidate[],
+  counts: Array<number | undefined>,
+  limit = 3,
+): ZeroResultExpansion[] {
+  return candidates
+    .map((candidate, index) => {
+      const count = counts[index];
+      return count != null && count > 0 ? { ...candidate, count } : null;
+    })
+    .filter((candidate): candidate is ZeroResultExpansion => candidate != null)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit);
+}
+
 export function bestZeroResultExpansion(
   candidates: Candidate[],
   counts: Array<number | undefined>,
 ): ZeroResultExpansion | undefined {
-  return candidates.reduce<ZeroResultExpansion | undefined>((best, candidate, index) => {
-    const count = counts[index];
-    return count != null && count > 0 && (!best || count > best.count)
-      ? { ...candidate, count }
-      : best;
-  }, undefined);
+  return bestZeroResultExpansions(candidates, counts, 1)[0];
 }
 
 export function useZeroResultExpansion({
@@ -136,11 +146,12 @@ export function useZeroResultExpansion({
     })),
   });
 
+  const counts = queries.map((query) => query.data);
+  const expansions = bestZeroResultExpansions(candidates, counts);
+
   return {
-    expansion: bestZeroResultExpansion(
-      candidates,
-      queries.map((query) => query.data),
-    ),
+    expansion: expansions[0],
+    expansions,
     isPending: enabled && queries.some((query) => query.isPending || query.isFetching),
   };
 }

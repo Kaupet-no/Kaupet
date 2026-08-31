@@ -153,22 +153,6 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
     }
   });
 
-export const getPromotionStatus = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .validator((input: unknown) => z.object({ promotion_id: z.string().uuid() }).parse(input))
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    const { data: promo, error } = await supabase
-      .from("listing_promotions")
-      .select("id, status, expires_at, starts_at, duration_days, listing_id, user_id")
-      .eq("id", data.promotion_id)
-      .maybeSingle();
-    if (error) throw error;
-    if (!promo) throw new Error("Fant ikke fremheving");
-    if (promo.user_id !== userId) throw new Error("Ikke tilgang");
-    return promo;
-  });
-
 export const getPromotionReceipt = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => z.object({ promotion_id: z.string().uuid() }).parse(input))

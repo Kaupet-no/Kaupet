@@ -142,11 +142,8 @@ export function ListingRow({
       {row.status === "expired" && (
         <span className="text-xs text-muted-foreground">Publiser på nytt for 30 nye dager</span>
       )}
-      {row.status === "draft" && (
-        <span className="text-xs text-muted-foreground">Ikke publisert</span>
-      )}
       {activePromotion && (
-        <span className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-xs text-accent-text">
+        <span className="inline-flex items-center gap-1 rounded-full border border-brand/40 bg-brand/10 px-2 py-0.5 text-xs text-brand-text">
           {activePromotion.is_gift ? "Gratis fremhevet" : "Fremhevet"} til{" "}
           {activePromotion.expires_at
             ? new Date(activePromotion.expires_at).toLocaleDateString("nb-NO", {

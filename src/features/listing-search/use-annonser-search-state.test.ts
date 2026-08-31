@@ -2,6 +2,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { useAnnonserSearchState } from "./use-annonser-search-state";
+import type { CategoryFilter } from "@/lib/category-filters";
 
 vi.mock("@/lib/haptics", () => ({
   hapticNotification: vi.fn(),
@@ -31,7 +32,7 @@ const categories = [
   { id: "child-1", slug: "mobil", name_nb: "Mobil", parent_id: "root-1" },
 ];
 
-function setup(overrides?: Partial<typeof baseSearch>) {
+function setup(overrides?: Partial<typeof baseSearch>, allFilters: CategoryFilter[] = []) {
   const navigate = vi.fn();
   const setQDraft = vi.fn();
   const { result } = renderHook(() =>
@@ -39,14 +40,53 @@ function setup(overrides?: Partial<typeof baseSearch>) {
       search: { ...baseSearch, ...overrides },
       navigate,
       categories,
-      allFilters: [],
+      allFilters,
       setQDraft,
     }),
   );
   return { result, navigate, setQDraft };
 }
 
+/** Samme nøkkel, ulikt vokabular i to kategorier — se pruningen i hooken. */
+function fuelFilter(categoryId: string, values: string[]): CategoryFilter {
+  return {
+    id: `fuel-${categoryId}`,
+    category_id: categoryId,
+    key: "fuel_type",
+    label_nb: "Drivstoff",
+    type: "select",
+    unit: null,
+    options: values.map((value) => ({ value, label_nb: value })),
+    sort_order: 1,
+    is_primary: true,
+    depends_on_key: null,
+    depends_on_value: null,
+    depends_on_not_value: null,
+    is_optional: false,
+  };
+}
+
 describe("useAnnonserSearchState", () => {
+  it("beholder en attributtverdi som finnes i den valgte kategorien", () => {
+    const { navigate } = setup({ categories: ["mobil"], attrs: "fuel_type:s:el" }, [
+      fuelFilter("child-1", ["el", "diesel"]),
+    ]);
+
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("nullstiller kategorispesifikke filtre når kategorien byttes", () => {
+    // "el" finnes ikke i Elektronikk sitt vokabular for samme nøkkel.
+    const { navigate } = setup({ categories: ["elektronikk"], attrs: "fuel_type:s:el" }, [
+      fuelFilter("child-1", ["el", "diesel"]),
+      fuelFilter("root-1", ["gass", "kull"]),
+    ]);
+
+    expect(navigate).toHaveBeenCalledTimes(1);
+    const patch = navigate.mock.calls[0][0].search({ ...baseSearch, attrs: "fuel_type:s:el" });
+    expect(patch.attrs).toBe("");
+  });
+
   it("merges the legacy single `category` param into effectiveCategories", () => {
     const { result } = setup({ category: "mobil", categories: ["elektronikk"] });
 

@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { SORT_OPTIONS, type SortValue, type Category } from "@/lib/categories";
+import { SORT_OPTIONS, type SortValue } from "@/lib/categories";
 import {
   PART_FITMENT_VEHICLE_IDS_KEY,
   type AttributeFilterValue,
@@ -18,16 +18,6 @@ export function getSortChipState(sort: SortValue) {
     label: SORT_OPTIONS.find((s) => s.value === sort)?.label ?? "Nyeste",
     active: sort !== "new",
   };
-}
-
-export function getCategoryChipState(categories: Category[], selectedCategories: string[]) {
-  const active = selectedCategories.length > 0;
-  const label = active
-    ? selectedCategories.length === 1
-      ? (categories.find((c) => c.slug === selectedCategories[0])?.name_nb ?? "Kategori")
-      : `${selectedCategories.length} kat.`
-    : "Kategori";
-  return { label, active };
 }
 
 export function getPriceChipState(

@@ -28,6 +28,8 @@ export function PreviewDraftView({ draft, onClose }: { draft: PreviewDraft; onCl
           priceNok={draft.priceNok}
           isFree={draft.isFree}
           condition={draft.condition}
+          canShip={draft.canShip}
+          requiresDeliveryMethod={draft.requiresDeliveryMethod}
           city={draft.city}
           postalCode={draft.postalCode}
           displayLat={draft.displayLat}

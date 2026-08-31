@@ -6,6 +6,7 @@ import { ResultList } from "@/components/result-list";
 import type { AppliedSearchState } from "./search-schema";
 import {
   bestZeroResultExpansion,
+  bestZeroResultExpansions,
   buildZeroResultCandidates,
   type ZeroResultExpansion,
 } from "./zero-result-expansion";
@@ -62,7 +63,7 @@ describe("nulltreffutvidelse", () => {
         mapListings={[]}
         mapCenter={null}
         radiusKm={10}
-        onMapCenterChange={vi.fn()}
+        onMapApplyViewport={vi.fn()}
         sort="new"
         onSortChange={vi.fn()}
         zeroResultExpansion={best}
@@ -76,5 +77,42 @@ describe("nulltreffutvidelse", () => {
 
     fireEvent.click(getByRole("button", { name: "Vis 12 treff uten «prisfilteret»" }));
     expect(onApply).toHaveBeenCalledWith(best);
+  });
+
+  it("viser opptil tre dokumenterte måter å utvide nulltreffet på", () => {
+    const candidates = buildZeroResultCandidates(applied, []);
+    const options = bestZeroResultExpansions(
+      candidates,
+      candidates.map((_, index) => (index < 3 ? index + 1 : 0)),
+    );
+    const onApply = vi.fn();
+    const { getAllByRole } = render(
+      <ResultList
+        isNative={false}
+        isDesktop={false}
+        q="volvo"
+        effectiveCategories={["bil"]}
+        cards={[]}
+        totalCount={0}
+        isLoading={false}
+        hasNextPage={false}
+        isFetchingNextPage={false}
+        fetchNextPage={vi.fn()}
+        resetFilters={vi.fn()}
+        mapListings={[]}
+        mapCenter={null}
+        radiusKm={10}
+        onMapApplyViewport={vi.fn()}
+        sort="new"
+        onSortChange={vi.fn()}
+        zeroResultExpansions={options}
+        onApplyZeroResultExpansion={onApply}
+      />,
+    );
+
+    const buttons = getAllByRole("button", { name: /Vis \d+ treff uten/ });
+    expect(buttons).toHaveLength(3);
+    fireEvent.click(buttons[1]);
+    expect(onApply).toHaveBeenCalledWith(options[1]);
   });
 });

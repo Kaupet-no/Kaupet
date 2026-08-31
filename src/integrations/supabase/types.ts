@@ -828,48 +828,75 @@ export type Database = {
           created_at: string
           id: string
           listing_id: string
-          user_id: string | null
-          visitor_key: string
         }
         Insert: {
           created_at?: string
           id?: string
           listing_id: string
-          user_id?: string | null
-          visitor_key: string
         }
         Update: {
           created_at?: string
           id?: string
           listing_id?: string
-          user_id?: string | null
-          visitor_key?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "listing_view_events_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
       }
-      listing_views: {
+      listing_view_rate_limits: {
         Row: {
-          created_at: string
-          id: string
+          key_hash: string
           listing_id: string
-          user_id: string | null
-          visitor_key: string
+          window_started_at: string
         }
         Insert: {
-          created_at?: string
-          id?: string
+          key_hash: string
           listing_id: string
-          user_id?: string | null
-          visitor_key: string
+          window_started_at?: string
         }
         Update: {
-          created_at?: string
-          id?: string
+          key_hash?: string
           listing_id?: string
-          user_id?: string | null
-          visitor_key?: string
+          window_started_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "listing_view_rate_limits_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      listing_view_totals: {
+        Row: {
+          listing_id: string
+          total_views: number
+        }
+        Insert: {
+          listing_id: string
+          total_views?: number
+        }
+        Update: {
+          listing_id?: string
+          total_views?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_view_totals_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: true
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       listings: {
         Row: {
@@ -886,7 +913,9 @@ export type Database = {
           description: string
           display_lat: number | null
           display_lng: number | null
+          draft_expiry_notified_at: string | null
           expires_at: string | null
+          hidden_from_home: boolean
           id: string
           is_free: boolean
           kaupet_code: string
@@ -904,7 +933,6 @@ export type Database = {
           subtitle: string | null
           title: string
           updated_at: string
-          view_count: number
         }
         Insert: {
           attributes?: Json
@@ -920,7 +948,9 @@ export type Database = {
           description?: string
           display_lat?: number | null
           display_lng?: number | null
+          draft_expiry_notified_at?: string | null
           expires_at?: string | null
+          hidden_from_home?: boolean
           id?: string
           is_free?: boolean
           kaupet_code?: string
@@ -938,7 +968,6 @@ export type Database = {
           subtitle?: string | null
           title: string
           updated_at?: string
-          view_count?: number
         }
         Update: {
           attributes?: Json
@@ -954,7 +983,9 @@ export type Database = {
           description?: string
           display_lat?: number | null
           display_lng?: number | null
+          draft_expiry_notified_at?: string | null
           expires_at?: string | null
+          hidden_from_home?: boolean
           id?: string
           is_free?: boolean
           kaupet_code?: string
@@ -972,7 +1003,6 @@ export type Database = {
           subtitle?: string | null
           title?: string
           updated_at?: string
-          view_count?: number
         }
         Relationships: [
           {
@@ -1303,27 +1333,6 @@ export type Database = {
           notify?: boolean
           updated_at?: string
           user_id?: string
-        }
-        Relationships: []
-      }
-      search_query_stats: {
-        Row: {
-          last_searched_at: string
-          query: string
-          search_count: number
-          zero_result_count: number
-        }
-        Insert: {
-          last_searched_at?: string
-          query: string
-          search_count?: number
-          zero_result_count?: number
-        }
-        Update: {
-          last_searched_at?: string
-          query?: string
-          search_count?: number
-          zero_result_count?: number
         }
         Relationships: []
       }
@@ -1743,6 +1752,7 @@ export type Database = {
           category_id: string | null
           created_at: string
           description: string | null
+          draft_expiry_notified_at: string | null
           expires_at: string
           id: string
           max_price_nok: number | null
@@ -1759,6 +1769,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           description?: string | null
+          draft_expiry_notified_at?: string | null
           expires_at?: string
           id?: string
           max_price_nok?: number | null
@@ -1775,6 +1786,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           description?: string | null
+          draft_expiry_notified_at?: string | null
           expires_at?: string
           id?: string
           max_price_nok?: number | null
@@ -1812,10 +1824,6 @@ export type Database = {
         Args: { _ip_hash: string; _token: string }
         Returns: string | null
       }
-      log_search_query_rate_limited: {
-        Args: { _key_hash: string; _query: string; _result_count: number }
-        Returns: undefined
-      }
       log_product_event_rate_limited: {
         Args: {
           _event_name: string
@@ -1823,7 +1831,6 @@ export type Database = {
           _path: string
           _platform: string
           _properties?: Json
-          _session_id: string
         }
         Returns: undefined
       }
@@ -2174,6 +2181,7 @@ export type Database = {
         Args: { _limit?: number; _query?: string; _status?: string }
         Returns: {
           created_at: string
+          hidden_from_home: boolean
           id: string
           kaupet_code: string
           seller_id: string
@@ -2181,6 +2189,10 @@ export type Database = {
           status: Database["public"]["Enums"]["listing_status"]
           title: string
         }[]
+      }
+      admin_set_listing_home_visibility: {
+        Args: { _hidden: boolean; _id: string }
+        Returns: undefined
       }
       admin_suspend_user: {
         Args: { _days?: number; _reason: string; _user_id: string }
@@ -2267,15 +2279,6 @@ export type Database = {
           views: number
         }[]
       }
-      admin_zero_result_searches: {
-        Args: { _limit?: number }
-        Returns: {
-          last_searched_at: string
-          query: string
-          search_count: number
-          zero_result_count: number
-        }[]
-      }
       cancel_account_deletion: { Args: never; Returns: boolean }
       demo_activate_promotion: {
         Args: { _duration_days: number; _listing_id: string }
@@ -2317,7 +2320,6 @@ export type Database = {
         Returns: {
           favorite_count: number
           total_views: number
-          unique_visitors: number
         }[]
       }
       listings_search_term_match: {
@@ -2331,9 +2333,9 @@ export type Database = {
           id: string
         }[]
       }
-      log_listing_view: {
-        Args: { _listing_id: string; _visitor_key: string }
-        Returns: undefined
+      log_listing_view_rate_limited: {
+        Args: { _key_hash: string; _listing_id: string }
+        Returns: boolean
       }
       match_listing_to_saved_searches: {
         Args: { _listing_id: string }
@@ -2451,6 +2453,7 @@ export type Database = {
         }[]
       }
       purge_expired_accounts: { Args: never; Returns: number }
+      purge_expired_personal_data: { Args: never; Returns: Json }
       request_account_deletion: { Args: { _email: string }; Returns: undefined }
       saved_search_unread_counts: {
         Args: never

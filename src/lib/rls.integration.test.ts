@@ -15,6 +15,7 @@
  * signed-in clients, assert who can/can't see what — for other tables.
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createHash } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const URL = process.env.LOCAL_SUPABASE_URL;
@@ -651,6 +652,83 @@ describe.skipIf(!canRun)(
     });
   },
 );
+
+describe.skipIf(!canRun)("Saved search matches persisted attributes before notifying", () => {
+  const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+  const suffix = Date.now();
+  const emails = {
+    owner: `rls-attribute-search-owner-${suffix}@example.com`,
+    seller: `rls-attribute-search-seller-${suffix}@example.com`,
+  };
+  const userIds: string[] = [];
+  let ownerId: string;
+  let searchId: string;
+
+  beforeAll(async () => {
+    const createUser = async (email: string) => {
+      const { data, error } = await admin.auth.admin.createUser({
+        email,
+        password: PASSWORD,
+        email_confirm: true,
+      });
+      if (error) throw error;
+      userIds.push(data.user!.id);
+      return data.user!.id;
+    };
+
+    ownerId = await createUser(emails.owner);
+    const sellerId = await createUser(emails.seller);
+    const { data, error } = await admin
+      .from("saved_searches")
+      .insert({
+        user_id: ownerId,
+        name: "RLS attribute search",
+        notify: true,
+        criteria: {
+          attributes: {
+            fuel_type: { kind: "select", value: "electric" },
+          },
+        },
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    searchId = data.id;
+
+    const { error: matchingError } = await admin.from("listings").insert({
+      seller_id: sellerId,
+      title: "RLS electric listing",
+      price_nok: 100,
+      status: "active",
+      attributes: { fuel_type: "electric" },
+    });
+    if (matchingError) throw matchingError;
+
+    const { error: nonMatchingError } = await admin.from("listings").insert({
+      seller_id: sellerId,
+      title: "RLS diesel listing",
+      price_nok: 100,
+      status: "active",
+      attributes: { fuel_type: "diesel" },
+    });
+    if (nonMatchingError) throw nonMatchingError;
+  });
+
+  afterAll(async () => {
+    if (!canRun) return;
+    await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+  });
+
+  it("notifies only for the listing matching the saved attribute", async () => {
+    const { data, error } = await admin
+      .from("saved_search_notifications")
+      .select("listing_id, listings!inner(title)")
+      .eq("saved_search_id", searchId);
+    expect(error).toBeNull();
+    expect(data).toHaveLength(1);
+    expect(data?.[0]?.listings).toMatchObject({ title: "RLS electric listing" });
+  });
+});
 
 describe.skipIf(!canRun)("RLS: push_subscriptions are private to their owner", () => {
   const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
@@ -2477,17 +2555,20 @@ describe.skipIf(!canRun)(
 );
 
 describe.skipIf(!canRun)(
-  "RLS: listing_views — anyone can log a view, nobody (not even the owner) can read raw rows",
+  "RLS: listing view counting is server-only — the rate-limited RPC runs only from the trusted server function (service_role), never directly from anon/authenticated",
   () => {
     const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
     const suffix = Date.now();
     const email = `rls-views-owner-${suffix}@example.com`;
     const userIds: string[] = [];
     let listingId: string;
-    let viewId: string;
 
     async function signIn() {
       return signInWithRetry(email);
+    }
+
+    function keyHash(input: string) {
+      return createHash("sha256").update(input).digest("hex");
     }
 
     beforeAll(async () => {
@@ -2504,7 +2585,7 @@ describe.skipIf(!canRun)(
         .from("listings")
         .insert({
           seller_id: ownerId,
-          title: "RLS listing_views test listing",
+          title: "RLS listing view test listing",
           price_nok: 100,
           status: "active",
         })
@@ -2512,14 +2593,6 @@ describe.skipIf(!canRun)(
         .single();
       if (listingErr) throw listingErr;
       listingId = listing.id;
-
-      const { data: view, error: viewErr } = await admin
-        .from("listing_views")
-        .insert({ listing_id: listingId, visitor_key: `rls-visitor-${suffix}` })
-        .select("id")
-        .single();
-      if (viewErr) throw viewErr;
-      viewId = view.id;
     });
 
     afterAll(async () => {
@@ -2527,43 +2600,74 @@ describe.skipIf(!canRun)(
       await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
     });
 
-    it("blocks direct table INSERT — logging a view only works via the log_listing_view RPC", async () => {
-      // 20260617123639_*.sql and 20260617142736_fix-listing-view-logging.sql
-      // both REVOKE INSERT (and SELECT) on listing_views from anon/
-      // authenticated entirely — PostgREST upserts need SELECT to check
-      // ON CONFLICT, which anon must never have (visitor_key shouldn't be
-      // publicly readable), so logging moved to a SECURITY DEFINER RPC
-      // that only needs EXECUTE. A raw client insert is expected to fail
-      // with a grant-level permission error now, not just an RLS filter.
+    it("blocks direct table access to listing_view_totals and listing_view_rate_limits for anon and authenticated", async () => {
       const anon = createClient(URL!, ANON_KEY!);
-      const { error } = await anon
-        .from("listing_views")
-        .insert({ listing_id: listingId, visitor_key: `rls-anon-visitor-${suffix}` });
-      expect(error).not.toBeNull();
+      const { error: totalsErr } = await anon
+        .from("listing_view_totals")
+        .select("total_views")
+        .eq("listing_id", listingId);
+      expect(totalsErr).not.toBeNull();
+
+      const owner = await signIn();
+      const { error: ownerTotalsErr } = await owner
+        .from("listing_view_totals")
+        .select("total_views")
+        .eq("listing_id", listingId);
+      expect(ownerTotalsErr).not.toBeNull();
+
+      const { error: limitsErr } = await anon
+        .from("listing_view_rate_limits")
+        .insert({ listing_id: listingId, key_hash: keyHash(`anon-insert-${suffix}`) });
+      expect(limitsErr).not.toBeNull();
     });
 
-    it("lets an anonymous visitor log a view via the log_listing_view RPC", async () => {
+    it("blocks anon and authenticated from calling log_listing_view_rate_limited directly (server function only, via supabaseAdmin)", async () => {
       const anon = createClient(URL!, ANON_KEY!);
-      const { error } = await anon.rpc("log_listing_view", {
+      const { error: anonErr } = await anon.rpc("log_listing_view_rate_limited", {
         _listing_id: listingId,
-        _visitor_key: `rls-anon-rpc-visitor-${suffix}`,
+        _key_hash: keyHash(`anon-direct-${suffix}`),
+      });
+      expect(anonErr).not.toBeNull();
+
+      const owner = await signIn();
+      const { error: ownerErr } = await owner.rpc("log_listing_view_rate_limited", {
+        _listing_id: listingId,
+        _key_hash: keyHash(`owner-direct-${suffix}`),
+      });
+      expect(ownerErr).not.toBeNull();
+    });
+
+    it("counts a view when called through the trusted server path (service_role, as listing-views.functions.ts does)", async () => {
+      const { data, error } = await admin.rpc("log_listing_view_rate_limited", {
+        _listing_id: listingId,
+        _key_hash: keyHash(`server-${suffix}`),
       });
       expect(error).toBeNull();
+      expect(data).toBe(true);
     });
 
-    it("blocks even the listing owner from reading raw view rows directly (no GRANT at all — use the listing_stats RPC instead)", async () => {
-      // No SELECT grant remains for authenticated either (revoked in the
-      // same two migrations) — owners get view counts via listing_stats(),
-      // never a raw table read.
+    it("rate-limits a second call with the same key within the same window", async () => {
+      const hash = keyHash(`server-repeat-${suffix}`);
+      await admin.rpc("log_listing_view_rate_limited", { _listing_id: listingId, _key_hash: hash });
+      const { data, error } = await admin.rpc("log_listing_view_rate_limited", {
+        _listing_id: listingId,
+        _key_hash: hash,
+      });
+      expect(error).toBeNull();
+      expect(data).toBe(false);
+    });
+
+    it("lets the owner read the aggregate count via listing_stats, never the raw tables", async () => {
       const owner = await signIn();
-      const { error } = await owner.from("listing_views").select("id").eq("id", viewId);
-      expect(error).not.toBeNull();
+      const { data, error } = await owner.rpc("listing_stats", { _listing_id: listingId });
+      expect(error).toBeNull();
+      expect(Array.isArray(data) ? data[0]?.total_views : undefined).toBeGreaterThanOrEqual(1);
     });
   },
 );
 
 describe.skipIf(!canRun)(
-  "RLS: listing_view_events are readable only by admins, insertable only via the log_listing_view RPC",
+  "RLS: listing_view_events are readable only by admins, insertable only via the log_listing_view_rate_limited RPC",
   () => {
     const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
     const suffix = Date.now();
@@ -2609,7 +2713,7 @@ describe.skipIf(!canRun)(
 
       const { data: event, error: eventErr } = await admin
         .from("listing_view_events")
-        .insert({ listing_id: listingId, visitor_key: `rls-event-visitor-${suffix}` })
+        .insert({ listing_id: listingId })
         .select("id")
         .single();
       if (eventErr) throw eventErr;
@@ -2641,11 +2745,9 @@ describe.skipIf(!canRun)(
       expect(data).toHaveLength(0);
     });
 
-    it("blocks a client from inserting a view event directly (no client GRANT — log_listing_view RPC only)", async () => {
+    it("blocks a client from inserting a view event directly (no client GRANT — log_listing_view_rate_limited RPC only)", async () => {
       const other = await signIn(emails.other);
-      const { error } = await other
-        .from("listing_view_events")
-        .insert({ listing_id: listingId, visitor_key: `rls-hijack-visitor-${suffix}` });
+      const { error } = await other.from("listing_view_events").insert({ listing_id: listingId });
       expect(error).not.toBeNull();
     });
   },
@@ -2731,59 +2833,6 @@ describe.skipIf(!canRun)(
         .from("listing_keyword_stats")
         .insert({ word: `${lexeme}-hijack`, category_id: categoryId, listing_count: 999 });
       expect(keywordErr).not.toBeNull();
-    });
-  },
-);
-
-describe.skipIf(!canRun)(
-  "RLS: search_query_stats has no client access at all, not even for admins",
-  () => {
-    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
-    const suffix = Date.now();
-    const emails = {
-      admin: `rls-searchstats-admin-${suffix}@example.com`,
-    };
-    const userIds: string[] = [];
-    const query = `rls test query ${suffix}`;
-
-    async function signIn(email: string) {
-      return signInWithRetry(email);
-    }
-
-    beforeAll(async () => {
-      const { data, error } = await admin.auth.admin.createUser({
-        email: emails.admin,
-        password: PASSWORD,
-        email_confirm: true,
-      });
-      if (error) throw error;
-      const adminId = data.user!.id;
-      userIds.push(adminId);
-      await grantAdmin(admin, adminId);
-
-      const { error: insertErr } = await admin
-        .from("search_query_stats")
-        .insert({ query, search_count: 1 });
-      if (insertErr) throw insertErr;
-    });
-
-    afterAll(async () => {
-      if (!canRun) return;
-      await admin.from("search_query_stats").delete().eq("query", query);
-      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
-    });
-
-    it("never returns search_query_stats rows to a client, even an admin (zero policies on this table)", async () => {
-      const adminClient = await signIn(emails.admin);
-      const { data, error } = await adminClient
-        .from("search_query_stats")
-        .select("query")
-        .eq("query", query);
-      if (error) {
-        expect(error).not.toBeNull();
-      } else {
-        expect(data).toHaveLength(0);
-      }
     });
   },
 );

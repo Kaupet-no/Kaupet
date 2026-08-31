@@ -68,6 +68,17 @@ export function NativeAdvancedSearch({
 }: Props) {
   const { user } = useAuth();
   const [v, setV] = useAdvancedSearchValue(open, initial);
+  const draftAttributeValues = attributeValues ?? v.attributes;
+  const handleDraftAttributeChange =
+    onAttributeChange ??
+    ((key: string, value: AttributeFilterValue | undefined) => {
+      setV((previous) => {
+        const next = { ...previous.attributes };
+        if (value === undefined) delete next[key];
+        else next[key] = value;
+        return { ...previous, attributes: next };
+      });
+    });
   const [saveOpen, setSaveOpen] = useState(false);
   const [section, setSection] = useState<NativeAdvancedSearchSection>(initialSection);
 
@@ -121,11 +132,12 @@ export function NativeAdvancedSearch({
           setValue={setV}
           categories={categories}
           section={section}
+          queryText={v.terms.join(" ")}
           location={location}
           onLocationChange={onLocationChange}
           attributeFilters={attributeFilters}
-          attributeValues={attributeValues}
-          onAttributeChange={onAttributeChange}
+          attributeValues={draftAttributeValues}
+          onAttributeChange={handleDraftAttributeChange}
           attributeCounts={attributeCounts}
         />
 

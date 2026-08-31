@@ -6,7 +6,7 @@
   },
   "src/components/advanced-search-sheet.tsx": {
     "react-hooks/set-state-in-effect": {
-      "count": 3
+      "count": 2
     }
   },
   "src/components/attribute-filter-chips.tsx": {
@@ -31,7 +31,7 @@
   },
   "src/components/listings-map.tsx": {
     "react-hooks/set-state-in-effect": {
-      "count": 2
+      "count": 4
     }
   },
   "src/components/location-filter.tsx": {
@@ -40,16 +40,6 @@
     }
   },
   "src/components/native-advanced-search.tsx": {
-    "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
-  },
-  "src/components/promote-listing-dialog.tsx": {
-    "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
-  },
-  "src/components/published-listing-dialog.tsx": {
     "react-hooks/set-state-in-effect": {
       "count": 1
     }
@@ -89,11 +79,6 @@
       "count": 1
     }
   },
-  "src/features/listing-creation/use-edit-location-picker.ts": {
-    "react-hooks/set-state-in-effect": {
-      "count": 2
-    }
-  },
   "src/features/listing-creation/use-listing-title-hints.ts": {
     "react-hooks/set-state-in-effect": {
       "count": 1
@@ -118,11 +103,6 @@
     }
   },
   "src/hooks/use-is-native.ts": {
-    "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
-  },
-  "src/hooks/use-nominatim-search.ts": {
     "react-hooks/set-state-in-effect": {
       "count": 1
     }

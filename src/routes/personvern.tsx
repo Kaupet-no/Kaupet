@@ -32,7 +32,7 @@ function PersonvernPage() {
           <h1 className="mt-2 font-display text-4xl leading-tight tracking-tight">
             Personvernerklæring
           </h1>
-          <p className="mt-3 text-sm text-muted-foreground">Sist oppdatert 3. august 2026</p>
+          <p className="mt-3 text-sm text-muted-foreground">Sist oppdatert 29. august 2026</p>
         </header>
       )}
 
@@ -43,7 +43,9 @@ function PersonvernPage() {
             bruker <strong>ingen tredjepartssporing</strong>,{" "}
             <strong>ingen markedsføringscookies</strong> og{" "}
             <strong>ingen eksterne analyseplattformer</strong>. Derfor benytter vi heller ikke en
-            cookie-banner som ber om samtykke.
+            cookie-banner som ber om samtykke. Vi lagrer kun det som er strengt nødvendig for at
+            tjenesten skal fungere. Alle data som lagres er beskrevet i sin helhet lenger ned på
+            denne siden.
           </p>
         </section>
 
@@ -52,7 +54,7 @@ function PersonvernPage() {
 
           <details className="group rounded-lg border border-border">
             <summary className="flex cursor-pointer items-center justify-between px-4 py-3 font-medium select-none list-none">
-              <span>På serveren</span>
+              <span>I våre systemer</span>
               <span className="text-muted-foreground transition-transform group-open:rotate-180">
                 ▾
               </span>
@@ -64,8 +66,10 @@ function PersonvernPage() {
                 profilside. E-postadressen er privat og vises ikke offentlig.
               </li>
               <li>
-                <strong>Annonser</strong> du har lagt ut, med tilhørende bilder, beskrivelse,
-                kategori og lokasjon (postnummer, by og koordinater for kartvisning).
+                <strong>Annonser</strong> du har lagt ut (salg eller «ønskes kjøpt»), med tilhørende
+                bilder, beskrivelse, kategori og lokasjon (postnummer, by og koordinater for
+                kartvisning). Utkast som ikke er publisert slettes automatisk etter 90 dager uten
+                aktivitet. Du får et varsel i innboksen 7 dager før dette skjer.
               </li>
               <li>
                 <strong>Meldinger</strong> mellom deg og andre brukere.
@@ -82,12 +86,13 @@ function PersonvernPage() {
                 eventuell kommentar). Disse er <strong>offentlig synlige</strong> på brukerprofilen.
               </li>
               <li>
-                <strong>Lagrede søk</strong> med søkekriterier, og varsler om nye treff på disse
-                søkene.
+                <strong>Lagrede søk</strong> med søkekriterier (kategori, pris, sted og lignende
+                strukturerte filtre, ikke fritekst), og varsler om nye treff på disse søkene. Slike
+                varsler slettes 180 dager etter at du har lest dem.
               </li>
               <li>
                 <strong>Rapporter</strong> du sender inn om upassende annonser, lagres slik at
-                moderator kan behandle dem.
+                moderator kan behandle dem, i inntil 3 år etter at saken er avsluttet.
               </li>
               <li>
                 <strong>Blokkeringer</strong> — hvilke brukere eller samtaler du har blokkert. Dette
@@ -99,14 +104,17 @@ function PersonvernPage() {
                 for partene i salget.
               </li>
               <li>
-                <strong>Visninger</strong> av annonser, for å gi selger statistikk. Hvis du er
-                innlogget når du ser en annonse, knyttes visningen til brukeren din. Hvis du ikke er
-                innlogget, knyttes den kun til en anonym sesjons-ID.
+                <strong>Visninger av annonser</strong>, for å gi selger et visningstall. Vi lagrer
+                et aggregert antall per annonse. <strong>Vi lagrer ikke</strong> hvem som har sett
+                den eller en identifikator som kobler flere besøk til samme person. For å hindre at
+                samme nettverk teller flere visninger sekundet etter sekundet, godtar vi maks én
+                telling per annonse per nettverk hvert 30. minutt.
               </li>
               <li>
                 <strong>Push-varslinger</strong> — hvis du slår på varsler, lagrer vi et
-                kryptografisk abonnementsnøkkelpar (offentlig/privat), nettleserinformasjon og dine
-                preferanser for hva du vil varsles om (nye meldinger, lagrede søk).
+                kryptografisk abonnementsnøkkelpar (offentlig/privat) eller enhets-token,
+                nettleser-/enhetsinformasjon og dine preferanser for hva du vil varsles om (nye
+                meldinger, lagrede søk, prisfall og lignende).
               </li>
               <li>
                 <strong>Betaling og annonsepromotering</strong> — hvis du betaler for å fremheve en
@@ -117,17 +125,29 @@ function PersonvernPage() {
                 <strong>Varsler om prisendringer</strong> — hvis du har lagt til en annonse som
                 favoritt eller har et lagret søk, kan vi lagre at det er sendt varsel til deg om
                 prisendring eller nytt treff, slik at du ikke varsles flere ganger om det samme.
+                Slike varsler slettes 180 dager etter at du har lest dem.
+              </li>
+              <li>
+                <strong>Kjøretøyoppslag</strong> — hvis du registrerer et kjøretøy, lagrer vi
+                registreringsnummeret og resultatet av oppslaget mot Statens vegvesen i 90 dager,
+                for å hindre misbruk og varsle deg hvis samme skilt tidligere er slått opp med et
+                annet resultat.
               </li>
               <li>
                 <strong>Moderering</strong> — ved brudd på reglene kan administrator registrere en{" "}
                 <em>utestengelse</em>, <em>midlertidig suspensjon</em> eller <em>IP-blokkering</em>.
                 Ved IP-blokkering lagres IP-adressen så lenge blokkeringen er aktiv, og fjernes når
-                den oppheves. Slike administrative handlinger logges internt med tidspunkt og årsak.
+                den oppheves. Slike administrative handlinger logges internt med tidspunkt og årsak
+                i 3 år.
               </li>
               <li>
                 <strong>Sletteforespørsler</strong> — når du ber om å slette kontoen, lagrer vi
                 e-post og tidsstempel i den 7 dager lange angrefristen før permanent sletting
                 utføres.
+              </li>
+              <li>
+                <strong>Feilsøkingslogger</strong> — tekniske serverfeil logges i 90 dager for å
+                rette feil i tjenesten. Loggen filtreres for å ikke inneholde personopplysninger.
               </li>
             </ul>
             <p className="border-t border-border px-4 py-3 text-muted-foreground">
@@ -159,43 +179,46 @@ function PersonvernPage() {
                 autentiseringsleverandøren Supabase.
               </li>
               <li>
-                <strong>kaupet_visitor_id</strong> — en tilfeldig, anonym ID som identifiserer
-                nettleseren din uten å være knyttet til navn, e-post eller IP-adresse. Brukes
-                utelukkende for å gi selger en grov teller på unike besøk per annonse, og for å
-                hindre at samme besøkende telles flere ganger ved refresh eller gjenåpning. ID-en
-                deles ikke med tredjepart og brukes ikke til sporing, profilering eller
-                markedsføring.
-              </li>
-              <li>
-                <strong>kaupet_push_msg_hint_dismissed_v1</strong> — husker at du har lukket
-                informasjonsmeldingen om push-varsler i meldingsoversikten, slik at den ikke vises
-                på nytt.
-              </li>
-              <li>
                 <strong>kaupet_recent_searches_v1</strong> — de siste søkene du har gjort, slik at
                 du kan navigere tilbake til søkereslutatene dine etter å ha sett på en annonse.
                 Forlater ikke enheten din.
-              </li>
-              <li>
-                <strong>kaupet_draft_ny_annonse</strong> og <strong>kaupet_draft_id</strong> —
-                utkast til annonse (tittel, pris, beskrivelse m.m.) lagres automatisk mens du fyller
-                ut annonseregistreringen, slik at du ikke mister innholdet ved utilsiktet lukking.
-                Slettes når annonsen er publisert eller forkastet.
               </li>
               <li>
                 <strong>kaupet_view_mode</strong> — husker om du foretrekker annonser vist i
                 rutenett eller liste. Forlater ikke enheten din.
               </li>
               <li>
-                <strong>kaupet_360_hint_seen</strong> — husker at du har sett veiledningen for
-                360°-visning av kjøretøy, slik at den ikke vises på nytt.
+                <strong>kaupet_theme</strong> — husker om du foretrekker lyst, mørkt eller
+                systemstyrt fargetema. Forlater ikke enheten din.
+              </li>
+              <li>
+                <strong>kaupet_draft_ny_annonse</strong>, <strong>kaupet_draft_id</strong>,{" "}
+                <strong>kaupet_draft_want_listing</strong> og{" "}
+                <strong>kaupet_draft_want_listing_id</strong> — utkast til salgsannonse eller
+                «ønskes kjøpt»-annonse (tittel, pris, beskrivelse m.m.) lagres automatisk mens du
+                fyller ut registreringen, slik at du ikke mister innholdet ved utilsiktet lukking.
+                Slettes når annonsen er publisert eller forkastet.
+              </li>
+              <li>
+                <strong>kaupet_push_msg_hint_dismissed_v1</strong>,{" "}
+                <strong>kaupet_360_hint_seen</strong> og{" "}
+                <strong>kaupet_onboarding_completed_v1</strong> — husker at du har lukket en
+                informasjonsmelding eller sett en veiledning, slik at den ikke vises på nytt.
+              </li>
+              <li>
+                <strong>kaupet-pending-auth-intent</strong> — husker en handling du forsøkte (f.eks.
+                å legge til favoritt) mens du ikke var innlogget, slik at handlingen fullføres
+                automatisk etter innlogging. Lagres i <code>sessionStorage</code> og slettes
+                automatisk når fanen lukkes eller handlingen er fullført.
               </li>
             </ul>
             <p className="border-t border-border px-4 py-3 text-muted-foreground">
               I tillegg lagrer vi <strong>kaupet:lastAnnonserSearch</strong> i nettleserens{" "}
               <code>sessionStorage</code>, som — i motsetning til de andre nøklene over — slettes
               automatisk når du lukker fanen. Denne brukes til å ta deg tilbake til søkeresultatene
-              dine etter å ha sett på en annonse.
+              dine etter å ha sett på en annonse. Bildeutkast til en påbegynt annonse mellomlagres
+              tilsvarende i nettleserens <code>IndexedDB</code>, og slettes sammen med det tekstlige
+              utkastet.
             </p>
           </details>
 
@@ -210,8 +233,10 @@ function PersonvernPage() {
               <li>
                 <strong>kaupet.app.location</strong> — husker posisjonen og søkeradius du sist
                 brukte i stedsfilteret (koordinater, radius i km og stedsnavn), slik at filteret er
-                forhåndsutfylt neste gang du åpner appen. Dataene forlater ikke enheten din og
-                brukes ikke til sporing.
+                forhåndsutfylt neste gang du åpner appen. Selve lagringen forlater ikke enheten din,
+                men når du utfører et geografisk søk sendes koordinatene og radiusen til Kaupet for
+                å finne relevante annonser — se «Kartverket og OpenStreetMap» under Tredjeparter for
+                hvordan adressesøk og kartvisning fungerer.
               </li>
               <li>
                 <strong>kaupet_onboarding_completed_v1</strong> — husker at du har fullført
@@ -230,8 +255,9 @@ function PersonvernPage() {
           </p>
           <ul className="mt-3 space-y-2 list-disc pl-5">
             <li>
-              <strong>Abonnementsnøkler</strong> — et kryptografisk nøkkelpar generert av
-              nettleseren din. Vi kan ikke bruke disse til å spore deg på tvers av nettsteder.
+              <strong>Abonnementsdata</strong> — i nettleseren et endepunkt og et kryptografisk
+              nøkkelpar generert av nettleseren din; i appen en enhets-token utstedt av Apple (APNs)
+              eller Google (FCM). Vi kan ikke bruke disse til å spore deg på tvers av nettsteder.
             </li>
             <li>
               <strong>Enhets- og nettleserinformasjon</strong> — brukes til å sende varslet til
@@ -244,7 +270,37 @@ function PersonvernPage() {
           </ul>
           <p className="mt-4">
             Du kan når som helst <strong>skru av varsler</strong> i nettleserens innstillinger eller
-            i profilen din på Kaupet.no. Da slettes abonnementsdataene automatisk fra serveren.
+            i profilen din på Kaupet.no. Da slettes abonnementsdataene fra serveren. Hvis du kun
+            trekker tilbake tillatelsen i telefonens/nettleserens systeminnstillinger uten å skru av
+            varsler i Kaupet, kan abonnementet bli stående til varseltjenesten (Apple/Google eller
+            nettleseren) rapporterer at det ikke lenger er gyldig — det brukes uansett ikke til noe
+            før det.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="font-display text-2xl">AI-basert kategoriforslag</h2>
+          <p className="mt-3">
+            Når du skriver tittelen på en ny annonse, foreslår Kaupet en kategori. Dette skjer først
+            med vår egen, interne statistikk basert på hva andre brukere har valgt for lignende
+            titler. Ingen data forlater Kaupets servere i dette tilfellet. Bare når denne interne
+            modellen er usikker, sender vi de <strong>første 100 tegnene</strong> av annonsetittelen
+            til <strong>Mistral AI</strong> for et forslag. Vi sender aldri e-postadressen din,
+            bruker-ID-en din eller annen personlig informasjon i denne forespørselen. Forslaget er
+            må bekreftes av deg før annonsen publiseres. Du kan også velge kategori selv.
+          </p>
+          <p className="mt-3">
+            Mistral AI er en selvstendig databehandler med driftssted i EU. Data sendt via deres API
+            brukes ikke til modelltrening som standard. Du kan lese mer i{" "}
+            <a
+              href="https://legal.mistral.ai/terms/privacy-policy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline underline-offset-2"
+            >
+              Mistral AIs personvernerklæring
+            </a>
+            .
           </p>
         </section>
 
@@ -253,27 +309,57 @@ function PersonvernPage() {
           <p className="mt-3">
             Vi lagrer opplysninger så lenge du har en aktiv konto og de er nødvendige for tjenesten.
             Annonser, meldinger og vurderinger beholdes til du selv sletter dem eller sletter
-            kontoen din. Unntak med egne frister er angitt eksplisitt ovenfor (blant annet
-            angrefristen på 7 dager ved kontosletting, og IP-blokkeringer som fjernes når de
-            oppheves).
+            kontoen din. Datatyper med en kortere, fast frist er angitt eksplisitt i listen over
+            («Informasjonen vi lagrer») — blant annet utkast (90 dager), leste varsler (180 dager),
+            kjøretøyoppslag og feilsøkingslogger (90 dager), og angrefristen på 7 dager ved
+            kontosletting. Den fullstendige, interne oversikten over lagringstid per datatype føres
+            i Kaupets behandlingsprotokoll og oppdateres i takt med denne erklæringen.
           </p>
         </section>
 
         <section>
           <h2 className="font-display text-2xl">Juridisk grunnlag</h2>
           <p className="mt-3">
-            Behandlingen skjer på grunnlag av <strong>avtale</strong> (nødvendig for å levere
-            tjenesten du har bedt om), <strong>samtykke</strong> (push-varslinger og eventuelle
-            preferanser) og <strong>berettiget interesse</strong> (statistikk til selgere og
-            sikkerhet i tjenesten).
+            Kjernetjenesten (konto, annonser, meldinger, favoritter, lagrede søk, betaling for
+            fremheving) behandles på grunnlag av <strong>avtale</strong> — det er nødvendig for å
+            levere tjenesten du har bedt om.
+          </p>
+          <p className="mt-3">
+            Push-varslinger, e-postvarsler og AI-kategoriforslaget behandles på grunnlag av{" "}
+            <strong>samtykke</strong> du selv gir ved å aktivere funksjonen.
+          </p>
+          <p className="mt-3">
+            Sikkerhet, misbruksforebygging (bl.a. IP-blokkering, bot-beskyttelse med Cloudflare
+            Turnstile og hastighetsbegrensning), moderering, feilsøking og aggregert bruksstatistikk
+            til produktforbedring behandles på grunnlag av <strong>berettiget interesse</strong>. Vi
+            har vurdert at denne interessen ikke går ut over din interesse i personvern, blant annet
+            fordi bruksstatistikken ikke inneholder noen identifikator som kan kobles til deg.
+          </p>
+          <p className="mt-3">
+            Enkelte opplysninger (f.eks. transaksjonsdata knyttet til betaling) kan i tillegg
+            behandles for å oppfylle en <strong>rettslig forpliktelse</strong>, som bokføringsloven.
           </p>
         </section>
 
         <section>
           <h2 className="font-display text-2xl">Dine rettigheter</h2>
           <p className="mt-3">
-            Du har rett til innsyn, retting, sletting og dataportabilitet for opplysningene vi har
-            om deg. Du kan også trekke tilbake samtykke og klage til{" "}
+            Du har rett til innsyn, retting, sletting og begrensning av opplysningene vi har om deg.
+            Du kan protestere mot behandling som bygger på vår berettigede interesse. Der
+            behandlingen bygger på samtykke (push-varsler, e-postvarsler), kan du trekke samtykket
+            tilbake når som helst, like enkelt som du ga det. Rett til dataportabilitet gjelder for
+            opplysninger du selv har gitt oss når behandlingen bygger på samtykke eller avtale og
+            skjer automatisk.
+          </p>
+          <p className="mt-3">
+            Kontakt oss på{" "}
+            <a
+              href="mailto:kontakt@kaupet.no"
+              className="text-primary underline underline-offset-2"
+            >
+              kontakt@kaupet.no
+            </a>{" "}
+            for å utøve rettighetene dine. Du kan også klage til{" "}
             <a
               href="https://www.datatilsynet.no"
               target="_blank"
@@ -282,11 +368,21 @@ function PersonvernPage() {
             >
               Datatilsynet
             </a>
-            . Kontakt oss for å utøve rettighetene dine.
+            .
           </p>
           <p className="mt-3">
             Tjenesten er ikke rettet mot barn, og krever at brukeren er minst 15 år ved registrering
             av konto. Brukere under 18 år må ha samtykke fra foresatte.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="font-display text-2xl">Automatiserte avgjørelser</h2>
+          <p className="mt-3">
+            Kaupet fatter ingen avgjørelser om deg utelukkende basert på automatisert behandling
+            eller profilering som har rettsvirkning for deg eller på tilsvarende måte påvirker deg i
+            vesentlig grad. AI-basert kategoriforslag (se over) er kun et forslag du alltid kan
+            overstyre før publisering.
           </p>
         </section>
 
@@ -299,10 +395,11 @@ function PersonvernPage() {
             permanent fra systemet.
           </p>
           <p className="mt-3">
-            For å bevare samtalehistorikken for andre brukere blir profilen din{" "}
-            <strong>anonymisert</strong> ved permanent sletting: navn og profilbilde fjernes, og du
-            vises som "Slettet bruker" i tidligere meldinger. Annonsene dine slettes. E-postadresse
-            og innloggingsdata fjernes fullstendig.
+            Ved permanent sletting fjernes{" "}
+            <strong>salgsannonsene og «ønskes kjøpt»-annonsene</strong> dine helt. For å bevare
+            samtalehistorikken for andre brukere blir profilen din <strong>anonymisert</strong>:
+            navn og profilbilde fjernes, og du vises som «Slettet bruker» i tidligere meldinger og
+            vurderinger. E-postadresse og innloggingsdata fjernes fullstendig.
           </p>
         </section>
 
@@ -315,8 +412,11 @@ function PersonvernPage() {
             <li>
               <strong>Cloudflare</strong> — vi bruker Cloudflare Workers som driftsplattform. Det
               betyr at trafikk til og fra Kaupet.no går gjennom Cloudflare sin infrastruktur, som
-              dermed ser IP-adressen din og annen teknisk informasjon om forespørselen din. Du kan
-              lese Cloudflares personvernerklæring på{" "}
+              dermed ser IP-adressen din og annen teknisk informasjon om forespørselen din.
+              Cloudflare Turnstile brukes i tillegg til å skille mennesker fra roboter ved
+              innlogging, registrering og publisering av annonser — dette innebærer at Cloudflare
+              ser tekniske signaler om nettleseren og enheten din på disse sidene. Du kan lese
+              Cloudflares personvernerklæring på{" "}
               <a
                 href="https://www.cloudflare.com/privacypolicy/"
                 target="_blank"
@@ -342,12 +442,45 @@ function PersonvernPage() {
               .
             </li>
             <li>
+              <strong>Mistral AI</strong> — mottar de første 100 tegnene av annonsetittelen når vårt
+              interne kategoriforslag er usikkert, se «AI-basert kategoriforslag» over. Du kan lese
+              deres personvernerklæring på{" "}
+              <a
+                href="https://legal.mistral.ai/terms/privacy-policy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary underline underline-offset-2"
+              >
+                legal.mistral.ai/terms/privacy-policy
+              </a>
+              .
+            </li>
+            <li>
+              <strong>Resend</strong> — sender transaksjonelle e-postvarsler du har bedt om (nye
+              meldinger, treff på lagrede søk og lignende) på våre vegne. Du kan lese deres
+              personvernerklæring på{" "}
+              <a
+                href="https://resend.com/legal/privacy-policy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary underline underline-offset-2"
+              >
+                resend.com/legal/privacy-policy
+              </a>
+              .
+            </li>
+            <li>
+              <strong>Statens vegvesen (Datautlevering)</strong> — når du registrerer et kjøretøy
+              med registreringsnummer, sender vi nummeret til Statens vegvesen for å hente
+              kjøretøydata automatisk.
+            </li>
+            <li>
               <strong>Google Firebase Cloud Messaging (FCM)</strong> — brukes for å sende
-              push-varslinger til Kaupet-appen på iOS og Android. Varsler leveres via Googles
-              infrastruktur, som dermed ser enhetsinformasjon og varselinnhold. Dette kan innebære
-              overføring av data til land utenfor EØS, basert på Googles standard
-              personvernbestemmelser (SCC) for slike overføringer. FCM brukes kun når du har
-              aktivert push-varslinger. Du kan lese Googles personvernerklæring på{" "}
+              push-varsler til Kaupet-appen på Android, og til iOS via Apples varslingstjeneste
+              (APNs). Varsler leveres via Googles infrastruktur, som dermed ser enhetsinformasjon og
+              varselinnhold. Dette kan innebære overføring av data til land utenfor EØS, basert på
+              Googles standard personvernbestemmelser (SCC) for slike overføringer. FCM brukes kun
+              når du har aktivert push-varsler. Du kan lese Googles personvernerklæring på{" "}
               <a
                 href="https://policies.google.com/privacy"
                 target="_blank"
@@ -359,9 +492,11 @@ function PersonvernPage() {
               .
             </li>
             <li>
-              <strong>OpenStreetMap / CARTO</strong> — kartfliser og adressesøk (Nominatim) for
-              visning og geokoding av lokasjon på annonser. IP-adressen din blir synlig for disse
-              tjenestene når kart eller adressesøk brukes.
+              <strong>Kartverket og OpenStreetMap</strong> — Kartverket leverer kartfliser, mens
+              adressesøk i kartvisningen bruker Nominatim fra OpenStreetMap Foundation, for visning
+              og geokoding av lokasjon på annonser. Adressesøk utføres kun når du eksplisitt trykker
+              «Søk» i et adressefelt — IP-adressen din blir da synlig for OpenStreetMap Foundation.
+              Kartfliser fra Kartverket lastes automatisk når et kart vises.
             </li>
           </ul>
         </section>
@@ -369,8 +504,8 @@ function PersonvernPage() {
         <section>
           <h2 className="font-display text-2xl">Endringer</h2>
           <p className="mt-3">
-            Vi oppdaterer denne erklæringen ved endringer i tjenesten. Versjon og dato øverst på
-            siden viser når den sist ble endret.
+            Vi oppdaterer denne erklæringen ved endringer i tjenesten. Dato øverst på siden viser
+            når den sist ble endret. Ved vesentlige endringer varsler vi deg også på epost.
           </p>
         </section>
 

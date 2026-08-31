@@ -10,6 +10,7 @@ import { nb } from "date-fns/locale";
 import { NativePageHeader } from "@/components/native-page-header";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useCategories } from "@/hooks/use-categories";
 import { useIsNative } from "@/hooks/use-is-native";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
@@ -61,17 +62,7 @@ function WtbListingPage() {
     },
   });
 
-  const { data: categories } = useQuery({
-    queryKey: ["categories"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("categories")
-        .select("id, name_nb, parent_id")
-        .order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-  });
+  const { data: categories } = useCategories();
   const categoriesById = useMemo(() => {
     const m = new Map<string, CategoryNode & { name_nb: string }>();
     for (const c of categories ?? []) m.set(c.id, c);

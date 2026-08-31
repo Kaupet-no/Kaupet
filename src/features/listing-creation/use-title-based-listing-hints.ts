@@ -71,13 +71,11 @@ export const SIMILAR_STOPWORDS = new Set([
 ]);
 
 /**
- * Shared core behind useListingTitleHints (create) and useEditListingHints
- * (edit): debounces the title, then derives "similar listings already up"
- * hints, a WTB (want-to-buy) price match, and keyword suggestions for the
- * description. The two wrapper hooks differ only in whether a category
- * suggestion is layered on top (create-only) and whether the listing being
- * edited is excluded from its own similar-listings search (edit-only) — both
- * previously duplicated this whole block verbatim.
+ * Shared core behind useListingTitleHints: debounces the title, then
+ * derives "similar listings already up" hints, a WTB (want-to-buy) price
+ * match, and keyword suggestions for the description. `excludeListingId`
+ * lets a caller editing an existing listing exclude it from its own
+ * similar-listings search.
  */
 export function useTitleBasedListingHints(params: {
   title: string;

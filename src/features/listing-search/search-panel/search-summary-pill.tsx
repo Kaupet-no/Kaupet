@@ -4,64 +4,55 @@ import { hapticImpact } from "@/lib/haptics";
 type Props = {
   /** Fritekst i det gjeldende søket. */
   q: string;
-  onQChange: (q: string) => void;
-  onSubmitQ: () => void;
-  /** Antall aktive filtre utenom fritekst — se `countActiveFilters`. */
+  /** Antall aktive filtre utenom fritekst. */
   filterCount: number;
-  onOpen: () => void;
+  onOpenQuery: () => void;
+  onOpenFilters: () => void;
 };
 
-/**
- * Kompakt søkesammendrag på native resultatflater (fase 9, tiltak 26).
- * Erstatter søkelinjen + den fulle chip-raden — den både **viser** hva som er
- * aktivt (ellers byttes trangt UI mot skjult tilstand, jf. 8.3) og er
- * inngangen til søkepanelet. Fritekstdelen er et ekte inndatafelt (ikke bare
- * en trigger for panelet) — filterikonet er den separate inngangen til panelet.
- */
-export function SearchSummaryPill({ q, onQChange, onSubmitQ, filterCount, onOpen }: Props) {
+/** Kompakt native oppsummering med separate query- og filterhandlinger. */
+export function SearchSummaryPill({ q, filterCount, onOpenQuery, onOpenFilters }: Props) {
   const filterText = `${filterCount} ${filterCount === 1 ? "filter" : "filtre"}`;
   return (
-    <div className="flex min-h-11 w-full items-center gap-2.5 rounded-full border border-border bg-card px-4 shadow-sm">
-      <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
-      <input
-        type="search"
-        value={q}
-        onChange={(e) => onQChange(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") onSubmitQ();
-        }}
-        onBlur={onSubmitQ}
-        placeholder="Søk i annonser"
-        aria-label="Søk i annonser"
-        className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-      />
+    <div className="flex min-h-12 w-full items-center rounded-full border border-border bg-card shadow-sm">
       <button
         type="button"
         onClick={() => {
           void hapticImpact("light");
-          onOpen();
+          onOpenQuery();
+        }}
+        className="native-touch-target flex min-w-0 flex-1 items-center gap-2 rounded-full px-4 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <SearchIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <span
+          className={`min-w-0 truncate ${q.trim() ? "text-foreground" : "text-muted-foreground"}`}
+        >
+          {q.trim() || "Søk i annonser"}
+        </span>
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          void hapticImpact("light");
+          onOpenFilters();
         }}
         aria-label={filterCount > 0 ? `Filtrer, ${filterText} aktive` : "Filtrer"}
-        className="native-touch-target -mr-2 flex shrink-0 items-center justify-center gap-1.5 rounded-full px-2 py-1 text-muted-foreground transition active:scale-[0.9]"
+        className="native-touch-target mr-1 flex shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         {filterCount > 0 ? (
           <span className="flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-            <SlidersHorizontal className="size-3" />
+            <SlidersHorizontal className="size-3" aria-hidden="true" />
             {filterText}
           </span>
         ) : (
-          <SlidersHorizontal className="size-4" />
+          <SlidersHorizontal className="size-4" aria-hidden="true" />
         )}
       </button>
     </div>
   );
 }
 
-/**
- * Teller aktive søkeparametere utenom fritekst, altså nøyaktig det pillen
- * oppsummerer. Kategori teller som ett filter uansett hvor mange som er valgt,
- * fordi hero-raden over pillen allerede viser kategorivalget.
- */
+/** Teller aktive søkeparametere utenom fritekst. */
 export function countActiveFilters(params: {
   min?: number;
   max?: number;

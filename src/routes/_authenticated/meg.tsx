@@ -28,6 +28,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { NativePageHeader } from "@/components/native-page-header";
+import { NotificationsBell } from "@/components/notifications-bell";
 import { DevServerSwitch } from "@/components/dev-server-switch";
 import { useShouldShowDevServerSwitch } from "@/hooks/use-should-show-dev-server-switch";
 import { FeedbackPanel } from "@/components/feedback-tag";
@@ -108,7 +109,7 @@ function MegPage() {
 
   return (
     <>
-      <NativePageHeader title="Meg" hideBack />
+      <NativePageHeader title="Meg" hideBack right={<NotificationsBell />} />
       <div className="mx-auto max-w-lg px-4 py-6">
         {/* Profilhode */}
         <button
@@ -251,7 +252,7 @@ function MegPage() {
             <div className="flex items-start gap-3">
               <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" />
               <p className="text-sm text-muted-foreground">
-                Som bruker av Kaupet.no er du med på å bygge en litt andreledes markedsplass, uten
+                Som bruker av Kaupet.no er du med på å bygge en litt annerledes markedsplass, uten
                 sporingscookies eller eksterne analyseverktøy. Les vår{" "}
                 <Link to="/personvern" className="underline hover:text-foreground">
                   personvernerklæring her

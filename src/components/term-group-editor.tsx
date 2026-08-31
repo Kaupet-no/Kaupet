@@ -28,7 +28,7 @@ export function TermGroupEditor({ groups, onChange }: Props) {
         variant="outline"
         onClick={() => onChange([...groups, emptyTermGroup()])}
       >
-        <Plus className="size-4" /> Legg til søkelinje
+        <Plus className="size-4" /> Legg til regel
       </Button>
     </div>
   );
@@ -61,17 +61,18 @@ export function TermGroupRow({
 
   return (
     <div
-      className={`space-y-2 rounded-md border p-2.5 ${
+      className={`space-y-2 rounded-lg border p-2.5 ${
         group.exclude ? "border-destructive/40 bg-destructive/5" : "border-border"
       }`}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="grid w-full gap-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 native:w-full native:flex-none">
           <InclusionToggle
             value={group.exclude}
             onChange={(exclude) => onChange({ ...group, exclude })}
           />
           <ModeToggle
+            compact
             value={group.mode}
             onChange={(mode) => onChange({ ...group, mode })}
             labels={
@@ -185,12 +186,15 @@ function InclusionToggle({
   onChange: (exclude: boolean) => void;
 }) {
   return (
-    <div className="flex w-full rounded-xl border border-border bg-card p-1 text-sm">
+    <div className="flex w-fit max-w-full rounded-lg border border-border bg-card p-0.5 text-sm native:w-full native:p-1">
       <button
         type="button"
         onClick={() => onChange(false)}
-        className={`native-touch-target flex-1 rounded-lg px-3 py-2 transition ${
-          !value ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+        aria-pressed={!value}
+        className={`native-touch-target h-9 rounded-md px-3 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring native:h-auto native:flex-1 native:py-2 ${
+          !value
+            ? "bg-muted font-medium text-foreground native:bg-primary native:text-primary-foreground"
+            : "text-muted-foreground hover:bg-muted hover:text-foreground"
         }`}
       >
         Inkluder
@@ -198,8 +202,11 @@ function InclusionToggle({
       <button
         type="button"
         onClick={() => onChange(true)}
-        className={`native-touch-target flex-1 rounded-lg px-3 py-2 transition ${
-          value ? "bg-destructive text-destructive-foreground" : "text-muted-foreground"
+        aria-pressed={value}
+        className={`native-touch-target h-9 rounded-md px-3 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring native:h-auto native:flex-1 native:py-2 ${
+          value
+            ? "bg-destructive/10 font-medium text-destructive native:bg-destructive native:text-destructive-foreground"
+            : "text-muted-foreground hover:bg-muted hover:text-foreground"
         }`}
       >
         Skal ikke inneholde

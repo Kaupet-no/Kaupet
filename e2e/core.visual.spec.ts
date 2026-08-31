@@ -1,4 +1,4 @@
-import type { Locator, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 
 const FILTER_QUERY = "e2efilterfixture";
@@ -70,22 +70,14 @@ test("forsiden holder visuell kontrakt", async ({ page }, testInfo) => {
   });
 });
 
-test("det native søkepanelet holder visuell kontrakt", async ({ page }, testInfo) => {
+test("det native søkepanelet holder visuell kontrakt", async ({ page }) => {
   await page.goto("/annonser?sort=price_asc&forcenative=1");
   await waitForHydration(page);
   await page.getByRole("button", { name: "Filtrer", exact: true }).click();
   await page.getByRole("heading", { name: "Søk og filtrer" }).waitFor();
-  const masks: Locator[] = [];
-  if (testInfo.project.name === "visual-web") {
-    const mapRegion = page.locator(".leaflet-container");
-    await expect(mapRegion).toHaveCount(1);
-    await expect(mapRegion).toBeVisible();
-    masks.push(mapRegion);
-  }
   await expect(page).toHaveScreenshot("search-panel.png", {
     animations: "disabled",
     fullPage: true,
-    mask: masks,
   });
 });
 
@@ -104,7 +96,10 @@ test("annonsedetaljen holder visuell kontrakt", async ({ page }, testInfo) => {
     .first()
     .click();
   await expect(page).toHaveURL(/\/\d{8}(?:\?|$)/);
-  await page.getByRole("button", { name: "Logg inn for å sende melding" }).waitFor();
+  // To knapper med samme tekst kan finnes samtidig på mobil: sidepanelet og
+  // den faste kontaktlinjen nederst (persistent kontakthandling) — begge
+  // betyr siden er klar, så .first() holder som ferdig-signal.
+  await page.getByRole("button", { name: "Logg inn for å sende melding" }).first().waitFor();
   const publishedDate = page
     .locator("dt")
     .filter({ hasText: /^(?:Publisert|Sist redigert)$/ })

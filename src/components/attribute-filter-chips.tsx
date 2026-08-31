@@ -160,6 +160,7 @@ export function SecondaryCategoryFilters({
   queryText,
   isNative = false,
   includePrimary = false,
+  autoFocusSearch,
 }: {
   /** Full filter set for the category — split into primary/secondary here,
    * same as `AttributeFilterChips`. */
@@ -174,6 +175,13 @@ export function SecondaryCategoryFilters({
    * Søkepanelet (fase 9) er eneste vei til kategorifiltrene på native etter at
    * chip-raden ble erstattet av sammendrag-pillen, så der må hele settet med. */
   includePrimary?: boolean;
+  /** Autofokuser søkefeltet på mount. Standard `!isNative`, som passer når
+   * dette rendres inne i en overlay brukeren nettopp åpnet (f.eks. "Flere
+   * filter"-dialogen) — der er fokus forventet. I sidekolonnen (`expanded`
+   * layout i `filter-sections.tsx`) rendres komponenten derimot alltid synlig
+   * med `isNative={!expanded}`, så autofokus der ville rykket siden ned til
+   * feltet hver gang en hovedkategori velges. Send `false` eksplisitt der. */
+  autoFocusSearch?: boolean;
 }) {
   const [search, setSearch] = useState("");
   const { secondary: secondaryOnly } = splitPrimaryFilters(filters);
@@ -208,13 +216,15 @@ export function SecondaryCategoryFilters({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Søk etter filter…"
-          autoFocus={!isNative}
+          autoFocus={autoFocusSearch ?? !isNative}
         />
       )}
       {visible.length === 0 ? (
         <p className="text-sm text-muted-foreground">Ingen filter matcher «{search}».</p>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        /* Beholderbredde, ikke vindusbredde: samme liste rendres både i en
+           290px sidekolonne og i en 512px dialog. */
+        <div className="grid grid-cols-1 gap-4 @md:grid-cols-2">
           <CategoryFilterFields
             filters={visible}
             brandLookupFilters={filters}
@@ -227,16 +237,6 @@ export function SecondaryCategoryFilters({
       )}
     </div>
   );
-}
-
-/** Count of secondary (non-primary) filters with an active value — shared by
- * `AttributeFilterChips`' own "Flere filter" badge and the native panel's
- * "Mer" chip, so the two never show a different number for the same state. */
-export function secondaryFilterCount(
-  filters: CategoryFilter[],
-  values: Record<string, AttributeFilterValue>,
-): number {
-  return splitPrimaryFilters(filters).secondary.filter((f) => values[f.key] !== undefined).length;
 }
 
 /**
@@ -581,7 +581,7 @@ export function AttributeFilterChips({
         <FilterChip
           label={condLabel}
           active={condActive}
-          icon={!isCard ? <span className="text-[11px]">✦</span> : undefined}
+          icon={!isCard ? <span className="text-xs">✦</span> : undefined}
           {...fieldProps}
           fieldLabel="Tilstand"
         />
@@ -650,8 +650,8 @@ export function AttributeFilterChips({
         <span
           className={
             isCard
-              ? "flex size-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white"
-              : "absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white"
+              ? "flex size-4 items-center justify-center rounded-full bg-brand text-2xs font-bold text-white"
+              : "absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full bg-brand text-2xs font-bold text-white"
           }
         >
           {secondaryCount}
@@ -867,7 +867,7 @@ function PriceUpToField({
       <div className="relative">
         <Input
           inputMode="numeric"
-          placeholder="Alle"
+          placeholder="Ingen grense"
           value={formatThousands(draft, PRICE_UPTO_MAX * 10)}
           onChange={(e) => setDraft(digitsOnlyClamped(e.target.value, PRICE_UPTO_MAX * 10))}
           onBlur={commit}

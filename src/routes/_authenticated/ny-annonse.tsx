@@ -1,6 +1,6 @@
 ﻿import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { ClientOnly, createFileRoute, useNavigate, useBlocker } from "@tanstack/react-router";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useForm, useWatch, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -16,7 +16,7 @@ import { PromoteListingDialog } from "@/components/promote-listing-dialog";
 import { PublishedListingDialog } from "@/components/published-listing-dialog";
 import { CategoryPicker } from "@/components/category-picker";
 import { useAllCategoryFilters, type AttributeMap } from "@/components/attribute-fields";
-import { modulesForKeys } from "@/features/listing-creation/modules/registry";
+import { useCategories, visibleCategories } from "@/hooks/use-categories";
 import {
   effectiveFlowForCategory,
   withRuntimeFieldGroups,
@@ -34,6 +34,7 @@ import { getCategoryBehavior } from "@/lib/category-behavior";
 import {
   categoryBreadcrumb,
   getMissingRequiredFilters,
+  isBoatCategory,
   vehicleCategoryGroupFor,
   VEHICLE_EQUIPMENT_FILTER_KEYS,
   type CategoryNode,
@@ -224,21 +225,12 @@ function NewListingPage() {
   const [categoryEditConfirmOpen, setCategoryEditConfirmOpen] = useState(false);
   const [editingCategoryViaTitle, setEditingCategoryViaTitle] = useState(false);
 
-  const { data: categories } = useQuery({
-    queryKey: ["categories", "with-parent"],
-    queryFn: async () => {
-      // select("*") rather than a column list so the query keeps working in
-      // the window before the title_example migration is applied.
-      const { data, error } = await supabase.from("categories").select("*").order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-  });
+  const { data: categories } = useCategories();
 
   // Hidden categories (e.g. the E2E test category) are only pickable for
   // demo/admin users — mirrors the is_hidden filtering on the browse surfaces.
   const pickableCategories = useMemo(
-    () => (categories ?? []).filter((c) => isDemo || !c.is_hidden),
+    () => visibleCategories(categories ?? [], isDemo),
     [categories, isDemo],
   );
 
@@ -278,7 +270,7 @@ function NewListingPage() {
       category_id: "",
       condition: "good",
       is_free: typeParam === "free",
-      can_ship: "pickup" as const,
+      can_ship: null,
       price_nok: "",
       postal_code: "",
       city: "",
@@ -343,7 +335,6 @@ function NewListingPage() {
     [categoryId, allFilters, categoriesById],
   );
   const isVehicle = vehicleGroup !== null;
-  const behavior = useMemo(() => getCategoryBehavior(vehicleGroup), [vehicleGroup]);
 
   const showMileage = useMemo(() => {
     if (!isVehicle) return false;
@@ -351,12 +342,14 @@ function NewListingPage() {
     return !VEHICLE_LEAF_SLUGS_WITHOUT_MILEAGE.includes(slug as VehicleLeafSlug);
   }, [isVehicle, categoryId, categoriesById]);
 
-  const activeModules = useMemo(
+  const genericAttributesActive = useMemo(
     () =>
-      modulesForKeys(
-        effectiveFlowForCategory(categoryId || null, allFlows ?? [], categoriesById, fromLanding)
-          .modules,
-      ),
+      effectiveFlowForCategory(
+        categoryId || null,
+        allFlows ?? [],
+        categoriesById,
+        fromLanding,
+      ).modules.includes("generic-attributes"),
     [categoryId, allFlows, categoriesById, fromLanding],
   );
 
@@ -397,6 +390,15 @@ function NewListingPage() {
         .fieldGroups,
     [categoryId, allFlows, categoriesById, fromLanding],
   );
+  const boatCategory = useMemo(
+    () => isBoatCategory(categoryId || null, allFilters ?? [], categoriesById),
+    [categoryId, allFilters, categoriesById],
+  );
+  const behavior = useMemo(
+    () => getCategoryBehavior(vehicleGroup, boatCategory),
+    [vehicleGroup, boatCategory],
+  );
+  const boatFactsActive = baseFieldGroupKeys.includes("boat-facts");
 
   const vehicleAttributeHiddenKeys = [
     ...(vehicleLookupResult ? VEHICLE_LOOKUP_FILTER_KEYS : []),
@@ -427,7 +429,6 @@ function NewListingPage() {
   // still gates vehicle-specific rendering choices like condition options or
   // showMileage, evaluated later once a leaf is genuinely known) does.
   const isVehicleFlow = baseFieldGroupKeys.includes("vehicle-registration");
-  const boatFactsActive = baseFieldGroupKeys.includes("boat-facts");
 
   // category-confirm er aldri en del av en kategoris lagrede field_groups —
   // den avhenger av live wizard-state og injiseres derfor her.
@@ -448,17 +449,30 @@ function NewListingPage() {
   // category_filters matcher, men det hindrer ikke en tom side fra å ta sin
   // egen steg-plass i wizarden — samme grunn som category-attributes over).
   const isCarLeaf = categoriesById.get(categoryId)?.slug === "bil";
-  const fieldGroupKeys = useMemo(
-    () =>
-      withRuntimeFieldGroups(baseFieldGroupKeys, {
-        showCategoryConfirm: fromLanding && !categoryConfirmed,
-      }).filter(
-        (key) =>
-          (key !== "category-attributes" || !isVehicleFlow) &&
-          (key !== "vehicle-equipment" || isCarLeaf),
-      ),
-    [baseFieldGroupKeys, fromLanding, categoryConfirmed, isVehicleFlow, isCarLeaf],
-  );
+  const fieldGroupKeys = useMemo(() => {
+    let keys = withRuntimeFieldGroups(baseFieldGroupKeys, {
+      showCategoryConfirm: fromLanding && !categoryConfirmed,
+    });
+    if (behavior.requiresDeliveryMethod && !keys.includes("delivery")) {
+      const insertAt = keys.indexOf("location");
+      keys = [...keys];
+      keys.splice(insertAt >= 0 ? insertAt : keys.length, 0, "delivery");
+    } else if (!behavior.requiresDeliveryMethod) {
+      keys = keys.filter((key) => key !== "delivery");
+    }
+    return keys.filter(
+      (key) =>
+        (key !== "category-attributes" || !isVehicleFlow) &&
+        (key !== "vehicle-equipment" || isCarLeaf),
+    );
+  }, [
+    baseFieldGroupKeys,
+    fromLanding,
+    categoryConfirmed,
+    behavior.requiresDeliveryMethod,
+    isVehicleFlow,
+    isCarLeaf,
+  ]);
 
   const pages: WizardPage[] = useMemo(
     () =>
@@ -774,7 +788,6 @@ function NewListingPage() {
     images,
     attributes,
     boatFactsActive,
-    activeModules,
     missingFilters,
     isFree,
     priceNok,
@@ -998,7 +1011,8 @@ function NewListingPage() {
       return "busy";
     }
 
-    // For kjøretøy rendrer title-photos kun bilder (se TitlePhotos) — feltet
+    // For kjøretøy rendrer photos-steget kun bilder (title-steget rendrer
+    // ikke for kjøretøy, se field-groups/registry.ts) — feltet
     // "title" fylles først på vehicle-facts-steget (VehicleTitleFields), så
     // det skal ikke valideres her, ellers blokkeres Neste stille uten
     // synlig feilmelding.
@@ -1026,7 +1040,6 @@ function NewListingPage() {
       images,
       attributes,
       boatFactsActive,
-      activeModules,
       missingFilters,
       isFree,
       priceNok,
@@ -1149,9 +1162,13 @@ function NewListingPage() {
           postal_code: values.postal_code || null,
           city: values.city || null,
           lat: finalCoords?.lat ?? null,
-          lng: finalCoords?.lng ?? null,
           can_ship:
-            fieldGroupKeys.includes("delivery") && !isVehicle ? values.can_ship !== "pickup" : null,
+            fieldGroupKeys.includes("delivery") &&
+            behavior.requiresDeliveryMethod &&
+            values.can_ship != null
+              ? values.can_ship !== "pickup"
+              : null,
+          lng: finalCoords?.lng ?? null,
           known_issues: isVehicle ? values.known_issues || null : null,
           no_known_issues: isVehicle ? !!values.no_known_issues : null,
           maintenance_history: isVehicle ? values.maintenance_history || null : null,
@@ -1292,6 +1309,8 @@ function NewListingPage() {
       priceNok: isFree ? null : validPriceNok,
       isFree,
       condition: fieldGroupKeys.includes("condition") ? (condition ?? null) : null,
+      canShip: behavior.requiresDeliveryMethod && canShip != null ? canShip !== "pickup" : null,
+      requiresDeliveryMethod: behavior.requiresDeliveryMethod,
       city: city || null,
       postalCode: postalCode || null,
       displayLat: coords?.lat ?? null,
@@ -1465,7 +1484,7 @@ function NewListingPage() {
     attributes,
     onAttributesChange: setAttributes,
     attributesTouched,
-    activeModules,
+    genericAttributesActive,
     boatFactsActive,
     vehicleAttributeHiddenKeys,
     extraFieldError,

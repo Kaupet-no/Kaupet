@@ -85,7 +85,7 @@ export function CategoryHero({
         }`}
         aria-hidden
       />
-      <div className={`relative z-10 mx-auto max-w-7xl px-4 ${compact ? "py-6" : "py-12"}`}>
+      <div className={`relative z-10 mx-auto max-w-6xl px-4 ${compact ? "py-6" : "py-12"}`}>
         <CategoryBreadcrumb
           breadcrumbEntries={breadcrumbEntries}
           extraSegments={extraSegments}

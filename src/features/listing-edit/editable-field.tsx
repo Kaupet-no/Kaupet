@@ -129,7 +129,10 @@ export function EditableField<T, C extends BaseEditContextValue = BaseEditContex
       tabIndex={0}
       onClick={() => setActive(true)}
       onKeyDown={(e) => {
-        if (e.key === "Enter") setActive(true);
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setActive(true);
+        }
       }}
       className={cn(
         "cursor-pointer rounded-md border border-dashed border-border/60 transition-colors hover:border-primary/50 hover:bg-primary/5",

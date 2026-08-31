@@ -1,14 +1,12 @@
-import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Eye, MapPin, Share2, X } from "lucide-react";
 
-import { supabase } from "@/integrations/supabase/client";
-import { signListingImageUrls } from "@/lib/storage";
 import { formatPrice } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
 import { ShareListingDialog } from "@/components/share-listing-dialog";
+import { useListingPreview } from "@/hooks/use-listing-preview";
 
 type Props = {
   listingId: string;
@@ -20,15 +18,6 @@ type Props = {
   canPromote?: boolean;
 };
 
-type PreviewData = {
-  title: string;
-  price_nok: number | null;
-  is_free: boolean;
-  city: string | null;
-  cover_path: string | null;
-  kaupet_code: string | null;
-};
-
 export function PublishedListingDialog({
   listingId,
   open,
@@ -38,49 +27,9 @@ export function PublishedListingDialog({
   onClose,
   canPromote = false,
 }: Props) {
-  const [imgUrl, setImgUrl] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
 
-  const { data: listing } = useQuery({
-    queryKey: ["listing-preview", listingId],
-    enabled: open,
-    queryFn: async (): Promise<PreviewData | null> => {
-      const { data, error } = await supabase
-        .from("listings")
-        .select(
-          "title, price_nok, is_free, city, kaupet_code, listing_images(storage_path, sort_order)",
-        )
-        .eq("id", listingId)
-        .maybeSingle();
-      if (error) throw error;
-      if (!data) return null;
-      const cover =
-        (data.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order)[0]
-          ?.storage_path ?? null;
-      return {
-        title: data.title,
-        price_nok: data.price_nok,
-        is_free: data.is_free,
-        city: data.city,
-        cover_path: cover,
-        kaupet_code: data.kaupet_code,
-      };
-    },
-  });
-
-  useEffect(() => {
-    if (!listing?.cover_path) {
-      setImgUrl(null);
-      return;
-    }
-    let cancelled = false;
-    signListingImageUrls([listing.cover_path]).then((m) => {
-      if (!cancelled) setImgUrl(m[listing.cover_path!] ?? null);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [listing?.cover_path]);
+  const { listing, imgUrl } = useListingPreview(listingId, open);
 
   return (
     <ResponsiveOverlay
@@ -139,7 +88,7 @@ export function PublishedListingDialog({
             <Button
               variant="outline"
               onClick={onPromote}
-              className="flex-1 border-accent/40 text-accent-text hover:bg-accent/10 hover:text-accent-text"
+              className="flex-1 border-brand/40 text-brand-text hover:bg-brand/10 hover:text-brand-text"
             >
               Fremhev annonse
             </Button>

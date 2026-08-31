@@ -32,6 +32,7 @@ import { getMyWtbListings, deleteWtbListing } from "@/lib/wtb-listings.functions
 import { formatDistanceToNow } from "date-fns";
 import { nb } from "date-fns/locale";
 import { useAllCategoryFilters } from "@/components/attribute-fields";
+import { useCategories } from "@/hooks/use-categories";
 import { isVehicleCategory } from "@/lib/category-filters";
 
 import { NativePageHeader } from "@/components/native-page-header";
@@ -78,14 +79,7 @@ function MyListingsPage() {
   });
 
   const { data: allFilters } = useAllCategoryFilters();
-  const { data: allCategories } = useQuery({
-    queryKey: ["categories"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("categories").select("id, parent_id");
-      if (error) throw error;
-      return data;
-    },
-  });
+  const { data: allCategories } = useCategories();
   const categoriesById = new Map((allCategories ?? []).map((c) => [c.id, c]));
   const isVehicleRow = (categoryId: string | null) =>
     isVehicleCategory(categoryId, allFilters ?? [], categoriesById);
@@ -237,7 +231,7 @@ function MyListingsPage() {
               <h1 className="font-display text-3xl tracking-tight max-sm:hidden">Mine annonser</h1>
             )}
             <p className="mt-1 text-muted-foreground">
-              Rediger, marker som solgt, eller slett annonsene dine.
+              Rediger, fremhev, marker som solgt eller slett annonsene dine.
             </p>
           </div>
           {!native && (
@@ -259,7 +253,7 @@ function MyListingsPage() {
                   },
                   {
                     value: "sold",
-                    label: `Solgt (${rows?.filter((r) => r.status === "sold" || r.status === "archived" || r.status === "expired").length ?? 0})`,
+                    label: `Solgt / utløpt (${rows?.filter((r) => r.status === "sold" || r.status === "archived" || r.status === "expired").length ?? 0})`,
                   },
                   {
                     value: "draft",
@@ -306,10 +300,17 @@ function MyListingsPage() {
                 </div>
               ) : filtered.length === 0 ? (
                 <EmptyState
-                  title="Ingen annonser å vise her."
+                  title={
+                    rows && rows.length > 0
+                      ? "Ingen annonser i denne kategorien."
+                      : "Ingen annonser å vise her."
+                  }
                   action={
                     <Button size="sm" variant="outline" onClick={() => setNewListingIntent("sell")}>
-                      <Plus className="size-4" /> Opprett din første annonse
+                      <Plus className="size-4" />{" "}
+                      {rows && rows.length > 0
+                        ? "Opprett en annonse"
+                        : "Opprett din første annonse"}
                     </Button>
                   }
                 />
@@ -375,7 +376,7 @@ function MyListingsPage() {
                 title="Du har ingen ønskes kjøpt-annonser ennå."
                 action={
                   <Button size="sm" variant="outline" onClick={() => setNewListingIntent("buy")}>
-                    <Plus className="size-4" /> Opprett ønskes kjøpt
+                    <Plus className="size-4" /> Opprett en ønskes kjøpt-annonse
                   </Button>
                 }
               />

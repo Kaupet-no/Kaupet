@@ -1,7 +1,9 @@
+import type { SearchParams } from "@/features/listing-search/search-schema";
+
 const STORAGE_KEY = "kaupet:lastAnnonserSearch";
 
 export interface LastSearchContext {
-  search: Record<string, unknown>;
+  search: SearchParams;
   label: string;
 }
 
@@ -13,6 +15,11 @@ export function saveLastSearchContext(ctx: LastSearchContext) {
   }
 }
 
+/** Used by the listing detail page's "Tilbake til {label}" link — the last
+ * /annonser search this session (if any), so a buyer can return to their
+ * exact previous search after viewing a listing instead of starting over.
+ * Cleared automatically when the tab closes (sessionStorage), matching what
+ * personvern.tsx documents for this key. */
 export function readLastSearchContext(): LastSearchContext | null {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);

@@ -6,7 +6,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ListingComposerShell } from "./listing-composer-shell";
 
 vi.mock("@/components/native-page-header", () => ({
-  NativePageHeader: () => <header>Ny annonse</header>,
+  NativePageHeader: ({ right }: { right?: ReactNode }) => (
+    <header>
+      Ny annonse
+      {right}
+    </header>
+  ),
 }));
 
 const { hapticNotification, hapticSelection } = vi.hoisted(() => ({
@@ -59,7 +64,7 @@ describe("ListingComposerShell", () => {
     );
   });
 
-  it("viser treposisjonsnavigasjon på et mellomsteg", () => {
+  it("viser Forrige/Fortsett i footeren og Avbryt i headeren på et mellomsteg", () => {
     const { onBack, onCancel } = renderShell();
     fireEvent.click(screen.getByRole("button", { name: "Forrige" }));
     fireEvent.click(screen.getByRole("button", { name: "Avbryt annonseopprettelse" }));

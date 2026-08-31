@@ -82,6 +82,13 @@ test("logger inn og publiserer en annonse", async ({ page }, testInfo) => {
   // "Vis frem". Selecting it satisfies the optional-price validation without
   // changing the publish contract this golden path proves.
   await page.getByRole("checkbox", { name: "Gis bort gratis" }).click();
+  // Delivery method is required for every non-vehicle, non-boat category
+  // (see requiresDeliveryMethod in category-behavior.ts) and createListing
+  // rejects can_ship: null server-side — but the wizard's own
+  // "requiredToPublish" check for the delivery field group doesn't catch a
+  // missing selection, so skipping this silently reaches "Publiseringsklar"
+  // and only fails once the publish click hits the server.
+  await page.getByRole("radio", { name: /Må hentes/ }).click();
   await clickNextAndWaitFor(page, wizardStep(page, "review-publish"), testInfo);
 
   await publishAndExpectSuccess(page, testInfo);

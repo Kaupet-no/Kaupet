@@ -4,6 +4,7 @@ import { IntentTitleLanding } from "@/components/intent-title-landing";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/hooks/use-auth";
+import { useUnreadNotificationsCount } from "@/hooks/use-unread";
 import { useFormFactor } from "@/hooks/use-form-factor";
 import { hapticImpact } from "@/lib/haptics";
 import { isNative } from "@/lib/native";
@@ -85,7 +86,7 @@ export function AppBottomNav() {
           aria-label="Hjem"
           aria-current={isOnHome ? "page" : undefined}
         >
-          <span className="flex h-11 w-11 items-center justify-center">
+          <span className="flex h-12 w-12 items-center justify-center">
             <img
               src={logoIcon}
               alt=""
@@ -93,30 +94,31 @@ export function AppBottomNav() {
             />
           </span>
           <span
-            className={`text-[11px] ${isOnHome ? "font-medium text-primary" : "text-muted-foreground"}`}
+            className={`native-nav-label ${isOnHome ? "font-medium text-primary" : "text-muted-foreground"}`}
           >
             Hjem
           </span>
         </Link>
 
         {/* Søk er en primær handling og er tilgjengelig uten konto. */}
-        <div className={itemClass} aria-current={isOnSearch ? "page" : undefined}>
+        <div className={itemClass}>
           <button
             type="button"
             onClick={() => {
               void hapticImpact("light");
               trackProductEvent("search_opened", { source: "bottom_nav" });
-              openPanel("categories");
+              openPanel("query");
             }}
-            className={`flex h-11 w-11 items-center justify-center rounded-full ${
+            className={`flex h-12 w-12 items-center justify-center rounded-full ${
               isOnSearch ? "text-primary" : "text-muted-foreground"
             }`}
             aria-label="Søk"
+            aria-current={isOnSearch ? "page" : undefined}
           >
             <Search className="size-6" />
           </button>
           <span
-            className={`text-[11px] ${isOnSearch ? "font-medium text-primary" : "text-muted-foreground"}`}
+            className={`native-nav-label ${isOnSearch ? "font-medium text-primary" : "text-muted-foreground"}`}
           >
             Søk
           </span>
@@ -157,49 +159,51 @@ export function AppBottomNav() {
               <Plus className="size-8" />
             </Link>
           )}
-          <span className="text-[11px] text-muted-foreground">
+          <span className="native-nav-label text-muted-foreground">
             {isOnNewAdPage ? "Avbryt" : "Ny annonse"}
           </span>
         </div>
 
         {/* Meldinger */}
-        <div className={itemClass} aria-current={isOnMeldinger ? "page" : undefined}>
+        <div className={itemClass}>
           {user ? (
-            <div className="relative flex h-11 w-11 items-center justify-center">
-              <MessagesButton />
+            <div className="relative flex h-12 w-12 items-center justify-center">
+              <MessagesButton isActive={isOnMeldinger} />
             </div>
           ) : (
             <button
               type="button"
               onClick={() => navigate({ to: "/auth" })}
-              className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground"
+              className="flex h-12 w-12 items-center justify-center rounded-full text-muted-foreground"
               aria-label="Meldinger (logg inn)"
+              aria-current={isOnMeldinger ? "page" : undefined}
             >
               <MessageCircle className="size-6" />
             </button>
           )}
           <span
-            className={`text-[11px] ${isOnMeldinger ? "font-medium text-primary" : "text-muted-foreground"}`}
+            className={`native-nav-label ${isOnMeldinger ? "font-medium text-primary" : "text-muted-foreground"}`}
           >
             Meldinger
           </span>
         </div>
 
         {/* Bruker */}
-        <div className={itemClass} aria-current={isOnMeg ? "page" : undefined}>
+        <div className={itemClass}>
           {user ? (
-            <UserAvatarButton userId={user.id} email={user.email ?? null} />
+            <UserAvatarButton userId={user.id} email={user.email ?? null} isActive={isOnMeg} />
           ) : (
             <Link
               to="/auth"
-              className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground"
+              className="flex h-12 w-12 items-center justify-center rounded-full text-muted-foreground"
               aria-label="Logg inn"
+              aria-current={isOnMeg ? "page" : undefined}
             >
               <LogIn className="size-6" />
             </Link>
           )}
           <span
-            className={`text-[11px] ${isOnMeg ? "font-medium text-primary" : "text-muted-foreground"}`}
+            className={`native-nav-label ${isOnMeg ? "font-medium text-primary" : "text-muted-foreground"}`}
           >
             {user ? "Meg" : "Logg inn"}
           </span>
@@ -219,9 +223,17 @@ export function AppBottomNav() {
   );
 }
 
-function UserAvatarButton({ userId, email }: { userId: string; email: string | null }) {
+export function UserAvatarButton({
+  userId,
+  email,
+  isActive,
+}: {
+  userId: string;
+  email: string | null;
+  isActive?: boolean;
+}) {
   const navigate = useNavigate();
-
+  const unreadCount = useUnreadNotificationsCount();
   const { data: profile } = useQuery({
     queryKey: ["profile-menu", userId],
     queryFn: async () => {
@@ -240,9 +252,10 @@ function UserAvatarButton({ userId, email }: { userId: string; email: string | n
   return (
     <button
       type="button"
-      aria-label="Meg"
+      aria-label={unreadCount > 0 ? `Meg, ${unreadCount} nye varsler` : "Meg"}
+      aria-current={isActive ? "page" : undefined}
       onClick={() => void navigate({ to: "/meg" })}
-      className="flex h-10 w-10 items-center justify-center"
+      className="relative flex h-12 w-12 items-center justify-center"
     >
       <Avatar className="size-8">
         {profile?.avatar_url && <AvatarImage src={profile.avatar_url} alt={displayName} />}
@@ -250,6 +263,14 @@ function UserAvatarButton({ userId, email }: { userId: string; email: string | n
           {initials(profile?.display_name, email ?? "")}
         </AvatarFallback>
       </Avatar>
+      {unreadCount > 0 && (
+        <span
+          className="pointer-events-none absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-2xs font-semibold text-brand-foreground"
+          aria-hidden="true"
+        >
+          {unreadCount > 9 ? "9+" : unreadCount}
+        </span>
+      )}
     </button>
   );
 }

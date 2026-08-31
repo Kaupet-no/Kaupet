@@ -42,27 +42,6 @@ const WEIGHT_KEY = "weight_kg";
 const MAX_TOTAL_WEIGHT_KEY = "max_total_weight_kg";
 
 /**
- * Trigger button for the "Se flere valg" `Collapsible` wrapping a category's
- * secondary filters — shared by the landing page and category page so the
- * label/icon behavior (and the +count hint) can't drift between the two.
- */
-export function MoreFiltersToggle({ open, count }: { open: boolean; count?: number }) {
-  return (
-    <CollapsibleTrigger asChild>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className="gap-1 px-0 text-primary hover:bg-transparent"
-      >
-        {open ? "Vis færre valg" : count ? `Se flere valg (+${count})` : "Se flere valg"}
-        <ChevronDown className={`size-4 transition-transform ${open ? "rotate-180" : ""}`} />
-      </Button>
-    </CollapsibleTrigger>
-  );
-}
-
-/**
  * Renders the configurable filter controls for a category's `CategoryFilter`s
  * (boolean/select/multiselect/text/range), driving them off externally-owned
  * state so the same UI can be embedded both on the category page and in the
@@ -378,7 +357,7 @@ export function CategoryFilterFields({
                   <ChevronDown className="size-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
                 </Button>
               </CollapsibleTrigger>
-              <CollapsibleContent className="grid grid-cols-1 gap-x-4 gap-y-1.5 rounded-md border border-border p-3 sm:grid-cols-2 lg:grid-cols-3">
+              <CollapsibleContent className="grid grid-cols-1 gap-x-4 gap-y-1.5 rounded-md border border-border p-3 @sm:grid-cols-2 @lg:grid-cols-3">
                 {(f.options ?? []).map((o) => (
                   <label key={o.value} className="flex items-center gap-2 text-sm">
                     <Checkbox

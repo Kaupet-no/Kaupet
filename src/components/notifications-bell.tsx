@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, CheckCheck, ShoppingBag, TrendingDown, X } from "lucide-react";
@@ -57,6 +57,10 @@ function formatKr(n: number) {
 export function NotificationsBell() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const invalidateNotifications = useCallback(() => {
+    qc.invalidateQueries({ queryKey: ["notifications"] });
+    qc.invalidateQueries({ queryKey: ["notifications-unread-count"] });
+  }, [qc]);
 
   const { data, refetch } = useQuery({
     queryKey: ["notifications", user?.id],
@@ -138,7 +142,7 @@ export function NotificationsBell() {
           filter: `user_id=eq.${userId}`,
         },
         () => {
-          qc.invalidateQueries({ queryKey: ["notifications"] });
+          invalidateNotifications();
           void refetch();
         },
       )
@@ -151,7 +155,7 @@ export function NotificationsBell() {
           filter: `user_id=eq.${userId}`,
         },
         () => {
-          qc.invalidateQueries({ queryKey: ["notifications"] });
+          invalidateNotifications();
           void refetch();
         },
       )
@@ -164,7 +168,7 @@ export function NotificationsBell() {
           filter: `user_id=eq.${userId}`,
         },
         () => {
-          qc.invalidateQueries({ queryKey: ["notifications"] });
+          invalidateNotifications();
           void refetch();
         },
       )
@@ -172,13 +176,13 @@ export function NotificationsBell() {
     return () => {
       supabase.removeChannel(ch);
     };
-  }, [userId, refetch, qc]);
+  }, [userId, refetch, invalidateNotifications]);
 
   // Fallback: refresh når fanen får fokus igjen
   useEffect(() => {
     if (!user) return;
     const onFocus = () => {
-      qc.invalidateQueries({ queryKey: ["notifications"] });
+      invalidateNotifications();
     };
     const onVisibility = () => {
       if (document.visibilityState === "visible") onFocus();
@@ -189,7 +193,7 @@ export function NotificationsBell() {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [user, qc]);
+  }, [user, invalidateNotifications]);
 
   const native = useIsNative();
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -205,7 +209,7 @@ export function NotificationsBell() {
       markAllPriceDropsRead(),
       markAllWtbMatchNotificationsRead(),
     ]);
-    qc.invalidateQueries({ queryKey: ["notifications"] });
+    invalidateNotifications();
   };
 
   const handleClick = async (n: Item) => {
@@ -213,23 +217,28 @@ export function NotificationsBell() {
     if (n.kind === "search") await markNotificationRead(n.id);
     else if (n.kind === "price_drop") await markPriceDropRead(n.id);
     else await markWtbMatchNotificationRead(n.id);
-    qc.invalidateQueries({ queryKey: ["notifications"] });
+    invalidateNotifications();
   };
 
   const handleDelete = async (n: Item) => {
     if (n.kind === "search") await deleteNotification(n.id);
     else if (n.kind === "price_drop") await deletePriceDrop(n.id);
     else await deleteWtbMatchNotification(n.id);
-    qc.invalidateQueries({ queryKey: ["notifications"] });
+    invalidateNotifications();
   };
 
   const bellTrigger = (
-    <Button variant="ghost" size="icon" aria-label="Varsler" className="relative">
+    <Button
+      variant="ghost"
+      size="icon"
+      aria-label={unread > 0 ? `Varsler, ${unread} uleste` : "Varsler"}
+      className="relative"
+    >
       <Bell className="size-5" />
       {unread > 0 && (
         <span
-          className="pointer-events-none absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-accent-foreground"
-          aria-label={`${unread} uleste varsler`}
+          className="pointer-events-none absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-2xs font-semibold text-brand-foreground"
+          aria-hidden="true"
         >
           {unread > 9 ? "9+" : unread}
         </span>
@@ -280,15 +289,18 @@ export function NotificationsBell() {
                 >
                   <div className="flex items-start gap-2">
                     {!n.read_at && (
-                      <span className="mt-1.5 size-2 shrink-0 rounded-full bg-accent" />
+                      <span
+                        className="mt-1.5 size-2 shrink-0 rounded-full bg-brand"
+                        aria-label="Ulest"
+                      />
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="line-clamp-1 text-sm font-medium">
                         {n.kind === "price_drop" && (
-                          <TrendingDown className="mr-1 inline size-3.5 text-accent" />
+                          <TrendingDown className="mr-1 inline size-3.5 text-brand" />
                         )}
                         {n.kind === "wtb_match" && (
-                          <ShoppingBag className="mr-1 inline size-3.5 text-accent" />
+                          <ShoppingBag className="mr-1 inline size-3.5 text-brand" />
                         )}
                         {n.listing_title ??
                           (n.kind === "price_drop" ? "Favoritten din" : "Ny annonse")}

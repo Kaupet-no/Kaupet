@@ -1,13 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
-import { ChevronDown, Info } from "lucide-react";
 import { useState } from "react";
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -15,11 +8,11 @@ import { prefetchCategorySuggestion } from "@/lib/category-suggestion.functions"
 
 type Intent = "sell" | "buy" | "free";
 
-const INTENT_LABELS: Record<Intent, string> = {
-  sell: "selge",
-  buy: "kjøpe",
-  free: "gi bort",
-};
+const INTENT_OPTIONS: { value: Intent; label: string }[] = [
+  { value: "sell", label: "Selge" },
+  { value: "buy", label: "Ønskes kjøpt" },
+  { value: "free", label: "Gi bort" },
+];
 
 /** Matches wtbSchema's title min (3) for "kjøpe", listingSchema's (5) for
  * "selge"/"gi bort" — a title shorter than this never triggers the
@@ -61,43 +54,37 @@ export function IntentTitleLanding({
 
   return (
     <form
-      className="flex flex-col items-center gap-6 pt-2"
+      className="flex flex-col items-stretch gap-6 pt-2"
       onSubmit={(e) => {
         e.preventDefault();
         submit();
       }}
     >
-      <div className="flex flex-wrap items-center justify-center gap-2 text-center text-xl font-semibold">
-        <span>Jeg ønsker å</span>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+      <div className="w-full space-y-2">
+        <Label id="intent-label" className="block text-center text-sm font-medium">
+          Jeg ønsker å
+        </Label>
+        <div role="radiogroup" aria-labelledby="intent-label" className="flex flex-col gap-2">
+          {INTENT_OPTIONS.map((opt) => (
             <button
+              key={opt.value}
               type="button"
-              className="inline-flex items-center gap-1 text-primary underline decoration-dotted underline-offset-4 hover:decoration-solid"
+              role="radio"
+              aria-checked={intent === opt.value}
+              onClick={() => {
+                setIntent(opt.value);
+                setError(null);
+              }}
+              className={`native-touch-target flex min-h-14 w-full items-center justify-center rounded-xl border px-4 text-center text-base font-medium transition-colors ${
+                intent === opt.value
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-card text-foreground hover:border-primary/40"
+              }`}
             >
-              {INTENT_LABELS[intent]}
-              <ChevronDown className="size-4" />
+              {opt.label}
             </button>
-          </DropdownMenuTrigger>
-          {/* z-[10000] Dialog/Sheet-innhold (se ui/dialog.tsx, ui/sheet.tsx) er
-          høyere enn DropdownMenuContents standard z-50 — uten override åpner
-          menyen usynlig bak modalen når landingsbildet vises i
-          ResponsiveOverlay. */}
-          <DropdownMenuContent align="center" className="z-[10001]">
-            {(Object.keys(INTENT_LABELS) as Intent[]).map((key) => (
-              <DropdownMenuItem
-                key={key}
-                onSelect={() => {
-                  setIntent(key);
-                  setError(null);
-                }}
-              >
-                {INTENT_LABELS[key]}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <span>:</span>
+          ))}
+        </div>
       </div>
       <div className="w-full space-y-1.5">
         <Label htmlFor="listing-title" className="block text-left text-sm font-medium">
@@ -116,17 +103,6 @@ export function IntentTitleLanding({
           aria-invalid={!!error}
         />
         {error && <p className="text-center text-xs text-destructive">{error}</p>}
-        <div className="flex items-center justify-center gap-1 text-center text-xs text-muted-foreground">
-          <span>Dette blir tittelen på annonsen din</span>
-          <button
-            type="button"
-            className="native-touch-target inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            aria-label="Informasjon om automatisk tittel"
-            title="For Bil, MC og Båt genereres tittelen automatisk"
-          >
-            <Info className="size-4" aria-hidden="true" />
-          </button>
-        </div>
       </div>
       <Button type="submit" size="lg" className="w-full">
         Fortsett

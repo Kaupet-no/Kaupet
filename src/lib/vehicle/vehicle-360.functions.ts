@@ -257,30 +257,6 @@ export const completeVehicle360CaptureSession = createServerFn({ method: "POST" 
     return { ok: true as const };
   });
 
-export const getVehicle360FrameCount = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .validator((input: unknown) => z.object({ listingId: z.string().uuid() }).parse(input))
-  .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { userId } = context;
-
-    const { data: listing, error: listingError } = await supabaseAdmin
-      .from("listings")
-      .select("id")
-      .eq("id", data.listingId)
-      .eq("seller_id", userId)
-      .maybeSingle();
-    if (listingError) throw listingError;
-    if (!listing) throw new Error("Fant ikke annonseutkastet");
-
-    const { count, error } = await supabaseAdmin
-      .from("listing_360_frames")
-      .select("id", { count: "exact", head: true })
-      .eq("listing_id", data.listingId);
-    if (error) throw error;
-    return { count: count ?? 0 };
-  });
-
 export const getVehicle360Frames = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => z.object({ listingId: z.string().uuid() }).parse(input))

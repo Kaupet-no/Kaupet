@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 
-import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
   DialogContent,
@@ -17,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
 import { useAllCategoryFilters } from "@/components/attribute-fields";
+import { useCategories } from "@/hooks/use-categories";
 import { vehicleCategoryGroupFor, type CategoryNode } from "@/lib/category-filters";
 import { useVehicleLookupFlow } from "@/features/listing-creation/use-vehicle-lookup-flow";
 import { saveListingField } from "./save-listing-field";
@@ -48,18 +48,7 @@ export function VehiclePlateEditDialog({
   const [regNr, setRegNr] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const { data: categories } = useQuery({
-    queryKey: ["categories"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("categories")
-        .select("id, name_nb, slug, parent_id, icon, color")
-        .order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-    enabled: open,
-  });
+  const { data: categories } = useCategories();
   const { data: allFilters } = useAllCategoryFilters();
   const categoriesById = useMemo(() => {
     const m = new Map<string, CategoryNode & { name_nb: string; slug?: string }>();

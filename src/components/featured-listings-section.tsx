@@ -38,7 +38,7 @@ export function FeaturedListingsSection({ categorySlug, limit = 3, allowedIds }:
     <section className="mb-6">
       <div className="rounded-xl border border-border bg-surface p-4">
         <div className="mb-3 flex items-center gap-1.5">
-          <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Promoterte annonser
           </span>
         </div>

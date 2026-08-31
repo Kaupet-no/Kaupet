@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { usePushStatus } from "@/hooks/use-push-status";
-import { supabase } from "@/integrations/supabase/client";
+import { useCategories } from "@/hooks/use-categories";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,6 +66,7 @@ import {
   type SavedSearch,
   type SearchCriteria,
 } from "@/lib/saved-searches";
+import { encodeAttrFilters } from "@/features/listing-search/search-schema";
 import { formatErrorMessage } from "@/lib/errors";
 
 export const Route = createFileRoute("/_authenticated/mine-sok")({
@@ -95,18 +96,7 @@ function MineSokPage() {
     queryFn: listUnreadCountsBySearch,
   });
 
-  const { data: categories } = useQuery({
-    queryKey: ["categories"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("categories")
-        .select("id, slug, name_nb, parent_id")
-        .order("sort_order")
-        .order("name_nb");
-      if (error) throw error;
-      return data;
-    },
-  });
+  const { data: categories } = useCategories();
 
   const searches = data ?? [];
   const hasActiveNotify = searches.some((s) => s.notify);
@@ -192,7 +182,7 @@ function MineSokPage() {
         sort: c.sort ?? "new",
         lat: c.lat ?? undefined,
         lng: c.lng ?? undefined,
-        radius: c.radius ?? undefined,
+        attrs: encodeAttrFilters(c.attributes ?? {}),
         loc: c.loc,
       } as never,
     });
@@ -234,7 +224,7 @@ function MineSokPage() {
           ) : searches.length === 0 ? (
             <EmptyState
               title="Ingen lagrede søk ennå"
-              description="Gjør et søk på annonse-siden og lagre kriteriene dine."
+              description="Gå til annonser og lagre kriteriene dine."
               action={
                 <Link to="/annonser" search={{ q: "", category: "", sort: "new" } as never}>
                   <Button>
@@ -256,7 +246,7 @@ function MineSokPage() {
                           {unread > 0 && (
                             <Link
                               to="/varsler"
-                              className="inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-accent-foreground hover:opacity-90"
+                              className="inline-flex items-center gap-1 rounded-full bg-brand px-2 py-0.5 text-xs font-semibold text-brand-foreground hover:opacity-90"
                             >
                               {unread} {unread === 1 ? "nytt treff" : "nye treff"}
                             </Link>

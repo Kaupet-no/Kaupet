@@ -30,7 +30,6 @@ export type ValidateCtx = {
   images: WizardSharedProps["images"];
   attributes: WizardSharedProps["attributes"];
   boatFactsActive: boolean;
-  activeModules: WizardSharedProps["activeModules"];
   missingFilters: { key: string; label_nb: string }[];
   isFree: boolean;
   priceNok: WizardSharedProps["priceNok"];
@@ -160,10 +159,6 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
           field: firstMissingFilter.key,
           message: `Fyll inn ${firstMissingFilter.label_nb.toLowerCase()} før du går videre.`,
         };
-      }
-      for (const mod of ctx.activeModules) {
-        const error = mod.validateExtra?.(ctx.attributes);
-        if (error) return error;
       }
       return null;
     },
@@ -360,26 +355,3 @@ export const LOCKED_FIELD_GROUP_KEYS: string[] = [
   "description-keywords",
   "review-publish",
 ];
-
-/**
- * Groups whose position in the array is structurally fixed by
- * resolveWizardPages regardless of array order (review-publish/
- * delivery-location are always last) — no drag handle for these in the admin
- * UI, since dragging them would be visibly inconsequential. `category-select`
- * is also structurally fixed (always first) but isn't part of a category's
- * stored field_groups at all (see category-flows.ts), so it never appears in
- * this admin-facing list. `title-photos` used to be fixed-first too, but is
- * now freely reorderable so a category (e.g. Bil og MC) can put
- * `category-attributes` before it — needed so vehicle lookup fills
- * brand/model/year before the title step reads them.
- *
- * `vehicle-registration` IS a normal, admin-configurable field group (seeded
- * on the Bil og MC category's flow row) since an admin may legitimately want
- * to reorder it.
- *
- * `vehicle-price` is runtime-injected right before `review-publish` (see
- * `withRuntimeFieldGroups`) whenever the flow has
- * `vehicle-registration`, never part of a category's stored `field_groups`,
- * so it never appears in the admin-facing list either.
- */
-export const POSITION_FIXED_FIELD_GROUP_KEYS: string[] = ["review-publish", "delivery", "location"];

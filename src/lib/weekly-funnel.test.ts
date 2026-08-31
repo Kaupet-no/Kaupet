@@ -22,17 +22,11 @@ const FORBIDDEN_FIELDS = [
   "properties",
   "query",
   "registration_number",
-  "session_id",
   "user_id",
 ];
 
-function event(
-  session: string,
-  eventName: string,
-  extra: Partial<ProductEventRow> = {},
-): ProductEventRow {
+function event(eventName: string, extra: Partial<ProductEventRow> = {}): ProductEventRow {
   return {
-    session_id: session,
     event_name: eventName,
     platform: "web",
     created_at: CREATED_AT,
@@ -41,37 +35,36 @@ function event(
   };
 }
 
-function completeJourney(index: number): ProductEventRow[] {
-  const session = `raw-session-${index}`;
-  const step = index % 2 === 0 ? "title-photos" : "photos";
+/** One full sell journey, from search through publish. `stepAlias` lets a
+ * test drive both the legacy and current step key through the same shape,
+ * since both must normalize to "photos" (see LEGACY_STEP_ALIASES). */
+function completeJourney(stepAlias: "title-photos" | "photos" = "photos"): ProductEventRow[] {
   return [
-    event(session, "search_opened"),
-    event(session, "search_submitted"),
-    event(session, "search_zero_results"),
-    event(session, "listing_opened"),
-    event(session, "contact_started"),
-    event(session, "listing_creation_started", { kind: "sell" }),
-    event(session, "listing_creation_step_completed", {
-      action: "viewed",
-      kind: "sell",
-      step,
-    }),
-    event(session, "listing_creation_step_completed", {
+    event("search_opened"),
+    event("search_submitted"),
+    event("search_zero_results"),
+    event("listing_opened"),
+    event("contact_started"),
+    event("listing_creation_started", { kind: "sell" }),
+    event("listing_creation_step_completed", { action: "viewed", kind: "sell", step: stepAlias }),
+    event("listing_creation_step_completed", {
       action: "completed",
       kind: "sell",
-      step,
+      step: stepAlias,
     }),
-    event(session, "listing_published", { kind: "sell" }),
+    event("listing_published", { kind: "sell" }),
   ];
 }
 
 function completeRows(count = SMALL_CELL_THRESHOLD): ProductEventRow[] {
-  return Array.from({ length: count }, (_, index) => completeJourney(index)).flat();
+  return Array.from({ length: count }, (_, index) =>
+    completeJourney(index % 2 === 0 ? "title-photos" : "photos"),
+  ).flat();
 }
 
 function expectedCompleteReport() {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     environment: "local",
     window: { from: "2026-08-17", to: "2026-08-24", timezone: "UTC" },
     privacy: {
@@ -82,11 +75,20 @@ function expectedCompleteReport() {
       search: [
         {
           platform: "web",
+          pageViewed: 0,
           opened: 5,
           submitted: 5,
           submissionRate: 1,
+          filterOpened: 0,
+          filterApplied: 0,
+          filterCancelled: 0,
+          suggestions: 0,
           zeroResults: 5,
           zeroResultRate: 1,
+          zeroResultRecovery: 0,
+          mapOpened: 0,
+          saved: 0,
+          resultOpened: 0,
           listingOpened: 5,
           listingOpenRate: 1,
           contactStarted: 5,
@@ -112,9 +114,42 @@ function expectedCompleteReport() {
         },
       ],
     },
-    limitations: ["environment_marker_missing", "journey_id_missing"],
+    limitations: [
+      "environment_marker_missing",
+      "journey_id_missing",
+      "session_correlation_removed",
+    ],
   };
 }
+
+it("summerer nye søkehandlingssignaler som uavhengige hendelser", () => {
+  const rows = [
+    ...completeRows(),
+    ...Array.from({ length: SMALL_CELL_THRESHOLD }, () => [
+      event("search_page_viewed"),
+      event("search_filter_opened"),
+      event("search_filter_applied"),
+      event("search_filter_cancelled"),
+      event("search_suggestion_selected"),
+      event("search_zero_results_recovered"),
+      event("search_map_opened"),
+      event("search_saved"),
+      event("search_result_opened"),
+    ]).flat(),
+  ];
+
+  expect(aggregateWeeklyFunnel(rows, OPTIONS).funnels.search[0]).toMatchObject({
+    pageViewed: 5,
+    filterOpened: 5,
+    filterApplied: 5,
+    filterCancelled: 5,
+    suggestions: 5,
+    zeroResultRecovery: 5,
+    mapOpened: 5,
+    saved: 5,
+    resultOpened: 5,
+  });
+});
 
 describe("weekly funnel aggregation", () => {
   it("aggregates a normal journey and merges controlled old/new step keys", () => {
@@ -123,7 +158,7 @@ describe("weekly funnel aggregation", () => {
 
   it("returns a deterministic empty report for an empty window", () => {
     expect(aggregateWeeklyFunnel([], OPTIONS)).toEqual({
-      schemaVersion: 1,
+      schemaVersion: 2,
       environment: "local",
       window: { from: "2026-08-17", to: "2026-08-24", timezone: "UTC" },
       privacy: {
@@ -131,13 +166,19 @@ describe("weekly funnel aggregation", () => {
         suppressedGroups: { search: 0, composer: 0, composerSteps: 0 },
       },
       funnels: { search: [], composer: [] },
-      limitations: ["environment_marker_missing", "journey_id_missing"],
+      limitations: [
+        "environment_marker_missing",
+        "journey_id_missing",
+        "session_correlation_removed",
+      ],
     });
   });
 
-  it("collapses duplicate fire-and-forget events", () => {
+  it("counts duplicate fire-and-forget rows independently (no session to dedupe against)", () => {
     const rows = completeRows();
-    expect(aggregateWeeklyFunnel([...rows, ...rows], OPTIONS)).toEqual(expectedCompleteReport());
+    const doubled = aggregateWeeklyFunnel([...rows, ...rows], OPTIONS);
+    expect(doubled.funnels.search[0]).toMatchObject({ opened: 10, submitted: 10, zeroResults: 10 });
+    expect(doubled.funnels.composer[0]).toMatchObject({ started: 10, published: 10 });
   });
 
   it("does not depend on fire-and-forget receive order", () => {
@@ -146,47 +187,42 @@ describe("weekly funnel aggregation", () => {
     );
   });
 
-  it("does not promote incomplete journeys", () => {
-    const incomplete = [
-      event("incomplete-search", "search_opened"),
-      event("orphan-search", "listing_opened"),
-      event("orphan-search", "contact_started"),
-      event("orphan-composer", "listing_creation_step_completed", {
+  it("counts every event on its own, without gating on an in-progress journey", () => {
+    const extra = [
+      event("search_opened"),
+      event("listing_opened"),
+      event("contact_started"),
+      event("listing_creation_step_completed", {
         action: "completed",
         kind: "sell",
         step: "photos",
       }),
-      event("orphan-composer", "listing_published", { kind: "sell" }),
-      event("unknown-step", "listing_creation_started", { kind: "sell" }),
-      event("unknown-step", "listing_creation_step_completed", {
+      event("listing_published", { kind: "sell" }),
+      event("listing_creation_started", { kind: "sell" }),
+      event("listing_creation_step_completed", {
         action: "viewed",
         kind: "sell",
         step: "uncontrolled free text",
       }),
     ];
 
-    const report = aggregateWeeklyFunnel([...completeRows(), ...incomplete], OPTIONS);
-    expect(report.funnels.search[0]).toEqual({
-      ...expectedCompleteReport().funnels.search[0],
+    const report = aggregateWeeklyFunnel([...completeRows(), ...extra], OPTIONS);
+    expect(report.funnels.search[0]).toMatchObject({
       opened: 6,
-      submissionRate: 0.8333,
+      submitted: 5,
+      listingOpened: 6,
+      contactStarted: 6,
     });
-    expect(report.funnels.composer[0]).toEqual({
-      ...expectedCompleteReport().funnels.composer[0],
-      started: 6,
-      publishRate: 0.8333,
-      steps: [
-        {
-          ...expectedCompleteReport().funnels.composer[0].steps[0],
-          viewRate: 0.8333,
-        },
-      ],
-    });
+    expect(report.funnels.composer[0]).toMatchObject({ started: 6, published: 6 });
+    // The unlisted "uncontrolled free text" step never surfaces as its own row.
+    expect(report.funnels.composer[0].steps).toEqual([
+      { step: "photos", viewed: 5, viewRate: 0.8333, completed: 6, completionRate: 1.2 },
+    ]);
   });
 
   it("suppresses groups containing positive cells below the threshold", () => {
     expect(aggregateWeeklyFunnel(completeRows(SMALL_CELL_THRESHOLD - 1), OPTIONS)).toEqual({
-      schemaVersion: 1,
+      schemaVersion: 2,
       environment: "local",
       window: { from: "2026-08-17", to: "2026-08-24", timezone: "UTC" },
       privacy: {
@@ -194,34 +230,31 @@ describe("weekly funnel aggregation", () => {
         suppressedGroups: { search: 1, composer: 1, composerSteps: 0 },
       },
       funnels: { search: [], composer: [] },
-      limitations: ["environment_marker_missing", "journey_id_missing"],
+      limitations: [
+        "environment_marker_missing",
+        "journey_id_missing",
+        "session_correlation_removed",
+      ],
     });
 
-    const stepSmall = completeRows().filter(
-      (row) =>
-        !(
-          row.session_id === "raw-session-4" && row.event_name === "listing_creation_step_completed"
-        ),
-    );
+    // Composer started/published stay at the full threshold; only the step
+    // pair for one journey is missing, so just that step group is suppressed.
+    const stepSmall = [
+      ...completeRows(SMALL_CELL_THRESHOLD - 1),
+      ...completeJourney().filter((row) => row.event_name !== "listing_creation_step_completed"),
+    ];
     const report = aggregateWeeklyFunnel(stepSmall, OPTIONS);
-    expect(report.privacy.suppressedGroups).toEqual({
-      search: 0,
-      composer: 0,
-      composerSteps: 1,
-    });
+    expect(report.privacy.suppressedGroups).toEqual({ search: 0, composer: 0, composerSteps: 1 });
     expect(report.funnels.search).toEqual(expectedCompleteReport().funnels.search);
     expect(report.funnels.composer).toEqual([
       { ...expectedCompleteReport().funnels.composer[0], steps: [] },
     ]);
   });
 
-  it("never includes forbidden properties, raw sessions, or event timestamps in output", () => {
+  it("never includes forbidden properties or raw event timestamps in output", () => {
     const output = JSON.stringify(aggregateWeeklyFunnel(completeRows(), OPTIONS));
     for (const forbidden of [...FORBIDDEN_FIELDS, ...Object.values(FORBIDDEN), CREATED_AT]) {
       expect(output).not.toContain(forbidden);
-    }
-    for (let index = 0; index < SMALL_CELL_THRESHOLD; index += 1) {
-      expect(output).not.toContain(`raw-session-${index}`);
     }
   });
 });

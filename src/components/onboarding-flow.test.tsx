@@ -12,7 +12,6 @@ const mocks = vi.hoisted(() => ({
   searches: [] as { notify: boolean }[],
   permission: "default" as NotificationPermission,
   enableOnThisDevice: vi.fn().mockResolvedValue(undefined),
-  requestLocationPermission: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -32,9 +31,6 @@ vi.mock("@/hooks/use-push-status", () => ({
     enableOnThisDevice: mocks.enableOnThisDevice,
   }),
 }));
-vi.mock("@/lib/native", () => ({
-  requestLocationPermission: mocks.requestLocationPermission,
-}));
 vi.mock("@/lib/haptics", () => ({ hapticImpact: vi.fn() }));
 vi.mock("@/lib/native-offline", () => ({ setBackOverride: vi.fn() }));
 vi.mock("@/lib/product-analytics", () => ({ trackProductEvent: vi.fn() }));
@@ -49,10 +45,13 @@ beforeEach(() => {
   mocks.searches = [];
   mocks.permission = "default";
   mocks.enableOnThisDevice.mockClear();
-  mocks.requestLocationPermission.mockClear();
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
-    value: vi.fn().mockReturnValue({ matches: true }),
+    value: vi.fn().mockReturnValue({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }),
   });
   Object.defineProperty(HTMLElement.prototype, "scrollTo", {
     configurable: true,
@@ -69,11 +68,9 @@ describe("OnboardingFlow", () => {
     expect(screen.getByRole("button", { name: "Utforsk Kaupet" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Logg inn og hent lagrede søk" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Ja, varsle meg" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Del lokasjonsdata" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Utforsk Kaupet" }));
     expect(mocks.enableOnThisDevice).not.toHaveBeenCalled();
-    expect(mocks.requestLocationPermission).not.toHaveBeenCalled();
   });
 
   it("utsetter push når innlogget bruker ikke har varslende lagrede søk", () => {
@@ -144,7 +141,10 @@ describe("OnboardingFlow", () => {
     expect(screen.getByRole("button", { name: "Ja, varsle meg" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Kom i gang" })).toBeNull();
     expect(
-      screen.getByText("Velkommen!").closest("[aria-hidden='true']")?.hasAttribute("inert"),
+      screen
+        .getByText("Finn, kjøp og selg brukt")
+        .closest("[aria-hidden='true']")
+        ?.hasAttribute("inert"),
     ).toBe(true);
   });
 });

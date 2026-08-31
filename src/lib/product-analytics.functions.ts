@@ -1,71 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
-import { z } from "zod";
-
-export const productEventNames = [
-  "auth_started",
-  "auth_completed",
-  "search_opened",
-  "search_submitted",
-  "search_zero_results",
-  "listing_opened",
-  "contact_started",
-  "favorite_toggled",
-  "listing_creation_started",
-  "listing_creation_step_completed",
-  "listing_published",
-  "onboarding_completed",
-] as const;
-export const listingCreationActionKeys = [
-  "viewed",
-  "back",
-  "completed",
-  "validation_failed",
-  "validation_prompt",
-  "draft_restored",
-  "draft_started",
-  "review_fix",
-  "publish_started",
-  "publish_failed",
-] as const;
-
-export type ListingCreationAction = (typeof listingCreationActionKeys)[number];
-
-export const listingCreationReasonKeys = [
-  "form",
-  "image",
-  "price",
-  "required_attributes",
-  "publish_form",
-  "new",
-  "existing",
-  "category",
-  "content",
-  "details",
-  "location",
-] as const;
-
-export type ListingCreationReason = (typeof listingCreationReasonKeys)[number];
-export const listingPublishedActionKeys = ["success"] as const;
-
-export type ListingPublishedAction = (typeof listingPublishedActionKeys)[number];
-
-const propertyValueSchema = z.union([
-  z.string().max(80),
-  z.number().finite(),
-  z.boolean(),
-  z.null(),
-]);
-
-const productEventSchema = z.object({
-  sessionId: z.string().uuid(),
-  eventName: z.enum(productEventNames),
-  platform: z.enum(["web", "ios", "android"]),
-  path: z.string().startsWith("/").max(160),
-  properties: z.record(z.string().max(40), propertyValueSchema).default({}),
-});
-
-export type ProductEventName = (typeof productEventNames)[number];
-export type ProductEventProperties = Record<string, string | number | boolean | null>;
+import { productEventSchema } from "./product-analytics-schema";
+export { productEventNames } from "./product-analytics-schema";
+export type { ProductEventName, ProductEventProperties } from "./product-analytics-schema";
 
 /** Records a deliberately small, non-identifying product event. Telemetry is
  * best effort at the call site and must never block a user action. */
@@ -78,7 +14,6 @@ export const logProductEvent = createServerFn({ method: "POST" })
     ]);
     const { error } = await supabaseAdmin.rpc("log_product_event_rate_limited", {
       _key_hash: await hashRequestIp(),
-      _session_id: data.sessionId,
       _event_name: data.eventName,
       _platform: data.platform,
       _path: data.path,

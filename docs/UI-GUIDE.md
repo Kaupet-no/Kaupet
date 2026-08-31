@@ -163,18 +163,19 @@ Tre varianter: `default`, `destructive`, og `warning` (amber, for advarsler som 
 - **Orientering:** telefon er låst til portrett ved oppstart, nettbrett roterer fritt (`src/lib/orientation.ts`). Trenger en flate landskap, kall `unlockOrientation()` ved mount og `lockPortraitOnPhone()` ved unmount — se `image-lightbox.tsx`, som er eneste unntak i dag. Ikke fjern landskap fra `Info.plist`: låsen styres i kjøretid, og plisten er det som gjør unntaket mulig i det hele tatt.
 - **Native-only CSS:** `setupNative()` setter klassen `.native` på `<html>`. Bruk den som gate for regler som kun skal gjelde i appen (tap-highlight, `user-select`, `overscroll-behavior` — se `styles.css`). Native scroll skal beholde WebView-ens plattformfeedback (iOS-bounce og Android edge-stretch/glow); bruk `overscroll-behavior: contain` på en konkret overlay-scrollregion når scroll ikke skal lekke til flaten bak. Merk at `user-select: none` bevisst er begrenset til interaktive elementer: brødtekst, annonsebeskrivelser og meldinger skal fortsatt kunne kopieres.
 - **Bunn-sheets kan dras ned for å lukkes** (`vaul` i `ui/sheet.tsx`, kun `side="bottom"`). Håndtaket rendres automatisk — ikke legg til ditt eget. Lange paneler bruker `expandable` (og eventuelt `initialSnapPoint`) på `SheetContent`/`NativeSheet`: første oppoverscroll utvider panelet til full høyde før innholdet ruller, mens nedoverdrag ved listetoppen bruker Vauls motstand, snap-back og lukkegrense. Merk sliders og andre kontroller som tar sin egen gest med `data-vaul-no-drag`.
-- **Søk på native går gjennom ett panel.** `SearchPanel` (`src/features/listing-search/search-panel/`) er den eneste native søkeflaten: et dratt `vaul`-panel med to detents (60 % / fullskjerm). Uten `results`-propen er det en søkelansering (fritekst, historikk, kategorier); med den redigerer det filtrene til resultatflaten det står over. Resultatflatene viser `SearchSummaryPill` i stedet for søkelinje + chip-rad. Ikke legg til en tredje native søkeflate ved siden av — utvid panelet. `NativeAdvancedSearch` er etter dette **kun** redigering av et lagret søk (`mine-sok.tsx`); begge rendrer de samme `SearchFilterSections`.
-- `vaul` brukes av alle bunn-sheets gjennom `SheetContent`; den ytre Radix-roten beholdes for felles dialogkontekst og API. `SearchPanel` har fortsatt sin egen `Drawer.Root` fordi det alltid har søkespesifikke detents (60 % / fullskjerm), men bruker samme scroll-overlevering som `SheetContent`.
+- **Søk på native går gjennom ett panel.** `SearchPanel` (`src/features/listing-search/search-panel/`) er den eneste native søkeflaten. Hjem og bunnavigasjon åpner panelets `query`-modus uten å navigere først. På telefon er panelet en dratt `vaul`-skuff med 60 %/fullskjerm-detents; på nettbrett er det en `ResponsiveOverlay`/dialog. Uten `results` er det en søkelansering med fritekst, historikk, forslag, lokasjon og kategorier. Med `results` redigerer det et lokalt filterutkast over resultatflaten. Resultatflatene viser `SearchSummaryPill` med separate query- og filterhandlinger. Ikke legg til en tredje native søkeflate ved siden av — utvid panelet. `NativeAdvancedSearch` er kun redigering av lagrede søk (`mine-sok.tsx`); begge rendrer de samme `SearchFilterSections`.
+- Query-submit skjer kun ved Enter/keyboard Search, en eksplisitt søkerad eller en tydelig primærknapp — aldri ved blur. Kategori-, attributt- og annonseforslag endrer utkastet; URL og resultater endres først ved eksplisitt anvendelse, bortsett fra en direkte launch-handling som navigerer til resultatlisten. Tolkede kriterier skal vises gjennom `SearchInterpretation` og kunne fjernes.
+- `vaul` brukes av alle bunn-sheets gjennom `SheetContent`; den ytre Radix-roten beholdes for felles dialogkontekst og API. `SearchPanel` bruker `Drawer.Root` kun på telefon fordi det har søkespesifikke detents. På nettbrett skal filterpanelet bruke dialogpresentasjonen og resultatflaten kan bruke delt treff-/kartlayout.
 - **Haptikk:** kall bare wrapperne i `src/lib/haptics.ts`, aldri Capacitor-pluginen direkte. Wrapperne normaliserer impact, selection og notification til én lett touch slik at handlinger ikke gir lange vibrasjonsmønstre på Android.
 - **Tekststørrelse:** `src/lib/text-scale.ts` speiler iOS' Dynamic Type inn i `html { font-size }`. Bruk `rem` (Tailwinds standard) for all typografi — `px`-satt tekst skalerer ikke med brukerens innstilling. Android trenger ingenting; WebView-en skalerer allerede selv.
 - Unngå `Tooltip` og andre hover-avhengige mønstre i flater som vises i native-appen.
 
 ## Native søk og filtre
 
-Native søk og filtrering bruker én `SearchPanel`-flyt. Første nivå er alltid
-en oversikt over valgt tilstand; en detaljkontroll åpnes på egen flate. Ikke
-legg søketreff, flere dropdown-lister, checkboksmatriser eller flere slidere i
-oversikten samtidig.
+Native søk og filtrering bruker én `SearchPanel`-flyt. Queryfeltet er første nivå
+for fritekstsøk; filterikonet åpner en oversikt over valgt tilstand. En
+detaljkontroll åpnes på egen flate. Ikke legg søketreff, flere dropdown-lister,
+checkboksmatriser eller flere slidere i oversikten samtidig.
 
 ### Tetthet, rader og handlinger
 

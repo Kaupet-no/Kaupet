@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { searchSchema } from "@/features/listing-search/search-schema";
-import { buildListingsSearchRpcArgs } from "@/features/listing-search/listing-search-query";
+import {
+  buildListingsPriceMaxRpcArgs,
+  buildListingsSearchRpcArgs,
+} from "@/features/listing-search/listing-search-query";
 
 describe("buildListingsSearchRpcArgs", () => {
   it("builds the same complete RPC filter set for list and count requests", () => {
@@ -56,6 +59,29 @@ describe("buildListingsSearchRpcArgs", () => {
     });
     expect(args?._attribute_filters).toEqual({
       body_type: { kind: "multiselect", values: ["suv", "kombi"] },
+    });
+  });
+
+  it("fjerner valgt maksimum når den tilgjengelige høyeste prisen beregnes", () => {
+    const search = searchSchema.parse({
+      categories: ["bil"],
+      min: 100,
+      max: 500,
+      includeFree: false,
+    });
+    const args = buildListingsPriceMaxRpcArgs({
+      search,
+      categories: [{ id: "car", slug: "bil", parent_id: "root" }],
+      effectiveCategories: ["bil"],
+      terms: [],
+    });
+
+    expect(args).toMatchObject({
+      _min_price: 100,
+      _max_price: null,
+      _sort: "price_desc",
+      _limit: 1,
+      _offset: 0,
     });
   });
 

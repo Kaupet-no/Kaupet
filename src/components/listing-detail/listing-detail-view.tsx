@@ -1,9 +1,10 @@
 import { Fragment, lazy, Suspense, useCallback, useState, type ReactNode } from "react";
 import { ClientOnly, Link } from "@tanstack/react-router";
-import { Loader2, MapPin, Maximize2 } from "lucide-react";
+import { ChevronLeft, Loader2, MapPin, Maximize2 } from "lucide-react";
 
 import { useIsNative } from "@/hooks/use-is-native";
 import { NativePageHeader } from "@/components/native-page-header";
+import { readLastSearchContext } from "@/lib/last-search-context";
 import { ImageGallery } from "@/components/listing-detail/image-gallery";
 import { type Vehicle360Frame } from "@/components/listing-detail/vehicle/vehicle-360-viewer";
 import { VehicleEquipmentList } from "@/components/listing-detail/vehicle/vehicle-equipment-list";
@@ -93,6 +94,26 @@ function LightboxLoadingFallback() {
   );
 }
 
+/** Link back to the last /annonser search this session, read from
+ * sessionStorage (see last-search-context.ts) — rendered inside
+ * `ClientOnly` since sessionStorage isn't available during SSR. Renders
+ * nothing when the visitor didn't arrive from a search this session
+ * (fresh tab, shared link, notification, ...). */
+function BackToSearchLink() {
+  const ctx = readLastSearchContext();
+  if (!ctx) return null;
+  return (
+    <Link
+      to="/annonser"
+      search={ctx.search}
+      className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+    >
+      <ChevronLeft className="size-4" aria-hidden />
+      Tilbake til {ctx.label}
+    </Link>
+  );
+}
+
 export type ListingDetailViewCategory = { name_nb: string; slug: string | null } | null;
 
 /** A single crumb in the ancestor chain from a root category down to the
@@ -140,9 +161,10 @@ export type ListingDetailViewProps = {
   images: { storage_path: string; sort_order: number; caption?: string | null }[];
   imgUrls: Record<string, string>;
   attributes: Record<string, unknown>;
-  /** Delivery method — not shown to buyers today, only used as an inline-
-   * editable field for the owner (edit mode). */
-  canShip?: boolean | null;
+  /** Whether this category uses delivery choices. False for Bil/MC and Båt. */
+  requiresDeliveryMethod: boolean;
+  /** Persisted delivery capability for categories that use delivery choices. */
+  canShip: boolean | null;
   /** Enables owner inline-editing: wraps the view in `ListingEditContext` and
    * turns editable regions into dashed-border/click-to-edit affordances.
    * Omitted (buyer view / no `editMode` prop) renders byte-for-byte
@@ -164,6 +186,11 @@ export type ListingDetailViewProps = {
   stickyContactSlot?: ReactNode;
   /** Sticky banner shown instead of the above when this is a pre-publish preview. */
   previewBanner?: ReactNode;
+  /** Shows a "Tilbake til {label}" link above the breadcrumb, reading the
+   * last saved /annonser search context for this session (see
+   * last-search-context.ts). Only set by the real listing detail route —
+   * omitted by the pre-publish preview, which isn't reached from a search. */
+  enableBackToSearch?: boolean;
   /** Extra nodes rendered at the end of the view — used by `$kaupetCode.tsx`
    * for the owner-only vehicle-plate/category edit modals, which need
    * `ListingDetailView`'s children slot rather than a named prop since they
@@ -194,6 +221,7 @@ export function ListingDetailView({
   images,
   imgUrls,
   attributes,
+  requiresDeliveryMethod,
   canShip,
   vehicle360Frames,
   vehicle360ImgUrls,
@@ -202,6 +230,7 @@ export function ListingDetailView({
   sellerContactSlot,
   stickyContactSlot,
   previewBanner,
+  enableBackToSearch,
   editMode,
   children,
 }: ListingDetailViewProps) {
@@ -214,7 +243,12 @@ export function ListingDetailView({
 
   const sortedImages = images.slice().sort((a, b) => a.sort_order - b.sort_order);
   const has360 = !!vehicle360Frames && vehicle360Frames.length > 0;
-  const showStickyContact = !isNative && !!stickyContactSlot;
+  // Persistent kontakthandling er kjøperreisens primære konvertering — skal
+  // ikke avhenge av at brukeren scroller forbi bilder/spesifikasjoner for å
+  // finne selgerkortet. Vist på både native og mobilweb (samme fysiske
+  // formfaktor); desktop web har allerede kontaktpanelet synlig i
+  // sidekolonnen uten scroll, se md:hidden på selve baren under.
+  const showStickyContact = !!stickyContactSlot;
 
   const priceLabel = isFree
     ? "Gis bort"
@@ -352,6 +386,7 @@ export function ListingDetailView({
       imgUrls={imgUrls}
       attributes={attributes}
       canShip={canShip ?? null}
+      requiresDeliveryMethod={requiresDeliveryMethod}
       vehicle360Frames={vehicle360Frames}
       vehicle360ImgUrls={vehicle360ImgUrls}
       actionsMenuSlot={actionsMenuSlot}
@@ -359,6 +394,7 @@ export function ListingDetailView({
       sellerContactSlot={sellerContactSlot}
       stickyContactSlot={stickyContactSlot}
       previewBanner={previewBanner}
+      enableBackToSearch={enableBackToSearch}
       activeImage={activeImage}
       setActiveImage={setActiveImage}
       lightboxIndex={lightboxIndex}
@@ -423,6 +459,7 @@ function ListingDetailViewBody({
   breadcrumb,
   imgUrls,
   attributes,
+  requiresDeliveryMethod,
   canShip,
   vehicle360Frames,
   vehicle360ImgUrls,
@@ -431,6 +468,7 @@ function ListingDetailViewBody({
   sellerContactSlot,
   stickyContactSlot,
   previewBanner,
+  enableBackToSearch,
   activeImage,
   setActiveImage,
   lightboxIndex,
@@ -474,6 +512,7 @@ function ListingDetailViewBody({
   breadcrumb?: ListingDetailBreadcrumbItem[];
   imgUrls: Record<string, string>;
   attributes: Record<string, unknown>;
+  requiresDeliveryMethod: boolean;
   canShip: boolean | null;
   vehicle360Frames?: Vehicle360Frame[];
   vehicle360ImgUrls?: Record<string, string>;
@@ -482,6 +521,7 @@ function ListingDetailViewBody({
   sellerContactSlot?: ReactNode;
   stickyContactSlot?: ReactNode;
   previewBanner?: ReactNode;
+  enableBackToSearch?: boolean;
   activeImage: number;
   setActiveImage: (i: number) => void;
   lightboxIndex: number | null;
@@ -527,6 +567,11 @@ function ListingDetailViewBody({
           headeren — headertittelen toner inn først når den er scrollet vekk. */}
       <NativePageHeader title={title} titleFadesIn />
       {previewBanner}
+      {enableBackToSearch && (
+        <ClientOnly>
+          <BackToSearchLink />
+        </ClientOnly>
+      )}
 
       <header className="mt-4">
         <div className="flex items-start justify-between gap-2">
@@ -576,17 +621,18 @@ function ListingDetailViewBody({
                     </Link>
                   )
                 );
-              if (!editCtx?.editMode) return crumb;
-              return (
-                <span
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => editCtx.openCategoryModal()}
-                  className="inline-block cursor-pointer rounded-md border border-dashed border-border/60 transition-colors hover:border-primary/50 hover:bg-primary/5"
-                >
-                  {crumb}
-                </span>
-              );
+              if (editCtx?.editMode) {
+                return (
+                  <button
+                    type="button"
+                    onClick={() => editCtx.openCategoryModal()}
+                    className="rounded-md border border-dashed border-border/60 px-2 py-1 text-left text-xs uppercase tracking-wide transition-colors hover:border-primary/50 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {breadcrumb?.map((c) => c.name_nb).join(" › ") ?? category?.name_nb}
+                  </button>
+                );
+              }
+              return crumb;
             })()}
             <div className="mt-1 flex items-center justify-between gap-3">
               {isVehicleListing ? (
@@ -1002,6 +1048,18 @@ function ListingDetailViewBody({
                   <dt className="text-muted-foreground">{label}</dt>
                   <dd className="font-medium">{dateStr}</dd>
                 </div>
+                {requiresDeliveryMethod && !editCtx?.editMode && (
+                  <div>
+                    <dt className="text-muted-foreground">Levering</dt>
+                    <dd className="font-medium">
+                      {canShip === true
+                        ? "Kan sendes"
+                        : canShip === false
+                          ? "Kun henting"
+                          : "Ikke oppgitt"}
+                    </dd>
+                  </div>
+                )}
                 {editCtx?.editMode && editCtx.behavior.requiresDeliveryMethod && (
                   <EditableField
                     fieldKey="delivery"
@@ -1010,7 +1068,7 @@ function ListingDetailViewBody({
                       <div>
                         <dt className="text-muted-foreground">Levering</dt>
                         <dd className="font-medium">
-                          {v === true ? "Frakt" : v === false ? "Kun henting" : "Ikke satt"}
+                          {v === true ? "Kan sendes" : v === false ? "Kun henting" : "Ikke satt"}
                         </dd>
                       </div>
                     )}
@@ -1121,8 +1179,16 @@ function ListingDetailViewBody({
 
       {showStickyContact && (
         <div
-          className="px-safe fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 py-3 backdrop-blur md:hidden"
-          style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}
+          className="px-safe fixed inset-x-0 z-40 border-t border-border bg-background/95 py-3 backdrop-blur md:hidden"
+          style={
+            isNative
+              ? // Bunnavigasjonen (AppBottomNav) ligger fast under denne
+                // siden med z-50 — baren må stå over den, ikke bak den, og
+                // trenger ikke egen safe-area-padding siden tab-baren
+                // allerede reserverer den.
+                { bottom: "var(--app-bottom-nav-h)" }
+              : { bottom: 0, paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }
+          }
         >
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
             <p className="font-display text-lg leading-none text-primary">{priceLabel}</p>

@@ -14,6 +14,7 @@ import { parseVehicleLookup } from "@/lib/vehicle/parse-vehicle-lookup";
 type Props = {
   listing: ListingCardData;
   linkState?: Record<string, unknown>;
+  onOpen?: () => void;
   coverImageUrl?: string | null;
   knownFavorite?: boolean;
   favoriteStateReady?: boolean;
@@ -26,6 +27,7 @@ type Props = {
 export function ListingCardExpanded({
   listing,
   linkState,
+  onOpen,
   coverImageUrl,
   knownFavorite,
   favoriteStateReady,
@@ -80,6 +82,7 @@ export function ListingCardExpanded({
           to="/$kaupetCode"
           params={{ kaupetCode: listing.kaupet_code }}
           state={linkState}
+          onClick={onOpen}
           className="block pr-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         >
           <h3 className="text-lg font-medium leading-snug">{listing.title}</h3>
@@ -128,6 +131,7 @@ export function ListingCardExpanded({
           to="/$kaupetCode"
           params={{ kaupetCode: listing.kaupet_code }}
           state={linkState}
+          onClick={onOpen}
           className="flex flex-col gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         >
           {(isVehicleListing || isBoatListing) && (

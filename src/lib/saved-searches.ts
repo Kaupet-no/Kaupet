@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { AttributeFilterValue } from "@/lib/category-filters";
 import type { TermGroup } from "@/lib/term-groups";
 
 export type SearchCriteria = {
@@ -17,6 +18,7 @@ export type SearchCriteria = {
   lng?: number | null;
   radius?: number | null;
   loc?: string;
+  attributes?: Record<string, AttributeFilterValue>;
 };
 
 export type SavedSearch = {
@@ -60,6 +62,10 @@ export function summarizeCriteria(c: SearchCriteria): string {
     parts.push(`${min}–${max}`);
   }
   if (c.loc) parts.push(`${c.loc}${c.radius ? ` (${c.radius} km)` : ""}`);
+  const attributeCount = Object.keys(c.attributes ?? {}).length;
+  if (attributeCount) {
+    parts.push(`${attributeCount} egenskap${attributeCount === 1 ? "" : "er"}`);
+  }
   return parts.length ? parts.join(" · ") : "Alle annonser";
 }
 

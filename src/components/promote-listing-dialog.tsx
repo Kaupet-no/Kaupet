@@ -1,11 +1,9 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2, MapPin } from "lucide-react";
 import { showErrorToast } from "@/lib/toast";
 
-import { supabase } from "@/integrations/supabase/client";
-import { signListingImageUrls } from "@/lib/storage";
 import { formatPrice } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -13,6 +11,7 @@ import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/co
 import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
 import { createPromotionCheckout, getPromotionPricing } from "@/lib/promotions.functions";
 import { formatErrorMessage } from "@/lib/errors";
+import { useListingPreview } from "@/hooks/use-listing-preview";
 
 type Props = {
   listingId: string;
@@ -20,18 +19,9 @@ type Props = {
   onOpenChange: (open: boolean) => void;
 };
 
-type PreviewData = {
-  title: string;
-  price_nok: number | null;
-  is_free: boolean;
-  city: string | null;
-  cover_path: string | null;
-};
-
 export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
   const [selected, setSelected] = useState<number | null>(null);
   const [accepted, setAccepted] = useState(false);
-  const [imgUrl, setImgUrl] = useState<string | null>(null);
 
   const fetchPricing = useServerFn(getPromotionPricing);
   const { data: pricing } = useQuery({
@@ -40,43 +30,7 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
     enabled: open,
   });
 
-  const { data: listing } = useQuery({
-    queryKey: ["listing-preview", listingId],
-    enabled: open,
-    queryFn: async (): Promise<PreviewData | null> => {
-      const { data, error } = await supabase
-        .from("listings")
-        .select("title, price_nok, is_free, city, listing_images(storage_path, sort_order)")
-        .eq("id", listingId)
-        .maybeSingle();
-      if (error) throw error;
-      if (!data) return null;
-      const cover =
-        (data.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order)[0]
-          ?.storage_path ?? null;
-      return {
-        title: data.title,
-        price_nok: data.price_nok,
-        is_free: data.is_free,
-        city: data.city,
-        cover_path: cover,
-      };
-    },
-  });
-
-  useEffect(() => {
-    if (!listing?.cover_path) {
-      setImgUrl(null);
-      return;
-    }
-    let cancelled = false;
-    signListingImageUrls([listing.cover_path]).then((m) => {
-      if (!cancelled) setImgUrl(m[listing.cover_path!] ?? null);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [listing?.cover_path]);
+  const { listing, imgUrl } = useListingPreview(listingId, open);
 
   const startCheckout = useServerFn(createPromotionCheckout);
   const checkout = useMutation({
@@ -103,7 +57,7 @@ export function PromoteListingDialog({ listingId, open, onOpenChange }: Props) {
         </DialogHeader>
 
         {/* Preview card */}
-        <div className="rounded-2xl border border-accent/30 bg-accent/5 p-3">
+        <div className="rounded-2xl border border-brand/30 bg-brand/5 p-3">
           <div className="mb-2 flex items-center gap-2">
             <p className="font-display text-xs uppercase tracking-wide text-muted-foreground">
               Promoterte annonser

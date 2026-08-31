@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   closestCenter,
@@ -38,9 +38,39 @@ import { FILTER_TYPES, filterKeyify, type Category, type EditableFilter } from "
 
 export function CategoryFiltersPanel({ category }: { category: Category }) {
   const qc = useQueryClient();
+  // Samme nøkkel som admin-oversikten, så treet allerede ligger i cachen.
+  const { data: allCategories } = useQuery({
+    queryKey: ["admin", "categories"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("categories")
+        .select(
+          "id, name_nb, slug, parent_id, sort_order, icon, color, heading_font, search_examples, title_example, is_hidden",
+        )
+        .order("sort_order")
+        .order("name_nb");
+      if (error) throw error;
+      return (data ?? []) as Category[];
+    },
+  });
   const [draft, setDraft] = useState<EditableFilter | null>(null);
   const [keyTouched, setKeyTouched] = useState(false);
   const [synonymsFilter, setSynonymsFilter] = useState<CategoryFilter | null>(null);
+
+  // Arvekjeden: et underkategori-filterpanel må vise nøyaktig det settet
+  // søket viser (egne + arvede, barn overstyrer forelder på samme nøkkel),
+  // ellers kan ikke administrator bestemme rekkefølgen mellom dem —
+  // `sort_order` er global per filterrad, ikke per kategori.
+  const ancestorIds = useMemo(() => {
+    const byId = new Map((allCategories ?? []).map((c) => [c.id, c]));
+    const ids = [category.id];
+    let cur = byId.get(category.parent_id ?? "");
+    while (cur) {
+      ids.push(cur.id);
+      cur = byId.get(cur.parent_id ?? "");
+    }
+    return ids;
+  }, [allCategories, category.id, category.parent_id]);
 
   const {
     data: filters,
@@ -48,22 +78,35 @@ export function CategoryFiltersPanel({ category }: { category: Category }) {
     isError,
     error: filtersError,
   } = useQuery({
-    queryKey: ["admin", "category-filters", category.id],
+    queryKey: ["admin", "category-filters", category.id, ancestorIds],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("category_filters")
         .select(
           "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value",
         )
-        .eq("category_id", category.id)
+        .in("category_id", ancestorIds)
         .order("sort_order");
       if (error) throw error;
-      return (data ?? []).map(normalizeFilter);
+      const all = (data ?? []).map(normalizeFilter);
+      // Barn overstyrer forelder på samme nøkkel — samme regel som
+      // `effectiveFiltersForCategory`, uttrykt over arvekjeden vi hentet.
+      const depth = (categoryId: string) => ancestorIds.indexOf(categoryId);
+      const byKey = new Map<string, CategoryFilter>();
+      for (const f of all) {
+        const existing = byKey.get(f.key);
+        if (!existing || depth(f.category_id) < depth(existing.category_id)) byKey.set(f.key, f);
+      }
+      return Array.from(byKey.values()).sort((a, b) => a.sort_order - b.sort_order);
     },
+    enabled: !!allCategories,
   });
+  const categoryNameById = useMemo(
+    () => new Map((allCategories ?? []).map((c) => [c.id, c.name_nb])),
+    [allCategories],
+  );
 
-  const invalidate = () =>
-    qc.invalidateQueries({ queryKey: ["admin", "category-filters", category.id] });
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["admin", "category-filters"] });
 
   const save = useMutation({
     mutationFn: async (f: EditableFilter) => {
@@ -75,7 +118,7 @@ export function CategoryFiltersPanel({ category }: { category: Category }) {
         type: f.type,
         unit: f.unit.trim() || null,
         options: usesOptions ? f.options.filter((o) => o.value.trim()) : null,
-        sort_order: (filters?.length ?? 0) * 10 + 10,
+        sort_order: Math.max(0, ...(filters ?? []).map((x) => x.sort_order)) + 10,
         is_primary: f.is_primary,
       };
       if (f.id) {
@@ -174,7 +217,9 @@ export function CategoryFiltersPanel({ category }: { category: Category }) {
   return (
     <>
       <p className="text-sm text-muted-foreground">
-        Filtre vises i annonseskjema og søk for denne kategorien og dens underkategorier.
+        Filtre vises i annonseskjema og søk for denne kategorien og dens underkategorier. Dra i
+        håndtaket for å bestemme rekkefølgen de vises i. Arvede filtre kan flyttes herfra, men
+        rekkefølgen deles med de andre underkategoriene som arver dem.
       </p>
 
       {isLoading ? (
@@ -205,6 +250,11 @@ export function CategoryFiltersPanel({ category }: { category: Category }) {
                     <SortableFilterRow
                       key={f.id}
                       filter={f}
+                      inheritedFrom={
+                        f.category_id === category.id
+                          ? undefined
+                          : (categoryNameById.get(f.category_id) ?? "overordnet kategori")
+                      }
                       onTogglePrimary={(is_primary) =>
                         toggleIsPrimary.mutate({ id: f.id, is_primary })
                       }

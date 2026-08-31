@@ -6,8 +6,9 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 /**
  * Proposes a new brand/model, used only from the "we don't recognize this
  * brand/model from Statens vegvesen — is this correct?" confirmation flow in
- * the listing form. Users never type free text directly into brand/model
- * fields; this is the sole way new entries enter the dataset besides admin.
+ * the listing form (see `useVehicleLookupFlow.confirmVehicleData`). Users
+ * never type free text directly into brand/model fields; this is the sole
+ * way new entries enter the dataset besides admin.
  *
  * The entry is created with status "pending" and only becomes selectable for
  * other users once an admin/moderator approves it in the admin panel — see

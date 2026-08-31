@@ -136,15 +136,15 @@ export function FavoriteButton({
         onClick={handleClick}
         disabled={toggle.isPending || (!!user && !isFavoriteReady)}
         className={cn(
-          "inline-flex items-center justify-center rounded-md border border-border bg-card text-sm font-medium transition hover:bg-accent/10",
+          "inline-flex items-center justify-center rounded-md border border-border bg-card text-sm font-medium transition hover:bg-brand/10",
           sizing.btn,
-          isFavorite && "border-accent/40 bg-accent/10 text-accent",
+          isFavorite && "border-brand/40 bg-brand/10 text-brand",
           className,
         )}
         aria-pressed={isFavorite}
         aria-label={isFavorite ? "Fjern fra favoritter" : "Lagre som favoritt"}
       >
-        <Heart className={cn(sizing.icon, isFavorite && "fill-accent text-accent")} />
+        <Heart className={cn(sizing.icon, isFavorite && "fill-brand text-brand")} />
         {isFavorite ? "Lagret som favoritt" : "Lagre som favoritt"}
       </button>
     );
@@ -164,7 +164,7 @@ export function FavoriteButton({
       aria-label={isFavorite ? "Fjern fra favoritter" : "Lagre som favoritt"}
     >
       <Heart
-        className={cn(sizing.icon, isFavorite ? "fill-accent text-accent" : "text-foreground")}
+        className={cn(sizing.icon, isFavorite ? "fill-brand text-brand" : "text-foreground")}
       />
     </button>
   );

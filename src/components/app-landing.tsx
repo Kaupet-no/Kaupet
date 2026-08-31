@@ -1,568 +1,130 @@
-import { useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import {
-  ArrowRight,
-  ChevronLeft,
-  Hash,
-  LayoutGrid,
-  MapPin,
-  Search as SearchIcon,
-  X,
-} from "lucide-react";
+import { LayoutGrid, MapPin, Search as SearchIcon } from "lucide-react";
 
-import { supabase } from "@/integrations/supabase/client";
-import { ListingCard, type ListingCardData } from "@/components/listing-card";
+import { ListingCard } from "@/components/listing-card";
+import { usePopularListings } from "@/features/landing/use-popular-listings";
 import { KaupetCodeDialog } from "@/components/kaupet-code-dialog";
-import { NativeSheet } from "@/components/ui/native-sheet";
-import { Skeleton } from "@/components/ui/skeleton";
-import { DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
-import { LocationPicker, RadiusPicker } from "@/components/location-filter";
 import { AnimatedSearchPlaceholder } from "@/components/animated-search-placeholder";
-import { useSavedLocation } from "@/hooks/use-saved-location";
-import { getCategoryIcon } from "@/lib/category-icons";
 import { useDefaultSearchExamples } from "@/hooks/use-default-search-examples";
-import { useIsNative } from "@/hooks/use-is-native";
 import { useFormFactor } from "@/hooks/use-form-factor";
 import { AppHeroLogo } from "@/components/app-hero-logo";
-import { useLandingCategories } from "@/features/landing/use-landing-categories";
-import { submitSearch } from "@/features/listing-search/submit-search";
-import { defaultAdvancedSearchValue } from "@/components/advanced-search-value";
-import { useAllVehicleBrands } from "@/lib/vehicle/vehicle-brands";
-
-type CategoryRow = {
-  id: string;
-  slug: string;
-  name_nb: string;
-  parent_id: string | null;
-  icon: string | null;
-  search_examples: string[] | null;
-};
+import { useSearchPanel } from "@/features/listing-search/search-panel/search-panel-context";
 
 export function AppLanding() {
-  const navigate = useNavigate();
-  const [q, setQ] = useState("");
-  const [focused, setFocused] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [location, setLocation] = useSavedLocation();
-  const [locOpen, setLocOpen] = useState(false);
-  const isNative = useIsNative();
-  // Nettbrett (fase 10): heroen får en øvre ramme og «Populært nå» blir et
-  // rutenett. Bevisst formatfaktor og ikke `md:`-breakpoints — de ville truffet
-  // kaupet.no på desktop, som ikke er en del av denne planen.
+  const { openPanel, savedLocation } = useSearchPanel();
+  const { popular, hasPopularitySignal } = usePopularListings(10);
   const isTablet = useFormFactor() === "tablet";
+  const searchExamples = useDefaultSearchExamples();
+  const hasLocation = savedLocation.lat != null && savedLocation.lng != null;
+  const locationLabel = hasLocation
+    ? `${savedLocation.label || "Valgt sted"} · ${savedLocation.radius} km`
+    : "Hele Norge";
 
-  const { categories, allFilters } = useLandingCategories();
-  const { data: vehicleBrands } = useAllVehicleBrands();
-
-  const rootCategories = useMemo(
-    () => (categories ?? []).filter((c) => c.parent_id === null),
-    [categories],
-  );
-  const childrenByParent = useMemo(() => {
-    const map = new Map<string, CategoryRow[]>();
-    for (const c of categories ?? []) {
-      if (!c.parent_id) continue;
-      const arr = map.get(c.parent_id) ?? [];
-      arr.push(c);
-      map.set(c.parent_id, arr);
-    }
-    return map;
-  }, [categories]);
-
-  const { data: popular } = useQuery({
-    queryKey: ["popular-listings-last-week"],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("popular_listings_last_week", { _limit: 10 });
-      if (error) throw error;
-      return (data ?? []).map<ListingCardData>((l) => ({
-        id: l.listing_id,
-        kaupet_code: l.kaupet_code,
-        title: l.title,
-        subtitle: l.subtitle,
-        price_nok: l.price_nok,
-        is_free: l.is_free,
-        city: l.city,
-        created_at: l.created_at,
-        cover_path: l.cover_path,
-        total_views: Number(l.total_views ?? 0),
-        views_last_week: Number(l.views_last_week ?? 0),
-        category_slug: l.category_slug,
-        attributes: l.attributes as Record<string, unknown> | null,
-      }));
-    },
-  });
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    void submitSearch({
-      applied: {
-        value: {
-          ...defaultAdvancedSearchValue(),
-          location,
-        },
-        attributes: {},
-      },
-      query: q,
-      categories: categories ?? [],
-      vehicleBrands: vehicleBrands ?? [],
-      allFilters: allFilters ?? [],
-      commit: (search) => navigate({ to: "/annonser", search }),
-    });
-  };
-
-  const [activeCategory, setActiveCategory] = useState<CategoryRow | null>(null);
-  const [categoriesSheetOpen, setCategoriesSheetOpen] = useState(false);
-
-  // Hint at what's searchable within the selected category by rotating its
-  // curated example words instead of the generic suggestions, mirroring the
-  // web landing page's typewriter behavior (src/routes/index.tsx).
-  const defaultSearchExamples = useDefaultSearchExamples();
-  const typewriterWords = useMemo(() => {
-    if (!activeCategory) return defaultSearchExamples;
-    if (activeCategory.search_examples?.length) {
-      return activeCategory.search_examples.map((w) => w.toLocaleLowerCase("nb-NO"));
-    }
-    const subs = childrenByParent.get(activeCategory.id) ?? [];
-    const words = subs.map((s) => s.name_nb.toLocaleLowerCase("nb-NO"));
-    return words.length > 0 ? words : [activeCategory.name_nb.toLocaleLowerCase("nb-NO")];
-  }, [activeCategory, childrenByParent, defaultSearchExamples]);
-
-  const pickCategory = (cat: CategoryRow) => {
-    const subs = childrenByParent.get(cat.id) ?? [];
-    if (subs.length === 0) {
-      const locationSearch = {
-        lat: location.lat ?? undefined,
-        lng: location.lng ?? undefined,
-        radius: location.lat != null ? location.radius : undefined,
-        loc: location.label || undefined,
-      };
-      navigate({
-        to: "/annonser",
-        search: { q: "", category: cat.slug, sort: "new", ...locationSearch },
-      });
-      return;
-    }
-    setActiveCategory(cat);
-  };
-
-  const hasLocation = location.lat != null && location.lng != null;
-  const placeholderPaused = focused || q.length > 0;
-
-  const tileButtonClass =
-    "flex w-32 flex-col items-center gap-2 border-b border-border px-3 py-4 text-center text-sm font-medium transition active:opacity-70";
-  const tileIconClass = "flex size-11 items-center justify-center text-primary";
+  const pillClass =
+    "native-touch-target inline-flex max-w-full items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm transition active:opacity-80";
 
   return (
-    <div className={isNative ? "pb-3" : "pb-24"}>
-      {isNative && <AppHeroLogo />}
+    <div className="pb-3">
+      <AppHeroLogo />
 
-      {/* Hero — sentrert søkefelt */}
-      <section
-        className={`flex flex-col items-center justify-center px-5 ${
-          isTablet
-            ? "min-h-[40vh] density-editorial"
-            : isNative
-              ? "min-h-[52vh] density-editorial"
-              : "min-h-[70vh] pt-8"
-        }`}
-      >
-        <h1 className="mb-6 text-center font-display text-2xl tracking-tight">
+      {/* Handel før merkevare: søk er første handling brukeren møter, og
+          hero/luft over er bevisst redusert (fase B1) slik at minst ett
+          troverdig annonsekort under er lesbart innen første skjermbilde
+          ved standard tekststørrelse på en vanlig telefon. */}
+      <section className="flex flex-col items-center gap-3 px-5 pb-4 pt-1 density-task">
+        <h1 className="text-center font-display text-xl tracking-tight">
           Hva leter du etter i dag?
         </h1>
-
-        <form
-          onSubmit={handleSearchSubmit}
-          className={`w-full ${isTablet ? "max-w-xl" : "max-w-md"}`}
+        <button
+          type="button"
+          onClick={() => openPanel("query")}
+          aria-label="Åpne søk i annonser"
+          className="relative flex h-14 w-full max-w-xl items-center rounded-full border border-border bg-card px-4 text-left text-base shadow-sm outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.99]"
         >
-          <div className="relative">
-            <SearchIcon className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
-            <input
-              ref={inputRef}
-              type="search"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
-              placeholder=""
-              aria-label="Søk i annonser"
-              aria-describedby={typewriterWords.length > 0 ? "landing-search-examples" : undefined}
-              className="h-14 w-full rounded-full border border-border bg-card pl-12 pr-4 text-base shadow-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
-            />
-            {typewriterWords.length > 0 && (
-              // Static (not tied to the rotating animation) so screen reader
-              // users get the example searches once, on focus, instead of
-              // an aria-live region re-announcing every ~2.7s.
-              <span id="landing-search-examples" className="sr-only">
-                For eksempel: {typewriterWords.join(", ")}
-              </span>
-            )}
-            {!placeholderPaused && (
-              <div className="pointer-events-none absolute inset-y-0 left-12 right-4 flex items-center">
-                <AnimatedSearchPlaceholder
-                  key={activeCategory?.id ?? "all"}
-                  words={typewriterWords}
-                  paused={placeholderPaused}
-                  className="text-base"
-                />
-              </div>
-            )}
-          </div>
+          <SearchIcon className="mr-3 size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <AnimatedSearchPlaceholder
+            words={searchExamples}
+            paused={false}
+            className="text-base text-muted-foreground"
+          />
+        </button>
 
-          {/* Lokasjon-chip */}
-          {/* Krysset ligger som *søsken* til chipen, ikke inni den: et
-              interaktivt element inne i et annet er ugyldig og leses dårlig av
-              skjermlesere (funn 10.2 / tiltak 28). */}
-          <div className="mt-4 flex items-center justify-center gap-1">
-            <ResponsiveOverlay open={locOpen} onOpenChange={setLocOpen}>
-              <button
-                type="button"
-                onClick={() => setLocOpen(true)}
-                // Eksplisitt navn: uten det leses knappen uten tilgjengelig navn
-                // (verifisert i tilgjengelighetstreet på native forside). Den
-                // synlige teksten er med i navnet, jf. WCAG 2.5.3.
-                aria-label={`Velg lokasjon: ${
-                  hasLocation ? `${location.label} · ${location.radius} km` : "Hvor som helst"
-                }`}
-                className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm transition ${
-                  hasLocation
-                    ? "border-primary/40 bg-primary/5 text-foreground"
-                    : "border-border bg-card text-muted-foreground"
-                }`}
-              >
-                <MapPin className="size-4" />
-                <span className="truncate max-w-[200px]">
-                  {hasLocation ? `${location.label} · ${location.radius} km` : "Hvor som helst"}
-                </span>
-              </button>
-              {hasLocation && (
-                <button
-                  type="button"
-                  className="flex size-11 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-                  onClick={() =>
-                    setLocation({ lat: null, lng: null, radius: location.radius, label: "" })
-                  }
-                  aria-label="Fjern lokasjon"
-                >
-                  <X className="size-4" />
-                </button>
-              )}
-              <ResponsiveOverlayContent
-                className="sm:max-w-sm"
-                aria-labelledby="app-location-title"
-                tabIndex={-1}
-                onOpenAutoFocus={(e) => {
-                  e.preventDefault();
-                  (e.target as HTMLElement)?.focus();
-                }}
-              >
-                <DialogHeader className="text-left">
-                  <DialogTitle id="app-location-title">Velg sted</DialogTitle>
-                </DialogHeader>
-                <div className="mt-1 space-y-3">
-                  <LocationPicker
-                    value={location}
-                    onChange={setLocation}
-                    onDone={() => setLocOpen(false)}
-                    autoFocus={false}
-                  />
-                  {hasLocation && (
-                    <RadiusPicker
-                      value={location.radius}
-                      onChange={(r) => setLocation({ ...location, radius: r })}
-                    />
-                  )}
-                </div>
-              </ResponsiveOverlayContent>
-            </ResponsiveOverlay>
-          </div>
+        {/* Lokasjon og kategorier veier likt — begge er inngangsvalg til
+            samme søkepanel, ikke en primær og en sekundær handling. Kaupet-
+            kode er en sjelden, gjenkjennende handling (ikke oppdagende) og
+            skal derfor ikke konkurrere visuelt med disse to. */}
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={() => openPanel("location")}
+            aria-label={`Velg lokasjon: ${locationLabel}`}
+            className={`${pillClass} ${
+              hasLocation
+                ? "border-primary/40 bg-primary/5 text-foreground"
+                : "border-border bg-card text-muted-foreground"
+            }`}
+          >
+            <MapPin className="size-4 shrink-0" aria-hidden="true" />
+            <span className="truncate">{locationLabel}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => openPanel("categories")}
+            aria-label="Alle kategorier"
+            className={`${pillClass} border-border bg-card text-muted-foreground`}
+          >
+            <LayoutGrid className="size-4 shrink-0" aria-hidden="true" />
+            <span className="truncate">Alle kategorier</span>
+          </button>
+        </div>
 
-          {!isNative && (
-            <div className="mt-3 flex justify-center">
-              <KaupetCodeDialog />
-            </div>
-          )}
-        </form>
+        <KaupetCodeDialog
+          trigger={
+            <button
+              type="button"
+              className="native-touch-target text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+            >
+              Har du en Kaupet-kode?
+            </button>
+          }
+        />
       </section>
 
-      {/* Kaupet-kode + Alle kategorier — kun native */}
-      {isNative && (
-        <div className="mb-2 flex items-center justify-center gap-3 px-5">
-          <KaupetCodeDialog
-            trigger={
-              <button type="button" className={tileButtonClass}>
-                <span className={tileIconClass}>
-                  <Hash className="size-5" />
-                </span>
-                Kaupet-kode
-              </button>
-            }
-          />
-          <NativeSheet
-            open={categoriesSheetOpen}
-            onOpenChange={(open) => {
-              setCategoriesSheetOpen(open);
-              if (!open) setActiveCategory(null);
-            }}
-            trigger={
-              <button type="button" className={tileButtonClass}>
-                <span className={tileIconClass}>
-                  <LayoutGrid className="size-5" />
-                </span>
-                Alle kategorier
-              </button>
-            }
-            titleVisible
-            title={
-              <span className="flex items-center gap-3">
-                {activeCategory ? `/${activeCategory.name_nb}` : "Kategorier"}
-                {activeCategory && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveCategory(null)}
-                    className="flex shrink-0 items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium transition hover:border-primary hover:text-primary"
-                  >
-                    <ChevronLeft className="size-3.5" />
-                    Tilbake
-                  </button>
-                )}
-              </span>
-            }
-            expandable
-            className="overflow-y-auto"
-          >
-            {!activeCategory ? (
-              <div className="mt-4 flex flex-col gap-2">
-                {rootCategories.map((cat) => {
-                  const Icon = getCategoryIcon(cat.icon);
-                  return (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => pickCategory(cat)}
-                      className="group flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left transition active:scale-[0.98]"
-                    >
-                      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                        <Icon className="size-5" />
-                      </span>
-                      <span className="truncate font-medium">{cat.name_nb}</span>
-                      <ArrowRight className="ml-auto size-4 shrink-0 text-muted-foreground" />
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              (() => {
-                const subs = childrenByParent.get(activeCategory.id) ?? [];
-                const allSlugs = [activeCategory.slug, ...subs.map((s) => s.slug)];
-                const locationSearch = {
-                  lat: location.lat ?? undefined,
-                  lng: location.lng ?? undefined,
-                  radius: location.lat != null ? location.radius : undefined,
-                  loc: location.label || undefined,
-                };
-                return (
-                  <div className="mt-4 flex flex-col gap-2">
-                    <Link
-                      to="/annonser"
-                      search={{
-                        q: "",
-                        category: "",
-                        categories: allSlugs,
-                        catMode: "any",
-                        sort: "new",
-                        ...locationSearch,
-                      }}
-                      onClick={() => setCategoriesSheetOpen(false)}
-                      className="group flex items-center justify-between gap-3 rounded-xl border border-primary bg-primary/5 px-4 py-4 text-left font-medium text-primary transition active:scale-[0.98]"
-                    >
-                      <span className="truncate">Alt i {activeCategory.name_nb}</span>
-                      <ArrowRight className="size-4 shrink-0 transition group-hover:translate-x-0.5" />
-                    </Link>
-                    {subs.map((sub) => (
-                      <Link
-                        key={sub.id}
-                        to="/annonser"
-                        search={{ q: "", category: sub.slug, sort: "new", ...locationSearch }}
-                        onClick={() => setCategoriesSheetOpen(false)}
-                        className="group flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-4 text-left transition active:scale-[0.98]"
-                      >
-                        <span className="truncate font-medium">{sub.name_nb}</span>
-                        <ArrowRight className="size-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
-                      </Link>
-                    ))}
-                    {subs.length === 0 && (
-                      <p className="text-sm text-muted-foreground">
-                        Ingen underkategorier — trykk over for å se alle annonser.
-                      </p>
-                    )}
-                  </div>
-                );
-              })()
-            )}
-          </NativeSheet>
-        </div>
-      )}
-
-      {/* Kategorier */}
-      {!isNative && (
-        <section className="overflow-hidden pt-2 sm:px-5">
-          <div className="mb-3 flex items-center justify-between gap-3 px-5 sm:px-0">
-            <h2 className="font-display text-lg tracking-tight">
-              {activeCategory ? `/${activeCategory.name_nb}` : "Kategorier"}
-            </h2>
-            {activeCategory && (
-              <button
-                type="button"
-                onClick={() => setActiveCategory(null)}
-                className="flex shrink-0 items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium transition hover:border-primary hover:text-primary"
-              >
-                <ChevronLeft className="size-3.5" />
-                Tilbake
-              </button>
-            )}
-          </div>
-
-          {!activeCategory ? (
-            <div className="duration-300 animate-out fade-out animate-in fade-in">
-              {/* Mobil: horisontal sveipbar rad */}
-              <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2 sm:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {rootCategories.length === 0 &&
-                  Array.from({ length: 6 }).map((_, i) => (
-                    <Skeleton key={i} className="h-24 w-20 shrink-0 rounded-2xl" />
-                  ))}
-                {rootCategories.map((cat) => {
-                  const Icon = getCategoryIcon(cat.icon);
-                  return (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => pickCategory(cat)}
-                      className="group flex w-20 shrink-0 snap-start flex-col items-center gap-2 active:opacity-80"
-                    >
-                      <span className="flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
-                        <Icon className="size-7" />
-                      </span>
-                      <span className="line-clamp-2 text-pretty text-center text-xs font-medium leading-tight">
-                        {cat.name_nb}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Tablet/desktop: grid */}
-              <div className="hidden grid-cols-2 gap-3 sm:grid md:grid-cols-3 lg:grid-cols-4">
-                {rootCategories.length === 0 &&
-                  Array.from({ length: 6 }).map((_, i) => (
-                    <Skeleton key={i} className="aspect-[5/4] rounded-2xl" />
-                  ))}
-                {rootCategories.map((cat) => {
-                  const Icon = getCategoryIcon(cat.icon);
-                  return (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => pickCategory(cat)}
-                      className="group flex aspect-[5/4] flex-col items-center justify-center gap-2 rounded-2xl border border-border bg-card p-3 text-center transition active:scale-[0.98] hover:border-primary"
-                    >
-                      <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
-                        <Icon className="size-5" />
-                      </span>
-                      <span className="text-pretty text-sm font-medium leading-tight">
-                        {cat.name_nb}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : (
-            (() => {
-              const subs = childrenByParent.get(activeCategory.id) ?? [];
-              const allSlugs = [activeCategory.slug, ...subs.map((s) => s.slug)];
-              const locationSearch = {
-                lat: location.lat ?? undefined,
-                lng: location.lng ?? undefined,
-                radius: location.lat != null ? location.radius : undefined,
-                loc: location.label || undefined,
-              };
-              return (
-                <div
-                  key={activeCategory.id}
-                  className="flex flex-col gap-2 px-5 duration-300 animate-in fade-in slide-in-from-bottom-8 sm:px-0"
-                >
-                  <Link
-                    to="/annonser"
-                    search={{
-                      q: "",
-                      category: "",
-                      categories: allSlugs,
-                      catMode: "any",
-                      sort: "new",
-                      ...locationSearch,
-                    }}
-                    className="group flex items-center justify-between gap-3 rounded-xl border border-primary bg-primary/5 px-4 py-4 text-left font-medium text-primary transition active:scale-[0.98]"
-                  >
-                    <span className="truncate">Alt i {activeCategory.name_nb}</span>
-                    <ArrowRight className="size-4 shrink-0 transition group-hover:translate-x-0.5" />
-                  </Link>
-                  {subs.map((sub) => (
-                    <Link
-                      key={sub.id}
-                      to="/annonser"
-                      search={{ q: "", category: sub.slug, sort: "new", ...locationSearch }}
-                      className="group flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-4 text-left transition active:scale-[0.98]"
-                    >
-                      <span className="truncate font-medium">{sub.name_nb}</span>
-                      <ArrowRight className="size-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
-                    </Link>
-                  ))}
-                  {subs.length === 0 && (
-                    <p className="text-sm text-muted-foreground">
-                      Ingen underkategorier — trykk over for å se alle annonser.
-                    </p>
-                  )}
-                </div>
-              );
-            })()
-          )}
-        </section>
-      )}
-
-      <section className="mt-6 pl-5">
+      <section className="mt-2 pl-5" aria-labelledby="popular-heading">
         <div className="mb-3 flex items-center justify-between pr-5">
-          <h2 className="font-display text-lg tracking-tight">Populært nå</h2>
-          <Link
-            to="/annonser"
-            search={{ q: "", category: "", sort: "new" }}
-            className="text-xs text-primary hover:underline"
+          <h2 id="popular-heading" className="font-display text-lg tracking-tight">
+            {hasPopularitySignal ? "Populært nå" : "Nye annonser"}
+          </h2>
+          <button
+            type="button"
+            onClick={() => openPanel("query")}
+            className="native-touch-target px-2 text-xs text-primary"
           >
             Se alle →
-          </Link>
+          </button>
         </div>
         {popular && popular.length > 0 ? (
-          // Nettbrett har plass til rutenettet karusellen komprimerer bort.
           isTablet ? (
-            <div className="grid grid-cols-3 gap-4 pb-2 pr-5">
-              {popular.map((l) => (
-                <ListingCard key={l.id} listing={l} />
+            <div className="grid grid-cols-3 gap-4 pb-2 pr-5 lg:grid-cols-4 xl:grid-cols-5">
+              {popular.map((listing) => (
+                <ListingCard key={listing.id} listing={listing} />
               ))}
             </div>
           ) : (
             <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 pr-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {popular.map((l) => (
-                <div key={l.id} className="w-[60%] shrink-0 snap-start sm:w-[40%]">
-                  <ListingCard listing={l} />
+              {popular.map((listing) => (
+                <div key={listing.id} className="w-[60%] shrink-0 snap-start">
+                  <ListingCard listing={listing} />
                 </div>
               ))}
             </div>
           )
         ) : (
           <div className="flex gap-3 overflow-hidden pr-5">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="aspect-[4/3] w-[60%] shrink-0 rounded-xl" />
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div
+                key={index}
+                className="aspect-[4/3] w-[60%] shrink-0 animate-pulse rounded-xl bg-muted"
+              />
             ))}
           </div>
         )}

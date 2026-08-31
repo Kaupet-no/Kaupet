@@ -7,6 +7,7 @@ import {
   effectiveFiltersForCategory,
   getMissingRequiredFilters,
   normalizeFilter,
+  isBoatCategory,
   PART_FITMENT_SCOPE_KEY,
   PART_FITMENT_VEHICLE_IDS_KEY,
   PART_FITMENT_YEAR_FROM_KEY,
@@ -20,7 +21,6 @@ import {
   effectiveFlowForCategory,
   type CategoryFlowRow,
 } from "@/features/listing-creation/category-flows";
-import { validateModules } from "@/features/listing-creation/modules/validators";
 import { validateRequiredFieldGroups } from "@/features/listing-creation/field-groups/validators";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -133,9 +133,12 @@ export const saveDraftListing = createServerFn({ method: "POST" })
     };
 
     if (data.id) {
+      // Re-editing a draft that already got the "expires in 7 days" system
+      // message must reset the flag — otherwise a second dormancy period
+      // (edit, then go quiet again) would delete it without a fresh warning.
       const { data: updated, error } = await supabaseAdmin
         .from("listings")
-        .update(fields)
+        .update({ ...fields, draft_expiry_notified_at: null })
         .eq("id", data.id)
         .eq("seller_id", userId)
         .eq("status", "draft")
@@ -267,13 +270,7 @@ export const createListing = createServerFn({ method: "POST" })
 
     // category_flows may not exist yet in every environment (pre-migration); degrade to the default flow.
     const flowRows = (flowsResult.data ?? []) as CategoryFlowRow[];
-    const { fieldGroups, modules } = effectiveFlowForCategory(
-      data.category_id,
-      flowRows,
-      categoriesById,
-    );
-    const moduleError = validateModules(modules, data.attributes ?? {});
-    if (moduleError) throw new Error(moduleError);
+    const { fieldGroups } = effectiveFlowForCategory(data.category_id, flowRows, categoriesById);
     const fieldGroupError = validateRequiredFieldGroups(
       fieldGroups,
       {
@@ -282,6 +279,7 @@ export const createListing = createServerFn({ method: "POST" })
       },
       getCategoryBehavior(
         vehicleCategoryGroupFor(data.category_id, normalizedFilters, categoriesById),
+        isBoatCategory(data.category_id, normalizedFilters, categoriesById),
       ),
     );
     if (fieldGroupError) throw new Error(fieldGroupError);

@@ -134,6 +134,20 @@ export function ListingComposerShell({
         backLabel={backLabel}
         onBack={onBack}
         hideBack={native}
+        right={
+          native ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={onCancel}
+              className="native-touch-target"
+              aria-label="Avbryt annonseopprettelse"
+            >
+              <X className="size-5" aria-hidden />
+            </Button>
+          ) : undefined
+        }
       />
       {!native && <ComposerHeading title={title} onTitleChange={onTitleChange} />}
       {categoryLabel && (
@@ -208,7 +222,7 @@ export function ListingComposerShell({
             )}
           >
             {native ? (
-              <div className="mx-auto grid w-full max-w-lg grid-cols-[1fr_auto_1fr] items-center gap-3">
+              <div className="mx-auto grid w-full max-w-lg grid-cols-2 items-center gap-3">
                 <Button
                   type="button"
                   variant="ghost"
@@ -222,16 +236,6 @@ export function ListingComposerShell({
                 >
                   <ChevronLeft className="size-5" aria-hidden />
                   Forrige
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="icon"
-                  onClick={onCancel}
-                  className="size-14 rounded-full"
-                  aria-label="Avbryt annonseopprettelse"
-                >
-                  <X className="size-6" aria-hidden />
                 </Button>
                 <div className="min-w-0 justify-self-end">{footer}</div>
               </div>

@@ -4,6 +4,7 @@ import { validateRequiredFieldGroups } from "./validators";
 import { getCategoryBehavior } from "@/lib/category-behavior";
 
 const VEHICLE_BEHAVIOR = getCategoryBehavior("bil");
+const BOAT_BEHAVIOR = getCategoryBehavior(null, true);
 
 describe("validateRequiredFieldGroups", () => {
   const DEFAULT_FLOW = [
@@ -38,25 +39,32 @@ describe("validateRequiredFieldGroups", () => {
     const flow = DEFAULT_FLOW.filter((k) => k !== "condition");
     expect(validateRequiredFieldGroups(flow, { condition: null, can_ship: true })).toBeNull();
   });
-
-  it("allows can_ship: null when the flow omits the delivery-location group", () => {
+  it("requires can_ship for ordinary categories even when a stored flow omits delivery", () => {
     const flow = DEFAULT_FLOW.filter((k) => k !== "delivery");
-    expect(validateRequiredFieldGroups(flow, { condition: "good", can_ship: null })).toBeNull();
+    expect(validateRequiredFieldGroups(flow, { condition: "good", can_ship: null })).toEqual(
+      expect.any(String),
+    );
   });
-
-  it("allows both to be null when the flow omits both groups", () => {
+  it("allows condition to be null but still requires delivery when both groups are omitted", () => {
     const flow = DEFAULT_FLOW.filter((k) => k !== "condition" && k !== "delivery");
-    expect(validateRequiredFieldGroups(flow, { condition: null, can_ship: null })).toBeNull();
+    expect(validateRequiredFieldGroups(flow, { condition: null, can_ship: null })).toBe(
+      "Velg en leveringsmetode for annonsen.",
+    );
   });
 
-  it("allows can_ship: null for vehicle categories even when delivery-location is in the flow", () => {
-    // Bil og MC can't be shipped by post — its delivery-location step only
-    // asks for a location, not a shipping method, so can_ship is never set.
+  it("allows can_ship: null for vehicle and boat categories", () => {
     expect(
       validateRequiredFieldGroups(
         DEFAULT_FLOW,
         { condition: "good", can_ship: null },
         VEHICLE_BEHAVIOR,
+      ),
+    ).toBeNull();
+    expect(
+      validateRequiredFieldGroups(
+        DEFAULT_FLOW,
+        { condition: "good", can_ship: null },
+        BOAT_BEHAVIOR,
       ),
     ).toBeNull();
   });
@@ -68,6 +76,12 @@ describe("validateRequiredFieldGroups", () => {
         { condition: null, can_ship: null },
         VEHICLE_BEHAVIOR,
       ),
+    ).toEqual(expect.any(String));
+  });
+
+  it("still requires condition for boat categories", () => {
+    expect(
+      validateRequiredFieldGroups(DEFAULT_FLOW, { condition: null, can_ship: null }, BOAT_BEHAVIOR),
     ).toEqual(expect.any(String));
   });
 });

@@ -17,8 +17,8 @@ import { RequiredMark } from "../required-mark";
  * Brukeren kan ikke redigere denne selv — kjøretøyannonser skal alltid ha en
  * tittel generert av kjøretøysopplysningene. Undertittel er flyttet til
  * beskrivelse-steget (`description-keywords`) — se der. Eksportert slik at
- * redigeringsruten (som ikke gjenbruker hele TitlePhotos-komponenten) kan
- * bruke samme oppførsel.
+ * redigeringsruten (som rendrer feltet direkte, ikke via denne wizard-
+ * gruppen) kan bruke samme oppførsel.
  */
 export function VehicleTitleFields({
   setValue,
@@ -56,8 +56,9 @@ export function VehicleTitleFields({
 
 /**
  * Non-vehicle title input. Vehicle categories never reach this component —
- * `TitlePhotos` below skips it entirely for `isVehicle` (their title moved to
- * the beskrivelse step, see `VehicleTitleFields` usage in
+ * `withRuntimeFieldGroups` (category-flows.ts) strips "title" from a
+ * vehicle flow's field groups entirely (their title moved to the
+ * beskrivelse step, see `VehicleTitleFields` usage in
  * description-keywords/index.tsx), so it no longer needs its own
  * vehicle-vs-generic branch.
  */
@@ -113,34 +114,5 @@ export function PhotosGroup({
       </p>
       <ImageUploader images={images} onChange={setImages} uploadProgress={uploadProgress} />
     </section>
-  );
-}
-
-/**
- * Photo upload + (for non-vehicle categories) title. For Bil og MC
- * (`isVehicle`), this step is images only — Tittel/Tilstand/Pris/
- * Kilometerstand all live on the next step (beskrivelse), see
- * description-keywords/index.tsx. Web shows images first then title; native
- * shows title first then images — same content, different order, preserved
- * verbatim from the original per-platform JSX.
- *
- * 360°-opptak lå tidligere her, men bildesteget er nå alltid steg 1 — før
- * kategori er bekreftet — så den valgfrie forbedringen vises på reviewflaten
- * (`field-groups/vehicle-360`).
- */
-export function TitlePhotos(props: WizardSharedProps) {
-  if (props.native) {
-    return (
-      <div className="space-y-6">
-        {!props.isVehicle && <TitleGroup {...props} />}
-        <PhotosGroup {...props} />
-      </div>
-    );
-  }
-  return (
-    <div className="space-y-6">
-      <PhotosGroup {...props} />
-      {!props.isVehicle && <TitleGroup {...props} />}
-    </div>
   );
 }

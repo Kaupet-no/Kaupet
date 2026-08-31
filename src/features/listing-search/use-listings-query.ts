@@ -1,9 +1,8 @@
-import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import type { Category } from "@/lib/categories";
-import { logSearchQueryEvent } from "@/lib/search-logging.functions";
 import type { ListingsPage } from "@/features/listing-search/search-schema";
 import {
+  buildListingsPriceMaxRpcArgs,
   buildListingsSearchRpcArgs,
   runListingsSearch,
   type ListingsSearchParams,
@@ -30,8 +29,6 @@ export function useListingsQuery({
   effectiveCategories,
   terms,
 }: UseListingsQueryArgs) {
-  const logSearchQuery = useServerFn(logSearchQueryEvent);
-
   return useInfiniteQuery({
     queryKey: ["listings", search, effectiveCategories, terms],
     // Uten dette blankes `totalCount`/listen momentant ved hvert filterbytte
@@ -45,16 +42,6 @@ export function useListingsQuery({
     getNextPageParam: (lastPage: ListingsPage) => lastPage.nextOffset ?? undefined,
     queryFn: async ({ pageParam, signal }): Promise<ListingsPage> => {
       const emptyPage: ListingsPage = { rows: [], totalCount: 0, nextOffset: null };
-
-      // Aggregated, fire-and-forget logging of the free-text query and its
-      // result count — only for the first page of a real text search, so
-      // future tuning (trigram threshold, synonyms) has data to work from.
-      const rawQuery = (search.q ?? "").trim();
-      const logSearch = (resultCount: number) => {
-        if (pageParam === 0 && rawQuery) {
-          void logSearchQuery({ data: { query: rawQuery, resultCount } });
-        }
-      };
 
       const args = buildListingsSearchRpcArgs({
         search,
@@ -91,12 +78,39 @@ export function useListingsQuery({
           attributes: attrs,
         };
       });
-      logSearch(totalCount);
       return {
         rows,
         totalCount,
         nextOffset: pageParam + rows.length < totalCount ? pageParam + PAGE_SIZE : null,
       };
+    },
+  });
+}
+
+/** Highest price in the current result scope, excluding only the selected
+ * maximum price so the control can still be widened after it is lowered. */
+export function useListingsPriceMax({
+  search,
+  categories,
+  effectiveCategories,
+  terms,
+}: UseListingsQueryArgs) {
+  const priceSearch = { ...search, max: undefined, sort: "price_desc" as const };
+
+  return useQuery({
+    queryKey: ["listings-price-max", priceSearch, effectiveCategories, terms],
+    placeholderData: keepPreviousData,
+    enabled: effectiveCategories.length === 0 || !!categories,
+    queryFn: async ({ signal }) => {
+      const args = buildListingsPriceMaxRpcArgs({
+        search,
+        categories,
+        effectiveCategories,
+        terms,
+      });
+      if (!args) return null;
+      const rows = await runListingsSearch(args, signal);
+      return rows[0]?.price_nok ?? null;
     },
   });
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ChevronRight, Eye, EyeOff, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -13,9 +13,9 @@ import { SecondaryCategoryFilters } from "@/components/attribute-filter-chips";
 import { CategoryFilterFields } from "@/components/category-filter-fields";
 import { describeAttrValue } from "@/components/active-filters";
 import { RangeFilterField } from "@/components/range-filter-field";
-import { PRICE_BOUNDS } from "@/lib/filter-range-bounds";
-import { CONDITIONS, type AdvancedSearchValue } from "@/components/advanced-search-value";
-import type { Category } from "@/lib/categories";
+import { PRICE_BOUNDS, type RangeBounds } from "@/lib/filter-range-bounds";
+import { conditionOptionsFor, type AdvancedSearchValue } from "@/components/advanced-search-value";
+import { buildTree, isCategorySelectionComplete, type Category } from "@/lib/categories";
 import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/location-filter";
 import { emptyTermGroup, type TermGroup } from "@/lib/term-groups";
 import {
@@ -23,6 +23,7 @@ import {
   type AttributeFilterValue,
   type CategoryFilter,
 } from "@/lib/category-filters";
+import { rankSearchFilters } from "@/features/listing-search/rank-search-filters";
 import { hapticImpact } from "@/lib/haptics";
 import type { ActiveFilterItem } from "./active-filter-items";
 
@@ -42,14 +43,23 @@ type Props = {
    * lagret-søk-redigering bruker normalt sted fra samme utkast som resten. */
   location?: LocationValue;
   onLocationChange?: (v: LocationValue) => void;
+  /** Query text used to prioritize filters matching the current intent. */
+  queryText?: string;
   /** Kategoriens sekundære attributtfiltre. Utelatt betyr ingen egen seksjon. */
   attributeFilters?: CategoryFilter[];
   attributeValues?: Record<string, AttributeFilterValue>;
   onAttributeChange?: (key: string, value: AttributeFilterValue | undefined) => void;
   attributeCounts?: Record<string, Record<string, number>>;
+  /** Result-aware bounds for the first-class price column. */
+  priceBounds?: RangeBounds;
   /** Se `SecondaryCategoryFilters`: søkepanelet må vise hele filtersettet,
    * siden det er eneste vei dit på native etter fase 9. */
   includePrimary?: boolean;
+  /** Oppsett: "drilldown" er telefonens én-seksjon-om-gangen-liste,
+   * "expanded" er nettleserens sidekolonne der alle seksjoner står åpne
+   * samtidig og hvert valg gjelder umiddelbart. Samme seksjoner, samme
+   * tilstand — bare kroppen skiller (se docs/ARCHITECTURE.md § plattform). */
+  layout?: "drilldown" | "expanded";
   /** Aktive filtertagger — vises øverst med swipe-for-å-fjerne (fase 12).
    * Utelatt (ikke bare tom liste) skjuler seksjonen helt, for kallere som
    * ikke sporer aktive filtre som en flat liste (mine-sok.tsx). */
@@ -70,12 +80,15 @@ export function SearchFilterSections({
   categories,
   section,
   location: locationProp,
+  queryText,
   onLocationChange: onLocationChangeProp,
   attributeFilters,
   attributeValues,
   onAttributeChange,
   attributeCounts,
+  priceBounds = PRICE_BOUNDS,
   includePrimary = false,
+  layout = "drilldown",
   activeItems,
 }: Props) {
   const [editingGroup, setEditingGroup] = useState<TermGroup | null>(null);
@@ -84,6 +97,17 @@ export function SearchFilterSections({
   const [overviewOpen, setOverviewOpen] = useState(section === "categories");
   const [activeSection, setActiveSection] = useState<SearchFilterSection>(section);
   const [activeAttributeKey, setActiveAttributeKey] = useState<string | null>(null);
+  // Sidekolonnen: alltid åpen så lenge ingen kategori er valgt (også etter
+  // «Nullstill»), ellers bare når brukeren selv har trykket «Endre».
+  const [categoryEditOpen, setCategoryEditOpen] = useState(false);
+  const categoryTree = useMemo(() => buildTree(categories), [categories]);
+  const expanded = layout === "expanded";
+  /** I sidekolonnen står alt åpent; i skuffen vises én seksjon om gangen. */
+  const showSection = (key: SearchFilterSection) => expanded || activeSection === key;
+  const sectionClass = expanded
+    ? "scroll-mt-2 space-y-3 border-t border-border pt-4"
+    : "density-task mt-4 scroll-mt-2 border-y border-border";
+  const labelClass = expanded ? "text-sm font-semibold" : "text-base font-medium";
 
   // Falls back to editing the draft's own location when no live location is
   // passed in (saved-search editing on mine-sok.tsx), so the "Sted" section
@@ -96,6 +120,7 @@ export function SearchFilterSections({
   const hasAttributeFilters =
     attributeFilters != null && attributeValues != null && onAttributeChange != null;
   const selectedCategories = categories.filter((category) => v.categories.includes(category.slug));
+  const conditionOptions = conditionOptionsFor(v.categories);
   const categorySummary =
     selectedCategories.length === 0
       ? "Alle kategorier"
@@ -104,7 +129,13 @@ export function SearchFilterSections({
         : `${selectedCategories[0].name_nb} +${selectedCategories.length - 1}`;
   const advancedFilterCount = Object.keys(attributeValues ?? {}).length;
   const primaryFilters = attributeFilters
-    ? splitPrimaryFilters(attributeFilters).primary.slice(0, 6)
+    ? rankSearchFilters({
+        filters: splitPrimaryFilters(attributeFilters).primary,
+        activeValues: attributeValues,
+        queryText: queryText ?? v.terms.join(" "),
+        facetCounts: attributeCounts,
+        limit: 6,
+      })
     : [];
   const priceSummary =
     v.min != null || v.max != null
@@ -173,7 +204,7 @@ export function SearchFilterSections({
       {activeItems && activeItems.length > 0 && (
         <p className="mb-6 text-sm text-muted-foreground">{activeItems.length} filtre valgt</p>
       )}
-      <div className="space-y-2">
+      <div className="overflow-hidden rounded-2xl border border-border bg-card">
         <FilterOverviewRow
           label="Kategori"
           value={categorySummary}
@@ -189,37 +220,316 @@ export function SearchFilterSections({
           label="Tilstand"
           value={v.conditions.length ? `${v.conditions.length} valgt` : "Alle"}
           onClick={() => setConditionsOpen(true)}
+          last={primaryFilters.length === 0}
         />
-      </div>
-      <div className="mt-6 space-y-2">
-        {primaryFilters.map((filter) => (
+        {primaryFilters.map((filter, index) => (
           <FilterOverviewRow
             key={filter.id}
             label={filter.label_nb}
             value={attributeSummary(filter)}
             onClick={() => openSection("attributes", filter.key)}
+            last={index === primaryFilters.length - 1}
           />
         ))}
+      </div>
+      <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-card">
         <FilterOverviewRow
           label="Alle filtre"
           value={advancedFilterCount ? `${advancedFilterCount} aktive` : "Ingen"}
           onClick={() => openSection("attributes")}
         />
         <FilterOverviewRow
-          label="Presist søk"
+          label="Flere søkevalg"
           value={advancedSearchSummary || "Ingen"}
           onClick={() => openSection("search")}
+          last
         />
       </div>
     </div>
   );
 
+  /** Selve seksjonene — delt mellom skuffens én-om-gangen-visning og
+   * sidekolonnens alt-åpent-visning, så det finnes bare ett filtersett. */
+  const sectionFields = (
+    <>
+      {showSection("location") && (
+        <section data-section="location" className={`${sectionClass} space-y-4`}>
+          <Label className={labelClass}>Sted</Label>
+          <LocationPicker value={location} onChange={onLocationChange} autoFocus={false} />
+          {locationActive && (
+            <RadiusPicker
+              value={location.radius}
+              onChange={(r) => onLocationChange({ ...location, radius: r })}
+            />
+          )}
+        </section>
+      )}
+
+      {showSection("price") && (
+        <section data-section="price" className={`${sectionClass} space-y-6`}>
+          <div className="space-y-3">
+            {/* Ingen egen seksjonstittel — RangeFilterField rendrer selv en
+                "Pris (NOK)"-label rett under. */}
+            <RangeFilterField
+              label="Pris (NOK)"
+              bounds={priceBounds}
+              value={{ min: v.min ?? undefined, max: v.max ?? undefined }}
+              onChange={({ min, max }) =>
+                setV((prev) => ({ ...prev, min: min ?? null, max: max ?? null }))
+              }
+            />
+            <div className="grid grid-cols-3 gap-2">
+              {[50_000, 100_000, 250_000]
+                .filter((max) => max <= priceBounds.max)
+                .map((max) => (
+                  <Button
+                    key={max}
+                    type="button"
+                    variant={v.max === max ? "default" : "outline"}
+                    size="default"
+                    className={expanded ? "px-1 text-xs" : "min-h-13 px-2 text-xs"}
+                    disabled={v.min != null && max < v.min}
+                    onClick={() => setV((previous) => ({ ...previous, max }))}
+                    aria-label={`Inntil ${max.toLocaleString("nb-NO")}`}
+                  >
+                    {/* Sidekolonnen er smal — «≤» i stedet for «Inntil». */}
+                    {expanded ? "≤ " : "Inntil "}
+                    {max.toLocaleString("nb-NO")}
+                  </Button>
+                ))}
+            </div>
+            <label
+              className={`flex cursor-pointer items-center gap-3 ${expanded ? "" : "min-h-11"}`}
+            >
+              <Checkbox
+                checked={v.includeFree}
+                onCheckedChange={(c) => {
+                  void hapticImpact("light");
+                  setV((prev) => ({ ...prev, includeFree: c === true }));
+                }}
+                id="adv-free"
+              />
+              <Label
+                htmlFor="adv-free"
+                className={`cursor-pointer ${expanded ? "text-sm" : "text-base"}`}
+              >
+                Inkluder gratis-annonser
+              </Label>
+            </label>
+          </div>
+        </section>
+      )}
+
+      {showSection("attributes") && (
+        <section data-section="attributes" className={`${sectionClass} space-y-4`}>
+          <Label className={labelClass}>
+            {activeAttributeKey
+              ? attributeFilters?.find((filter) => filter.key === activeAttributeKey)?.label_nb
+              : "Alle filtre"}
+          </Label>
+          {hasAttributeFilters && v.categories.length > 0 ? (
+            activeAttributeKey ? (
+              <CategoryFilterFields
+                filters={attributeFilters!.filter((filter) => filter.key === activeAttributeKey)}
+                brandLookupFilters={attributeFilters}
+                values={attributeValues!}
+                onChange={onAttributeChange!}
+                counts={attributeCounts}
+                isNative={!expanded}
+              />
+            ) : (
+              <SecondaryCategoryFilters
+                filters={attributeFilters!}
+                values={attributeValues!}
+                onChange={onAttributeChange!}
+                counts={attributeCounts}
+                /* Sidekolonnen følger rekkefølgen administrator har satt i
+                   admin (category_filters.sort_order). Relevanssorteringen
+                   etter søketeksten hører hjemme der plassen er knapp og
+                   filtrene ligger bak et trykk — ikke der alle står synlige. */
+                queryText={expanded ? undefined : (queryText ?? v.terms.join(" "))}
+                isNative={!expanded}
+                includePrimary={includePrimary}
+                // Denne seksjonen er alltid synlig i sidekolonnen (ikke bak et
+                // eksplisitt "åpne filter"-trykk), så autofokus her ville
+                // rykket siden ned til søkefeltet så snart en hovedkategori
+                // velges. Se `SecondaryCategoryFilters`.
+                autoFocusSearch={false}
+              />
+            )
+          ) : (
+            <button
+              type="button"
+              onClick={() => !expanded && setCategoryOpen(true)}
+              disabled={expanded}
+              className="native-touch-target flex w-full items-center rounded-xl border border-dashed border-border px-4 py-3 text-left text-sm text-muted-foreground disabled:cursor-default"
+            >
+              Velg kategori for å se kategorispesifikke filtre
+            </button>
+          )}
+        </section>
+      )}
+
+      {showSection("search") && (
+        <section key="search" className={`${sectionClass} space-y-3`}>
+          <Label className={labelClass}>Søket skal matche</Label>
+
+          <ModeToggle
+            value={v.qMode}
+            onChange={(qMode) => setV((previous) => ({ ...previous, qMode }))}
+            labels={["Alle ordene", "Minst ett ord"]}
+          />
+
+          {v.extraGroups.map((g) => (
+            <div
+              key={g.id}
+              className={`flex min-h-14 w-full items-start gap-3 rounded-xl border px-4 py-3 text-left ${
+                g.exclude ? "border-destructive/40 bg-destructive/5" : "border-border bg-card"
+              }`}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  void hapticImpact("light");
+                  setEditingGroup(g);
+                }}
+                className="flex min-w-0 flex-1 items-start gap-3 text-left"
+              >
+                <span
+                  className={`mt-0.5 shrink-0 ${g.exclude ? "text-destructive" : "text-muted-foreground"}`}
+                >
+                  {g.exclude ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span
+                    className={`block text-sm font-medium ${g.exclude ? "text-destructive" : ""}`}
+                  >
+                    {g.exclude
+                      ? "Skal ikke inneholde"
+                      : g.mode === "all"
+                        ? "Må inneholde"
+                        : "Kan inneholde"}
+                  </span>
+                  <span className="block truncate text-sm text-muted-foreground">
+                    {g.terms.length > 0 ? g.terms.join(", ") : "Ingen ord lagt til"}
+                  </span>
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => removeGroup(g.id)}
+                className="native-hit-area shrink-0 rounded-full p-1.5 text-muted-foreground hover:text-foreground"
+                aria-label="Fjern regel"
+              >
+                <Trash2 className="size-4" />
+              </button>
+            </div>
+          ))}
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              void hapticImpact("light");
+              setEditingGroup(emptyTermGroup());
+            }}
+            className="w-fit justify-start px-2 text-muted-foreground hover:text-foreground native:h-auto native:w-full native:rounded-xl native:border native:border-dashed native:border-border native:px-4 native:py-3 native:hover:border-primary native:hover:bg-transparent native:hover:text-primary native:active:scale-[0.98]"
+          >
+            <Plus className="size-4" />
+            Legg til regel
+          </Button>
+        </section>
+      )}
+    </>
+  );
+
+  /** Kategori og tilstand er egne ark i skuffen, men hører hjemme rett i
+   * sidekolonnen — ingen grunn til å åpne en dialog for dem der. */
+  const inlineCategoryAndConditions = (
+    <>
+      {/* Kategorivelgeren er høy (hovedkategori + underkategoriliste), så den
+          står bare åpen så lenge ingen kategori er valgt. Etterpå holder en
+          sammendragslinje med «Endre» — resten av filtrene er viktigere når
+          kategorien først er satt. */}
+      <section data-section="categories" className={`${sectionClass} space-y-3`}>
+        {categoryEditOpen || !isCategorySelectionComplete(v.categories, categoryTree) ? (
+          <>
+            <CategoryPicker
+              categories={categories}
+              selected={v.categories}
+              onChange={(slugs) => setV((prev) => ({ ...prev, categories: slugs, catMode: "any" }))}
+            />
+            {v.categories.length > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => setCategoryEditOpen(false)}
+              >
+                Ferdig
+              </Button>
+            )}
+          </>
+        ) : (
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <Label className={labelClass}>Kategori</Label>
+              <p className="truncate text-sm text-muted-foreground">{categorySummary}</p>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="shrink-0 px-2 text-primary"
+              onClick={() => setCategoryEditOpen(true)}
+            >
+              Endre
+            </Button>
+          </div>
+        )}
+      </section>
+      <section data-section="conditions" className={`${sectionClass} space-y-2`}>
+        <Label className={labelClass}>Tilstand</Label>
+        {conditionOptions.map((condition) => (
+          <label key={condition.value} className="flex cursor-pointer items-center gap-3">
+            <Checkbox
+              checked={v.conditions.includes(condition.value)}
+              onCheckedChange={(checked) =>
+                setV((prev) => ({
+                  ...prev,
+                  conditions:
+                    checked === true
+                      ? [...prev.conditions, condition.value]
+                      : prev.conditions.filter((entry) => entry !== condition.value),
+                }))
+              }
+              id={`adv-condition-${condition.value}`}
+            />
+            <Label
+              htmlFor={`adv-condition-${condition.value}`}
+              className="cursor-pointer text-sm font-normal"
+            >
+              {condition.label}
+            </Label>
+          </label>
+        ))}
+      </section>
+    </>
+  );
+
   return (
     <>
-      {overviewOpen ? (
+      {expanded ? (
+        <div className="@container space-y-1">
+          {inlineCategoryAndConditions}
+          {sectionFields}
+        </div>
+      ) : overviewOpen ? (
         overview
       ) : (
-        <div className="flex-1 overflow-y-auto px-4 py-5 pb-[calc(6rem+env(safe-area-inset-bottom))]">
+        <div className="@container flex-1 overflow-y-auto px-4 py-5 pb-[calc(6rem+env(safe-area-inset-bottom))]">
           <button
             type="button"
             onClick={() => setOverviewOpen(true)}
@@ -227,186 +537,7 @@ export function SearchFilterSections({
           >
             Tilbake til filteroversikt
           </button>
-          {activeSection === "location" && (
-            <section
-              data-section="location"
-              className="density-task mt-4 scroll-mt-2 space-y-4 border-y border-border"
-            >
-              <Label className="text-base font-medium">Sted</Label>
-              <LocationPicker value={location} onChange={onLocationChange} autoFocus={false} />
-              {locationActive && (
-                <RadiusPicker
-                  value={location.radius}
-                  onChange={(r) => onLocationChange({ ...location, radius: r })}
-                />
-              )}
-            </section>
-          )}
-
-          {activeSection === "price" && (
-            <section
-              data-section="price"
-              className="density-task mt-4 scroll-mt-2 space-y-6 border-y border-border"
-            >
-              <div className="space-y-3">
-                {/* Ingen egen seksjonstittel — RangeFilterField rendrer selv en
-                "Pris (NOK)"-label rett under. */}
-                <RangeFilterField
-                  label="Pris (NOK)"
-                  bounds={PRICE_BOUNDS}
-                  value={{ min: v.min ?? undefined, max: v.max ?? undefined }}
-                  onChange={({ min, max }) =>
-                    setV((prev) => ({ ...prev, min: min ?? null, max: max ?? null }))
-                  }
-                />
-                <div className="grid grid-cols-3 gap-2">
-                  {[50_000, 100_000, 250_000].map((max) => (
-                    <Button
-                      key={max}
-                      type="button"
-                      variant={v.max === max ? "default" : "outline"}
-                      size="default"
-                      className="min-h-13 px-2 text-xs"
-                      disabled={v.min != null && max < v.min}
-                      onClick={() => setV((previous) => ({ ...previous, max }))}
-                    >
-                      Inntil {max.toLocaleString("nb-NO")}
-                    </Button>
-                  ))}
-                </div>
-                <label className="flex min-h-11 cursor-pointer items-center gap-3">
-                  <Checkbox
-                    checked={v.includeFree}
-                    onCheckedChange={(c) => {
-                      void hapticImpact("light");
-                      setV((prev) => ({ ...prev, includeFree: c === true }));
-                    }}
-                    id="adv-free"
-                  />
-                  <Label htmlFor="adv-free" className="cursor-pointer text-base">
-                    Inkluder gratis-annonser
-                  </Label>
-                </label>
-              </div>
-            </section>
-          )}
-
-          {activeSection === "attributes" && (
-            <section
-              data-section="attributes"
-              className="density-task space-y-4 border-y border-border"
-            >
-              <Label className="text-base font-medium">
-                {activeAttributeKey
-                  ? attributeFilters?.find((filter) => filter.key === activeAttributeKey)?.label_nb
-                  : "Alle filtre"}
-              </Label>
-              {hasAttributeFilters && v.categories.length > 0 ? (
-                activeAttributeKey ? (
-                  <CategoryFilterFields
-                    filters={attributeFilters!.filter(
-                      (filter) => filter.key === activeAttributeKey,
-                    )}
-                    brandLookupFilters={attributeFilters}
-                    values={attributeValues!}
-                    onChange={onAttributeChange!}
-                    counts={attributeCounts}
-                    isNative
-                  />
-                ) : (
-                  <SecondaryCategoryFilters
-                    filters={attributeFilters!}
-                    values={attributeValues!}
-                    onChange={onAttributeChange!}
-                    counts={attributeCounts}
-                    isNative
-                    includePrimary={includePrimary}
-                  />
-                )
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setCategoryOpen(true)}
-                  className="native-touch-target flex w-full items-center rounded-xl border border-dashed border-border px-4 py-3 text-left text-sm text-muted-foreground"
-                >
-                  Velg kategori for å se kategorispesifikke filtre
-                </button>
-              )}
-            </section>
-          )}
-
-          {activeSection === "search" && (
-            <section
-              data-section="search"
-              className="density-task space-y-3 border-y border-border"
-            >
-              <Label className="text-base font-medium">Presist søk</Label>
-
-              <ModeToggle
-                value={v.qMode}
-                onChange={(qMode) => setV((previous) => ({ ...previous, qMode }))}
-                labels={["Alle ord", "Minst ett"]}
-              />
-
-              {v.extraGroups.map((g) => (
-                <div
-                  key={g.id}
-                  className={`flex min-h-14 w-full items-start gap-3 rounded-xl border px-4 py-3 text-left ${
-                    g.exclude ? "border-destructive/40 bg-destructive/5" : "border-border bg-card"
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void hapticImpact("light");
-                      setEditingGroup(g);
-                    }}
-                    className="flex min-w-0 flex-1 items-start gap-3 text-left"
-                  >
-                    <span
-                      className={`mt-0.5 shrink-0 ${g.exclude ? "text-destructive" : "text-muted-foreground"}`}
-                    >
-                      {g.exclude ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span
-                        className={`block text-sm font-medium ${g.exclude ? "text-destructive" : ""}`}
-                      >
-                        {g.exclude
-                          ? "Skal ikke inneholde"
-                          : g.mode === "all"
-                            ? "Må inneholde"
-                            : "Kan inneholde"}
-                      </span>
-                      <span className="block truncate text-sm text-muted-foreground">
-                        {g.terms.length > 0 ? g.terms.join(", ") : "Ingen ord lagt til"}
-                      </span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeGroup(g.id)}
-                    className="native-hit-area shrink-0 rounded-full p-1.5 text-muted-foreground hover:text-foreground"
-                    aria-label="Fjern regel"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
-                </div>
-              ))}
-
-              <button
-                type="button"
-                onClick={() => {
-                  void hapticImpact("light");
-                  setEditingGroup(emptyTermGroup());
-                }}
-                className="native-touch-target flex w-full items-center gap-2 rounded-xl border border-dashed border-border px-4 py-3 text-sm text-muted-foreground transition active:scale-[0.98] hover:border-primary hover:text-primary"
-              >
-                <Plus className="size-4" />
-                Legg til regel
-              </button>
-            </section>
-          )}
+          {sectionFields}
         </div>
       )}
 
@@ -435,7 +566,7 @@ export function SearchFilterSections({
         open={conditionsOpen}
         onOpenChange={setConditionsOpen}
         title="Tilstand"
-        options={CONDITIONS.map((condition) => ({
+        options={conditionOptions.map((condition) => ({
           value: condition.value,
           label: condition.label,
         }))}
@@ -460,16 +591,20 @@ function FilterOverviewRow({
   label,
   value,
   onClick,
+  last,
 }: {
   label: string;
   value: string;
   onClick: () => void;
+  last?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="native-touch-target flex min-h-14 w-full items-center gap-3 rounded-xl bg-muted px-4 py-3 text-left"
+      className={`native-touch-target flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left transition active:bg-muted ${
+        last ? "" : "border-b border-border"
+      }`}
     >
       <span className="min-w-0 flex-1">
         <span className="block text-base font-medium">{label}</span>
@@ -515,7 +650,7 @@ function OpenTermGroupSheet({
       onOpenChange={(o) => {
         if (!o) onClose();
       }}
-      title="Presist søk"
+      title="Flere søkevalg"
       titleVisible
       expandable
       className="overflow-y-auto"

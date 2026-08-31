@@ -29,7 +29,7 @@ type LocationPickerProps = {
 
 export function LocationPicker({ value, onChange, onDone, autoFocus = true }: LocationPickerProps) {
   const [query, setQuery] = useState(value.label ?? "");
-  const { results, loading } = useNominatimSearch(query);
+  const { results, loading, searchedQuery, search, clear: clearSearch } = useNominatimSearch();
   const [locationPermission, setLocationPermission] = useState<"granted" | "denied" | null>(null);
 
   useEffect(() => {
@@ -80,33 +80,51 @@ export function LocationPicker({ value, onChange, onDone, autoFocus = true }: Lo
   const clear = () => {
     onChange({ lat: null, lng: null, radius: value.radius, label: "" });
     setQuery("");
+    clearSearch();
   };
 
   const hasLocation = value.lat != null && value.lng != null;
 
   return (
     <div className="w-full space-y-2 p-1">
-      <div className="relative">
-        <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          autoFocus={autoFocus}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Sted (f.eks. Oslo, Bergen, 7030)"
-          className="pl-8 pr-8"
-          aria-label="Søk etter sted"
-        />
-        {hasLocation && (
-          <button
-            type="button"
-            onClick={clear}
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-muted"
-            aria-label="Fjern lokasjon"
-          >
-            <X className="size-4" />
-          </button>
-        )}
-      </div>
+      <form
+        className="flex gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void search(query);
+        }}
+      >
+        <div className="relative min-w-0 flex-1">
+          <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            autoFocus={autoFocus}
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              clearSearch();
+            }}
+            placeholder="Sted eller postnummer"
+            className="pl-8 pr-8"
+            aria-label="Søk etter sted"
+          />
+          {hasLocation && (
+            <button
+              type="button"
+              onClick={clear}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-muted"
+              aria-label="Fjern lokasjon"
+            >
+              <X className="size-4" />
+            </button>
+          )}
+        </div>
+        <Button type="submit" variant="outline" disabled={query.trim().length < 2 || loading}>
+          Søk
+        </Button>
+      </form>
+      <p className="text-xs text-muted-foreground">
+        Søket sendes til OpenStreetMap når du trykker Søk.
+      </p>
       <Button
         type="button"
         variant="outline"
@@ -123,7 +141,7 @@ export function LocationPicker({ value, onChange, onDone, autoFocus = true }: Lo
       </Button>
       <div className="max-h-[260px] overflow-y-auto">
         {loading && <div className="px-2 py-2 text-sm text-muted-foreground">Søker…</div>}
-        {!loading && results.length === 0 && query.length >= 2 && (
+        {!loading && searchedQuery === query.trim() && results.length === 0 && (
           <div className="px-2 py-2 text-sm text-muted-foreground">Ingen treff</div>
         )}
         {results.map((r) => (

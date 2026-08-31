@@ -10,6 +10,7 @@ import { useListingGalleryImages } from "@/hooks/use-listing-gallery-images";
 type Props = {
   listing: ListingCardData;
   linkState?: Record<string, unknown>;
+  onOpen?: () => void;
   coverImageUrl?: string | null;
   knownFavorite?: boolean;
   favoriteStateReady?: boolean;
@@ -22,6 +23,7 @@ type Props = {
 export function ListingCardImages({
   listing,
   linkState,
+  onOpen,
   coverImageUrl,
   knownFavorite,
   favoriteStateReady,
@@ -86,7 +88,11 @@ export function ListingCardImages({
         onClick={(e) => {
           // Karusellpilene ligger visuelt oppå bildet og dermed inni denne
           // lenken — bare naviger når klikket ikke traff en pil.
-          if ((e.target as HTMLElement).closest("button")) e.preventDefault();
+          if ((e.target as HTMLElement).closest("button")) {
+            e.preventDefault();
+            return;
+          }
+          onOpen?.();
         }}
         className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >

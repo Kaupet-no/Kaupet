@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useIsNative } from "@/hooks/use-is-native";
 import { createFileRoute, useNavigate, useBlocker, useRouter, Link } from "@tanstack/react-router";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useForm, useWatch, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,7 +9,7 @@ import { z } from "zod";
 import { showErrorToast } from "@/lib/toast";
 import { AlertCircle, ChevronLeft, ChevronRight, Loader2, Check, Bell } from "lucide-react";
 
-import { supabase } from "@/integrations/supabase/client";
+import { useCategories } from "@/hooks/use-categories";
 import { createWtbListing } from "@/lib/wtb-listings.functions";
 import { prefetchCategorySuggestion } from "@/lib/category-suggestion.functions";
 import { useCategorySuggestionLoadingMessage } from "@/features/listing-creation/use-category-suggestion-loading-message";
@@ -198,18 +198,7 @@ function NewWtbPage() {
     });
   }, [step, stepIndex]);
 
-  const { data: categories = [] } = useQuery({
-    queryKey: ["categories", "with-color"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("categories")
-        .select("id, name_nb, parent_id, icon, color")
-        .order("sort_order")
-        .order("name_nb");
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
+  const { data: categories = [] } = useCategories();
 
   const { data: allFilters } = useAllCategoryFilters();
   const categoriesById = useMemo(() => {

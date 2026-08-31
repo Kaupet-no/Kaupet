@@ -25,7 +25,7 @@ export async function login(page: Page, email: string, password: string) {
   await page.goto("/auth?mode=signin");
   await page.locator("html[data-kaupet-hydrated='true']").waitFor();
   await page.getByLabel("E-post").fill(email);
-  await page.getByLabel("Passord").fill(password);
+  await page.getByLabel("Passord", { exact: true }).fill(password);
   await page.getByRole("main").getByRole("button", { name: "Logg inn" }).click();
   await expect(page).toHaveURL("/", { timeout: 10_000 });
 }
@@ -125,6 +125,27 @@ export async function clickAndWaitFor(
   await expected.waitFor();
 }
 
+/**
+ * Clicks a one-shot, non-idempotent trigger (a mutation — e.g. "publish
+ * this listing") exactly once, then waits with one generous budget instead
+ * of clickAndWaitFor's retry-click loop. Root cause of the long-standing
+ * "click completes but the page never updates" publish flake (see
+ * clickAndWaitFor's docstring): the retry loop re-clicks whenever `expected`
+ * hasn't shown up yet, but a Radix AlertDialogAction can stay in the
+ * accessibility tree mid-close-animation — so a slow mutation (createListing
+ * itself, not just the click) meant the "confirm publish" button looked
+ * still-visible on the next attempt and got clicked again, firing a second
+ * concurrent `mutation.mutate()` while the first was still in flight. That
+ * race is exactly the kind of bug static analysis of the mutation code in
+ * isolation won't show. Only use this for actions that must fire at most
+ * once; clickAndWaitFor remains correct for idempotent triggers (dialog
+ * opens, wizard "Neste").
+ */
+export async function clickOnceAndWaitFor(trigger: Locator, expected: Locator, timeout = 20_000) {
+  await trigger.click();
+  await expected.waitFor({ timeout });
+}
+
 export async function clickNextAndWaitFor(page: Page, expected: Locator, testInfo: TestInfo) {
   await clickAndWaitFor(
     page,
@@ -171,6 +192,17 @@ export async function fillDescriptionAndAdvance(
  * by the time this assertion ran, even though publishing had succeeded).
  */
 export async function publishAndExpectSuccess(page: Page, testInfo: TestInfo) {
+  // Root cause of the flake this retry logic was papering over (see trace
+  // from the 2026-08-31 CI run): the publish button stays disabled until the
+  // invisible Turnstile widget resolves (`turnstileEnabled && !turnstileToken`
+  // in review-publish/index.tsx), and loading Turnstile's challenge iframe
+  // from Cloudflare can take longer than clickAndWaitFor's per-attempt
+  // budget (5s click + 8s wait, x3 = 39s, already over the 30s test
+  // timeout). Waiting for the button to actually become enabled first — on
+  // its own, generous budget — means the click-retry loop below only has to
+  // absorb an actual missed click, not Turnstile's network-bound solve time.
+  testInfo.setTimeout(testInfo.timeout + 20_000);
+  await expect(page.getByTestId("publish-listing-button")).toBeEnabled({ timeout: 20_000 });
   await clickAndWaitFor(
     page,
     page.getByTestId("publish-listing-button"),
@@ -178,11 +210,12 @@ export async function publishAndExpectSuccess(page: Page, testInfo: TestInfo) {
     testInfo,
     "no-progress-after-publish-click",
   );
-  await clickAndWaitFor(
-    page,
+  // Not clickAndWaitFor: this button fires mutation.mutate() — a real,
+  // non-idempotent publish — so it must be clicked at most once. See
+  // clickOnceAndWaitFor's docstring for the double-submit race this avoids.
+  await clickOnceAndWaitFor(
     page.getByTestId("publish-anyway-button"),
     page.getByRole("heading", { name: "Annonsen din er publisert, bra jobba!" }),
-    testInfo,
-    "no-progress-after-publish-anyway-click",
+    20_000,
   );
 }

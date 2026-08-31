@@ -56,11 +56,17 @@ export function LoanCalculator({ totalPriceKr }: { totalPriceKr: number | null }
       </p>
 
       <div className="mt-4 space-y-1.5">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Egenkapital: {formatKr(clampedDownPayment)}</span>
-          <span className="text-muted-foreground">Lånebeløp: {formatKr(loanAmountKr)}</span>
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <label htmlFor="loan-down-payment" className="text-muted-foreground">
+            Egenkapital: {formatKr(clampedDownPayment)}
+          </label>
+          <span className="text-right text-muted-foreground">
+            Lånebeløp: {formatKr(loanAmountKr)}
+          </span>
         </div>
         <Slider
+          id="loan-down-payment"
+          aria-label="Egenkapital"
           value={[clampedDownPayment]}
           onValueChange={([v]) => setDownPaymentKr(v)}
           min={0}
@@ -70,10 +76,12 @@ export function LoanCalculator({ totalPriceKr }: { totalPriceKr: number | null }
       </div>
 
       <div className="mt-4 space-y-1.5">
-        <span className="text-sm text-muted-foreground">
-          Effektiv rente: {interestRatePct.toLocaleString("nb-NO", { minimumFractionDigits: 1 })} %
-        </span>
+        <label htmlFor="loan-interest-rate" className="text-sm text-muted-foreground">
+          Rente (anslag): {interestRatePct.toLocaleString("nb-NO", { minimumFractionDigits: 1 })} %
+        </label>
         <Slider
+          id="loan-interest-rate"
+          aria-label="Rente (anslag)"
           value={[interestRatePct]}
           onValueChange={([v]) => setInterestRatePct(v)}
           min={0}
@@ -83,15 +91,17 @@ export function LoanCalculator({ totalPriceKr }: { totalPriceKr: number | null }
       </div>
 
       <div className="mt-4">
-        <span className="text-sm text-muted-foreground">Nedbetalingstid</span>
+        <label htmlFor="loan-term" className="text-sm text-muted-foreground">
+          Nedbetalingstid
+        </label>
         <Select value={String(termYears)} onValueChange={(v) => setTermYears(Number(v))}>
-          <SelectTrigger className="mt-1.5">
+          <SelectTrigger id="loan-term" aria-label="Nedbetalingstid" className="mt-1.5">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {TERM_YEARS_OPTIONS.map((years) => (
               <SelectItem key={years} value={String(years)}>
-                {years} {years === 1 ? "år" : "år"}
+                {years} år
               </SelectItem>
             ))}
           </SelectContent>

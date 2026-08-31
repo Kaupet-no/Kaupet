@@ -209,7 +209,7 @@ function VarslerPage() {
               description="Lagre et søk for å bli varslet om nye treff."
               action={
                 <Link to="/mine-sok">
-                  <Button>Mine søk</Button>
+                  <Button>Gå til mine søk</Button>
                 </Link>
               }
             />
@@ -229,15 +229,18 @@ function VarslerPage() {
                   >
                     <div className="flex items-start gap-2">
                       {!n.read_at && (
-                        <span className="mt-1.5 size-2.5 shrink-0 rounded-full bg-accent" />
+                        <span
+                          className="mt-1.5 size-2.5 shrink-0 rounded-full bg-brand"
+                          aria-label="Ulest"
+                        />
                       )}
                       <div className="min-w-0 flex-1">
                         <p className="line-clamp-1 text-sm font-medium">
                           {n.kind === "price_drop" && (
-                            <TrendingDown className="mr-1 inline size-3.5 text-accent" />
+                            <TrendingDown className="mr-1 inline size-3.5 text-brand" />
                           )}
                           {n.kind === "wtb_match" && (
-                            <ShoppingBag className="mr-1 inline size-3.5 text-accent" />
+                            <ShoppingBag className="mr-1 inline size-3.5 text-brand" />
                           )}
                           {n.listing_title ??
                             (n.kind === "price_drop" ? "Favoritten din" : "Ny annonse")}

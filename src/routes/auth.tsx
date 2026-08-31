@@ -4,7 +4,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
-import { Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,8 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Turnstile } from "@marsidev/react-turnstile";
 import { isNative } from "@/lib/native";
+import { useIsNative } from "@/hooks/use-is-native";
+import { NativePageHeader } from "@/components/native-page-header";
 import { formatErrorMessage } from "@/lib/errors";
 import { passwordStrength } from "@/lib/password-strength";
 import { passwordSchema } from "@/lib/auth-schemas";
@@ -59,7 +61,8 @@ const signUpSchema = signInSchema.extend({
   displayName: z.string().trim().max(50, "Maks 50 tegn").optional().or(z.literal("")),
   password: passwordSchema,
   acceptedTerms: z.boolean().refine((v) => v === true, {
-    message: "Du må godta brukervilkårene og personvernerklæringen for å opprette konto.",
+    message:
+      "Du må godta brukervilkårene og bekrefte at du har lest personvernerklæringen for å opprette konto.",
   }),
 });
 
@@ -72,8 +75,10 @@ function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const turnstileEnabled = !!import.meta.env.VITE_TURNSTILE_SITE_KEY;
   const isSignUp = authMode === "signup";
+  const native = useIsNative();
 
   useEffect(() => setAuthMode(mode), [mode]);
 
@@ -120,6 +125,7 @@ function AuthPage() {
   useEffect(() => {
     clearErrors();
     setTurnstileToken(null);
+    setShowPassword(false);
   }, [authMode, clearErrors]);
 
   const webOrigin = () => (isNative() ? "https://kaupet.no" : window.location.origin);
@@ -205,21 +211,33 @@ function AuthPage() {
     }
   };
 
+  const title =
+    authMode === "reset"
+      ? "Glemt passord"
+      : authMode === "resend"
+        ? "Bekreft e-post"
+        : authMode === "confirm"
+          ? "Sjekk e-posten din"
+          : isSignUp
+            ? "Bli medlem"
+            : "Logg inn";
+
   return (
-    <div className="mx-auto flex max-w-md flex-col px-4 py-16">
-      <div className="rounded-2xl border border-border bg-card p-8 shadow-sm">
-        <h1 className="font-display text-3xl tracking-tight">
-          {authMode === "reset"
-            ? "Glemt passord"
-            : authMode === "resend"
-              ? "Bekreft e-post"
-              : authMode === "confirm"
-                ? "Sjekk e-posten din"
-                : isSignUp
-                  ? "Bli medlem"
-                  : "Logg inn"}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+    <div className={native ? "flex flex-col" : "mx-auto flex max-w-md flex-col px-4 py-16"}>
+      <NativePageHeader title={title} backTo={returnTo ?? "/"} />
+      <div
+        className={
+          native
+            ? "px-safe flex-1 px-4 py-6"
+            : "rounded-2xl border border-border bg-card p-8 shadow-sm"
+        }
+      >
+        {!native && <h1 className="font-display text-3xl tracking-tight">{title}</h1>}
+        <p
+          className={
+            native ? "text-sm text-muted-foreground" : "mt-1 text-sm text-muted-foreground"
+          }
+        >
           {authMode === "reset"
             ? "Skriv inn e-postadressen din, så sender vi deg en lenke for å sette nytt passord."
             : authMode === "resend"
@@ -249,6 +267,8 @@ function AuthPage() {
                 <Input
                   id="email"
                   type="email"
+                  inputMode="email"
+                  autoComplete="email"
                   placeholder="kari@eksempel.no"
                   aria-invalid={!!errors.email}
                   aria-describedby={errors.email ? "email-error" : undefined}
@@ -290,6 +310,8 @@ function AuthPage() {
                 <Input
                   id="email"
                   type="email"
+                  inputMode="email"
+                  autoComplete="email"
                   placeholder="kari@eksempel.no"
                   aria-invalid={!!errors.email}
                   aria-describedby={errors.email ? "email-error" : undefined}
@@ -323,6 +345,7 @@ function AuthPage() {
                 <Label htmlFor="name">Visningsnavn</Label>
                 <Input
                   id="name"
+                  autoComplete="name"
                   placeholder="Kari Nordmann"
                   aria-invalid={!!errors.displayName}
                   aria-describedby={errors.displayName ? "name-error" : undefined}
@@ -340,6 +363,8 @@ function AuthPage() {
               <Input
                 id="email"
                 type="email"
+                inputMode="email"
+                autoComplete="email"
                 placeholder="kari@eksempel.no"
                 aria-invalid={!!errors.email}
                 aria-describedby={errors.email ? "email-error" : undefined}
@@ -364,17 +389,35 @@ function AuthPage() {
                   </button>
                 )}
               </div>
-              <Input
-                id="password"
-                type="password"
-                aria-invalid={!!errors.password}
-                aria-describedby={errors.password ? "password-error" : undefined}
-                {...register("password")}
-              />
-              {errors.password && (
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete={isSignUp ? "new-password" : "current-password"}
+                  className="pr-10"
+                  aria-invalid={!!errors.password}
+                  aria-describedby={errors.password ? "password-error" : "password-hint"}
+                  {...register("password")}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="native-touch-target absolute right-1 top-1/2 flex -translate-y-1/2 items-center justify-center text-muted-foreground hover:text-foreground"
+                  aria-label={showPassword ? "Skjul passord" : "Vis passord"}
+                >
+                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              </div>
+              {errors.password ? (
                 <p id="password-error" className="text-sm text-destructive">
                   {errors.password.message}
                 </p>
+              ) : (
+                isSignUp && (
+                  <p id="password-hint" className="text-xs text-muted-foreground">
+                    Minst 8 tegn
+                  </p>
+                )
               )}
               {!isSignUp && (
                 <p className="text-xs text-muted-foreground">
@@ -420,7 +463,7 @@ function AuthPage() {
                     className="mt-0.5"
                   />
                   <span>
-                    Jeg har lest og godtar{" "}
+                    Jeg godtar{" "}
                     <Link
                       to="/vilkar"
                       target="_blank"
@@ -428,7 +471,7 @@ function AuthPage() {
                     >
                       brukervilkårene
                     </Link>{" "}
-                    og{" "}
+                    og bekrefter at jeg har lest{" "}
                     <Link
                       to="/personvern"
                       target="_blank"
@@ -453,6 +496,11 @@ function AuthPage() {
                 onExpire={() => setTurnstileToken(null)}
                 options={{ size: "invisible" }}
               />
+            )}
+            {turnstileEnabled && !turnstileToken && !loading && (
+              <p role="status" aria-live="polite" className="text-xs text-muted-foreground">
+                Bekrefter at du ikke er en robot …
+              </p>
             )}
             <Button
               type="submit"
@@ -481,11 +529,13 @@ function AuthPage() {
         )}
       </div>
 
-      <p className="mt-6 text-center text-xs text-muted-foreground">
-        <Link to="/" className="hover:underline">
-          ← Tilbake til forsiden
-        </Link>
-      </p>
+      {!native && (
+        <p className="mt-6 text-center text-xs text-muted-foreground">
+          <Link to="/" className="hover:underline">
+            ← Tilbake til forsiden
+          </Link>
+        </p>
+      )}
     </div>
   );
 }

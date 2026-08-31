@@ -18,6 +18,23 @@ export type RangeBounds = {
  * derived from filter metadata. */
 export const PRICE_BOUNDS: RangeBounds = { min: 0, max: 1_000_000, step: 1000, unit: "kr" };
 
+/** Price bounds sized to the current result set while preserving an active
+ * selection and a usable fallback before the first facet response arrives. */
+export function priceBoundsForMax(
+  availableMax: number | null | undefined,
+  selected?: { min?: number; max?: number },
+): RangeBounds {
+  const rawMax =
+    availableMax === undefined
+      ? PRICE_BOUNDS.max
+      : Math.max(availableMax ?? PRICE_BOUNDS.step, selected?.min ?? 0, selected?.max ?? 0);
+  const max = Math.max(
+    PRICE_BOUNDS.step,
+    Math.ceil(rawMax / PRICE_BOUNDS.step) * PRICE_BOUNDS.step,
+  );
+  return { ...PRICE_BOUNDS, max };
+}
+
 /** Per-key scales for the numeric attribute filters where a generic 0–100k
  * ramp would be useless (a year slider starting at 0, a mileage slider
  * stepping by 1 km). Keys match category_filters.key. */

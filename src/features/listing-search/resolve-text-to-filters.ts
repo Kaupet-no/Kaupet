@@ -1,5 +1,9 @@
 import { fetchSynonymMatches, removeMatchedWords } from "./use-search-synonym-matches";
-import { parseNumericFilters, removeNumericMatches } from "@/lib/search-number-parser";
+import {
+  parseNumericFilters,
+  parsePriceFilters,
+  removeNumericMatches,
+} from "@/lib/search-number-parser";
 import { stripFillerWords } from "@/lib/search-stopwords";
 import { negateSynonymMatches } from "@/lib/search-negation";
 import {
@@ -10,6 +14,7 @@ import {
 } from "@/lib/search-category-match";
 import {
   effectiveFiltersForCategories,
+  vehicleCategoriesForBrandGroup,
   type AttributeFilterValue,
   type CategoryFilter,
   type VehicleBrandGroup,
@@ -17,12 +22,20 @@ import {
 import { buildTree, type Category } from "@/lib/categories";
 
 export type InterpretedCriterion =
-  | { kind: "category"; slug: string; source: "text" | "user" }
+  | { kind: "category"; slug: string; source: "text" | "user"; matchedText?: string }
   | {
       kind: "attribute";
       key: string;
       value: AttributeFilterValue;
       source: "text" | "user";
+      matchedText?: string;
+    }
+  | {
+      kind: "price";
+      min?: number;
+      max?: number;
+      source: "text" | "user";
+      matchedText?: string;
     };
 
 export type ResolvedTextFilters = {
@@ -32,6 +45,8 @@ export type ResolvedTextFilters = {
   /** Category slug to apply, if a category name or vehicle brand was
    * recognized in the text. */
   categorySlug?: string;
+  minPrice?: number;
+  maxPrice?: number;
   /** Attribute filter values recognized from equipment synonyms and
    * number+unit facts, keyed the same way handleAttrValueChange expects. */
   attrPatch: Record<string, AttributeFilterValue>;
@@ -59,9 +74,13 @@ export async function resolveTextToFilters(params: {
   let q = params.q.trim();
   if (!q) return { q, attrPatch: {}, criteria: [] };
   const criterionPositions = new Map<string, number>();
+  const criterionMatchedText = new Map<string, string>();
   const rememberPosition = (key: string, matchedText: string) => {
     const position = params.q.toLocaleLowerCase().indexOf(matchedText.toLocaleLowerCase());
-    criterionPositions.set(key, Math.min(criterionPositions.get(key) ?? Infinity, position));
+    if (position < (criterionPositions.get(key) ?? Infinity)) {
+      criterionPositions.set(key, position);
+      criterionMatchedText.set(key, matchedText);
+    }
   };
 
   // "attribute" is last-priority: it infers a category from a body-type
@@ -85,13 +104,35 @@ export async function resolveTextToFilters(params: {
   // filter it actually is, since categoryId is no longer null.
 
   const tree = buildTree(categories);
-  const categoryId = categoryMatch ? tree.bySlug.get(categoryMatch.categorySlug)?.id : undefined;
+  const brandCategories =
+    categoryMatch?.source === "brand" && categoryMatch.brandCategoryGroup
+      ? vehicleCategoriesForBrandGroup(
+          categoryMatch.brandCategoryGroup,
+          categories,
+          allFilters,
+          tree.byId,
+        )
+      : [];
+  const categorySlug =
+    brandCategories.length === 1 ? brandCategories[0].slug : categoryMatch?.categorySlug;
+  const categoryId = categorySlug ? tree.bySlug.get(categorySlug)?.id : undefined;
   const attrFilters = categoryId
     ? effectiveFiltersForCategories([categoryId], allFilters, tree.byId)
     : [];
 
   const attrPatch: Record<string, AttributeFilterValue> = {};
-
+  const priceMatches = parsePriceFilters(q);
+  let minPrice: number | undefined;
+  let maxPrice: number | undefined;
+  for (const m of priceMatches) {
+    rememberPosition("price", m.matchedText);
+    minPrice = m.min ?? minPrice;
+    maxPrice = m.max ?? maxPrice;
+  }
+  q = removeNumericMatches(
+    q,
+    priceMatches.map((m) => ({ ...m, filterKey: "__price" })),
+  );
   const numericMatches = parseNumericFilters(q, attrFilters);
   for (const m of numericMatches) {
     rememberPosition(`attribute:${m.filterKey}`, m.matchedText);
@@ -151,26 +192,54 @@ export async function resolveTextToFilters(params: {
     }
   }
   q = removeMatchedWords(q, synonymMatches);
-
   q = stripFillerWords(q);
-
   const criteria: InterpretedCriterion[] = [
     ...(categoryMatch
-      ? [{ kind: "category" as const, slug: categoryMatch.categorySlug, source: "text" as const }]
+      ? [
+          {
+            kind: "category" as const,
+            slug: categorySlug ?? categoryMatch.categorySlug,
+            source: "text" as const,
+            matchedText: categoryMatch.matchedText,
+          },
+        ]
+      : []),
+    ...(priceMatches.length > 0
+      ? [
+          {
+            kind: "price" as const,
+            min: minPrice,
+            max: maxPrice,
+            source: "text" as const,
+            matchedText: priceMatches.map((m) => m.matchedText).join(" "),
+          },
+        ]
       : []),
     ...Object.entries(attrPatch).map(([key, value]) => ({
       kind: "attribute" as const,
       key,
       value,
       source: "text" as const,
+      matchedText: criterionMatchedText.get(`attribute:${key}`),
     })),
   ].sort((a, b) => {
     const key = (criterion: InterpretedCriterion) =>
-      criterion.kind === "category" ? "category" : `attribute:${criterion.key}`;
+      criterion.kind === "category"
+        ? "category"
+        : criterion.kind === "price"
+          ? "price"
+          : `attribute:${criterion.key}`;
     return (
       (criterionPositions.get(key(a)) ?? Infinity) - (criterionPositions.get(key(b)) ?? Infinity)
     );
   });
 
-  return { q, categorySlug: categoryMatch?.categorySlug, attrPatch, criteria };
+  return {
+    q,
+    categorySlug,
+    ...(minPrice !== undefined ? { minPrice } : {}),
+    ...(maxPrice !== undefined ? { maxPrice } : {}),
+    attrPatch,
+    criteria,
+  };
 }

@@ -13,16 +13,19 @@ import "leaflet/dist/leaflet.css";
 import { Link } from "@tanstack/react-router";
 import { MapPin, Search as SearchIcon, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import { NativeSheet } from "@/components/ui/native-sheet";
+import { LocationPicker, RadiusPicker, type LocationValue } from "@/components/location-filter";
 import { signListingImageUrls } from "@/lib/storage";
 import { useNominatimSearch, type NominatimResult } from "@/hooks/use-nominatim-search";
-import { useTheme } from "@/hooks/use-theme";
+import { isValidMapCoordinate, KARTVERKET_TILE_LAYER } from "@/lib/kartverket-map";
 
 const EARTH_RADIUS_KM = 6371;
 
 const centerIcon = L.divIcon({
   className: "",
-  html: `<div style="width:18px;height:18px;border-radius:9999px;background:var(--primary);border:3px solid white;box-shadow:0 0 0 2px var(--primary),0 4px 14px var(--primary);"></div>`,
+  html: `<div style="width:18px;height:18px;border-radius:9999px;background:var(--primary);border:3px solid white;box-shadow:0 0 0 2px var(--primary),0 2px 8px hsl(0 0% 0% / 0.28);"></div>`,
   iconSize: [18, 18],
   iconAnchor: [9, 9],
 });
@@ -71,7 +74,6 @@ export type MapListing = {
   lng: number;
   cover_path?: string | null;
 };
-
 type Props = {
   center: { lat: number; lng: number } | null;
   radiusKm: number;
@@ -80,9 +82,12 @@ type Props = {
   activeId?: string | null;
   onMarkerHover?: (id: string | null) => void;
   onMarkerSelect?: (id: string | null) => void;
-  onCenterChange?: (c: { lat: number; lng: number }) => void;
-  onRadiusChange?: (km: number) => void;
+  onApplyViewport: (c: { lat: number; lng: number }, radiusKm: number) => void | Promise<void>;
   onClearLocation?: () => void;
+  viewportApplying?: boolean;
+  deferViewport?: boolean;
+  edgeToEdge?: boolean;
+  compactTouchControls?: boolean;
   className?: string;
 };
 
@@ -222,6 +227,24 @@ function ZoomRadiusSync({
   return null;
 }
 
+function MapViewportReporter({
+  enabled,
+  onChange,
+}: {
+  enabled: boolean;
+  onChange: (center: { lat: number; lng: number }) => void;
+}) {
+  const map = useMapEvents({
+    dragend: () => {
+      if (enabled) onChange(map.getCenter());
+    },
+    zoomend: () => {
+      if (enabled) onChange(map.getCenter());
+    },
+  });
+  return null;
+}
+
 const NORWAY_CENTER = { lat: 64.5, lng: 11.0 };
 
 export function ListingsMap({
@@ -232,28 +255,55 @@ export function ListingsMap({
   activeId,
   onMarkerHover,
   onMarkerSelect,
-  onCenterChange,
-  onRadiusChange,
+  onApplyViewport,
   onClearLocation,
+  viewportApplying = false,
+  deferViewport = false,
+  edgeToEdge = false,
+  compactTouchControls = false,
   className,
 }: Props) {
-  const { resolvedTheme } = useTheme();
-  const initial = center ?? NORWAY_CENTER;
-  const zoom = center ? 11 : 5;
+  const initial = isValidMapCoordinate(center) ? center : NORWAY_CENTER;
+  const mapCenter = isValidMapCoordinate(center) ? center : null;
+  const validListings = listings.filter(isValidMapCoordinate);
   const [previewRadiusKm, setPreviewRadiusKm] = useState(radiusKm);
   const [radiusManuallySet, setRadiusManuallySet] = useState(false);
   const [isSliderInteracting, setIsSliderInteracting] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [locQuery, setLocQuery] = useState("");
-  const { results: locResults, loading: locLoading } = useNominatimSearch(locQuery);
-
+  const [pendingCenter, setPendingCenter] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationSheetOpen, setLocationSheetOpen] = useState(false);
+  const [controlLocation, setControlLocation] = useState<LocationValue>(() => ({
+    lat: mapCenter?.lat ?? null,
+    lng: mapCenter?.lng ?? null,
+    radius: radiusKm,
+    label: "",
+  }));
+  const {
+    results: locResults,
+    loading: locLoading,
+    searchedQuery: locSearchedQuery,
+    search: searchLocation,
+    clear: clearLocationSearch,
+  } = useNominatimSearch();
+  useEffect(() => {
+    // Ruten er fasit etter et eksplisitt søk eller et filterapply.
+    setPendingCenter(null);
+  }, [center?.lat, center?.lng, radiusKm]);
+  useEffect(() => {
+    setControlLocation({
+      lat: mapCenter?.lat ?? null,
+      lng: mapCenter?.lng ?? null,
+      radius: radiusKm,
+      label: "",
+    });
+  }, [mapCenter?.lat, mapCenter?.lng, radiusKm]);
   useEffect(() => {
     // Når et filter allerede er aktivt (eller brukeren har justert slideren
     // selv), er radiusKm-propen fasit. Før noe filter er satt følger radiusen
-    // i stedet dynamisk kartets zoom (se ZoomRadiusSync), så vi skal ikke
-    // overskrive den med en statisk standardverdi her.
-    if (center || radiusManuallySet) setPreviewRadiusKm(radiusKm);
-  }, [radiusKm, center, radiusManuallySet]);
+    // i stedet dynamisk standardverdi.
+    if (mapCenter || radiusManuallySet) setPreviewRadiusKm(radiusKm);
+  }, [radiusKm, mapCenter, radiusManuallySet]);
 
   useEffect(() => {
     setIsTouchDevice(window.matchMedia("(hover: none)").matches);
@@ -262,45 +312,61 @@ export function ListingsMap({
   const clearIcon = useMemo(() => makeClearIcon(isTouchDevice), [isTouchDevice]);
 
   const handleClear = () => {
+    setPendingCenter(null);
     onClearLocation?.();
     setRadiusManuallySet(false);
   };
 
   const commitCenter = (c: { lat: number; lng: number }) => {
-    onCenterChange?.(c);
-    if (previewRadiusKm !== radiusKm) onRadiusChange?.(previewRadiusKm);
+    if (deferViewport) {
+      setPendingCenter(c);
+      return;
+    }
+    onApplyViewport(c, previewRadiusKm);
+  };
+
+  const commitRadius = (km: number) => {
+    setPreviewRadiusKm(km);
+    setRadiusManuallySet(true);
+    if (deferViewport) setPendingCenter((previous) => previous ?? mapCenter);
+    else if (mapCenter) onApplyViewport(mapCenter, km);
+  };
+
+  const applyPendingViewport = async () => {
+    if (!pendingCenter || viewportApplying) return;
+    await onApplyViewport(pendingCenter, previewRadiusKm);
   };
 
   const pickLocResult = (r: NominatimResult) => {
-    commitCenter({ lat: parseFloat(r.lat), lng: parseFloat(r.lon) });
+    const next = { lat: Number.parseFloat(r.lat), lng: Number.parseFloat(r.lon) };
+    if (!isValidMapCoordinate(next)) return;
+    commitCenter(next);
     setLocQuery("");
+    clearLocationSearch();
   };
 
   return (
     <div className={`group relative ${className ?? ""}`}>
       <MapContainer
         center={[initial.lat, initial.lng]}
-        zoom={zoom}
+        zoom={mapCenter ? 11 : 5}
         scrollWheelZoom
         zoomControl={false}
-        className="h-full w-full rounded-2xl"
+        className={`h-full w-full ${edgeToEdge ? "" : "rounded-2xl"}`}
       >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url={`https://{s}.basemaps.cartocdn.com/${resolvedTheme === "dark" ? "dark_all" : "light_all"}/{z}/{x}/{y}{r}.png`}
-          subdomains="abcd"
-        />
-        <CenterUpdater center={center} radiusKm={radiusKm} />
+        <TileLayer {...KARTVERKET_TILE_LAYER} />
+        <MapViewportReporter enabled={deferViewport} onChange={setPendingCenter} />
+        <CenterUpdater center={mapCenter} radiusKm={radiusKm} />
         <ClickHandler onClick={commitCenter} />
         <ZoomRadiusSync
-          active={!center && !radiusManuallySet}
+          active={!mapCenter && !radiusManuallySet}
           onDefaultRadius={setPreviewRadiusKm}
         />
-        {!center && <HoverRadiusPreview radiusKm={previewRadiusKm} />}
-        {center && (
+        {!mapCenter && <HoverRadiusPreview radiusKm={previewRadiusKm} />}
+        {mapCenter && (
           <>
             <Circle
-              center={[center.lat, center.lng]}
+              center={[mapCenter.lat, mapCenter.lng]}
               radius={radiusKm * 1000}
               pathOptions={{
                 color: "hsl(var(--primary))",
@@ -311,24 +377,26 @@ export function ListingsMap({
               }}
             />
             <Marker
-              position={[center.lat, center.lng]}
+              position={[mapCenter.lat, mapCenter.lng]}
               icon={centerIcon}
+              title="Flytt søkesenter"
               draggable
               eventHandlers={{
                 dragend: (e) => {
                   const m = e.target as L.Marker;
                   const p = m.getLatLng();
-                  onCenterChange?.({ lat: p.lat, lng: p.lng });
+                  commitCenter({ lat: p.lat, lng: p.lng });
                 },
               }}
             />
             {onClearLocation && (
               <Marker
                 position={[
-                  clearIconPosition(center, radiusKm).lat,
-                  clearIconPosition(center, radiusKm).lng,
+                  clearIconPosition(mapCenter, radiusKm).lat,
+                  clearIconPosition(mapCenter, radiusKm).lng,
                 ]}
                 icon={clearIcon}
+                title="Fjern sted"
                 eventHandlers={{
                   click: (e) => {
                     L.DomEvent.stop(e);
@@ -339,7 +407,7 @@ export function ListingsMap({
             )}
           </>
         )}
-        {listings.map((l) => (
+        {validListings.map((l) => (
           <PriceMarker
             key={l.id}
             listing={l}
@@ -350,10 +418,10 @@ export function ListingsMap({
           />
         ))}
       </MapContainer>
-      {onRadiusChange && (
+      {!compactTouchControls && (
         <div className="absolute left-3 top-3 z-[400]">
           <div
-            className={`rounded-2xl border border-border bg-card/95 shadow-lg backdrop-blur transition-all ${
+            className={`rounded-2xl border border-border bg-card/95 shadow-lg backdrop-blur transition-[width,padding] duration-200 ${
               isTouchDevice || isSliderInteracting
                 ? "w-56 p-3"
                 : "w-9 p-2 group-hover:w-56 group-hover:p-3"
@@ -392,39 +460,54 @@ export function ListingsMap({
                 min={1}
                 max={100}
                 step={1}
-                onValueChange={([v]) => {
-                  setPreviewRadiusKm(v);
-                  setRadiusManuallySet(true);
-                }}
+                onValueChange={([v]) => commitRadius(v)}
                 onPointerDown={() => setIsSliderInteracting(true)}
                 onValueCommit={([v]) => {
                   setIsSliderInteracting(false);
-                  setPreviewRadiusKm(v);
-                  setRadiusManuallySet(true);
-                  if (center) onRadiusChange(v);
+                  commitRadius(v);
                 }}
                 aria-label="Søkeradius i kilometer"
               />
-              <div className="relative">
-                <SearchIcon className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={locQuery}
-                  onChange={(e) => setLocQuery(e.target.value)}
-                  placeholder="Stedsnavn eller postnummer"
-                  className="h-8 pl-7 text-xs"
-                  aria-label="Søk etter sted eller postnummer"
-                />
-              </div>
+              <form
+                className="flex gap-1"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void searchLocation(locQuery);
+                }}
+              >
+                <div className="relative min-w-0 flex-1">
+                  <SearchIcon className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={locQuery}
+                    onChange={(event) => {
+                      setLocQuery(event.target.value);
+                      clearLocationSearch();
+                    }}
+                    placeholder="Sted eller postnummer"
+                    className="h-8 pl-7 text-xs"
+                    aria-label="Søk etter sted eller postnummer"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-2 text-xs"
+                  disabled={locQuery.trim().length < 2 || locLoading}
+                >
+                  Søk
+                </Button>
+              </form>
             </div>
           </div>
-          {(isTouchDevice || isSliderInteracting || locQuery.length >= 2) && (
+          {(isTouchDevice || isSliderInteracting || locSearchedQuery !== null) && (
             <div
               className={`absolute left-0 top-full mt-1 w-56 overflow-hidden rounded-xl border border-border bg-card shadow-lg ${
                 isTouchDevice || isSliderInteracting ? "" : "hidden group-hover:block"
               }`}
             >
               {locLoading && <div className="px-2 py-2 text-xs text-muted-foreground">Søker…</div>}
-              {!locLoading && locResults.length === 0 && locQuery.trim().length >= 2 && (
+              {!locLoading && locSearchedQuery === locQuery.trim() && locResults.length === 0 && (
                 <div className="px-2 py-2 text-xs text-muted-foreground">Ingen treff</div>
               )}
               {locResults.map((r) => (
@@ -441,6 +524,64 @@ export function ListingsMap({
             </div>
           )}
         </div>
+      )}
+      {compactTouchControls && (
+        <>
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon"
+            className="absolute left-4 top-4 z-[400] size-12 rounded-full shadow-md"
+            aria-label="Sted og radius"
+            onClick={() => setLocationSheetOpen(true)}
+          >
+            <MapPin className="size-5" />
+          </Button>
+          <NativeSheet
+            open={locationSheetOpen}
+            onOpenChange={setLocationSheetOpen}
+            title="Sted og radius"
+            titleVisible
+            expandable
+          >
+            <div className="mt-3 space-y-5">
+              <LocationPicker
+                value={controlLocation}
+                onChange={(next) => {
+                  setControlLocation(next);
+                  if (next.lat != null && next.lng != null) {
+                    commitCenter({ lat: next.lat, lng: next.lng });
+                  }
+                }}
+                autoFocus={false}
+              />
+              <RadiusPicker value={previewRadiusKm} onChange={commitRadius} />
+              <Button
+                type="button"
+                size="native"
+                className="w-full"
+                disabled={viewportApplying || pendingCenter == null}
+                onClick={async () => {
+                  await applyPendingViewport();
+                  if (!viewportApplying) setLocationSheetOpen(false);
+                }}
+              >
+                {viewportApplying ? "Henter sted …" : "Bruk"}
+              </Button>
+            </div>
+          </NativeSheet>
+        </>
+      )}
+      {deferViewport && pendingCenter && (
+        <Button
+          type="button"
+          size="native"
+          className="absolute inset-x-4 bottom-4 z-[400] shadow-lg"
+          disabled={viewportApplying}
+          onClick={applyPendingViewport}
+        >
+          {viewportApplying ? "Henter sted …" : "Søk i dette området"}
+        </Button>
       )}
     </div>
   );
@@ -467,6 +608,7 @@ function PriceMarker({
     <Marker
       position={[listing.lat, listing.lng]}
       icon={icon}
+      title={`Åpne annonse: ${listing.title}`}
       eventHandlers={{
         mouseover: () => onHover?.(listing.id),
         mouseout: () => onHover?.(null),

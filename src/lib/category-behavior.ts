@@ -37,7 +37,7 @@ export type CategoryBreadcrumbContext = {
  * flag only needs to be added in one place.
  */
 export type CategoryBehavior = {
-  /** Whether the listing must declare a delivery method (pickup/ship/both). Vehicles can't be shipped, so this is false for them. */
+  /** Whether the listing must declare a delivery method (pickup/ship/both). Bil/MC and Båt opt out. */
   requiresDeliveryMethod: boolean;
   /** Whether the generic category-attributes field group should render. False for vehicles, whose attributes are captured via the vehicle-* field groups instead. */
   showGenericAttributes: boolean;
@@ -104,7 +104,16 @@ const VEHICLE_BEHAVIOR: CategoryBehavior = {
   },
 };
 
-/** Resolves category behavior from a vehicle brand group (or null for non-vehicle categories), as returned by `vehicleCategoryGroupFor`. */
-export function getCategoryBehavior(vehicleGroup: VehicleBrandGroup | null): CategoryBehavior {
-  return vehicleGroup ? VEHICLE_BEHAVIOR : DEFAULT_BEHAVIOR;
+const BOAT_BEHAVIOR: CategoryBehavior = {
+  ...DEFAULT_BEHAVIOR,
+  requiresDeliveryMethod: false,
+};
+
+/** Resolves category behavior from a vehicle brand group or a boat flow. */
+export function getCategoryBehavior(
+  vehicleGroup: VehicleBrandGroup | null,
+  isBoat = false,
+): CategoryBehavior {
+  if (vehicleGroup) return VEHICLE_BEHAVIOR;
+  return isBoat ? BOAT_BEHAVIOR : DEFAULT_BEHAVIOR;
 }

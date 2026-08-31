@@ -23,6 +23,73 @@ async function expectNativeTouchTarget(locator: Locator) {
   expect(box!.width).toBeGreaterThanOrEqual(48);
   expect(box!.height).toBeGreaterThanOrEqual(48);
 }
+test("bevarer native søkeopplevelse etter intern ruting", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    window.localStorage.setItem("kaupet_onboarding_completed_v1", "true");
+  });
+  await page.goto("/?forcenative=1");
+  await page.locator("html[data-kaupet-hydrated='true']").waitFor();
+
+  await page.getByRole("button", { name: "Søk", exact: true }).last().click();
+  await expect(page).toHaveURL(/\/\?forcenative=1/);
+  await expect(page.getByRole("dialog", { name: "Søk og filtrer" })).toBeVisible();
+  await expect(page.getByRole("searchbox", { name: "Søk i annonser" })).toBeVisible();
+  await expect(page.locator("html")).toHaveClass(/native/);
+});
+test("søker fra native hjem og lander på delbar resultat-URL", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    window.localStorage.setItem("kaupet_onboarding_completed_v1", "true");
+  });
+  await page.goto("/?forcenative=1");
+  await page.locator("html[data-kaupet-hydrated='true']").waitFor();
+
+  await page.getByRole("button", { name: "Åpne søk i annonser" }).click();
+  const input = page.getByRole("searchbox", { name: "Søk i annonser" });
+  await input.fill("sykkel");
+  await page.getByRole("button", { name: "Søk etter «sykkel»" }).click();
+
+  await expect(page).toHaveURL(/\/annonser\?.*q=sykkel/);
+  await expect(page.getByRole("button", { name: /sykkel/ })).toBeVisible();
+});
+test("søker i nytt kartområde uten å endre URL før eksplisitt handling", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route("**/nominatim.openstreetmap.org/reverse**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ address: { city: "Oslo", country_code: "no" } }),
+    });
+  });
+  await page.goto(`/annonser?forcenative&q=${filterFixture.query}&sort=new`);
+  await page.locator("html[data-kaupet-hydrated='true']").waitFor();
+
+  const mapButton = page.getByRole("button", { name: "Vis kart" });
+  await expect(mapButton).toBeVisible();
+  await mapButton.click();
+
+  const mapDialog = page.getByRole("dialog", { name: "Kart over søkeresultater" });
+  await expect(mapDialog).toBeVisible();
+  await expect(mapDialog.getByText("Kartverket")).toBeVisible();
+  const map = mapDialog.locator(".leaflet-container");
+  await expect(map).toBeVisible();
+  const box = await map.boundingBox();
+  expect(box).not.toBeNull();
+  const startX = box!.x + box!.width / 2;
+  const startY = box!.y + box!.height / 2;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + 48, startY + 24);
+  await page.mouse.up();
+
+  const searchAreaButton = mapDialog.getByRole("button", { name: "Søk i dette området" });
+  await expect(searchAreaButton).toBeVisible();
+  const before = page.url();
+  await searchAreaButton.click();
+  await expect(page).not.toHaveURL(before);
+  await expect(page).toHaveURL(/[?&]lat=/);
+});
 
 test("holder filter som utkast frem til brukeren anvender dem", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -55,7 +122,10 @@ test("holder filter som utkast frem til brukeren anvender dem", async ({ page })
   await page.getByRole("button", { name: /^Pris/ }).click();
   await page.getByRole("checkbox", { name: "Inkluder gratis-annonser" }).click();
   await expect(page).not.toHaveURL(/includeFree=false/);
-  await expect(applyButton).toHaveText("Beregner treff …");
+  await expect(
+    page.getByRole("status").filter({ hasText: "Beregner nytt antall treff" }),
+  ).toBeVisible();
+  await expect(applyButton).toHaveText(/Vis \d+ annonser?/);
   await expect(applyButton).toHaveText(`Vis ${filterFixture.paid} annonser`, { timeout: 10_000 });
 
   await applyButton.click();

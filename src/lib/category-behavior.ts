@@ -104,7 +104,16 @@ const VEHICLE_BEHAVIOR: CategoryBehavior = {
   },
 };
 
-/** Resolves category behavior from a vehicle brand group (or null for non-vehicle categories), as returned by `vehicleCategoryGroupFor`. */
-export function getCategoryBehavior(vehicleGroup: VehicleBrandGroup | null): CategoryBehavior {
-  return vehicleGroup ? VEHICLE_BEHAVIOR : DEFAULT_BEHAVIOR;
+const BOAT_BEHAVIOR: CategoryBehavior = {
+  ...DEFAULT_BEHAVIOR,
+  requiresDeliveryMethod: false,
+};
+
+/** Resolves category behavior from a vehicle brand group or a boat flow. */
+export function getCategoryBehavior(
+  vehicleGroup: VehicleBrandGroup | null,
+  isBoat = false,
+): CategoryBehavior {
+  if (vehicleGroup) return VEHICLE_BEHAVIOR;
+  return isBoat ? BOAT_BEHAVIOR : DEFAULT_BEHAVIOR;
 }

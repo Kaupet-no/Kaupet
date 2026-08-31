@@ -4,6 +4,7 @@ import { validateRequiredFieldGroups } from "./validators";
 import { getCategoryBehavior } from "@/lib/category-behavior";
 
 const VEHICLE_BEHAVIOR = getCategoryBehavior("bil");
+const BOAT_BEHAVIOR = getCategoryBehavior(null, true);
 
 describe("validateRequiredFieldGroups", () => {
   const DEFAULT_FLOW = [
@@ -49,14 +50,19 @@ describe("validateRequiredFieldGroups", () => {
     expect(validateRequiredFieldGroups(flow, { condition: null, can_ship: null })).toBeNull();
   });
 
-  it("allows can_ship: null for vehicle categories even when delivery-location is in the flow", () => {
-    // Bil og MC can't be shipped by post — its delivery-location step only
-    // asks for a location, not a shipping method, so can_ship is never set.
+  it("allows can_ship: null for vehicle and boat categories", () => {
     expect(
       validateRequiredFieldGroups(
         DEFAULT_FLOW,
         { condition: "good", can_ship: null },
         VEHICLE_BEHAVIOR,
+      ),
+    ).toBeNull();
+    expect(
+      validateRequiredFieldGroups(
+        DEFAULT_FLOW,
+        { condition: "good", can_ship: null },
+        BOAT_BEHAVIOR,
       ),
     ).toBeNull();
   });
@@ -68,6 +74,12 @@ describe("validateRequiredFieldGroups", () => {
         { condition: null, can_ship: null },
         VEHICLE_BEHAVIOR,
       ),
+    ).toEqual(expect.any(String));
+  });
+
+  it("still requires condition for boat categories", () => {
+    expect(
+      validateRequiredFieldGroups(DEFAULT_FLOW, { condition: null, can_ship: null }, BOAT_BEHAVIOR),
     ).toEqual(expect.any(String));
   });
 });

@@ -114,6 +114,13 @@ function BackToSearchLink() {
   );
 }
 
+export type ListingOrganizationBrand = {
+  displayName: string;
+  logoUrl: string | null;
+  websiteUrl: string | null;
+  palette: "forest" | "navy" | "burgundy" | "slate";
+};
+
 export type ListingDetailViewCategory = { name_nb: string; slug: string | null } | null;
 
 /** A single crumb in the ancestor chain from a root category down to the
@@ -180,6 +187,10 @@ export type ListingDetailViewProps = {
   ownerStatsSlot?: ReactNode;
   /** Contact-seller panel. */
   sellerContactSlot?: ReactNode;
+  /** Live organization identity shown only when Proff branding is effective. */
+  organizationBrand?: ListingOrganizationBrand;
+  /** Optional related active organization listings section. */
+  relatedListingsSlot?: ReactNode;
   /** Compact "Send melding"-button shown in the fixed mobile contact bar.
    * Omitted (e.g. for the owner's own listing, or the pre-publish preview)
    * hides the bar entirely. Web only — native has its own bottom nav. */
@@ -196,6 +207,15 @@ export type ListingDetailViewProps = {
    * `ListingDetailView`'s children slot rather than a named prop since they
    * render as dialogs, not inline content. Omitted for buyers/preview. */
   children?: ReactNode;
+};
+const ORGANIZATION_BRAND_COLORS: Record<
+  ListingOrganizationBrand["palette"],
+  { background: string; foreground: string }
+> = {
+  forest: { background: "oklch(0.35 0.06 160)", foreground: "oklch(0.985 0.012 85)" },
+  navy: { background: "oklch(0.32 0.08 250)", foreground: "oklch(0.985 0.012 85)" },
+  burgundy: { background: "oklch(0.34 0.09 20)", foreground: "oklch(0.985 0.012 85)" },
+  slate: { background: "oklch(0.32 0.02 250)", foreground: "oklch(0.985 0.012 85)" },
 };
 
 export function ListingDetailView({
@@ -221,13 +241,15 @@ export function ListingDetailView({
   images,
   imgUrls,
   attributes,
+  actionsMenuSlot,
   requiresDeliveryMethod,
   canShip,
   vehicle360Frames,
   vehicle360ImgUrls,
-  actionsMenuSlot,
   ownerStatsSlot,
   sellerContactSlot,
+  organizationBrand,
+  relatedListingsSlot,
   stickyContactSlot,
   previewBanner,
   enableBackToSearch,
@@ -392,6 +414,8 @@ export function ListingDetailView({
       actionsMenuSlot={actionsMenuSlot}
       ownerStatsSlot={ownerStatsSlot}
       sellerContactSlot={sellerContactSlot}
+      organizationBrand={organizationBrand}
+      relatedListingsSlot={relatedListingsSlot}
       stickyContactSlot={stickyContactSlot}
       previewBanner={previewBanner}
       enableBackToSearch={enableBackToSearch}
@@ -466,6 +490,8 @@ function ListingDetailViewBody({
   actionsMenuSlot,
   ownerStatsSlot,
   sellerContactSlot,
+  organizationBrand,
+  relatedListingsSlot,
   stickyContactSlot,
   previewBanner,
   enableBackToSearch,
@@ -519,6 +545,8 @@ function ListingDetailViewBody({
   actionsMenuSlot?: ReactNode;
   ownerStatsSlot?: ReactNode;
   sellerContactSlot?: ReactNode;
+  organizationBrand?: ListingOrganizationBrand;
+  relatedListingsSlot?: ReactNode;
   stickyContactSlot?: ReactNode;
   previewBanner?: ReactNode;
   enableBackToSearch?: boolean;
@@ -556,6 +584,9 @@ function ListingDetailViewBody({
   const isBoatListing = !isVehicleListing && isBoatAttributes(attributes);
   const nativeSpecLayout = isNative && (isVehicleListing || isBoatListing);
   const nativePlateUnderTitle = isNative && isVehicleListing;
+  const brandColors = organizationBrand
+    ? ORGANIZATION_BRAND_COLORS[organizationBrand.palette]
+    : null;
   // Tilstand-etiketter er per kjøretøytype (se VEHICLE_CONDITIONS_BY_SLUG) —
   // faller tilbake til de generiske etikettene (via `?? v`/CONDITIONS der de
   // brukes) dersom slug mangler eller ikke finnes i tabellen.
@@ -572,7 +603,34 @@ function ListingDetailViewBody({
           <BackToSearchLink />
         </ClientOnly>
       )}
-
+      {organizationBrand && brandColors && (
+        <section
+          aria-label="Bedriftsprofil"
+          className="mb-4 flex items-center gap-3 rounded-xl px-4 py-3"
+          style={{ backgroundColor: brandColors.background, color: brandColors.foreground }}
+        >
+          {organizationBrand.logoUrl && (
+            <img
+              src={organizationBrand.logoUrl}
+              alt={`Logo for ${organizationBrand.displayName}`}
+              className="size-12 rounded-lg bg-white/95 object-contain p-1"
+            />
+          )}
+          <div className="min-w-0">
+            <p className="font-display text-lg font-semibold">{organizationBrand.displayName}</p>
+            {organizationBrand.websiteUrl && (
+              <a
+                href={organizationBrand.websiteUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-sm underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              >
+                {organizationBrand.websiteUrl.replace(/^https:\/\//, "")}
+              </a>
+            )}
+          </div>
+        </section>
+      )}
       <header className="mt-4">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
@@ -1128,6 +1186,7 @@ function ListingDetailViewBody({
           {!nativeSpecLayout && sellerContactSlot}
         </aside>
       </div>
+      {relatedListingsSlot}
 
       {displayLat != null && displayLng != null && (
         <section className="mt-10">

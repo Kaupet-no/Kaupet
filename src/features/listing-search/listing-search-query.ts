@@ -96,7 +96,7 @@ export async function runListingsSearch(
   args: NonNullable<ReturnType<typeof buildListingsSearchRpcArgs>>,
   signal?: AbortSignal,
 ) {
-  const request = supabase.rpc("search_listings_page", args);
+  const request = supabase.rpc("search_listings_page", args as never);
   if (signal) request.abortSignal(signal);
   const { data, error } = await request;
   if (error) throw error;

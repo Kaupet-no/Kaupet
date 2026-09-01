@@ -429,6 +429,23 @@ tilgang til implementasjonen.
 | AUTH-10 | E+R  | P1  | Kontosletting (`account_deletions`)                         | Sletting fjerner/anonymiserer eierdata etter policy; samtalepartner ser konsistent tilstand, ikke ødelagte referanser |
 | AUTH-11 | M    | P1  | Sesjonsutløp midt i en flyt                                 | Bruker mister ikke utfylte data; blir bedt om å logge inn og returneres til samme sted                                |
 
+#### 11.1.1 Bedriftskontoer, Proff og prøveperiode — R1/R4
+
+| ID     | Nivå | P   | Tittel                                                           | Forventet resultat                                                                                                                                                           |
+| ------ | ---- | --- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BUS-01 | U    | P0  | Organisasjonsnummer: normalisering og Modulus-11                 | Mellomrom fjernes; ni sifre med gyldig kontrollsiffer godtas; feil lengde, tegn og kontrollsiffer 10 avvises                                                                 |
+| BUS-02 | U    | P0  | Brønnøysund-oppslag                                              | Forretningsadresse brukes foran postadresse; manglende adresse gir `null`; 404, 429, 5xx, timeout og ugyldig JSON gir samme bokmålsfeil uten nettverkskall i testen          |
+| BUS-03 | C    | P0  | Bedriftsregistrering: steg, fullmakt og vilkår                   | Privat/bedrift-grenen starter på riktig steg; ugyldig nummer feiler inline; bedrift, nummer og adresse vises; fullmakt og vilkår må bekreftes før konto kan opprettes        |
+| BUS-04 | C    | P1  | Bedriftsregistrering: loading, dobbeltklikk og e-postbekreftelse | Søk/submit viser `status` og blokkerer gjentakelse; duplikat vises på organisasjonssteget; signup bruker bedriftscallback; resend bruker samme callback                      |
+| BUS-05 | U    | P0  | Planmatrise og entitlements                                      | Alle avtalte feature-rader/priser er identiske på desktop og mobil; basis er gratis; effektiv Proff krever valgt Proff og DB-sluttdato i fremtiden                           |
+| BUS-06 | C    | P0  | Planvalg: førstevalg, aktiv/utløpt/avbrutt prøveperiode          | Første Proffvalg gir én 30-dagers prøveperiode og umiddelbar tilgang; basis avslutter aktiv prøve; brukt prøve kan ikke startes på nytt; loading/success/error vises         |
+| BUS-07 | U    | P0  | Serverfunksjoner: superbruker og Proff-autorisasjon              | Ikke-superbruker avvises; basisfelt kan endres på begge planer; branding/invitasjon krever effektiv Proff; validerings- og duplikatfeil er feltspesifikke                    |
+| BUS-08 | R    | P0  | Organisasjon, medlemskap og annonseeierskap                      | Privat, egen bedrift, annen bedrift og anonym får kun avtalte SELECT/INSERT/UPDATE/DELETE; fjernet medlem får annonser overført til superbruker uten å endre organisasjon    |
+| BUS-09 | R    | P0  | Meldings- og logo-tilgang                                        | Superbruker kan lese/sende organisasjonens samtaler som seg selv; kryssbedrift/vanlig medlem får ingen konsolltilgang; kun effektiv Proff-superbruker kan skrive/slette logo |
+| BUS-10 | E    | P0  | Bedriftsregistrering til konsoll                                 | Bekreftet superbruker uten plan sendes til planvalg; basis, aktiv Proff og aktivt medlem ser riktige flater; anonym og privat bruker slipper ikke inn                        |
+| BUS-11 | E    | P1  | Trial utløper og skjuler Proff-funksjoner                        | Branding/nettside/andre annonser skjules; ekstra medlemmer deaktiveres og mister organisasjonstilgang; data beholdes og privat konto fungerer                                |
+| BUS-12 | M    | P1  | Bedriftsflyt på web og native størrelser                         | 320–1024 px, 200 % tekst, lys/mørk modus, redusert bevegelse og tastatur har ingen horisontal planoverflow, synlig fokus eller touchmål under 48 px                          |
+
 ### 11.2 Kategorier og landingsflater
 
 | ID     | Nivå | P   | Tittel                                                                                       | Forventet resultat                                                                                                 |

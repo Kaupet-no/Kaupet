@@ -370,7 +370,7 @@ export const matchWtbListingsForListing = createServerFn({ method: "GET" })
       _title: data.title,
       _description: data.description ?? null,
       _attributes: data.attributes ?? {},
-    });
+    } as never);
     if (error || !rows?.[0]) return { count: 0, maxPrice: null };
 
     return { count: rows[0].match_count ?? 0, maxPrice: rows[0].max_price ?? null };

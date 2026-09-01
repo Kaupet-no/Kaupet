@@ -12,7 +12,9 @@ import {
   Shield,
   ShieldCheck,
   User,
+  Building2,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
@@ -26,7 +28,10 @@ import { setTestMode } from "@/lib/test-mode.functions";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Switch } from "@/components/ui/switch";
+import {
+  isActiveBusinessSuperuser,
+  useBusinessMembership,
+} from "@/features/business-account/use-business-membership";
 import { NativePageHeader } from "@/components/native-page-header";
 import { NotificationsBell } from "@/components/notifications-bell";
 import { DevServerSwitch } from "@/components/dev-server-switch";
@@ -59,6 +64,7 @@ function initials(name: string | null | undefined, fallback: string) {
 
 function MegPage() {
   const { user } = useAuth();
+  const { data: businessMembership } = useBusinessMembership();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { data: isAdmin } = useIsAdmin();
@@ -165,6 +171,13 @@ function MegPage() {
               label="Min profil"
               onClick={() => void navigate({ to: "/profil" })}
             />
+            {isActiveBusinessSuperuser(businessMembership) && (
+              <NavRow
+                icon={<Building2 className="size-5 text-primary" />}
+                label="Bedriftskonsoll"
+                onClick={() => void navigate({ to: "/bedrift", search: { tab: "oversikt" } })}
+              />
+            )}
             {isAdmin && (
               <NavRow
                 icon={<Shield className="size-5 text-primary" />}

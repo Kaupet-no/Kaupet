@@ -14,6 +14,8 @@ import { Route as KaupetCodeRouteImport } from './routes/$kaupetCode'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AnnonserRouteImport } from './routes/annonser'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as BedriftsinvitasjonRouteImport } from './routes/bedriftsinvitasjon'
+import { Route as BekreftEpostRouteImport } from './routes/bekreft-epost'
 import { Route as PersonvernRouteImport } from './routes/personvern'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as TilbakestillPassordRouteImport } from './routes/tilbakestill-passord'
@@ -21,6 +23,7 @@ import { Route as VilkarRouteImport } from './routes/vilkar'
 import { Route as KaupetCodeSubRouteImport } from './routes/$kaupetCode_.$sub'
 import { Route as R360OpptakTokenRouteImport } from './routes/360-opptak.$token'
 import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authenticated/admin/route'
+import { Route as AuthenticatedBedriftRouteRouteImport } from './routes/_authenticated/bedrift/route'
 import { Route as AuthenticatedFavoritterRouteImport } from './routes/_authenticated/favoritter'
 import { Route as AuthenticatedMegRouteImport } from './routes/_authenticated/meg'
 import { Route as AuthenticatedMineSokRouteImport } from './routes/_authenticated/mine-sok'
@@ -40,6 +43,8 @@ import { Route as AuthenticatedAdminModerasjonRouteImport } from './routes/_auth
 import { Route as AuthenticatedAdminPromoteringerRouteImport } from './routes/_authenticated/admin/promoteringer'
 import { Route as AuthenticatedAdminTilbakemeldingerRouteImport } from './routes/_authenticated/admin/tilbakemeldinger'
 import { Route as AuthenticatedAdminVippsWebhooksRouteImport } from './routes/_authenticated/admin/vipps-webhooks'
+import { Route as AuthenticatedBedriftIndexRouteImport } from './routes/_authenticated/bedrift/index'
+import { Route as AuthenticatedBedriftVelgPlanRouteImport } from './routes/_authenticated/bedrift/velg-plan'
 import { Route as AuthenticatedBekrefterPromoIdRouteImport } from './routes/_authenticated/bekrefter.$promoId'
 import { Route as AuthenticatedKvitteringPromoIdRouteImport } from './routes/_authenticated/kvittering.$promoId'
 import { Route as AuthenticatedMeldingerIndexRouteImport } from './routes/_authenticated/meldinger.index'
@@ -70,6 +75,16 @@ const AnnonserRoute = AnnonserRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BedriftsinvitasjonRoute = BedriftsinvitasjonRouteImport.update({
+  id: '/bedriftsinvitasjon',
+  path: '/bedriftsinvitasjon',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BekreftEpostRoute = BekreftEpostRouteImport.update({
+  id: '/bekreft-epost',
+  path: '/bekreft-epost',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PersonvernRoute = PersonvernRouteImport.update({
@@ -107,6 +122,12 @@ const AuthenticatedAdminRouteRoute = AuthenticatedAdminRouteRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedBedriftRouteRoute =
+  AuthenticatedBedriftRouteRouteImport.update({
+    id: '/bedrift',
+    path: '/bedrift',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedFavoritterRoute = AuthenticatedFavoritterRouteImport.update({
   id: '/favoritter',
   path: '/favoritter',
@@ -210,6 +231,18 @@ const AuthenticatedAdminVippsWebhooksRoute =
     path: '/vipps-webhooks',
     getParentRoute: () => AuthenticatedAdminRouteRoute,
   } as any)
+const AuthenticatedBedriftIndexRoute =
+  AuthenticatedBedriftIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedBedriftRouteRoute,
+  } as any)
+const AuthenticatedBedriftVelgPlanRoute =
+  AuthenticatedBedriftVelgPlanRouteImport.update({
+    id: '/velg-plan',
+    path: '/velg-plan',
+    getParentRoute: () => AuthenticatedBedriftRouteRoute,
+  } as any)
 const AuthenticatedBekrefterPromoIdRoute =
   AuthenticatedBekrefterPromoIdRouteImport.update({
     id: '/bekrefter/$promoId',
@@ -256,11 +289,14 @@ export interface FileRoutesByFullPath {
   '/$kaupetCode': typeof KaupetCodeRoute
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
+  '/bedriftsinvitasjon': typeof BedriftsinvitasjonRoute
+  '/bekreft-epost': typeof BekreftEpostRoute
   '/personvern': typeof PersonvernRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/tilbakestill-passord': typeof TilbakestillPassordRoute
   '/vilkar': typeof VilkarRoute
   '/admin': typeof AuthenticatedAdminRouteRouteWithChildren
+  '/bedrift': typeof AuthenticatedBedriftRouteRouteWithChildren
   '/$kaupetCode/$sub': typeof KaupetCodeSubRoute
   '/360-opptak/$token': typeof R360OpptakTokenRoute
   '/favoritter': typeof AuthenticatedFavoritterRoute
@@ -281,10 +317,12 @@ export interface FileRoutesByFullPath {
   '/admin/promoteringer': typeof AuthenticatedAdminPromoteringerRoute
   '/admin/tilbakemeldinger': typeof AuthenticatedAdminTilbakemeldingerRoute
   '/admin/vipps-webhooks': typeof AuthenticatedAdminVippsWebhooksRoute
+  '/bedrift/velg-plan': typeof AuthenticatedBedriftVelgPlanRoute
   '/bekrefter/$promoId': typeof AuthenticatedBekrefterPromoIdRoute
   '/kvittering/$promoId': typeof AuthenticatedKvitteringPromoIdRoute
   '/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
+  '/bedrift/': typeof AuthenticatedBedriftIndexRoute
   '/meldinger/': typeof AuthenticatedMeldingerIndexRoute
   '/mine-annonser/': typeof AuthenticatedMineAnnonserIndexRoute
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
@@ -295,6 +333,8 @@ export interface FileRoutesByTo {
   '/$kaupetCode': typeof KaupetCodeRoute
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
+  '/bedriftsinvitasjon': typeof BedriftsinvitasjonRoute
+  '/bekreft-epost': typeof BekreftEpostRoute
   '/personvern': typeof PersonvernRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/tilbakestill-passord': typeof TilbakestillPassordRoute
@@ -319,10 +359,12 @@ export interface FileRoutesByTo {
   '/admin/promoteringer': typeof AuthenticatedAdminPromoteringerRoute
   '/admin/tilbakemeldinger': typeof AuthenticatedAdminTilbakemeldingerRoute
   '/admin/vipps-webhooks': typeof AuthenticatedAdminVippsWebhooksRoute
+  '/bedrift/velg-plan': typeof AuthenticatedBedriftVelgPlanRoute
   '/bekrefter/$promoId': typeof AuthenticatedBekrefterPromoIdRoute
   '/kvittering/$promoId': typeof AuthenticatedKvitteringPromoIdRoute
   '/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
+  '/bedrift': typeof AuthenticatedBedriftIndexRoute
   '/meldinger': typeof AuthenticatedMeldingerIndexRoute
   '/mine-annonser': typeof AuthenticatedMineAnnonserIndexRoute
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
@@ -335,11 +377,14 @@ export interface FileRoutesById {
   '/$kaupetCode': typeof KaupetCodeRoute
   '/annonser': typeof AnnonserRoute
   '/auth': typeof AuthRoute
+  '/bedriftsinvitasjon': typeof BedriftsinvitasjonRoute
+  '/bekreft-epost': typeof BekreftEpostRoute
   '/personvern': typeof PersonvernRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/tilbakestill-passord': typeof TilbakestillPassordRoute
   '/vilkar': typeof VilkarRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteRouteWithChildren
+  '/_authenticated/bedrift': typeof AuthenticatedBedriftRouteRouteWithChildren
   '/$kaupetCode_/$sub': typeof KaupetCodeSubRoute
   '/360-opptak/$token': typeof R360OpptakTokenRoute
   '/_authenticated/favoritter': typeof AuthenticatedFavoritterRoute
@@ -360,10 +405,12 @@ export interface FileRoutesById {
   '/_authenticated/admin/promoteringer': typeof AuthenticatedAdminPromoteringerRoute
   '/_authenticated/admin/tilbakemeldinger': typeof AuthenticatedAdminTilbakemeldingerRoute
   '/_authenticated/admin/vipps-webhooks': typeof AuthenticatedAdminVippsWebhooksRoute
+  '/_authenticated/bedrift/velg-plan': typeof AuthenticatedBedriftVelgPlanRoute
   '/_authenticated/bekrefter/$promoId': typeof AuthenticatedBekrefterPromoIdRoute
   '/_authenticated/kvittering/$promoId': typeof AuthenticatedKvitteringPromoIdRoute
   '/_authenticated/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
+  '/_authenticated/bedrift/': typeof AuthenticatedBedriftIndexRoute
   '/_authenticated/meldinger/': typeof AuthenticatedMeldingerIndexRoute
   '/_authenticated/mine-annonser/': typeof AuthenticatedMineAnnonserIndexRoute
   '/api/public/push/dispatch': typeof ApiPublicPushDispatchRoute
@@ -376,11 +423,14 @@ export interface FileRouteTypes {
     | '/$kaupetCode'
     | '/annonser'
     | '/auth'
+    | '/bedriftsinvitasjon'
+    | '/bekreft-epost'
     | '/personvern'
     | '/sitemap.xml'
     | '/tilbakestill-passord'
     | '/vilkar'
     | '/admin'
+    | '/bedrift'
     | '/$kaupetCode/$sub'
     | '/360-opptak/$token'
     | '/favoritter'
@@ -401,10 +451,12 @@ export interface FileRouteTypes {
     | '/admin/promoteringer'
     | '/admin/tilbakemeldinger'
     | '/admin/vipps-webhooks'
+    | '/bedrift/velg-plan'
     | '/bekrefter/$promoId'
     | '/kvittering/$promoId'
     | '/meldinger/$id'
     | '/admin/'
+    | '/bedrift/'
     | '/meldinger/'
     | '/mine-annonser/'
     | '/api/public/push/dispatch'
@@ -415,6 +467,8 @@ export interface FileRouteTypes {
     | '/$kaupetCode'
     | '/annonser'
     | '/auth'
+    | '/bedriftsinvitasjon'
+    | '/bekreft-epost'
     | '/personvern'
     | '/sitemap.xml'
     | '/tilbakestill-passord'
@@ -439,10 +493,12 @@ export interface FileRouteTypes {
     | '/admin/promoteringer'
     | '/admin/tilbakemeldinger'
     | '/admin/vipps-webhooks'
+    | '/bedrift/velg-plan'
     | '/bekrefter/$promoId'
     | '/kvittering/$promoId'
     | '/meldinger/$id'
     | '/admin'
+    | '/bedrift'
     | '/meldinger'
     | '/mine-annonser'
     | '/api/public/push/dispatch'
@@ -454,11 +510,14 @@ export interface FileRouteTypes {
     | '/$kaupetCode'
     | '/annonser'
     | '/auth'
+    | '/bedriftsinvitasjon'
+    | '/bekreft-epost'
     | '/personvern'
     | '/sitemap.xml'
     | '/tilbakestill-passord'
     | '/vilkar'
     | '/_authenticated/admin'
+    | '/_authenticated/bedrift'
     | '/$kaupetCode_/$sub'
     | '/360-opptak/$token'
     | '/_authenticated/favoritter'
@@ -479,10 +538,12 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/promoteringer'
     | '/_authenticated/admin/tilbakemeldinger'
     | '/_authenticated/admin/vipps-webhooks'
+    | '/_authenticated/bedrift/velg-plan'
     | '/_authenticated/bekrefter/$promoId'
     | '/_authenticated/kvittering/$promoId'
     | '/_authenticated/meldinger/$id'
     | '/_authenticated/admin/'
+    | '/_authenticated/bedrift/'
     | '/_authenticated/meldinger/'
     | '/_authenticated/mine-annonser/'
     | '/api/public/push/dispatch'
@@ -495,6 +556,8 @@ export interface RootRouteChildren {
   KaupetCodeRoute: typeof KaupetCodeRoute
   AnnonserRoute: typeof AnnonserRoute
   AuthRoute: typeof AuthRoute
+  BedriftsinvitasjonRoute: typeof BedriftsinvitasjonRoute
+  BekreftEpostRoute: typeof BekreftEpostRoute
   PersonvernRoute: typeof PersonvernRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TilbakestillPassordRoute: typeof TilbakestillPassordRoute
@@ -546,6 +609,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/bedriftsinvitasjon': {
+      id: '/bedriftsinvitasjon'
+      path: '/bedriftsinvitasjon'
+      fullPath: '/bedriftsinvitasjon'
+      preLoaderRoute: typeof BedriftsinvitasjonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bekreft-epost': {
+      id: '/bekreft-epost'
+      path: '/bekreft-epost'
+      fullPath: '/bekreft-epost'
+      preLoaderRoute: typeof BekreftEpostRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/personvern': {
       id: '/personvern'
       path: '/personvern'
@@ -593,6 +670,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AuthenticatedAdminRouteRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/bedrift': {
+      id: '/_authenticated/bedrift'
+      path: '/bedrift'
+      fullPath: '/bedrift'
+      preLoaderRoute: typeof AuthenticatedBedriftRouteRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/favoritter': {
@@ -728,6 +812,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminVippsWebhooksRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
+    '/_authenticated/bedrift/': {
+      id: '/_authenticated/bedrift/'
+      path: '/'
+      fullPath: '/bedrift/'
+      preLoaderRoute: typeof AuthenticatedBedriftIndexRouteImport
+      parentRoute: typeof AuthenticatedBedriftRouteRoute
+    }
+    '/_authenticated/bedrift/velg-plan': {
+      id: '/_authenticated/bedrift/velg-plan'
+      path: '/velg-plan'
+      fullPath: '/bedrift/velg-plan'
+      preLoaderRoute: typeof AuthenticatedBedriftVelgPlanRouteImport
+      parentRoute: typeof AuthenticatedBedriftRouteRoute
+    }
     '/_authenticated/bekrefter/$promoId': {
       id: '/_authenticated/bekrefter/$promoId'
       path: '/bekrefter/$promoId'
@@ -809,8 +907,25 @@ const AuthenticatedAdminRouteRouteWithChildren =
     AuthenticatedAdminRouteRouteChildren,
   )
 
+interface AuthenticatedBedriftRouteRouteChildren {
+  AuthenticatedBedriftVelgPlanRoute: typeof AuthenticatedBedriftVelgPlanRoute
+  AuthenticatedBedriftIndexRoute: typeof AuthenticatedBedriftIndexRoute
+}
+
+const AuthenticatedBedriftRouteRouteChildren: AuthenticatedBedriftRouteRouteChildren =
+  {
+    AuthenticatedBedriftVelgPlanRoute: AuthenticatedBedriftVelgPlanRoute,
+    AuthenticatedBedriftIndexRoute: AuthenticatedBedriftIndexRoute,
+  }
+
+const AuthenticatedBedriftRouteRouteWithChildren =
+  AuthenticatedBedriftRouteRoute._addFileChildren(
+    AuthenticatedBedriftRouteRouteChildren,
+  )
+
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRouteRoute: typeof AuthenticatedAdminRouteRouteWithChildren
+  AuthenticatedBedriftRouteRoute: typeof AuthenticatedBedriftRouteRouteWithChildren
   AuthenticatedFavoritterRoute: typeof AuthenticatedFavoritterRoute
   AuthenticatedMegRoute: typeof AuthenticatedMegRoute
   AuthenticatedMineSokRoute: typeof AuthenticatedMineSokRoute
@@ -827,6 +942,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRouteRoute: AuthenticatedAdminRouteRouteWithChildren,
+  AuthenticatedBedriftRouteRoute: AuthenticatedBedriftRouteRouteWithChildren,
   AuthenticatedFavoritterRoute: AuthenticatedFavoritterRoute,
   AuthenticatedMegRoute: AuthenticatedMegRoute,
   AuthenticatedMineSokRoute: AuthenticatedMineSokRoute,
@@ -850,6 +966,8 @@ const rootRouteChildren: RootRouteChildren = {
   KaupetCodeRoute: KaupetCodeRoute,
   AnnonserRoute: AnnonserRoute,
   AuthRoute: AuthRoute,
+  BedriftsinvitasjonRoute: BedriftsinvitasjonRoute,
+  BekreftEpostRoute: BekreftEpostRoute,
   PersonvernRoute: PersonvernRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TilbakestillPassordRoute: TilbakestillPassordRoute,

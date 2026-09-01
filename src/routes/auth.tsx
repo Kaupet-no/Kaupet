@@ -12,6 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { BusinessSignupFlow } from "@/features/business-account/business-signup-flow";
 import { isNative } from "@/lib/native";
 import { useIsNative } from "@/hooks/use-is-native";
 import { NativePageHeader } from "@/components/native-page-header";
@@ -72,6 +74,7 @@ function AuthPage() {
   const { mode, returnTo } = Route.useSearch();
   const navigate = useNavigate();
   const [authMode, setAuthMode] = useState<AuthMode>(mode);
+  const [signupKind, setSignupKind] = useState<"private" | "business">("private");
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const turnstileRef = useRef<TurnstileInstance | null>(null);
@@ -125,7 +128,8 @@ function AuthPage() {
   useEffect(() => {
     clearErrors();
     setShowPassword(false);
-  }, [authMode, clearErrors]);
+    if (!isSignUp) setSignupKind("private");
+  }, [authMode, clearErrors, isSignUp]);
 
   const webOrigin = () => (isNative() ? "https://kaupet.no" : window.location.origin);
 
@@ -251,6 +255,25 @@ function AuthPage() {
                   ? "Det tar bare et halvt minutt og er helt gratis."
                   : "Velkommen tilbake til Kaupet."}
         </p>
+        {isSignUp && (
+          <RadioGroup
+            value={signupKind}
+            onValueChange={(value) => {
+              if (value === "private" || value === "business") setSignupKind(value);
+            }}
+            aria-label="Kontotype"
+            className="mt-6 gap-3"
+          >
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="private" id="account-type-private" />
+              <Label htmlFor="account-type-private">Privatperson</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="business" id="account-type-business" />
+              <Label htmlFor="account-type-business">Bedrift</Label>
+            </div>
+          </RadioGroup>
+        )}
 
         {authMode === "confirm" ? (
           <p className="mt-6 text-center text-sm text-muted-foreground">
@@ -272,7 +295,6 @@ function AuthPage() {
                   type="email"
                   inputMode="email"
                   autoComplete="email"
-                  placeholder="kari@eksempel.no"
                   aria-invalid={!!errors.email}
                   aria-describedby={errors.email ? "email-error" : undefined}
                   {...register("email")}
@@ -341,6 +363,8 @@ function AuthPage() {
               </button>
             </p>
           </>
+        ) : isSignUp && signupKind === "business" ? (
+          <BusinessSignupFlow />
         ) : (
           <form
             onSubmit={(e) => void handleSubmit(onSubmit)(e)}
@@ -514,18 +538,21 @@ function AuthPage() {
           </form>
         )}
 
-        {authMode !== "reset" && authMode !== "resend" && authMode !== "confirm" && (
-          <p className="mt-6 text-center text-sm text-muted-foreground">
-            {isSignUp ? "Har du allerede en konto? " : "Ny på Kaupet? "}
-            <button
-              type="button"
-              className="font-medium text-primary hover:underline"
-              onClick={() => goToMode(isSignUp ? "signin" : "signup")}
-            >
-              {isSignUp ? "Logg inn" : "Bli medlem"}
-            </button>
-          </p>
-        )}
+        {authMode !== "reset" &&
+          authMode !== "resend" &&
+          authMode !== "confirm" &&
+          !(isSignUp && signupKind === "business") && (
+            <p className="mt-6 text-center text-sm text-muted-foreground">
+              {isSignUp ? "Har du allerede en konto? " : "Ny på Kaupet? "}
+              <button
+                type="button"
+                className="font-medium text-primary hover:underline"
+                onClick={() => goToMode(isSignUp ? "signin" : "signup")}
+              >
+                {isSignUp ? "Logg inn" : "Bli medlem"}
+              </button>
+            </p>
+          )}
       </div>
 
       {!native && (

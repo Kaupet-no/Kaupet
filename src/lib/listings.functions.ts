@@ -26,6 +26,101 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 const MAX_LISTINGS_PER_HOUR = 5;
 
+type ListingOwnership = {
+  seller_id: string;
+  organization_id: string | null;
+};
+
+type ListingMutationRow = {
+  id: string;
+  seller_id: string;
+  organization_id: string | null;
+  status: string;
+  is_free: boolean;
+  price_nok: number | null;
+};
+
+async function resolveListingOwnership(
+  supabaseAdmin: SupabaseClient,
+  userId: string,
+): Promise<ListingOwnership> {
+  const { data: membership, error } = await supabaseAdmin
+    .from("organization_members")
+    .select("organization_id")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .maybeSingle();
+  if (error) throw error;
+  if (!membership) return { seller_id: userId, organization_id: null };
+
+  const { error: syncError } = await supabaseAdmin.rpc("sync_organization_entitlements", {
+    _organization_id: membership.organization_id,
+  });
+  if (syncError) throw syncError;
+  const { data: activeMembership, error: membershipError } = await supabaseAdmin
+    .from("organization_members")
+    .select("organization_id, role, status")
+    .eq("organization_id", membership.organization_id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (membershipError) throw membershipError;
+  if (!activeMembership || activeMembership.status !== "active") {
+    throw new Error("Du har ikke aktiv tilgang til bedriften.");
+  }
+  if (activeMembership.role === "member") {
+    const { data: hasAccess, error: accessError } = await supabaseAdmin.rpc(
+      "organization_has_proff_access",
+      { _organization_id: activeMembership.organization_id },
+    );
+    if (accessError) throw accessError;
+    if (!hasAccess) throw new Error("Proff-tilgang er ikke aktiv.");
+  }
+  return { seller_id: userId, organization_id: activeMembership.organization_id };
+}
+
+async function authorizeListingMutation(
+  supabaseAdmin: SupabaseClient,
+  userId: string,
+  listingId: string,
+): Promise<ListingMutationRow> {
+  const { data: listing, error } = await supabaseAdmin
+    .from("listings")
+    .select("id, seller_id, organization_id, status, is_free, price_nok")
+    .eq("id", listingId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!listing) throw new Error("Annonsen finnes ikke.");
+  if (listing.seller_id === userId && !listing.organization_id) return listing;
+  if (!listing.organization_id) throw new Error("Du har ikke tilgang til denne annonsen");
+
+  const { error: syncError } = await supabaseAdmin.rpc("sync_organization_entitlements", {
+    _organization_id: listing.organization_id,
+  });
+  if (syncError) throw syncError;
+  const { data: membership, error: membershipError } = await supabaseAdmin
+    .from("organization_members")
+    .select("role, status")
+    .eq("organization_id", listing.organization_id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (membershipError) throw membershipError;
+  if (!membership || membership.status !== "active") {
+    throw new Error("Du har ikke tilgang til denne annonsen");
+  }
+  if (membership.role === "member") {
+    if (listing.seller_id !== userId) {
+      throw new Error("Du har ikke tilgang til denne annonsen");
+    }
+    const { data: hasAccess, error: accessError } = await supabaseAdmin.rpc(
+      "organization_has_proff_access",
+      { _organization_id: listing.organization_id },
+    );
+    if (accessError) throw accessError;
+    if (!hasAccess) throw new Error("Proff-tilgang er ikke aktiv.");
+  }
+  return listing;
+}
+
 async function assertUnderHourlyListingLimit(
   supabaseAdmin: SupabaseClient,
   userId: string,
@@ -133,6 +228,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
     };
 
     if (data.id) {
+      await authorizeListingMutation(supabaseAdmin, userId, data.id);
       // Re-editing a draft that already got the "expires in 7 days" system
       // message must reset the flag — otherwise a second dormancy period
       // (edit, then go quiet again) would delete it without a fresh warning.
@@ -140,7 +236,6 @@ export const saveDraftListing = createServerFn({ method: "POST" })
         .from("listings")
         .update({ ...fields, draft_expiry_notified_at: null })
         .eq("id", data.id)
-        .eq("seller_id", userId)
         .eq("status", "draft")
         .select("id, kaupet_code")
         .single();
@@ -148,6 +243,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
       return { id: updated.id as string, kaupet_code: updated.kaupet_code as string };
     }
 
+    const ownership = await resolveListingOwnership(supabaseAdmin, userId);
     await assertUnderHourlyListingLimit(
       supabaseAdmin,
       userId,
@@ -156,7 +252,11 @@ export const saveDraftListing = createServerFn({ method: "POST" })
 
     const { data: listing, error } = await supabaseAdmin
       .from("listings")
-      .insert({ seller_id: userId, status: "draft", ...fields })
+      .insert({
+        ...(ownership.organization_id ? ownership : { seller_id: userId }),
+        status: "draft",
+        ...fields,
+      })
       .select("id, kaupet_code")
       .single();
     if (error) throw error;
@@ -168,11 +268,11 @@ export const discardDraftListing = createServerFn({ method: "POST" })
   .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await authorizeListingMutation(supabaseAdmin, context.userId, data.id);
     const { error } = await supabaseAdmin
       .from("listings")
       .delete()
       .eq("id", data.id)
-      .eq("seller_id", context.userId)
       .eq("status", "draft");
     if (error) throw error;
   });
@@ -218,28 +318,8 @@ export const createListing = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { userId } = context;
-
-    const turnstileSecret = process.env.TURNSTILE_SECRET_KEY;
-    if (!turnstileSecret) {
-      // Bot protection must be configured in production/staging; only skip it
-      // when running locally without the secret set. This fails closed rather
-      // than silently letting listings through unverified in a misconfigured
-      // deployed environment.
-      if (process.env.NODE_ENV === "production") {
-        throw new Error("Serverfeil: bot-beskyttelse er ikke konfigurert.");
-      }
-    } else {
-      if (!data.turnstileToken) throw new Error("Turnstile-validering feilet. Prøv igjen.");
-      const cfRes = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-        method: "POST",
-        body: new URLSearchParams({
-          secret: turnstileSecret,
-          response: data.turnstileToken,
-        }),
-      });
-      const cfJson = (await cfRes.json()) as { success: boolean };
-      if (!cfJson.success) throw new Error("Turnstile-validering feilet. Prøv igjen.");
-    }
+    const { verifyTurnstileToken } = await import("@/lib/turnstile.server");
+    await verifyTurnstileToken(data.turnstileToken);
 
     const [{ data: filterRows }, { data: categoryRows }, flowsResult] = await Promise.all([
       supabaseAdmin
@@ -306,11 +386,11 @@ export const createListing = createServerFn({ method: "POST" })
     };
 
     if (data.draftId) {
+      await authorizeListingMutation(supabaseAdmin, userId, data.draftId);
       const { data: listing, error } = await supabaseAdmin
         .from("listings")
         .update(listingFields)
         .eq("id", data.draftId)
-        .eq("seller_id", userId)
         .eq("status", "draft")
         .select("id, kaupet_code")
         .single();
@@ -318,6 +398,7 @@ export const createListing = createServerFn({ method: "POST" })
       return { id: listing.id as string, kaupet_code: listing.kaupet_code as string };
     }
 
+    const ownership = await resolveListingOwnership(supabaseAdmin, userId);
     await assertUnderHourlyListingLimit(
       supabaseAdmin,
       userId,
@@ -326,10 +407,12 @@ export const createListing = createServerFn({ method: "POST" })
 
     const { data: listing, error } = await supabaseAdmin
       .from("listings")
-      .insert({ seller_id: userId, ...listingFields })
+      .insert({
+        ...(ownership.organization_id ? ownership : { seller_id: userId }),
+        ...listingFields,
+      })
       .select("id, kaupet_code")
       .single();
-
     if (error) throw error;
     return { id: listing.id as string, kaupet_code: listing.kaupet_code as string };
   });
@@ -338,17 +421,10 @@ export const republishListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { userId } = context;
+    const listing = await authorizeListingMutation(supabaseAdmin, userId, data.id);
 
-    const { data: listing, error: fetchError } = await supabase
-      .from("listings")
-      .select("id, seller_id, status, is_free, price_nok")
-      .eq("id", data.id)
-      .single();
-    if (fetchError) throw fetchError;
-    if (!listing || listing.seller_id !== userId) {
-      throw new Error("Du har ikke tilgang til denne annonsen");
-    }
     if (listing.status === "disabled") {
       throw new Error("Denne annonsen er deaktivert av moderator og kan ikke reaktiveres");
     }
@@ -359,7 +435,7 @@ export const republishListing = createServerFn({ method: "POST" })
     const now = new Date().toISOString();
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    const { data: updated, error } = await supabase
+    const { data: updated, error } = await supabaseAdmin
       .from("listings")
       .update({
         status: "active",

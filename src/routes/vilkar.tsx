@@ -32,7 +32,7 @@ function VilkarPage() {
           <h1 className="mt-2 font-display text-4xl leading-tight tracking-tight">
             Brukervilkår for Kaupet.no
           </h1>
-          <p className="mt-3 text-sm text-muted-foreground">Sist oppdatert 23. juli 2026</p>
+          <p className="mt-3 text-sm text-muted-foreground">Sist oppdatert 1. september 2026</p>
         </header>
       )}
 
@@ -289,6 +289,26 @@ function VilkarPage() {
               .
             </li>
           </ul>
+        </section>
+        <section>
+          <h2 className="font-display text-2xl">18. Bedriftskontoer og Proff</h2>
+          <p className="mt-3">
+            Bedriftskontoen opprettes på vegne av virksomheten som er identifisert med
+            organisasjonsnummer. Personen som oppretter kontoen bekrefter at vedkommende har
+            fullmakt til å handle på vegne av virksomheten, og er ansvarlig for at opplysningene som
+            oppgis er korrekte og oppdaterte.
+          </p>
+          <p className="mt-3">
+            Bedriftskontoer kan velge «Proff basis» eller «Proff». Proff gir én ikke-fornybar
+            prøveperiode på 30 dager med umiddelbar tilgang. Når prøveperioden avsluttes eller
+            utløper, blir Proff-funksjoner som branding, nettsidelenke og ekstra brukere deaktivert.
+            Lagrede bedrifts-, medlems- og profileringsopplysninger slettes ikke av den grunn.
+          </p>
+          <p className="mt-3">
+            Det innkreves ikke betaling for Proff før en separat faktura- eller kortbetalingsløsning
+            er lansert og vilkårene for denne er gjort tilgjengelige. Kaupet oppretter ikke faktura
+            eller betalingsavtale gjennom dette planvalget.
+          </p>
         </section>
       </div>
     </article>

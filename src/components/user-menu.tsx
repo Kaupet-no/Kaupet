@@ -13,6 +13,7 @@ import {
   Shield,
   FlaskConical,
   Moon,
+  Building2,
 } from "lucide-react";
 
 import { useIsAdmin } from "@/hooks/use-is-admin";
@@ -27,6 +28,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { NewListingDialog } from "@/components/new-listing-dialog";
+import {
+  isActiveBusinessSuperuser,
+  useBusinessMembership,
+} from "@/features/business-account/use-business-membership";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,6 +58,7 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
   const [newListingOpen, setNewListingOpen] = useState(false);
   const callSetTestMode = useServerFn(setTestMode);
   const { resolvedTheme, setTheme } = useTheme();
+  const { data: businessMembership } = useBusinessMembership();
 
   async function handleToggleTest(next: boolean) {
     if (toggling) return;
@@ -136,6 +142,13 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
             <User className="size-4" /> Min profil
           </Link>
         </DropdownMenuItem>
+        {isActiveBusinessSuperuser(businessMembership) && (
+          <DropdownMenuItem asChild>
+            <Link to="/bedrift" search={{ tab: "oversikt" }} className="cursor-pointer">
+              <Building2 className="size-4" /> Bedriftskonsoll
+            </Link>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem asChild>
           <Link to="/profil" search={{ tab: "konto" }} className="cursor-pointer">
             <Settings className="size-4" /> Kontoinnstillinger

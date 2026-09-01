@@ -6,6 +6,7 @@ export const AVATAR_BUCKET = "avatars";
 export const MESSAGE_ATTACHMENTS_BUCKET = "message-attachments";
 export const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB
 export const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp"] as const;
+export const ORGANIZATION_LOGOS_BUCKET = "organization-logos";
 
 export type ImageValidationError =
   | { kind: "too-large"; name: string; bytes: number }
@@ -37,6 +38,34 @@ export function extFromMime(mime: string): string {
   if (mime === "image/png") return "png";
   if (mime === "image/webp") return "webp";
   return "bin";
+}
+
+export async function uploadOrganizationLogo(opts: {
+  organizationId: string;
+  file: File;
+}): Promise<string> {
+  const validationError = validateImages([opts.file]);
+  if (validationError) throw new Error(describeImageError(validationError));
+  const ext = extFromMime(opts.file.type);
+  const path = `${opts.organizationId}/logo-${Date.now()}.${ext}`;
+  const { error } = await supabase.storage.from(ORGANIZATION_LOGOS_BUCKET).upload(path, opts.file, {
+    contentType: opts.file.type,
+    cacheControl: "31536000",
+    upsert: false,
+  });
+  if (error) throw error;
+  return path;
+}
+
+export async function deletePreviousOrganizationLogo(
+  previousPath: string | null | undefined,
+): Promise<void> {
+  if (!previousPath) return;
+  try {
+    await supabase.storage.from(ORGANIZATION_LOGOS_BUCKET).remove([previousPath]);
+  } catch {
+    // best-effort cleanup after the database points to the new logo
+  }
 }
 
 export async function uploadListingImage(opts: {

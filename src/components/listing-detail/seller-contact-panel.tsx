@@ -1,4 +1,4 @@
-import { MessageCircle, Share2, ShieldCheck, User as UserIcon } from "lucide-react";
+import { Building2, MessageCircle, Share2, ShieldCheck, User as UserIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { FavoriteButton } from "@/components/favorite-button";
@@ -8,13 +8,23 @@ import { ListingEvidence } from "@/components/listing-detail/listing-evidence";
 import { mapListingFactSource } from "@/components/listing-detail/fact-source";
 import { TradeSafetyAdvice } from "@/components/trade-safety-advice";
 
-type Seller = {
-  display_name: string | null;
-  avatar_url: string | null;
-  created_at: string;
-  avg_rating?: number;
-  review_count?: number;
-} | null;
+export type SellerIdentity =
+  | {
+      kind: "private";
+      display_name: string | null;
+      avatar_url: string | null;
+      created_at: string;
+      avg_rating?: number;
+      review_count?: number;
+    }
+  | {
+      kind: "business";
+      displayName: string;
+      organizationNumber: string;
+      postalCode: string | null;
+      city: string | null;
+      createdAt: string;
+    };
 
 export function SellerContactPanel({
   isLoggedIn,
@@ -31,7 +41,7 @@ export function SellerContactPanel({
   hasRegistryData,
 }: {
   isLoggedIn: boolean;
-  seller: Seller;
+  seller: SellerIdentity | null;
   isOwner: boolean;
   listingId: string;
   kaupetCode: string;
@@ -46,9 +56,9 @@ export function SellerContactPanel({
   const evidenceSources = [
     ...(hasRegistryData ? [mapListingFactSource("vehicleLookup")] : []),
     mapListingFactSource("sellerFields"),
-    ...(seller?.created_at
+    ...(seller?.kind === "private" && seller.created_at
       ? [mapListingFactSource("profileAge", seller.created_at)]
-      : seller?.review_count
+      : seller?.kind === "private" && seller.review_count
         ? [mapListingFactSource("reviews")]
         : []),
   ];
@@ -56,7 +66,7 @@ export function SellerContactPanel({
   return (
     <div className="rounded-xl border border-border bg-card p-4">
       <div className="flex items-center gap-3">
-        {seller?.avatar_url ? (
+        {seller?.kind === "private" && seller.avatar_url ? (
           <img
             src={seller.avatar_url}
             alt={seller.display_name ? `Profilbilde av ${seller.display_name}` : "Profilbilde"}
@@ -64,17 +74,18 @@ export function SellerContactPanel({
           />
         ) : (
           <div className="flex size-10 items-center justify-center rounded-full bg-muted">
-            <UserIcon className="size-5 text-muted-foreground" />
+            {seller?.kind === "business" ? (
+              <Building2 className="size-5 text-muted-foreground" aria-hidden="true" />
+            ) : (
+              <UserIcon className="size-5 text-muted-foreground" />
+            )}
           </div>
         )}
         <div className="text-sm">
-          {seller ? (
+          {seller?.kind === "private" ? (
             <>
               <div className="flex flex-wrap items-center gap-1.5">
                 <p className="font-medium">{seller?.display_name ?? "Selger"}</p>
-                {/* Statisk "Privatperson" inntil vi har forhandlerkontoer —
-                    da avgjøres denne av kontotype i stedet for å alltid vise
-                    privatperson. */}
                 <span className="text-xs text-muted-foreground">Privatperson</span>
               </div>
               {!!seller?.review_count && (
@@ -93,6 +104,22 @@ export function SellerContactPanel({
                     month: "long",
                     year: "numeric",
                   })}
+                </p>
+              )}
+            </>
+          ) : seller?.kind === "business" ? (
+            <>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <p className="font-medium">{seller.displayName}</p>
+                <span className="text-xs text-muted-foreground">Bedrift</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Org.nr.{" "}
+                {seller.organizationNumber.replace(/\D/g, "").replace(/(\d{3})(?=\d)/g, "$1 ")}
+              </p>
+              {(seller.postalCode || seller.city) && (
+                <p className="text-xs text-muted-foreground">
+                  {[seller.postalCode, seller.city].filter(Boolean).join(" ")}
                 </p>
               )}
             </>
@@ -119,7 +146,9 @@ export function SellerContactPanel({
             {contacting
               ? "Åpner samtale…"
               : isLoggedIn
-                ? "Send melding til selger"
+                ? seller?.kind === "business"
+                  ? "Send melding til bedriften"
+                  : "Send melding til selger"
                 : "Logg inn for å sende melding"}
           </Button>
         </div>

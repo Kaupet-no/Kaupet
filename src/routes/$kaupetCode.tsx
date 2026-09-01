@@ -22,9 +22,12 @@ import { normalizeSlugForMatch } from "@/lib/slug";
 import { searchSchema } from "@/features/listing-search/search-schema";
 import { signListingImageUrls, signVehicle360FrameUrls } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { OwnerStatsPanel } from "@/components/listing-detail/owner-stats-panel";
 import { SellerContactPanel } from "@/components/listing-detail/seller-contact-panel";
+import type { SellerIdentity } from "@/components/listing-detail/seller-contact-panel";
 import { ListingDetailView } from "@/components/listing-detail/listing-detail-view";
+import type { ListingOrganizationBrand } from "@/components/listing-detail/listing-detail-view";
 import { getCategoryBehavior } from "@/lib/category-behavior";
 import {
   genericBrandFilterFor,
@@ -44,6 +47,9 @@ import { savePendingAuthIntent, takePendingAuthIntent } from "@/lib/pending-auth
 import { trackProductEvent } from "@/lib/product-analytics";
 import { logListingView } from "@/lib/listing-views.functions";
 import { parseVehicleLookup } from "@/lib/vehicle/parse-vehicle-lookup";
+import { hasEffectiveProffAccess } from "@/features/business-account/plans";
+import { ListingCard } from "@/components/listing-card";
+import { toListingCardData } from "@/lib/listing-card-data";
 
 export const Route = createFileRoute("/$kaupetCode")({
   validateSearch: searchSchema.extend({
@@ -339,12 +345,31 @@ function ListingDetailPage() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, subtitle, description, price_nok, is_free, condition, can_ship, city, postal_code, display_lat, display_lng, created_at, updated_at, published_at, status, seller_id, category_id, attributes, known_issues, no_known_issues, maintenance_history, listing_images(storage_path, sort_order, caption), listing_360_frames(storage_path, frame_order), categories(id, name_nb, slug, parent_id)",
+          "id, kaupet_code, title, subtitle, description, price_nok, is_free, condition, can_ship, city, postal_code, display_lat, display_lng, created_at, updated_at, published_at, status, seller_id, organization_id, category_id, attributes, known_issues, no_known_issues, maintenance_history, listing_images(storage_path, sort_order, caption), listing_360_frames(storage_path, frame_order), categories(id, name_nb, slug, parent_id), organizations(id, display_name, organization_number, postal_code, city, created_at, website_url, logo_path, brand_palette, selected_plan, proff_access_until)",
         )
         .eq("kaupet_code", kaupetCode)
         .maybeSingle();
       if (error) throw error;
       if (!data) throw new Error("Annonsen finnes ikke");
+
+      const organization = Array.isArray(data.organizations)
+        ? data.organizations[0]
+        : data.organizations;
+      if (organization) {
+        return {
+          ...data,
+          organization,
+          seller: {
+            kind: "business" as const,
+            displayName: organization.display_name,
+            organizationNumber: organization.organization_number,
+            postalCode: organization.postal_code,
+            city: organization.city,
+            createdAt: organization.created_at,
+          } satisfies SellerIdentity,
+        };
+      }
+
       const { data: profile } = await supabase
         .from("profiles")
         .select("display_name, avatar_url, created_at")
@@ -358,14 +383,42 @@ function ListingDetailPage() {
       const ratingRow = Array.isArray(ratingRows) ? ratingRows[0] : ratingRows;
       return {
         ...data,
+        organization: null,
         seller: profile
           ? {
+              kind: "private" as const,
               ...profile,
               avg_rating: Number(ratingRow?.avg_rating ?? 0),
               review_count: Number(ratingRow?.review_count ?? 0),
             }
           : null,
       };
+    },
+  });
+  const organization = data?.organization ?? null;
+  const hasEffectiveOrganizationProff = hasEffectiveProffAccess(organization);
+  const {
+    data: otherOrganizationListings,
+    isLoading: otherListingsLoading,
+    isError: otherListingsError,
+  } = useQuery({
+    queryKey: ["organization-listings", organization?.id, data?.id],
+    enabled: hasEffectiveOrganizationProff && !!organization?.id && !!data?.id,
+    queryFn: async () => {
+      const { data: rows, error } = await supabase
+        .from("listings")
+        .select(
+          "id, kaupet_code, title, subtitle, price_nok, is_free, city, created_at, listing_images(storage_path, sort_order), attributes, categories(slug)",
+        )
+        .eq("organization_id", organization!.id)
+        .eq("status", "active")
+        .neq("id", data!.id)
+        .order("created_at", { ascending: false })
+        .limit(4);
+      if (error) throw error;
+      return (rows ?? []).map((row) =>
+        toListingCardData(row as Parameters<typeof toListingCardData>[0]),
+      );
     },
   });
 
@@ -591,6 +644,47 @@ function ListingDetailPage() {
         })),
     ];
   })();
+  const organizationBrand: ListingOrganizationBrand | undefined =
+    hasEffectiveOrganizationProff && organization
+      ? {
+          displayName: organization.display_name,
+          logoUrl: organization.logo_path
+            ? supabase.storage.from("organization-logos").getPublicUrl(organization.logo_path).data
+                .publicUrl
+            : null,
+          websiteUrl: organization.website_url,
+          palette:
+            organization.brand_palette === "navy" ||
+            organization.brand_palette === "burgundy" ||
+            organization.brand_palette === "slate"
+              ? organization.brand_palette
+              : "forest",
+        }
+      : undefined;
+  const relatedListingsSlot =
+    hasEffectiveOrganizationProff && !otherListingsError ? (
+      otherListingsLoading ? (
+        <section className="mt-10" aria-label="Flere annonser fra bedriften">
+          <Skeleton className="h-7 w-64" />
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }, (_, index) => (
+              <Skeleton key={index} className="aspect-[4/3] rounded-lg" />
+            ))}
+          </div>
+        </section>
+      ) : otherOrganizationListings && otherOrganizationListings.length > 0 ? (
+        <section className="mt-10" aria-labelledby="organization-listings-heading">
+          <h2 id="organization-listings-heading" className="font-display text-xl">
+            Flere annonser fra bedriften
+          </h2>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {otherOrganizationListings.map((listing) => (
+              <ListingCard key={listing.id} listing={listing} />
+            ))}
+          </div>
+        </section>
+      ) : undefined
+    ) : undefined;
 
   return (
     <ListingDetailView
@@ -614,6 +708,8 @@ function ListingDetailPage() {
       categoryId={data.category_id}
       canShip={data.can_ship}
       requiresDeliveryMethod={behavior.requiresDeliveryMethod}
+      organizationBrand={organizationBrand}
+      relatedListingsSlot={relatedListingsSlot}
       breadcrumb={breadcrumb}
       enableBackToSearch
       images={images}

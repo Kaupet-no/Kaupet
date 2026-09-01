@@ -89,6 +89,7 @@ export function ListingRow({
   onPublishDraft,
   onDelete,
   busy,
+  readOnly = false,
 }: {
   row: Row;
   /** Whether the listing's category is under Bil og MC — gates the native-only
@@ -102,6 +103,8 @@ export function ListingRow({
   onPublishDraft: () => void;
   onDelete: () => void;
   busy: boolean;
+  /** Render only the listing link in console surfaces. */
+  readOnly?: boolean;
 }) {
   const [imgUrl, setImgUrl] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -199,15 +202,19 @@ export function ListingRow({
           <div className="mt-1 flex flex-wrap items-center gap-1.5">{statusBadges}</div>
           <p className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
             {row.city && <span>{row.city}</span>}
-            <span className="inline-flex items-center gap-1">
-              <Eye className="size-3" /> {row.view_count}
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <Heart className="size-3" /> {row.favorite_count}
-            </span>
+            {!readOnly && (
+              <>
+                <span className="inline-flex items-center gap-1">
+                  <Eye className="size-3" /> {row.view_count}
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <Heart className="size-3" /> {row.favorite_count}
+                </span>
+              </>
+            )}
           </p>
         </div>
-        {isVehicle && (row.status === "draft" || row.status === "active") && (
+        {!readOnly && isVehicle && (row.status === "draft" || row.status === "active") && (
           <Vehicle360CaptureLauncher
             listingId={row.id}
             listingTitle={row.title}
@@ -216,73 +223,75 @@ export function ListingRow({
             size="icon"
           />
         )}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="shrink-0"
-              disabled={busy}
-              onClick={() => void hapticImpact("light")}
-              aria-label="Flere valg"
-            >
-              <MoreVertical className="size-5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuItem asChild>
-              <Link
-                to="/$kaupetCode"
-                params={{ kaupetCode: row.kaupet_code }}
-                search={{ edit: true }}
-                className="flex items-center gap-2"
+        {!readOnly && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="shrink-0"
+                disabled={busy}
+                onClick={() => void hapticImpact("light")}
+                aria-label="Flere valg"
               >
-                <Pencil className="size-4" /> Rediger
-              </Link>
-            </DropdownMenuItem>
-            {row.status === "active" && (
-              <>
-                {!activePromotion && (
-                  <DropdownMenuItem onClick={onPromote}>Fremhev annonse</DropdownMenuItem>
-                )}
-                <DropdownMenuItem
-                  onClick={() => {
-                    void hapticImpact("medium");
-                    onMarkSold();
-                  }}
+                <MoreVertical className="size-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem asChild>
+                <Link
+                  to="/$kaupetCode"
+                  params={{ kaupetCode: row.kaupet_code }}
+                  search={{ edit: true }}
+                  className="flex items-center gap-2"
                 >
-                  <CheckCircle2 className="size-4" /> Marker som solgt
+                  <Pencil className="size-4" /> Rediger
+                </Link>
+              </DropdownMenuItem>
+              {row.status === "active" && (
+                <>
+                  {!activePromotion && (
+                    <DropdownMenuItem onClick={onPromote}>Fremhev annonse</DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem
+                    onClick={() => {
+                      void hapticImpact("medium");
+                      onMarkSold();
+                    }}
+                  >
+                    <CheckCircle2 className="size-4" /> Marker som solgt
+                  </DropdownMenuItem>
+                </>
+              )}
+              {row.status === "expired" && (
+                <DropdownMenuItem onClick={onRepublish}>
+                  <RotateCcw className="size-4" /> Publiser på nytt
                 </DropdownMenuItem>
-              </>
-            )}
-            {row.status === "expired" && (
-              <DropdownMenuItem onClick={onRepublish}>
-                <RotateCcw className="size-4" /> Publiser på nytt
+              )}
+              {row.status === "draft" && (
+                <DropdownMenuItem onClick={onPublishDraft}>
+                  <Send className="size-4" /> Publiser
+                </DropdownMenuItem>
+              )}
+              {(row.status === "sold" || row.status === "archived") && (
+                <DropdownMenuItem onClick={onReactivate}>
+                  <RotateCcw className="size-4" /> Reaktiver
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={() => {
+                  void hapticImpact("medium");
+                  setDeleteOpen(true);
+                }}
+              >
+                <Trash2 className="size-4" /> Slett annonse
               </DropdownMenuItem>
-            )}
-            {row.status === "draft" && (
-              <DropdownMenuItem onClick={onPublishDraft}>
-                <Send className="size-4" /> Publiser
-              </DropdownMenuItem>
-            )}
-            {(row.status === "sold" || row.status === "archived") && (
-              <DropdownMenuItem onClick={onReactivate}>
-                <RotateCcw className="size-4" /> Reaktiver
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
-              onClick={() => {
-                void hapticImpact("medium");
-                setDeleteOpen(true);
-              }}
-            >
-              <Trash2 className="size-4" /> Slett annonse
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        {deleteDialog}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        {!readOnly && deleteDialog}
       </li>
     );
   }
@@ -309,84 +318,96 @@ export function ListingRow({
         <p className="mt-1 font-display text-sm">{formatPrice(row)}</p>
         <p className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
           {row.city && <span>{row.city}</span>}
-          <span className="inline-flex items-center gap-1">
-            <Eye className="size-3" /> {row.view_count}
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <Heart className="size-3" /> {row.favorite_count}
-          </span>
+          {!readOnly && (
+            <>
+              <span className="inline-flex items-center gap-1">
+                <Eye className="size-3" /> {row.view_count}
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <Heart className="size-3" /> {row.favorite_count}
+              </span>
+            </>
+          )}
         </p>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Link to="/$kaupetCode" params={{ kaupetCode: row.kaupet_code }} search={{ edit: true }}>
-          <Button size="sm" variant="outline" disabled={busy}>
-            <Pencil className="size-4" /> Rediger
+      {readOnly ? (
+        <Link to="/$kaupetCode" params={{ kaupetCode: row.kaupet_code }}>
+          <Button size="sm" variant="outline">
+            Åpne annonse
           </Button>
         </Link>
-        {row.status === "active" ? (
-          <>
-            {activePromotion ? (
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <Link to="/$kaupetCode" params={{ kaupetCode: row.kaupet_code }} search={{ edit: true }}>
+            <Button size="sm" variant="outline" disabled={busy}>
+              <Pencil className="size-4" /> Rediger
+            </Button>
+          </Link>
+          {row.status === "active" ? (
+            <>
+              {activePromotion ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled
+                  className="border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-400"
+                >
+                  <Check className="size-4" /> Annonse fremhevet
+                </Button>
+              ) : (
+                <Button size="sm" variant="outline" onClick={onPromote} disabled={busy}>
+                  Fremhev annonse
+                </Button>
+              )}
+              <Button size="sm" variant="outline" onClick={onMarkSold} disabled={busy}>
+                <CheckCircle2 className="size-4" /> Marker som solgt
+              </Button>
+            </>
+          ) : row.status === "expired" ? (
+            <Button size="sm" variant="outline" onClick={onRepublish} disabled={busy}>
+              <RotateCcw className="size-4" /> Publiser på nytt
+            </Button>
+          ) : row.status === "draft" ? (
+            <Button size="sm" variant="outline" onClick={onPublishDraft} disabled={busy}>
+              <Send className="size-4" /> Publiser
+            </Button>
+          ) : (
+            <Button size="sm" variant="outline" onClick={onReactivate} disabled={busy}>
+              <RotateCcw className="size-4" /> Reaktiver
+            </Button>
+          )}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
               <Button
                 size="sm"
-                variant="outline"
-                disabled
-                className="border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-400"
+                variant="ghost"
+                className="text-destructive"
+                disabled={busy}
+                aria-label="Slett"
               >
-                <Check className="size-4" /> Annonse fremhevet
+                <Trash2 className="size-4" />
               </Button>
-            ) : (
-              <Button size="sm" variant="outline" onClick={onPromote} disabled={busy}>
-                Fremhev annonse
-              </Button>
-            )}
-            <Button size="sm" variant="outline" onClick={onMarkSold} disabled={busy}>
-              <CheckCircle2 className="size-4" /> Marker som solgt
-            </Button>
-          </>
-        ) : row.status === "expired" ? (
-          <Button size="sm" variant="outline" onClick={onRepublish} disabled={busy}>
-            <RotateCcw className="size-4" /> Publiser på nytt
-          </Button>
-        ) : row.status === "draft" ? (
-          <Button size="sm" variant="outline" onClick={onPublishDraft} disabled={busy}>
-            <Send className="size-4" /> Publiser
-          </Button>
-        ) : (
-          <Button size="sm" variant="outline" onClick={onReactivate} disabled={busy}>
-            <RotateCcw className="size-4" /> Reaktiver
-          </Button>
-        )}
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-destructive"
-              disabled={busy}
-              aria-label="Slett"
-            >
-              <Trash2 className="size-4" />
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Slette annonsen?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Dette kan ikke angres. Annonsen «{row.title}» blir fjernet permanent.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Avbryt</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={onDelete}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                Slett
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Slette annonsen?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Dette kan ikke angres. Annonsen «{row.title}» blir fjernet permanent.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={onDelete}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Slett
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      )}
     </li>
   );
 }

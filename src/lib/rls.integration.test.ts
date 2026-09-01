@@ -132,6 +132,76 @@ describe.skipIf(!canRun)("RLS: conversations & messages are only visible to part
       .eq("conversation_id", conversationId);
     expect(messages).toHaveLength(0);
   });
+  it("lar hver deltaker flytte sin egen samtale til papirkurven og gjenopprette den", async () => {
+    const buyer = await signIn(emails.buyer);
+    const seller = await signIn(emails.seller);
+    const outsider = await signIn(emails.outsider);
+    const { data: buyerUser } = await buyer.auth.getUser();
+
+    const { error: deleteError, count: deleteCount } = await buyer
+      .from("conversations")
+      .update({ buyer_deleted_at: new Date().toISOString() }, { count: "exact" })
+      .eq("id", conversationId);
+    expect(deleteError).toBeNull();
+    expect(deleteCount).toBe(1);
+
+    const { data: buyerInbox } = await buyer
+      .from("conversations")
+      .select("id")
+      .or(
+        `and(buyer_id.eq.${buyerUser.user!.id},buyer_deleted_at.is.null),and(seller_id.eq.${buyerUser.user!.id},seller_deleted_at.is.null)`,
+      )
+      .eq("id", conversationId);
+    expect(buyerInbox).toHaveLength(0);
+
+    const { data: buyerTrash } = await buyer
+      .from("conversations")
+      .select("id, buyer_deleted_at")
+      .eq("id", conversationId)
+      .not("buyer_deleted_at", "is", null);
+    expect(buyerTrash).toHaveLength(1);
+
+    const { data: sellerInbox } = await seller
+      .from("conversations")
+      .select("id")
+      .eq("id", conversationId);
+    expect(sellerInbox).toHaveLength(1);
+
+    const { error: outsiderError, count: outsiderCount } = await outsider
+      .from("conversations")
+      .update({ buyer_deleted_at: new Date().toISOString() }, { count: "exact" })
+      .eq("id", conversationId);
+    expect(outsiderError).toBeNull();
+    expect(outsiderCount).toBe(0);
+
+    const { error: restoreError, count: restoreCount } = await buyer
+      .from("conversations")
+      .update({ buyer_deleted_at: null }, { count: "exact" })
+      .eq("id", conversationId);
+    expect(restoreError).toBeNull();
+    expect(restoreCount).toBe(1);
+    const expiredAt = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString();
+    const { error: expireError } = await admin
+      .from("conversations")
+      .update({ buyer_deleted_at: expiredAt })
+      .eq("id", conversationId);
+    expect(expireError).toBeNull();
+
+    const { data: expiredTrash } = await buyer
+      .from("conversations")
+      .select("id")
+      .eq("id", conversationId)
+      .gte("buyer_deleted_at", new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString());
+    expect(expiredTrash).toHaveLength(0);
+
+    const { error: expiredRestoreError } = await buyer
+      .from("conversations")
+      .update({ buyer_deleted_at: null })
+      .eq("id", conversationId);
+    expect(expiredRestoreError).not.toBeNull();
+
+    await admin.from("conversations").update({ buyer_deleted_at: null }).eq("id", conversationId);
+  });
 });
 
 describe.skipIf(!canRun)("RLS: listings — draft visibility and owner-only writes", () => {

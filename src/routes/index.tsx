@@ -15,6 +15,7 @@ import { AppLanding } from "@/components/app-landing";
 import { KaupetCodeDialog } from "@/components/kaupet-code-dialog";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { IntentTitleLanding } from "@/components/intent-title-landing";
+import { CategorySuggestionDialog } from "@/components/category-suggestion-dialog";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { findCategorySuggestion } from "@/lib/categories";
 import { Badge } from "@/components/ui/badge";
@@ -324,8 +325,8 @@ function WebLanding() {
                   Opprett en annonse
                 </Button>
                 <Dialog open={adPickerOpen} onOpenChange={setAdPickerOpen}>
-                  <DialogContent className="sm:max-w-md">
-                    <DialogTitle className="sr-only">Opprett annonse</DialogTitle>
+                  <DialogContent className="sm:max-w-4xl">
+                    <DialogTitle className="sr-only">Hva vil du gjøre?</DialogTitle>
                     <IntentTitleLanding onNavigate={() => setAdPickerOpen(false)} />
                   </DialogContent>
                 </Dialog>
@@ -355,13 +356,16 @@ function WebLanding() {
               Utforsk kategorier
             </h2>
           </div>
-          <Link
-            to="/annonser"
-            search={{ q: "", category: "", sort: "new" }}
-            className="text-sm text-primary hover:underline"
-          >
-            Alle annonser →
-          </Link>
+          <div className="flex flex-wrap items-center gap-4">
+            <CategorySuggestionDialog />
+            <Link
+              to="/annonser"
+              search={{ q: "", category: "", sort: "new" }}
+              className="text-sm text-primary hover:underline"
+            >
+              Alle annonser →
+            </Link>
+          </div>
         </div>
 
         <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">

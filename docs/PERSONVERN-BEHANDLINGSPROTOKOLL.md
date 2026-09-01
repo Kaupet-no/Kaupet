@@ -1,13 +1,11 @@
 # Intern behandlingsprotokoll for personopplysninger
 
-Dette er den autoritative, interne oversikten over hvilke personopplysninger
+Dette er den interne oversikten over hvilke personopplysninger
 Kaupet.no behandler, hvorfor, hvor de lagres, hvem de eventuelt deles med, og
 hvor lenge de beholdes før sletting. `/personvern` (den brukervendte
 personvernerklæringen) skal aldri love mer eller mindre enn det som står her.
 Ved motstrid gjelder denne protokollen — rett protokollen og
 personvernerklæringen sammen i samme endring.
-
-Behandlingsansvarlig: **Happy Pixel AS**, org.nr. 933 197 867.
 
 ## Hvordan bruke dette dokumentet
 
@@ -157,19 +155,3 @@ samtykke før den tas i bruk.
 | `kaupet-pending-auth-intent`                                                                  | `sessionStorage`                    | Fullføre en handling (f.eks. favoritt) etter innlogging | Nei                                                                   |
 | `kaupet:lastAnnonserSearch`                                                                   | `sessionStorage`                    | Gå tilbake til forrige søkeresultat                     | Nei, slettes når fanen lukkes                                         |
 | Bildeutkast                                                                                   | IndexedDB (`kaupet-listing-drafts`) | Mellomlagre bilder under annonseregistrering            | Nei                                                                   |
-
-**Fjernet i denne revisjonen:** `kaupet_visitor_id` (localStorage) og
-`kaupet-product-session` (sessionStorage) — begge var klientgenererte
-identifikatorer uten et rent funksjonelt unntak fra samtykkekravet.
-Visningstelling og produktmåling er erstattet med de aggregerte,
-identifikatorløse mekanismene i § 10.
-
-## Vedlegg A — kjente gap (ikke løst i denne revisjonen)
-
-- `vipps_webhook_events` mangler en egen slettefrist. Foreslått: samme frist
-  som regnskapsbilag tilsier (bokføringsloven), avklares med regnskapsfører
-  før en konkret frist legges inn i `purge_expired_personal_data()`.
-- Faktisk Supabase-prosjektregion, Resend-plan/lagringstid og Mistral
-  Zero-Data-Retention-status er ikke bekreftet i leverandørdashbordene —
-  merket som «ikke verifisert fra dette repoet» over inntil noen med
-  kontotilgang bekrefter dem.

@@ -110,6 +110,8 @@ export type Database = {
       }
       feedback: {
         Row: {
+          category_description: string | null
+          category_name: string | null
           created_at: string
           id: string
           message: string
@@ -118,6 +120,8 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          category_description?: string | null
+          category_name?: string | null
           created_at?: string
           id?: string
           message: string
@@ -126,6 +130,8 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          category_description?: string | null
+          category_name?: string | null
           created_at?: string
           id?: string
           message?: string
@@ -314,34 +320,40 @@ export type Database = {
       }
       conversations: {
         Row: {
+          buyer_deleted_at: string | null
           buyer_id: string
           buyer_last_read_at: string | null
           created_at: string
           id: string
           last_message_at: string
           listing_id: string | null
+          seller_deleted_at: string | null
           seller_id: string
           seller_last_read_at: string | null
           wtb_listing_id: string | null
         }
         Insert: {
+          buyer_deleted_at?: string | null
           buyer_id: string
           buyer_last_read_at?: string | null
           created_at?: string
           id?: string
           last_message_at?: string
           listing_id?: string | null
+          seller_deleted_at?: string | null
           seller_id: string
           seller_last_read_at?: string | null
           wtb_listing_id?: string | null
         }
         Update: {
+          buyer_deleted_at?: string | null
           buyer_id?: string
           buyer_last_read_at?: string | null
           created_at?: string
           id?: string
           last_message_at?: string
           listing_id?: string | null
+          seller_deleted_at?: string | null
           seller_id?: string
           seller_last_read_at?: string | null
           wtb_listing_id?: string | null

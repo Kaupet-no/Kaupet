@@ -6,8 +6,10 @@ import { requireAdminRole } from "@/lib/admin-auth.server";
 
 export type AdminFeedbackRow = {
   id: string;
-  type: "ris" | "ros";
+  type: "ris" | "ros" | "kategori";
   message: string;
+  category_name: string | null;
+  category_description: string | null;
   created_at: string;
   user_id: string | null;
   display_name: string | null;
@@ -15,7 +17,7 @@ export type AdminFeedbackRow = {
 };
 
 const listSchema = z.object({
-  typeFilter: z.enum(["ris", "ros"]).nullable().optional(),
+  typeFilter: z.enum(["ris", "ros", "kategori"]).nullable().optional(),
   sortBy: z.enum(["created_at", "type"]).optional().default("created_at"),
   ascending: z.boolean().optional().default(false),
   limit: z.number().int().min(1).max(200).optional().default(100),
@@ -31,7 +33,10 @@ export const adminListFeedback = createServerFn({ method: "GET" })
 
     let query = supabaseAdmin
       .from("feedback")
-      .select("id, type, message, created_at, user_id, page_url", { count: "exact" })
+      .select(
+        "id, type, message, category_name, category_description, created_at, user_id, page_url",
+        { count: "exact" },
+      )
       .order(data.sortBy, { ascending: data.ascending })
       .range(data.offset, data.offset + data.limit - 1);
     if (data.typeFilter) query = query.eq("type", data.typeFilter);
@@ -54,8 +59,10 @@ export const adminListFeedback = createServerFn({ method: "GET" })
 
     const result: AdminFeedbackRow[] = (rows ?? []).map((r) => ({
       id: r.id,
-      type: r.type as "ris" | "ros",
+      type: r.type as "ris" | "ros" | "kategori",
       message: r.message,
+      category_name: r.category_name,
+      category_description: r.category_description,
       created_at: r.created_at,
       user_id: r.user_id,
       display_name: r.user_id ? (names.get(r.user_id) ?? null) : null,

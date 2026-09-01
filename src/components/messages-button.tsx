@@ -38,12 +38,14 @@ async function fetchConversationPreviews(userId: string): Promise<ConvPreview[]>
   const { data: convs, error } = await supabase
     .from("conversations")
     .select(
-      `id, buyer_id, seller_id, listing_id, last_message_at, buyer_last_read_at, seller_last_read_at,
+      `id, buyer_id, seller_id, listing_id, last_message_at, buyer_last_read_at, seller_last_read_at, buyer_deleted_at, seller_deleted_at,
        listing:listings(title),
        buyer:profiles!conversations_buyer_id_fkey(id, display_name, avatar_url),
        seller:profiles!conversations_seller_id_fkey(id, display_name, avatar_url)`,
     )
-    .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
+    .or(
+      `and(buyer_id.eq.${userId},buyer_deleted_at.is.null),and(seller_id.eq.${userId},seller_deleted_at.is.null)`,
+    )
     .order("last_message_at", { ascending: false })
     .limit(8);
 
@@ -67,10 +69,12 @@ async function fetchConversationPreviews(userId: string): Promise<ConvPreview[]>
     const { data: simpleConvs, error: e2 } = await supabase
       .from("conversations")
       .select(
-        `id, buyer_id, seller_id, listing_id, last_message_at, buyer_last_read_at, seller_last_read_at,
+        `id, buyer_id, seller_id, listing_id, last_message_at, buyer_last_read_at, seller_last_read_at, buyer_deleted_at, seller_deleted_at,
          listing:listings(title)`,
       )
-      .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
+      .or(
+        `and(buyer_id.eq.${userId},buyer_deleted_at.is.null),and(seller_id.eq.${userId},seller_deleted_at.is.null)`,
+      )
       .order("last_message_at", { ascending: false })
       .limit(8);
     if (e2) throw e2;

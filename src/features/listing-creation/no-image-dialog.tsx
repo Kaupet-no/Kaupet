@@ -24,8 +24,8 @@ export function NoImageDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Ingen bilder lagt til</AlertDialogTitle>
           <AlertDialogDescription>
-            Bilder kan gjøre det enklere for andre å vurdere annonsen. Du kan legge til bilder nå
-            eller fortsette uten.
+            Bilder vil gjøre annonsen din mer attraktiv og føre til flere besøkende. Du kan også
+            legge til bilder senere.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

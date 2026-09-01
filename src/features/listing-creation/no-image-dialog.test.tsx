@@ -17,7 +17,7 @@ describe("NoImageDialog", () => {
     expect(screen.getByRole("alertdialog", { name: "Ingen bilder lagt til" })).toBeTruthy();
     expect(
       screen.getByText(
-        "Bilder kan gjøre det enklere for andre å vurdere annonsen. Du kan legge til bilder nå eller fortsette uten.",
+        "Bilder vil gjøre annonsen din mer attraktiv og føre til flere besøkende. Du kan også legge til bilder senere.",
       ),
     ).toBeTruthy();
     expect(screen.getByRole("button", { name: "Legg til bilder" })).toBeTruthy();

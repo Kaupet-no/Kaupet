@@ -212,9 +212,9 @@ export function AppBottomNav() {
 
       {/* Ny annonse-velger: telefon = Sheet, nettbrett/web = Dialog. */}
       <ResponsiveOverlay open={adPickerOpen} onOpenChange={setAdPickerOpen}>
-        <ResponsiveOverlayContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Hva vil du annonsere?</DialogTitle>
+        <ResponsiveOverlayContent className="sm:max-w-4xl">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Hva vil du gjøre?</DialogTitle>
           </DialogHeader>
           <IntentTitleLanding onNavigate={() => setAdPickerOpen(false)} />
         </ResponsiveOverlayContent>

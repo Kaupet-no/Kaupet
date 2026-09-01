@@ -75,7 +75,7 @@ function AdminLayout() {
             <NavTab
               to="/admin/tilbakemeldinger"
               icon={<MessageSquareHeart className="size-4" />}
-              label="Ris og Ros"
+              label="Tilbakemeldinger"
             />
           </>
         )}

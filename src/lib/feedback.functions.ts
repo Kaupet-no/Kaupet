@@ -58,3 +58,45 @@ export const submitFeedback = createServerFn({ method: "POST" })
     });
     if (error) throw error;
   });
+
+const categorySuggestionSchema = z.object({
+  categoryName: z.string().trim().min(1, "Skriv inn en kategori").max(200, "Maks 200 tegn"),
+  description: z.string().trim().max(2000, "Maks 2000 tegn").optional(),
+  pageUrl: z.string().trim().max(2000).optional(),
+});
+
+/** Submits a category suggestion without exposing feedback rows to clients. */
+export const submitCategorySuggestion = createServerFn({ method: "POST" })
+  .validator((input: unknown) => categorySuggestionSchema.parse(input))
+  .handler(async ({ data }) => {
+    // Static import would expose the service-role client to client bundles;
+    // this server function is imported by client components.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let userId: string | null = null;
+    const request = getRequest();
+    const authHeader = request?.headers?.get("authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      const token = authHeader.slice("Bearer ".length);
+      const { data: claims } = await supabaseAdmin.auth.getClaims(token);
+      userId = (claims?.claims?.sub as string | undefined) ?? null;
+    }
+
+    const ip =
+      request?.headers?.get("cf-connecting-ip") ??
+      request?.headers?.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+      "unknown";
+    if (!throttle(userId ?? `ip:${ip}`)) {
+      throw new Error("Du har sendt mange forslag på kort tid. Prøv igjen senere.");
+    }
+
+    const { error } = await supabaseAdmin.from("feedback").insert({
+      type: "kategori",
+      message: data.categoryName,
+      category_name: data.categoryName,
+      category_description: data.description || null,
+      user_id: userId,
+      page_url: data.pageUrl ?? null,
+    });
+    if (error) throw error;
+  });

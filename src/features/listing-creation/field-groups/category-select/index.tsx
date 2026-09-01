@@ -1,9 +1,9 @@
 import { Sparkles } from "lucide-react";
 
+import { CategorySuggestionDialog } from "@/components/category-suggestion-dialog";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { CategoryPicker } from "@/components/category-picker";
-
 import type { WizardSharedProps } from "../types";
 import { RequiredMark } from "../required-mark";
 
@@ -74,6 +74,7 @@ export function CategorySelect({
         onSelect={onCategorySelect}
         selectableGroups={bilOgMcCategoryId ? [bilOgMcCategoryId] : undefined}
       />
+      <CategorySuggestionDialog />
 
       {errors.category_id && (
         <p id="category-error" className="text-sm text-destructive">

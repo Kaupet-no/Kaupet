@@ -19,24 +19,6 @@ en innebygd offline-side (`capacitor-shell/offline.html`).
 └──────────────────────────────────┘
 ```
 
-## Hva er med i POC
-
-- iOS- og Android-prosjekt generert med Capacitor
-- App-ikon og splash (Kaupet-merkevare)
-- Innebygd visuell offline-side med "Prøv igjen"-knapp
-- Toast-varsel ved nettverkstap mens appen kjører
-- Native kamera/galleri i bildevelgeren
-- Native GPS-posisjon i lokasjonsfilteret
-- Native delefunksjon på annonsesider
-- Android: hardware tilbake-knapp navigerer i WebView-historikken
-- Custom URL scheme `no.kaupet.app://` (forberedt, ikke aktivt brukt)
-
-## Ikke med i POC
-
-- Publisering i App Store / Google Play
-- Universal Links / App Links
-- Google OAuth-login i appen (bruk e-post + passord)
-
 ## Native push-varsler (Android og iOS / FCM)
 
 Begge native apper bruker `@capacitor/push-notifications` + Firebase Cloud
@@ -148,16 +130,12 @@ I Xcode:
 3. Velg iOS Simulator eller koble til en iPhone
 4. Trykk play-knappen
 
-> En gratis Apple-ID lar deg installere appen på din egen enhet i 7 dager
-> om gangen. Ingen Apple Developer Program ($99/år) trengs for POC.
-
 ---
 
 ## Oppdater appen etter en kaupet.no-endring
 
-Fordi appen laster `https://kaupet.no` direkte trenger du normalt
-**ingenting** å gjøre når web-appen oppdateres — brukerne får siste versjon
-neste gang de starter appen.
+Fordi appen laster `https://kaupet.no` direkte, trenger du normalt
+ikke å gjøre noe når web-appen oppdateres. Siste versjon lastes inn automatisk neste gang appen startes.
 
 Du trenger kun å bygge og distribuere ny app-versjon når:
 

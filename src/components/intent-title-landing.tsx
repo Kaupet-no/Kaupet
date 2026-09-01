@@ -22,7 +22,7 @@ const INTENT_OPTIONS: { value: Intent; label: string; description: string; icon:
   {
     value: "sell",
     label: "Jeg vil selge",
-    description: "Finn en ny eier og sett en pris.",
+    description: "Sett en pris og finn en ny eier.",
     icon: ShoppingBag,
   },
   {

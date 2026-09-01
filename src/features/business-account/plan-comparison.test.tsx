@@ -29,7 +29,7 @@ describe("business plan comparison", () => {
   it("keeps the exact prices and feature decisions in one data source", () => {
     expect(BUSINESS_PLANS.proff_basis.monthlyPriceNok).toBe(0);
     expect(BUSINESS_PLANS.proff.monthlyPriceNok).toBe(1490);
-    expect(BUSINESS_PLANS.proff.trialText).toBe("30 dager gratis, deretter 1 490 kr per måned");
+    expect(BUSINESS_PLANS.proff.trialText).toBe("30 dager gratis prøveperiode");
 
     const labels = [
       "Opprette ubegrenset antall annonser i alle kategorier",
@@ -40,7 +40,7 @@ describe("business plan comparison", () => {
       "Egen branding på annonser",
       "Andre annonser fra bedriften vises i egne annonser",
       "Nettsidelenke på egne annonser",
-      "Masseopprettelse med Excel/CSV",
+      "Opprett flere annonser om gangen med Excel/CSV",
       "API-integrasjon",
       "Prioritert support",
     ];

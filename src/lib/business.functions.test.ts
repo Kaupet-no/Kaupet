@@ -218,7 +218,7 @@ describe("business server functions", () => {
     expect(admin.calls.updates).toContainEqual({ display_name: "Nytt navn", city: "Bergen" });
     await expect(
       updateBusinessProfile({ data: { websiteUrl: "https://example.com" } }),
-    ).rejects.toThrow("krever aktiv Proff-tilgang");
+    ).rejects.toThrow("aktivt Proff-abonnement");
   });
 
   it("requires an active superuser and Proff before inviting members", async () => {
@@ -230,7 +230,7 @@ describe("business server functions", () => {
     buildAdmin({ proff: false });
     await expect(
       inviteOrganizationMember({ data: { name: "Kari Nordmann", email: "kari@example.com" } }),
-    ).rejects.toThrow("krever aktiv Proff-tilgang");
+    ).rejects.toThrow("aktivt Proff-abonnement");
 
     buildAdmin({ proff: true });
     await expect(

@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import type Autoplay from "embla-carousel-autoplay";
+import Autoplay from "embla-carousel-autoplay";
+import { useMemo } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -18,22 +19,23 @@ import { ListingCard, type ListingCardData } from "@/components/listing-card";
 // inline inside another component's render is a *new* function on every
 // render, which makes React unmount and remount the whole subtree (every
 // <img> included) instead of just re-rendering it, causing visible flicker.
-export function PopularCarousel({
-  popular,
-  isError,
-  onRetry,
-  autoplay,
-  hasPopularitySignal,
-}: {
+export type PopularCarouselProps = {
   popular: ListingCardData[] | undefined;
   isError: boolean;
   onRetry: () => void;
-  autoplay: React.RefObject<ReturnType<typeof Autoplay>>;
   /** Vis "Nye annonser" i stedet for "Populært akkurat nå" når ingen av
    * annonsene faktisk har reelle visninger ennå (tidlig fase / lavt volum) —
    * se usePopularListings. */
   hasPopularitySignal: boolean;
-}) {
+};
+
+export function PopularCarousel({
+  popular,
+  isError,
+  onRetry,
+  hasPopularitySignal,
+}: PopularCarouselProps) {
+  const autoplay = useMemo(() => Autoplay({ delay: 4500, stopOnInteraction: true }), []);
   const isLoading = popular === undefined;
 
   // Nothing to show yet (e.g. no traffic in the first week after launch) —
@@ -65,11 +67,7 @@ export function PopularCarousel({
           </Button>
         </div>
       ) : !isLoading && popular.length > 0 ? (
-        <Carousel
-          opts={{ align: "start", loop: true }}
-          plugins={[autoplay.current]}
-          className="w-full"
-        >
+        <Carousel opts={{ align: "start", loop: true }} plugins={[autoplay]} className="w-full">
           <CarouselContent>
             {popular.map((listing) => (
               <CarouselItem

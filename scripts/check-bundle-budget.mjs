@@ -8,8 +8,8 @@ const JS_LIMIT = 450 * 1024;
 const CSS_LIMIT = 180 * 1024;
 // Route totals include each route's preloads plus the root preloads, de-duplicated.
 const ROUTE_LIMITS = {
-  "/": 1_750 * 1024,
-  "/annonser": 1_750 * 1024,
+  "/": 1_600 * 1024,
+  "/annonser": 1_650 * 1024,
 };
 
 function fail(message) {

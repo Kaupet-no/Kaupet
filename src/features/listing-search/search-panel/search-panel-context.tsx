@@ -9,14 +9,12 @@ import {
   useState,
 } from "react";
 
-import { useCategories, visibleCategories } from "@/hooks/use-categories";
-import { useAllCategoryFilters } from "@/components/attribute-fields";
 import { useSavedLocation } from "@/hooks/use-saved-location";
 import type { LocationValue } from "@/components/location-filter";
 import type { SearchPanelResultsContext, SearchPanelSection } from "./search-panel";
 
-const SearchPanel = lazy(() =>
-  import("./search-panel").then((module) => ({ default: module.SearchPanel })),
+const SearchPanelLoader = lazy(() =>
+  import("./search-panel-loader").then((module) => ({ default: module.SearchPanelLoader })),
 );
 
 type Ctx = {
@@ -43,13 +41,7 @@ export function SearchPanelProvider({ children }: { children: React.ReactNode })
   const [results, setResults] = useState<SearchPanelResultsContext | null>(null);
   const [savedLocation, setSavedLocation] = useSavedLocation();
 
-  const { data: allCategoriesRaw } = useCategories();
-  const categories = useMemo(
-    () => visibleCategories(allCategoriesRaw ?? [], false),
-    [allCategoriesRaw],
-  );
-
-  const { data: allFilters } = useAllCategoryFilters();
+  // Kategori- og filterdata lastes først når brukeren faktisk åpner panelet.
 
   const openPanel = useCallback((s: SearchPanelSection = "query") => {
     setSection(s);
@@ -78,11 +70,9 @@ export function SearchPanelProvider({ children }: { children: React.ReactNode })
       {children}
       {panelRequested && (
         <Suspense fallback={null}>
-          <SearchPanel
+          <SearchPanelLoader
             open={open}
             onOpenChange={setOpen}
-            categories={categories ?? []}
-            allFilters={allFilters ?? []}
             initialSection={section}
             results={results ?? undefined}
             savedLocation={savedLocation}

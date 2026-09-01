@@ -4,11 +4,12 @@
 /* Kaupet ships Norwegian Bokmål UI only. Loading the Latin subsets directly
    avoids downloading Cyrillic, Greek and Vietnamese variable-font files. */
 @font-face {
+  /* Vektaksen dekker alle brukte heading-vekter til 58 KiB; opsz-varianten er 132 KiB. */
   font-family: "Newsreader Variable";
   font-style: normal;
   font-display: swap;
   font-weight: 200 800;
-  src: url("@fontsource-variable/newsreader/files/newsreader-latin-opsz-normal.woff2")
+  src: url("@fontsource-variable/newsreader/files/newsreader-latin-wght-normal.woff2")
     format("woff2-variations");
 }
 
@@ -549,9 +550,10 @@
   background: #fbf9f3;
   transition: opacity 200ms ease-out;
 }
-#native-boot-splash img {
+.native-boot #native-boot-splash .native-boot-icon {
   width: 64px;
   height: 64px;
+  background: url("/native-boot-icon.png") center / contain no-repeat;
   animation: native-boot-pulse 1.6s ease-in-out infinite;
 }
 @keyframes native-boot-pulse {

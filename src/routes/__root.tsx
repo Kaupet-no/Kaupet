@@ -205,7 +205,7 @@ function RootShell({ children }: { children: ReactNode }) {
             splash leaves off and stays until the native layout has actually
             painted (see useIsNative / hideNativeBootSplash). */}
         <div id="native-boot-splash">
-          <img src="/native-boot-icon.png" alt="" width={64} height={64} />
+          <div className="native-boot-icon" aria-hidden="true" />
         </div>
         {children}
         <Scripts />

@@ -26,7 +26,7 @@ afterEach(cleanup);
 beforeEach(() => setBusinessPlanMock.mockReset().mockResolvedValue({ organization: {} }));
 
 describe("business plan comparison", () => {
-  it("keeps the exact prices and feature decision table in one data source", () => {
+  it("keeps the exact prices and feature decisions in one data source", () => {
     expect(BUSINESS_PLANS.proff_basis.monthlyPriceNok).toBe(0);
     expect(BUSINESS_PLANS.proff.monthlyPriceNok).toBe(1490);
     expect(BUSINESS_PLANS.proff.trialText).toBe("30 dager gratis, deretter 1 490 kr per måned");
@@ -74,11 +74,15 @@ describe("business plan comparison", () => {
     ]);
   });
 
-  it("renders a semantic desktop table and stacked mobile cards without hiding feature meaning", () => {
+  it("renders two accessible comparison cards without hiding feature meaning", () => {
     renderPlans();
-    expect(
-      screen.getByRole("table", { name: "Sammenligning av Proff basis og Proff" }),
-    ).toBeTruthy();
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(screen.getByRole("heading", { name: "Proff basis" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Proff" })).toBeTruthy();
+    expect(screen.queryByText("Anbefalt", { exact: true })).toBeNull();
+    expect(screen.queryByText("Start enkelt", { exact: true })).toBeNull();
+    expect(screen.getAllByText("Proff", { exact: true }).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Basis", { exact: true }).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Gratis – alltid").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/1.?490 kr per måned/).length).toBeGreaterThan(0);
     expect(screen.getAllByText("—").length).toBeGreaterThan(0);

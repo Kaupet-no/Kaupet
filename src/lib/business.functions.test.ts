@@ -40,10 +40,13 @@ const defaultContext = { userId: "superuser-1", supabase: supabaseAdmin };
 import {
   acceptOrganizationInvite,
   inviteOrganizationMember,
+  lookupBusinessOrganization,
   removeOrganizationMember,
   setBusinessPlan,
   updateBusinessProfile,
 } from "./business.functions";
+
+import { fetchOrganizationFromBrreg } from "@/lib/brreg.server";
 
 const organizationId = "11111111-1111-4111-8111-111111111111";
 const memberId = "22222222-2222-4222-8222-222222222222";
@@ -51,7 +54,9 @@ const memberId = "22222222-2222-4222-8222-222222222222";
 function buildAdmin(
   overrides: {
     organization?: Record<string, unknown>;
+    existingOrganization?: Record<string, unknown> | null;
     membership?: Record<string, unknown> | null;
+    contactEmail?: string | null;
     proff?: boolean;
   } = {},
 ) {
@@ -83,7 +88,12 @@ function buildAdmin(
       chain[method] = vi.fn(() => chain);
     }
     chain.maybeSingle = vi.fn(async () => ({
-      data: table === "organization_members" ? membership : null,
+      data:
+        table === "organizations"
+          ? (overrides.existingOrganization ?? null)
+          : table === "organization_members"
+            ? membership
+            : null,
       error: null,
     }));
     chain.single = vi.fn(async () => ({
@@ -113,6 +123,10 @@ function buildAdmin(
     }
     return { data: null, error: null };
   });
+  supabaseAdmin.auth.admin.getUserById = vi.fn().mockResolvedValue({
+    data: { user: overrides.contactEmail ? { email: overrides.contactEmail } : null },
+    error: null,
+  });
   supabaseAdmin.auth.admin.inviteUserByEmail = vi.fn().mockResolvedValue({
     data: { user: { id: "invited-user-1" } },
     error: null,
@@ -127,6 +141,25 @@ beforeEach(() => {
 });
 
 describe("business server functions", () => {
+  it("viser maskert kontaktperson og support ved duplikat organisasjonsnummer", async () => {
+    buildAdmin({
+      existingOrganization: { id: organizationId },
+      membership: {
+        organization_id: organizationId,
+        user_id: "contact-user-1",
+        role: "superuser",
+        status: "active",
+      },
+      contactEmail: "Kari.Nordmann@example.com",
+    });
+
+    await expect(
+      lookupBusinessOrganization({ data: { organizationNumber: "974 760 673" } }),
+    ).rejects.toThrow(
+      "Denne bedriften er allerede registrert på Kaupet. Bedriftens kontaktperson er ka***@ex***.com. Du kan også kontakte support på kontakt@kaupet.no.",
+    );
+    expect(fetchOrganizationFromBrreg).not.toHaveBeenCalled();
+  });
   it("starts Proff once with a thirty-day database trial and does not restart it", async () => {
     buildAdmin();
     const first = await setBusinessPlan({ data: { plan: "proff" } });

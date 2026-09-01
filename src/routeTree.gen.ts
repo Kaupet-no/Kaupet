@@ -34,6 +34,7 @@ import { Route as AuthenticatedVarslerRouteImport } from './routes/_authenticate
 import { Route as AnnonseListingIdRouteImport } from './routes/annonse.$listingId'
 import { Route as AnnonserFilterRouteImport } from './routes/annonser_.filter'
 import { Route as BrukerIdRouteImport } from './routes/bruker.$id'
+import { Route as DesignBedriftPlanerRouteImport } from './routes/design/bedrift-planer'
 import { Route as OkIdRouteImport } from './routes/ok.$id'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedAdminBrukereRouteImport } from './routes/_authenticated/admin/brukere'
@@ -179,6 +180,11 @@ const BrukerIdRoute = BrukerIdRouteImport.update({
   path: '/bruker/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DesignBedriftPlanerRoute = DesignBedriftPlanerRouteImport.update({
+  id: '/design/bedrift-planer',
+  path: '/design/bedrift-planer',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OkIdRoute = OkIdRouteImport.update({
   id: '/ok/$id',
   path: '/ok/$id',
@@ -309,6 +315,7 @@ export interface FileRoutesByFullPath {
   '/annonse/$listingId': typeof AnnonseListingIdRoute
   '/annonser/filter': typeof AnnonserFilterRoute
   '/bruker/$id': typeof BrukerIdRoute
+  '/design/bedrift-planer': typeof DesignBedriftPlanerRoute
   '/ok/$id': typeof OkIdRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
@@ -351,6 +358,7 @@ export interface FileRoutesByTo {
   '/annonse/$listingId': typeof AnnonseListingIdRoute
   '/annonser/filter': typeof AnnonserFilterRoute
   '/bruker/$id': typeof BrukerIdRoute
+  '/design/bedrift-planer': typeof DesignBedriftPlanerRoute
   '/ok/$id': typeof OkIdRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
@@ -397,6 +405,7 @@ export interface FileRoutesById {
   '/annonse/$listingId': typeof AnnonseListingIdRoute
   '/annonser_/filter': typeof AnnonserFilterRoute
   '/bruker/$id': typeof BrukerIdRoute
+  '/design/bedrift-planer': typeof DesignBedriftPlanerRoute
   '/ok/$id': typeof OkIdRoute
   '/_authenticated/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/_authenticated/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
@@ -443,6 +452,7 @@ export interface FileRouteTypes {
     | '/annonse/$listingId'
     | '/annonser/filter'
     | '/bruker/$id'
+    | '/design/bedrift-planer'
     | '/ok/$id'
     | '/admin/brukere'
     | '/admin/kategorier'
@@ -485,6 +495,7 @@ export interface FileRouteTypes {
     | '/annonse/$listingId'
     | '/annonser/filter'
     | '/bruker/$id'
+    | '/design/bedrift-planer'
     | '/ok/$id'
     | '/admin/brukere'
     | '/admin/kategorier'
@@ -530,6 +541,7 @@ export interface FileRouteTypes {
     | '/annonse/$listingId'
     | '/annonser_/filter'
     | '/bruker/$id'
+    | '/design/bedrift-planer'
     | '/ok/$id'
     | '/_authenticated/admin/brukere'
     | '/_authenticated/admin/kategorier'
@@ -567,6 +579,7 @@ export interface RootRouteChildren {
   AnnonseListingIdRoute: typeof AnnonseListingIdRoute
   AnnonserFilterRoute: typeof AnnonserFilterRoute
   BrukerIdRoute: typeof BrukerIdRoute
+  DesignBedriftPlanerRoute: typeof DesignBedriftPlanerRoute
   OkIdRoute: typeof OkIdRoute
   ApiPublicPushDispatchRoute: typeof ApiPublicPushDispatchRoute
   ApiPublicVippsWebhookRoute: typeof ApiPublicVippsWebhookRoute
@@ -747,6 +760,13 @@ declare module '@tanstack/react-router' {
       path: '/bruker/$id'
       fullPath: '/bruker/$id'
       preLoaderRoute: typeof BrukerIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/design/bedrift-planer': {
+      id: '/design/bedrift-planer'
+      path: '/design/bedrift-planer'
+      fullPath: '/design/bedrift-planer'
+      preLoaderRoute: typeof DesignBedriftPlanerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ok/$id': {
@@ -977,6 +997,7 @@ const rootRouteChildren: RootRouteChildren = {
   AnnonseListingIdRoute: AnnonseListingIdRoute,
   AnnonserFilterRoute: AnnonserFilterRoute,
   BrukerIdRoute: BrukerIdRoute,
+  DesignBedriftPlanerRoute: DesignBedriftPlanerRoute,
   OkIdRoute: OkIdRoute,
   ApiPublicPushDispatchRoute: ApiPublicPushDispatchRoute,
   ApiPublicVippsWebhookRoute: ApiPublicVippsWebhookRoute,

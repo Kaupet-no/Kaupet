@@ -1,21 +1,14 @@
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Check, Loader2, Minus } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 
-import { formatErrorMessage } from "@/lib/errors";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { formatErrorMessage } from "@/lib/errors";
 import { setBusinessPlan } from "@/lib/business.functions";
+import { BusinessPlanLogo } from "./business-plan-logo";
 import {
   BUSINESS_PLANS,
   hasEffectiveProffAccess,
@@ -57,7 +50,6 @@ function FeatureStatus({ feature }: { feature: BusinessPlanFeature }) {
     </span>
   ) : (
     <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-muted-foreground">
-      <Minus aria-hidden="true" className="size-4 shrink-0" />
       <span aria-label={`Ikke inkludert: ${feature.label}`}>—</span>
       {feature.note && <span className="text-xs">{feature.note}</span>}
     </span>
@@ -84,12 +76,17 @@ function planAction(
 
 function PlanHeading({ config }: { config: BusinessPlanConfig }) {
   return (
-    <div className="space-y-2">
-      <CardTitle className="text-xl">{config.name}</CardTitle>
-      <p className="font-display text-2xl tracking-tight tabular-nums">
-        {formatPrice(config.monthlyPriceNok)}
-      </p>
-      {config.trialText && <p className="text-sm text-muted-foreground">{config.trialText}</p>}
+    <div className="space-y-6">
+      <h3 className="sr-only">{config.name}</h3>
+      <BusinessPlanLogo plan={config.id} />
+      <div className="space-y-2 border-t border-border pt-6">
+        <p className="font-display text-3xl tracking-tight tabular-nums">
+          {formatPrice(config.monthlyPriceNok)}
+        </p>
+        <p className="min-h-10 text-sm text-muted-foreground">
+          {config.trialText ?? <span aria-hidden="true">&nbsp;</span>}
+        </p>
+      </div>
     </div>
   );
 }
@@ -120,12 +117,8 @@ export function PlanComparison({
     <section aria-labelledby="business-plan-heading" className="space-y-6">
       <div className="space-y-2">
         <h2 id="business-plan-heading" className="font-display text-2xl tracking-tight">
-          Velg bedriftsplan
+          Velg planen som passer deg og din bedrift.
         </h2>
-        <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-          Velg planen som passer bedriften. Du kan bruke Proff umiddelbart i prøveperioden; betaling
-          innkreves ikke før en separat betalingsløsning er lansert.
-        </p>
       </div>
       {mutation.isPending && (
         <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
@@ -151,45 +144,7 @@ export function PlanComparison({
         </Alert>
       )}
 
-      <div className="hidden overflow-hidden rounded-xl border md:block">
-        <Table>
-          <caption className="sr-only">Sammenligning av Proff basis og Proff</caption>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[45%]">Funksjon</TableHead>
-              {planOrder.map((plan) => (
-                <TableHead key={plan} className="min-w-44 align-top">
-                  <PlanHeading config={BUSINESS_PLANS[plan]} />
-                  {showSelection && (
-                    <PlanButton
-                      plan={plan}
-                      organization={organization}
-                      isPending={mutation.isPending}
-                      onChoose={choosePlan}
-                    />
-                  )}
-                </TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {BUSINESS_PLANS.proff_basis.features.map((feature, index) => (
-              <TableRow key={feature.label}>
-                <TableHead scope="row" className="font-medium text-foreground">
-                  {feature.label}
-                </TableHead>
-                {planOrder.map((plan) => (
-                  <TableCell key={plan} className="align-top">
-                    <FeatureStatus feature={BUSINESS_PLANS[plan].features[index]} />
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-
-      <div className="grid gap-4 md:hidden">
+      <div className="grid gap-4 md:grid-cols-2">
         {planOrder.map((plan) => (
           <PlanCard
             key={plan}
@@ -220,7 +175,7 @@ function PlanButton({
   return (
     <Button
       type="button"
-      className="mt-4 w-full"
+      className="mt-8 h-12 w-full"
       variant={plan === "proff" ? "default" : "outline"}
       disabled={action.disabled || isPending}
       aria-busy={isPending}
@@ -246,11 +201,19 @@ function PlanCard({
   onChoose: (plan: BusinessPlan) => void;
 }) {
   const config = BUSINESS_PLANS[plan];
+  const isProff = plan === "proff";
   const isSelected = organization?.selected_plan === plan;
   return (
-    <Card className={isSelected ? "border-primary" : undefined}>
-      <CardHeader>
-        <div className="flex items-start justify-between gap-3">
+    <Card
+      className={`relative overflow-hidden ${
+        isProff
+          ? "border-primary shadow-[0_16px_40px_-28px_var(--primary)]"
+          : "border-border bg-surface/60"
+      } ${isSelected ? "ring-2 ring-primary/20" : ""}`}
+    >
+      {isProff && <div className="h-1 bg-brand" aria-hidden="true" />}
+      <CardHeader className="p-6 sm:p-8">
+        <div className="flex items-start justify-between gap-4">
           <PlanHeading config={config} />
           {isSelected && <Badge variant="secondary">Valgt</Badge>}
         </div>
@@ -263,8 +226,8 @@ function PlanCard({
           />
         )}
       </CardHeader>
-      <CardContent>
-        <ul className="space-y-4 border-t pt-4">
+      <CardContent className="px-6 pb-6 sm:px-8 sm:pb-8">
+        <ul className="space-y-4 border-t border-border pt-6">
           {config.features.map((feature) => (
             <li key={feature.label} className="space-y-1 text-sm">
               <div className="font-medium">{feature.label}</div>

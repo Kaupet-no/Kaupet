@@ -17,6 +17,7 @@ import { formatErrorMessage } from "@/lib/errors";
 import { showSuccessToast } from "@/lib/toast";
 import { isNative } from "@/lib/native";
 import { supabase } from "@/integrations/supabase/client";
+import { formatResendCooldown, useResendCooldown } from "@/hooks/use-resend-cooldown";
 
 /* eslint-disable react-hooks/refs */
 const TERMS_VERSION = "1.0";
@@ -67,6 +68,7 @@ export function BusinessSignupFlow() {
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
   const [resendLoading, setResendLoading] = useState(false);
+  const resendCooldown = useResendCooldown();
   const [showPassword, setShowPassword] = useState(false);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
   const turnstileRef = useRef<TurnstileInstance | null>(null);
@@ -164,7 +166,7 @@ export function BusinessSignupFlow() {
   };
 
   const resendConfirmation = async () => {
-    if (!submittedEmail) return;
+    if (!submittedEmail || resendCooldown.isCoolingDown) return;
     setResendLoading(true);
     setStepError(null);
     try {
@@ -174,7 +176,8 @@ export function BusinessSignupFlow() {
         options: { emailRedirectTo: `${webOrigin()}/bekreft-epost` },
       });
       if (error) throw error;
-      showSuccessToast("Bekreftelses-e-post sendt på nytt. Sjekk innboksen din.");
+      resendCooldown.startCooldown();
+      showSuccessToast("Bekreftelses-e-post sendt på nytt. Du kan sende en ny om fem minutter.");
     } catch (error: unknown) {
       setStepError(formatErrorMessage(error, "Kunne ikke sende e-post. Prøv igjen."));
     } finally {
@@ -206,11 +209,13 @@ export function BusinessSignupFlow() {
           type="button"
           variant="outline"
           className="w-full"
-          disabled={resendLoading}
+          disabled={resendLoading || resendCooldown.isCoolingDown}
           onClick={() => void resendConfirmation()}
         >
           {resendLoading && <Loader2 className="size-4 animate-spin" />}
-          Send bekreftelses-e-post på nytt
+          {resendCooldown.isCoolingDown
+            ? `Send bekreftelses-e-post på nytt om ${formatResendCooldown(resendCooldown.secondsRemaining)}`
+            : "Send bekreftelses-e-post på nytt"}
         </Button>
       </section>
     );
@@ -235,7 +240,11 @@ export function BusinessSignupFlow() {
         tabIndex={-1}
         className="text-xl font-semibold outline-none"
       >
-        {step === 1 ? "Finn bedriften" : step === 2 ? "Bekreft bedriften" : "Opprett profilen din"}
+        {step === 1
+          ? "Finn bedriften din"
+          : step === 2
+            ? "Bekreft bedriften"
+            : "Opprett profilen din"}
       </h2>
       {stepError && (
         <p role="alert" className="mt-3 text-sm text-destructive">

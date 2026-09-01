@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { safeReturnTo } from "./auth-return";
+import { postAuthDestination, safeReturnTo } from "./auth-return";
 
 // Dekker AUTH-03 (docs/TESTSTRATEGI.md § 11.1)
 describe("safeReturnTo", () => {
@@ -10,5 +10,19 @@ describe("safeReturnTo", () => {
   it.each(["https://evil.example", "//evil.example/path", "annonser", null, 12])(
     "rejects unsafe destination %s",
     (destination) => expect(safeReturnTo(destination)).toBeUndefined(),
+  );
+});
+
+describe("postAuthDestination", () => {
+  it.each([
+    { returnTo: "/annonser/123", hasBusinessAccount: true, expected: "/bedrift" },
+    { returnTo: undefined, hasBusinessAccount: true, expected: "/bedrift" },
+    { returnTo: "/annonser/123", hasBusinessAccount: false, expected: "/annonser/123" },
+    { returnTo: undefined, hasBusinessAccount: false, expected: "/" },
+  ])(
+    "prioriterer riktig mål for bedrift=$hasBusinessAccount og returnTo=$returnTo",
+    ({ returnTo, hasBusinessAccount, expected }) => {
+      expect(postAuthDestination(returnTo, hasBusinessAccount)).toBe(expected);
+    },
   );
 });

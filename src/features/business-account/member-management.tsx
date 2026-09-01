@@ -154,20 +154,26 @@ export function MemberManagement({ organization, userId }: Props) {
           >
             <div className="space-y-2">
               <Label htmlFor="member-name">Navn</Label>
-              <Input
-                id="member-name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-              />
+              <div className="relative">
+                <Input
+                  id="member-name"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  className="leading-6"
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="member-email">E-post</Label>
-              <Input
-                id="member-email"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-              />
+              <div className="relative">
+                <Input
+                  id="member-email"
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  className="leading-6"
+                />
+              </div>
             </div>
             <Button type="submit" disabled={inviteMutation.isPending}>
               {inviteMutation.isPending ? (

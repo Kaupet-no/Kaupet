@@ -124,9 +124,28 @@ bun dev
 
 Stopp stacken med `bunx supabase stop` når du er ferdig. Supabase Studio (lokalt admin-UI) er tilgjengelig på `http://localhost:54323`.
 
-#### Alternativ: kjør mot et eksternt Supabase-prosjekt
+#### Alternativ: kjør mot Kaupet sitt staging-Supabase
 
-Har du tilgang til et eget eller Kaupet sitt Supabase-prosjekt, kan du i stedet kopiere `.env.example` til `.env` og fylle inn verdiene direkte:
+For å kjøre appen lokalt mot staging-prosjektet, dekrypter staging-hemmelighetene
+og legg dem i den lokale `.env`-filen:
+
+```bash
+bun run env:staging
+bun dev
+```
+
+Dette bruker delt staging-data. Ikke kjør destruktive eller produksjonslignende
+administrative operasjoner lokalt. Bytt tilbake til isolert lokal Supabase med:
+
+```bash
+bunx supabase start
+bun run env:local
+```
+
+#### Alternativ: kjør mot et annet eksternt Supabase-prosjekt
+
+Har du tilgang til et eget Supabase-prosjekt, kan du i stedet kopiere
+`.env.example` til `.env` og fylle inn verdiene direkte:
 
 ```
 VITE_SUPABASE_URL=...

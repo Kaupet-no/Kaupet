@@ -59,6 +59,7 @@ async function reachProfile() {
 afterEach(cleanup);
 
 beforeEach(() => {
+  localStorage.clear();
   lookupBusinessOrganizationMock.mockReset().mockResolvedValue(organization);
   bindBusinessSignupEmailMock.mockReset().mockResolvedValue({ email: "kari@example.com" });
   signUpMock.mockReset().mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
@@ -69,7 +70,7 @@ describe("BusinessSignupFlow", () => {
   it("starts at step one with an accessible organization-number field", () => {
     render(<BusinessSignupFlow />);
 
-    expect(screen.getByRole("heading", { name: "Finn bedriften" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Finn bedriften din" })).toBeTruthy();
     expect(screen.getByLabelText("Organisasjonsnummer").getAttribute("inputmode")).toBe("numeric");
     expect(screen.getByLabelText("Steg 1 av 3")).toBeTruthy();
     expect(screen.queryByText("Opprett profilen din")).toBeNull();
@@ -114,19 +115,24 @@ describe("BusinessSignupFlow", () => {
     expect(screen.getByText(/har fullmakt til å opprette konto/)).toBeTruthy();
   });
 
-  it("shows duplicate lookup errors at the organization step", async () => {
+  it("viser duplicatefeil med maskert kontaktperson og supportadresse", async () => {
     lookupBusinessOrganizationMock.mockRejectedValueOnce(
       new Error(
-        "Denne bedriften er allerede registrert. Kontakt bedriftens superbruker for tilgang.",
+        "Denne bedriften er allerede registrert på Kaupet. Bedriftens kontaktperson er ka***@ex***.com. Du kan også kontakte support på kontakt@kaupet.no.",
       ),
     );
     render(<BusinessSignupFlow />);
     lookup();
 
     await waitFor(() =>
-      expect(screen.getByRole("alert").textContent).toContain("allerede registrert"),
+      expect(screen.getByRole("alert").textContent).toContain(
+        "Denne bedriften er allerede registrert på Kaupet.",
+      ),
     );
-    expect(screen.getByRole("heading", { name: "Finn bedriften" })).toBeTruthy();
+    expect(screen.getByRole("alert").textContent).toContain("ka***@ex***.com");
+    expect(screen.getByRole("alert").textContent).toContain("kontakt@kaupet.no");
+    expect(screen.getByRole("alert").textContent).not.toContain("Kari.Nordmann@example.com");
+    expect(screen.getByRole("heading", { name: "Finn bedriften din" })).toBeTruthy();
   });
 
   it("binds email before signup, stores business metadata, and supports resend", async () => {
@@ -164,7 +170,8 @@ describe("BusinessSignupFlow", () => {
       }),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Send bekreftelses-e-post på nytt" }));
+    const resendButton = screen.getByRole("button", { name: "Send bekreftelses-e-post på nytt" });
+    fireEvent.click(resendButton);
     await waitFor(() =>
       expect(resendMock).toHaveBeenCalledWith({
         type: "signup",
@@ -172,5 +179,10 @@ describe("BusinessSignupFlow", () => {
         options: { emailRedirectTo: `${window.location.origin}/bekreft-epost` },
       }),
     );
+    expect((resendButton as HTMLButtonElement).disabled).toBe(true);
+    expect(resendButton.textContent).toContain("5:00");
+
+    fireEvent.click(resendButton);
+    expect(resendMock).toHaveBeenCalledTimes(1);
   });
 });

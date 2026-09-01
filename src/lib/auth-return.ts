@@ -8,6 +8,13 @@ export function safeReturnTo(value: unknown): string | undefined {
   return value;
 }
 
+export function postAuthDestination(
+  returnTo: string | undefined,
+  hasBusinessAccount: boolean,
+): string {
+  return hasBusinessAccount ? "/bedrift" : (returnTo ?? "/");
+}
+
 export function currentReturnTo(): string {
   if (typeof window === "undefined") return "/";
   return `${window.location.pathname}${window.location.search}${window.location.hash}`;

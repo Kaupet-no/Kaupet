@@ -11,14 +11,56 @@ type AdminClient = SupabaseClient<Database>;
 // Server-only modules must stay dynamically imported because this module is also
 // imported by browser components through createServerFn.
 
-const DUPLICATE_ORGANIZATION_MESSAGE =
-  "Denne bedriften er allerede registrert. Kontakt bedriftens superbruker for tilgang.";
+const DUPLICATE_ORGANIZATION_MESSAGE = "Denne bedriften er allerede registrert på Kaupet.";
+const SUPPORT_MESSAGE = "Du kan også kontakte support på kontakt@kaupet.no.";
 const UNAUTHORIZED_MESSAGE = "Du har ikke tilgang til bedriftskontoen.";
-const PROFF_REQUIRED_MESSAGE = "Denne funksjonen krever aktiv Proff-tilgang.";
+const PROFF_REQUIRED_MESSAGE = "Denne funksjonen krever et aktivt Proff-abonnement.";
 const USED_TRIAL_MESSAGE =
   "Prøveperioden er brukt. Proff kan aktiveres når betalingsløsningen er på plass.";
 const INVITE_EXISTING_MESSAGE =
   "E-postadressen er allerede i bruk. Invitasjon av eksisterende kontoer støttes ikke ennå.";
+
+function maskContactEmail(email: string): string | null {
+  const normalized = email.trim().toLowerCase();
+  const separator = normalized.lastIndexOf("@");
+  if (separator <= 0) return null;
+
+  const localPart = normalized.slice(0, separator);
+  const domain = normalized.slice(separator + 1);
+  const tldSeparator = domain.lastIndexOf(".");
+  if (!domain || tldSeparator <= 0 || tldSeparator === domain.length - 1) return null;
+
+  const host = domain.slice(0, tldSeparator);
+  const tld = domain.slice(tldSeparator);
+  return `${localPart.slice(0, 2)}***@${host.slice(0, 2)}***${tld}`;
+}
+
+async function duplicateOrganizationMessage(
+  supabaseAdmin: AdminClient,
+  organizationId: string,
+): Promise<string> {
+  const { data: membership, error: membershipError } = await supabaseAdmin
+    .from("organization_members")
+    .select("user_id")
+    .eq("organization_id", organizationId)
+    .eq("role", "superuser")
+    .eq("status", "active")
+    .maybeSingle();
+  if (membershipError) return `${DUPLICATE_ORGANIZATION_MESSAGE} ${SUPPORT_MESSAGE}`;
+
+  const userId = membership?.user_id as string | undefined;
+  if (!userId) return `${DUPLICATE_ORGANIZATION_MESSAGE} ${SUPPORT_MESSAGE}`;
+
+  const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
+  const maskedEmail = !error && data.user?.email ? maskContactEmail(data.user.email) : null;
+  return [
+    DUPLICATE_ORGANIZATION_MESSAGE,
+    maskedEmail ? `Bedriftens kontaktperson er ${maskedEmail}.` : null,
+    SUPPORT_MESSAGE,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
 
 const uuid = z.string().uuid();
 const planSchema = z.enum(["proff_basis", "proff"]);
@@ -93,7 +135,9 @@ export const lookupBusinessOrganization = createServerFn({ method: "POST" })
       .eq("organization_number", organizationNumber)
       .maybeSingle();
     if (existingError) throw existingError;
-    if (existing) throw new Error(DUPLICATE_ORGANIZATION_MESSAGE);
+    if (existing) {
+      throw new Error(await duplicateOrganizationMessage(supabaseAdmin, existing.id as string));
+    }
     await supabaseAdmin
       .from("business_signup_intents")
       .delete()
@@ -113,7 +157,9 @@ export const lookupBusinessOrganization = createServerFn({ method: "POST" })
       .select("signup_token, organization_number, legal_name, postal_code, city, expires_at")
       .single();
     if (intentError) {
-      if (intentError.code === "23505") throw new Error(DUPLICATE_ORGANIZATION_MESSAGE);
+      if (intentError.code === "23505") {
+        throw new Error(`${DUPLICATE_ORGANIZATION_MESSAGE} ${SUPPORT_MESSAGE}`);
+      }
       throw intentError;
     }
 

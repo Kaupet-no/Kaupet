@@ -18,9 +18,8 @@ function ChooseBusinessPlanPage() {
       <NativePageHeader title="Velg bedriftsplan" hideBack />
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:py-12">
         <div className="mb-8 space-y-2">
-          <p className="text-sm font-medium text-primary">{organization.display_name}</p>
           <h1 className="font-display text-3xl tracking-tight sm:text-4xl">
-            Kom i gang med bedriften
+            Velkommen til Kaupet Proff.
           </h1>
           <p className="max-w-2xl text-muted-foreground">
             Velg en plan for å åpne bedriftskontoen. Du kan bytte plan senere dersom behovene endrer

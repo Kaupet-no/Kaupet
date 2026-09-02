@@ -50,7 +50,10 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
       .eq("duration_days", data.duration_days)
       .eq("active", true)
       .maybeSingle();
-    if (perr) throw perr;
+    if (perr) {
+      const { toClientError } = await import("@/lib/to-client-error.server");
+      throw await toClientError("createPromotionCheckout.getPricing", perr);
+    }
     if (!pricing) throw new Error("Ugyldig pakkevarighet");
 
     // Block if an active or pending promotion exists

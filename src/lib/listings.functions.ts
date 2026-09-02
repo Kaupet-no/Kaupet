@@ -325,7 +325,10 @@ export const saveDraftListing = createServerFn({ method: "POST" })
         .eq("status", "draft")
         .select("id, kaupet_code")
         .single();
-      if (error) throw error;
+      if (error) {
+        const { toClientError } = await import("@/lib/to-client-error.server");
+        throw await toClientError("saveDraftListing.update", error, { listing_id: data.id });
+      }
       return { id: updated.id as string, kaupet_code: updated.kaupet_code as string };
     }
 

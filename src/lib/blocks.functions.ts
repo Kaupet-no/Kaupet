@@ -71,7 +71,8 @@ export const createBlock = createServerFn({ method: "POST" })
       if ((error as { code?: string }).code === "23505") {
         return { ok: true, alreadyBlocked: true };
       }
-      throw error;
+      const { toClientError } = await import("@/lib/to-client-error.server");
+      throw await toClientError("createBlock", error, { blocker_id: userId });
     }
     return { ok: true, alreadyBlocked: false };
   });

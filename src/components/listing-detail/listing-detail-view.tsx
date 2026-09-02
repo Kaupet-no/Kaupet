@@ -33,6 +33,7 @@ import {
   VEHICLE_CONDITIONS_BY_SLUG,
 } from "@/lib/constants";
 import { PART_FITMENT_SCOPE_KEY } from "@/lib/category-filters";
+import { resolveBrandColors } from "@/lib/brand-color";
 import {
   VEHICLE_LEAF_SLUGS,
   computeOmregistreringsavgift,
@@ -118,7 +119,8 @@ export type ListingOrganizationBrand = {
   displayName: string;
   logoUrl: string | null;
   websiteUrl: string | null;
-  palette: "forest" | "navy" | "burgundy" | "slate";
+  /** Palett-ID (se BRAND_PALETTES) eller egendefinert «#rrggbb». */
+  palette: string | null;
 };
 
 export type ListingDetailViewCategory = { name_nb: string; slug: string | null } | null;
@@ -208,16 +210,6 @@ export type ListingDetailViewProps = {
    * render as dialogs, not inline content. Omitted for buyers/preview. */
   children?: ReactNode;
 };
-const ORGANIZATION_BRAND_COLORS: Record<
-  ListingOrganizationBrand["palette"],
-  { background: string; foreground: string }
-> = {
-  forest: { background: "oklch(0.35 0.06 160)", foreground: "oklch(0.985 0.012 85)" },
-  navy: { background: "oklch(0.32 0.08 250)", foreground: "oklch(0.985 0.012 85)" },
-  burgundy: { background: "oklch(0.34 0.09 20)", foreground: "oklch(0.985 0.012 85)" },
-  slate: { background: "oklch(0.32 0.02 250)", foreground: "oklch(0.985 0.012 85)" },
-};
-
 export function ListingDetailView({
   title,
   subtitle,
@@ -584,9 +576,7 @@ function ListingDetailViewBody({
   const isBoatListing = !isVehicleListing && isBoatAttributes(attributes);
   const nativeSpecLayout = isNative && (isVehicleListing || isBoatListing);
   const nativePlateUnderTitle = isNative && isVehicleListing;
-  const brandColors = organizationBrand
-    ? ORGANIZATION_BRAND_COLORS[organizationBrand.palette]
-    : null;
+  const brandColors = organizationBrand ? resolveBrandColors(organizationBrand.palette) : null;
   // Tilstand-etiketter er per kjøretøytype (se VEHICLE_CONDITIONS_BY_SLUG) —
   // faller tilbake til de generiske etikettene (via `?? v`/CONDITIONS der de
   // brukes) dersom slug mangler eller ikke finnes i tabellen.

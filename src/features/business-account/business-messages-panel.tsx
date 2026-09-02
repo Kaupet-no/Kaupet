@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Loader2, MessageCircle } from "lucide-react";
+import { ChevronRight, Loader2, MessageCircle } from "lucide-react";
 
 import { EmptyState } from "@/components/ui/empty-state";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card, CardContent } from "@/components/ui/card";
 import type { BusinessOrganization } from "@/features/business-account/use-business-membership";
 import { supabase } from "@/integrations/supabase/client";
 import { signListingImageUrls } from "@/lib/storage";
@@ -120,16 +119,27 @@ export function BusinessMessagesPanel({ organization, locationId }: Props) {
     };
   }, [conversationsQuery.data]);
 
+  const conversations = conversationsQuery.data ?? [];
+
   return (
-    <section aria-labelledby="business-messages-title" className="space-y-5">
-      <div>
-        <h2 id="business-messages-title" className="font-display text-2xl tracking-tight">
-          Meldinger
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Samtaler knyttet til bedriftens annonser. Svar som deg selv i den eksisterende
-          meldingsflaten.
-        </p>
+    <section aria-labelledby="business-messages-title" className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="max-w-xl">
+          <h2 id="business-messages-title" className="font-display text-3xl tracking-tight">
+            Meldinger
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Samtaler knyttet til bedriftens annonser. Svar som deg selv i den eksisterende
+            meldingsflaten.
+          </p>
+        </div>
+        {!conversationsQuery.isLoading &&
+          !conversationsQuery.isError &&
+          conversations.length > 0 && (
+            <p className="text-sm text-muted-foreground">
+              {conversations.length} {conversations.length === 1 ? "samtale" : "samtaler"}
+            </p>
+          )}
       </div>
       {conversationsQuery.isLoading ? (
         <div
@@ -145,76 +155,78 @@ export function BusinessMessagesPanel({ organization, locationId }: Props) {
             Kunne ikke laste bedriftens meldinger. Prøv igjen senere.
           </AlertDescription>
         </Alert>
-      ) : conversationsQuery.data?.length ? (
-        <Card>
-          <CardContent className="p-0">
-            <ul className="divide-y divide-border">
-              {conversationsQuery.data.map((conversation) => {
-                const listing = conversation.listing;
-                const buyer = conversation.buyer;
-                const latest = conversation.latest;
-                const coverPath = listing?.listing_images
-                  ?.slice()
-                  .sort((a, b) => a.sort_order - b.sort_order)[0]?.storage_path;
-                const coverUrl = coverPath ? imageUrls[coverPath] : undefined;
-                return (
-                  <li key={conversation.id}>
-                    <Link
-                      to="/meldinger/$id"
-                      params={{ id: conversation.id }}
-                      search={{ source: "business" }}
-                      className="flex min-h-20 items-center gap-3 p-4 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
-                    >
-                      <span className="size-12 shrink-0 overflow-hidden rounded-lg bg-muted">
-                        {coverUrl ? (
-                          <img src={coverUrl} alt="" className="size-full object-cover" />
-                        ) : (
-                          <MessageCircle className="m-3 size-6 text-muted-foreground" />
-                        )}
-                      </span>
-                      {buyer?.avatar_url ? (
-                        <img
-                          src={buyer.avatar_url}
-                          alt=""
-                          className="size-10 rounded-full object-cover"
-                        />
+      ) : conversations.length ? (
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <ul className="divide-y divide-border">
+            {conversations.map((conversation) => {
+              const listing = conversation.listing;
+              const buyer = conversation.buyer;
+              const latest = conversation.latest;
+              const coverPath = listing?.listing_images
+                ?.slice()
+                .sort((a, b) => a.sort_order - b.sort_order)[0]?.storage_path;
+              const coverUrl = coverPath ? imageUrls[coverPath] : undefined;
+              return (
+                <li key={conversation.id}>
+                  <Link
+                    to="/meldinger/$id"
+                    params={{ id: conversation.id }}
+                    search={{ source: "business" }}
+                    className="group flex min-h-24 items-center gap-3 p-4 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset sm:gap-4 sm:p-5"
+                  >
+                    <span className="size-14 shrink-0 overflow-hidden rounded-lg bg-muted">
+                      {coverUrl ? (
+                        <img src={coverUrl} alt="" className="size-full object-cover" />
                       ) : (
-                        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted">
-                          <MessageCircle className="size-5 text-muted-foreground" />
-                        </span>
+                        <MessageCircle className="m-4 size-6 text-muted-foreground" />
                       )}
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold">
-                          {buyer?.deleted_at
-                            ? "Slettet bruker"
-                            : (buyer?.display_name ?? "Ukjent kjøper")}
-                        </span>
-                        <span className="block truncate text-xs text-muted-foreground">
-                          {listing?.title ?? "Slettet annonse"}
-                          {latest ? ` · ${latest.body}` : " · Ingen meldinger enda"}
-                        </span>
+                    </span>
+                    {buyer?.avatar_url ? (
+                      <img
+                        src={buyer.avatar_url}
+                        alt=""
+                        className="size-10 shrink-0 rounded-full object-cover"
+                      />
+                    ) : (
+                      <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted">
+                        <MessageCircle className="size-5 text-muted-foreground" />
                       </span>
-                      <time
-                        className="shrink-0 text-xs text-muted-foreground"
-                        dateTime={conversation.last_message_at}
-                      >
-                        {new Intl.DateTimeFormat("nb-NO", {
-                          dateStyle: "medium",
-                          timeStyle: "short",
-                        }).format(new Date(conversation.last_message_at))}
-                      </time>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </CardContent>
-        </Card>
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold">
+                        {buyer?.deleted_at
+                          ? "Slettet bruker"
+                          : (buyer?.display_name ?? "Ukjent kjøper")}
+                      </span>
+                      <span className="mt-1 block truncate text-sm text-muted-foreground">
+                        {listing?.title ?? "Slettet annonse"}
+                      </span>
+                      <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                        {latest?.body ?? "Ingen meldinger enda"}
+                      </span>
+                    </span>
+                    <time
+                      className="hidden shrink-0 text-xs text-muted-foreground sm:block"
+                      dateTime={conversation.last_message_at}
+                    >
+                      {new Intl.DateTimeFormat("nb-NO", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      }).format(new Date(conversation.last_message_at))}
+                    </time>
+                    <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 ease-out group-hover:translate-x-0.5" />
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       ) : (
         <EmptyState
           icon={MessageCircle}
           title="Ingen samtaler enda"
           description="Meldinger om bedriftens annonser vises her."
+          className="p-8 sm:p-10"
         />
       )}
     </section>

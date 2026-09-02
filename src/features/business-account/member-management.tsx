@@ -15,7 +15,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -100,130 +99,153 @@ function PermissionFields({
   value,
   categories,
   onChange,
+  collapsible = false,
 }: {
   value: OrganizationMemberPermissions;
   categories: Category[];
   onChange: (next: OrganizationMemberPermissions) => void;
+  collapsible?: boolean;
 }) {
   const update = (patch: Partial<OrganizationMemberPermissions>) =>
     onChange(normalizePermissions({ ...value, ...patch }));
   const disabled = value.role === "superuser";
+  const [showAdvanced, setShowAdvanced] = useState(!collapsible);
 
   return (
-    <div className="space-y-5 rounded-lg border border-border p-4">
-      <div className="space-y-2">
-        <Label htmlFor="member-role">Rolle</Label>
-        <select
-          id="member-role"
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-          value={value.role}
-          onChange={(event) =>
-            update({ role: event.target.value as OrganizationMemberPermissions["role"] })
-          }
+    <div
+      className={
+        collapsible ? "border-t border-border pt-5" : "space-y-5 border-t border-border pt-5"
+      }
+    >
+      {collapsible && (
+        <button
+          type="button"
+          className="flex min-h-12 w-full items-center justify-between rounded-lg border border-border px-3 text-left text-sm font-medium transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-expanded={showAdvanced}
+          onClick={() => setShowAdvanced((current) => !current)}
         >
-          <option value="member">Bruker</option>
-          <option value="superuser">Superbruker</option>
-        </select>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Choice
-          id="member-listing-access"
-          label="Annonseinnsyn"
-          value={value.listingAccess}
-          disabled={disabled}
-          options={[
-            ["own", "Kun egne annonser"],
-            ["all", "Alle bedriftens annonser"],
-          ]}
-          onChange={(listingAccess) =>
-            update({
-              listingAccess: listingAccess as OrganizationMemberPermissions["listingAccess"],
-            })
-          }
-        />
-        <Choice
-          id="member-chat-access"
-          label="Chatinnsyn"
-          value={value.chatAccess}
-          disabled={disabled}
-          options={[
-            ["own", "Kun chatter om egne annonser"],
-            ["all", "Alle bedriftens chatter"],
-          ]}
-          onChange={(chatAccess) =>
-            update({ chatAccess: chatAccess as OrganizationMemberPermissions["chatAccess"] })
-          }
-        />
-        <Choice
-          id="member-edit-scope"
-          label="Redigering"
-          value={value.listingEditScope}
-          disabled={disabled}
-          options={[
-            ["none", "Kan ikke redigere"],
-            ["own", "Kan redigere egne"],
-            ["all", "Kan redigere alle"],
-          ]}
-          onChange={(listingEditScope) =>
-            update({
-              listingEditScope:
-                listingEditScope as OrganizationMemberPermissions["listingEditScope"],
-            })
-          }
-        />
-      </div>
-      <label className="flex min-h-12 items-center gap-3 text-sm">
-        <Checkbox
-          checked={value.canCreateListings}
-          disabled={disabled}
-          onCheckedChange={(checked) => update({ canCreateListings: checked === true })}
-        />
-        <span>Kan opprette annonser</span>
-      </label>
-      <div className="space-y-3">
-        <Label htmlFor="member-category-access">Kategorier for nye annonser</Label>
-        <select
-          id="member-category-access"
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-          value={value.categoryAccess}
-          disabled={disabled || !value.canCreateListings}
-          onChange={(event) =>
-            update({
-              categoryAccess: event.target.value as OrganizationMemberPermissions["categoryAccess"],
-            })
-          }
-        >
-          <option value="all">Alle kategorier</option>
-          <option value="restricted">Kun valgte kategorier</option>
-        </select>
-        {value.categoryAccess === "restricted" && value.canCreateListings && !disabled && (
-          <div className="grid max-h-56 gap-2 overflow-y-auto rounded-md border border-border p-3 sm:grid-cols-2">
-            {categories.map((category) => (
-              <label key={category.id} className="flex min-h-10 items-center gap-2 text-sm">
-                <Checkbox
-                  checked={value.allowedCategoryIds.includes(category.id)}
-                  onCheckedChange={(checked) =>
-                    update({
-                      allowedCategoryIds:
-                        checked === true
-                          ? [...value.allowedCategoryIds, category.id]
-                          : value.allowedCategoryIds.filter((id) => id !== category.id),
-                    })
-                  }
-                />
-                <span>{category.name_nb}</span>
-              </label>
-            ))}
+          {showAdvanced ? "Skjul avanserte rettigheter" : "Vis avanserte rettigheter"}
+        </button>
+      )}
+      {showAdvanced && (
+        <div className="space-y-5">
+          <p className="text-sm font-semibold">Rettigheter</p>
+          <div className="space-y-2">
+            <Label htmlFor="member-role">Rolle</Label>
+            <select
+              id="member-role"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={value.role}
+              onChange={(event) =>
+                update({ role: event.target.value as OrganizationMemberPermissions["role"] })
+              }
+            >
+              <option value="member">Bruker</option>
+              <option value="superuser">Superbruker</option>
+            </select>
           </div>
-        )}
-        {value.categoryAccess === "restricted" && value.allowedCategoryIds.length === 0 && (
-          <p className="text-xs text-destructive">Velg minst én kategori.</p>
-        )}
-      </div>
-      {disabled && (
-        <p className="text-xs text-muted-foreground">
-          Superbrukere har full tilgang til bedriftens annonser og chatter.
-        </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Choice
+              id="member-listing-access"
+              label="Annonseinnsyn"
+              value={value.listingAccess}
+              disabled={disabled}
+              options={[
+                ["own", "Kun egne annonser"],
+                ["all", "Alle bedriftens annonser"],
+              ]}
+              onChange={(listingAccess) =>
+                update({
+                  listingAccess: listingAccess as OrganizationMemberPermissions["listingAccess"],
+                })
+              }
+            />
+            <Choice
+              id="member-chat-access"
+              label="Chatinnsyn"
+              value={value.chatAccess}
+              disabled={disabled}
+              options={[
+                ["own", "Kun chatter om egne annonser"],
+                ["all", "Alle bedriftens chatter"],
+              ]}
+              onChange={(chatAccess) =>
+                update({ chatAccess: chatAccess as OrganizationMemberPermissions["chatAccess"] })
+              }
+            />
+            <Choice
+              id="member-edit-scope"
+              label="Redigering"
+              value={value.listingEditScope}
+              disabled={disabled}
+              options={[
+                ["none", "Kan ikke redigere"],
+                ["own", "Kan redigere egne"],
+                ["all", "Kan redigere alle"],
+              ]}
+              onChange={(listingEditScope) =>
+                update({
+                  listingEditScope:
+                    listingEditScope as OrganizationMemberPermissions["listingEditScope"],
+                })
+              }
+            />
+          </div>
+          <label className="flex min-h-12 items-center gap-3 text-sm">
+            <Checkbox
+              checked={value.canCreateListings}
+              disabled={disabled}
+              onCheckedChange={(checked) => update({ canCreateListings: checked === true })}
+            />
+            <span>Kan opprette annonser</span>
+          </label>
+          <div className="space-y-3">
+            <Label htmlFor="member-category-access">Kategorier for nye annonser</Label>
+            <select
+              id="member-category-access"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={value.categoryAccess}
+              disabled={disabled || !value.canCreateListings}
+              onChange={(event) =>
+                update({
+                  categoryAccess: event.target
+                    .value as OrganizationMemberPermissions["categoryAccess"],
+                })
+              }
+            >
+              <option value="all">Alle kategorier</option>
+              <option value="restricted">Kun valgte kategorier</option>
+            </select>
+            {value.categoryAccess === "restricted" && value.canCreateListings && !disabled && (
+              <div className="grid max-h-56 gap-2 overflow-y-auto rounded-md border border-border p-3 sm:grid-cols-2">
+                {categories.map((category) => (
+                  <label key={category.id} className="flex min-h-10 items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={value.allowedCategoryIds.includes(category.id)}
+                      onCheckedChange={(checked) =>
+                        update({
+                          allowedCategoryIds:
+                            checked === true
+                              ? [...value.allowedCategoryIds, category.id]
+                              : value.allowedCategoryIds.filter((id) => id !== category.id),
+                        })
+                      }
+                    />
+                    <span>{category.name_nb}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+            {value.categoryAccess === "restricted" && value.allowedCategoryIds.length === 0 && (
+              <p className="text-xs text-destructive">Velg minst én kategori.</p>
+            )}
+          </div>
+          {disabled && (
+            <p className="text-xs text-muted-foreground">
+              Superbrukere har full tilgang til bedriftens annonser og chatter.
+            </p>
+          )}
+        </div>
       )}
     </div>
   );
@@ -441,77 +463,76 @@ export function MemberManagement({ organization, locations, userId, role }: Prop
   return (
     <section aria-labelledby="business-members-title" className="space-y-6">
       <div>
-        <h2 id="business-members-title" className="font-display text-2xl tracking-tight">
+        <h2 id="business-members-title" className="font-display text-3xl tracking-tight">
           Brukere
         </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Inviter kollegaer og bestem nøyaktig hvilke annonser, chatter og kategorier de får bruke.
-        </p>
+        <p className="mt-1 text-sm text-muted-foreground">Inviter kollegaer og sett rettigheter.</p>
       </div>
       {errorMessage && (
         <Alert variant="destructive">
           <AlertDescription>{errorMessage}</AlertDescription>
         </Alert>
       )}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
+      <div className="space-y-4">
+        <div>
+          <h3 className="flex items-center gap-2 text-base font-semibold">
             <UserPlus className="size-5" /> Inviter bruker
-          </CardTitle>
-          <CardDescription>Rettighetene lagres sammen med invitasjonen.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <form
-            className="grid gap-4 sm:grid-cols-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (!inviteMutation.isPending) inviteMutation.mutate();
-            }}
+          </h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Rettighetene lagres sammen med invitasjonen.
+          </p>
+        </div>
+        <form
+          className="grid gap-4 border-t border-border pt-5 sm:grid-cols-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!inviteMutation.isPending) inviteMutation.mutate();
+          }}
+        >
+          <div className="space-y-2">
+            <Label htmlFor="member-name">Navn</Label>
+            <Input
+              id="member-name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="member-email">E-post</Label>
+            <Input
+              id="member-email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <PermissionFields
+              value={permissions}
+              categories={categories}
+              onChange={setPermissions}
+              collapsible
+            />
+          </div>
+          <Button
+            type="submit"
+            className="sm:col-span-2 sm:w-fit"
+            disabled={inviteMutation.isPending}
           >
-            <div className="space-y-2">
-              <Label htmlFor="member-name">Navn</Label>
-              <Input
-                id="member-name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="member-email">E-post</Label>
-              <Input
-                id="member-email"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <PermissionFields
-                value={permissions}
-                categories={categories}
-                onChange={setPermissions}
-              />
-            </div>
-            <Button
-              type="submit"
-              className="sm:col-span-2 sm:w-fit"
-              disabled={inviteMutation.isPending}
-            >
-              {inviteMutation.isPending ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <UserPlus className="size-4" />
-              )}
-              {inviteMutation.isPending ? "Sender…" : "Send invitasjon"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Medlemmer</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
+            {inviteMutation.isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <UserPlus className="size-4" />
+            )}
+            {inviteMutation.isPending ? "Sender…" : "Send invitasjon"}
+          </Button>
+        </form>
+      </div>
+      <div className="border-t border-border pt-6">
+        <div>
+          <h3 className="text-base font-semibold">Medlemmer</h3>
+        </div>
+        <div className="mt-4 overflow-hidden rounded-xl border border-border bg-card">
           {membersQuery.isLoading ? (
             <div
               className="flex items-center gap-2 px-6 pb-6 text-sm text-muted-foreground"
@@ -573,8 +594,8 @@ export function MemberManagement({ organization, locations, userId, role }: Prop
           ) : (
             <p className="px-6 pb-6 text-sm text-muted-foreground">Ingen medlemmer å vise.</p>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
       <AlertDialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

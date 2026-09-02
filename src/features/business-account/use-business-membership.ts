@@ -40,7 +40,8 @@ export type BusinessOrganization = {
   proff_access_until: string | null;
   website_url: string | null;
   logo_path: string | null;
-  brand_palette: "forest" | "navy" | "burgundy" | "slate" | null;
+  /** Palett-ID (se BRAND_PALETTES) eller egendefinert «#rrggbb». */
+  brand_palette: string | null;
   created_at: string;
   updated_at: string;
 };

@@ -1,13 +1,22 @@
+import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, ListChecks } from "lucide-react";
+import { Loader2, ListChecks, Plus, Upload } from "lucide-react";
 
 import { EmptyState } from "@/components/ui/empty-state";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { hasEffectiveProffAccess } from "@/features/business-account/plans";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ListingRow, type Row } from "@/features/my-listings/listing-row";
 import type { BusinessOrganization } from "@/features/business-account/use-business-membership";
+import { hasEffectiveProffAccess } from "@/features/business-account/plans";
 import { supabase } from "@/integrations/supabase/client";
 
 type Props = {
@@ -87,28 +96,49 @@ export function BusinessListingsPanel({
       }));
     },
   });
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "draft">("all");
+  const listings = listingsQuery.data ?? [];
+  const filteredListings = listings.filter((listing) => {
+    const matchesStatus = statusFilter === "all" || listing.status === statusFilter;
+    const needle = search.trim().toLocaleLowerCase("nb-NO");
+    const matchesSearch =
+      !needle ||
+      listing.title.toLocaleLowerCase("nb-NO").includes(needle) ||
+      listing.city?.toLocaleLowerCase("nb-NO").includes(needle);
+    return matchesStatus && matchesSearch;
+  });
 
   return (
-    <section aria-labelledby="business-listings-title" className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 id="business-listings-title" className="font-display text-2xl tracking-tight">
+    <section aria-labelledby="business-listings-title" className="space-y-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="max-w-xl">
+          <h2 id="business-listings-title" className="font-display text-3xl tracking-tight">
             Annonser
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Aktive annonser og utkast fra bedriften. Åpne en annonse for å redigere den i den
-            vanlige annonseflaten.
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Hold oversikten over det som er publisert og det som gjenstår før publisering.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto">
           {canCreateListings && (
-            <Button asChild variant="outline">
-              <Link to="/ny-annonse">Ny annonse</Link>
+            <Button asChild className="flex-1 sm:flex-none">
+              <Link to="/ny-annonse">
+                <Plus className="size-4" aria-hidden="true" />
+                Ny annonse
+              </Link>
             </Button>
           )}
           {canCreateListings && hasEffectiveProffAccess(organization) && (
-            <Button type="button" onClick={onImport}>
-              Importer annonser
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onImport}
+              className="flex-1 sm:flex-none"
+              aria-label="Importer annonser"
+            >
+              <Upload className="size-4" aria-hidden="true" />
+              Importer
             </Button>
           )}
         </div>
@@ -127,33 +157,77 @@ export function BusinessListingsPanel({
             Kunne ikke laste bedriftens annonser. Prøv igjen senere.
           </AlertDescription>
         </Alert>
-      ) : listingsQuery.data?.length ? (
-        <ul className="space-y-3">
-          {listingsQuery.data.map((row) => (
-            <ListingRow
-              key={row.id}
-              row={row}
-              isVehicle={false}
-              activePromotion={null}
-              onPromote={() => undefined}
-              onMarkSold={() => undefined}
-              onReactivate={() => undefined}
-              onRepublish={() => undefined}
-              onPublishDraft={() => undefined}
-              onDelete={() => undefined}
-              busy={false}
-              readOnly={
-                listingEditScope === "none" ||
-                (listingEditScope === "own" && row.seller_id !== userId)
-              }
+      ) : listings.length ? (
+        <>
+          <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center">
+            <div className="min-w-0 flex-1">
+              <label htmlFor="business-listings-search" className="sr-only">
+                Søk i annonser
+              </label>
+              <Input
+                id="business-listings-search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Søk etter tittel eller sted"
+                className="bg-background"
+              />
+            </div>
+            <div className="sm:w-44">
+              <label htmlFor="business-listings-status" className="sr-only">
+                Filtrer annonser etter status
+              </label>
+              <Select
+                value={statusFilter}
+                onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}
+              >
+                <SelectTrigger id="business-listings-status" className="bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alle statuser</SelectItem>
+                  <SelectItem value="active">Publisert</SelectItem>
+                  <SelectItem value="draft">Utkast</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          {filteredListings.length ? (
+            <ul className="space-y-3">
+              {filteredListings.map((row) => (
+                <ListingRow
+                  key={row.id}
+                  row={row}
+                  isVehicle={false}
+                  activePromotion={null}
+                  onPromote={() => undefined}
+                  onMarkSold={() => undefined}
+                  onReactivate={() => undefined}
+                  onRepublish={() => undefined}
+                  onPublishDraft={() => undefined}
+                  onDelete={() => undefined}
+                  busy={false}
+                  readOnly={
+                    listingEditScope === "none" ||
+                    (listingEditScope === "own" && row.seller_id !== userId)
+                  }
+                />
+              ))}
+            </ul>
+          ) : (
+            <EmptyState
+              icon={ListChecks}
+              title="Ingen treff"
+              description="Prøv et annet søk eller velg en annen status."
+              className="p-8 sm:p-10"
             />
-          ))}
-        </ul>
+          )}
+        </>
       ) : (
         <EmptyState
           icon={ListChecks}
           title="Ingen annonser å vise"
           description="Aktive annonser og utkast fra bedriften vises her."
+          className="p-8 sm:p-10"
         />
       )}
     </section>

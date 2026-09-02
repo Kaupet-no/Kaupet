@@ -670,12 +670,7 @@ function ListingDetailPage() {
                 .publicUrl
             : null,
           websiteUrl: organization.website_url,
-          palette:
-            organization.brand_palette === "navy" ||
-            organization.brand_palette === "burgundy" ||
-            organization.brand_palette === "slate"
-              ? organization.brand_palette
-              : "forest",
+          palette: organization.brand_palette,
         }
       : undefined;
   const relatedListingsSlot =

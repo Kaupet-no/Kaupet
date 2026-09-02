@@ -411,7 +411,12 @@ const profileSchema = z.object({
     .nullable()
     .optional(),
   logoPath: z.string().trim().max(500).nullable().optional(),
-  brandPalette: z.enum(["forest", "navy", "burgundy", "slate"]).nullable().optional(),
+  // Enten en forhåndsdefinert palett-ID eller en egendefinert hex-farge —
+  // speiler organizations_brand_palette_check i databasen.
+  brandPalette: z
+    .union([z.enum(["forest", "navy", "burgundy", "slate"]), z.string().regex(/^#[0-9a-f]{6}$/u)])
+    .nullable()
+    .optional(),
 });
 
 export const updateBusinessProfile = createServerFn({ method: "POST" })

@@ -77,7 +77,6 @@ function BusinessConsoleRoute() {
 
   return (
     <>
-      <NativePageHeader title="Bedriftskonsoll" backLabel="Meg" backTo="/meg" />
       <BusinessConsole
         organization={membership.organization}
         locations={membership.locations}

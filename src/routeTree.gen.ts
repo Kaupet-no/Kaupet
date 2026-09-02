@@ -37,6 +37,7 @@ import { Route as BrukerIdRouteImport } from './routes/bruker.$id'
 import { Route as DesignBedriftPlanerRouteImport } from './routes/design/bedrift-planer'
 import { Route as OkIdRouteImport } from './routes/ok.$id'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
+import { Route as AuthenticatedAdminBedrifterRouteImport } from './routes/_authenticated/admin/bedrifter'
 import { Route as AuthenticatedAdminBrukereRouteImport } from './routes/_authenticated/admin/brukere'
 import { Route as AuthenticatedAdminKategorierRouteImport } from './routes/_authenticated/admin/kategorier'
 import { Route as AuthenticatedAdminKjoretoyRouteImport } from './routes/_authenticated/admin/kjoretoy'
@@ -197,6 +198,12 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedAdminRouteRoute,
 } as any)
+const AuthenticatedAdminBedrifterRoute =
+  AuthenticatedAdminBedrifterRouteImport.update({
+    id: '/bedrifter',
+    path: '/bedrifter',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
 const AuthenticatedAdminBrukereRoute =
   AuthenticatedAdminBrukereRouteImport.update({
     id: '/brukere',
@@ -330,6 +337,7 @@ export interface FileRoutesByFullPath {
   '/bruker/$id': typeof BrukerIdRoute
   '/design/bedrift-planer': typeof DesignBedriftPlanerRoute
   '/ok/$id': typeof OkIdRoute
+  '/admin/bedrifter': typeof AuthenticatedAdminBedrifterRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/admin/kjoretoy': typeof AuthenticatedAdminKjoretoyRoute
@@ -375,6 +383,7 @@ export interface FileRoutesByTo {
   '/bruker/$id': typeof BrukerIdRoute
   '/design/bedrift-planer': typeof DesignBedriftPlanerRoute
   '/ok/$id': typeof OkIdRoute
+  '/admin/bedrifter': typeof AuthenticatedAdminBedrifterRoute
   '/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/admin/kjoretoy': typeof AuthenticatedAdminKjoretoyRoute
@@ -424,6 +433,7 @@ export interface FileRoutesById {
   '/bruker/$id': typeof BrukerIdRoute
   '/design/bedrift-planer': typeof DesignBedriftPlanerRoute
   '/ok/$id': typeof OkIdRoute
+  '/_authenticated/admin/bedrifter': typeof AuthenticatedAdminBedrifterRoute
   '/_authenticated/admin/brukere': typeof AuthenticatedAdminBrukereRoute
   '/_authenticated/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/_authenticated/admin/kjoretoy': typeof AuthenticatedAdminKjoretoyRoute
@@ -473,6 +483,7 @@ export interface FileRouteTypes {
     | '/bruker/$id'
     | '/design/bedrift-planer'
     | '/ok/$id'
+    | '/admin/bedrifter'
     | '/admin/brukere'
     | '/admin/kategorier'
     | '/admin/kjoretoy'
@@ -518,6 +529,7 @@ export interface FileRouteTypes {
     | '/bruker/$id'
     | '/design/bedrift-planer'
     | '/ok/$id'
+    | '/admin/bedrifter'
     | '/admin/brukere'
     | '/admin/kategorier'
     | '/admin/kjoretoy'
@@ -566,6 +578,7 @@ export interface FileRouteTypes {
     | '/bruker/$id'
     | '/design/bedrift-planer'
     | '/ok/$id'
+    | '/_authenticated/admin/bedrifter'
     | '/_authenticated/admin/brukere'
     | '/_authenticated/admin/kategorier'
     | '/_authenticated/admin/kjoretoy'
@@ -809,6 +822,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
+    '/_authenticated/admin/bedrifter': {
+      id: '/_authenticated/admin/bedrifter'
+      path: '/bedrifter'
+      fullPath: '/admin/bedrifter'
+      preLoaderRoute: typeof AuthenticatedAdminBedrifterRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
     '/_authenticated/admin/brukere': {
       id: '/_authenticated/admin/brukere'
       path: '/brukere'
@@ -939,6 +959,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedAdminRouteRouteChildren {
+  AuthenticatedAdminBedrifterRoute: typeof AuthenticatedAdminBedrifterRoute
   AuthenticatedAdminBrukereRoute: typeof AuthenticatedAdminBrukereRoute
   AuthenticatedAdminKategorierRoute: typeof AuthenticatedAdminKategorierRoute
   AuthenticatedAdminKjoretoyRoute: typeof AuthenticatedAdminKjoretoyRoute
@@ -952,6 +973,7 @@ interface AuthenticatedAdminRouteRouteChildren {
 
 const AuthenticatedAdminRouteRouteChildren: AuthenticatedAdminRouteRouteChildren =
   {
+    AuthenticatedAdminBedrifterRoute: AuthenticatedAdminBedrifterRoute,
     AuthenticatedAdminBrukereRoute: AuthenticatedAdminBrukereRoute,
     AuthenticatedAdminKategorierRoute: AuthenticatedAdminKategorierRoute,
     AuthenticatedAdminKjoretoyRoute: AuthenticatedAdminKjoretoyRoute,

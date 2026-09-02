@@ -1621,6 +1621,9 @@ export type Database = {
           proff_trial_started_at: string | null
           selected_plan: string | null
           updated_at: string
+          verification_status: string
+          verified_at: string | null
+          verified_by: string | null
           website_url: string | null
         }
         Insert: {
@@ -1637,6 +1640,9 @@ export type Database = {
           proff_trial_started_at?: string | null
           selected_plan?: string | null
           updated_at?: string
+          verification_status?: string
+          verified_at?: string | null
+          verified_by?: string | null
           website_url?: string | null
         }
         Update: {
@@ -1653,6 +1659,9 @@ export type Database = {
           proff_trial_started_at?: string | null
           selected_plan?: string | null
           updated_at?: string
+          verification_status?: string
+          verified_at?: string | null
+          verified_by?: string | null
           website_url?: string | null
         }
         Relationships: []
@@ -2793,6 +2802,7 @@ export type Database = {
       admin_unban_ip: { Args: { _id: string }; Returns: undefined }
       admin_unban_user: { Args: { _user_id: string }; Returns: undefined }
       admin_unsuspend_user: { Args: { _user_id: string }; Returns: undefined }
+      admin_verify_organization: { Args: { _organization_id: string }; Returns: undefined }
       admin_update_vehicle_brand: {
         Args: { _id: string; _name: string }
         Returns: {
@@ -3169,6 +3179,10 @@ export type Database = {
         }[]
       }
       organization_has_proff_access: {
+        Args: { _organization_id: string }
+        Returns: boolean
+      }
+      organization_is_verified: {
         Args: { _organization_id: string }
         Returns: boolean
       }

@@ -9,6 +9,7 @@ import {
   Car,
   MessageSquareHeart,
   Receipt,
+  BadgeCheck,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsAdmin } from "@/hooks/use-is-admin";
@@ -72,6 +73,11 @@ function AdminLayout() {
               to="/admin/proff-abonnement"
               icon={<Receipt className="size-4" />}
               label="Proff-abonnement"
+            />
+            <NavTab
+              to="/admin/bedrifter"
+              icon={<BadgeCheck className="size-4" />}
+              label="Bedrifter"
             />
             <NavTab
               to="/admin/vipps-webhooks"

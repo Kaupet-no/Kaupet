@@ -3575,6 +3575,10 @@ describe.skipIf(!canRun)(
             proff_trial_started_at: new Date(now - 24 * 60 * 60 * 1000).toISOString(),
             proff_trial_ends_at: new Date(now + 30 * 24 * 60 * 60 * 1000).toISOString(),
             proff_access_until: new Date(now + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            // This block tests membership/listing/storage RLS, not M-4's
+            // registration-affiliation gate — grandfather these orgs in as
+            // verified like a real approved business.
+            verification_status: "verified",
           })
           .select("id")
           .single();
@@ -4456,6 +4460,133 @@ describe.skipIf(!canRun)(
       expect(otherAllowed).toBe(true);
 
       await admin.from("endpoint_rate_limits").delete().eq("bucket", bucket);
+    });
+  },
+);
+
+describe.skipIf(!canRun)(
+  "RLS: an unverified organization cannot create or publish listings (M-4)",
+  () => {
+    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+    const suffix = Date.now();
+    const emails = {
+      owner: `rls-m4-owner-${suffix}@example.com`,
+      admin: `rls-m4-admin-${suffix}@example.com`,
+    };
+    const userIds: string[] = [];
+    let ownerId: string;
+    let organizationId: string;
+    let locationId: string;
+
+    async function signIn(email: string) {
+      return signInWithRetry(email);
+    }
+
+    beforeAll(async () => {
+      const mkUser = async (email: string) => {
+        const { data, error } = await admin.auth.admin.createUser({
+          email,
+          password: PASSWORD,
+          email_confirm: true,
+        });
+        if (error) throw error;
+        userIds.push(data.user!.id);
+        return data.user!.id;
+      };
+      ownerId = await mkUser(emails.owner);
+      await mkUser(emails.admin);
+      await admin.from("user_roles").insert({ user_id: userIds[1], role: "admin" });
+
+      const organizationNumber = 200_000_000 + (suffix % 700_000_000);
+      const { data: org, error: orgError } = await admin
+        .from("organizations")
+        .insert({
+          organization_number: String(organizationNumber),
+          legal_name: `RLS M-4 Bedrift ${suffix}`,
+          display_name: `RLS M-4 Bedrift ${suffix}`,
+          selected_plan: "proff",
+          proff_access_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          // No verification_status given — must default to 'unverified'.
+        })
+        .select("id, verification_status")
+        .single();
+      if (orgError) throw orgError;
+      organizationId = org.id;
+      expect(org.verification_status).toBe("unverified");
+
+      const { data: location, error: locationError } = await admin
+        .from("organization_locations")
+        .insert({
+          organization_id: organizationId,
+          name: "Hovedlokasjon",
+          address_line: "Testgata 1",
+          postal_code: "0001",
+          city: "Oslo",
+          is_default: true,
+        })
+        .select("id")
+        .single();
+      if (locationError) throw locationError;
+      locationId = location.id;
+
+      const { error: memberError } = await admin.from("organization_members").insert({
+        organization_id: organizationId,
+        user_id: ownerId,
+        role: "superuser",
+        status: "active",
+      });
+      if (memberError) throw memberError;
+    });
+
+    afterAll(async () => {
+      if (!canRun) return;
+      await admin.from("organizations").delete().eq("id", organizationId);
+      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+    });
+
+    it("blocks even the organization's own superuser from creating a listing", async () => {
+      const owner = await signIn(emails.owner);
+      const { error } = await owner.from("listings").insert({
+        seller_id: ownerId,
+        organization_id: organizationId,
+        organization_location_id: locationId,
+        title: "M-4 unverified org listing",
+        price_nok: 100,
+        status: "draft",
+      });
+      expect(error).not.toBeNull();
+    });
+
+    it("rejects admin_verify_organization from a non-admin, then allows listing creation once an admin approves it", async () => {
+      const owner = await signIn(emails.owner);
+      const { error: selfVerifyError } = await owner.rpc("admin_verify_organization", {
+        _organization_id: organizationId,
+      });
+      expect(selfVerifyError).not.toBeNull();
+
+      const adminUser = await signIn(emails.admin);
+      const { error: verifyError } = await adminUser.rpc("admin_verify_organization", {
+        _organization_id: organizationId,
+      });
+      expect(verifyError).toBeNull();
+
+      const { data: org } = await admin
+        .from("organizations")
+        .select("verification_status, verified_by")
+        .eq("id", organizationId)
+        .single();
+      expect(org?.verification_status).toBe("verified");
+      expect(org?.verified_by).toBe(userIds[1]);
+
+      const { error: insertError } = await owner.from("listings").insert({
+        seller_id: ownerId,
+        organization_id: organizationId,
+        organization_location_id: locationId,
+        title: "M-4 now-verified org listing",
+        price_nok: 100,
+        status: "draft",
+      });
+      expect(insertError).toBeNull();
     });
   },
 );

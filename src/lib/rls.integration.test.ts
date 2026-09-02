@@ -4065,3 +4065,235 @@ describe.skipIf(!canRun)(
     });
   },
 );
+
+describe.skipIf(!canRun)("RLS: storage buckets enforce owner/participant access (K-2)", () => {
+  const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+  const suffix = Date.now();
+  const emails = {
+    seller: `rls-storage-seller-${suffix}@example.com`,
+    buyer: `rls-storage-buyer-${suffix}@example.com`,
+    outsider: `rls-storage-outsider-${suffix}@example.com`,
+  };
+
+  const userIds: string[] = [];
+  const objectPaths: Record<string, string[]> = {
+    "listing-images": [],
+    "listing-360-frames": [],
+    avatars: [],
+    "message-attachments": [],
+  };
+  let sellerId: string;
+  let buyerId: string;
+  let activeListingId: string;
+  let draftListingId: string;
+  let conversationId: string;
+
+  async function signIn(email: string) {
+    return signInWithRetry(email);
+  }
+
+  beforeAll(async () => {
+    const mkUser = async (email: string) => {
+      const { data, error } = await admin.auth.admin.createUser({
+        email,
+        password: PASSWORD,
+        email_confirm: true,
+      });
+      if (error) throw error;
+      userIds.push(data.user!.id);
+      return data.user!.id;
+    };
+    sellerId = await mkUser(emails.seller);
+    buyerId = await mkUser(emails.buyer);
+    await mkUser(emails.outsider);
+
+    const { data: active, error: activeErr } = await admin
+      .from("listings")
+      .insert({
+        seller_id: sellerId,
+        title: "RLS storage active listing",
+        price_nok: 100,
+        status: "active",
+      })
+      .select("id")
+      .single();
+    if (activeErr) throw activeErr;
+    activeListingId = active.id;
+
+    const { data: draft, error: draftErr } = await admin
+      .from("listings")
+      .insert({
+        seller_id: sellerId,
+        title: "RLS storage draft listing",
+        price_nok: 100,
+        status: "draft",
+      })
+      .select("id")
+      .single();
+    if (draftErr) throw draftErr;
+    draftListingId = draft.id;
+
+    const { data: conv, error: convErr } = await admin
+      .from("conversations")
+      .insert({ listing_id: activeListingId, buyer_id: buyerId, seller_id: sellerId })
+      .select("id")
+      .single();
+    if (convErr) throw convErr;
+    conversationId = conv.id;
+  });
+
+  afterAll(async () => {
+    if (!canRun) return;
+    for (const [bucket, paths] of Object.entries(objectPaths)) {
+      if (paths.length > 0) await admin.storage.from(bucket).remove(paths);
+    }
+    await admin.from("listings").delete().in("id", [activeListingId, draftListingId]);
+    await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+  });
+
+  it("lets only the seller upload/delete listing images, but anyone read an active listing's", async () => {
+    const seller = await signIn(emails.seller);
+    const outsider = await signIn(emails.outsider);
+    const anon = createClient(URL!, ANON_KEY!);
+    const content = new Blob(["img"], { type: "image/png" });
+
+    const path = `${sellerId}/${activeListingId}/rls-${suffix}.png`;
+    objectPaths["listing-images"].push(path);
+
+    const { error: outsiderUploadError } = await outsider.storage
+      .from("listing-images")
+      .upload(path, content, { contentType: "image/png" });
+    expect(outsiderUploadError).not.toBeNull();
+
+    const { error: sellerUploadError } = await seller.storage
+      .from("listing-images")
+      .upload(path, content, { contentType: "image/png" });
+    expect(sellerUploadError).toBeNull();
+
+    const { data: anonDownload, error: anonDownloadError } = await anon.storage
+      .from("listing-images")
+      .download(path);
+    expect(anonDownloadError).toBeNull();
+    expect(anonDownload).toBeTruthy();
+
+    const { error: outsiderDeleteError } = await outsider.storage
+      .from("listing-images")
+      .remove([path]);
+    // Supabase Storage returns ok even when RLS silently filters the row
+    // out of the delete set, so assert the object is still there instead.
+    expect(outsiderDeleteError).toBeNull();
+    const { data: stillThere } = await seller.storage.from("listing-images").download(path);
+    expect(stillThere).toBeTruthy();
+  });
+
+  it("hides a draft listing's images from everyone but the seller", async () => {
+    const seller = await signIn(emails.seller);
+    const outsider = await signIn(emails.outsider);
+    const anon = createClient(URL!, ANON_KEY!);
+    const content = new Blob(["img"], { type: "image/png" });
+
+    const path = `${sellerId}/${draftListingId}/rls-${suffix}.png`;
+    objectPaths["listing-images"].push(path);
+    const { error: uploadError } = await seller.storage
+      .from("listing-images")
+      .upload(path, content, { contentType: "image/png" });
+    expect(uploadError).toBeNull();
+
+    const { error: anonError } = await anon.storage.from("listing-images").download(path);
+    expect(anonError).not.toBeNull();
+
+    const { error: outsiderError } = await outsider.storage.from("listing-images").download(path);
+    expect(outsiderError).not.toBeNull();
+
+    const { data: sellerDownload, error: sellerError } = await seller.storage
+      .from("listing-images")
+      .download(path);
+    expect(sellerError).toBeNull();
+    expect(sellerDownload).toBeTruthy();
+  });
+
+  it("exposes 360 frames of an active listing publicly but hides a draft's", async () => {
+    const anon = createClient(URL!, ANON_KEY!);
+    const content = new Blob(["frame"], { type: "image/webp" });
+
+    const activePath = `${activeListingId}/0.webp`;
+    objectPaths["listing-360-frames"].push(activePath);
+    const { error: activeUploadError } = await admin.storage
+      .from("listing-360-frames")
+      .upload(activePath, content, { contentType: "image/webp" });
+    expect(activeUploadError).toBeNull();
+
+    const draftPath = `${draftListingId}/0.webp`;
+    objectPaths["listing-360-frames"].push(draftPath);
+    const { error: draftUploadError } = await admin.storage
+      .from("listing-360-frames")
+      .upload(draftPath, content, { contentType: "image/webp" });
+    expect(draftUploadError).toBeNull();
+
+    const { data: activeDownload, error: activeError } = await anon.storage
+      .from("listing-360-frames")
+      .download(activePath);
+    expect(activeError).toBeNull();
+    expect(activeDownload).toBeTruthy();
+
+    const { error: draftError } = await anon.storage.from("listing-360-frames").download(draftPath);
+    expect(draftError).not.toBeNull();
+  });
+
+  it("lets only conversation participants read/write message attachments", async () => {
+    const seller = await signIn(emails.seller);
+    const buyer = await signIn(emails.buyer);
+    const outsider = await signIn(emails.outsider);
+    const content = new Blob(["attachment"], { type: "image/png" });
+
+    const path = `${conversationId}/rls-${suffix}.png`;
+    objectPaths["message-attachments"].push(path);
+
+    const { error: outsiderUploadError } = await outsider.storage
+      .from("message-attachments")
+      .upload(path, content, { contentType: "image/png" });
+    expect(outsiderUploadError).not.toBeNull();
+
+    const { error: buyerUploadError } = await buyer.storage
+      .from("message-attachments")
+      .upload(path, content, { contentType: "image/png" });
+    expect(buyerUploadError).toBeNull();
+
+    const { data: sellerDownload, error: sellerDownloadError } = await seller.storage
+      .from("message-attachments")
+      .download(path);
+    expect(sellerDownloadError).toBeNull();
+    expect(sellerDownload).toBeTruthy();
+
+    const { error: outsiderDownloadError } = await outsider.storage
+      .from("message-attachments")
+      .download(path);
+    expect(outsiderDownloadError).not.toBeNull();
+  });
+
+  it("lets anyone read avatars but only the owner write their own", async () => {
+    const seller = await signIn(emails.seller);
+    const outsider = await signIn(emails.outsider);
+    const anon = createClient(URL!, ANON_KEY!);
+    const content = new Blob(["avatar"], { type: "image/png" });
+
+    const path = `${sellerId}/avatar-${suffix}.png`;
+    objectPaths.avatars.push(path);
+
+    const { error: outsiderUploadError } = await outsider.storage
+      .from("avatars")
+      .upload(path, content, { contentType: "image/png" });
+    expect(outsiderUploadError).not.toBeNull();
+
+    const { error: sellerUploadError } = await seller.storage
+      .from("avatars")
+      .upload(path, content, { contentType: "image/png" });
+    expect(sellerUploadError).toBeNull();
+
+    const { data: anonDownload, error: anonDownloadError } = await anon.storage
+      .from("avatars")
+      .download(path);
+    expect(anonDownloadError).toBeNull();
+    expect(anonDownload).toBeTruthy();
+  });
+});

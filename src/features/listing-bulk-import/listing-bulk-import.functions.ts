@@ -18,11 +18,14 @@ import {
   type CategoryFlowRow,
 } from "@/features/listing-creation/category-flows";
 import { validateRequiredFieldGroups } from "@/features/listing-creation/field-groups/validators";
-import {
-  organizationListingLocation,
-  type OrganizationListingLocation,
-} from "@/lib/organization-location.server";
 import { bulkImportRowSchema, normalizeBulkImportRow, type BulkImportRow } from "./import-schema";
+
+type OrganizationListingLocation = {
+  postal_code: string | null;
+  city: string | null;
+  lat: number | null;
+  lng: number | null;
+};
 
 const MAX_IMPORT_ROWS = 500;
 const BATCH_SIZE = 25;
@@ -124,6 +127,7 @@ async function loadImportContext(
   }
 
   const categoryRows = (categories ?? []) as CategoryRecord[];
+  const { organizationListingLocation } = await import("@/lib/organization-location.server");
   return {
     location: await organizationListingLocation(supabaseAdmin, membership.organization_id),
     organizationId: membership.organization_id,

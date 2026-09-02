@@ -7,7 +7,7 @@ ALTER TABLE public.organization_members
   ADD COLUMN listing_edit_scope text NOT NULL DEFAULT 'own'
     CHECK (listing_edit_scope IN ('none', 'own', 'all')),
   ADD COLUMN category_access text NOT NULL DEFAULT 'all'
-    CHECK (category_access IN ('all', 'restricted')),
+    CHECK (category_access IN ('all', 'restricted'));
 
 -- Existing ordinary members keep today's behavior. Superusers already had full access.
 UPDATE public.organization_members

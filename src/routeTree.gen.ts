@@ -52,6 +52,7 @@ import { Route as AuthenticatedKvitteringPromoIdRouteImport } from './routes/_au
 import { Route as AuthenticatedMeldingerIndexRouteImport } from './routes/_authenticated/meldinger.index'
 import { Route as AuthenticatedMeldingerIdRouteImport } from './routes/_authenticated/meldinger.$id'
 import { Route as AuthenticatedMineAnnonserIndexRouteImport } from './routes/_authenticated/mine-annonser.index'
+import { Route as ApiPublicCspReportRouteImport } from './routes/api/public/csp-report'
 import { Route as ApiPublicPushDispatchRouteImport } from './routes/api/public/push/dispatch'
 import { Route as ApiPublicVippsWebhookRouteImport } from './routes/api/public/vipps/webhook'
 
@@ -286,6 +287,11 @@ const AuthenticatedMineAnnonserIndexRoute =
     path: '/mine-annonser/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiPublicCspReportRoute = ApiPublicCspReportRouteImport.update({
+  id: '/api/public/csp-report',
+  path: '/api/public/csp-report',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicPushDispatchRoute = ApiPublicPushDispatchRouteImport.update({
   id: '/api/public/push/dispatch',
   path: '/api/public/push/dispatch',
@@ -336,6 +342,7 @@ export interface FileRoutesByFullPath {
   '/bekrefter/$promoId': typeof AuthenticatedBekrefterPromoIdRoute
   '/kvittering/$promoId': typeof AuthenticatedKvitteringPromoIdRoute
   '/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
+  '/api/public/csp-report': typeof ApiPublicCspReportRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/bedrift/': typeof AuthenticatedBedriftIndexRoute
   '/meldinger/': typeof AuthenticatedMeldingerIndexRoute
@@ -380,6 +387,7 @@ export interface FileRoutesByTo {
   '/bekrefter/$promoId': typeof AuthenticatedBekrefterPromoIdRoute
   '/kvittering/$promoId': typeof AuthenticatedKvitteringPromoIdRoute
   '/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
+  '/api/public/csp-report': typeof ApiPublicCspReportRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/bedrift': typeof AuthenticatedBedriftIndexRoute
   '/meldinger': typeof AuthenticatedMeldingerIndexRoute
@@ -428,6 +436,7 @@ export interface FileRoutesById {
   '/_authenticated/bekrefter/$promoId': typeof AuthenticatedBekrefterPromoIdRoute
   '/_authenticated/kvittering/$promoId': typeof AuthenticatedKvitteringPromoIdRoute
   '/_authenticated/meldinger/$id': typeof AuthenticatedMeldingerIdRoute
+  '/api/public/csp-report': typeof ApiPublicCspReportRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/bedrift/': typeof AuthenticatedBedriftIndexRoute
   '/_authenticated/meldinger/': typeof AuthenticatedMeldingerIndexRoute
@@ -476,6 +485,7 @@ export interface FileRouteTypes {
     | '/bekrefter/$promoId'
     | '/kvittering/$promoId'
     | '/meldinger/$id'
+    | '/api/public/csp-report'
     | '/admin/'
     | '/bedrift/'
     | '/meldinger/'
@@ -520,6 +530,7 @@ export interface FileRouteTypes {
     | '/bekrefter/$promoId'
     | '/kvittering/$promoId'
     | '/meldinger/$id'
+    | '/api/public/csp-report'
     | '/admin'
     | '/bedrift'
     | '/meldinger'
@@ -567,6 +578,7 @@ export interface FileRouteTypes {
     | '/_authenticated/bekrefter/$promoId'
     | '/_authenticated/kvittering/$promoId'
     | '/_authenticated/meldinger/$id'
+    | '/api/public/csp-report'
     | '/_authenticated/admin/'
     | '/_authenticated/bedrift/'
     | '/_authenticated/meldinger/'
@@ -594,6 +606,7 @@ export interface RootRouteChildren {
   BrukerIdRoute: typeof BrukerIdRoute
   DesignBedriftPlanerRoute: typeof DesignBedriftPlanerRoute
   OkIdRoute: typeof OkIdRoute
+  ApiPublicCspReportRoute: typeof ApiPublicCspReportRoute
   ApiPublicPushDispatchRoute: typeof ApiPublicPushDispatchRoute
   ApiPublicVippsWebhookRoute: typeof ApiPublicVippsWebhookRoute
 }
@@ -901,6 +914,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMineAnnonserIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/csp-report': {
+      id: '/api/public/csp-report'
+      path: '/api/public/csp-report'
+      fullPath: '/api/public/csp-report'
+      preLoaderRoute: typeof ApiPublicCspReportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/push/dispatch': {
       id: '/api/public/push/dispatch'
       path: '/api/public/push/dispatch'
@@ -1022,6 +1042,7 @@ const rootRouteChildren: RootRouteChildren = {
   BrukerIdRoute: BrukerIdRoute,
   DesignBedriftPlanerRoute: DesignBedriftPlanerRoute,
   OkIdRoute: OkIdRoute,
+  ApiPublicCspReportRoute: ApiPublicCspReportRoute,
   ApiPublicPushDispatchRoute: ApiPublicPushDispatchRoute,
   ApiPublicVippsWebhookRoute: ApiPublicVippsWebhookRoute,
 }

@@ -13,9 +13,15 @@ const SECURITY_HEADERS = {
   "x-frame-options": "SAMEORIGIN",
   "referrer-policy": "strict-origin-when-cross-origin",
   "permissions-policy": "camera=(self), geolocation=(self), microphone=()",
+  "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
   // Report-only first: the app has intentional inline bootstrap/JSON-LD and
   // third-party Turnstile/map/Supabase traffic. Promote to enforcement after
-  // production reports confirm this source inventory is complete.
+  // production reports (now collected at /api/public/csp-report — see
+  // docs/SIKKERHETSVURDERING.md M-6) confirm this source inventory is
+  // complete. 'unsafe-inline' still covers the intentional inline
+  // bootstrap/JSON-LD scripts; replacing it with a per-request nonce needs
+  // threading a nonce through SSR rendering, which is a bigger change than
+  // this header config and is tracked separately.
   "content-security-policy-report-only": [
     "default-src 'self'",
     "base-uri 'self'",
@@ -29,7 +35,10 @@ const SECURITY_HEADERS = {
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://nominatim.openstreetmap.org https://challenges.cloudflare.com",
     "frame-src https://challenges.cloudflare.com",
     "worker-src 'self' blob:",
+    "upgrade-insecure-requests",
+    "report-to csp",
   ].join("; "),
+  "reporting-endpoints": 'csp="/api/public/csp-report"',
 };
 
 // Server-only secrets that features silently need at runtime. Warn early in

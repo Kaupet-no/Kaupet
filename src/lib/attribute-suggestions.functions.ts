@@ -15,6 +15,9 @@ export const getAttributeValueSuggestions = createServerFn({ method: "GET" })
       .parse(input),
   )
   .handler(async ({ data }) => {
+    const { assertNotRateLimited } = await import("@/lib/rate-limit.server");
+    await assertNotRateLimited("attribute-value-suggestions", 120, 300);
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: rows, error } = await supabaseAdmin.rpc("attribute_value_suggestions", {
       cat_id: data.categoryId,

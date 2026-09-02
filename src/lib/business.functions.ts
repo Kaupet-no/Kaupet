@@ -217,6 +217,8 @@ export const lookupBusinessOrganization = createServerFn({ method: "POST" })
     const organizationNumber = assertOrganizationNumber(data.organizationNumber);
     const { verifyTurnstileToken } = await import("@/lib/turnstile.server");
     await verifyTurnstileToken(data.turnstileToken);
+    const { assertNotRateLimited } = await import("@/lib/rate-limit.server");
+    await assertNotRateLimited("lookup-business-organization", 20, 600);
     const supabaseAdmin = await getAdmin();
 
     const { data: existing, error: existingError } = await supabaseAdmin

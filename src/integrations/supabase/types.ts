@@ -1999,16 +1999,19 @@ export type Database = {
       }
       site_settings: {
         Row: {
+          category_suggestion_ai_enabled: boolean
           default_search_examples: string[]
           id: boolean
           updated_at: string
         }
         Insert: {
+          category_suggestion_ai_enabled?: boolean
           default_search_examples?: string[]
           id?: boolean
           updated_at?: string
         }
         Update: {
+          category_suggestion_ai_enabled?: boolean
           default_search_examples?: string[]
           id?: boolean
           updated_at?: string
@@ -2930,6 +2933,10 @@ export type Database = {
         Returns: boolean
       }
       cancel_account_deletion: { Args: never; Returns: boolean }
+      check_endpoint_rate_limit: {
+        Args: { _bucket: string; _key_hash: string; _limit: number; _window_seconds: number }
+        Returns: boolean
+      }
       compute_wtb_matches: {
         Args: {
           _attributes: Json

@@ -8,6 +8,9 @@ export type AttributeRangeBoundsMap = Record<string, { min: number; max: number 
 export const getAttributeRangeBounds = createServerFn({ method: "GET" })
   .validator((input: unknown) => z.object({ categoryId: z.string().uuid() }).parse(input))
   .handler(async ({ data }) => {
+    const { assertNotRateLimited } = await import("@/lib/rate-limit.server");
+    await assertNotRateLimited("attribute-range-bounds", 60, 300);
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: rows, error } = await supabaseAdmin.rpc("attribute_range_bounds", {
       cat_id: data.categoryId,

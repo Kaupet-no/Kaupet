@@ -6,6 +6,9 @@ export const suggestKeywordsForListing = createServerFn({ method: "GET" })
     z.object({ title: z.string().max(200), category_id: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data }) => {
+    const { assertNotRateLimited } = await import("@/lib/rate-limit.server");
+    await assertNotRateLimited("suggest-keywords-for-listing", 60, 300);
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: rows, error } = await supabaseAdmin.rpc("suggest_keywords_for_listing", {

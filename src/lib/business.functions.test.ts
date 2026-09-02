@@ -33,6 +33,9 @@ vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin }));
 vi.mock("@/lib/turnstile.server", () => ({
   verifyTurnstileToken: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock("@/lib/rate-limit.server", () => ({
+  assertNotRateLimited: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock("@/lib/brreg.server", () => ({ fetchOrganizationFromBrreg: vi.fn() }));
 const sendInternalEmail = vi.fn().mockResolvedValue(undefined);
 vi.mock("@/lib/email.server", () => ({

@@ -16,6 +16,9 @@ type CategorySuggestionResult = { suggestions: CategorySuggestion[] };
 export const suggestCategoryForTitle = createServerFn({ method: "GET" })
   .validator((input: unknown) => z.object({ title: z.string().min(3).max(200) }).parse(input))
   .handler(async ({ data }) => {
+    const { assertNotRateLimited } = await import("@/lib/rate-limit.server");
+    await assertNotRateLimited("suggest-category-for-title", 40, 300);
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: rows, error } = await supabaseAdmin.rpc("suggest_category_for_title", {
@@ -40,6 +43,13 @@ export const suggestCategoryForTitle = createServerFn({ method: "GET" })
         }
       : null;
     if (!top || totalVotes < MIN_TOTAL_VOTES || share < MIN_SHARE) {
+      const { data: settings } = await supabaseAdmin
+        .from("site_settings")
+        .select("category_suggestion_ai_enabled")
+        .single();
+      if (settings?.category_suggestion_ai_enabled === false) {
+        return { suggestions: voteSuggestion ? [voteSuggestion] : [] };
+      }
       // Keep this dynamic import at the server boundary: this module is also
       // imported by client components, while the AI provider must stay server-only.
       const { suggestCategoryForTitleAi } = await import("@/lib/category-suggestion-ai.server");

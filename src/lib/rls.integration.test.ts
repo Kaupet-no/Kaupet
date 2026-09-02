@@ -4404,3 +4404,58 @@ describe.skipIf(!canRun)("RLS: feedback rate limiting is enforced in the databas
     await admin.from("feedback_rate_limits").delete().eq("key_hash", keyHash);
   });
 });
+
+describe.skipIf(!canRun)(
+  "RLS: endpoint rate limiting for unauthenticated AI/heavy endpoints (M-9)",
+  () => {
+    const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+    const suffix = Date.now();
+
+    it("only service_role may call check_endpoint_rate_limit", async () => {
+      const anon = createClient(URL!, ANON_KEY!);
+      const { error } = await anon.rpc("check_endpoint_rate_limit", {
+        _bucket: "test",
+        _key_hash: "a".repeat(64),
+        _limit: 5,
+        _window_seconds: 60,
+      });
+      expect(error).not.toBeNull();
+    });
+
+    it("allows up to the limit then rejects, per bucket+key independently", async () => {
+      const keyHash = createHash("sha256").update(`m9-${suffix}`).digest("hex");
+      const otherKeyHash = createHash("sha256").update(`m9-other-${suffix}`).digest("hex");
+      const bucket = `m9-test-${suffix}`;
+
+      for (let i = 0; i < 3; i++) {
+        const { data: allowed, error } = await admin.rpc("check_endpoint_rate_limit", {
+          _bucket: bucket,
+          _key_hash: keyHash,
+          _limit: 3,
+          _window_seconds: 60,
+        });
+        expect(error).toBeNull();
+        expect(allowed).toBe(true);
+      }
+
+      const { data: fourth, error: fourthError } = await admin.rpc("check_endpoint_rate_limit", {
+        _bucket: bucket,
+        _key_hash: keyHash,
+        _limit: 3,
+        _window_seconds: 60,
+      });
+      expect(fourthError).toBeNull();
+      expect(fourth).toBe(false);
+
+      // A different key in the same bucket has its own budget.
+      const { data: otherAllowed, error: otherError } = await admin.rpc(
+        "check_endpoint_rate_limit",
+        { _bucket: bucket, _key_hash: otherKeyHash, _limit: 3, _window_seconds: 60 },
+      );
+      expect(otherError).toBeNull();
+      expect(otherAllowed).toBe(true);
+
+      await admin.from("endpoint_rate_limits").delete().eq("bucket", bucket);
+    });
+  },
+);

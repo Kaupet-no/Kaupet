@@ -132,6 +132,44 @@ describe.skipIf(!canRun)("RLS: conversations & messages are only visible to part
       .eq("conversation_id", conversationId);
     expect(messages).toHaveLength(0);
   });
+
+  it("rejects a message body over 4000 characters (M-7)", async () => {
+    const buyer = await signIn(emails.buyer);
+    const {
+      data: { user: buyerUser },
+    } = await buyer.auth.getUser();
+    const { error } = await buyer.from("messages").insert({
+      conversation_id: conversationId,
+      sender_id: buyerUser!.id,
+      body: "x".repeat(4001),
+    });
+    expect(error).not.toBeNull();
+
+    const { error: okError } = await buyer.from("messages").insert({
+      conversation_id: conversationId,
+      sender_id: buyerUser!.id,
+      body: "x".repeat(4000),
+    });
+    expect(okError).toBeNull();
+  });
+
+  it("rejects a display_name over 80 characters (M-7)", async () => {
+    const buyer = await signIn(emails.buyer);
+    const {
+      data: { user: buyerUser },
+    } = await buyer.auth.getUser();
+    const { error } = await buyer
+      .from("profiles")
+      .update({ display_name: "x".repeat(81) })
+      .eq("id", buyerUser!.id);
+    expect(error).not.toBeNull();
+
+    const { error: okError } = await buyer
+      .from("profiles")
+      .update({ display_name: "x".repeat(80) })
+      .eq("id", buyerUser!.id);
+    expect(okError).toBeNull();
+  });
   it("lar hver deltaker flytte sin egen samtale til papirkurven og gjenopprette den", async () => {
     const buyer = await signIn(emails.buyer);
     const seller = await signIn(emails.seller);

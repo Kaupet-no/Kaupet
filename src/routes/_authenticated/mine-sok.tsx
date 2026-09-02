@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { NativePageHeader } from "@/components/native-page-header";
 import { useIsNative } from "@/hooks/use-is-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Bell,
   BellOff,
@@ -19,7 +19,8 @@ import { toast } from "sonner";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { usePushStatus } from "@/hooks/use-push-status";
-import { useCategories } from "@/hooks/use-categories";
+import { useCategories, visibleCategories } from "@/hooks/use-categories";
+import { useIsDemo } from "@/hooks/use-is-demo";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -96,7 +97,12 @@ function MineSokPage() {
     queryFn: listUnreadCountsBySearch,
   });
 
-  const { data: categories } = useCategories();
+  const { data: allCategories } = useCategories();
+  const { data: isDemo = false } = useIsDemo();
+  const categories = useMemo(
+    () => visibleCategories(allCategories ?? [], isDemo),
+    [allCategories, isDemo],
+  );
 
   const searches = data ?? [];
   const hasActiveNotify = searches.some((s) => s.notify);

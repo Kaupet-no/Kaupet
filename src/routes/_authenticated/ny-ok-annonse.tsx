@@ -9,7 +9,8 @@ import { z } from "zod";
 import { showErrorToast } from "@/lib/toast";
 import { AlertCircle, ChevronLeft, ChevronRight, Loader2, Check, Bell } from "lucide-react";
 
-import { useCategories } from "@/hooks/use-categories";
+import { useCategories, visibleCategories } from "@/hooks/use-categories";
+import { useIsDemo } from "@/hooks/use-is-demo";
 import { createWtbListing } from "@/lib/wtb-listings.functions";
 import { prefetchCategorySuggestion } from "@/lib/category-suggestion.functions";
 import { useCategorySuggestionLoadingMessage } from "@/features/listing-creation/use-category-suggestion-loading-message";
@@ -198,7 +199,12 @@ function NewWtbPage() {
     });
   }, [step, stepIndex]);
 
-  const { data: categories = [] } = useCategories();
+  const { data: allCategories = [] } = useCategories();
+  const { data: isDemo = false } = useIsDemo();
+  const categories = useMemo(
+    () => visibleCategories(allCategories, isDemo),
+    [allCategories, isDemo],
+  );
 
   const { data: allFilters } = useAllCategoryFilters();
   const categoriesById = useMemo(() => {

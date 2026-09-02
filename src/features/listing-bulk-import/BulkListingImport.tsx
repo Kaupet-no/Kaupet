@@ -1,9 +1,10 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 import {
+  Check,
   CheckCircle2,
-  ChevronDown,
+  ChevronsUpDown,
   Download,
   FileSpreadsheet,
   Loader2,
@@ -36,9 +37,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
-import { CategoryPicker } from "@/components/category-picker";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { buildTree, descendants, type Category } from "@/lib/categories";
+import { categoryBreadcrumb } from "@/lib/category-filters";
+import { cn } from "@/lib/utils";
 import { showErrorToast } from "@/lib/toast";
-import { useCategories } from "@/hooks/use-categories";
+import { useCategories, visibleCategories } from "@/hooks/use-categories";
+import { useIsDemo } from "@/hooks/use-is-demo";
 import { useAllCategoryFilters } from "@/hooks/use-category-filters";
 import { createListingsFromImport, type BulkImportResult } from "./listing-bulk-import.functions";
 import {
@@ -47,9 +60,6 @@ import {
   type ParsedBulkImport,
 } from "./parse-import-file";
 
-/** CategoryPicker sender denne id-en når «Ingen (toppnivå)» velges. */
-const PICKER_ROOT = "__none__";
-
 export function BulkListingImport({
   open,
   onOpenChange,
@@ -57,10 +67,22 @@ export function BulkListingImport({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { data: categories = [], isLoading: categoriesLoading } = useCategories();
+  const { data: allCategories = [], isLoading: categoriesLoading } = useCategories();
+  // Skjulte kategorier (bl.a. E2E-testkategorien) skal bare være plukkbare for
+  // demo-/admin-brukere — samme regel som annonseveiviseren og
+  // kategoribytte-dialogen.
+  const { data: isDemo = false } = useIsDemo();
+  const categories = useMemo(
+    () => visibleCategories(allCategories, isDemo),
+    [allCategories, isDemo],
+  );
   const { data: filters = [] } = useAllCategoryFilters();
   const [templateCategoryId, setTemplateCategoryId] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [categorySearch, setCategorySearch] = useState("");
+  // Popoveren må portaleres inn i selve overlay-noden, ellers drar
+  // dialogens fokusfelle fokus tilbake til knappen i stedet for søkefeltet.
+  const [overlayEl, setOverlayEl] = useState<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [parsed, setParsed] = useState<ParsedBulkImport | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -81,12 +103,45 @@ export function BulkListingImport({
     downloadBulkImportXlsxTemplate({ categories, filters, categoryId: templateCategoryId });
   };
 
-  const templateCategory = categories.find((category) => category.id === templateCategoryId);
-  const templateCategoryLabel = !templateCategory
+  /** Hele kategoritreet flatet ut i visningsrekkefølge (hovedkategori
+   * etterfulgt av sine underkategorier), slik at hele treet kan vises og
+   * søkes i som én liste i stedet for å bores gjennom nivå for nivå. */
+  const categoryOptions = useMemo(() => {
+    const tree = buildTree(categories);
+    const out: Array<{
+      category: Category;
+      depth: number;
+      breadcrumb: string;
+      parentLabel: string;
+      descendantCount: number;
+    }> = [];
+    const walk = (category: Category, depth: number) => {
+      out.push({
+        category,
+        depth,
+        breadcrumb: categoryBreadcrumb(category.id, tree.byId),
+        parentLabel: categoryBreadcrumb(category.parent_id, tree.byId),
+        descendantCount: descendants(category, tree).length,
+      });
+      for (const child of tree.childrenByParent.get(category.id) ?? []) walk(child, depth + 1);
+    };
+    for (const root of tree.roots) walk(root, 0);
+    return out;
+  }, [categories]);
+
+  const query = categorySearch.trim().toLowerCase();
+  const matchingOptions = query
+    ? categoryOptions.filter((option) => option.category.name_nb.toLowerCase().includes(query))
+    : categoryOptions;
+
+  const selectedOption = categoryOptions.find(
+    (option) => option.category.id === templateCategoryId,
+  );
+  const templateCategoryLabel = !selectedOption
     ? "Alle kategorier"
-    : categories.some((category) => category.parent_id === templateCategory.id)
-      ? `${templateCategory.name_nb} (alle underkategorier)`
-      : templateCategory.name_nb;
+    : selectedOption.descendantCount > 0
+      ? `${selectedOption.breadcrumb} (alle underkategorier)`
+      : selectedOption.breadcrumb;
 
   const invalidRowNumbers = new Set(parsed?.errors.map((error) => error.rowNumber) ?? []);
   const reset = () => {
@@ -136,8 +191,16 @@ export function BulkListingImport({
   const pending = createImport.isPending;
   return (
     <ResponsiveOverlay open={open} onOpenChange={(next) => !pending && onOpenChange(next)}>
-      <ResponsiveOverlayContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
-        <div className="space-y-6">
+      {/* På desktop flyttes rullingen fra dialogruten til den indre div-en:
+          kategori-popoveren portaleres inn i dialognoden, og `overflow-y-auto`
+          der klipper den så snart listen strekker seg forbi dialogens kant.
+          Bunn-sheeten på telefon beholder rullingen der vaul forventer den
+          (se sheet.tsx), og trenger ingen egen høydebegrensning. */}
+      <ResponsiveOverlayContent
+        ref={setOverlayEl}
+        className="max-h-[90vh] overflow-y-auto sm:max-w-4xl sm:overflow-y-visible"
+      >
+        <div className="space-y-6 sm:max-h-[calc(90vh-3rem)] sm:overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileSpreadsheet className="size-5 text-primary" />
@@ -153,72 +216,152 @@ export function BulkListingImport({
               <Alert>
                 <AlertTitle>Filformat</AlertTitle>
                 <AlertDescription>
-                  Velg en kategori for å få en mal med ferdige kolonner og nedtrekksmenyer for
-                  akkurat de feltene kategorien trenger. Obligatoriske kolonner:{" "}
-                  <code>external_id</code>, <code>category</code>, <code>title</code>,{" "}
-                  <code>description</code> og <code>price</code>. Bruk <code>external_id</code> som
-                  bedriftens egen stabile referanse, for eksempel varenummer, SKU eller lager-ID.
-                  Verdien må være unik i filen. Pris er hele kroner i NOK. Én annonse per rad; maks
-                  500 rader og 5 MB. Bilder importeres ikke, og bilde-URL-er støttes ikke.
+                  Obligatoriske kolonner: <code>external_id</code>, <code>category</code>,{" "}
+                  <code>title</code>, <code>description</code> og <code>price</code>. Bruk{" "}
+                  <code>external_id</code> som bedriftens egen stabile referanse, for eksempel
+                  varenummer, SKU eller lager-ID. Verdien må være unik i filen. Pris er hele kroner
+                  i NOK. Én annonse per rad; maks 500 rader og 5 MB. Bilder importeres ikke, og
+                  bilde-URL-er støttes ikke.
                 </AlertDescription>
               </Alert>
-              <div className="flex flex-wrap items-end gap-3">
-                <div className="min-w-56 flex-1 space-y-2">
+              <div className="space-y-3">
+                <div className="max-w-md space-y-2">
                   <Label id="template-category-label">Mal for kategori</Label>
-                  <CategoryPicker
+                  <Popover
                     open={pickerOpen}
-                    onOpenChange={setPickerOpen}
-                    categories={categories}
-                    selectedId={templateCategoryId ?? ""}
-                    allowSelectAny
-                    onSelect={(categoryId) =>
-                      setTemplateCategoryId(categoryId === PICKER_ROOT ? null : categoryId)
-                    }
-                    trigger={
+                    onOpenChange={(next) => {
+                      setPickerOpen(next);
+                      if (!next) setCategorySearch("");
+                    }}
+                  >
+                    <PopoverTrigger asChild>
                       <Button
                         type="button"
                         variant="outline"
+                        role="combobox"
+                        aria-expanded={pickerOpen}
                         aria-labelledby="template-category-label"
                         className="w-full justify-between font-normal"
-                        onClick={() => setPickerOpen(true)}
                         disabled={categoriesLoading}
                       >
-                        {templateCategoryLabel}
-                        <ChevronDown className="size-4 opacity-60" />
+                        <span className="truncate">{templateCategoryLabel}</span>
+                        <ChevronsUpDown className="size-4 opacity-60" />
                       </Button>
-                    }
-                  />
+                    </PopoverTrigger>
+                    <PopoverContent
+                      container={overlayEl}
+                      align="start"
+                      collisionPadding={16}
+                      className="w-(--radix-popover-trigger-width) p-0"
+                    >
+                      <Command shouldFilter={false}>
+                        <CommandInput
+                          placeholder="Søk i kategorier …"
+                          value={categorySearch}
+                          onValueChange={setCategorySearch}
+                        />
+                        <CommandList>
+                          <CommandEmpty>Ingen kategorier funnet</CommandEmpty>
+                          <CommandGroup>
+                            {!query && (
+                              <CommandItem
+                                value="__all__"
+                                onSelect={() => {
+                                  setTemplateCategoryId(null);
+                                  setPickerOpen(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "size-4 shrink-0",
+                                    templateCategoryId ? "opacity-0" : "opacity-100",
+                                  )}
+                                />
+                                <span className="flex flex-col">
+                                  <span className="font-medium">Alle kategorier</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    Mal med alle felles kolonner
+                                  </span>
+                                </span>
+                              </CommandItem>
+                            )}
+                            {matchingOptions.map((option) => (
+                              <CommandItem
+                                key={option.category.id}
+                                value={option.category.id}
+                                onSelect={() => {
+                                  setTemplateCategoryId(option.category.id);
+                                  setPickerOpen(false);
+                                }}
+                                style={
+                                  query
+                                    ? undefined
+                                    : { paddingLeft: `calc(0.5rem + ${option.depth} * 0.875rem)` }
+                                }
+                              >
+                                <Check
+                                  className={cn(
+                                    "size-4 shrink-0",
+                                    templateCategoryId === option.category.id
+                                      ? "opacity-100"
+                                      : "opacity-0",
+                                  )}
+                                />
+                                <span className="min-w-0 flex-1 truncate">
+                                  {query && option.parentLabel && (
+                                    <span className="text-muted-foreground">
+                                      {option.parentLabel} ›{" "}
+                                    </span>
+                                  )}
+                                  <span className={option.depth === 0 ? "font-medium" : undefined}>
+                                    {option.category.name_nb}
+                                  </span>
+                                </span>
+                                {option.descendantCount > 0 && (
+                                  <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                                    {option.descendantCount} underkategorier
+                                  </span>
+                                )}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                   <p className="text-xs text-muted-foreground">
-                    Velg en hovedkategori for å få med alle underkategoriene dens, eller en
-                    underkategori for en smalere mal.
+                    Malen får kolonner og nedtrekksmenyer for feltene kategorien bruker. En
+                    hovedkategori tar med alle underkategoriene sine.
                   </p>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => void downloadTemplate()}
-                  disabled={categoriesLoading}
-                >
-                  <Download className="size-4" />
-                  Last ned Excel-mal
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={pending}
-                >
-                  <Upload className="size-4" />
-                  Velg fil
-                </Button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                  className="sr-only"
-                  aria-label="Velg importfil"
-                  onChange={(event) => void selectFile(event.target.files?.[0])}
-                />
+                <div className="flex flex-wrap gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void downloadTemplate()}
+                    disabled={categoriesLoading}
+                  >
+                    <Download className="size-4" />
+                    Last ned Excel-mal
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={pending}
+                  >
+                    <Upload className="size-4" />
+                    Velg fil
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    className="sr-only"
+                    aria-label="Velg importfil"
+                    onChange={(event) => void selectFile(event.target.files?.[0])}
+                  />
+                </div>
               </div>
               {fileError && (
                 <Alert variant="destructive">

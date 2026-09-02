@@ -41,7 +41,12 @@ export function ResponsiveOverlayContent({
   onCloseAutoFocus,
   ...props
 }: React.ComponentPropsWithoutRef<typeof DialogContent> &
-  Pick<SheetContentProps, "expandable" | "initialSnapPoint">) {
+  Pick<SheetContentProps, "expandable" | "initialSnapPoint"> & {
+    /** Videresendes til Dialog-/Sheet-innholdet, slik at kall som må
+     * portalere inn i overlayet (f.eks. en Popover som ellers havner
+     * utenfor dialogens fokusfelle) får tak i noden. */
+    ref?: React.Ref<HTMLDivElement>;
+  }) {
   const phone = useFormFactor() === "phone";
   const returnFocusRef = React.useRef<HTMLElement | null>(null);
   const focusProps = {

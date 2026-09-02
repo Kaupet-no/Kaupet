@@ -122,7 +122,7 @@ function Price({ plan }: { plan: BusinessPlan }) {
         {config.monthlyPriceNok === 0 ? "Gratis" : "1 490 kr"}
       </span>
       {config.monthlyPriceNok > 0 && (
-        <span className="pb-1 text-xs text-muted-foreground">/ måned</span>
+        <span className="pb-1 text-xs text-muted-foreground">/ måned eks. mva</span>
       )}
     </div>
   );

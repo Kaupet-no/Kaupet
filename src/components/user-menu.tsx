@@ -29,7 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { NewListingDialog } from "@/components/new-listing-dialog";
 import {
-  isActiveBusinessSuperuser,
+  isActiveBusinessMember,
   useBusinessMembership,
 } from "@/features/business-account/use-business-membership";
 import {
@@ -142,7 +142,7 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
             <User className="size-4" /> Min profil
           </Link>
         </DropdownMenuItem>
-        {isActiveBusinessSuperuser(businessMembership) && (
+        {isActiveBusinessMember(businessMembership) && (
           <DropdownMenuItem asChild>
             <Link to="/bedrift" search={{ tab: "oversikt" }} className="cursor-pointer">
               <Building2 className="size-4" /> Bedriftskonsoll

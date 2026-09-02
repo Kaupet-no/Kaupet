@@ -71,7 +71,9 @@ export function BusinessProfileForm({ organization }: Props) {
       if (displayName.length < 2 || displayName.length > 120) {
         throw new Error("Visningsnavnet må være mellom 2 og 120 tegn.");
       }
-      if (postalCode && !/^\d{4}$/u.test(postalCode)) {
+      // Adressen er lokasjonen på hver annonse fra bedriften, så den kan ikke
+      // stå tom lenger.
+      if (!/^\d{4}$/u.test(postalCode)) {
         throw new Error("Postnummer må være fire siffer.");
       }
       if (city.length < 1 || city.length > 100) {
@@ -99,7 +101,7 @@ export function BusinessProfileForm({ organization }: Props) {
       const updated = await callUpdate({
         data: {
           displayName,
-          postalCode: postalCode || null,
+          postalCode,
           city,
           ...(canBrand
             ? {
@@ -164,10 +166,18 @@ export function BusinessProfileForm({ organization }: Props) {
             2–120 tegn. Juridisk navn og organisasjonsnummer kan ikke endres.
           </p>
         </div>
+        <div className="space-y-2 sm:col-span-2">
+          <h3 className="font-semibold">Bedriftsadresse</h3>
+          <p className="text-sm text-muted-foreground">
+            Alle annonser fra bedriften bruker denne adressen som lokasjon — den settes ikke per
+            annonse. Den er hentet fra Brønnøysundregistrene ved registrering, og kan endres her.
+          </p>
+        </div>
         <div className="space-y-2">
-          <Label htmlFor="business-postal-code">Postnummer (valgfritt)</Label>
+          <Label htmlFor="business-postal-code">Postnummer</Label>
           <Input
             id="business-postal-code"
+            required
             inputMode="numeric"
             maxLength={4}
             value={form.postalCode}
@@ -175,7 +185,7 @@ export function BusinessProfileForm({ organization }: Props) {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="business-city">By</Label>
+          <Label htmlFor="business-city">Sted</Label>
           <Input
             id="business-city"
             required

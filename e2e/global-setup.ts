@@ -36,6 +36,7 @@ export default async function globalSetup() {
   const runId = Date.now();
   const password = "e2e-test-password-12345";
   const userIds: string[] = [];
+  let businessOrganizationId: string | null = null;
 
   async function createTestUser(suffix: string, displayName: string, needsDemoRole = false) {
     const email = `e2e-${runId}-${suffix}@example.com`;
@@ -69,6 +70,27 @@ export default async function globalSetup() {
     for (const project of PUBLISH_PROJECTS) {
       users[project] = await createTestUser(project, `E2E Test ${project}`, true);
     }
+    const desktopUser = users["desktop-web"];
+    const { data: businessOrganization, error: businessOrganizationError } = await admin
+      .from("organizations")
+      .insert({
+        organization_number: `9${String(runId).slice(-8)}`,
+        legal_name: "E2E Proff AS",
+        display_name: "E2E Proff",
+        selected_plan: "proff",
+        proff_access_until: new Date(Date.now() + 86_400_000).toISOString(),
+      })
+      .select("id")
+      .single();
+    if (businessOrganizationError) throw businessOrganizationError;
+    businessOrganizationId = businessOrganization.id;
+    const { error: businessMemberError } = await admin.from("organization_members").insert({
+      organization_id: businessOrganization.id,
+      user_id: desktopUser.userId,
+      role: "superuser",
+      status: "active",
+    });
+    if (businessMemberError) throw businessMemberError;
 
     const { data: category, error: categoryError } = await admin
       .from("categories")
@@ -147,10 +169,14 @@ export default async function globalSetup() {
       JSON.stringify({
         users,
         userIds,
+        businessOrganizationId,
         filterFixture: { query: FILTER_FIXTURE_QUERY, total: 3, paid: 2 },
       }),
     );
   } catch (setupError) {
+    if (businessOrganizationId) {
+      await admin.from("organizations").delete().eq("id", businessOrganizationId);
+    }
     for (const userId of userIds) await admin.auth.admin.deleteUser(userId);
     throw setupError;
   }

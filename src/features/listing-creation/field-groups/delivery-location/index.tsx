@@ -6,6 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 
+import {
+  useBusinessMembership,
+  type BusinessOrganization,
+} from "@/features/business-account/use-business-membership";
+
 import type { WizardSharedProps } from "../types";
 import { RequiredMark } from "../required-mark";
 
@@ -274,6 +279,36 @@ export function DeliveryGroup(props: WizardSharedProps) {
   return <DeliveryLocation {...props} showLocation={false} />;
 }
 
+/**
+ * Bedriftsannonser bruker bedriftsadressen som lokasjon — den settes ikke per
+ * annonse. Serveren overstyrer uansett `postal_code`/`city` for annonser som
+ * eies av en organisasjon (se `listings.functions.ts`); her slipper brukeren
+ * å fylle ut et felt som likevel forkastes.
+ */
+function OrganizationLocationNote({ organization }: { organization: BusinessOrganization }) {
+  const address = [organization.postal_code, organization.city].filter(Boolean).join(" ");
+  return (
+    <section className="space-y-2">
+      <Label>Sted</Label>
+      <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/40 p-4">
+        <MapPin className="mt-0.5 size-5 shrink-0 text-primary" />
+        <div className="text-sm">
+          <p className="font-medium">{address || "Bedriftsadressen mangler"}</p>
+          <p className="mt-1 text-muted-foreground">
+            {address
+              ? "Annonsen bruker bedriftsadressen. En superbruker kan endre den i bedriftskonsollet."
+              : "Legg inn postnummer og sted på bedriften i bedriftskonsollet, så får annonsene riktig lokasjon."}
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function LocationGroup(props: WizardSharedProps) {
+  const { data: membership } = useBusinessMembership();
+  if (membership?.status === "active") {
+    return <OrganizationLocationNote organization={membership.organization} />;
+  }
   return <DeliveryLocation {...props} showDelivery={false} />;
 }

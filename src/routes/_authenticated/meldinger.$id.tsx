@@ -33,10 +33,7 @@ import { ConversationErrorBoundary } from "@/components/meldinger/conversation-e
 import { Skeleton } from "@/components/ui/skeleton";
 import { renderWithDayDividers, type Message } from "@/components/meldinger/message-list";
 import { SalePanel } from "@/components/meldinger/sale-panel";
-import {
-  isActiveBusinessSuperuser,
-  useBusinessMembership,
-} from "@/features/business-account/use-business-membership";
+import { useBusinessMembership } from "@/features/business-account/use-business-membership";
 import { TradeSafetyAdvice } from "@/components/trade-safety-advice";
 
 export const Route = createFileRoute("/_authenticated/meldinger/$id")({
@@ -60,7 +57,9 @@ export const Route = createFileRoute("/_authenticated/meldinger/$id")({
 
 function ConversationPage() {
   const { data: businessMembership } = useBusinessMembership();
-  const isBusinessSuperuser = isActiveBusinessSuperuser(businessMembership);
+  const isBusinessSuperuser =
+    businessMembership?.status === "active" &&
+    (businessMembership.role === "superuser" || businessMembership.chat_access === "all");
   const native = useIsNative();
   const isTablet = useFormFactor() === "tablet";
   const keyboardVisible = useKeyboardVisible();

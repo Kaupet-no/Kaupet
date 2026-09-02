@@ -15,6 +15,28 @@ export type BusinessPlanConfig = {
   features: readonly BusinessPlanFeature[];
 };
 
+/** Billing period a business can order Proff for. Prices are ex. VAT. */
+export type ProffTerm = "monthly" | "yearly";
+
+export type ProffTermConfig = {
+  id: ProffTerm;
+  months: number;
+  /** Total price for the whole term, ex. VAT. Hardcoded so price changes never yield fractional kroner. */
+  priceExVatNok: number;
+  discountPct: number;
+};
+
+export const PROFF_TERMS = {
+  monthly: { id: "monthly", months: 1, priceExVatNok: 1490, discountPct: 0 },
+  yearly: { id: "yearly", months: 12, priceExVatNok: 16092, discountPct: 10 },
+} as const satisfies Record<ProffTerm, ProffTermConfig>;
+
+/** What the term costs per month, ex. VAT — the number used to compare terms. */
+export function proffTermMonthlyExVatNok(term: ProffTerm): number {
+  const config = PROFF_TERMS[term];
+  return Math.round(config.priceExVatNok / config.months);
+}
+
 const sharedFeatures = [
   { label: "Opprette ubegrenset antall annonser i alle kategorier", included: true },
   { label: "Sende og motta meldinger", included: true },

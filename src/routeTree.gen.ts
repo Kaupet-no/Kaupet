@@ -41,6 +41,7 @@ import { Route as AuthenticatedAdminBrukereRouteImport } from './routes/_authent
 import { Route as AuthenticatedAdminKategorierRouteImport } from './routes/_authenticated/admin/kategorier'
 import { Route as AuthenticatedAdminKjoretoyRouteImport } from './routes/_authenticated/admin/kjoretoy'
 import { Route as AuthenticatedAdminModerasjonRouteImport } from './routes/_authenticated/admin/moderasjon'
+import { Route as AuthenticatedAdminProffAbonnementRouteImport } from './routes/_authenticated/admin/proff-abonnement'
 import { Route as AuthenticatedAdminPromoteringerRouteImport } from './routes/_authenticated/admin/promoteringer'
 import { Route as AuthenticatedAdminTilbakemeldingerRouteImport } from './routes/_authenticated/admin/tilbakemeldinger'
 import { Route as AuthenticatedAdminVippsWebhooksRouteImport } from './routes/_authenticated/admin/vipps-webhooks'
@@ -219,6 +220,12 @@ const AuthenticatedAdminModerasjonRoute =
     path: '/moderasjon',
     getParentRoute: () => AuthenticatedAdminRouteRoute,
   } as any)
+const AuthenticatedAdminProffAbonnementRoute =
+  AuthenticatedAdminProffAbonnementRouteImport.update({
+    id: '/proff-abonnement',
+    path: '/proff-abonnement',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
 const AuthenticatedAdminPromoteringerRoute =
   AuthenticatedAdminPromoteringerRouteImport.update({
     id: '/promoteringer',
@@ -321,6 +328,7 @@ export interface FileRoutesByFullPath {
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/admin/kjoretoy': typeof AuthenticatedAdminKjoretoyRoute
   '/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
+  '/admin/proff-abonnement': typeof AuthenticatedAdminProffAbonnementRoute
   '/admin/promoteringer': typeof AuthenticatedAdminPromoteringerRoute
   '/admin/tilbakemeldinger': typeof AuthenticatedAdminTilbakemeldingerRoute
   '/admin/vipps-webhooks': typeof AuthenticatedAdminVippsWebhooksRoute
@@ -364,6 +372,7 @@ export interface FileRoutesByTo {
   '/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/admin/kjoretoy': typeof AuthenticatedAdminKjoretoyRoute
   '/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
+  '/admin/proff-abonnement': typeof AuthenticatedAdminProffAbonnementRoute
   '/admin/promoteringer': typeof AuthenticatedAdminPromoteringerRoute
   '/admin/tilbakemeldinger': typeof AuthenticatedAdminTilbakemeldingerRoute
   '/admin/vipps-webhooks': typeof AuthenticatedAdminVippsWebhooksRoute
@@ -411,6 +420,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/kategorier': typeof AuthenticatedAdminKategorierRoute
   '/_authenticated/admin/kjoretoy': typeof AuthenticatedAdminKjoretoyRoute
   '/_authenticated/admin/moderasjon': typeof AuthenticatedAdminModerasjonRoute
+  '/_authenticated/admin/proff-abonnement': typeof AuthenticatedAdminProffAbonnementRoute
   '/_authenticated/admin/promoteringer': typeof AuthenticatedAdminPromoteringerRoute
   '/_authenticated/admin/tilbakemeldinger': typeof AuthenticatedAdminTilbakemeldingerRoute
   '/_authenticated/admin/vipps-webhooks': typeof AuthenticatedAdminVippsWebhooksRoute
@@ -458,6 +468,7 @@ export interface FileRouteTypes {
     | '/admin/kategorier'
     | '/admin/kjoretoy'
     | '/admin/moderasjon'
+    | '/admin/proff-abonnement'
     | '/admin/promoteringer'
     | '/admin/tilbakemeldinger'
     | '/admin/vipps-webhooks'
@@ -501,6 +512,7 @@ export interface FileRouteTypes {
     | '/admin/kategorier'
     | '/admin/kjoretoy'
     | '/admin/moderasjon'
+    | '/admin/proff-abonnement'
     | '/admin/promoteringer'
     | '/admin/tilbakemeldinger'
     | '/admin/vipps-webhooks'
@@ -547,6 +559,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/kategorier'
     | '/_authenticated/admin/kjoretoy'
     | '/_authenticated/admin/moderasjon'
+    | '/_authenticated/admin/proff-abonnement'
     | '/_authenticated/admin/promoteringer'
     | '/_authenticated/admin/tilbakemeldinger'
     | '/_authenticated/admin/vipps-webhooks'
@@ -811,6 +824,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminModerasjonRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
+    '/_authenticated/admin/proff-abonnement': {
+      id: '/_authenticated/admin/proff-abonnement'
+      path: '/proff-abonnement'
+      fullPath: '/admin/proff-abonnement'
+      preLoaderRoute: typeof AuthenticatedAdminProffAbonnementRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
     '/_authenticated/admin/promoteringer': {
       id: '/_authenticated/admin/promoteringer'
       path: '/promoteringer'
@@ -903,6 +923,7 @@ interface AuthenticatedAdminRouteRouteChildren {
   AuthenticatedAdminKategorierRoute: typeof AuthenticatedAdminKategorierRoute
   AuthenticatedAdminKjoretoyRoute: typeof AuthenticatedAdminKjoretoyRoute
   AuthenticatedAdminModerasjonRoute: typeof AuthenticatedAdminModerasjonRoute
+  AuthenticatedAdminProffAbonnementRoute: typeof AuthenticatedAdminProffAbonnementRoute
   AuthenticatedAdminPromoteringerRoute: typeof AuthenticatedAdminPromoteringerRoute
   AuthenticatedAdminTilbakemeldingerRoute: typeof AuthenticatedAdminTilbakemeldingerRoute
   AuthenticatedAdminVippsWebhooksRoute: typeof AuthenticatedAdminVippsWebhooksRoute
@@ -915,6 +936,8 @@ const AuthenticatedAdminRouteRouteChildren: AuthenticatedAdminRouteRouteChildren
     AuthenticatedAdminKategorierRoute: AuthenticatedAdminKategorierRoute,
     AuthenticatedAdminKjoretoyRoute: AuthenticatedAdminKjoretoyRoute,
     AuthenticatedAdminModerasjonRoute: AuthenticatedAdminModerasjonRoute,
+    AuthenticatedAdminProffAbonnementRoute:
+      AuthenticatedAdminProffAbonnementRoute,
     AuthenticatedAdminPromoteringerRoute: AuthenticatedAdminPromoteringerRoute,
     AuthenticatedAdminTilbakemeldingerRoute:
       AuthenticatedAdminTilbakemeldingerRoute,

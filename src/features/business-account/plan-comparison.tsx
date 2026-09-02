@@ -1,4 +1,5 @@
-import { useMutation } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Check, Loader2 } from "lucide-react";
 
@@ -6,16 +7,22 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { formatErrorMessage } from "@/lib/errors";
-import { setBusinessPlan } from "@/lib/business.functions";
+import { getOpenProffOrder, setBusinessPlan } from "@/lib/business.functions";
 import { BusinessPlanLogo } from "./business-plan-logo";
+import { ProffOrderDialog } from "./proff-order-dialog";
+import { formatProffTermMonthlyEquivalent, formatProffTermPrice } from "./proff-pricing";
 import {
   BUSINESS_PLANS,
+  PROFF_TERMS,
   hasEffectiveProffAccess,
   type BusinessOrganizationEntitlement,
   type BusinessPlan,
   type BusinessPlanConfig,
   type BusinessPlanFeature,
+  type ProffTerm,
 } from "./plans";
 
 export type PlanComparisonOrganization = BusinessOrganizationEntitlement & {
@@ -32,9 +39,9 @@ export type PlanComparisonProps = {
 
 const planOrder: BusinessPlan[] = ["proff_basis", "proff"];
 
-function formatPrice(price: number) {
-  if (price === 0) return "Gratis – alltid";
-  return `${new Intl.NumberFormat("nb-NO").format(price)} kr per måned`;
+function formatPrice(config: BusinessPlanConfig, term: ProffTerm) {
+  if (config.monthlyPriceNok === 0) return "Gratis – alltid";
+  return formatProffTermPrice(term);
 }
 
 function hasUsedTrial(organization: PlanComparisonOrganization | null | undefined) {
@@ -56,16 +63,21 @@ function FeatureStatus({ feature }: { feature: BusinessPlanFeature }) {
   );
 }
 
+type PlanAction = { label: string; disabled: boolean; order?: boolean };
+
 function planAction(
   plan: BusinessPlan,
   organization: PlanComparisonOrganization | null | undefined,
-) {
-  if (organization?.selected_plan === plan) {
-    return { label: "Valgt", disabled: true };
+  hasOpenOrder: boolean,
+): PlanAction {
+  if (plan === "proff" && hasUsedTrial(organization) && !hasEffectiveProffAccess(organization)) {
+    return hasOpenOrder
+      ? { label: "Bestilling mottatt", disabled: true }
+      : { label: "Bestill Proff", disabled: false, order: true };
   }
 
-  if (plan === "proff" && hasUsedTrial(organization) && !hasEffectiveProffAccess(organization)) {
-    return { label: "Prøveperioden er brukt", disabled: true };
+  if (organization?.selected_plan === plan) {
+    return { label: "Valgt", disabled: true };
   }
 
   return {
@@ -74,17 +86,21 @@ function planAction(
   };
 }
 
-function PlanHeading({ config }: { config: BusinessPlanConfig }) {
+function PlanHeading({ config, term }: { config: BusinessPlanConfig; term: ProffTerm }) {
+  const monthlyEquivalent =
+    config.monthlyPriceNok > 0 ? formatProffTermMonthlyEquivalent(term) : null;
   return (
     <div className="space-y-6">
       <h3 className="sr-only">{config.name}</h3>
       <BusinessPlanLogo plan={config.id} />
       <div className="space-y-2 border-t border-border pt-6">
         <p className="font-display text-3xl tracking-tight tabular-nums">
-          {formatPrice(config.monthlyPriceNok)}
+          {formatPrice(config, term)}
         </p>
         <p className="min-h-10 text-sm text-muted-foreground">
-          {config.trialText ?? <span aria-hidden="true">&nbsp;</span>}
+          {[monthlyEquivalent, config.trialText].filter(Boolean).join(" · ") || (
+            <span aria-hidden="true">&nbsp;</span>
+          )}
         </p>
       </div>
     </div>
@@ -96,7 +112,17 @@ export function PlanComparison({
   onSuccess,
   showSelection = true,
 }: PlanComparisonProps) {
+  const [term, setTerm] = useState<ProffTerm>("monthly");
+  const [orderOpen, setOrderOpen] = useState(false);
   const selectPlan = useServerFn(setBusinessPlan);
+  const fetchOpenOrder = useServerFn(getOpenProffOrder);
+  const openOrderQuery = useQuery({
+    queryKey: ["proff-open-order"],
+    queryFn: () => fetchOpenOrder(),
+    enabled: showSelection,
+    staleTime: 30_000,
+  });
+  const openOrder = openOrderQuery.data?.order ?? null;
   const mutation = useMutation({
     mutationFn: (plan: BusinessPlan) => selectPlan({ data: { plan } }),
     onSuccess: (_result, plan) => onSuccess?.(plan),
@@ -109,6 +135,10 @@ export function PlanComparison({
 
   function choosePlan(plan: BusinessPlan) {
     if (mutation.isPending) return;
+    if (planAction(plan, organization, openOrder !== null).order) {
+      setOrderOpen(true);
+      return;
+    }
     mutation.reset();
     mutation.mutate(plan);
   }
@@ -126,10 +156,39 @@ export function PlanComparison({
         </p>
       )}
 
-      {trialUsed && (
+      <fieldset className="space-y-3">
+        <legend className="text-sm font-medium">Betalingsperiode for Proff</legend>
+        <RadioGroup
+          className="flex flex-wrap gap-4"
+          value={term}
+          onValueChange={(value) => setTerm(value as ProffTerm)}
+        >
+          <div className="flex items-center gap-2">
+            <RadioGroupItem value="monthly" id="proff-term-monthly" />
+            <Label htmlFor="proff-term-monthly">Månedlig</Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <RadioGroupItem value="yearly" id="proff-term-yearly" />
+            <Label htmlFor="proff-term-yearly" className="flex items-center gap-2">
+              Årlig
+              <Badge variant="secondary">Spar {PROFF_TERMS.yearly.discountPct} %</Badge>
+            </Label>
+          </div>
+        </RadioGroup>
+      </fieldset>
+
+      {openOrder && (
         <Alert role="status">
           <AlertDescription>
-            Prøveperioden er brukt. Proff kan aktiveres når betalingsløsningen er på plass.
+            Bestillingen er mottatt. Fakturaen sendes til {openOrder.billing_email}, og Proff
+            aktiveres når betalingen er registrert.
+          </AlertDescription>
+        </Alert>
+      )}
+      {trialUsed && !openOrder && (
+        <Alert role="status">
+          <AlertDescription>
+            Prøveperioden er brukt. Bestill Proff for å fortsette med de betalte funksjonene.
           </AlertDescription>
         </Alert>
       )}
@@ -149,13 +208,22 @@ export function PlanComparison({
           <PlanCard
             key={plan}
             plan={plan}
+            term={term}
             organization={organization}
+            hasOpenOrder={openOrder !== null}
             isPending={mutation.isPending}
             showSelection={showSelection}
             onChoose={choosePlan}
           />
         ))}
       </div>
+
+      <ProffOrderDialog
+        open={orderOpen}
+        onOpenChange={setOrderOpen}
+        term={term}
+        onOrdered={() => openOrderQuery.refetch()}
+      />
     </section>
   );
 }
@@ -163,15 +231,17 @@ export function PlanComparison({
 function PlanButton({
   plan,
   organization,
+  hasOpenOrder,
   isPending,
   onChoose,
 }: {
   plan: BusinessPlan;
   organization: PlanComparisonOrganization | null | undefined;
+  hasOpenOrder: boolean;
   isPending: boolean;
   onChoose: (plan: BusinessPlan) => void;
 }) {
-  const action = planAction(plan, organization);
+  const action = planAction(plan, organization, hasOpenOrder);
   return (
     <Button
       type="button"
@@ -189,13 +259,17 @@ function PlanButton({
 
 function PlanCard({
   plan,
+  term,
   organization,
+  hasOpenOrder,
   isPending,
   showSelection,
   onChoose,
 }: {
   plan: BusinessPlan;
+  term: ProffTerm;
   organization: PlanComparisonOrganization | null | undefined;
+  hasOpenOrder: boolean;
   isPending: boolean;
   showSelection: boolean;
   onChoose: (plan: BusinessPlan) => void;
@@ -214,13 +288,14 @@ function PlanCard({
       {isProff && <div className="h-1 bg-brand" aria-hidden="true" />}
       <CardHeader className="p-6 sm:p-8">
         <div className="flex items-start justify-between gap-4">
-          <PlanHeading config={config} />
+          <PlanHeading config={config} term={term} />
           {isSelected && <Badge variant="secondary">Valgt</Badge>}
         </div>
         {showSelection && (
           <PlanButton
             plan={plan}
             organization={organization}
+            hasOpenOrder={hasOpenOrder}
             isPending={isPending}
             onChoose={onChoose}
           />

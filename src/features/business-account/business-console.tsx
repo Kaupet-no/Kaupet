@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -35,12 +36,16 @@ import { BusinessMessagesPanel } from "@/features/business-account/business-mess
 import { BusinessProfileForm } from "@/features/business-account/business-profile-form";
 import { MemberManagement } from "@/features/business-account/member-management";
 import { setBusinessPlan } from "@/lib/business.functions";
+import { BulkListingImport } from "@/features/listing-bulk-import/BulkListingImport";
 
 export type BusinessTab = "oversikt" | "annonser" | "meldinger" | "bedriftsprofil" | "brukere";
 
 type Props = {
   organization: BusinessOrganization;
   userId: string;
+  role: "superuser" | "member";
+  listingAccess: "own" | "all";
+  listingEditScope: "none" | "own" | "all";
   tab: BusinessTab;
   onTabChange: (tab: BusinessTab) => void;
 };
@@ -53,7 +58,16 @@ const TAB_LABELS: Record<BusinessTab, string> = {
   brukere: "Brukere",
 };
 
-export function BusinessConsole({ organization, userId, tab, onTabChange }: Props) {
+export function BusinessConsole({
+  organization,
+  userId,
+  role,
+  listingAccess,
+  listingEditScope,
+  tab,
+  onTabChange,
+}: Props) {
+  const [importOpen, setImportOpen] = useState(false);
   const queryClient = useQueryClient();
   const effectiveProff = hasEffectiveProffAccess(organization);
   const callSetPlan = useServerFn(setBusinessPlan);
@@ -98,7 +112,7 @@ export function BusinessConsole({ organization, userId, tab, onTabChange }: Prop
       </div>
 
       <Tabs
-        value={!effectiveProff && tab === "brukere" ? "oversikt" : tab}
+        value={(!effectiveProff || role !== "superuser") && tab === "brukere" ? "oversikt" : tab}
         onValueChange={(value) => onTabChange(value as BusinessTab)}
       >
         <TabsList
@@ -106,7 +120,7 @@ export function BusinessConsole({ organization, userId, tab, onTabChange }: Prop
           aria-label="Bedriftskonsoll"
         >
           {(Object.keys(TAB_LABELS) as BusinessTab[])
-            .filter((value) => value !== "brukere" || effectiveProff)
+            .filter((value) => value !== "brukere" || (effectiveProff && role === "superuser"))
             .map((value) => (
               <TabsTrigger key={value} value={value} className="min-h-9">
                 {TAB_LABELS[value]}
@@ -126,10 +140,18 @@ export function BusinessConsole({ organization, userId, tab, onTabChange }: Prop
             planMutationSuccess={planMutation.isSuccess}
             onCancelTrial={() => planMutation.mutate()}
             onNavigate={onTabChange}
+            canManageMembers={role === "superuser"}
           />
         </TabsContent>
         <TabsContent value="annonser" className="mt-6">
-          <BusinessListingsPanel organization={organization} />
+          <BusinessListingsPanel
+            organization={organization}
+            userId={userId}
+            listingAccess={listingAccess}
+            listingEditScope={listingEditScope}
+            canCreateListings={role === "superuser" || (effectiveProff && role === "member")}
+            onImport={() => setImportOpen(true)}
+          />
         </TabsContent>
         <TabsContent value="meldinger" className="mt-6">
           <BusinessMessagesPanel organization={organization} />
@@ -138,9 +160,10 @@ export function BusinessConsole({ organization, userId, tab, onTabChange }: Prop
           <BusinessProfileForm organization={organization} />
         </TabsContent>
         <TabsContent value="brukere" className="mt-6">
-          <MemberManagement organization={organization} userId={userId} />
+          <MemberManagement organization={organization} userId={userId} role={role} />
         </TabsContent>
       </Tabs>
+      {effectiveProff && <BulkListingImport open={importOpen} onOpenChange={setImportOpen} />}
     </div>
   );
 }
@@ -156,6 +179,7 @@ function Overview({
   planMutationSuccess,
   onCancelTrial,
   onNavigate,
+  canManageMembers,
 }: {
   organization: BusinessOrganization;
   planName: string;
@@ -167,6 +191,7 @@ function Overview({
   planMutationSuccess: boolean;
   onCancelTrial: () => void;
   onNavigate: (tab: BusinessTab) => void;
+  canManageMembers: boolean;
 }) {
   const trialEnd = organization.proff_trial_ends_at
     ? new Intl.DateTimeFormat("nb-NO", { dateStyle: "long" }).format(
@@ -294,7 +319,7 @@ function Overview({
           label="Rediger bedriftsprofil"
           onClick={() => onNavigate("bedriftsprofil")}
         />
-        {effectiveProff && (
+        {effectiveProff && canManageMembers && (
           <ConsoleLink
             icon={<Users className="size-5" />}
             label="Administrer brukere"
@@ -305,9 +330,17 @@ function Overview({
       {!effectiveProff && organization.selected_plan === "proff" && (
         <Alert variant="warning">
           <AlertDescription>
-            {trialEnded || organization.proff_trial_cancelled_at
-              ? "Prøveperioden er brukt. Proff kan aktiveres når betalingsløsningen er på plass."
-              : "Proff-funksjonene er ikke aktive."}
+            {trialEnded || organization.proff_trial_cancelled_at ? (
+              <>
+                Prøveperioden er brukt.{" "}
+                <Link to="/bedrift/velg-plan" className="underline underline-offset-4">
+                  Bestill Proff
+                </Link>{" "}
+                for å fortsette med de betalte funksjonene.
+              </>
+            ) : (
+              "Proff-funksjonene er ikke aktive."
+            )}
           </AlertDescription>
         </Alert>
       )}

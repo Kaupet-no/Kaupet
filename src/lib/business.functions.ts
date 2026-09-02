@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isValidOrganizationNumber, normalizeOrganizationNumber } from "@/lib/organization-number";
+import { PROFF_TERMS, type ProffTerm } from "@/features/business-account/plans";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -16,7 +17,7 @@ const SUPPORT_MESSAGE = "Du kan også kontakte support på kontakt@kaupet.no.";
 const UNAUTHORIZED_MESSAGE = "Du har ikke tilgang til bedriftskontoen.";
 const PROFF_REQUIRED_MESSAGE = "Denne funksjonen krever et aktivt Proff-abonnement.";
 const USED_TRIAL_MESSAGE =
-  "Prøveperioden er brukt. Proff kan aktiveres når betalingsløsningen er på plass.";
+  "Prøveperioden er brukt. Bestill Proff for å fortsette med de betalte funksjonene.";
 const INVITE_EXISTING_MESSAGE =
   "E-postadressen er allerede i bruk. Invitasjon av eksisterende kontoer støttes ikke ennå.";
 
@@ -64,6 +65,67 @@ async function duplicateOrganizationMessage(
 
 const uuid = z.string().uuid();
 const planSchema = z.enum(["proff_basis", "proff"]);
+const memberRoleSchema = z.enum(["superuser", "member"]);
+const listingAccessSchema = z.enum(["own", "all"]);
+const chatAccessSchema = z.enum(["own", "all"]);
+const listingEditScopeSchema = z.enum(["none", "own", "all"]);
+const categoryAccessSchema = z.enum(["all", "restricted"]);
+
+export type OrganizationMemberPermissions = {
+  role: "superuser" | "member";
+  listingAccess: "own" | "all";
+  chatAccess: "own" | "all";
+  canCreateListings: boolean;
+  listingEditScope: "none" | "own" | "all";
+  categoryAccess: "all" | "restricted";
+  allowedCategoryIds: string[];
+};
+
+const memberPermissionsSchema = z
+  .object({
+    role: memberRoleSchema.default("member"),
+    listingAccess: listingAccessSchema.default("own"),
+    chatAccess: chatAccessSchema.default("own"),
+    canCreateListings: z.boolean().default(true),
+    listingEditScope: listingEditScopeSchema.default("own"),
+    categoryAccess: categoryAccessSchema.default("all"),
+    allowedCategoryIds: z.array(uuid).default([]),
+  })
+  .superRefine((value, context) => {
+    if (
+      value.role === "member" &&
+      value.canCreateListings &&
+      value.categoryAccess === "restricted" &&
+      value.allowedCategoryIds.length === 0
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["allowedCategoryIds"],
+        message: "Velg minst én kategori.",
+      });
+    }
+  });
+function normalizeMemberPermissions(
+  value: OrganizationMemberPermissions,
+): OrganizationMemberPermissions {
+  if (value.role === "superuser") {
+    return {
+      role: "superuser",
+      listingAccess: "all",
+      chatAccess: "all",
+      canCreateListings: true,
+      listingEditScope: "all",
+      categoryAccess: "all",
+      allowedCategoryIds: [],
+    };
+  }
+  return {
+    ...value,
+    listingAccess: value.listingEditScope === "all" ? "all" : value.listingAccess,
+    categoryAccess: value.canCreateListings ? value.categoryAccess : "all",
+    allowedCategoryIds: value.categoryAccess === "restricted" ? value.allowedCategoryIds : [],
+  };
+}
 
 function assertOrganizationNumber(value: string): string {
   const normalized = normalizeOrganizationNumber(value);
@@ -372,7 +434,11 @@ export const inviteOrganizationMember = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) =>
     z
-      .object({ name: z.string().trim().min(2).max(80), email: z.string().trim().email() })
+      .object({
+        name: z.string().trim().min(2).max(80),
+        email: z.string().trim().email(),
+        permissions: memberPermissionsSchema.optional(),
+      })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
@@ -380,6 +446,9 @@ export const inviteOrganizationMember = createServerFn({ method: "POST" })
     if (!(await hasEffectiveProffAccess(supabaseAdmin, organizationId))) {
       throw new Error(PROFF_REQUIRED_MESSAGE);
     }
+    const permissions = normalizeMemberPermissions(
+      data.permissions ?? memberPermissionsSchema.parse({}),
+    );
     const email = data.email.trim().toLowerCase();
     const { data: invited, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
       email,
@@ -403,15 +472,67 @@ export const inviteOrganizationMember = createServerFn({ method: "POST" })
     const { error: memberError } = await supabaseAdmin.from("organization_members").insert({
       organization_id: organizationId,
       user_id: userId,
-      role: "member",
+      role: permissions.role,
       status: "invited",
+      listing_access: permissions.listingAccess,
+      chat_access: permissions.chatAccess,
+      can_create_listings: permissions.canCreateListings,
+      listing_edit_scope: permissions.listingEditScope,
+      category_access: permissions.categoryAccess,
     });
     if (memberError) {
       await supabaseAdmin.auth.admin.deleteUser(userId);
       if (memberError.code === "23505") throw new Error(INVITE_EXISTING_MESSAGE);
       throw memberError;
     }
+    if (permissions.categoryAccess === "restricted") {
+      const { error: categoryError } = await supabaseAdmin
+        .from("organization_member_categories")
+        .insert(
+          permissions.allowedCategoryIds.map((categoryId) => ({
+            organization_id: organizationId,
+            user_id: userId,
+            category_id: categoryId,
+          })),
+        );
+      if (categoryError) {
+        await supabaseAdmin.from("organization_members").delete().match({
+          organization_id: organizationId,
+          user_id: userId,
+        });
+        await supabaseAdmin.auth.admin.deleteUser(userId);
+        throw categoryError;
+      }
+    }
     return { userId, email };
+  });
+
+export const updateOrganizationMemberPermissions = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) =>
+    z
+      .object({
+        userId: uuid,
+        permissions: memberPermissionsSchema,
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { organizationId } = await requireSuperuserOrganization(context.userId);
+    const permissions = normalizeMemberPermissions(data.permissions);
+    const { error } = await context.supabase.rpc("update_organization_member_permissions", {
+      _organization_id: organizationId,
+      _user_id: data.userId,
+      _role: permissions.role,
+      _listing_access: permissions.listingAccess,
+      _chat_access: permissions.chatAccess,
+      _can_create_listings: permissions.canCreateListings,
+      _listing_edit_scope: permissions.listingEditScope,
+      _category_access: permissions.categoryAccess,
+      _allowed_category_ids: permissions.allowedCategoryIds,
+    });
+    if (error) throw error;
+    return { userId: data.userId };
   });
 
 export const acceptOrganizationInvite = createServerFn({ method: "POST" })
@@ -422,7 +543,6 @@ export const acceptOrganizationInvite = createServerFn({ method: "POST" })
       .from("organization_members")
       .select("organization_id, role, status")
       .eq("user_id", context.userId)
-      .eq("role", "member")
       .eq("status", "invited")
       .maybeSingle();
     if (lookupError) throw lookupError;
@@ -460,3 +580,144 @@ export const removeOrganizationMember = createServerFn({ method: "POST" })
     if (error) throw error;
     return { userId: data.userId };
   });
+
+const ORDER_SELECT =
+  "id, term, status, price_ex_vat_nok, billing_email, billing_reference, fiken_invoice_number, period_start, period_end, created_at";
+
+export type ProffOrder = {
+  id: string;
+  term: ProffTerm;
+  status: "pending" | "invoiced" | "paid" | "cancelled";
+  price_ex_vat_nok: number;
+  billing_email: string;
+  billing_reference: string | null;
+  fiken_invoice_number: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  created_at: string;
+};
+
+async function findOpenProffOrder(
+  supabaseAdmin: AdminClient,
+  organizationId: string,
+): Promise<ProffOrder | null> {
+  const { data, error } = await supabaseAdmin
+    .from("proff_orders")
+    .select(ORDER_SELECT)
+    .eq("organization_id", organizationId)
+    .in("status", ["pending", "invoiced"])
+    .maybeSingle();
+  if (error) throw error;
+  return (data as ProffOrder | null) ?? null;
+}
+
+/** The open order for the caller's organization, so the UI can show "invoice on the way". */
+export const getOpenProffOrder = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin, organizationId } = await requireSuperuserOrganization(context.userId);
+    return { order: await findOpenProffOrder(supabaseAdmin, organizationId) };
+  });
+
+export const requestProffSubscription = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) =>
+    z
+      .object({
+        term: z.enum(["monthly", "yearly"]),
+        billingEmail: z.string().trim().toLowerCase().email().max(320),
+        billingReference: z.string().trim().max(120).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin, organizationId } = await requireSuperuserOrganization(context.userId);
+    // The price is authoritative on the server; the client only picks a term.
+    const term = PROFF_TERMS[data.term];
+
+    const { data: inserted, error } = await supabaseAdmin
+      .from("proff_orders")
+      .insert({
+        organization_id: organizationId,
+        requested_by: context.userId,
+        term: term.id,
+        price_ex_vat_nok: term.priceExVatNok,
+        billing_email: data.billingEmail,
+        billing_reference: data.billingReference || null,
+      })
+      .select(ORDER_SELECT)
+      .single();
+
+    if (error) {
+      // proff_orders_one_open_per_org: an order is already waiting to be invoiced.
+      if (error.code === "23505") {
+        const existing = await findOpenProffOrder(supabaseAdmin, organizationId);
+        if (existing) return { order: existing, alreadyOpen: true };
+      }
+      throw error;
+    }
+
+    const organization = await getOrganization(supabaseAdmin, organizationId);
+    await notifyProffOrder(supabaseAdmin, organization, inserted as ProffOrder);
+    return { order: inserted as ProffOrder, alreadyOpen: false };
+  });
+
+/**
+ * Who follows up a new order. PROFF_ORDER_INBOX wins when set (a shared sales
+ * address), otherwise every admin is notified so the alert never depends on
+ * configuration that may be missing.
+ */
+async function proffOrderRecipients(supabaseAdmin: AdminClient): Promise<string[]> {
+  const configured = process.env.PROFF_ORDER_INBOX?.trim();
+  if (configured) return [configured];
+
+  const { data: admins, error } = await supabaseAdmin
+    .from("user_roles")
+    .select("user_id")
+    .eq("role", "admin");
+  if (error) throw error;
+
+  const emails = await Promise.all(
+    (admins ?? []).map(async ({ user_id }) => {
+      const { data, error: userError } = await supabaseAdmin.auth.admin.getUserById(user_id);
+      return userError ? null : (data.user?.email ?? null);
+    }),
+  );
+  return emails.filter((email): email is string => Boolean(email));
+}
+
+/** Phase 0: the invoice is created by hand in Fiken, so a human has to be told. */
+async function notifyProffOrder(
+  supabaseAdmin: AdminClient,
+  organization: { legal_name: string; organization_number: string; display_name: string },
+  order: ProffOrder,
+) {
+  try {
+    const to = await proffOrderRecipients(supabaseAdmin);
+    if (to.length === 0) {
+      console.error("No Proff order recipients configured, skipping notification");
+      return;
+    }
+    const siteUrl = process.env.PUBLIC_SITE_URL?.replace(/\/+$/, "") ?? "";
+    const { sendInternalEmail } = await import("@/lib/email.server");
+    await sendInternalEmail({
+      to,
+      subject: `Proff-bestilling: ${organization.legal_name}`,
+      text: [
+        `Bedrift: ${organization.legal_name} (${organization.display_name})`,
+        `Org.nr: ${organization.organization_number}`,
+        `Periode: ${order.term === "yearly" ? "Årlig" : "Månedlig"}`,
+        `Pris: ${order.price_ex_vat_nok} kr eks. mva`,
+        `Fakturaepost: ${order.billing_email}`,
+        `Deres referanse: ${order.billing_reference ?? "—"}`,
+        `Ordre-ID: ${order.id}`,
+        "",
+        "Opprett faktura i Fiken og registrer den under Admin → Proff-abonnement:",
+        `${siteUrl}/admin/proff-abonnement`,
+      ].join("\n"),
+    });
+  } catch (cause) {
+    // The order is stored; a failed notification must not fail the customer's request.
+    console.error("Failed to send Proff order notification", cause);
+  }
+}

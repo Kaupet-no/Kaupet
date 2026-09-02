@@ -1085,6 +1085,67 @@ export type Database = {
           },
         ]
       }
+      organization_listing_imports: {
+        Row: {
+          created_at: string
+          error_code: string | null
+          external_id: string
+          id: string
+          import_id: string
+          listing_id: string | null
+          organization_id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_code?: string | null
+          external_id: string
+          id?: string
+          import_id: string
+          listing_id?: string | null
+          organization_id: string
+          status: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error_code?: string | null
+          external_id?: string
+          id?: string
+          import_id?: string
+          listing_id?: string | null
+          organization_id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_listing_imports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_listing_imports_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_listing_imports_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       messages: {
         Row: {
           attachment_path: string | null
@@ -1173,7 +1234,12 @@ export type Database = {
       }
       organization_members: {
         Row: {
+          can_create_listings: boolean
+          category_access: string
+          chat_access: string
           created_at: string
+          listing_access: string
+          listing_edit_scope: string
           organization_id: string
           role: string
           status: string
@@ -1181,7 +1247,12 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          can_create_listings?: boolean
+          category_access?: string
+          chat_access?: string
           created_at?: string
+          listing_access?: string
+          listing_edit_scope?: string
           organization_id: string
           role: string
           status: string
@@ -1189,8 +1260,13 @@ export type Database = {
           user_id: string
         }
         Update: {
+          can_create_listings?: boolean
+          category_access?: string
+          chat_access?: string
           created_at?: string
           organization_id?: string
+          listing_access?: string
+          listing_edit_scope?: string
           role?: string
           status?: string
           updated_at?: string
@@ -1206,6 +1282,27 @@ export type Database = {
           },
         ]
       }
+      organization_member_categories: {
+        Row: {
+          category_id: string
+          created_at: string
+          organization_id: string
+          user_id: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          organization_id: string
+          user_id: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          organization_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       organizations: {
         Row: {
           brand_palette: string | null
@@ -1213,7 +1310,9 @@ export type Database = {
           created_at: string
           display_name: string
           id: string
+          lat: number | null
           legal_name: string
+          lng: number | null
           logo_path: string | null
           organization_number: string
           postal_code: string | null
@@ -1231,7 +1330,9 @@ export type Database = {
           created_at?: string
           display_name: string
           id?: string
+          lat?: number | null
           legal_name: string
+          lng?: number | null
           logo_path?: string | null
           organization_number: string
           postal_code?: string | null
@@ -1249,7 +1350,9 @@ export type Database = {
           created_at?: string
           display_name?: string
           id?: string
+          lat?: number | null
           legal_name?: string
+          lng?: number | null
           logo_path?: string | null
           organization_number?: string
           postal_code?: string | null
@@ -1262,6 +1365,65 @@ export type Database = {
           website_url?: string | null
         }
         Relationships: []
+      }
+      proff_orders: {
+        Row: {
+          admin_note: string | null
+          billing_email: string
+          billing_reference: string | null
+          created_at: string
+          fiken_invoice_number: string | null
+          id: string
+          organization_id: string
+          period_end: string | null
+          period_start: string | null
+          price_ex_vat_nok: number
+          requested_by: string | null
+          status: string
+          term: string
+          updated_at: string
+        }
+        Insert: {
+          admin_note?: string | null
+          billing_email: string
+          billing_reference?: string | null
+          created_at?: string
+          fiken_invoice_number?: string | null
+          id?: string
+          organization_id: string
+          period_end?: string | null
+          period_start?: string | null
+          price_ex_vat_nok: number
+          requested_by?: string | null
+          status?: string
+          term: string
+          updated_at?: string
+        }
+        Update: {
+          admin_note?: string | null
+          billing_email?: string
+          billing_reference?: string | null
+          created_at?: string
+          fiken_invoice_number?: string | null
+          id?: string
+          organization_id?: string
+          period_end?: string | null
+          period_start?: string | null
+          price_ex_vat_nok?: number
+          requested_by?: string | null
+          status?: string
+          term?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proff_orders_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       product_event_rate_limits: {
         Row: {
@@ -2571,9 +2733,48 @@ export type Database = {
           suspension_reason: string
         }[]
       }
+      extend_proff_access: {
+        Args: { _months: number; _organization_id: string }
+        Returns: {
+          period_end: string
+          period_start: string
+        }[]
+      }
       organization_has_proff_access: {
         Args: { _organization_id: string }
         Returns: boolean
+      }
+      can_access_organization_chat: {
+        Args: { _organization_id: string; _seller_id: string; _user_id?: string }
+        Returns: boolean
+      }
+      can_create_organization_listing: {
+        Args: { _category_id: string; _organization_id: string; _user_id?: string }
+        Returns: boolean
+      }
+      can_update_organization_listing: {
+        Args: {
+          _category_id: string
+          _organization_id: string
+          _seller_id: string
+          _status: Database["public"]["Enums"]["listing_status"]
+          _user_id?: string
+        }
+        Returns: boolean
+      }
+      can_view_organization_listing: {
+        Args: { _organization_id: string; _seller_id: string; _user_id?: string }
+        Returns: boolean
+      }
+      create_listing_from_import_row: {
+        Args: {
+          _external_id: string
+          _import_id: string
+          _listing: Json
+          _organization_id: string
+          _user_id: string
+        }
+        Returns: Json
       }
       popular_listings_by_category: {
         Args: { _category_ids: string[]; _limit?: number; _offset?: number }
@@ -2614,6 +2815,20 @@ export type Database = {
         }[]
       }
       purge_expired_accounts: { Args: never; Returns: number }
+      update_organization_member_permissions: {
+        Args: {
+          _allowed_category_ids: string[]
+          _can_create_listings: boolean
+          _category_access: string
+          _chat_access: string
+          _listing_access: string
+          _listing_edit_scope: string
+          _organization_id: string
+          _role: string
+          _user_id: string
+        }
+        Returns: undefined
+      }
       purge_expired_personal_data: { Args: never; Returns: Json }
       remove_organization_member: {
         Args: { _organization_id: string; _user_id: string }

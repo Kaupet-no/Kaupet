@@ -1,16 +1,27 @@
+import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, ListChecks } from "lucide-react";
 
 import { EmptyState } from "@/components/ui/empty-state";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { hasEffectiveProffAccess } from "@/features/business-account/plans";
 import { ListingRow, type Row } from "@/features/my-listings/listing-row";
 import type { BusinessOrganization } from "@/features/business-account/use-business-membership";
 import { supabase } from "@/integrations/supabase/client";
 
-type Props = { organization: BusinessOrganization };
+type Props = {
+  organization: BusinessOrganization;
+  userId: string;
+  listingAccess: "own" | "all";
+  listingEditScope: "none" | "own" | "all";
+  canCreateListings: boolean;
+  onImport: () => void;
+};
 
 type RawListing = {
   id: string;
+  seller_id: string;
   kaupet_code: string;
   title: string;
   status: string;
@@ -24,21 +35,36 @@ type RawListing = {
   listing_images: { storage_path: string; sort_order: number }[] | null;
 };
 
-export function BusinessListingsPanel({ organization }: Props) {
+export function BusinessListingsPanel({
+  organization,
+  userId,
+  listingAccess,
+  listingEditScope,
+  canCreateListings,
+  onImport,
+}: Props) {
   const listingsQuery = useQuery({
-    queryKey: ["business-listings", organization.id],
+    queryKey: ["business-listings", organization.id, userId, listingAccess],
     queryFn: async (): Promise<Row[]> => {
-      const { data, error } = await supabase
+      const baseQuery = supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, status, price_nok, is_free, city, category_id, description, created_at, expires_at, listing_images(storage_path, sort_order)",
+          "id, seller_id, kaupet_code, title, status, price_nok, is_free, city, category_id, description, created_at, expires_at, listing_images(storage_path, sort_order)",
         )
-        .eq("organization_id", organization.id)
-        .in("status", ["active", "draft"])
-        .order("created_at", { ascending: false });
+        .eq("organization_id", organization.id);
+      const { data, error } =
+        listingAccess === "own"
+          ? await baseQuery
+              .eq("seller_id", userId)
+              .in("status", ["active", "draft"])
+              .order("created_at", { ascending: false })
+          : await baseQuery
+              .in("status", ["active", "draft"])
+              .order("created_at", { ascending: false });
       if (error) throw error;
       return ((data ?? []) as unknown as RawListing[]).map((listing) => ({
         id: listing.id,
+        seller_id: listing.seller_id,
         kaupet_code: listing.kaupet_code,
         title: listing.title,
         status: listing.status as Row["status"],
@@ -60,14 +86,28 @@ export function BusinessListingsPanel({ organization }: Props) {
 
   return (
     <section aria-labelledby="business-listings-title" className="space-y-5">
-      <div>
-        <h2 id="business-listings-title" className="font-display text-2xl tracking-tight">
-          Annonser
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Aktive annonser og utkast fra bedriften. Åpne en annonse for å redigere den i den vanlige
-          annonseflaten.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 id="business-listings-title" className="font-display text-2xl tracking-tight">
+            Annonser
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Aktive annonser og utkast fra bedriften. Åpne en annonse for å redigere den i den
+            vanlige annonseflaten.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {canCreateListings && (
+            <Button asChild variant="outline">
+              <Link to="/ny-annonse">Ny annonse</Link>
+            </Button>
+          )}
+          {canCreateListings && hasEffectiveProffAccess(organization) && (
+            <Button type="button" onClick={onImport}>
+              Importer annonser
+            </Button>
+          )}
+        </div>
       </div>
       {listingsQuery.isLoading ? (
         <div
@@ -98,7 +138,10 @@ export function BusinessListingsPanel({ organization }: Props) {
               onPublishDraft={() => undefined}
               onDelete={() => undefined}
               busy={false}
-              readOnly
+              readOnly={
+                listingEditScope === "none" ||
+                (listingEditScope === "own" && row.seller_id !== userId)
+              }
             />
           ))}
         </ul>

@@ -16,7 +16,10 @@ const AUTH_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), ".auth
  */
 export default async function globalTeardown() {
   if (!existsSync(AUTH_FILE)) return;
-  const { userIds } = JSON.parse(readFileSync(AUTH_FILE, "utf-8")) as { userIds: string[] };
+  const { userIds, businessOrganizationId } = JSON.parse(readFileSync(AUTH_FILE, "utf-8")) as {
+    userIds: string[];
+    businessOrganizationId?: string | null;
+  };
 
   const url = process.env.SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -24,6 +27,10 @@ export default async function globalTeardown() {
   if (url && serviceRoleKey) {
     const admin = createClient(url, serviceRoleKey);
     const failures = [];
+    if (businessOrganizationId) {
+      const { error } = await admin.from("organizations").delete().eq("id", businessOrganizationId);
+      if (error) failures.push({ userId: `organization:${businessOrganizationId}`, error });
+    }
     for (const userId of userIds) {
       const { error } = await admin.auth.admin.deleteUser(userId);
       if (error) failures.push({ userId, error });
@@ -34,7 +41,7 @@ export default async function globalTeardown() {
           failures
             .map(
               ({ userId, error }) =>
-                `${userId}: status=${error!.status} code=${error!.code} message=${error!.message}`,
+                `${userId}: status=${"status" in error ? error.status : "-"} code=${error.code ?? "-"} message=${error.message}`,
             )
             .join("; "),
       );

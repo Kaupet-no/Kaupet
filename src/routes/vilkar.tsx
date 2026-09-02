@@ -305,9 +305,18 @@ function VilkarPage() {
             Lagrede bedrifts-, medlems- og profileringsopplysninger slettes ikke av den grunn.
           </p>
           <p className="mt-3">
-            Det innkreves ikke betaling for Proff før en separat faktura- eller kortbetalingsløsning
-            er lansert og vilkårene for denne er gjort tilgjengelige. Kaupet oppretter ikke faktura
-            eller betalingsavtale gjennom dette planvalget.
+            Proff koster 1 490 kr per måned eks. mva, eller 16 092 kr per år eks. mva ved
+            årsabonnement (12 måneder med 10 % rabatt). Merverdiavgift kommer i tillegg etter
+            gjeldende sats. Abonnementet faktureres forskuddsvis for hele perioden, med
+            betalingsfrist oppgitt på fakturaen.
+          </p>
+          <p className="mt-3">
+            Bestillingen er bindende for den perioden som er fakturert, men abonnementet har ingen
+            bindingstid utover dette. Ved oppsigelse løper Proff ut den betalte perioden, og
+            påbegynte perioder refunderes ikke. Blir en faktura ikke betalt ved forfall, sendes
+            betalingspåminnelse, og Proff-funksjonene deaktiveres når den betalte perioden er
+            utløpt. Prisendringer varsles minst 30 dager før de får virkning for en ny
+            faktureringsperiode.
           </p>
         </section>
       </div>

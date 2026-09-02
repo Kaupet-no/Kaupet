@@ -34,6 +34,10 @@ vi.mock("@/lib/turnstile.server", () => ({
   verifyTurnstileToken: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock("@/lib/brreg.server", () => ({ fetchOrganizationFromBrreg: vi.fn() }));
+const sendInternalEmail = vi.fn().mockResolvedValue(undefined);
+vi.mock("@/lib/email.server", () => ({
+  sendInternalEmail: (...args: unknown[]) => sendInternalEmail(...args),
+}));
 
 const defaultContext = { userId: "superuser-1", supabase: supabaseAdmin };
 
@@ -42,8 +46,10 @@ import {
   inviteOrganizationMember,
   lookupBusinessOrganization,
   removeOrganizationMember,
+  requestProffSubscription,
   setBusinessPlan,
   updateBusinessProfile,
+  updateOrganizationMemberPermissions,
 } from "./business.functions";
 
 import { fetchOrganizationFromBrreg } from "@/lib/brreg.server";
@@ -97,7 +103,23 @@ function buildAdmin(
       error: null,
     }));
     chain.single = vi.fn(async () => ({
-      data: table === "organization_members" ? { organization_id: organizationId } : organization,
+      data:
+        table === "organization_members"
+          ? { organization_id: organizationId }
+          : table === "proff_orders"
+            ? {
+                id: "33333333-3333-4333-8333-333333333333",
+                term: "yearly",
+                status: "pending",
+                price_ex_vat_nok: 16092,
+                billing_email: "faktura@eksempel.no",
+                billing_reference: null,
+                fiken_invoice_number: null,
+                period_start: null,
+                period_end: null,
+                created_at: "2026-09-02T08:00:00.000Z",
+              }
+            : organization,
       error: null,
     }));
     chain.update = vi.fn((updates: Record<string, unknown>) => {
@@ -108,7 +130,10 @@ function buildAdmin(
     chain.insert = vi.fn(() => chain);
     chain.delete = vi.fn(() => chain);
     chain.then = (resolve: (value: unknown) => unknown, reject: (error: unknown) => unknown) =>
-      Promise.resolve({ data: null, error: null }).then(resolve, reject);
+      Promise.resolve({
+        data: table === "user_roles" ? [{ user_id: "admin-user-1" }] : null,
+        error: null,
+      }).then(resolve, reject);
     return chain;
   };
   supabaseAdmin.from.mockImplementation((table: string) => makeChain(table));
@@ -160,6 +185,43 @@ describe("business server functions", () => {
     );
     expect(fetchOrganizationFromBrreg).not.toHaveBeenCalled();
   });
+  it("varsler administrator om ny Proff-bestilling og priser perioden på serveren", async () => {
+    buildAdmin({ contactEmail: "admin@kaupet.no" });
+    delete process.env.PROFF_ORDER_INBOX;
+
+    const { order } = await requestProffSubscription({
+      data: { term: "yearly", billingEmail: "faktura@eksempel.no" },
+    });
+    expect(order.price_ex_vat_nok).toBe(16092);
+
+    expect(sendInternalEmail).toHaveBeenCalledTimes(1);
+    const email = sendInternalEmail.mock.calls[0]![0] as {
+      to: string[];
+      subject: string;
+      text: string;
+    };
+    // Without a configured inbox the alert still reaches the admins.
+    expect(email.to).toEqual(["admin@kaupet.no"]);
+    expect(email.subject).toContain("Eksempel AS");
+    expect(email.text).toContain("974760673");
+    expect(email.text).toContain("16092 kr eks. mva");
+    expect(email.text).toContain("/admin/proff-abonnement");
+  });
+
+  it("sender Proff-varselet til PROFF_ORDER_INBOX når den er satt", async () => {
+    buildAdmin();
+    process.env.PROFF_ORDER_INBOX = "salg@kaupet.no";
+    try {
+      await requestProffSubscription({
+        data: { term: "monthly", billingEmail: "faktura@eksempel.no" },
+      });
+      const email = sendInternalEmail.mock.calls[0]![0] as { to: string[] };
+      expect(email.to).toEqual(["salg@kaupet.no"]);
+    } finally {
+      delete process.env.PROFF_ORDER_INBOX;
+    }
+  });
+
   it("starts Proff once with a thirty-day database trial and does not restart it", async () => {
     buildAdmin();
     const first = await setBusinessPlan({ data: { plan: "proff" } });
@@ -242,6 +304,39 @@ describe("business server functions", () => {
     expect(supabaseAdmin.auth.admin.inviteUserByEmail).toHaveBeenCalledWith(
       "kari@example.com",
       expect.any(Object),
+    );
+  });
+  it("normalizes promoted superusers to full permissions before the guarded update", async () => {
+    buildAdmin({ proff: true });
+    await expect(
+      updateOrganizationMemberPermissions({
+        data: {
+          userId: memberId,
+          permissions: {
+            role: "superuser",
+            listingAccess: "own",
+            chatAccess: "own",
+            canCreateListings: false,
+            listingEditScope: "none",
+            categoryAccess: "restricted",
+            allowedCategoryIds: [],
+          },
+        },
+      }),
+    ).resolves.toEqual({ userId: memberId });
+    expect(supabaseAdmin.rpc).toHaveBeenCalledWith(
+      "update_organization_member_permissions",
+      expect.objectContaining({
+        _organization_id: organizationId,
+        _user_id: memberId,
+        _role: "superuser",
+        _listing_access: "all",
+        _chat_access: "all",
+        _can_create_listings: true,
+        _listing_edit_scope: "all",
+        _category_access: "all",
+        _allowed_category_ids: [],
+      }),
     );
   });
 

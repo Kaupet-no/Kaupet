@@ -8,11 +8,11 @@
 
 ## Hva er Kaupet?
 
-Kaupet er en bøyd form av det norrøne uttrykket _kaup_, som betyr _kjøp_ eller _avtale_. Det kan også spores til det latinske uttrykket _caupo_ for _kremmer_. **Kaupet.no** er bygget for å være en alternativ markedsplass der det skal være enkelt og gratis å omsette brukte gjenstander.
+Kaupet er en bøyd form av det norrøne uttrykket _kaup_, som betyr _kjøp_ eller _avtale_. Det kan også spores til det latinske uttrykket _caupo_ for _kremmer_. Kaupet.no er bygget for å være en alternativ markedsplass der det skal være enkelt og gratis å omsette brukte gjenstander.
 
-Kaupet.no finnes fordi en nasjonal markedsplass for brukte varer bør være grunnleggende infrastruktur i et moderne samfunn, og bør derfor være gratis å bruke, uten sporing eller salg av brukerdata. Opprettelse av annonser er en grunnleggende funksjon alle bør ha tilgang til, og skal aldri være en betalt tjeneste.
+**Kaupet.no** finnes fordi en nasjonal markedsplass for brukte varer bør være grunnleggende infrastruktur i et moderne samfunn, og bør derfor være gratis å bruke, uten sporing eller salg av brukerdata. Opprettelse av annonser er en grunnleggende funksjon **alle** bør ha tilgang til, og skal **aldri** være en betalt tjeneste.
 
-Digital infrastruktur og forvaltning av tjenesten er riktignok ikke gratis. Betaling skal derimot _alltid_ være frivillig, og skal gi merverdi utover tjenestens basisfunksjonalitet. Dette er en risiko **Kaupet.no** tar, og skal **aldri** gå på bekostning av tjenestens brukere.
+Digital infrastruktur og forvaltning av tjenesten er riktignok ikke gratis. Betaling skal derimot **alltid** være frivillig, og skal gi merverdi utover tjenestens basisfunksjonalitet. Dette er en risiko **Kaupet.no** tar, og skal **aldri** gå på bekostning av tjenestens brukere.
 
 ## Funksjoner
 
@@ -85,7 +85,7 @@ Brukere kan dele annonser med QR-kode eller en **Kaupet-kode**. Dette er et ått
 
 <img src="docs/images/app-hjem.png" alt="Forsiden i Kaupet-appen, med bunnavigasjon" width="320">
 
-Appene deler kode med nettsiden, men benytter en egen native-tilpasset layout. Denne har blant annet en egen bunnavigasjon og sidetopper, og en mobiltilpasset flyt for annonseopprettelse. Appen er bygget med [Capacitor](https://capacitorjs.com), føles som en native applikasjon, med blant annet:
+Appene deler kode med nettsiden, men benytter en egen native-tilpasset layout. Denne har blant annet en egen bunnavigasjon og sidetopper, og en mobiltilpasset flyt for annonseopprettelse. Appen er bygget med [Capacitor](https://capacitorjs.com) og føles som en native applikasjon, med blant annet:
 
 - kamera og bildevalg, inkludert 360°-opptak av kjøretøy
 - push-varsler for meldinger, lagrede søk og annen aktivitet

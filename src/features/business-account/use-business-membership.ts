@@ -28,6 +28,11 @@ export type BusinessMembership = {
   user_id: string;
   role: "superuser" | "member";
   status: "invited" | "active" | "deactivated";
+  listing_access: "own" | "all";
+  chat_access: "own" | "all";
+  can_create_listings: boolean;
+  listing_edit_scope: "none" | "own" | "all";
+  category_access: "all" | "restricted";
   created_at: string;
   updated_at: string;
   organization: BusinessOrganization;
@@ -45,7 +50,9 @@ export function useBusinessMembership() {
       if (!user) return null;
       const { data: membership, error: membershipError } = await supabase
         .from("organization_members")
-        .select("organization_id, user_id, role, status, created_at, updated_at")
+        .select(
+          "organization_id, user_id, role, status, listing_access, chat_access, can_create_listings, listing_edit_scope, category_access, created_at, updated_at",
+        )
         .eq("user_id", user.id)
         .maybeSingle();
       if (membershipError) throw membershipError;
@@ -59,7 +66,9 @@ export function useBusinessMembership() {
 
       const { data: currentMembership, error: currentMembershipError } = await supabase
         .from("organization_members")
-        .select("organization_id, user_id, role, status, created_at, updated_at")
+        .select(
+          "organization_id, user_id, role, status, listing_access, chat_access, can_create_listings, listing_edit_scope, category_access, created_at, updated_at",
+        )
         .eq("user_id", user.id)
         .maybeSingle();
       if (currentMembershipError) throw currentMembershipError;
@@ -74,15 +83,23 @@ export function useBusinessMembership() {
         .maybeSingle();
       if (organizationError) throw organizationError;
       if (!organization) return null;
-
       return {
         ...currentMembership,
         role: currentMembership.role as BusinessMembership["role"],
         status: currentMembership.status as BusinessMembership["status"],
+        listing_access: currentMembership.listing_access as BusinessMembership["listing_access"],
+        chat_access: currentMembership.chat_access as BusinessMembership["chat_access"],
+        can_create_listings: currentMembership.can_create_listings as boolean,
+        listing_edit_scope:
+          currentMembership.listing_edit_scope as BusinessMembership["listing_edit_scope"],
+        category_access: currentMembership.category_access as BusinessMembership["category_access"],
         organization: organization as BusinessOrganization,
       };
     },
   });
+}
+export function isActiveBusinessMember(membership: BusinessMembership | null | undefined) {
+  return membership?.status === "active";
 }
 
 export function isActiveBusinessSuperuser(membership: BusinessMembership | null | undefined) {

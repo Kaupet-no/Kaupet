@@ -4,6 +4,29 @@ import { renderNotificationEmail, type NotificationEmailType } from "@/lib/email
 
 const FROM = process.env.RESEND_FROM_EMAIL || "Kaupet.no <ikkesvar@varsel.kaupet.no>";
 
+/**
+ * Plain-text email to a Kaupet inbox (sales, ops). Deliberately not routed through
+ * renderNotificationEmail: those templates are the customer-facing notification design.
+ */
+export async function sendInternalEmail(params: {
+  to: string | string[];
+  subject: string;
+  text: string;
+}): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.error("Missing RESEND_API_KEY, skipping email");
+    return;
+  }
+
+  await new Resend(apiKey).emails.send({
+    from: FROM,
+    to: params.to,
+    subject: params.subject,
+    text: params.text,
+  });
+}
+
 export async function sendNotificationEmail(params: {
   to: string;
   type: NotificationEmailType;

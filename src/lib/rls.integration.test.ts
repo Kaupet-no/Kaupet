@@ -3956,5 +3956,63 @@ describe.skipIf(!canRun)(
         });
       expect(expiredOwnerUploadError).not.toBeNull();
     });
+
+    it("keeps proff_orders server-only and stacks paid terms on remaining access", async () => {
+      const owner = await signIn(emails.owner);
+      const anon = createClient(URL!, ANON_KEY!);
+
+      const { data: order, error: orderError } = await admin
+        .from("proff_orders")
+        .insert({
+          organization_id: otherOrganizationId,
+          term: "monthly",
+          price_ex_vat_nok: 1490,
+          billing_email: `faktura-${suffix}@example.com`,
+        })
+        .select("id")
+        .single();
+      expect(orderError).toBeNull();
+
+      // Billing data must never leak to the client, not even to the superuser.
+      for (const client of [owner, anon]) {
+        const { data, error } = await client.from("proff_orders").select("id");
+        expect(error !== null || (data ?? []).length === 0).toBe(true);
+      }
+
+      const expiredAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const { error: expireError } = await admin
+        .from("organizations")
+        .update({ proff_access_until: expiredAt })
+        .eq("id", otherOrganizationId);
+      expect(expireError).toBeNull();
+
+      const extend = async (months: number) => {
+        const { data, error } = await admin
+          .rpc("extend_proff_access", { _organization_id: otherOrganizationId, _months: months })
+          .single();
+        expect(error).toBeNull();
+        return data as unknown as { period_start: string; period_end: string };
+      };
+
+      // Expired access starts a fresh period from now, not from the old date.
+      const first = await extend(1);
+      expect(Date.parse(first.period_start)).toBeGreaterThan(Date.parse(expiredAt));
+      expect(Date.parse(first.period_end)).toBeGreaterThan(Date.now());
+
+      // A renewal stacks on the remaining period instead of truncating it.
+      const second = await extend(12);
+      expect(Date.parse(second.period_start)).toBe(Date.parse(first.period_end));
+
+      const { data: organization, error: readError } = await admin
+        .from("organizations")
+        .select("selected_plan, proff_access_until")
+        .eq("id", otherOrganizationId)
+        .single();
+      expect(readError).toBeNull();
+      expect(organization?.selected_plan).toBe("proff");
+      expect(Date.parse(organization!.proff_access_until!)).toBe(Date.parse(second.period_end));
+
+      await admin.from("proff_orders").delete().eq("id", order!.id);
+    });
   },
 );

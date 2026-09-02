@@ -8,6 +8,7 @@ import {
   Webhook,
   Car,
   MessageSquareHeart,
+  Receipt,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsAdmin } from "@/hooks/use-is-admin";
@@ -66,6 +67,11 @@ function AdminLayout() {
               to="/admin/promoteringer"
               icon={<Sparkles className="size-4" />}
               label="Fremhevinger"
+            />
+            <NavTab
+              to="/admin/proff-abonnement"
+              icon={<Receipt className="size-4" />}
+              label="Proff-abonnement"
             />
             <NavTab
               to="/admin/vipps-webhooks"

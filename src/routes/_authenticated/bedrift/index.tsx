@@ -4,10 +4,7 @@ import { AlertCircle, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { NativePageHeader } from "@/components/native-page-header";
 import { BusinessConsole, type BusinessTab } from "@/features/business-account/business-console";
-import {
-  isActiveBusinessSuperuser,
-  useBusinessMembership,
-} from "@/features/business-account/use-business-membership";
+import { useBusinessMembership } from "@/features/business-account/use-business-membership";
 import { useAuth } from "@/hooks/use-auth";
 
 const TABS: BusinessTab[] = ["oversikt", "annonser", "meldinger", "bedriftsprofil", "brukere"];
@@ -55,7 +52,7 @@ function BusinessConsoleRoute() {
     );
   }
 
-  if (!membership || !isActiveBusinessSuperuser(membership)) {
+  if (!membership || membership.status !== "active") {
     return (
       <div className="mx-auto max-w-2xl px-4 py-10">
         <Alert>
@@ -71,6 +68,9 @@ function BusinessConsoleRoute() {
       <BusinessConsole
         organization={membership.organization}
         userId={user?.id ?? membership.user_id}
+        role={membership.role}
+        listingAccess={membership.listing_access}
+        listingEditScope={membership.listing_edit_scope}
         tab={tab}
         onTabChange={(nextTab) =>
           void navigate({ to: "/bedrift", search: { tab: nextTab }, replace: true })

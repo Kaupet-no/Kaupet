@@ -1,7 +1,5 @@
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-
-import { supabase } from "@/integrations/supabase/client";
+import { useAllCategoryFilters } from "@/hooks/use-category-filters";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -16,7 +14,6 @@ import {
   effectiveFiltersForCategory,
   filterDependencyMet,
   getMissingRequiredFilters,
-  normalizeFilter,
   NUMERIC_DIGIT_CAPS,
   PART_FITMENT_SCOPE_KEY,
   PART_FITMENT_VEHICLE_IDS_KEY,
@@ -35,23 +32,9 @@ import {
 
 export type AttributeMap = Record<string, AttributeValue>;
 
-/** Fetches all category filters once; cached across the app. */
-export function useAllCategoryFilters() {
-  return useQuery({
-    queryKey: ["category-filters", "all"],
-    queryFn: async () => {
-      // select("*") rather than a column list so the query keeps working in
-      // the window before the depends_on_not_value/is_optional migration is
-      // applied.
-      const { data, error } = await supabase
-        .from("category_filters")
-        .select("*")
-        .order("sort_order");
-      if (error) throw error;
-      return (data ?? []).map(normalizeFilter);
-    },
-  });
-}
+// Hooken bor i src/hooks/use-category-filters.ts; re-eksportert her for
+// eksisterende importer.
+export { useAllCategoryFilters };
 
 /**
  * Renders one input per effective filter for the given category. Values are a

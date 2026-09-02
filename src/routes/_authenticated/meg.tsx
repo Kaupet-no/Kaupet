@@ -29,7 +29,7 @@ import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-  isActiveBusinessSuperuser,
+  isActiveBusinessMember,
   useBusinessMembership,
 } from "@/features/business-account/use-business-membership";
 import { NativePageHeader } from "@/components/native-page-header";
@@ -171,7 +171,7 @@ function MegPage() {
               label="Min profil"
               onClick={() => void navigate({ to: "/profil" })}
             />
-            {isActiveBusinessSuperuser(businessMembership) && (
+            {isActiveBusinessMember(businessMembership) && (
               <NavRow
                 icon={<Building2 className="size-5 text-primary" />}
                 label="Bedriftskonsoll"

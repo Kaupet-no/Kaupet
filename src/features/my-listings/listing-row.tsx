@@ -43,6 +43,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export type Row = {
   id: string;
+  seller_id?: string;
   kaupet_code: string;
   title: string;
   status: "draft" | "active" | "sold" | "archived" | "expired";

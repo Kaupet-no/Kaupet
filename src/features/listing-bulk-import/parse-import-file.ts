@@ -313,7 +313,7 @@ function mapRows(
 
 async function parseXlsx(file: File): Promise<unknown[][]> {
   try {
-    const XLSX = await import("xlsx");
+    const XLSX = await import("@e965/xlsx");
     const workbook = XLSX.read(await file.arrayBuffer(), {
       type: "array",
       sheetRows: MAX_IMPORT_ROWS + 3,

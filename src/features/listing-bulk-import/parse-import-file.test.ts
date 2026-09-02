@@ -82,7 +82,7 @@ describe("bulk import parser", () => {
   });
 
   it("leser første ark i XLSX", async () => {
-    const XLSX = await import("xlsx");
+    const XLSX = await import("@e965/xlsx");
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(
       workbook,
@@ -144,7 +144,7 @@ describe("bulk import parser", () => {
       ],
       categoryId: "root",
     });
-    const XLSX = await import("xlsx");
+    const XLSX = await import("@e965/xlsx");
     const workbook = XLSX.read(bytes, { type: "array" });
     const keys = XLSX.utils.sheet_to_json<string[]>(workbook.Sheets["Annonser"], {
       header: 1,
@@ -184,7 +184,7 @@ describe("bulk import parser", () => {
       ],
       categoryId: "category-1",
     });
-    const XLSX = await import("xlsx");
+    const XLSX = await import("@e965/xlsx");
     const workbook = XLSX.read(bytes, { type: "array" });
     expect(workbook.SheetNames).toEqual([
       "Start",

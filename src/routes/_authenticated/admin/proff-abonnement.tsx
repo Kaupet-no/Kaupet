@@ -5,10 +5,13 @@ import { useServerFn } from "@tanstack/react-start";
 import { Loader2 } from "lucide-react";
 
 import {
+  adminListLocationCharges,
   adminListProffOrders,
+  adminMarkLocationChargeInvoiced,
   adminMarkProffOrderInvoiced,
   adminMarkProffOrderPaid,
   adminCancelProffOrder,
+  type AdminLocationCharge,
   type AdminProffOrder,
 } from "@/lib/admin-proff.functions";
 import { PROFF_TERMS } from "@/features/business-account/plans";
@@ -76,18 +79,31 @@ function AdminProffOrdersPage() {
   const markInvoiced = useServerFn(adminMarkProffOrderInvoiced);
   const markPaid = useServerFn(adminMarkProffOrderPaid);
   const cancelOrder = useServerFn(adminCancelProffOrder);
+  const listLocationCharges = useServerFn(adminListLocationCharges);
+  const markLocationChargeInvoiced = useServerFn(adminMarkLocationChargeInvoiced);
 
   const [status, setStatus] = useState<string>("pending");
   const [invoiceTarget, setInvoiceTarget] = useState<AdminProffOrder | null>(null);
   const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [locationInvoiceTarget, setLocationInvoiceTarget] = useState<AdminLocationCharge | null>(
+    null,
+  );
+  const [locationInvoiceNumber, setLocationInvoiceNumber] = useState("");
 
   const ordersQ = useQuery({
     queryKey: ["admin-proff-orders", status],
     queryFn: () =>
       listOrders({ data: { status: status === "all" ? undefined : (status as never) } }),
   });
+  const locationChargesQ = useQuery({
+    queryKey: ["admin-location-charges"],
+    queryFn: () => listLocationCharges(),
+  });
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["admin-proff-orders"] });
+  const invalidate = () => {
+    void qc.invalidateQueries({ queryKey: ["admin-proff-orders"] });
+    void qc.invalidateQueries({ queryKey: ["admin-location-charges"] });
+  };
 
   const invoice = useMutation({
     mutationFn: (vars: { orderId: string; fikenInvoiceNumber: string }) =>
@@ -118,8 +134,24 @@ function AdminProffOrdersPage() {
     },
     onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke kansellere")),
   });
+  const locationInvoice = useMutation({
+    mutationFn: (vars: {
+      subscriptionId: string;
+      periodStart: string;
+      fikenInvoiceNumber: string;
+    }) => markLocationChargeInvoiced({ data: vars }),
+    onSuccess: () => {
+      showSuccessToast("Lokasjonsperioden er merket som fakturert");
+      setLocationInvoiceTarget(null);
+      setLocationInvoiceNumber("");
+      invalidate();
+    },
+    onError: (e: Error) =>
+      showErrorToast(formatErrorMessage(e, "Kunne ikke lagre lokasjonsfakturaen")),
+  });
 
   const orders = ordersQ.data ?? [];
+  const locationCharges = locationChargesQ.data ?? [];
 
   return (
     <div className="space-y-6">
@@ -259,6 +291,69 @@ function AdminProffOrdersPage() {
           )}
         </CardContent>
       </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Lokasjonsperioder til fakturering</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {locationChargesQ.isLoading ? (
+            <p className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
+              <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+              Laster lokasjonsperioder…
+            </p>
+          ) : locationCharges.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Ingen lokasjonsperioder til fakturering.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Bedrift</TableHead>
+                    <TableHead>Lokasjon</TableHead>
+                    <TableHead>Periode</TableHead>
+                    <TableHead>Pris eks. mva</TableHead>
+                    <TableHead>Fakturaepost</TableHead>
+                    <TableHead className="text-right">Handling</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {locationCharges.map((charge) => (
+                    <TableRow key={`${charge.subscription_id}-${charge.period_start}`}>
+                      <TableCell>
+                        <div className="font-medium">{charge.legal_name || "—"}</div>
+                        <div className="text-xs text-muted-foreground">{charge.display_name}</div>
+                      </TableCell>
+                      <TableCell>{charge.location_name}</TableCell>
+                      <TableCell>
+                        {formatDate(charge.period_start)}–{formatDate(charge.period_end)}
+                      </TableCell>
+                      <TableCell className="tabular-nums">
+                        {formatNok(charge.amount_ex_vat_nok)}
+                      </TableCell>
+                      <TableCell>{charge.billing_email || "—"}</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setLocationInvoiceTarget(charge);
+                            setLocationInvoiceNumber("");
+                          }}
+                        >
+                          Fakturert i Fiken
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Dialog
         open={invoiceTarget !== null}
@@ -294,6 +389,48 @@ function AdminProffOrdersPage() {
               }
             >
               {invoice.isPending && <Loader2 aria-hidden="true" className="size-4 animate-spin" />}
+              Lagre
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={locationInvoiceTarget !== null}
+        onOpenChange={(open) => !open && setLocationInvoiceTarget(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Fakturanummer for lokasjonsperiode</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="location-fiken-invoice-number">Fakturanummer</Label>
+            <Input
+              id="location-fiken-invoice-number"
+              value={locationInvoiceNumber}
+              onChange={(event) => setLocationInvoiceNumber(event.target.value)}
+              placeholder="10023"
+              inputMode="numeric"
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setLocationInvoiceTarget(null)}>
+              Avbryt
+            </Button>
+            <Button
+              type="button"
+              disabled={!locationInvoiceNumber.trim() || locationInvoice.isPending}
+              onClick={() =>
+                locationInvoiceTarget &&
+                locationInvoice.mutate({
+                  subscriptionId: locationInvoiceTarget.subscription_id,
+                  periodStart: locationInvoiceTarget.period_start,
+                  fikenInvoiceNumber: locationInvoiceNumber.trim(),
+                })
+              }
+            >
+              {locationInvoice.isPending && (
+                <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+              )}
               Lagre
             </Button>
           </DialogFooter>

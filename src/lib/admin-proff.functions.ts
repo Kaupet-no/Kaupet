@@ -149,3 +149,113 @@ export const adminCancelProffOrder = createServerFn({ method: "POST" })
     if (!cancelled) throw new Error("Bestillingen kan ikke kanselleres.");
     return { ok: true };
   });
+
+export type AdminLocationCharge = {
+  subscription_id: string;
+  location_id: string;
+  location_name: string;
+  organization_id: string;
+  period_start: string;
+  period_end: string;
+  amount_ex_vat_nok: number;
+  billing_email: string;
+  legal_name: string;
+  display_name: string;
+  fiken_invoice_number: string | null;
+};
+
+export const adminListLocationCharges = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    const supabaseAdmin = await getAdminClient();
+    const { data, error } = await supabaseAdmin
+      .from("organization_location_subscriptions")
+      .select(
+        "id, location_id, billing_interval_months, unit_price_ex_vat_nok, next_period_start, organization_locations!inner(organization_id, name, organizations!inner(display_name, legal_name))",
+      )
+      .lte("next_period_start", new Date().toISOString())
+      .order("next_period_start");
+    if (error) throw error;
+    const rows = (data ?? []) as unknown as Array<{
+      id: string;
+      location_id: string;
+      billing_interval_months: number;
+      unit_price_ex_vat_nok: number;
+      next_period_start: string;
+      organization_locations: {
+        organization_id: string;
+        name: string;
+        organizations: { display_name: string; legal_name: string } | null;
+      };
+    }>;
+    const organizationIds = [
+      ...new Set(rows.map((row) => row.organization_locations.organization_id)),
+    ];
+    const { data: profiles, error: profilesError } = await supabaseAdmin
+      .from("organization_billing_profiles")
+      .select("organization_id, billing_email")
+      .in("organization_id", organizationIds);
+    if (profilesError) throw profilesError;
+    const billingEmails = new Map(
+      (profiles ?? []).map((profile) => [profile.organization_id, profile.billing_email]),
+    );
+    return rows.map((row) => {
+      const periodStart = new Date(row.next_period_start);
+      const periodEnd = new Date(periodStart);
+      periodEnd.setUTCMonth(periodEnd.getUTCMonth() + row.billing_interval_months);
+      const organization = row.organization_locations.organizations;
+      return {
+        subscription_id: row.id,
+        location_id: row.location_id,
+        location_name: row.organization_locations.name,
+        organization_id: row.organization_locations.organization_id,
+        period_start: row.next_period_start,
+        period_end: periodEnd.toISOString(),
+        amount_ex_vat_nok: row.unit_price_ex_vat_nok * row.billing_interval_months,
+        billing_email: billingEmails.get(row.organization_locations.organization_id) ?? "",
+        legal_name: organization?.legal_name ?? "",
+        display_name: organization?.display_name ?? "",
+        fiken_invoice_number: null,
+      };
+    }) satisfies AdminLocationCharge[];
+  });
+
+export const adminMarkLocationChargeInvoiced = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) =>
+    z
+      .object({
+        subscriptionId: uuid,
+        periodStart: z.string().datetime(),
+        fikenInvoiceNumber: z.string().trim().min(1).max(40),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    const supabaseAdmin = await getAdminClient();
+    const { data: period, error } = await supabaseAdmin.rpc(
+      "mark_organization_location_charge_invoiced",
+      {
+        _subscription_id: data.subscriptionId,
+        _period_start: data.periodStart,
+        _fiken_invoice_number: data.fikenInvoiceNumber,
+      },
+    );
+    if (error) throw error;
+    return {
+      period: period
+        ? {
+            id: String((period as { id: string }).id),
+            subscription_id: String((period as { subscription_id: string }).subscription_id),
+            period_start: String((period as { period_start: string }).period_start),
+            period_end: String((period as { period_end: string }).period_end),
+            amount_ex_vat_nok: Number((period as { amount_ex_vat_nok: number }).amount_ex_vat_nok),
+            fiken_invoice_number: (period as { fiken_invoice_number: string | null })
+              .fiken_invoice_number,
+            invoiced_at: String((period as { invoiced_at: string }).invoiced_at),
+          }
+        : null,
+    };
+  });

@@ -21,8 +21,7 @@ export type SellerIdentity =
       kind: "business";
       displayName: string;
       organizationNumber: string;
-      postalCode: string | null;
-      city: string | null;
+      visitingAddress?: string | null;
       createdAt: string;
     };
 
@@ -117,9 +116,9 @@ export function SellerContactPanel({
                 Org.nr.{" "}
                 {seller.organizationNumber.replace(/\D/g, "").replace(/(\d{3})(?=\d)/g, "$1 ")}
               </p>
-              {(seller.postalCode || seller.city) && (
+              {seller.visitingAddress && (
                 <p className="text-xs text-muted-foreground">
-                  {[seller.postalCode, seller.city].filter(Boolean).join(" ")}
+                  Besøksadresse: {seller.visitingAddress}
                 </p>
               )}
             </>

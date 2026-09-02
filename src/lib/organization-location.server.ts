@@ -7,30 +7,21 @@ export type OrganizationListingLocation = {
   city: string | null;
   lat: number | null;
   lng: number | null;
+  address_line: string | null;
 };
 
-/**
- * Lokasjonen alle annonser fra en bedrift skal bruke.
- *
- * Bedriftsbrukere setter ikke sted per annonse — adressen kommer fra
- * `organizations`, som er forhåndsutfylt fra Brønnøysundregistrene ved
- * registrering og kan endres av en superbruker i bedriftskonsollet.
- *
- * Koordinatene slås opp fra postnummeret første gang de trengs og lagres på
- * organisasjonen, slik at en import på 500 rader gjør ett geokodingskall og
- * ikke 500. En adresseendring nullstiller dem (trigger i
- * 20260902110000_organization_address_location.sql), så neste annonse slår
- * opp på nytt. Oppslaget er best effort: feiler det, publiseres annonsen med
- * postnummer og sted, men uten koordinater.
- */
+/** Resolves and caches coordinates on the selected organization location. */
 export async function organizationListingLocation(
   supabaseAdmin: SupabaseClient,
   organizationId: string,
+  locationId: string,
 ): Promise<OrganizationListingLocation> {
   const { data, error } = await supabaseAdmin
-    .from("organizations")
-    .select("postal_code, city, lat, lng")
-    .eq("id", organizationId)
+    .from("organization_locations")
+    .select("postal_code, city, lat, lng, address_line, organization_id, active")
+    .eq("id", locationId)
+    .eq("organization_id", organizationId)
+    .eq("active", true)
     .single();
   if (error) throw error;
 
@@ -39,13 +30,13 @@ export async function organizationListingLocation(
     city: data.city ?? null,
     lat: data.lat ?? null,
     lng: data.lng ?? null,
+    address_line: data.address_line ?? null,
   };
   if (location.lat != null && location.lng != null) return location;
   if (!location.postal_code) return location;
 
   const looked = await lookupPostalCode(location.postal_code);
   if (!looked) return location;
-
   const resolved = {
     ...location,
     city: location.city ?? (looked.city || null),
@@ -53,8 +44,9 @@ export async function organizationListingLocation(
     lng: looked.lng,
   };
   await supabaseAdmin
-    .from("organizations")
-    .update({ lat: resolved.lat, lng: resolved.lng })
-    .eq("id", organizationId);
+    .from("organization_locations")
+    .update({ city: resolved.city, lat: resolved.lat, lng: resolved.lng })
+    .eq("id", locationId)
+    .eq("organization_id", organizationId);
   return resolved;
 }

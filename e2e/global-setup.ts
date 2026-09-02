@@ -84,6 +84,20 @@ export default async function globalSetup() {
       .single();
     if (businessOrganizationError) throw businessOrganizationError;
     businessOrganizationId = businessOrganization.id;
+    const { data: businessLocation, error: businessLocationError } = await admin
+      .from("organization_locations")
+      .insert({
+        organization_id: businessOrganization.id,
+        name: "Hovedlokasjon",
+        address_line: "Storgata 1",
+        postal_code: "0001",
+        city: "Oslo",
+        is_default: true,
+      })
+      .select("id")
+      .single();
+    if (businessLocationError) throw businessLocationError;
+    if (!businessLocation) throw new Error("E2E-lokasjon ble ikke opprettet.");
     const { error: businessMemberError } = await admin.from("organization_members").insert({
       organization_id: businessOrganization.id,
       user_id: desktopUser.userId,
@@ -91,6 +105,18 @@ export default async function globalSetup() {
       status: "active",
     });
     if (businessMemberError) throw businessMemberError;
+    const { error: businessLocationMemberError } = await admin
+      .from("organization_location_members")
+      .insert({
+        organization_id: businessOrganization.id,
+        location_id: businessLocation.id,
+        user_id: desktopUser.userId,
+        role: "manager",
+        listing_access: "all",
+        listing_edit_scope: "all",
+        chat_access: "all",
+      });
+    if (businessLocationMemberError) throw businessLocationMemberError;
 
     const { data: category, error: categoryError } = await admin
       .from("categories")

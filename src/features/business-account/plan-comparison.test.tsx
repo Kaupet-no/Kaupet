@@ -7,10 +7,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const setBusinessPlanMock = vi.fn();
 const getOpenProffOrderMock = vi.fn();
 const requestProffSubscriptionMock = vi.fn();
+const getBusinessOrganizationMock = vi.fn();
 vi.mock("@/lib/business.functions", () => ({
   setBusinessPlan: (...args: unknown[]) => setBusinessPlanMock(...args),
   getOpenProffOrder: (...args: unknown[]) => getOpenProffOrderMock(...args),
   requestProffSubscription: (...args: unknown[]) => requestProffSubscriptionMock(...args),
+  getBusinessOrganization: (...args: unknown[]) => getBusinessOrganizationMock(...args),
 }));
 vi.mock("@tanstack/react-start", () => ({ useServerFn: (fn: unknown) => fn }));
 
@@ -34,6 +36,14 @@ function renderPlans(organization: Parameters<typeof PlanComparison>[0]["organiz
 afterEach(cleanup);
 beforeEach(() => {
   setBusinessPlanMock.mockReset().mockResolvedValue({ organization: {} });
+  getBusinessOrganizationMock.mockReset().mockResolvedValue({
+    billingProfile: {
+      billing_email: "faktura@example.com",
+      address_line: null,
+      postal_code: null,
+      city: null,
+    },
+  });
   getOpenProffOrderMock.mockReset().mockResolvedValue({ order: null });
   requestProffSubscriptionMock.mockReset().mockResolvedValue({ order: {}, alreadyOpen: false });
 });
@@ -166,15 +176,12 @@ describe("business plan comparison", () => {
     fireEvent.click(screen.getByLabelText(/Årlig/));
     fireEvent.click(screen.getAllByRole("button", { name: "Bestill Proff" })[0]!);
 
-    const email = await screen.findByLabelText("E-post for faktura");
-    fireEvent.change(email, { target: { value: "faktura@bedriften.no" } });
     fireEvent.click(screen.getByRole("button", { name: "Send bestilling" }));
 
     await waitFor(() =>
       expect(requestProffSubscriptionMock).toHaveBeenCalledWith({
         data: {
           term: "yearly",
-          billingEmail: "faktura@bedriften.no",
           billingReference: undefined,
         },
       }),

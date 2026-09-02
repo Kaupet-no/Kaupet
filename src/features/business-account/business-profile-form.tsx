@@ -8,8 +8,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { hasEffectiveProffAccess } from "@/features/business-account/plans";
-import type { BusinessOrganization } from "@/features/business-account/use-business-membership";
-import { updateBusinessProfile } from "@/lib/business.functions";
+import type {
+  BusinessLocation,
+  BusinessOrganization,
+} from "@/features/business-account/use-business-membership";
+import {
+  createOrganizationLocation,
+  updateBusinessProfile,
+  updateOrganizationBillingEmail,
+  updateOrganizationLocation,
+} from "@/lib/business.functions";
 import {
   ORGANIZATION_LOGOS_BUCKET,
   deletePreviousOrganizationLogo,
@@ -26,12 +34,25 @@ const PALETTES = [
   { id: "slate", label: "Skifer", swatch: "oklch(0.32 0.02 250)" },
 ] as const;
 
-type Props = { organization: BusinessOrganization };
+type Props = {
+  organization: BusinessOrganization;
+  locations: BusinessLocation[];
+  billingProfile?: {
+    billing_email: string;
+    address_line: string | null;
+    postal_code: string | null;
+    city: string | null;
+  } | null;
+};
 
-type FormState = {
-  displayName: string;
+type LocationFormState = {
+  name: string;
+  addressLine: string;
   postalCode: string;
   city: string;
+};
+type FormState = {
+  displayName: string;
   websiteUrl: string;
   brandPalette: (typeof PALETTES)[number]["id"];
 };
@@ -39,22 +60,31 @@ type FormState = {
 function initialState(organization: BusinessOrganization): FormState {
   return {
     displayName: organization.display_name,
-    postalCode: organization.postal_code ?? "",
-    city: organization.city ?? "",
     websiteUrl: organization.website_url ?? "",
     brandPalette: organization.brand_palette ?? "forest",
   };
 }
 
-export function BusinessProfileForm({ organization }: Props) {
+export function BusinessProfileForm({ organization, locations, billingProfile }: Props) {
   const queryClient = useQueryClient();
   const canBrand = hasEffectiveProffAccess(organization);
+  const canManageLocations = Boolean(billingProfile);
   const [form, setForm] = useState(() => initialState(organization));
+  const [billingEmail, setBillingEmail] = useState(billingProfile?.billing_email ?? "");
+  const [locationForm, setLocationForm] = useState<LocationFormState>({
+    name: "",
+    addressLine: "",
+    postalCode: "",
+    city: "",
+  });
+  const [editingLocationId, setEditingLocationId] = useState<string | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const callUpdate = useServerFn(updateBusinessProfile);
-
+  const callUpdateBilling = useServerFn(updateOrganizationBillingEmail);
+  const callCreateLocation = useServerFn(createOrganizationLocation);
+  const callUpdateLocation = useServerFn(updateOrganizationLocation);
   const logoUrl = useMemo(() => {
     if (!canBrand || !organization.logo_path) return null;
     return supabase.storage.from(ORGANIZATION_LOGOS_BUCKET).getPublicUrl(organization.logo_path)
@@ -66,18 +96,8 @@ export function BusinessProfileForm({ organization }: Props) {
       setValidationError(null);
       setSaved(false);
       const displayName = form.displayName.trim();
-      const postalCode = form.postalCode.trim();
-      const city = form.city.trim();
       if (displayName.length < 2 || displayName.length > 120) {
         throw new Error("Visningsnavnet må være mellom 2 og 120 tegn.");
-      }
-      // Adressen er lokasjonen på hver annonse fra bedriften, så den kan ikke
-      // stå tom lenger.
-      if (!/^\d{4}$/u.test(postalCode)) {
-        throw new Error("Postnummer må være fire siffer.");
-      }
-      if (city.length < 1 || city.length > 100) {
-        throw new Error("By må være mellom 1 og 100 tegn.");
       }
       let websiteUrl: string | undefined;
       if (canBrand) {
@@ -101,8 +121,6 @@ export function BusinessProfileForm({ organization }: Props) {
       const updated = await callUpdate({
         data: {
           displayName,
-          postalCode,
-          city,
           ...(canBrand
             ? {
                 websiteUrl: websiteUrl || null,
@@ -125,6 +143,27 @@ export function BusinessProfileForm({ organization }: Props) {
     onError: (error: Error) => setValidationError(error.message),
   });
 
+  const locationMutation = useMutation({
+    mutationFn: () =>
+      editingLocationId
+        ? callUpdateLocation({ data: { ...locationForm, locationId: editingLocationId } })
+        : callCreateLocation({ data: locationForm }),
+    onSuccess: async () => {
+      setLocationForm({ name: "", addressLine: "", postalCode: "", city: "" });
+      setEditingLocationId(null);
+      setSaved(true);
+      await queryClient.invalidateQueries({ queryKey: ["business-membership"] });
+    },
+    onError: (error: Error) => setValidationError(error.message),
+  });
+  const billingMutation = useMutation({
+    mutationFn: () => callUpdateBilling({ data: { billingEmail } }),
+    onSuccess: async () => {
+      setSaved(true);
+      await queryClient.invalidateQueries({ queryKey: ["business-membership"] });
+    },
+    onError: (error: Error) => setValidationError(error.message),
+  });
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((previous) => ({ ...previous, [key]: value }));
 
@@ -166,33 +205,158 @@ export function BusinessProfileForm({ organization }: Props) {
             2–120 tegn. Juridisk navn og organisasjonsnummer kan ikke endres.
           </p>
         </div>
-        <div className="space-y-2 sm:col-span-2">
-          <h3 className="font-semibold">Bedriftsadresse</h3>
-          <p className="text-sm text-muted-foreground">
-            Alle annonser fra bedriften bruker denne adressen som lokasjon — den settes ikke per
-            annonse. Den er hentet fra Brønnøysundregistrene ved registrering, og kan endres her.
-          </p>
+        <div className="space-y-3 sm:col-span-2">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="font-semibold">Lokasjoner</h3>
+              <p className="text-sm text-muted-foreground">
+                Adressen velges per lokasjon og brukes på annonsene som opprettes der.
+              </p>
+            </div>
+            {canManageLocations && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setEditingLocationId("");
+                  setLocationForm({ name: "", addressLine: "", postalCode: "", city: "" });
+                }}
+              >
+                Ny lokasjon
+              </Button>
+            )}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {locations.map((location) => (
+              <div key={location.id} className="rounded-lg border border-border p-3 text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="font-medium">
+                    {location.name}
+                    {location.is_default ? " · Standard" : ""}
+                  </p>
+                  {canManageLocations && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setEditingLocationId(location.id);
+                        setLocationForm({
+                          name: location.name,
+                          addressLine: location.address_line ?? "",
+                          postalCode: location.postal_code ?? "",
+                          city: location.city ?? "",
+                        });
+                      }}
+                    >
+                      Rediger
+                    </Button>
+                  )}
+                </div>
+                <p className="text-muted-foreground">
+                  {[location.address_line, location.postal_code, location.city]
+                    .filter(Boolean)
+                    .join(", ") || "Adresse ikke registrert"}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="business-postal-code">Postnummer</Label>
-          <Input
-            id="business-postal-code"
-            required
-            inputMode="numeric"
-            maxLength={4}
-            value={form.postalCode}
-            onChange={(event) => setField("postalCode", event.target.value)}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="business-city">Sted</Label>
-          <Input
-            id="business-city"
-            required
-            value={form.city}
-            onChange={(event) => setField("city", event.target.value)}
-          />
-        </div>
+        {canManageLocations && editingLocationId !== null && (
+          <div className="space-y-4 border-t border-border pt-5 sm:col-span-2">
+            <div>
+              <h3 className="font-semibold">
+                {editingLocationId ? "Rediger lokasjon" : "Ny lokasjon"}
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Lokasjonen blir tilgjengelig i annonseoppretteren og for tildelte medlemmer.
+              </p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {(
+                [
+                  ["name", "Navn", "f.eks. Oslo butikk"],
+                  ["addressLine", "Gateadresse", "Storgata 1"],
+                  ["postalCode", "Postnummer", "0001"],
+                  ["city", "Poststed", "Oslo"],
+                ] as const
+              ).map(([field, label, placeholder]) => (
+                <div key={field} className="space-y-2">
+                  <Label htmlFor={`location-${field}`}>{label}</Label>
+                  <Input
+                    id={`location-${field}`}
+                    value={locationForm[field]}
+                    placeholder={placeholder}
+                    onChange={(event) =>
+                      setLocationForm((previous) => ({
+                        ...previous,
+                        [field]: event.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                disabled={locationMutation.isPending}
+                onClick={() => locationMutation.mutate()}
+              >
+                {locationMutation.isPending && <Loader2 className="size-4 animate-spin" />}
+                {locationMutation.isPending
+                  ? "Lagrer…"
+                  : editingLocationId
+                    ? "Lagre lokasjon"
+                    : "Opprett lokasjon"}
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setEditingLocationId(null)}>
+                Avbryt
+              </Button>
+            </div>
+          </div>
+        )}
+        {billingProfile && (
+          <div className="space-y-4 border-t border-border pt-5 sm:col-span-2">
+            <div>
+              <h3 className="font-semibold">Fakturaprofil</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Brukes som mottaker for nye Proff-bestillinger. Adressen er hentet fra
+                Brønnøysundregistrene.
+              </p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+              <div className="space-y-2">
+                <Label htmlFor="business-billing-email">Faktura-e-post</Label>
+                <Input
+                  id="business-billing-email"
+                  type="email"
+                  value={billingEmail}
+                  onChange={(event) => setBillingEmail(event.target.value)}
+                />
+              </div>
+              <div className="flex items-end justify-between gap-3">
+                <p className="text-sm text-muted-foreground">
+                  {[billingProfile.address_line, billingProfile.postal_code, billingProfile.city]
+                    .filter(Boolean)
+                    .join(", ") || "Fakturaadresse ikke registrert"}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={billingMutation.isPending}
+                  onClick={() => billingMutation.mutate()}
+                >
+                  {billingMutation.isPending ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    "Lagre"
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {canBrand ? (
           <div className="space-y-5 border-t border-border pt-5 sm:col-span-2">

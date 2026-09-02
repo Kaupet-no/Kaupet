@@ -22,7 +22,10 @@ import {
   type CategoryFlowRow,
 } from "@/features/listing-creation/category-flows";
 import { validateRequiredFieldGroups } from "@/features/listing-creation/field-groups/validators";
-import { organizationListingLocation } from "@/lib/organization-location.server";
+import {
+  organizationListingLocation,
+  type OrganizationListingLocation,
+} from "@/lib/organization-location.server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const MAX_LISTINGS_PER_HOUR = 5;
@@ -30,12 +33,14 @@ const MAX_LISTINGS_PER_HOUR = 5;
 type ListingOwnership = {
   seller_id: string;
   organization_id: string | null;
+  organization_location_id: string | null;
 };
 
 type ListingMutationRow = {
   id: string;
   seller_id: string;
   organization_id: string | null;
+  organization_location_id: string | null;
   status: string;
   is_free: boolean;
   price_nok: number | null;
@@ -46,17 +51,18 @@ async function resolveListingOwnership(
   supabaseAdmin: SupabaseClient,
   userId: string,
   categoryId: string | null,
+  requestedLocationId?: string | null,
 ): Promise<ListingOwnership> {
   const { data: membership, error } = await supabaseAdmin
     .from("organization_members")
-    .select(
-      "organization_id, role, status, can_create_listings, listing_edit_scope, category_access",
-    )
+    .select("organization_id, role, status, can_create_listings, category_access")
     .eq("user_id", userId)
     .eq("status", "active")
     .maybeSingle();
   if (error) throw error;
-  if (!membership) return { seller_id: userId, organization_id: null };
+  if (!membership) {
+    return { seller_id: userId, organization_id: null, organization_location_id: null };
+  }
   if (membership.role === "member") {
     const { error: syncError } = await supabaseAdmin.rpc("sync_organization_entitlements", {
       _organization_id: membership.organization_id,
@@ -84,27 +90,68 @@ async function resolveListingOwnership(
       if (!allowed) throw new Error("Du har ikke tilgang til denne kategorien.");
     }
   }
-  return { seller_id: userId, organization_id: membership.organization_id };
+  if (!requestedLocationId) throw new Error("Velg en lokasjon før annonsen opprettes.");
+  const { data: location, error: locationError } = await supabaseAdmin
+    .from("organization_locations")
+    .select("id")
+    .eq("id", requestedLocationId)
+    .eq("organization_id", membership.organization_id)
+    .eq("active", true)
+    .maybeSingle();
+  if (locationError) throw locationError;
+  if (!location) throw new Error("Lokasjonen finnes ikke eller er ikke aktiv.");
+  if (membership.role !== "superuser") {
+    const { data: assignment, error: assignmentError } = await supabaseAdmin
+      .from("organization_location_members")
+      .select("location_id")
+      .eq("location_id", requestedLocationId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (assignmentError) throw assignmentError;
+    if (!assignment) throw new Error("Du har ikke tilgang til denne lokasjonen.");
+  }
+  return {
+    seller_id: userId,
+    organization_id: membership.organization_id,
+    organization_location_id: requestedLocationId,
+  };
 }
 
-/**
- * Bedriftsannonser bruker alltid bedriftsadressen som lokasjon. Overstyringen
- * ligger her, der eierskapet allerede avgjøres, slik at hver vei inn —
- * kladd, publisering og Proff-import — treffer samme regel. Klienten kan
- * sende hva som helst i `postal_code`/`city`; det forkastes for annonser som
- * eies av en organisasjon.
- */
 async function organizationLocationOverride(
   supabaseAdmin: SupabaseClient,
   organizationId: string | null,
-): Promise<{
-  postal_code: string | null;
-  city: string | null;
-  lat: number | null;
-  lng: number | null;
-} | null> {
-  if (!organizationId) return null;
-  return organizationListingLocation(supabaseAdmin, organizationId);
+  locationId: string | null,
+): Promise<OrganizationListingLocation | null> {
+  if (!organizationId || !locationId) return null;
+  return organizationListingLocation(supabaseAdmin, organizationId, locationId);
+}
+function listingLocationFields(location: OrganizationListingLocation | null) {
+  if (!location) return null;
+  return {
+    postal_code: location.postal_code,
+    city: location.city,
+    lat: location.lat,
+    lng: location.lng,
+  };
+}
+
+async function saveVisitingAddressSnapshot(
+  supabaseAdmin: SupabaseClient,
+  listingId: string,
+  location: OrganizationListingLocation | null,
+  showVisitingAddress: boolean,
+) {
+  await supabaseAdmin.from("listing_visiting_addresses").delete().eq("listing_id", listingId);
+  if (!showVisitingAddress || !location?.address_line || !location.postal_code || !location.city) {
+    return;
+  }
+  const { error } = await supabaseAdmin.from("listing_visiting_addresses").insert({
+    listing_id: listingId,
+    address_line: location.address_line,
+    postal_code: location.postal_code,
+    city: location.city,
+  });
+  if (error) throw error;
 }
 
 async function authorizeListingMutation(
@@ -114,42 +161,30 @@ async function authorizeListingMutation(
 ): Promise<ListingMutationRow> {
   const { data: listing, error } = await supabaseAdmin
     .from("listings")
-    .select("id, seller_id, organization_id, status, is_free, price_nok, category_id")
+    .select(
+      "id, seller_id, organization_id, organization_location_id, status, is_free, price_nok, category_id",
+    )
     .eq("id", listingId)
     .maybeSingle();
   if (error) throw error;
   if (!listing) throw new Error("Annonsen finnes ikke.");
   if (listing.seller_id === userId && !listing.organization_id) return listing;
-  if (!listing.organization_id) throw new Error("Du har ikke tilgang til denne annonsen");
-
-  const { error: syncError } = await supabaseAdmin.rpc("sync_organization_entitlements", {
-    _organization_id: listing.organization_id,
-  });
-  if (syncError) throw syncError;
-  const { data: membership, error: membershipError } = await supabaseAdmin
-    .from("organization_members")
-    .select("role, status, listing_edit_scope")
-    .eq("organization_id", listing.organization_id)
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (membershipError) throw membershipError;
-  if (!membership || membership.status !== "active") {
+  if (!listing.organization_id || !listing.organization_location_id) {
     throw new Error("Du har ikke tilgang til denne annonsen");
   }
-  if (membership.role === "member") {
-    const { data: hasAccess, error: accessError } = await supabaseAdmin.rpc(
-      "organization_has_proff_access",
-      { _organization_id: listing.organization_id },
-    );
-    if (accessError) throw accessError;
-    if (!hasAccess) throw new Error("Proff-tilgang er ikke aktiv.");
-    if (
-      membership.listing_edit_scope === "none" ||
-      (membership.listing_edit_scope === "own" && listing.seller_id !== userId)
-    ) {
-      throw new Error("Du har ikke tilgang til denne annonsen");
-    }
-  }
+  const { data: allowed, error: permissionError } = await supabaseAdmin.rpc(
+    "can_update_organization_listing",
+    {
+      _organization_id: listing.organization_id,
+      _location_id: listing.organization_location_id,
+      _seller_id: listing.seller_id,
+      _status: listing.status,
+      _category_id: listing.category_id,
+      _user_id: userId,
+    },
+  );
+  if (permissionError) throw permissionError;
+  if (!allowed) throw new Error("Du har ikke tilgang til denne annonsen");
   return listing;
 }
 
@@ -226,6 +261,8 @@ export const saveDraftListing = createServerFn({ method: "POST" })
         city: z.string().max(100).nullable().optional(),
         lat: z.number().nullable().optional(),
         lng: z.number().nullable().optional(),
+        organization_location_id: z.string().uuid().nullable().optional(),
+        show_visiting_address: z.boolean().optional(),
         can_ship: z.boolean().nullable().optional(),
         known_issues: z.string().trim().max(2000).nullable().optional(),
         no_known_issues: z.boolean().nullable().optional(),
@@ -250,6 +287,9 @@ export const saveDraftListing = createServerFn({ method: "POST" })
       ...(data.city !== undefined && { city: data.city }),
       ...(data.lat !== undefined && { lat: data.lat }),
       ...(data.lng !== undefined && { lng: data.lng }),
+      ...(data.show_visiting_address !== undefined && {
+        show_visiting_address: data.show_visiting_address,
+      }),
       ...(data.can_ship !== undefined && { can_ship: data.can_ship }),
       ...(data.known_issues !== undefined && { known_issues: data.known_issues }),
       ...(data.no_known_issues !== undefined && { no_known_issues: !!data.no_known_issues }),
@@ -264,13 +304,23 @@ export const saveDraftListing = createServerFn({ method: "POST" })
       const orgLocation = await organizationLocationOverride(
         supabaseAdmin,
         existing.organization_id,
+        existing.organization_location_id,
       );
-      // Re-editing a draft that already got the "expires in 7 days" system
-      // message must reset the flag — otherwise a second dormancy period
-      // (edit, then go quiet again) would delete it without a fresh warning.
       const { data: updated, error } = await supabaseAdmin
         .from("listings")
-        .update({ ...fields, ...orgLocation, draft_expiry_notified_at: null })
+        .update({
+          ...fields,
+          ...(existing.organization_id
+            ? {
+                ...listingLocationFields(orgLocation),
+                organization_location_id: existing.organization_location_id,
+              }
+            : {
+                organization_location_id: null,
+                show_visiting_address: false,
+              }),
+          draft_expiry_notified_at: null,
+        })
         .eq("id", data.id)
         .eq("status", "draft")
         .select("id, kaupet_code")
@@ -279,10 +329,16 @@ export const saveDraftListing = createServerFn({ method: "POST" })
       return { id: updated.id as string, kaupet_code: updated.kaupet_code as string };
     }
 
-    const ownership = await resolveListingOwnership(supabaseAdmin, userId, null);
+    const ownership = await resolveListingOwnership(
+      supabaseAdmin,
+      userId,
+      data.category_id ?? null,
+      data.organization_location_id,
+    );
     const orgLocation = await organizationLocationOverride(
       supabaseAdmin,
       ownership.organization_id,
+      ownership.organization_location_id,
     );
     await assertUnderHourlyListingLimit(
       supabaseAdmin,
@@ -293,10 +349,15 @@ export const saveDraftListing = createServerFn({ method: "POST" })
     const { data: listing, error } = await supabaseAdmin
       .from("listings")
       .insert({
-        ...(ownership.organization_id ? ownership : { seller_id: userId }),
+        ...ownership,
+        ...(ownership.organization_id
+          ? {
+              ...listingLocationFields(orgLocation),
+              show_visiting_address: data.show_visiting_address ?? false,
+            }
+          : { seller_id: userId, organization_location_id: null, show_visiting_address: false }),
         status: "draft",
         ...fields,
-        ...orgLocation,
       })
       .select("id, kaupet_code")
       .single();
@@ -338,6 +399,8 @@ export const createListing = createServerFn({ method: "POST" })
         city: z.string().max(100).nullable(),
         lat: z.number().nullable(),
         lng: z.number().nullable(),
+        organization_location_id: z.string().uuid().nullable().optional(),
+        show_visiting_address: z.boolean().optional(),
         can_ship: z.boolean().nullable(),
         known_issues: z.string().trim().max(2000).nullable().optional(),
         no_known_issues: z.boolean().nullable().optional(),
@@ -421,32 +484,53 @@ export const createListing = createServerFn({ method: "POST" })
       known_issues: data.known_issues ?? null,
       no_known_issues: !!data.no_known_issues,
       maintenance_history: data.maintenance_history ?? null,
+      show_visiting_address: data.show_visiting_address ?? false,
       ...(data.attributes !== undefined && { attributes: data.attributes }),
       status: "active" as const,
       published_at: new Date().toISOString(),
     };
-
     if (data.draftId) {
       const existing = await authorizeListingMutation(supabaseAdmin, userId, data.draftId);
       const orgLocation = await organizationLocationOverride(
         supabaseAdmin,
         existing.organization_id,
+        existing.organization_location_id,
       );
       const { data: listing, error } = await supabaseAdmin
         .from("listings")
-        .update({ ...listingFields, ...orgLocation })
+        .update({
+          ...listingFields,
+          ...(existing.organization_id
+            ? {
+                ...listingLocationFields(orgLocation),
+                organization_location_id: existing.organization_location_id,
+              }
+            : { organization_location_id: null, show_visiting_address: false }),
+        })
         .eq("id", data.draftId)
         .eq("status", "draft")
         .select("id, kaupet_code")
         .single();
       if (error) throw error;
+      await saveVisitingAddressSnapshot(
+        supabaseAdmin,
+        listing.id as string,
+        orgLocation,
+        existing.organization_id ? (data.show_visiting_address ?? false) : false,
+      );
       return { id: listing.id as string, kaupet_code: listing.kaupet_code as string };
     }
 
-    const ownership = await resolveListingOwnership(supabaseAdmin, userId, data.category_id);
+    const ownership = await resolveListingOwnership(
+      supabaseAdmin,
+      userId,
+      data.category_id,
+      data.organization_location_id,
+    );
     const orgLocation = await organizationLocationOverride(
       supabaseAdmin,
       ownership.organization_id,
+      ownership.organization_location_id,
     );
     await assertUnderHourlyListingLimit(
       supabaseAdmin,
@@ -457,13 +541,21 @@ export const createListing = createServerFn({ method: "POST" })
     const { data: listing, error } = await supabaseAdmin
       .from("listings")
       .insert({
-        ...(ownership.organization_id ? ownership : { seller_id: userId }),
+        ...ownership,
+        ...(ownership.organization_id
+          ? orgLocation
+          : { seller_id: userId, organization_location_id: null, show_visiting_address: false }),
         ...listingFields,
-        ...orgLocation,
       })
       .select("id, kaupet_code")
       .single();
     if (error) throw error;
+    await saveVisitingAddressSnapshot(
+      supabaseAdmin,
+      listing.id as string,
+      orgLocation,
+      ownership.organization_id ? (data.show_visiting_address ?? false) : false,
+    );
     return { id: listing.id as string, kaupet_code: listing.kaupet_code as string };
   });
 

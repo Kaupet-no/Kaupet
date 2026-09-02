@@ -120,6 +120,8 @@ const listingSchema = z.object({
     .optional()
     .or(z.literal("")),
   city: z.string().trim().max(100).optional().or(z.literal("")),
+  organization_location_id: z.string().uuid().nullable().optional(),
+  show_visiting_address: z.boolean().optional(),
   known_issues: z.string().trim().max(2000).optional().or(z.literal("")),
   no_known_issues: z.boolean().optional(),
   maintenance_history: z.string().trim().max(2000).optional().or(z.literal("")),
@@ -275,6 +277,8 @@ function NewListingPage() {
       price_nok: "",
       postal_code: "",
       city: "",
+      organization_location_id: null,
+      show_visiting_address: false,
       known_issues: "",
       no_known_issues: false,
       maintenance_history: "",
@@ -294,6 +298,8 @@ function NewListingPage() {
     priceNok,
     knownIssues,
     noKnownIssues,
+    organizationLocationId,
+    showVisitingAddress,
     maintenanceHistory,
   ] = useWatch({
     control,
@@ -310,6 +316,8 @@ function NewListingPage() {
       "price_nok",
       "known_issues",
       "no_known_issues",
+      "organization_location_id",
+      "show_visiting_address",
       "maintenance_history",
     ],
   });
@@ -894,6 +902,8 @@ function NewListingPage() {
     setImages,
     knownIssues,
     noKnownIssues: !!noKnownIssues,
+    organizationLocationId,
+    showVisitingAddress,
     maintenanceHistory,
     stepKey: currentStepKey,
   });
@@ -1177,6 +1187,8 @@ function NewListingPage() {
               ? values.can_ship !== "pickup"
               : null,
           lng: finalCoords?.lng ?? null,
+          organization_location_id: values.organization_location_id ?? null,
+          show_visiting_address: values.show_visiting_address ?? false,
           known_issues: isVehicle ? values.known_issues || null : null,
           no_known_issues: isVehicle ? !!values.no_known_issues : null,
           maintenance_history: isVehicle ? values.maintenance_history || null : null,

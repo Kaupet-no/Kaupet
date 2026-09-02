@@ -49,7 +49,6 @@ import {
   requestProffSubscription,
   setBusinessPlan,
   updateBusinessProfile,
-  updateOrganizationMemberPermissions,
 } from "./business.functions";
 
 import { fetchOrganizationFromBrreg } from "@/lib/brreg.server";
@@ -273,30 +272,45 @@ describe("business server functions", () => {
   it("allows basic profile fields but gates branding fields without effective Proff", async () => {
     const admin = buildAdmin({ proff: false });
     await expect(
-      updateBusinessProfile({ data: { displayName: "Nytt navn", city: "Bergen" } }),
+      updateBusinessProfile({ data: { displayName: "Nytt navn" } }),
     ).resolves.toMatchObject({
-      organization: { display_name: "Nytt navn", city: "Bergen" },
+      organization: { display_name: "Nytt navn" },
     });
-    expect(admin.calls.updates).toContainEqual({ display_name: "Nytt navn", city: "Bergen" });
+    expect(admin.calls.updates).toContainEqual({ display_name: "Nytt navn" });
     await expect(
       updateBusinessProfile({ data: { websiteUrl: "https://example.com" } }),
     ).rejects.toThrow("aktivt Proff-abonnement");
   });
 
   it("requires an active superuser and Proff before inviting members", async () => {
+    const locationAssignments = [
+      {
+        locationId: "33333333-3333-4333-8333-333333333333",
+        role: "member" as const,
+        listingAccess: "own" as const,
+        listingEditScope: "own" as const,
+        chatAccess: "own" as const,
+      },
+    ];
     buildAdmin({ membership: null });
     await expect(
-      inviteOrganizationMember({ data: { name: "Kari Nordmann", email: "kari@example.com" } }),
+      inviteOrganizationMember({
+        data: { name: "Kari Nordmann", email: "kari@example.com", locationAssignments },
+      }),
     ).rejects.toThrow("ikke tilgang");
 
     buildAdmin({ proff: false });
     await expect(
-      inviteOrganizationMember({ data: { name: "Kari Nordmann", email: "kari@example.com" } }),
+      inviteOrganizationMember({
+        data: { name: "Kari Nordmann", email: "kari@example.com", locationAssignments },
+      }),
     ).rejects.toThrow("aktivt Proff-abonnement");
 
     buildAdmin({ proff: true });
     await expect(
-      inviteOrganizationMember({ data: { name: "Kari Nordmann", email: "kari@example.com" } }),
+      inviteOrganizationMember({
+        data: { name: "Kari Nordmann", email: "kari@example.com", locationAssignments },
+      }),
     ).resolves.toEqual({
       userId: "invited-user-1",
       email: "kari@example.com",
@@ -304,39 +318,6 @@ describe("business server functions", () => {
     expect(supabaseAdmin.auth.admin.inviteUserByEmail).toHaveBeenCalledWith(
       "kari@example.com",
       expect.any(Object),
-    );
-  });
-  it("normalizes promoted superusers to full permissions before the guarded update", async () => {
-    buildAdmin({ proff: true });
-    await expect(
-      updateOrganizationMemberPermissions({
-        data: {
-          userId: memberId,
-          permissions: {
-            role: "superuser",
-            listingAccess: "own",
-            chatAccess: "own",
-            canCreateListings: false,
-            listingEditScope: "none",
-            categoryAccess: "restricted",
-            allowedCategoryIds: [],
-          },
-        },
-      }),
-    ).resolves.toEqual({ userId: memberId });
-    expect(supabaseAdmin.rpc).toHaveBeenCalledWith(
-      "update_organization_member_permissions",
-      expect.objectContaining({
-        _organization_id: organizationId,
-        _user_id: memberId,
-        _role: "superuser",
-        _listing_access: "all",
-        _chat_access: "all",
-        _can_create_listings: true,
-        _listing_edit_scope: "all",
-        _category_access: "all",
-        _allowed_category_ids: [],
-      }),
     );
   });
 

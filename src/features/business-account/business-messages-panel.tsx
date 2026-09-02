@@ -10,7 +10,7 @@ import type { BusinessOrganization } from "@/features/business-account/use-busin
 import { supabase } from "@/integrations/supabase/client";
 import { signListingImageUrls } from "@/lib/storage";
 
-type Props = { organization: BusinessOrganization };
+type Props = { organization: BusinessOrganization; locationId: string | "all" };
 
 type Listing = {
   id: string;
@@ -41,17 +41,18 @@ type Profile = {
   deleted_at: string | null;
 };
 
-export function BusinessMessagesPanel({ organization }: Props) {
+export function BusinessMessagesPanel({ organization, locationId }: Props) {
   const conversationsQuery = useQuery({
-    queryKey: ["business-messages", organization.id],
+    queryKey: ["business-messages", organization.id, locationId],
     queryFn: async (): Promise<BusinessConversation[]> => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("conversations")
         .select(
-          "id, buyer_id, seller_id, listing_id, last_message_at, listing:listings!inner(id, title, organization_id, listing_images(storage_path, sort_order))",
+          "id, buyer_id, seller_id, listing_id, last_message_at, listing:listings!inner(id, title, organization_id, organization_location_id, listing_images(storage_path, sort_order))",
         )
-        .eq("listing.organization_id", organization.id)
-        .order("last_message_at", { ascending: false });
+        .eq("listing.organization_id", organization.id);
+      if (locationId !== "all") query = query.eq("listing.organization_location_id", locationId);
+      const { data, error } = await query.order("last_message_at", { ascending: false });
       if (error) throw error;
       const conversations = (data ?? []) as unknown as Conversation[];
       const ids = conversations.map((conversation) => conversation.id);

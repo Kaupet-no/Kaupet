@@ -29,6 +29,8 @@ describe("fetchOrganizationFromBrreg", () => {
     await expect(fetchOrganizationFromBrreg("974 760 673", fetchImpl)).resolves.toEqual({
       organizationNumber: "974760673",
       legalName: "REGISTERENHETEN I BRØNNØYSUND",
+      visitingAddress: { addressLine: null, postalCode: "8901", city: "BRØNNØYSUND" },
+      billingAddress: { addressLine: null, postalCode: "8901", city: "BRØNNØYSUND" },
       postalCode: "8901",
       city: "BRØNNØYSUND",
     });

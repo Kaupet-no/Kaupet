@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { AlertCircle, Loader2 } from "lucide-react";
+import { z } from "zod";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { NativePageHeader } from "@/components/native-page-header";
@@ -10,8 +11,13 @@ import { useAuth } from "@/hooks/use-auth";
 const TABS: BusinessTab[] = ["oversikt", "annonser", "meldinger", "bedriftsprofil", "brukere"];
 
 export const Route = createFileRoute("/_authenticated/bedrift/")({
-  validateSearch: (search: Record<string, unknown>): { tab: BusinessTab } => ({
+  validateSearch: (search: Record<string, unknown>): { tab: BusinessTab; location?: string } => ({
     tab: TABS.includes(search.tab as BusinessTab) ? (search.tab as BusinessTab) : "oversikt",
+    location:
+      typeof search.location === "string" &&
+      (search.location === "all" || z.string().uuid().safeParse(search.location).success)
+        ? search.location
+        : undefined,
   }),
   head: () => ({ meta: [{ title: "Bedriftskonsoll — Kaupet.no" }] }),
   component: BusinessConsoleRoute,
@@ -19,10 +25,17 @@ export const Route = createFileRoute("/_authenticated/bedrift/")({
 
 function BusinessConsoleRoute() {
   const navigate = useNavigate();
+  const { tab, location } = Route.useSearch();
   const { user } = useAuth();
-  const { tab } = Route.useSearch();
   const membershipQuery = useBusinessMembership();
   const membership = membershipQuery.data;
+  const selectedLocationId =
+    membership?.role === "superuser" && location === "all"
+      ? "all"
+      : (membership?.locations.find((candidate) => candidate.id === location)?.id ??
+        membership?.locations.find((candidate) => candidate.is_default)?.id ??
+        membership?.locations[0]?.id ??
+        "all");
 
   if (membershipQuery.isLoading) {
     return (
@@ -67,10 +80,18 @@ function BusinessConsoleRoute() {
       <NativePageHeader title="Bedriftskonsoll" backLabel="Meg" backTo="/meg" />
       <BusinessConsole
         organization={membership.organization}
+        locations={membership.locations}
+        billingProfile={membership.billingProfile}
+        selectedLocationId={selectedLocationId}
+        onLocationChange={(nextLocationId) =>
+          void navigate({
+            to: "/bedrift",
+            search: { tab, location: nextLocationId },
+            replace: true,
+          })
+        }
         userId={user?.id ?? membership.user_id}
         role={membership.role}
-        listingAccess={membership.listing_access}
-        listingEditScope={membership.listing_edit_scope}
         tab={tab}
         onTabChange={(nextTab) =>
           void navigate({ to: "/bedrift", search: { tab: nextTab }, replace: true })

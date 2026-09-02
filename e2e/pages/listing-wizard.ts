@@ -27,7 +27,7 @@ export async function login(page: Page, email: string, password: string) {
   await page.getByLabel("E-post").fill(email);
   await page.getByLabel("Passord", { exact: true }).fill(password);
   await page.getByRole("main").getByRole("button", { name: "Logg inn" }).click();
-  await expect(page).toHaveURL("/", { timeout: 10_000 });
+  await expect(page).toHaveURL(/\/(?:bedrift)?(?:\?.*)?$/, { timeout: 10_000 });
 }
 
 /** type=sell is required — without it the route redirects to "/". */

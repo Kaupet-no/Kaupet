@@ -105,6 +105,9 @@ export type Database = {
       }
       business_signup_intents: {
         Row: {
+          billing_address_line: string | null
+          billing_city: string | null
+          billing_postal_code: string | null
           city: string | null
           created_at: string
           email: string | null
@@ -113,8 +116,14 @@ export type Database = {
           organization_number: string
           postal_code: string | null
           signup_token: string
+          visiting_address_line: string | null
+          visiting_city: string | null
+          visiting_postal_code: string | null
         }
         Insert: {
+          billing_address_line?: string | null
+          billing_city?: string | null
+          billing_postal_code?: string | null
           city?: string | null
           created_at?: string
           email?: string | null
@@ -123,8 +132,14 @@ export type Database = {
           organization_number: string
           postal_code?: string | null
           signup_token?: string
+          visiting_address_line?: string | null
+          visiting_city?: string | null
+          visiting_postal_code?: string | null
         }
         Update: {
+          billing_address_line?: string | null
+          billing_city?: string | null
+          billing_postal_code?: string | null
           city?: string | null
           created_at?: string
           email?: string | null
@@ -133,6 +148,9 @@ export type Database = {
           organization_number?: string
           postal_code?: string | null
           signup_token?: string
+          visiting_address_line?: string | null
+          visiting_city?: string | null
+          visiting_postal_code?: string | null
         }
         Relationships: []
       }
@@ -959,6 +977,38 @@ export type Database = {
           },
         ]
       }
+      listing_visiting_addresses: {
+        Row: {
+          address_line: string
+          city: string
+          created_at: string
+          listing_id: string
+          postal_code: string
+        }
+        Insert: {
+          address_line: string
+          city: string
+          created_at?: string
+          listing_id: string
+          postal_code: string
+        }
+        Update: {
+          address_line?: string
+          city?: string
+          created_at?: string
+          listing_id?: string
+          postal_code?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_visiting_addresses_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: true
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       listings: {
         Row: {
           attributes: Json
@@ -986,11 +1036,13 @@ export type Database = {
           maintenance_history: string | null
           no_known_issues: boolean
           organization_id: string | null
+          organization_location_id: string | null
           postal_code: string | null
           price_nok: number | null
           published_at: string | null
           search_vector: unknown
           seller_id: string
+          show_visiting_address: boolean
           status: Database["public"]["Enums"]["listing_status"]
           subtitle: string | null
           title: string
@@ -1022,11 +1074,13 @@ export type Database = {
           maintenance_history?: string | null
           no_known_issues?: boolean
           organization_id?: string | null
+          organization_location_id?: string | null
           postal_code?: string | null
           price_nok?: number | null
           published_at?: string | null
           search_vector?: unknown
           seller_id: string
+          show_visiting_address?: boolean
           status?: Database["public"]["Enums"]["listing_status"]
           subtitle?: string | null
           title: string
@@ -1058,11 +1112,13 @@ export type Database = {
           maintenance_history?: string | null
           no_known_issues?: boolean
           organization_id?: string | null
+          organization_location_id?: string | null
           postal_code?: string | null
           price_nok?: number | null
           published_at?: string | null
           search_vector?: unknown
           seller_id?: string
+          show_visiting_address?: boolean
           status?: Database["public"]["Enums"]["listing_status"]
           subtitle?: string | null
           title?: string
@@ -1083,67 +1139,13 @@ export type Database = {
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
-        ]
-      }
-      organization_listing_imports: {
-        Row: {
-          created_at: string
-          error_code: string | null
-          external_id: string
-          id: string
-          import_id: string
-          listing_id: string | null
-          organization_id: string
-          status: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          error_code?: string | null
-          external_id: string
-          id?: string
-          import_id: string
-          listing_id?: string | null
-          organization_id: string
-          status: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          error_code?: string | null
-          external_id?: string
-          id?: string
-          import_id?: string
-          listing_id?: string | null
-          organization_id?: string
-          status?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
           {
-            foreignKeyName: "organization_listing_imports_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: "listings_organization_location_id_fkey"
+            columns: ["organization_location_id"]
             isOneToOne: false
-            referencedRelation: "organizations"
+            referencedRelation: "organization_locations"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "organization_listing_imports_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "organization_listing_imports_listing_id_fkey"
-            columns: ["listing_id"]
-            isOneToOne: false
-            referencedRelation: "listings"
-            referencedColumns: ["id"]
-          }
         ]
       }
       messages: {
@@ -1232,49 +1234,291 @@ export type Database = {
         }
         Relationships: []
       }
-      organization_members: {
+      organization_billing_profiles: {
         Row: {
-          can_create_listings: boolean
-          category_access: string
-          chat_access: string
+          address_line: string | null
+          billing_email: string
+          city: string | null
           created_at: string
-          listing_access: string
-          listing_edit_scope: string
           organization_id: string
-          role: string
+          postal_code: string | null
+          registry_refreshed_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          address_line?: string | null
+          billing_email: string
+          city?: string | null
+          created_at?: string
+          organization_id: string
+          postal_code?: string | null
+          registry_refreshed_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address_line?: string | null
+          billing_email?: string
+          city?: string | null
+          created_at?: string
+          organization_id?: string
+          postal_code?: string | null
+          registry_refreshed_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_billing_profiles_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_listing_imports: {
+        Row: {
+          created_at: string
+          error_code: string | null
+          external_id: string
+          id: string
+          import_id: string
+          listing_id: string | null
+          organization_id: string
           status: string
           updated_at: string
           user_id: string
         }
         Insert: {
-          can_create_listings?: boolean
-          category_access?: string
-          chat_access?: string
           created_at?: string
-          listing_access?: string
-          listing_edit_scope?: string
+          error_code?: string | null
+          external_id: string
+          id?: string
+          import_id: string
+          listing_id?: string | null
           organization_id: string
-          role: string
           status: string
           updated_at?: string
           user_id: string
         }
         Update: {
-          can_create_listings?: boolean
-          category_access?: string
-          chat_access?: string
           created_at?: string
+          error_code?: string | null
+          external_id?: string
+          id?: string
+          import_id?: string
+          listing_id?: string | null
           organization_id?: string
-          listing_access?: string
-          listing_edit_scope?: string
-          role?: string
           status?: string
           updated_at?: string
           user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "organization_members_organization_id_fkey"
+            foreignKeyName: "organization_listing_imports_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_listing_imports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_location_charge_periods: {
+        Row: {
+          amount_ex_vat_nok: number
+          created_at: string
+          fiken_invoice_number: string | null
+          id: string
+          invoiced_at: string | null
+          period_end: string
+          period_start: string
+          subscription_id: string
+        }
+        Insert: {
+          amount_ex_vat_nok: number
+          created_at?: string
+          fiken_invoice_number?: string | null
+          id?: string
+          invoiced_at?: string | null
+          period_end: string
+          period_start: string
+          subscription_id: string
+        }
+        Update: {
+          amount_ex_vat_nok?: number
+          created_at?: string
+          fiken_invoice_number?: string | null
+          id?: string
+          invoiced_at?: string | null
+          period_end?: string
+          period_start?: string
+          subscription_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_location_charge_periods_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "organization_location_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_location_members: {
+        Row: {
+          chat_access: string
+          created_at: string
+          listing_access: string
+          listing_edit_scope: string
+          location_id: string
+          organization_id: string
+          role: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          chat_access?: string
+          created_at?: string
+          listing_access?: string
+          listing_edit_scope?: string
+          location_id: string
+          organization_id: string
+          role?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          chat_access?: string
+          created_at?: string
+          listing_access?: string
+          listing_edit_scope?: string
+          location_id?: string
+          organization_id?: string
+          role?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_location_members_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "organization_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_location_members_location_organization_fk"
+            columns: ["location_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_locations"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "organization_location_members_organization_id_user_id_fkey"
+            columns: ["organization_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "organization_members"
+            referencedColumns: ["organization_id", "user_id"]
+          },
+          {
+            foreignKeyName: "organization_location_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "organization_members"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      organization_location_subscriptions: {
+        Row: {
+          billing_interval_months: number
+          created_at: string
+          id: string
+          location_id: string
+          next_period_start: string
+          unit_price_ex_vat_nok: number
+          updated_at: string
+        }
+        Insert: {
+          billing_interval_months?: number
+          created_at?: string
+          id?: string
+          location_id: string
+          next_period_start: string
+          unit_price_ex_vat_nok?: number
+          updated_at?: string
+        }
+        Update: {
+          billing_interval_months?: number
+          created_at?: string
+          id?: string
+          location_id?: string
+          next_period_start?: string
+          unit_price_ex_vat_nok?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_location_subscriptions_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: true
+            referencedRelation: "organization_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_locations: {
+        Row: {
+          active: boolean
+          address_line: string | null
+          city: string | null
+          created_at: string
+          id: string
+          is_default: boolean
+          lat: number | null
+          lng: number | null
+          name: string
+          organization_id: string
+          postal_code: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          address_line?: string | null
+          city?: string | null
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          lat?: number | null
+          lng?: number | null
+          name: string
+          organization_id: string
+          postal_code?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          address_line?: string | null
+          city?: string | null
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          lat?: number | null
+          lng?: number | null
+          name?: string
+          organization_id?: string
+          postal_code?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_locations_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -1301,21 +1545,73 @@ export type Database = {
           organization_id?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "organization_member_categories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_member_categories_organization_id_user_id_fkey"
+            columns: ["organization_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "organization_members"
+            referencedColumns: ["organization_id", "user_id"]
+          },
+        ]
+      }
+      organization_members: {
+        Row: {
+          can_create_listings: boolean
+          category_access: string
+          created_at: string
+          organization_id: string
+          role: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          can_create_listings?: boolean
+          category_access?: string
+          created_at?: string
+          organization_id: string
+          role: string
+          status: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          can_create_listings?: boolean
+          category_access?: string
+          created_at?: string
+          organization_id?: string
+          role?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_members_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       organizations: {
         Row: {
           brand_palette: string | null
-          city: string | null
           created_at: string
           display_name: string
           id: string
-          lat: number | null
           legal_name: string
-          lng: number | null
           logo_path: string | null
           organization_number: string
-          postal_code: string | null
           proff_access_until: string | null
           proff_trial_cancelled_at: string | null
           proff_trial_ends_at: string | null
@@ -1326,16 +1622,12 @@ export type Database = {
         }
         Insert: {
           brand_palette?: string | null
-          city?: string | null
           created_at?: string
           display_name: string
           id?: string
-          lat?: number | null
           legal_name: string
-          lng?: number | null
           logo_path?: string | null
           organization_number: string
-          postal_code?: string | null
           proff_access_until?: string | null
           proff_trial_cancelled_at?: string | null
           proff_trial_ends_at?: string | null
@@ -1346,16 +1638,12 @@ export type Database = {
         }
         Update: {
           brand_palette?: string | null
-          city?: string | null
           created_at?: string
           display_name?: string
           id?: string
-          lat?: number | null
           legal_name?: string
-          lng?: number | null
           logo_path?: string | null
           organization_number?: string
-          postal_code?: string | null
           proff_access_until?: string | null
           proff_trial_cancelled_at?: string | null
           proff_trial_ends_at?: string | null
@@ -1363,6 +1651,51 @@ export type Database = {
           selected_plan?: string | null
           updated_at?: string
           website_url?: string | null
+        }
+        Relationships: []
+      }
+      product_event_rate_limits: {
+        Row: {
+          attempts: number
+          key_hash: string
+          window_started_at: string
+        }
+        Insert: {
+          attempts?: number
+          key_hash: string
+          window_started_at?: string
+        }
+        Update: {
+          attempts?: number
+          key_hash?: string
+          window_started_at?: string
+        }
+        Relationships: []
+      }
+      product_events: {
+        Row: {
+          created_at: string
+          event_name: string
+          id: number
+          path: string
+          platform: string
+          properties: Json
+        }
+        Insert: {
+          created_at?: string
+          event_name: string
+          id?: never
+          path: string
+          platform: string
+          properties?: Json
+        }
+        Update: {
+          created_at?: string
+          event_name?: string
+          id?: never
+          path?: string
+          platform?: string
+          properties?: Json
         }
         Relationships: []
       }
@@ -1424,51 +1757,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      product_event_rate_limits: {
-        Row: {
-          attempts: number
-          key_hash: string
-          window_started_at: string
-        }
-        Insert: {
-          attempts?: number
-          key_hash: string
-          window_started_at?: string
-        }
-        Update: {
-          attempts?: number
-          key_hash?: string
-          window_started_at?: string
-        }
-        Relationships: []
-      }
-      product_events: {
-        Row: {
-          created_at: string
-          event_name: string
-          id: number
-          path: string
-          platform: string
-          properties: Json
-        }
-        Insert: {
-          created_at?: string
-          event_name: string
-          id?: never
-          path: string
-          platform: string
-          properties?: Json
-        }
-        Update: {
-          created_at?: string
-          event_name?: string
-          id?: never
-          path?: string
-          platform?: string
-          properties?: Json
-        }
-        Relationships: []
       }
       profiles: {
         Row: {
@@ -2579,8 +2867,50 @@ export type Database = {
           value: string
         }[]
       }
+      can_access_organization_chat: {
+        Args: {
+          _location_id: string
+          _organization_id: string
+          _seller_id: string
+          _user_id?: string
+        }
+        Returns: boolean
+      }
       can_act_for_organization: {
         Args: { _organization_id: string; _user_id?: string }
+        Returns: boolean
+      }
+      can_create_organization_listing: {
+        Args: {
+          _category_id: string
+          _location_id: string
+          _organization_id: string
+          _user_id?: string
+        }
+        Returns: boolean
+      }
+      can_manage_organization_location: {
+        Args: { _location_id: string; _user_id?: string }
+        Returns: boolean
+      }
+      can_update_organization_listing: {
+        Args: {
+          _category_id: string
+          _location_id: string
+          _organization_id: string
+          _seller_id: string
+          _status: Database["public"]["Enums"]["listing_status"]
+          _user_id?: string
+        }
+        Returns: boolean
+      }
+      can_view_organization_listing: {
+        Args: {
+          _location_id: string
+          _organization_id: string
+          _seller_id: string
+          _user_id?: string
+        }
         Returns: boolean
       }
       cancel_account_deletion: { Args: never; Returns: boolean }
@@ -2621,8 +2951,67 @@ export type Database = {
         Args: { _ip_hash: string; _token: string }
         Returns: string
       }
+      create_listing_from_import_row:
+        | {
+            Args: {
+              _external_id: string
+              _import_id: string
+              _listing: Json
+              _organization_id: string
+              _user_id: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              _external_id: string
+              _import_id: string
+              _listing: Json
+              _location_id: string
+              _organization_id: string
+              _show_visiting_address?: boolean
+              _user_id: string
+            }
+            Returns: Json
+          }
+      create_organization_location: {
+        Args: {
+          _address_line: string
+          _city: string
+          _name: string
+          _organization_id: string
+          _postal_code: string
+        }
+        Returns: {
+          active: boolean
+          address_line: string | null
+          city: string | null
+          created_at: string
+          id: string
+          is_default: boolean
+          lat: number | null
+          lng: number | null
+          name: string
+          organization_id: string
+          postal_code: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "organization_locations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       expire_listing_promotions: { Args: never; Returns: number }
       expire_old_listings: { Args: never; Returns: number }
+      extend_proff_access: {
+        Args: { _months: number; _organization_id: string }
+        Returns: {
+          period_end: string
+          period_start: string
+        }[]
+      }
       generate_kaupet_code: { Args: never; Returns: string }
       get_featured_listing_ids: {
         Args: { _category_slug?: string; _limit?: number }
@@ -2695,6 +3084,29 @@ export type Database = {
         }
         Returns: undefined
       }
+      mark_organization_location_charge_invoiced: {
+        Args: {
+          _fiken_invoice_number: string
+          _period_start: string
+          _subscription_id: string
+        }
+        Returns: {
+          amount_ex_vat_nok: number
+          created_at: string
+          fiken_invoice_number: string | null
+          id: string
+          invoiced_at: string | null
+          period_end: string
+          period_start: string
+          subscription_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "organization_location_charge_periods"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       match_listing_to_saved_searches: {
         Args: { _listing_id: string }
         Returns: undefined
@@ -2733,48 +3145,9 @@ export type Database = {
           suspension_reason: string
         }[]
       }
-      extend_proff_access: {
-        Args: { _months: number; _organization_id: string }
-        Returns: {
-          period_end: string
-          period_start: string
-        }[]
-      }
       organization_has_proff_access: {
         Args: { _organization_id: string }
         Returns: boolean
-      }
-      can_access_organization_chat: {
-        Args: { _organization_id: string; _seller_id: string; _user_id?: string }
-        Returns: boolean
-      }
-      can_create_organization_listing: {
-        Args: { _category_id: string; _organization_id: string; _user_id?: string }
-        Returns: boolean
-      }
-      can_update_organization_listing: {
-        Args: {
-          _category_id: string
-          _organization_id: string
-          _seller_id: string
-          _status: Database["public"]["Enums"]["listing_status"]
-          _user_id?: string
-        }
-        Returns: boolean
-      }
-      can_view_organization_listing: {
-        Args: { _organization_id: string; _seller_id: string; _user_id?: string }
-        Returns: boolean
-      }
-      create_listing_from_import_row: {
-        Args: {
-          _external_id: string
-          _import_id: string
-          _listing: Json
-          _organization_id: string
-          _user_id: string
-        }
-        Returns: Json
       }
       popular_listings_by_category: {
         Args: { _category_ids: string[]; _limit?: number; _offset?: number }
@@ -2815,21 +3188,11 @@ export type Database = {
         }[]
       }
       purge_expired_accounts: { Args: never; Returns: number }
-      update_organization_member_permissions: {
-        Args: {
-          _allowed_category_ids: string[]
-          _can_create_listings: boolean
-          _category_access: string
-          _chat_access: string
-          _listing_access: string
-          _listing_edit_scope: string
-          _organization_id: string
-          _role: string
-          _user_id: string
-        }
+      purge_expired_personal_data: { Args: never; Returns: Json }
+      remove_organization_location_member: {
+        Args: { _location_id: string; _user_id: string }
         Returns: undefined
       }
-      purge_expired_personal_data: { Args: never; Returns: Json }
       remove_organization_member: {
         Args: { _organization_id: string; _user_id: string }
         Returns: undefined
@@ -2888,6 +3251,17 @@ export type Database = {
           title: string
           total_count: number
         }[]
+      }
+      set_organization_location_member_permissions: {
+        Args: {
+          _chat_access: string
+          _listing_access: string
+          _listing_edit_scope: string
+          _location_id: string
+          _role: string
+          _user_id: string
+        }
+        Returns: undefined
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }

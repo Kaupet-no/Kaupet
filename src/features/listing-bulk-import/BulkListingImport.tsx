@@ -46,6 +46,13 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { buildTree, descendants, type Category } from "@/lib/categories";
 import { categoryBreadcrumb } from "@/lib/category-filters";
 import { cn } from "@/lib/utils";
@@ -63,14 +70,21 @@ import {
 export function BulkListingImport({
   open,
   onOpenChange,
+  locations = [],
+  selectedLocationId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  locations?: Array<{
+    id: string;
+    name: string;
+    address_line: string | null;
+    postal_code: string | null;
+    city: string | null;
+  }>;
+  selectedLocationId?: string | null;
 }) {
   const { data: allCategories = [], isLoading: categoriesLoading } = useCategories();
-  // Skjulte kategorier (bl.a. E2E-testkategorien) skal bare være plukkbare for
-  // demo-/admin-brukere — samme regel som annonseveiviseren og
-  // kategoribytte-dialogen.
   const { data: isDemo = false } = useIsDemo();
   const categories = useMemo(
     () => visibleCategories(allCategories, isDemo),
@@ -78,10 +92,10 @@ export function BulkListingImport({
   );
   const { data: filters = [] } = useAllCategoryFilters();
   const [templateCategoryId, setTemplateCategoryId] = useState<string | null>(null);
+  const [locationId, setLocationId] = useState(selectedLocationId ?? locations[0]?.id ?? "");
+  const [showVisitingAddress, setShowVisitingAddress] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState("");
-  // Popoveren må portaleres inn i selve overlay-noden, ellers drar
-  // dialogens fokusfelle fokus tilbake til knappen i stedet for søkefeltet.
   const [overlayEl, setOverlayEl] = useState<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [parsed, setParsed] = useState<ParsedBulkImport | null>(null);
@@ -90,12 +104,15 @@ export function BulkListingImport({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [results, setResults] = useState<BulkImportResult[] | null>(null);
   const createImport = useMutation({
-    mutationFn: (variables: { importId: string; rows: ParsedBulkImport["rows"] }) =>
-      createListingsFromImport({ data: variables }),
+    mutationFn: (variables: {
+      importId: string;
+      rows: ParsedBulkImport["rows"];
+      locationId: string;
+      showVisitingAddress: boolean;
+    }) => createListingsFromImport({ data: variables }),
     onSuccess: setResults,
     onError: (error: Error) => showErrorToast(error.message || "Kunne ikke opprette annonsene."),
   });
-
   // Malbyggeren drar med seg logo-PNG-en og OOXML-skriveren, som ingen
   // trenger før de faktisk laster ned malen.
   const downloadTemplate = async () => {
@@ -224,6 +241,46 @@ export function BulkListingImport({
                   bilde-URL-er støttes ikke.
                 </AlertDescription>
               </Alert>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="bulk-location">Lokasjon for annonsene</Label>
+                  <Select value={locationId} onValueChange={setLocationId}>
+                    <SelectTrigger id="bulk-location">
+                      <SelectValue placeholder="Velg lokasjon" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {locations.map((location) => (
+                        <SelectItem key={location.id} value={location.id}>
+                          {location.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Lokasjon velges før import. Kolonnene postnummer og sted i filen brukes ikke.
+                  </p>
+                </div>
+                <div
+                  role="group"
+                  aria-label="Vis besøksadresse"
+                  className="flex items-start gap-3 rounded-md border p-3 text-sm"
+                >
+                  <input
+                    id="bulk-show-address"
+                    type="checkbox"
+                    aria-label="Vis besøksadresse"
+                    className="mt-1 size-4 accent-primary"
+                    checked={showVisitingAddress}
+                    onChange={(event) => setShowVisitingAddress(event.target.checked)}
+                  />
+                  <span>
+                    <span className="font-medium">Vis besøksadresse</span>
+                    <span className="block text-muted-foreground">
+                      Publiser full gateadresse på annonsene.
+                    </span>
+                  </span>
+                </div>
+              </div>
               <div className="space-y-3">
                 <div className="max-w-md space-y-2">
                   <Label id="template-category-label">Mal for kategori</Label>
@@ -480,9 +537,14 @@ export function BulkListingImport({
             <AlertDialogAction
               onClick={(event) => {
                 event.preventDefault();
-                if (importId && parsed) {
+                if (importId && parsed && locationId) {
                   setConfirmOpen(false);
-                  createImport.mutate({ importId, rows: parsed.rows });
+                  createImport.mutate({
+                    importId,
+                    rows: parsed.rows,
+                    locationId,
+                    showVisitingAddress,
+                  });
                 }
               }}
             >

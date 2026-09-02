@@ -1,15 +1,19 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { ClientOnly } from "@tanstack/react-router";
 import { Hash, Loader2, LocateFixed, MapPin } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-
+import { Checkbox } from "@/components/ui/checkbox";
 import {
-  useBusinessMembership,
-  type BusinessOrganization,
-} from "@/features/business-account/use-business-membership";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useBusinessMembership } from "@/features/business-account/use-business-membership";
 
 import type { WizardSharedProps } from "../types";
 import { RequiredMark } from "../required-mark";
@@ -279,36 +283,72 @@ export function DeliveryGroup(props: WizardSharedProps) {
   return <DeliveryLocation {...props} showLocation={false} />;
 }
 
-/**
- * Bedriftsannonser bruker bedriftsadressen som lokasjon — den settes ikke per
- * annonse. Serveren overstyrer uansett `postal_code`/`city` for annonser som
- * eies av en organisasjon (se `listings.functions.ts`); her slipper brukeren
- * å fylle ut et felt som likevel forkastes.
- */
-function OrganizationLocationNote({ organization }: { organization: BusinessOrganization }) {
-  const address = [organization.postal_code, organization.city].filter(Boolean).join(" ");
-  return (
-    <section className="space-y-2">
-      <Label>Sted</Label>
-      <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/40 p-4">
-        <MapPin className="mt-0.5 size-5 shrink-0 text-primary" />
-        <div className="text-sm">
-          <p className="font-medium">{address || "Bedriftsadressen mangler"}</p>
-          <p className="mt-1 text-muted-foreground">
-            {address
-              ? "Annonsen bruker bedriftsadressen. En superbruker kan endre den i bedriftskonsollet."
-              : "Legg inn postnummer og sted på bedriften i bedriftskonsollet, så får annonsene riktig lokasjon."}
-          </p>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 export function LocationGroup(props: WizardSharedProps) {
+  const { setValue } = props;
   const { data: membership } = useBusinessMembership();
+  const selectedLocationId = props.watch("organization_location_id") ?? "";
+  const locations = membership?.status === "active" ? membership.locations : [];
+  const selectedLocation =
+    locations.find((location) => location.id === selectedLocationId) ??
+    locations.find((location) => location.is_default) ??
+    locations[0];
+
+  useEffect(() => {
+    if (membership?.status !== "active" || !selectedLocation || selectedLocationId) return;
+    setValue("organization_location_id", selectedLocation.id, { shouldDirty: false });
+  }, [membership?.status, setValue, selectedLocation, selectedLocationId]);
+
   if (membership?.status === "active") {
-    return <OrganizationLocationNote organization={membership.organization} />;
+    return (
+      <section className="space-y-3">
+        <div className="space-y-2">
+          <Label htmlFor="organization-location">Lokasjon</Label>
+          <Select
+            value={selectedLocationId || selectedLocation?.id || ""}
+            onValueChange={(value) =>
+              props.setValue("organization_location_id", value, { shouldValidate: true })
+            }
+          >
+            <SelectTrigger id="organization-location">
+              <SelectValue placeholder="Velg lokasjon" />
+            </SelectTrigger>
+            <SelectContent>
+              {locations.map((location) => (
+                <SelectItem key={location.id} value={location.id}>
+                  {location.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {selectedLocation && (
+          <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/40 p-4">
+            <MapPin className="mt-0.5 size-5 shrink-0 text-primary" />
+            <div className="text-sm">
+              <p className="font-medium">{selectedLocation.name}</p>
+              <p className="text-muted-foreground">
+                {[
+                  selectedLocation.address_line,
+                  selectedLocation.postal_code,
+                  selectedLocation.city,
+                ]
+                  .filter(Boolean)
+                  .join(", ") || "Adresse ikke registrert"}
+              </p>
+            </div>
+          </div>
+        )}
+        <label className="flex items-center gap-2 text-sm">
+          <Checkbox
+            checked={props.watch("show_visiting_address") ?? false}
+            onCheckedChange={(checked) =>
+              props.setValue("show_visiting_address", checked === true, { shouldDirty: true })
+            }
+          />
+          Vis full besøksadresse på annonsen
+        </label>
+      </section>
+    );
   }
   return <DeliveryLocation {...props} showDelivery={false} />;
 }

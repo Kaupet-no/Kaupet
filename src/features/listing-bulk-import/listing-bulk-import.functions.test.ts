@@ -45,7 +45,18 @@ function setup({ membership = true, duplicate = false } = {}) {
     chain.single = vi.fn(async () =>
       table === "organizations"
         ? { data: { postal_code: "0150", city: "Oslo", lat: 59.91, lng: 10.75 }, error: null }
-        : { data: null, error: null },
+        : table === "organization_locations"
+          ? {
+              data: {
+                postal_code: "0150",
+                city: "Oslo",
+                lat: 59.91,
+                lng: 10.75,
+                address_line: "Storgata 1",
+              },
+              error: null,
+            }
+          : { data: null, error: null },
     );
     chain.maybeSingle = vi.fn(async () =>
       table === "organization_members"
@@ -93,6 +104,8 @@ const validRow = {
   attributes: {},
 };
 
+const locationId = "33333333-3333-4333-8333-333333333333";
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -101,7 +114,7 @@ describe("createListingsFromImport", () => {
   it("avviser en bruker uten aktiv organisasjonsmedlemskap", async () => {
     setup({ membership: false });
     await expect(
-      createListingsFromImport({ data: { importId, rows: [validRow] } }),
+      createListingsFromImport({ data: { importId, rows: [validRow], locationId } }),
     ).rejects.toThrow("tilgang");
   });
 
@@ -109,7 +122,7 @@ describe("createListingsFromImport", () => {
     const state = setup();
     const invalidRow = { ...validRow, rowNumber: 3, externalId: "external-2", title: "kort" };
     const result = await createListingsFromImport({
-      data: { importId, rows: [validRow, invalidRow] },
+      data: { importId, rows: [validRow, invalidRow], locationId },
     });
     expect(result).toEqual([
       {
@@ -132,7 +145,7 @@ describe("createListingsFromImport", () => {
   it("returnerer en sikker radfeil for ukjent kategori", async () => {
     const state = setup();
     const result = await createListingsFromImport({
-      data: { importId, rows: [{ ...validRow, category: "finnes-ikke" }] },
+      data: { importId, rows: [{ ...validRow, category: "finnes-ikke" }], locationId },
     });
     expect(result[0]).toMatchObject({
       rowNumber: 2,
@@ -142,23 +155,28 @@ describe("createListingsFromImport", () => {
     expect(state.createCalls()).toBe(0);
   });
 
-  it("bruker bedriftsadressen som lokasjon i stedet for noe fra filen", async () => {
+  it("bruker valgt lokasjon i stedet for noe fra filen", async () => {
     setup();
-    await createListingsFromImport({ data: { importId, rows: [validRow] } });
+    await createListingsFromImport({ data: { importId, rows: [validRow], locationId } });
     const call = supabaseAdmin.rpc.mock.calls.find(
       ([name]) => name === "create_listing_from_import_row",
     );
-    expect(call?.[1]._listing).toMatchObject({
-      postal_code: "0150",
-      city: "Oslo",
-      lat: 59.91,
-      lng: 10.75,
+    expect(call?.[1]).toMatchObject({
+      _location_id: locationId,
+      _listing: {
+        postal_code: "0150",
+        city: "Oslo",
+        lat: 59.91,
+        lng: 10.75,
+      },
     });
   });
 
   it("returnerer duplikat ved ny innsending med samme import-ID", async () => {
     setup({ duplicate: true });
-    const result = await createListingsFromImport({ data: { importId, rows: [validRow] } });
+    const result = await createListingsFromImport({
+      data: { importId, rows: [validRow], locationId },
+    });
     expect(result[0]).toMatchObject({
       status: "duplicate",
       listingId: "listing-1",

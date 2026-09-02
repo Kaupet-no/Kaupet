@@ -25,6 +25,7 @@ type OrganizationListingLocation = {
   city: string | null;
   lat: number | null;
   lng: number | null;
+  address_line: string | null;
 };
 
 const MAX_IMPORT_ROWS = 500;
@@ -39,17 +40,17 @@ export type BulkImportResult = {
 };
 
 type CategoryRecord = CategoryNode & { slug: string; name_nb: string };
-
 type ImportContext = {
   organizationId: string;
   userId: string;
+  locationId: string;
+  showVisitingAddress: boolean;
   categoryAccess: "all" | "restricted";
   allowedCategoryIds: Set<string>;
   categories: CategoryRecord[];
   categoriesById: Map<string, CategoryRecord>;
   filters: ReturnType<typeof normalizeFilter>[];
   flows: CategoryFlowRow[];
-  /** Bedriftsadressen; annonsene får den, ikke en adresse fra filen. */
   location: OrganizationListingLocation;
 };
 
@@ -79,6 +80,8 @@ function resolveCategory(category: string, categories: CategoryRecord[]): Catego
 async function loadImportContext(
   supabaseAdmin: SupabaseClient<Database>,
   userId: string,
+  locationId: string,
+  showVisitingAddress: boolean,
 ): Promise<ImportContext> {
   const { data: membership, error: membershipError } = await supabaseAdmin
     .from("organization_members")
@@ -91,7 +94,24 @@ async function loadImportContext(
   if (membership.role === "member" && !membership.can_create_listings) {
     throw new Error("Du har ikke tilgang til å opprette annonser.");
   }
-
+  const { data: assignment, error: assignmentError } = await supabaseAdmin
+    .from("organization_location_members")
+    .select("location_id")
+    .eq("location_id", locationId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (assignmentError) throw assignmentError;
+  const { data: location, error: locationError } = await supabaseAdmin
+    .from("organization_locations")
+    .select("postal_code, city, lat, lng, address_line")
+    .eq("id", locationId)
+    .eq("organization_id", membership.organization_id)
+    .eq("active", true)
+    .single();
+  if (locationError) throw locationError;
+  if (membership.role !== "superuser" && !assignment) {
+    throw new Error("Du har ikke tilgang til denne lokasjonen.");
+  }
   const { error: syncError } = await supabaseAdmin.rpc("sync_organization_entitlements", {
     _organization_id: membership.organization_id,
   });
@@ -102,7 +122,6 @@ async function loadImportContext(
   );
   if (accessError) throw accessError;
   if (!hasAccess) throw new Error("Proff-tilgang er ikke aktiv.");
-
   const [
     { data: categories, error: categoryError },
     { data: memberCategories, error: memberCategoryError },
@@ -125,14 +144,14 @@ async function loadImportContext(
   if (categoryError || memberCategoryError || filterError) {
     throw categoryError ?? memberCategoryError ?? filterError;
   }
-
   const categoryRows = (categories ?? []) as CategoryRecord[];
-  const { organizationListingLocation } = await import("@/lib/organization-location.server");
   return {
-    location: await organizationListingLocation(supabaseAdmin, membership.organization_id),
+    location: location as OrganizationListingLocation,
     organizationId: membership.organization_id,
     userId,
-    categoryAccess: membership.category_access as ImportContext["categoryAccess"],
+    locationId,
+    showVisitingAddress,
+    categoryAccess: membership.category_access as "all" | "restricted",
     allowedCategoryIds: new Set((memberCategories ?? []).map((row) => row.category_id)),
     categories: categoryRows,
     categoriesById: new Map(categoryRows.map((category) => [category.id, category])),
@@ -223,6 +242,8 @@ async function createRow(
       maintenance_history: normalized.maintenanceHistory ?? "",
       attributes: normalized.attributes,
     },
+    _location_id: context.locationId,
+    _show_visiting_address: context.showVisitingAddress,
   });
   if (error) throw error;
   const result = (data ?? {}) as { status?: string; listing_id?: string; error?: string };
@@ -274,12 +295,19 @@ export const createListingsFromImport = createServerFn({ method: "POST" })
       .object({
         importId: z.string().uuid(),
         rows: z.array(z.unknown()).min(1).max(MAX_IMPORT_ROWS),
+        locationId: z.string().uuid(),
+        showVisitingAddress: z.boolean().default(false),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const importContext = await loadImportContext(supabaseAdmin, context.userId);
+    const importContext = await loadImportContext(
+      supabaseAdmin,
+      context.userId,
+      data.locationId,
+      data.showVisitingAddress,
+    );
     const rows = data.rows.map((value, index) => {
       const row = value as Partial<BulkImportRow>;
       return {

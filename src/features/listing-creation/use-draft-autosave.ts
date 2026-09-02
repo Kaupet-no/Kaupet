@@ -27,6 +27,8 @@ type DraftFields = {
   priceNok: number | string | undefined;
   postalCode?: string;
   city?: string;
+  organizationLocationId?: string | null;
+  showVisitingAddress?: boolean;
   coords: { lat: number; lng: number } | null;
   isVehicle: boolean;
   attributes: AttributeMap;
@@ -69,7 +71,6 @@ export function useDraftAutosave(fields: DraftFields) {
     priceNok,
     postalCode,
     city,
-    coords,
     isVehicle,
     attributes,
     images,
@@ -77,6 +78,9 @@ export function useDraftAutosave(fields: DraftFields) {
     knownIssues,
     noKnownIssues,
     maintenanceHistory,
+    organizationLocationId,
+    showVisitingAddress,
+    coords,
     stepKey,
   } = fields;
 
@@ -175,6 +179,8 @@ export function useDraftAutosave(fields: DraftFields) {
             price_nok: priceNok,
             postal_code: postalCode,
             city,
+            organization_location_id: organizationLocationId,
+            show_visiting_address: showVisitingAddress,
             coords,
             attributes,
             known_issues: knownIssues,
@@ -203,6 +209,8 @@ export function useDraftAutosave(fields: DraftFields) {
     priceNok,
     postalCode,
     city,
+    organizationLocationId,
+    showVisitingAddress,
     coords,
     attributes,
     knownIssues,
@@ -245,6 +253,8 @@ export function useDraftAutosave(fields: DraftFields) {
           price_nok: isFree ? null : typeof priceNok === "number" ? priceNok : null,
           postal_code: postalCode || null,
           city: city || null,
+          organization_location_id: organizationLocationId || null,
+          show_visiting_address: showVisitingAddress ?? false,
           lat: coords?.lat ?? null,
           lng: coords?.lng ?? null,
           can_ship: canShip == null ? null : canShip !== "pickup",
@@ -293,8 +303,9 @@ export function useDraftAutosave(fields: DraftFields) {
     priceNok,
     postalCode,
     city,
+    organizationLocationId,
+    showVisitingAddress,
     draftId,
-    hasDraftData,
   ]);
 
   // Save draft when tab becomes hidden (user switches away or closes tab)
@@ -314,8 +325,9 @@ export function useDraftAutosave(fields: DraftFields) {
     priceNok,
     postalCode,
     city,
+    organizationLocationId,
+    showVisitingAddress,
     draftId,
-    hasDraftData,
   ]);
 
   async function restoreDraft(target: RestoreTarget) {
@@ -338,6 +350,10 @@ export function useDraftAutosave(fields: DraftFields) {
       setValue("postal_code", hasDraftData.postal_code);
       if (hasDraftData.postal_code) setLocationMethod("postal");
     }
+    if (typeof hasDraftData.organization_location_id === "string")
+      setValue("organization_location_id", hasDraftData.organization_location_id);
+    if (typeof hasDraftData.show_visiting_address === "boolean")
+      setValue("show_visiting_address", hasDraftData.show_visiting_address);
     if (typeof hasDraftData.city === "string") setValue("city", hasDraftData.city);
     if (
       hasDraftData.coords &&

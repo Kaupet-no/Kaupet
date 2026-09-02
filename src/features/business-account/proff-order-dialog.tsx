@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2 } from "lucide-react";
 
@@ -9,7 +9,7 @@ import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/co
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ResponsiveOverlay, ResponsiveOverlayContent } from "@/components/ui/responsive-overlay";
-import { requestProffSubscription } from "@/lib/business.functions";
+import { getBusinessOrganization, requestProffSubscription } from "@/lib/business.functions";
 import { formatErrorMessage } from "@/lib/errors";
 import { PROFF_TERMS, type ProffTerm } from "./plans";
 import { formatProffTermPrice } from "./proff-pricing";
@@ -22,16 +22,21 @@ export type ProffOrderDialogProps = {
 };
 
 export function ProffOrderDialog({ open, onOpenChange, term, onOrdered }: ProffOrderDialogProps) {
-  const [billingEmail, setBillingEmail] = useState("");
   const [billingReference, setBillingReference] = useState("");
   const request = useServerFn(requestProffSubscription);
+  const loadBusinessOrganization = useServerFn(getBusinessOrganization);
+  const billingQuery = useQuery({
+    queryKey: ["business-billing-profile"],
+    queryFn: loadBusinessOrganization,
+    enabled: open,
+    staleTime: 30_000,
+  });
 
   const mutation = useMutation({
     mutationFn: () =>
       request({
         data: {
           term,
-          billingEmail: billingEmail.trim(),
           billingReference: billingReference.trim() || undefined,
         },
       }),
@@ -64,7 +69,7 @@ export function ProffOrderDialog({ open, onOpenChange, term, onOrdered }: ProffO
         {mutation.isSuccess ? (
           <Alert role="status">
             <AlertDescription>
-              Bestillingen er mottatt. Fakturaen kommer til {billingEmail.trim()}.
+              Bestillingen er mottatt. Fakturaen sendes til fakturaprofilen.
             </AlertDescription>
           </Alert>
         ) : (
@@ -75,17 +80,20 @@ export function ProffOrderDialog({ open, onOpenChange, term, onOrdered }: ProffO
               if (!pending) mutation.mutate();
             }}
           >
-            <div className="space-y-2">
-              <Label htmlFor="proff-billing-email">E-post for faktura</Label>
-              <Input
-                id="proff-billing-email"
-                type="email"
-                required
-                autoComplete="email"
-                value={billingEmail}
-                onChange={(event) => setBillingEmail(event.target.value)}
-                placeholder="faktura@bedriften.no"
-              />
+            <div className="rounded-md border border-border bg-muted/40 p-3 text-sm">
+              <p className="font-medium">Fakturaopplysninger</p>
+              {billingQuery.isLoading ? (
+                <p className="text-muted-foreground">Laster fakturaprofil…</p>
+              ) : billingQuery.data?.billingProfile ? (
+                <p className="text-muted-foreground">
+                  {billingQuery.data.billingProfile.billing_email}
+                  {billingQuery.data.billingProfile.address_line
+                    ? ` · ${billingQuery.data.billingProfile.address_line}, ${billingQuery.data.billingProfile.postal_code ?? ""} ${billingQuery.data.billingProfile.city ?? ""}`
+                    : ""}
+                </p>
+              ) : (
+                <p className="text-muted-foreground">Fakturaprofil mangler.</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="proff-billing-reference">Deres referanse (valgfri)</Label>

@@ -59,7 +59,8 @@ function ConversationPage() {
   const { data: businessMembership } = useBusinessMembership();
   const isBusinessSuperuser =
     businessMembership?.status === "active" &&
-    (businessMembership.role === "superuser" || businessMembership.chat_access === "all");
+    (businessMembership.role === "superuser" ||
+      businessMembership.locations.some((location) => location.permissions.chatAccess === "all"));
   const native = useIsNative();
   const isTablet = useFormFactor() === "tablet";
   const keyboardVisible = useKeyboardVisible();

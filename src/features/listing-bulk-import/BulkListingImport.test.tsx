@@ -115,7 +115,21 @@ import { BulkListingImport } from "./BulkListingImport";
 
 describe("BulkListingImport", () => {
   it("viser forhåndsvisning med antall gyldige rader og lar brukeren bekrefte", async () => {
-    render(<BulkListingImport open onOpenChange={vi.fn()} />);
+    render(
+      <BulkListingImport
+        open
+        onOpenChange={vi.fn()}
+        locations={[
+          {
+            id: "33333333-3333-4333-8333-333333333333",
+            name: "Hovedlokasjon",
+            address_line: null,
+            postal_code: null,
+            city: null,
+          },
+        ]}
+      />,
+    );
     fireEvent.change(screen.getByLabelText("Velg importfil"), {
       target: { files: [new File(["data"], "annonser.csv", { type: "text/csv" })] },
     });

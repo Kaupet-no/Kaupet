@@ -3489,6 +3489,7 @@ describe.skipIf(!canRun)(
     };
     const userIds: string[] = [];
     const organizationIds: string[] = [];
+    const locationIds = new Map<string, string>();
     const objectPaths: string[] = [];
     let ownerId: string;
     let memberId: string;
@@ -3532,8 +3533,6 @@ describe.skipIf(!canRun)(
             organization_number: number,
             legal_name: name,
             display_name: name,
-            postal_code: "0001",
-            city: "Oslo",
             selected_plan: "proff",
             proff_trial_started_at: new Date(now - 24 * 60 * 60 * 1000).toISOString(),
             proff_trial_ends_at: new Date(now + 30 * 24 * 60 * 60 * 1000).toISOString(),
@@ -3542,7 +3541,23 @@ describe.skipIf(!canRun)(
           .select("id")
           .single();
         if (error) throw error;
+        if (!data) throw new Error("Organization insert returned no row");
         organizationIds.push(data.id);
+        const { data: location, error: locationError } = await admin
+          .from("organization_locations")
+          .insert({
+            organization_id: data.id,
+            name: "Hovedlokasjon",
+            address_line: "Storgata 1",
+            postal_code: "0001",
+            city: "Oslo",
+            is_default: true,
+          })
+          .select("id")
+          .single();
+        if (locationError) throw locationError;
+        if (!location) throw new Error("Location insert returned no row");
+        locationIds.set(data.id, location.id);
         return data.id;
       };
       const organizationNumber = 100_000_000 + (suffix % 800_000_000);
@@ -3566,6 +3581,38 @@ describe.skipIf(!canRun)(
         },
       ]);
       if (memberError) throw memberError;
+      const { error: locationMemberError } = await admin
+        .from("organization_location_members")
+        .insert([
+          {
+            organization_id: organizationId,
+            location_id: locationIds.get(organizationId)!,
+            user_id: ownerId,
+            role: "manager",
+            listing_access: "all",
+            listing_edit_scope: "all",
+            chat_access: "all",
+          },
+          {
+            organization_id: organizationId,
+            location_id: locationIds.get(organizationId)!,
+            user_id: memberId,
+            role: "member",
+            listing_access: "all",
+            listing_edit_scope: "all",
+            chat_access: "all",
+          },
+          {
+            organization_id: otherOrganizationId,
+            location_id: locationIds.get(otherOrganizationId)!,
+            user_id: otherId,
+            role: "manager",
+            listing_access: "all",
+            listing_edit_scope: "all",
+            chat_access: "all",
+          },
+        ]);
+      if (locationMemberError) throw locationMemberError;
 
       const createListing = async (
         sellerId: string,
@@ -3578,6 +3625,7 @@ describe.skipIf(!canRun)(
           .insert({
             seller_id: sellerId,
             organization_id: listingOrganizationId,
+            organization_location_id: locationIds.get(listingOrganizationId)!,
             title,
             price_nok: 100,
             status,
@@ -3745,6 +3793,7 @@ describe.skipIf(!canRun)(
         .insert({
           seller_id: memberId,
           organization_id: organizationId,
+          organization_location_id: locationIds.get(organizationId)!,
           title: "RLS member-created business listing",
           price_nok: 101,
           status: "draft",

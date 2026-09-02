@@ -42,6 +42,8 @@ const baseFields = {
   priceNok: "",
   postalCode: "",
   city: "",
+  organizationLocationId: "00000000-0000-4000-8000-000000000001",
+  showVisitingAddress: true,
   coords: null,
   isVehicle: false,
   attributes: {},
@@ -123,7 +125,12 @@ describe("useDraftAutosave", () => {
     expect(localStorage.getItem(DRAFT_ID_KEY)).toBe("new-draft-id");
     expect(saveDraftListingMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ title: "En fin sykkel", can_ship: null }),
+        data: expect.objectContaining({
+          title: "En fin sykkel",
+          can_ship: null,
+          organization_location_id: "00000000-0000-4000-8000-000000000001",
+          show_visiting_address: true,
+        }),
       }),
     );
   });

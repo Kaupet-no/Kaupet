@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 type Props = {
   organization: BusinessOrganization;
+  locationId: string | "all";
   userId: string;
   listingAccess: "own" | "all";
   listingEditScope: "none" | "own" | "all";
@@ -34,9 +35,9 @@ type RawListing = {
   expires_at: string | null;
   listing_images: { storage_path: string; sort_order: number }[] | null;
 };
-
 export function BusinessListingsPanel({
   organization,
+  locationId,
   userId,
   listingAccess,
   listingEditScope,
@@ -44,14 +45,17 @@ export function BusinessListingsPanel({
   onImport,
 }: Props) {
   const listingsQuery = useQuery({
-    queryKey: ["business-listings", organization.id, userId, listingAccess],
+    queryKey: ["business-listings", organization.id, userId, listingAccess, locationId],
     queryFn: async (): Promise<Row[]> => {
-      const baseQuery = supabase
+      let baseQuery = supabase
         .from("listings")
         .select(
           "id, seller_id, kaupet_code, title, status, price_nok, is_free, city, category_id, description, created_at, expires_at, listing_images(storage_path, sort_order)",
         )
         .eq("organization_id", organization.id);
+      if (locationId !== "all") {
+        baseQuery = baseQuery.eq("organization_location_id", locationId);
+      }
       const { data, error } =
         listingAccess === "own"
           ? await baseQuery

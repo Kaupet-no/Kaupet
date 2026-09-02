@@ -345,7 +345,7 @@ function ListingDetailPage() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, subtitle, description, price_nok, is_free, condition, can_ship, city, postal_code, display_lat, display_lng, created_at, updated_at, published_at, status, seller_id, organization_id, category_id, attributes, known_issues, no_known_issues, maintenance_history, listing_images(storage_path, sort_order, caption), listing_360_frames(storage_path, frame_order), categories(id, name_nb, slug, parent_id), organizations(id, display_name, organization_number, postal_code, city, created_at, website_url, logo_path, brand_palette, selected_plan, proff_access_until)",
+          "id, kaupet_code, title, subtitle, description, price_nok, is_free, condition, can_ship, city, postal_code, display_lat, display_lng, created_at, updated_at, published_at, status, seller_id, organization_id, category_id, attributes, known_issues, no_known_issues, maintenance_history, show_visiting_address, listing_visiting_addresses(address_line, postal_code, city), listing_images(storage_path, sort_order, caption), listing_360_frames(storage_path, frame_order), categories(id, name_nb, slug, parent_id), organizations(id, display_name, organization_number, created_at, website_url, logo_path, brand_palette, selected_plan, proff_access_until)",
         )
         .eq("kaupet_code", kaupetCode)
         .maybeSingle();
@@ -355,6 +355,9 @@ function ListingDetailPage() {
       const organization = Array.isArray(data.organizations)
         ? data.organizations[0]
         : data.organizations;
+      const visitingAddress = Array.isArray(data.listing_visiting_addresses)
+        ? data.listing_visiting_addresses[0]
+        : data.listing_visiting_addresses;
       if (organization) {
         return {
           ...data,
@@ -363,8 +366,11 @@ function ListingDetailPage() {
             kind: "business" as const,
             displayName: organization.display_name,
             organizationNumber: organization.organization_number,
-            postalCode: organization.postal_code,
-            city: organization.city,
+            visitingAddress: visitingAddress
+              ? [visitingAddress.address_line, visitingAddress.postal_code, visitingAddress.city]
+                  .filter(Boolean)
+                  .join(", ")
+              : null,
             createdAt: organization.created_at,
           } satisfies SellerIdentity,
         };

@@ -71,14 +71,25 @@ const chatAccessSchema = z.enum(["own", "all"]);
 const listingEditScopeSchema = z.enum(["none", "own", "all"]);
 const categoryAccessSchema = z.enum(["all", "restricted"]);
 
-export type OrganizationMemberPermissions = {
+export type OrganizationPermissions = {
   role: "superuser" | "member";
-  listingAccess: "own" | "all";
-  chatAccess: "own" | "all";
   canCreateListings: boolean;
-  listingEditScope: "none" | "own" | "all";
   categoryAccess: "all" | "restricted";
   allowedCategoryIds: string[];
+};
+
+export type OrganizationLocationPermissions = {
+  role: "member" | "manager";
+  listingAccess: "own" | "all";
+  listingEditScope: "none" | "own" | "all";
+  chatAccess: "own" | "all";
+};
+
+/** Temporary wire-compatible shape while callers migrate to location scope. */
+export type OrganizationMemberPermissions = OrganizationPermissions & {
+  listingAccess: "own" | "all";
+  chatAccess: "own" | "all";
+  listingEditScope: "none" | "own" | "all";
 };
 
 const memberPermissionsSchema = z
@@ -140,23 +151,32 @@ async function getAdmin(): Promise<AdminClient> {
   return supabaseAdmin;
 }
 
-async function requireSuperuserOrganization(userId: string) {
+async function requireOrganizationMember(userId: string) {
   const supabaseAdmin = await getAdmin();
   const { data: membership, error } = await supabaseAdmin
     .from("organization_members")
     .select("organization_id, role, status")
     .eq("user_id", userId)
-    .eq("role", "superuser")
     .eq("status", "active")
     .maybeSingle();
   if (error) throw error;
   if (!membership) throw new Error(UNAUTHORIZED_MESSAGE);
-
   const { error: syncError } = await supabaseAdmin.rpc("sync_organization_entitlements", {
     _organization_id: membership.organization_id,
   });
   if (syncError) throw syncError;
-  return { supabaseAdmin, organizationId: membership.organization_id as string };
+  return {
+    supabaseAdmin,
+    organizationId: membership.organization_id as string,
+    role: membership.role as "superuser" | "member",
+    status: membership.status as "active",
+  };
+}
+
+async function requireSuperuserOrganization(userId: string) {
+  const membership = await requireOrganizationMember(userId);
+  if (membership.role !== "superuser") throw new Error(UNAUTHORIZED_MESSAGE);
+  return membership;
 }
 
 async function hasEffectiveProffAccess(supabaseAdmin: AdminClient, organizationId: string) {
@@ -167,10 +187,18 @@ async function hasEffectiveProffAccess(supabaseAdmin: AdminClient, organizationI
   return data === true;
 }
 
+export type BusinessAddress = {
+  addressLine: string | null;
+  postalCode: string | null;
+  city: string | null;
+};
+
 export type BusinessOrganizationLookup = {
   signupToken: string;
   organizationNumber: string;
   legalName: string;
+  visitingAddress: BusinessAddress;
+  billingAddress: BusinessAddress;
   postalCode: string | null;
   city: string | null;
   expiresAt: string;
@@ -213,10 +241,16 @@ export const lookupBusinessOrganization = createServerFn({ method: "POST" })
       .insert({
         organization_number: organization.organizationNumber,
         legal_name: organization.legalName,
-        postal_code: organization.postalCode,
-        city: organization.city,
+        visiting_address_line: organization.visitingAddress.addressLine,
+        visiting_postal_code: organization.visitingAddress.postalCode,
+        visiting_city: organization.visitingAddress.city,
+        billing_address_line: organization.billingAddress.addressLine,
+        billing_postal_code: organization.billingAddress.postalCode,
+        billing_city: organization.billingAddress.city,
       })
-      .select("signup_token, organization_number, legal_name, postal_code, city, expires_at")
+      .select(
+        "signup_token, organization_number, legal_name, visiting_address_line, visiting_postal_code, visiting_city, billing_address_line, billing_postal_code, billing_city, expires_at",
+      )
       .single();
     if (intentError) {
       if (intentError.code === "23505") {
@@ -229,8 +263,18 @@ export const lookupBusinessOrganization = createServerFn({ method: "POST" })
       signupToken: intent.signup_token as string,
       organizationNumber: intent.organization_number as string,
       legalName: intent.legal_name as string,
-      postalCode: (intent.postal_code as string | null) ?? null,
-      city: (intent.city as string | null) ?? null,
+      visitingAddress: {
+        addressLine: (intent.visiting_address_line as string | null) ?? null,
+        postalCode: (intent.visiting_postal_code as string | null) ?? null,
+        city: (intent.visiting_city as string | null) ?? null,
+      },
+      billingAddress: {
+        addressLine: (intent.billing_address_line as string | null) ?? null,
+        postalCode: (intent.billing_postal_code as string | null) ?? null,
+        city: (intent.billing_city as string | null) ?? null,
+      },
+      postalCode: (intent.visiting_postal_code as string | null) ?? null,
+      city: (intent.visiting_city as string | null) ?? null,
       expiresAt: intent.expires_at as string,
     };
   });
@@ -283,7 +327,7 @@ async function getOrganization(supabaseAdmin: AdminClient, organizationId: strin
   const { data, error } = await supabaseAdmin
     .from("organizations")
     .select(
-      "id, organization_number, legal_name, display_name, postal_code, city, selected_plan, proff_trial_started_at, proff_trial_ends_at, proff_trial_cancelled_at, proff_access_until, website_url, logo_path, brand_palette",
+      "id, organization_number, legal_name, display_name, selected_plan, proff_trial_started_at, proff_trial_ends_at, proff_trial_cancelled_at, proff_access_until, website_url, logo_path, brand_palette",
     )
     .eq("id", organizationId)
     .single();
@@ -294,12 +338,159 @@ async function getOrganization(supabaseAdmin: AdminClient, organizationId: strin
 export const getBusinessOrganization = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabaseAdmin, organizationId } = await requireSuperuserOrganization(context.userId);
+    const { supabaseAdmin, organizationId, role, status } = await requireOrganizationMember(
+      context.userId,
+    );
     const organization = await getOrganization(supabaseAdmin, organizationId);
+    const { data: membership, error: membershipError } = await supabaseAdmin
+      .from("organization_members")
+      .select(
+        "organization_id, user_id, role, status, can_create_listings, category_access, created_at, updated_at",
+      )
+      .eq("organization_id", organizationId)
+      .eq("user_id", context.userId)
+      .single();
+    if (membershipError) throw membershipError;
+    const { data: categories, error: categoriesError } = await supabaseAdmin
+      .from("organization_member_categories")
+      .select("category_id")
+      .eq("organization_id", organizationId)
+      .eq("user_id", context.userId);
+    if (categoriesError) throw categoriesError;
+    const { data: locations, error: locationsError } = await supabaseAdmin
+      .from("organization_locations")
+      .select(
+        "id, organization_id, name, address_line, postal_code, city, lat, lng, is_default, active, created_at, updated_at, organization_location_members!organization_location_members_location_organization_fk(user_id, role, listing_access, listing_edit_scope, chat_access)",
+      )
+      .eq("organization_id", organizationId)
+      .eq("active", true)
+      .order("is_default", { ascending: false })
+      .order("name");
+    if (locationsError) throw locationsError;
+    const allowedCategoryIds = (categories ?? []).map((row) => row.category_id as string);
+    const normalizedLocations = (locations ?? [])
+      .map((location) => {
+        const assignment = (
+          Array.isArray(location.organization_location_members)
+            ? location.organization_location_members
+            : []
+        ).find((member) => member.user_id === context.userId);
+        return {
+          id: location.id as string,
+          organization_id: location.organization_id as string,
+          name: location.name as string,
+          address_line: location.address_line as string | null,
+          postal_code: location.postal_code as string | null,
+          city: location.city as string | null,
+          lat: location.lat as number | null,
+          lng: location.lng as number | null,
+          is_default: location.is_default as boolean,
+          active: location.active as boolean,
+          created_at: location.created_at as string,
+          updated_at: location.updated_at as string,
+          permissions:
+            role === "superuser"
+              ? {
+                  role: "manager" as const,
+                  listingAccess: "all" as const,
+                  listingEditScope: "all" as const,
+                  chatAccess: "all" as const,
+                }
+              : assignment
+                ? {
+                    role: assignment.role as "member" | "manager",
+                    listingAccess: assignment.listing_access as "own" | "all",
+                    listingEditScope: assignment.listing_edit_scope as "none" | "own" | "all",
+                    chatAccess: assignment.chat_access as "own" | "all",
+                  }
+                : null,
+        };
+      })
+      .filter((location) => location.permissions !== null);
+    let billingProfile = null;
+    if (role === "superuser") {
+      const { data, error } = await supabaseAdmin
+        .from("organization_billing_profiles")
+        .select(
+          "organization_id, billing_email, address_line, postal_code, city, registry_refreshed_at",
+        )
+        .eq("organization_id", organizationId)
+        .maybeSingle();
+      if (error) throw error;
+      billingProfile = data;
+    }
     return {
       organization,
-      membership: { organizationId, role: "superuser" as const, status: "active" as const },
+      membership: {
+        ...membership,
+        role,
+        status,
+        category_access: membership.category_access as "all" | "restricted",
+        can_create_listings: membership.can_create_listings as boolean,
+        allowed_category_ids: allowedCategoryIds,
+      },
+      locations: normalizedLocations,
+      billingProfile,
     };
+  });
+
+const profileSchema = z.object({
+  displayName: z.string().trim().min(2).max(120).optional(),
+  websiteUrl: z
+    .string()
+    .url()
+    .refine((value) => value.startsWith("https://"), "Nettsiden må bruke https://")
+    .nullable()
+    .optional(),
+  logoPath: z.string().trim().max(500).nullable().optional(),
+  brandPalette: z.enum(["forest", "navy", "burgundy", "slate"]).nullable().optional(),
+});
+
+export const updateBusinessProfile = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) => profileSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin, organizationId } = await requireSuperuserOrganization(context.userId);
+    const advancedRequested =
+      data.websiteUrl !== undefined ||
+      data.logoPath !== undefined ||
+      data.brandPalette !== undefined;
+    if (advancedRequested && !(await hasEffectiveProffAccess(supabaseAdmin, organizationId))) {
+      throw new Error(PROFF_REQUIRED_MESSAGE);
+    }
+    const updates = {
+      ...(data.displayName !== undefined && { display_name: data.displayName }),
+      ...(data.websiteUrl !== undefined && { website_url: data.websiteUrl }),
+      ...(data.logoPath !== undefined && { logo_path: data.logoPath }),
+      ...(data.brandPalette !== undefined && { brand_palette: data.brandPalette }),
+    };
+    const { error } = await supabaseAdmin
+      .from("organizations")
+      .update(updates)
+      .eq("id", organizationId);
+    if (error) throw error;
+    return { organization: await getOrganization(supabaseAdmin, organizationId) };
+  });
+
+const billingEmailSchema = z.object({
+  billingEmail: z.string().trim().toLowerCase().email().max(320),
+});
+
+export const updateOrganizationBillingEmail = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) => billingEmailSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin, organizationId } = await requireSuperuserOrganization(context.userId);
+    const { data: billingProfile, error } = await supabaseAdmin
+      .from("organization_billing_profiles")
+      .update({ billing_email: data.billingEmail })
+      .eq("organization_id", organizationId)
+      .select(
+        "organization_id, billing_email, address_line, postal_code, city, registry_refreshed_at",
+      )
+      .single();
+    if (error) throw error;
+    return { billingProfile };
   });
 
 export const setBusinessPlan = createServerFn({ method: "POST" })
@@ -356,54 +547,97 @@ export const setBusinessPlan = createServerFn({ method: "POST" })
     return { organization: await getOrganization(supabaseAdmin, organizationId) };
   });
 
-const profileSchema = z.object({
-  displayName: z.string().trim().min(2).max(120).optional(),
-  postalCode: z
-    .string()
-    .regex(/^\d{4}$/)
-    .optional(),
-  city: z.string().trim().min(1).max(100).optional(),
-  websiteUrl: z
-    .string()
-    .url()
-    .refine((value) => value.startsWith("https://"), "Nettsiden må bruke https://")
-    .nullable()
-    .optional(),
-  logoPath: z.string().trim().max(500).nullable().optional(),
-  brandPalette: z.enum(["forest", "navy", "burgundy", "slate"]).nullable().optional(),
+const locationInputSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  addressLine: z.string().trim().min(1).max(240),
+  postalCode: z.string().regex(/^\d{4}$/),
+  city: z.string().trim().min(1).max(100),
 });
 
-export const updateBusinessProfile = createServerFn({ method: "POST" })
+export const createOrganizationLocation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((input: unknown) => profileSchema.parse(input))
+  .validator((input: unknown) => locationInputSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin, organizationId } = await requireSuperuserOrganization(context.userId);
-    const advancedRequested =
-      data.websiteUrl !== undefined ||
-      data.logoPath !== undefined ||
-      data.brandPalette !== undefined;
-    if (advancedRequested && !(await hasEffectiveProffAccess(supabaseAdmin, organizationId))) {
-      throw new Error(PROFF_REQUIRED_MESSAGE);
-    }
+    const { data: location, error } = await supabaseAdmin.rpc("create_organization_location", {
+      _organization_id: organizationId,
+      _name: data.name,
+      _address_line: data.addressLine,
+      _postal_code: data.postalCode,
+      _city: data.city,
+    });
+    if (error) throw error;
+    return { location };
+  });
 
-    const updates = {
-      ...(data.displayName !== undefined && { display_name: data.displayName }),
-      ...(data.postalCode !== undefined && { postal_code: data.postalCode }),
-      ...(data.city !== undefined && { city: data.city }),
-      ...(data.websiteUrl !== undefined && { website_url: data.websiteUrl }),
-      ...(data.logoPath !== undefined && { logo_path: data.logoPath }),
-      ...(data.brandPalette !== undefined && { brand_palette: data.brandPalette }),
-    };
-    const { data: organization, error } = await supabaseAdmin
-      .from("organizations")
-      .update(updates)
-      .eq("id", organizationId)
+export const updateOrganizationLocation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) => locationInputSchema.extend({ locationId: uuid }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin, organizationId } = await requireSuperuserOrganization(context.userId);
+    const { data: location, error } = await supabaseAdmin
+      .from("organization_locations")
+      .update({
+        name: data.name,
+        address_line: data.addressLine,
+        postal_code: data.postalCode,
+        city: data.city,
+      })
+      .eq("id", data.locationId)
+      .eq("organization_id", organizationId)
       .select(
-        "id, organization_number, legal_name, display_name, postal_code, city, selected_plan, proff_trial_started_at, proff_trial_ends_at, proff_trial_cancelled_at, proff_access_until, website_url, logo_path, brand_palette",
+        "id, organization_id, name, address_line, postal_code, city, lat, lng, is_default, active",
       )
       .single();
     if (error) throw error;
-    return { organization };
+    return { location };
+  });
+
+const locationMemberSchema = z.object({
+  locationId: uuid,
+  userId: uuid,
+  role: z.enum(["member", "manager"]),
+  listingAccess: listingAccessSchema,
+  listingEditScope: listingEditScopeSchema,
+  chatAccess: chatAccessSchema,
+});
+
+export const setOrganizationLocationMember = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) => locationMemberSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const membership = await requireOrganizationMember(context.userId);
+    const { error } = await context.supabase.rpc("set_organization_location_member_permissions", {
+      _location_id: data.locationId,
+      _user_id: data.userId,
+      _role: data.role,
+      _listing_access: data.listingAccess,
+      _listing_edit_scope: data.listingEditScope,
+      _chat_access: data.chatAccess,
+    });
+    if (error) throw error;
+    return {
+      userId: data.userId,
+      locationId: data.locationId,
+      organizationId: membership.organizationId,
+    };
+  });
+
+export const removeOrganizationLocationMember = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) => z.object({ locationId: uuid, userId: uuid }).parse(input))
+  .handler(async ({ data, context }) => {
+    const membership = await requireOrganizationMember(context.userId);
+    const { error } = await context.supabase.rpc("remove_organization_location_member", {
+      _location_id: data.locationId,
+      _user_id: data.userId,
+    });
+    if (error) throw error;
+    return {
+      userId: data.userId,
+      locationId: data.locationId,
+      organizationId: membership.organizationId,
+    };
   });
 
 async function businessInvitationRedirect(): Promise<string> {
@@ -438,6 +672,17 @@ export const inviteOrganizationMember = createServerFn({ method: "POST" })
         name: z.string().trim().min(2).max(80),
         email: z.string().trim().email(),
         permissions: memberPermissionsSchema.optional(),
+        locationAssignments: z
+          .array(
+            z.object({
+              locationId: uuid,
+              role: z.enum(["member", "manager"]),
+              listingAccess: listingAccessSchema,
+              listingEditScope: listingEditScopeSchema,
+              chatAccess: chatAccessSchema,
+            }),
+          )
+          .min(1),
       })
       .parse(input),
   )
@@ -474,10 +719,7 @@ export const inviteOrganizationMember = createServerFn({ method: "POST" })
       user_id: userId,
       role: permissions.role,
       status: "invited",
-      listing_access: permissions.listingAccess,
-      chat_access: permissions.chatAccess,
       can_create_listings: permissions.canCreateListings,
-      listing_edit_scope: permissions.listingEditScope,
       category_access: permissions.categoryAccess,
     });
     if (memberError) {
@@ -504,35 +746,50 @@ export const inviteOrganizationMember = createServerFn({ method: "POST" })
         throw categoryError;
       }
     }
+    let assignments = data.locationAssignments;
+    if (!assignments) {
+      const { data: defaultLocation, error: defaultLocationError } = await supabaseAdmin
+        .from("organization_locations")
+        .select("id")
+        .eq("organization_id", organizationId)
+        .eq("is_default", true)
+        .single();
+      if (defaultLocationError || !defaultLocation) {
+        throw defaultLocationError ?? new Error("Bedriften må ha minst én aktiv lokasjon.");
+      }
+      assignments = [
+        {
+          locationId: defaultLocation.id,
+          role: "member" as const,
+          listingAccess: permissions.listingAccess,
+          listingEditScope: permissions.listingEditScope,
+          chatAccess: permissions.chatAccess,
+        },
+      ];
+    }
+    const { error: locationsError } = await supabaseAdmin
+      .from("organization_location_members")
+      .insert(
+        assignments.map((assignment) => ({
+          location_id: assignment.locationId,
+          organization_id: organizationId,
+          user_id: userId,
+          role: permissions.role === "superuser" ? "manager" : assignment.role,
+          listing_access: permissions.role === "superuser" ? "all" : assignment.listingAccess,
+          listing_edit_scope:
+            permissions.role === "superuser" ? "all" : assignment.listingEditScope,
+          chat_access: permissions.role === "superuser" ? "all" : assignment.chatAccess,
+        })),
+      );
+    if (locationsError) {
+      await supabaseAdmin.from("organization_members").delete().match({
+        organization_id: organizationId,
+        user_id: userId,
+      });
+      await supabaseAdmin.auth.admin.deleteUser(userId);
+      throw locationsError;
+    }
     return { userId, email };
-  });
-
-export const updateOrganizationMemberPermissions = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .validator((input: unknown) =>
-    z
-      .object({
-        userId: uuid,
-        permissions: memberPermissionsSchema,
-      })
-      .parse(input),
-  )
-  .handler(async ({ data, context }) => {
-    const { organizationId } = await requireSuperuserOrganization(context.userId);
-    const permissions = normalizeMemberPermissions(data.permissions);
-    const { error } = await context.supabase.rpc("update_organization_member_permissions", {
-      _organization_id: organizationId,
-      _user_id: data.userId,
-      _role: permissions.role,
-      _listing_access: permissions.listingAccess,
-      _chat_access: permissions.chatAccess,
-      _can_create_listings: permissions.canCreateListings,
-      _listing_edit_scope: permissions.listingEditScope,
-      _category_access: permissions.categoryAccess,
-      _allowed_category_ids: permissions.allowedCategoryIds,
-    });
-    if (error) throw error;
-    return { userId: data.userId };
   });
 
 export const acceptOrganizationInvite = createServerFn({ method: "POST" })
@@ -555,11 +812,10 @@ export const acceptOrganizationInvite = createServerFn({ method: "POST" })
     if (!(await hasEffectiveProffAccess(supabaseAdmin, organizationId))) {
       throw new Error("Invitasjonen er ikke lenger tilgjengelig.");
     }
-
     const { data: accepted, error } = await supabaseAdmin
       .from("organization_members")
       .update({ status: "active" })
-      .eq("organization_id", membership.organization_id)
+      .eq("organization_id", organizationId)
       .eq("user_id", context.userId)
       .eq("status", "invited")
       .select("organization_id")
@@ -572,8 +828,8 @@ export const removeOrganizationMember = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => z.object({ userId: uuid }).parse(input))
   .handler(async ({ data, context }) => {
-    const { organizationId } = await requireSuperuserOrganization(context.userId);
-    const { error } = await context.supabase.rpc("remove_organization_member", {
+    const { supabaseAdmin, organizationId } = await requireSuperuserOrganization(context.userId);
+    const { error } = await supabaseAdmin.rpc("remove_organization_member", {
       _organization_id: organizationId,
       _user_id: data.userId,
     });
@@ -611,7 +867,6 @@ async function findOpenProffOrder(
   return (data as ProffOrder | null) ?? null;
 }
 
-/** The open order for the caller's organization, so the UI can show "invoice on the way". */
 export const getOpenProffOrder = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -625,16 +880,19 @@ export const requestProffSubscription = createServerFn({ method: "POST" })
     z
       .object({
         term: z.enum(["monthly", "yearly"]),
-        billingEmail: z.string().trim().toLowerCase().email().max(320),
         billingReference: z.string().trim().max(120).optional(),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     const { supabaseAdmin, organizationId } = await requireSuperuserOrganization(context.userId);
-    // The price is authoritative on the server; the client only picks a term.
     const term = PROFF_TERMS[data.term];
-
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from("organization_billing_profiles")
+      .select("billing_email, address_line, postal_code, city")
+      .eq("organization_id", organizationId)
+      .single();
+    if (profileError) throw profileError;
     const { data: inserted, error } = await supabaseAdmin
       .from("proff_orders")
       .insert({
@@ -642,24 +900,21 @@ export const requestProffSubscription = createServerFn({ method: "POST" })
         requested_by: context.userId,
         term: term.id,
         price_ex_vat_nok: term.priceExVatNok,
-        billing_email: data.billingEmail,
+        billing_email: profile.billing_email,
         billing_reference: data.billingReference || null,
       })
       .select(ORDER_SELECT)
       .single();
-
     if (error) {
-      // proff_orders_one_open_per_org: an order is already waiting to be invoiced.
       if (error.code === "23505") {
         const existing = await findOpenProffOrder(supabaseAdmin, organizationId);
         if (existing) return { order: existing, alreadyOpen: true };
       }
       throw error;
     }
-
     const organization = await getOrganization(supabaseAdmin, organizationId);
     await notifyProffOrder(supabaseAdmin, organization, inserted as ProffOrder);
-    return { order: inserted as ProffOrder, alreadyOpen: false };
+    return { order: inserted as ProffOrder, alreadyOpen: false, billingAddress: profile };
   });
 
 /**

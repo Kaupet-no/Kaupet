@@ -1,16 +1,38 @@
 import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 
-import { supabase } from "@/integrations/supabase/client";
+import { getBusinessOrganization } from "@/lib/business.functions";
 import { useAuth } from "@/hooks/use-auth";
 import type { BusinessPlan } from "@/features/business-account/plans";
+
+export type BusinessLocationPermissions = {
+  role: "member" | "manager";
+  listingAccess: "own" | "all";
+  listingEditScope: "none" | "own" | "all";
+  chatAccess: "own" | "all";
+};
+
+export type BusinessLocation = {
+  id: string;
+  organization_id: string;
+  name: string;
+  address_line: string | null;
+  postal_code: string | null;
+  city: string | null;
+  lat: number | null;
+  lng: number | null;
+  is_default: boolean;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+  permissions: BusinessLocationPermissions;
+};
 
 export type BusinessOrganization = {
   id: string;
   organization_number: string;
   legal_name: string;
   display_name: string;
-  postal_code: string | null;
-  city: string | null;
   selected_plan: BusinessPlan | null;
   proff_trial_started_at: string | null;
   proff_trial_ends_at: string | null;
@@ -28,19 +50,31 @@ export type BusinessMembership = {
   user_id: string;
   role: "superuser" | "member";
   status: "invited" | "active" | "deactivated";
-  listing_access: "own" | "all";
-  chat_access: "own" | "all";
   can_create_listings: boolean;
-  listing_edit_scope: "none" | "own" | "all";
   category_access: "all" | "restricted";
+  allowed_category_ids: string[];
   created_at: string;
   updated_at: string;
   organization: BusinessOrganization;
+  locations: BusinessLocation[];
+  billingProfile: {
+    organization_id: string;
+    billing_email: string;
+    address_line: string | null;
+    postal_code: string | null;
+    city: string | null;
+    registry_refreshed_at: string | null;
+  } | null;
 };
+
+type BusinessOrganizationResponse = Awaited<
+  ReturnType<ReturnType<typeof useServerFn<typeof getBusinessOrganization>>>
+>;
 
 /** The single client-side membership query used by menu, account page, and console. */
 export function useBusinessMembership() {
   const { user } = useAuth();
+  const loadBusinessOrganization = useServerFn(getBusinessOrganization);
 
   return useQuery({
     queryKey: ["business-membership", user?.id],
@@ -48,56 +82,18 @@ export function useBusinessMembership() {
     staleTime: 30_000,
     queryFn: async (): Promise<BusinessMembership | null> => {
       if (!user) return null;
-      const { data: membership, error: membershipError } = await supabase
-        .from("organization_members")
-        .select(
-          "organization_id, user_id, role, status, listing_access, chat_access, can_create_listings, listing_edit_scope, category_access, created_at, updated_at",
-        )
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (membershipError) throw membershipError;
-      if (!membership) return null;
-
-      // Entitlements are synchronized on reads; no background job is needed for trial expiry.
-      const { error: syncError } = await supabase.rpc("sync_organization_entitlements", {
-        _organization_id: membership.organization_id,
-      });
-      if (syncError) throw syncError;
-
-      const { data: currentMembership, error: currentMembershipError } = await supabase
-        .from("organization_members")
-        .select(
-          "organization_id, user_id, role, status, listing_access, chat_access, can_create_listings, listing_edit_scope, category_access, created_at, updated_at",
-        )
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (currentMembershipError) throw currentMembershipError;
-      if (!currentMembership) return null;
-
-      const { data: organization, error: organizationError } = await supabase
-        .from("organizations")
-        .select(
-          "id, organization_number, legal_name, display_name, postal_code, city, selected_plan, proff_trial_started_at, proff_trial_ends_at, proff_trial_cancelled_at, proff_access_until, website_url, logo_path, brand_palette, created_at, updated_at",
-        )
-        .eq("id", currentMembership.organization_id)
-        .maybeSingle();
-      if (organizationError) throw organizationError;
-      if (!organization) return null;
+      const response = (await loadBusinessOrganization()) as BusinessOrganizationResponse;
+      if (!response?.membership || response.membership.status !== "active") return null;
       return {
-        ...currentMembership,
-        role: currentMembership.role as BusinessMembership["role"],
-        status: currentMembership.status as BusinessMembership["status"],
-        listing_access: currentMembership.listing_access as BusinessMembership["listing_access"],
-        chat_access: currentMembership.chat_access as BusinessMembership["chat_access"],
-        can_create_listings: currentMembership.can_create_listings as boolean,
-        listing_edit_scope:
-          currentMembership.listing_edit_scope as BusinessMembership["listing_edit_scope"],
-        category_access: currentMembership.category_access as BusinessMembership["category_access"],
-        organization: organization as BusinessOrganization,
-      };
+        ...response.membership,
+        organization: response.organization as BusinessOrganization,
+        locations: response.locations as BusinessLocation[],
+        billingProfile: response.billingProfile,
+      } as BusinessMembership;
     },
   });
 }
+
 export function isActiveBusinessMember(membership: BusinessMembership | null | undefined) {
   return membership?.status === "active";
 }

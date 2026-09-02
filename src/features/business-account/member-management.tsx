@@ -20,15 +20,17 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { hasEffectiveProffAccess } from "@/features/business-account/plans";
-import type { BusinessOrganization } from "@/features/business-account/use-business-membership";
+import type {
+  BusinessLocation,
+  BusinessOrganization,
+} from "@/features/business-account/use-business-membership";
 import {
   inviteOrganizationMember,
   removeOrganizationMember,
-  updateOrganizationMemberPermissions,
+  setOrganizationLocationMember,
   type OrganizationMemberPermissions,
 } from "@/lib/business.functions";
 import { supabase } from "@/integrations/supabase/client";
-
 type Category = { id: string; name_nb: string; parent_id: string | null };
 
 export type OrganizationMember = OrganizationMemberPermissions & {
@@ -36,10 +38,12 @@ export type OrganizationMember = OrganizationMemberPermissions & {
   status: "invited" | "active" | "deactivated";
   created_at: string;
   display_name: string | null;
+  locationId: string;
 };
 
 type Props = {
   organization: BusinessOrganization;
+  locations: BusinessLocation[];
   userId: string;
   role: "superuser" | "member";
 };
@@ -260,7 +264,7 @@ function Choice({
   );
 }
 
-export function MemberManagement({ organization, userId, role }: Props) {
+export function MemberManagement({ organization, locations, userId, role }: Props) {
   const canManage = hasEffectiveProffAccess(organization) && role === "superuser";
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
@@ -271,7 +275,7 @@ export function MemberManagement({ organization, userId, role }: Props) {
   const [removeTarget, setRemoveTarget] = useState<OrganizationMember | null>(null);
   const callInvite = useServerFn(inviteOrganizationMember);
   const callRemove = useServerFn(removeOrganizationMember);
-  const callUpdate = useServerFn(updateOrganizationMemberPermissions);
+  const callUpdate = useServerFn(setOrganizationLocationMember);
 
   const categoriesQuery = useQuery({
     queryKey: ["business-member-categories"],
@@ -286,14 +290,12 @@ export function MemberManagement({ organization, userId, role }: Props) {
     },
   });
   const membersQuery = useQuery({
-    queryKey: ["business-members", organization.id],
+    queryKey: ["business-members", organization.id, locations.map((location) => location.id)],
     enabled: canManage,
     queryFn: async (): Promise<OrganizationMember[]> => {
       const { data: members, error } = await supabase
         .from("organization_members")
-        .select(
-          "user_id, role, status, created_at, listing_access, chat_access, can_create_listings, listing_edit_scope, category_access",
-        )
+        .select("user_id, role, status, created_at, can_create_listings, category_access")
         .eq("organization_id", organization.id)
         .order("created_at", { ascending: true });
       if (error) throw error;
@@ -301,6 +303,7 @@ export function MemberManagement({ organization, userId, role }: Props) {
       const [
         { data: profiles, error: profilesError },
         { data: categoryRows, error: categoryError },
+        { data: assignments, error: assignmentsError },
       ] = await Promise.all([
         ids.length
           ? supabase.from("profiles").select("id, display_name").in("id", ids)
@@ -312,30 +315,43 @@ export function MemberManagement({ organization, userId, role }: Props) {
               .eq("organization_id", organization.id)
               .in("user_id", ids)
           : Promise.resolve({ data: [], error: null }),
+        ids.length
+          ? supabase
+              .from("organization_location_members")
+              .select("user_id, location_id, role, listing_access, listing_edit_scope, chat_access")
+              .eq("organization_id", organization.id)
+              .in("user_id", ids)
+          : Promise.resolve({ data: [], error: null }),
       ]);
-      if (profilesError) throw profilesError;
-      if (categoryError) throw categoryError;
+      if (profilesError || categoryError || assignmentsError) {
+        throw profilesError ?? categoryError ?? assignmentsError;
+      }
       const names = new Map((profiles ?? []).map((profile) => [profile.id, profile.display_name]));
       const allowed = new Map<string, string[]>();
       for (const row of categoryRows ?? [])
         allowed.set(row.user_id, [...(allowed.get(row.user_id) ?? []), row.category_id]);
-      return (members ?? []).map((member) => ({
-        user_id: member.user_id,
-        role: member.role as OrganizationMember["role"],
-        status: member.status as OrganizationMember["status"],
-        created_at: member.created_at,
-        display_name: names.get(member.user_id) ?? null,
-        listingAccess: member.listing_access as OrganizationMemberPermissions["listingAccess"],
-        chatAccess: member.chat_access as OrganizationMemberPermissions["chatAccess"],
-        canCreateListings: member.can_create_listings,
-        listingEditScope:
-          member.listing_edit_scope as OrganizationMemberPermissions["listingEditScope"],
-        categoryAccess: member.category_access as OrganizationMemberPermissions["categoryAccess"],
-        allowedCategoryIds: allowed.get(member.user_id) ?? [],
-      }));
+      return (members ?? []).map((member) => {
+        const assignment = (assignments ?? []).find((row) => row.user_id === member.user_id);
+        return {
+          user_id: member.user_id,
+          role: member.role as OrganizationMember["role"],
+          status: member.status as OrganizationMember["status"],
+          created_at: member.created_at,
+          display_name: names.get(member.user_id) ?? null,
+          locationId: assignment?.location_id ?? locations[0]?.id ?? "",
+          listingAccess: (assignment?.listing_access ??
+            "own") as OrganizationMemberPermissions["listingAccess"],
+          chatAccess: (assignment?.chat_access ??
+            "own") as OrganizationMemberPermissions["chatAccess"],
+          canCreateListings: member.can_create_listings,
+          listingEditScope: (assignment?.listing_edit_scope ??
+            "own") as OrganizationMemberPermissions["listingEditScope"],
+          categoryAccess: member.category_access as OrganizationMemberPermissions["categoryAccess"],
+          allowedCategoryIds: allowed.get(member.user_id) ?? [],
+        };
+      });
     },
   });
-
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["business-members", organization.id] });
   const inviteMutation = useMutation({
@@ -347,7 +363,24 @@ export function MemberManagement({ organization, userId, role }: Props) {
       const next = normalizePermissions(permissions);
       if (next.categoryAccess === "restricted" && next.allowedCategoryIds.length === 0)
         throw new Error("Velg minst én kategori.");
-      return callInvite({ data: { name: name.trim(), email: email.trim(), permissions: next } });
+      const defaultLocation = locations.find((location) => location.is_default) ?? locations[0];
+      if (!defaultLocation) throw new Error("Bedriften må ha minst én aktiv lokasjon.");
+      return callInvite({
+        data: {
+          name: name.trim(),
+          email: email.trim(),
+          permissions: next,
+          locationAssignments: [
+            {
+              locationId: defaultLocation.id,
+              role: next.role === "superuser" ? "manager" : "member",
+              listingAccess: next.listingAccess,
+              listingEditScope: next.listingEditScope,
+              chatAccess: next.chatAccess,
+            },
+          ],
+        },
+      });
     },
     onSuccess: async () => {
       setName("");
@@ -363,7 +396,16 @@ export function MemberManagement({ organization, userId, role }: Props) {
       const next = normalizePermissions(permissionValue(editing));
       if (next.categoryAccess === "restricted" && next.allowedCategoryIds.length === 0)
         throw new Error("Velg minst én kategori.");
-      return callUpdate({ data: { userId: editing.user_id, permissions: next } });
+      return callUpdate({
+        data: {
+          locationId: editing.locationId,
+          userId: editing.user_id,
+          role: editing.role === "superuser" ? "manager" : "member",
+          listingAccess: next.listingAccess,
+          listingEditScope: next.listingEditScope,
+          chatAccess: next.chatAccess,
+        },
+      });
     },
     onSuccess: async () => {
       setEditing(null);

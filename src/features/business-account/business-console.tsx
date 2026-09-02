@@ -3,6 +3,13 @@ import { Link } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Building2,
   CalendarClock,
   ChevronRight,
@@ -27,10 +34,14 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import type { BusinessMembership } from "@/features/business-account/use-business-membership";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BUSINESS_PLANS, hasEffectiveProffAccess } from "@/features/business-account/plans";
-import type { BusinessOrganization } from "@/features/business-account/use-business-membership";
+import type {
+  BusinessLocation,
+  BusinessOrganization,
+} from "@/features/business-account/use-business-membership";
 import { BusinessListingsPanel } from "@/features/business-account/business-listings-panel";
 import { BusinessMessagesPanel } from "@/features/business-account/business-messages-panel";
 import { BusinessProfileForm } from "@/features/business-account/business-profile-form";
@@ -39,13 +50,14 @@ import { setBusinessPlan } from "@/lib/business.functions";
 import { BulkListingImport } from "@/features/listing-bulk-import/BulkListingImport";
 
 export type BusinessTab = "oversikt" | "annonser" | "meldinger" | "bedriftsprofil" | "brukere";
-
 type Props = {
   organization: BusinessOrganization;
+  locations: BusinessLocation[];
+  billingProfile: BusinessMembership["billingProfile"];
+  selectedLocationId: string | "all";
+  onLocationChange: (locationId: string | "all") => void;
   userId: string;
   role: "superuser" | "member";
-  listingAccess: "own" | "all";
-  listingEditScope: "none" | "own" | "all";
   tab: BusinessTab;
   onTabChange: (tab: BusinessTab) => void;
 };
@@ -57,13 +69,14 @@ const TAB_LABELS: Record<BusinessTab, string> = {
   bedriftsprofil: "Bedriftsprofil",
   brukere: "Brukere",
 };
-
 export function BusinessConsole({
   organization,
+  locations,
+  billingProfile,
+  selectedLocationId,
+  onLocationChange,
   userId,
   role,
-  listingAccess,
-  listingEditScope,
   tab,
   onTabChange,
 }: Props) {
@@ -95,6 +108,11 @@ export function BusinessConsole({
     !!organization.proff_trial_ends_at &&
     !organization.proff_trial_cancelled_at &&
     new Date(organization.proff_trial_ends_at).getTime() > now;
+  const selectedLocation = locations.find((location) => location.id === selectedLocationId);
+  const effectiveListingAccess =
+    selectedLocation?.permissions.listingAccess ?? (role === "superuser" ? "all" : "own");
+  const effectiveListingEditScope =
+    selectedLocation?.permissions.listingEditScope ?? (role === "superuser" ? "all" : "none");
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-safe py-6 sm:py-10">
@@ -104,11 +122,27 @@ export function BusinessConsole({
         </p>
         <h1 className="mt-2 font-display text-3xl tracking-tight">{organization.display_name}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Org.nr. {organization.organization_number}
-          {organization.city
-            ? ` · ${organization.postal_code ? `${organization.postal_code} ` : ""}${organization.city}`
-            : ""}
+          Org.nr. {organization.organization_number} · {locations.length}{" "}
+          {locations.length === 1 ? "lokasjon" : "lokasjoner"}
         </p>
+      </div>
+      <div className="mb-6 max-w-md space-y-2">
+        <label htmlFor="business-location-context" className="text-sm font-medium">
+          Aktiv lokasjon
+        </label>
+        <Select value={selectedLocationId} onValueChange={onLocationChange}>
+          <SelectTrigger id="business-location-context">
+            <SelectValue placeholder="Velg lokasjon" />
+          </SelectTrigger>
+          <SelectContent>
+            {role === "superuser" && <SelectItem value="all">Alle lokasjoner</SelectItem>}
+            {locations.map((location) => (
+              <SelectItem key={location.id} value={location.id}>
+                {location.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <Tabs
@@ -146,24 +180,41 @@ export function BusinessConsole({
         <TabsContent value="annonser" className="mt-6">
           <BusinessListingsPanel
             organization={organization}
+            locationId={selectedLocationId}
             userId={userId}
-            listingAccess={listingAccess}
-            listingEditScope={listingEditScope}
+            listingAccess={effectiveListingAccess}
+            listingEditScope={effectiveListingEditScope}
             canCreateListings={role === "superuser" || (effectiveProff && role === "member")}
             onImport={() => setImportOpen(true)}
           />
         </TabsContent>
         <TabsContent value="meldinger" className="mt-6">
-          <BusinessMessagesPanel organization={organization} />
+          <BusinessMessagesPanel organization={organization} locationId={selectedLocationId} />
         </TabsContent>
         <TabsContent value="bedriftsprofil" className="mt-6">
-          <BusinessProfileForm organization={organization} />
+          <BusinessProfileForm
+            organization={organization}
+            locations={locations}
+            billingProfile={billingProfile}
+          />
         </TabsContent>
         <TabsContent value="brukere" className="mt-6">
-          <MemberManagement organization={organization} userId={userId} role={role} />
+          <MemberManagement
+            organization={organization}
+            locations={locations}
+            userId={userId}
+            role={role}
+          />
         </TabsContent>
       </Tabs>
-      {effectiveProff && <BulkListingImport open={importOpen} onOpenChange={setImportOpen} />}
+      {effectiveProff && (
+        <BulkListingImport
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          locations={locations}
+          selectedLocationId={selectedLocationId === "all" ? null : selectedLocationId}
+        />
+      )}
     </div>
   );
 }

@@ -27,11 +27,12 @@ export type ListingFormShape = {
   price_nok?: number | "" | undefined;
   postal_code?: string | undefined;
   city?: string | undefined;
+  organization_location_id?: string | null;
+  show_visiting_address?: boolean;
   known_issues?: string | undefined;
   no_known_issues?: boolean;
   maintenance_history?: string | undefined;
 };
-
 export type ComposerReviewClassification =
   "requiredToPublish" | "recommendedForTrust" | "optionalEnhancement";
 

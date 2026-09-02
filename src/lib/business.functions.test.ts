@@ -168,24 +168,16 @@ beforeEach(() => {
 });
 
 describe("business server functions", () => {
-  it("viser maskert kontaktperson og support ved duplikat organisasjonsnummer", async () => {
-    buildAdmin({
-      existingOrganization: { id: organizationId },
-      membership: {
-        organization_id: organizationId,
-        user_id: "contact-user-1",
-        role: "superuser",
-        status: "active",
-      },
-      contactEmail: "Kari.Nordmann@example.com",
-    });
+  it("henviser til support uten å lekke kontaktinfo ved duplikat organisasjonsnummer (L-11)", async () => {
+    buildAdmin({ existingOrganization: { id: organizationId } });
 
     await expect(
       lookupBusinessOrganization({ data: { organizationNumber: "974 760 673" } }),
     ).rejects.toThrow(
-      "Denne bedriften er allerede registrert på Kaupet. Bedriftens kontaktperson er ka***@ex***.com. Du kan også kontakte support på kontakt@kaupet.no.",
+      "Denne bedriften er allerede registrert på Kaupet. Du kan også kontakte support på kontakt@kaupet.no.",
     );
     expect(fetchOrganizationFromBrreg).not.toHaveBeenCalled();
+    expect(supabaseAdmin.auth.admin.getUserById).not.toHaveBeenCalled();
   });
   it("varsler administrator om ny Proff-bestilling og priser perioden på serveren", async () => {
     buildAdmin({ contactEmail: "admin@kaupet.no" });

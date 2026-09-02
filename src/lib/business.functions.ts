@@ -21,46 +21,12 @@ const USED_TRIAL_MESSAGE =
 const INVITE_EXISTING_MESSAGE =
   "E-postadressen er allerede i bruk. Invitasjon av eksisterende kontoer støttes ikke ennå.";
 
-function maskContactEmail(email: string): string | null {
-  const normalized = email.trim().toLowerCase();
-  const separator = normalized.lastIndexOf("@");
-  if (separator <= 0) return null;
-
-  const localPart = normalized.slice(0, separator);
-  const domain = normalized.slice(separator + 1);
-  const tldSeparator = domain.lastIndexOf(".");
-  if (!domain || tldSeparator <= 0 || tldSeparator === domain.length - 1) return null;
-
-  const host = domain.slice(0, tldSeparator);
-  const tld = domain.slice(tldSeparator);
-  return `${localPart.slice(0, 2)}***@${host.slice(0, 2)}***${tld}`;
-}
-
-async function duplicateOrganizationMessage(
-  supabaseAdmin: AdminClient,
-  organizationId: string,
-): Promise<string> {
-  const { data: membership, error: membershipError } = await supabaseAdmin
-    .from("organization_members")
-    .select("user_id")
-    .eq("organization_id", organizationId)
-    .eq("role", "superuser")
-    .eq("status", "active")
-    .maybeSingle();
-  if (membershipError) return `${DUPLICATE_ORGANIZATION_MESSAGE} ${SUPPORT_MESSAGE}`;
-
-  const userId = membership?.user_id as string | undefined;
-  if (!userId) return `${DUPLICATE_ORGANIZATION_MESSAGE} ${SUPPORT_MESSAGE}`;
-
-  const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
-  const maskedEmail = !error && data.user?.email ? maskContactEmail(data.user.email) : null;
-  return [
-    DUPLICATE_ORGANIZATION_MESSAGE,
-    maskedEmail ? `Bedriftens kontaktperson er ${maskedEmail}.` : null,
-    SUPPORT_MESSAGE,
-  ]
-    .filter(Boolean)
-    .join(" ");
+// L-11: this used to include a masked contact email (an***@ka***.no) in the
+// response. Combined with the organization number, that's often enough to
+// guess the full address — and the endpoint requires no login. Refer to
+// support instead; they can share contact info after an identity check.
+function duplicateOrganizationMessage(): string {
+  return `${DUPLICATE_ORGANIZATION_MESSAGE} ${SUPPORT_MESSAGE}`;
 }
 
 const uuid = z.string().uuid();
@@ -228,7 +194,7 @@ export const lookupBusinessOrganization = createServerFn({ method: "POST" })
       .maybeSingle();
     if (existingError) throw existingError;
     if (existing) {
-      throw new Error(await duplicateOrganizationMessage(supabaseAdmin, existing.id as string));
+      throw new Error(duplicateOrganizationMessage());
     }
     await supabaseAdmin
       .from("business_signup_intents")

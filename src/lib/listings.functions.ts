@@ -596,10 +596,15 @@ export const getListingKaupetCodeById = createServerFn({ method: "GET" })
   .validator((input: unknown) => z.object({ listing_id: z.string().uuid() }).parse(input))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Unauthenticated (legacy /annonse/:id → /$kaupetCode redirect), so this
+    // must not use service-role to reveal a draft/disabled listing's code —
+    // same visibility RLS gives everyone else. See
+    // docs/SIKKERHETSVURDERING.md L-13.
     const { data: row, error } = await supabaseAdmin
       .from("listings")
       .select("kaupet_code")
       .eq("id", data.listing_id)
+      .eq("status", "active")
       .maybeSingle();
     if (error) throw error;
     return { kaupet_code: row?.kaupet_code ?? null };

@@ -103,7 +103,7 @@ export const adminGetVippsPaymentStatus = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: promo, error } = await supabaseAdmin
       .from("listing_promotions")
-      .select("id, status, price_nok, vipps_reference, is_gift")
+      .select("id, status, price_nok, vipps_reference, vipps_mode, is_gift")
       .eq("id", data.promotion_id)
       .maybeSingle();
     if (error) throw error;
@@ -111,12 +111,12 @@ export const adminGetVippsPaymentStatus = createServerFn({ method: "POST" })
     if (promo.is_gift || !promo.vipps_reference) {
       return { hasVipps: false as const };
     }
-    const { getVippsPayment, getVippsMode } = await import("@/lib/vipps.server");
+    const { getVippsPayment } = await import("@/lib/vipps.server");
     const { getRequest } = await import("@tanstack/react-start/server");
     const host = getRequest().headers.get("host");
-    const mode = getVippsMode(host);
+    const mode = promo.vipps_mode as "test" | "production";
     try {
-      const result = await getVippsPayment(promo.vipps_reference, host);
+      const result = await getVippsPayment(promo.vipps_reference, host, mode);
       const captured = result.state === "CAPTURED" || result.state === "AUTHORIZED";
       const failedStates = ["ABORTED", "EXPIRED", "CANCELLED", "TERMINATED", "FAILED"];
       const mismatch =
@@ -150,7 +150,7 @@ export const adminRefundPromotion = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: promo, error } = await supabaseAdmin
       .from("listing_promotions")
-      .select("id, price_nok, vipps_reference, status, is_gift")
+      .select("id, price_nok, vipps_reference, vipps_mode, status, is_gift")
       .eq("id", data.promotion_id)
       .maybeSingle();
     if (error) throw error;
@@ -167,6 +167,7 @@ export const adminRefundPromotion = createServerFn({ method: "POST" })
       promo.price_nok,
       `r-${promo.id.replace(/-/g, "")}-${Date.now().toString(36)}`,
       host,
+      promo.vipps_mode as "test" | "production",
     );
 
     const { error: refundErr } = await supabaseAdmin

@@ -45,6 +45,12 @@ describe("getVippsMode", () => {
     process.env.VIPPS_ENVIRONMENT = "production";
     expect(getVippsMode("test.kaupet.no")).toBe("production");
   });
+
+  it("is not influenced by client-controllable state on a production host", () => {
+    // K-1 regression: mode must derive only from host / VIPPS_ENVIRONMENT,
+    // never from a cookie or other request state the client can set.
+    expect(getVippsMode("kaupet.no")).toBe("production");
+  });
 });
 
 describe("assertVippsConfigured", () => {

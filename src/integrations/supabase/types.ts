@@ -829,6 +829,7 @@ export type Database = {
           status: Database["public"]["Enums"]["promotion_status"]
           updated_at: string
           user_id: string
+          vipps_mode: string | null
           vipps_psp_reference: string | null
           vipps_reference: string | null
         }
@@ -847,6 +848,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["promotion_status"]
           updated_at?: string
           user_id: string
+          vipps_mode?: string | null
           vipps_psp_reference?: string | null
           vipps_reference?: string | null
         }
@@ -865,6 +867,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["promotion_status"]
           updated_at?: string
           user_id?: string
+          vipps_mode?: string | null
           vipps_psp_reference?: string | null
           vipps_reference?: string | null
         }

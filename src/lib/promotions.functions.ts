@@ -64,7 +64,18 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
       throw new Error("Denne annonsen har allerede en aktiv eller ventende fremheving");
     }
 
-    // Create pending row
+    const { createVippsPayment, getVippsMode } = await import("@/lib/vipps.server");
+    const host = (() => {
+      try {
+        return getRequestHost();
+      } catch {
+        return null;
+      }
+    })();
+    const vippsMode = getVippsMode(host);
+
+    // Create pending row — vipps_mode is fixed at creation and reused for
+    // reconcile/capture/refund/webhook, instead of re-derived per request.
     const reference = `kaupet-promo-${crypto.randomUUID()}`;
     const { data: promo, error: ierr } = await supabaseAdmin
       .from("listing_promotions")
@@ -75,20 +86,11 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
         price_nok: pricing.price_nok,
         status: "pending",
         vipps_reference: reference,
+        vipps_mode: vippsMode,
       })
       .select("id")
       .single();
     if (ierr) throw ierr;
-
-    const { createVippsPayment, getVippsMode } = await import("@/lib/vipps.server");
-    const host = (() => {
-      try {
-        return getRequestHost();
-      } catch {
-        return null;
-      }
-    })();
-    const vippsMode = getVippsMode(host);
     const origin = host
       ? `https://${host}`
       : (process.env.PUBLIC_SITE_URL ??
@@ -195,7 +197,9 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
 
     const { data: promo, error } = await supabaseAdmin
       .from("listing_promotions")
-      .select("id, user_id, status, duration_days, price_nok, vipps_reference, expires_at")
+      .select(
+        "id, user_id, status, duration_days, price_nok, vipps_reference, vipps_mode, expires_at",
+      )
       .eq("id", data.promotion_id)
       .maybeSingle();
     if (error) throw error;
@@ -218,7 +222,8 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
     })();
 
     const { getVippsPayment, captureVippsPayment } = await import("@/lib/vipps.server");
-    const payment = await getVippsPayment(promo.vipps_reference, host);
+    const vippsMode = promo.vipps_mode as "test" | "production";
+    const payment = await getVippsPayment(promo.vipps_reference, host, vippsMode);
 
     if (payment.state === "AUTHORIZED" || payment.state === "CAPTURED") {
       const now = new Date();
@@ -242,6 +247,7 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
             promo.price_nok,
             `capture-${promo.id}`,
             host,
+            vippsMode,
           );
         } catch (e) {
           console.error("[reconcilePromotionPayment] capture failed", e);

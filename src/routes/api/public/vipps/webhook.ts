@@ -81,7 +81,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
         // Look up promotion
         const { data: promo } = await supabaseAdmin
           .from("listing_promotions")
-          .select("id, status, duration_days, price_nok")
+          .select("id, status, duration_days, price_nok, vipps_mode")
           .eq("vipps_reference", reference)
           .maybeSingle();
 
@@ -93,9 +93,11 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
           return new Response("ok");
         }
 
-        // Re-fetch authoritative state from Vipps
+        // Re-fetch authoritative state from Vipps, using the environment the
+        // transaction was created in — not the request's host.
+        const promoMode = promo.vipps_mode as "test" | "production";
         try {
-          const payment = await getVippsPayment(reference, host);
+          const payment = await getVippsPayment(reference, host, promoMode);
           if (payment.state === "AUTHORIZED" || payment.state === "CAPTURED") {
             if (promo.status === "pending") {
               const now = new Date();
@@ -119,6 +121,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
                     promo.price_nok,
                     `capture-${promo.id}`,
                     host,
+                    promoMode,
                   );
                 } catch (e) {
                   console.error("[vipps webhook] capture failed", e);

@@ -6,7 +6,6 @@
  */
 import { createHmac, timingSafeEqual } from "crypto";
 import { isTestHost } from "./env";
-import { getRequestIsTest } from "./env.server";
 
 /** Constant-time HMAC-SHA256 signature check for the Vipps webhook. */
 export function verifyVippsWebhookSignature(
@@ -36,11 +35,14 @@ const tokenCache: { test: TokenCache; production: TokenCache } = {
   production: null,
 };
 
-function hostAwareEnv(host?: string | null): VippsEnv {
+function hostAwareEnv(host?: string | null, explicitMode?: "test" | "production"): VippsEnv {
   // Explicit override (local dev): VIPPS_ENVIRONMENT=test|production wins.
+  // Never derive this from client-controllable state (cookies, headers) — it
+  // picks which Vipps API (and whose money) a payment is created against.
   const override = process.env.VIPPS_ENVIRONMENT;
-  const useTest =
-    override === "test" || (override !== "production" && (isTestHost(host) || getRequestIsTest()));
+  const useTest = explicitMode
+    ? explicitMode === "test"
+    : override === "test" || (override !== "production" && isTestHost(host));
 
   if (useTest) {
     return {
@@ -187,13 +189,14 @@ export type VippsPaymentStatus =
 export async function getVippsPayment(
   reference: string,
   host?: string | null,
+  explicitMode?: "test" | "production",
 ): Promise<{
   state: VippsPaymentStatus;
   pspReference?: string;
   amount?: { value: number; currency: string };
 }> {
   assertVippsConfigured(host);
-  const e = hostAwareEnv(host);
+  const e = hostAwareEnv(host, explicitMode);
   const res = await fetch(`${e.baseUrl}/epayment/v1/payments/${reference}`, {
     headers: await vippsHeaders(e),
   });
@@ -213,9 +216,10 @@ export async function captureVippsPayment(
   amountNok: number,
   idempotencyKey: string,
   host?: string | null,
+  explicitMode?: "test" | "production",
 ) {
   assertVippsConfigured(host);
-  const e = hostAwareEnv(host);
+  const e = hostAwareEnv(host, explicitMode);
   const res = await fetch(`${e.baseUrl}/epayment/v1/payments/${reference}/capture`, {
     method: "POST",
     headers: await vippsHeaders(e, { "Idempotency-Key": idempotencyKey }),
@@ -234,9 +238,10 @@ export async function refundVippsPayment(
   amountNok: number,
   idempotencyKey: string,
   host?: string | null,
+  explicitMode?: "test" | "production",
 ) {
   assertVippsConfigured(host);
-  const e = hostAwareEnv(host);
+  const e = hostAwareEnv(host, explicitMode);
   const res = await fetch(`${e.baseUrl}/epayment/v1/payments/${reference}/refund`, {
     method: "POST",
     headers: await vippsHeaders(e, { "Idempotency-Key": idempotencyKey }),

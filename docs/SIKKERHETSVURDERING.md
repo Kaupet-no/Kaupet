@@ -6,23 +6,34 @@
 
 Fikses steg for steg, én commit per funn, verifisert mot en lokal Supabase-stack der det er relevant.
 
-| #                   | Funn                                                 | Status                                   |
-| ------------------- | ---------------------------------------------------- | ---------------------------------------- |
-| K-1                 | Betalingsmiljø nedgraderes via forfalsket cookie     | ✅ Fikset (`3e36c7a`)                    |
-| K-2                 | Storage-policyer ikke i versjonskontroll             | ✅ Fikset (`a59eb2e`)                    |
-| H-3                 | `pull_request_target` + `bun install` med scripts    | ✅ Fikset (`a584b80`)                    |
-| M-4                 | Ingen affiliasjonskontroll ved bedriftsregistrering  | ✅ Fikset (`ff38743`, minimumsvariant)   |
-| M-5                 | `organizations` lesbar for `anon` med `USING (true)` | ✅ Fikset (`859d2e6`)                    |
-| M-6                 | CSP report-only uten rapportmottaker; mangler HSTS   | ✅ Fikset (`9f5de3a`, delvis — se notat) |
-| M-7                 | Ingen serverside lengdegrense på tekstkolonner       | ✅ Fikset (`f66efcf`)                    |
-| M-8                 | Rate-limiting i minnet per Worker-isolate            | ✅ Fikset (`4cecf32`)                    |
-| M-9                 | Uautentiserte funksjoner mot betalte/tunge ressurser | ✅ Fikset (`091f909`, delvis — se notat) |
-| L-10 til L-16, I-17 | Lavrisiko / info                                     | Ikke startet                             |
+| #    | Funn                                                  | Status                                   |
+| ---- | ----------------------------------------------------- | ---------------------------------------- |
+| K-1  | Betalingsmiljø nedgraderes via forfalsket cookie      | ✅ Fikset (`3e36c7a`)                    |
+| K-2  | Storage-policyer ikke i versjonskontroll              | ✅ Fikset (`a59eb2e`)                    |
+| H-3  | `pull_request_target` + `bun install` med scripts     | ✅ Fikset (`a584b80`)                    |
+| M-4  | Ingen affiliasjonskontroll ved bedriftsregistrering   | ✅ Fikset (`ff38743`, minimumsvariant)   |
+| M-5  | `organizations` lesbar for `anon` med `USING (true)`  | ✅ Fikset (`859d2e6`)                    |
+| M-6  | CSP report-only uten rapportmottaker; mangler HSTS    | ✅ Fikset (`9f5de3a`, delvis — se notat) |
+| M-7  | Ingen serverside lengdegrense på tekstkolonner        | ✅ Fikset (`f66efcf`)                    |
+| M-8  | Rate-limiting i minnet per Worker-isolate             | ✅ Fikset (`4cecf32`)                    |
+| M-9  | Uautentiserte funksjoner mot betalte/tunge ressurser  | ✅ Fikset (`091f909`, delvis — se notat) |
+| L-10 | Android `allowBackup="true"`                          | ✅ Fikset (`f878a97`)                    |
+| L-11 | Maskert kontakt-e-post lekkes uautentisert            | ✅ Fikset (`700f389`)                    |
+| L-12 | `listUserReviews` maskerer ikke slettede i hovedstien | ✅ Fikset (`057cb6c`)                    |
+| L-13 | `getListingKaupetCodeById` omgår statusfilter         | ✅ Fikset (`287d161`)                    |
+| L-14 | Rå databasefeil returneres til klienten               | ✅ Fikset (`059b8eb`, delvis — se notat) |
+| L-15 | Svak passordpolicy                                    | ✅ Fikset (`0aac05d`, delvis — se notat) |
+| L-16 | `@xmldom/xmldom` moderate advisory                    | ✅ Fikset (`6ddca58`)                    |
+| I-17 | Stagings service-role-nøkkel på produksjons-Worker    | Ikke gjort — valgfritt, se notat         |
 
-**Delvise fikser:**
+**Delvise fikser / bevisst ikke gjort:**
 
 - **M-6:** `'unsafe-inline'` i `script-src` er ikke fjernet (krever per-request CSP-nonce gjennom SSR-rendringen); promotering til enforcement venter på stille produksjonsrapporter.
 - **M-9:** Turnstile er ikke lagt til på `suggestCategoryForTitle` — den kalles fra `intent-title-landing.tsx` på hvert tastetrykk før brukeren er i wizarden, så det er en UX-avgjørelse (usynlig widget på en pre-auth landingsside), ikke noe en sikkerhetsfiks bør avgjøre alene.
+- **L-14:** `toClientError()` er kun brukt på de tre eksemplene funnet nevner (`saveDraftListing`, `createBlock`, `createPromotionCheckout`). Resten av `throw error`-forekomstene i handlers gjenstår — funnet selv foreslår inkrementell utrulling.
+- **I-17:** urørt. Å flytte til en dedikert read-only Postgres-rolle eller en manuell `workflow_dispatch`-jobb er en infrastrukturendring mot en levende staging-database, forskjellig fra kodeendringene i resten av lista — bør gjøres bevisst, ikke som del av denne gjennomgangen.
+
+**Verifisering:** alle DB-migrasjoner er kjørt mot en lokal Supabase-stack (`supabase db reset`), med RLS-integrasjonstester (130 tester) og enhetstester (590 tester) grønne. `bun audit` rapporterer ingen sårbarheter. `tsc --noEmit`, full ESLint og en produksjonsbuild er rene.
 
 ---
 

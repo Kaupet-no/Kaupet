@@ -16,14 +16,43 @@ type RawReviewRow = {
   comment: string | null;
   created_at: string;
   reviewer:
-    | { id: string; display_name: string | null; avatar_url: string | null }
-    | { id: string; display_name: string | null; avatar_url: string | null }[]
+    | {
+        id: string;
+        display_name: string | null;
+        avatar_url: string | null;
+        deleted_at: string | null;
+      }
+    | {
+        id: string;
+        display_name: string | null;
+        avatar_url: string | null;
+        deleted_at: string | null;
+      }[]
     | null;
   listing:
     | { id: string; kaupet_code: string; title: string }
     | { id: string; kaupet_code: string; title: string }[]
     | null;
 };
+
+/** Deleted profiles must never show their real name/avatar in a review list
+ * — this is the one masking rule, applied at every path that joins reviewer
+ * profiles (see docs/SIKKERHETSVURDERING.md L-12). */
+function maskDeletedReviewer(
+  p: {
+    id: string;
+    display_name: string | null;
+    avatar_url: string | null;
+    deleted_at: string | null;
+  } | null,
+): { id: string; display_name: string | null; avatar_url: string | null } | null {
+  if (!p) return null;
+  return {
+    id: p.id,
+    display_name: p.deleted_at ? "Slettet bruker" : p.display_name,
+    avatar_url: p.deleted_at ? null : p.avatar_url,
+  };
+}
 
 export type ReviewRow = {
   id: string;
@@ -205,7 +234,7 @@ export const listUserReviews = createServerFn({ method: "POST" })
       .from("user_reviews")
       .select(
         `id, listing_id, reviewer_id, reviewee_id, role, rating, comment, created_at,
-         reviewer:profiles!user_reviews_reviewer_id_fkey(id, display_name, avatar_url),
+         reviewer:profiles!user_reviews_reviewer_id_fkey(id, display_name, avatar_url, deleted_at),
          listing:listings(id, kaupet_code, title)`,
       )
       .eq("reviewee_id", data.userId)
@@ -237,13 +266,7 @@ export const listUserReviews = createServerFn({ method: "POST" })
         return {
           ...r,
           role: r.role as "buyer" | "seller",
-          reviewer: p
-            ? {
-                id: p.id,
-                display_name: p.deleted_at ? "Slettet bruker" : p.display_name,
-                avatar_url: p.deleted_at ? null : p.avatar_url,
-              }
-            : null,
+          reviewer: maskDeletedReviewer(p ?? null),
           listing: lmap.get(r.listing_id) ?? null,
         };
       });
@@ -255,7 +278,7 @@ export const listUserReviews = createServerFn({ method: "POST" })
       return {
         ...r,
         role: r.role as "buyer" | "seller",
-        reviewer: reviewer ?? null,
+        reviewer: maskDeletedReviewer(reviewer ?? null),
         listing: listing ?? null,
       };
     });

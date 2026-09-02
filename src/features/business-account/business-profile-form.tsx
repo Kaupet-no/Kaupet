@@ -207,23 +207,31 @@ export function BusinessProfileForm({ organization, locations, billingProfile }:
         </div>
         <div className="space-y-3 sm:col-span-2">
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="font-semibold">Lokasjoner</h3>
-              <p className="text-sm text-muted-foreground">
-                Adressen velges per lokasjon og brukes på annonsene som opprettes der.
-              </p>
-            </div>
+            {locations.length > 1 && (
+              <div>
+                <h3 className="font-semibold">Lokasjoner</h3>
+                <p className="text-sm text-muted-foreground">
+                  Adressen velges per lokasjon og brukes på annonsene som opprettes der.
+                </p>
+              </div>
+            )}
             {canManageLocations && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setEditingLocationId("");
-                  setLocationForm({ name: "", addressLine: "", postalCode: "", city: "" });
-                }}
-              >
-                Ny lokasjon
-              </Button>
+              <div className="space-y-2 text-right">
+                <p className="max-w-xs text-xs text-muted-foreground">
+                  Ny lokasjon koster 249 kr per måned per lokasjon, ekskl. mva. Faktureres fra neste
+                  fakturaperiode.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setEditingLocationId("");
+                    setLocationForm({ name: "", addressLine: "", postalCode: "", city: "" });
+                  }}
+                >
+                  Ny lokasjon
+                </Button>
+              </div>
             )}
           </div>
           <div className="grid gap-3 sm:grid-cols-2">

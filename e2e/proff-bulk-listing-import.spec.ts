@@ -22,6 +22,23 @@ function skipNonDesktop(projectName: string) {
 }
 
 test.describe("Proff masseimport", () => {
+  test("skjuler lokasjonsvalg for bedrifter med én lokasjon", async ({ page }, testInfo) => {
+    test.skip(
+      skipNonDesktop(testInfo.project.name),
+      "Lokasjonskontekst-fixture bruker desktop-Proff.",
+    );
+    const credentials = users["desktop-web"];
+    if (!credentials) throw new Error("Mangler desktop E2E-bruker");
+    await login(page, credentials.email, credentials.password);
+    await page.goto("/bedrift?tab=bedriftsprofil");
+
+    await expect(page.getByLabel("Aktiv lokasjon")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Lokasjoner" })).toHaveCount(0);
+    await expect(page.getByText("Adressen velges per lokasjon")).toHaveCount(0);
+    await expect(page.getByText(/Ny lokasjon koster 249 kr per måned per lokasjon/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Ny lokasjon" })).toBeVisible();
+  });
+
   test("forhåndsviser og oppretter to annonser", async ({ page }, testInfo) => {
     test.skip(
       skipNonDesktop(testInfo.project.name),

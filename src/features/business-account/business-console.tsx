@@ -122,28 +122,30 @@ export function BusinessConsole({
         </p>
         <h1 className="mt-2 font-display text-3xl tracking-tight">{organization.display_name}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Org.nr. {organization.organization_number} · {locations.length}{" "}
-          {locations.length === 1 ? "lokasjon" : "lokasjoner"}
+          Org.nr. {organization.organization_number}
+          {locations.length > 1 ? ` · ${locations.length} lokasjoner` : ""}
         </p>
       </div>
-      <div className="mb-6 max-w-md space-y-2">
-        <label htmlFor="business-location-context" className="text-sm font-medium">
-          Aktiv lokasjon
-        </label>
-        <Select value={selectedLocationId} onValueChange={onLocationChange}>
-          <SelectTrigger id="business-location-context">
-            <SelectValue placeholder="Velg lokasjon" />
-          </SelectTrigger>
-          <SelectContent>
-            {role === "superuser" && <SelectItem value="all">Alle lokasjoner</SelectItem>}
-            {locations.map((location) => (
-              <SelectItem key={location.id} value={location.id}>
-                {location.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {locations.length > 1 && (
+        <div className="mb-6 max-w-md space-y-2">
+          <label htmlFor="business-location-context" className="text-sm font-medium">
+            Aktiv lokasjon
+          </label>
+          <Select value={selectedLocationId} onValueChange={onLocationChange}>
+            <SelectTrigger id="business-location-context">
+              <SelectValue placeholder="Velg lokasjon" />
+            </SelectTrigger>
+            <SelectContent>
+              {role === "superuser" && <SelectItem value="all">Alle lokasjoner</SelectItem>}
+              {locations.map((location) => (
+                <SelectItem key={location.id} value={location.id}>
+                  {location.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       <Tabs
         value={(!effectiveProff || role !== "superuser") && tab === "brukere" ? "oversikt" : tab}

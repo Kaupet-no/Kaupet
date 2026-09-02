@@ -84,6 +84,14 @@ export default async function globalSetup() {
       .single();
     if (businessOrganizationError) throw businessOrganizationError;
     businessOrganizationId = businessOrganization.id;
+    const { error: businessBillingProfileError } = await admin
+      .from("organization_billing_profiles")
+      .insert({
+        organization_id: businessOrganization.id,
+        billing_email: `faktura-${runId}@example.com`,
+      });
+    if (businessBillingProfileError) throw businessBillingProfileError;
+
     const { data: businessLocation, error: businessLocationError } = await admin
       .from("organization_locations")
       .insert({

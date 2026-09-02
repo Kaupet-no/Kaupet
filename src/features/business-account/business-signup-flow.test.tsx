@@ -147,7 +147,7 @@ describe("BusinessSignupFlow", () => {
 
     fireEvent.change(screen.getByLabelText("Navn"), { target: { value: "Kari Nordmann" } });
     fireEvent.change(screen.getByLabelText("E-post"), { target: { value: "KARI@example.com" } });
-    fireEvent.change(screen.getByLabelText("Passord"), { target: { value: "hemmelig8" } });
+    fireEvent.change(screen.getByLabelText("Passord"), { target: { value: "hemmelig123" } });
     fireEvent.click(screen.getByRole("checkbox", { name: /brukervilkårene/ }));
     fireEvent.click(screen.getByRole("button", { name: "Opprett bedriftskonto" }));
 

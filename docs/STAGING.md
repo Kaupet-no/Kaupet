@@ -43,6 +43,21 @@ For produksjon gjentas punkt 3–7 med:
 Legg Resend-nøkkelen i prosjektets secret store eller Supabase SMTP-innstilling,
 aldri i git. Test først med en kontrollert adresse i staging.
 
+## Auth security (produksjon)
+
+`supabase/config.toml` er kun lokal dev-config — de faktiske innstillingene
+for staging/produksjon bor i Supabase-dashbordet (**Authentication →
+Sign In / Providers → Email**) og kan ikke verifiseres fra repoet. Forvent
+og hold disse verdiene i produksjon (se docs/SIKKERHETSVURDERING.md L-15):
+
+- **`secure_password_change`: på.** Uten reauth ved passordbytte kan en
+  kapret sesjon (stjålet token) endre passordet og låse ut den rettmessige
+  eieren.
+- **Turnstile-captcha: aktivert** for signup/passordtilbakestilling.
+- **«Leaked password protection» (HIBP): på.**
+- **`minimum_password_length`: minst 10** — matcher `passwordSchema` i
+  `src/lib/auth-schemas.ts`.
+
 ## Testing
 
 - `bun run test` — kjører unittester (Vitest). Inngår i CI.

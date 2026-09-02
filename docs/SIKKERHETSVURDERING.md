@@ -6,18 +6,23 @@
 
 Fikses steg for steg, én commit per funn, verifisert mot en lokal Supabase-stack der det er relevant.
 
-| #                   | Funn                                                 | Status                |
-| ------------------- | ---------------------------------------------------- | --------------------- |
-| K-1                 | Betalingsmiljø nedgraderes via forfalsket cookie     | ✅ Fikset (`3e36c7a`) |
-| K-2                 | Storage-policyer ikke i versjonskontroll             | ✅ Fikset (`a59eb2e`) |
-| H-3                 | `pull_request_target` + `bun install` med scripts    | ✅ Fikset (`a584b80`) |
-| M-4                 | Ingen affiliasjonskontroll ved bedriftsregistrering  | Ikke startet          |
-| M-5                 | `organizations` lesbar for `anon` med `USING (true)` | ✅ Fikset (`859d2e6`) |
-| M-6                 | CSP report-only uten rapportmottaker; mangler HSTS   | Ikke startet          |
-| M-7                 | Ingen serverside lengdegrense på tekstkolonner       | Ikke startet          |
-| M-8                 | Rate-limiting i minnet per Worker-isolate            | Ikke startet          |
-| M-9                 | Uautentiserte funksjoner mot betalte/tunge ressurser | Ikke startet          |
-| L-10 til L-16, I-17 | Lavrisiko / info                                     | Ikke startet          |
+| #                   | Funn                                                 | Status                                   |
+| ------------------- | ---------------------------------------------------- | ---------------------------------------- |
+| K-1                 | Betalingsmiljø nedgraderes via forfalsket cookie     | ✅ Fikset (`3e36c7a`)                    |
+| K-2                 | Storage-policyer ikke i versjonskontroll             | ✅ Fikset (`a59eb2e`)                    |
+| H-3                 | `pull_request_target` + `bun install` med scripts    | ✅ Fikset (`a584b80`)                    |
+| M-4                 | Ingen affiliasjonskontroll ved bedriftsregistrering  | ✅ Fikset (`ff38743`, minimumsvariant)   |
+| M-5                 | `organizations` lesbar for `anon` med `USING (true)` | ✅ Fikset (`859d2e6`)                    |
+| M-6                 | CSP report-only uten rapportmottaker; mangler HSTS   | ✅ Fikset (`9f5de3a`, delvis — se notat) |
+| M-7                 | Ingen serverside lengdegrense på tekstkolonner       | ✅ Fikset (`f66efcf`)                    |
+| M-8                 | Rate-limiting i minnet per Worker-isolate            | ✅ Fikset (`4cecf32`)                    |
+| M-9                 | Uautentiserte funksjoner mot betalte/tunge ressurser | ✅ Fikset (`091f909`, delvis — se notat) |
+| L-10 til L-16, I-17 | Lavrisiko / info                                     | Ikke startet                             |
+
+**Delvise fikser:**
+
+- **M-6:** `'unsafe-inline'` i `script-src` er ikke fjernet (krever per-request CSP-nonce gjennom SSR-rendringen); promotering til enforcement venter på stille produksjonsrapporter.
+- **M-9:** Turnstile er ikke lagt til på `suggestCategoryForTitle` — den kalles fra `intent-title-landing.tsx` på hvert tastetrykk før brukeren er i wizarden, så det er en UX-avgjørelse (usynlig widget på en pre-auth landingsside), ikke noe en sikkerhetsfiks bør avgjøre alene.
 
 ---
 

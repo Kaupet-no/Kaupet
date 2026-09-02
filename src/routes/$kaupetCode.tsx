@@ -47,7 +47,6 @@ import { savePendingAuthIntent, takePendingAuthIntent } from "@/lib/pending-auth
 import { trackProductEvent } from "@/lib/product-analytics";
 import { logListingView } from "@/lib/listing-views.functions";
 import { parseVehicleLookup } from "@/lib/vehicle/parse-vehicle-lookup";
-import { hasEffectiveProffAccess } from "@/features/business-account/plans";
 import { ListingCard } from "@/components/listing-card";
 import { toListingCardData } from "@/lib/listing-card-data";
 
@@ -345,16 +344,28 @@ function ListingDetailPage() {
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, subtitle, description, price_nok, is_free, condition, can_ship, city, postal_code, display_lat, display_lng, created_at, updated_at, published_at, status, seller_id, organization_id, category_id, attributes, known_issues, no_known_issues, maintenance_history, show_visiting_address, listing_visiting_addresses(address_line, postal_code, city), listing_images(storage_path, sort_order, caption), listing_360_frames(storage_path, frame_order), categories(id, name_nb, slug, parent_id), organizations(id, display_name, organization_number, created_at, website_url, logo_path, brand_palette, selected_plan, proff_access_until)",
+          "id, kaupet_code, title, subtitle, description, price_nok, is_free, condition, can_ship, city, postal_code, display_lat, display_lng, created_at, updated_at, published_at, status, seller_id, organization_id, category_id, attributes, known_issues, no_known_issues, maintenance_history, show_visiting_address, listing_visiting_addresses(address_line, postal_code, city), listing_images(storage_path, sort_order, caption), listing_360_frames(storage_path, frame_order), categories(id, name_nb, slug, parent_id)",
         )
         .eq("kaupet_code", kaupetCode)
         .maybeSingle();
       if (error) throw error;
       if (!data) throw new Error("Annonsen finnes ikke");
 
-      const organization = Array.isArray(data.organizations)
-        ? data.organizations[0]
-        : data.organizations;
+      // organizations has commercial columns (selected_plan, proff_access_until,
+      // ...) that must not be publicly readable — organizations_public is a
+      // view exposing only the branding columns this page needs. See
+      // docs/SIKKERHETSVURDERING.md M-5.
+      const organization = data.organization_id
+        ? (
+            await supabase
+              .from("organizations_public")
+              .select(
+                "id, display_name, organization_number, created_at, website_url, logo_path, brand_palette, has_active_proff",
+              )
+              .eq("id", data.organization_id)
+              .maybeSingle()
+          ).data
+        : null;
       const visitingAddress = Array.isArray(data.listing_visiting_addresses)
         ? data.listing_visiting_addresses[0]
         : data.listing_visiting_addresses;
@@ -402,7 +413,7 @@ function ListingDetailPage() {
     },
   });
   const organization = data?.organization ?? null;
-  const hasEffectiveOrganizationProff = hasEffectiveProffAccess(organization);
+  const hasEffectiveOrganizationProff = organization?.has_active_proff ?? false;
   const {
     data: otherOrganizationListings,
     isLoading: otherListingsLoading,

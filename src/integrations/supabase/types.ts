@@ -2478,7 +2478,20 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      organizations_public: {
+        Row: {
+          id: string
+          display_name: string
+          legal_name: string
+          organization_number: string
+          website_url: string | null
+          logo_path: string | null
+          brand_palette: string | null
+          created_at: string
+          has_active_proff: boolean | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       admin_approve_vehicle_brand: { Args: { _id: string }; Returns: undefined }

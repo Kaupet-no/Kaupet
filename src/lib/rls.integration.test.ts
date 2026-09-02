@@ -3709,12 +3709,37 @@ describe.skipIf(!canRun)(
       expect(otherError).toBeNull();
       expect(otherRows).toEqual([{ organization_id: otherOrganizationId, user_id: otherId }]);
 
-      const { data: publicOrganizations, error: publicError } = await anon
+      // M-5: the base table is member-only now — commercial state
+      // (selected_plan, proff_access_until, ...) must not be readable by
+      // anon or by a member of a different organization.
+      const { data: anonBaseRow, error: anonBaseError } = await anon
         .from("organizations")
         .select("id")
+        .eq("id", organizationId);
+      expect(anonBaseError).toBeNull();
+      expect(anonBaseRow).toHaveLength(0);
+
+      const { data: otherBaseRow, error: otherBaseError } = await other
+        .from("organizations")
+        .select("id")
+        .eq("id", organizationId);
+      expect(otherBaseError).toBeNull();
+      expect(otherBaseRow).toHaveLength(0);
+
+      // The public view exposes only branding columns, for every org — it
+      // never had a selected_plan column to select in the first place.
+      const { error: publicError } = await anon
+        .from("organizations_public")
+        .select("id, selected_plan" as "id")
         .in("id", [organizationId, otherOrganizationId]);
-      expect(publicError).toBeNull();
-      expect(publicOrganizations?.map((row) => row.id).sort()).toEqual(
+      expect(publicError).not.toBeNull();
+
+      const { data: publicSafeColumns, error: publicSafeError } = await anon
+        .from("organizations_public")
+        .select("id")
+        .in("id", [organizationId, otherOrganizationId]);
+      expect(publicSafeError).toBeNull();
+      expect(publicSafeColumns?.map((row) => row.id).sort()).toEqual(
         [organizationId, otherOrganizationId].sort(),
       );
       const { error: anonymousMembershipError } = await anon

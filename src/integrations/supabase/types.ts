@@ -3281,6 +3281,18 @@ export type Database = {
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      submit_feedback_rate_limited: {
+        Args: {
+          _category_description?: string | null
+          _category_name?: string | null
+          _key_hash: string
+          _message: string
+          _page_url?: string | null
+          _type: string
+          _user_id: string | null
+        }
+        Returns: undefined
+      }
       submit_listing_report: {
         Args: { _comment?: string; _listing_id: string; _reason: string }
         Returns: undefined

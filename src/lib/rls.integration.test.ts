@@ -4360,3 +4360,47 @@ describe.skipIf(!canRun)("RLS: storage buckets enforce owner/participant access 
     expect(anonDownload).toBeTruthy();
   });
 });
+
+describe.skipIf(!canRun)("RLS: feedback rate limiting is enforced in the database (M-8)", () => {
+  const admin = canRun ? createClient(URL!, SERVICE_ROLE_KEY!) : null!;
+  const suffix = Date.now();
+
+  it("only service_role may call submit_feedback_rate_limited", async () => {
+    const anon = createClient(URL!, ANON_KEY!);
+    const { error } = await anon.rpc("submit_feedback_rate_limited", {
+      _key_hash: "a".repeat(64),
+      _type: "ris",
+      _message: "hei",
+      _user_id: null,
+    });
+    expect(error).not.toBeNull();
+  });
+
+  it("allows 5 submissions per key per window and rejects the 6th", async () => {
+    const keyHash = createHash("sha256").update(`m8-${suffix}`).digest("hex");
+
+    for (let i = 0; i < 5; i++) {
+      const { error } = await admin.rpc("submit_feedback_rate_limited", {
+        _key_hash: keyHash,
+        _type: "ris",
+        _message: `attempt ${i}`,
+        _user_id: null,
+      });
+      expect(error).toBeNull();
+    }
+
+    const { error: sixthError } = await admin.rpc("submit_feedback_rate_limited", {
+      _key_hash: keyHash,
+      _type: "ris",
+      _message: "attempt 5",
+      _user_id: null,
+    });
+    expect(sixthError?.message).toMatch(/rate_limited/);
+
+    const { data: rows } = await admin.from("feedback").select("id").eq("message", `attempt 4`);
+    expect(rows).toHaveLength(1);
+
+    await admin.from("feedback").delete().like("message", "attempt %");
+    await admin.from("feedback_rate_limits").delete().eq("key_hash", keyHash);
+  });
+});

@@ -2,21 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 
-/** Naive in-memory throttle per worker instance: max N submissions per key
- * (user id or IP) per hour. Good enough as abuse damping for a feedback box;
- * the table itself is only writable through this fn (no RLS insert policy). */
-const RATE_LIMIT = 5;
-const WINDOW_MS = 60 * 60 * 1000;
-const recentByKey = new Map<string, number[]>();
-
-function throttle(key: string): boolean {
-  const now = Date.now();
-  const arr = (recentByKey.get(key) ?? []).filter((t) => now - t < WINDOW_MS);
-  if (arr.length >= RATE_LIMIT) return false;
-  arr.push(now);
-  recentByKey.set(key, arr);
-  return true;
-}
+import { hashRequestIp, sha256Hex } from "@/lib/request-ip.server";
 
 const feedbackSchema = z.object({
   type: z.enum(["ris", "ros"]),
@@ -24,39 +10,59 @@ const feedbackSchema = z.object({
   pageUrl: z.string().trim().max(2000).optional(),
 });
 
+async function rateLimitedInsert(args: {
+  userId: string | null;
+  type: string;
+  message: string;
+  pageUrl?: string | null;
+  categoryName?: string | null;
+  categoryDescription?: string | null;
+  rateLimitedMessage: string;
+}) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const keyHash = args.userId ? await sha256Hex(`user:${args.userId}`) : await hashRequestIp();
+  const { error } = await supabaseAdmin.rpc("submit_feedback_rate_limited", {
+    _key_hash: keyHash,
+    _type: args.type,
+    _message: args.message,
+    _user_id: args.userId,
+    _page_url: args.pageUrl ?? null,
+    _category_name: args.categoryName ?? null,
+    _category_description: args.categoryDescription ?? null,
+  });
+  if (error) {
+    if (error.message.includes("rate_limited")) throw new Error(args.rateLimitedMessage);
+    throw error;
+  }
+}
+
+/** Best-effort user attribution from the (optional) Authorization header. */
+async function attributedUserId(): Promise<string | null> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const request = getRequest();
+  const authHeader = request?.headers?.get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) return null;
+  const token = authHeader.slice("Bearer ".length);
+  const { data: claims } = await supabaseAdmin.auth.getClaims(token);
+  return (claims?.claims?.sub as string | undefined) ?? null;
+}
+
 /** Submits a "Ris og Ros" feedback message. Works without login — when a
  * valid Supabase bearer token accompanies the request the feedback is
- * attributed to that user, otherwise it's stored anonymously. */
+ * attributed to that user, otherwise it's stored anonymously. Rate-limited
+ * in the database (see submit_feedback_rate_limited) rather than in memory,
+ * since a Worker isolate's memory doesn't survive between requests. */
 export const submitFeedback = createServerFn({ method: "POST" })
   .validator((input: unknown) => feedbackSchema.parse(input))
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-    // Best-effort user attribution from the (optional) Authorization header.
-    let userId: string | null = null;
-    const request = getRequest();
-    const authHeader = request?.headers?.get("authorization");
-    if (authHeader?.startsWith("Bearer ")) {
-      const token = authHeader.slice("Bearer ".length);
-      const { data: claims } = await supabaseAdmin.auth.getClaims(token);
-      userId = (claims?.claims?.sub as string | undefined) ?? null;
-    }
-
-    const ip =
-      request?.headers?.get("cf-connecting-ip") ??
-      request?.headers?.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-      "unknown";
-    if (!throttle(userId ?? `ip:${ip}`)) {
-      throw new Error("Du har sendt mange tilbakemeldinger på kort tid. Prøv igjen senere.");
-    }
-
-    const { error } = await supabaseAdmin.from("feedback").insert({
+    const userId = await attributedUserId();
+    await rateLimitedInsert({
+      userId,
       type: data.type,
       message: data.message,
-      user_id: userId,
-      page_url: data.pageUrl ?? null,
+      pageUrl: data.pageUrl,
+      rateLimitedMessage: "Du har sendt mange tilbakemeldinger på kort tid. Prøv igjen senere.",
     });
-    if (error) throw error;
   });
 
 const categorySuggestionSchema = z.object({
@@ -69,34 +75,14 @@ const categorySuggestionSchema = z.object({
 export const submitCategorySuggestion = createServerFn({ method: "POST" })
   .validator((input: unknown) => categorySuggestionSchema.parse(input))
   .handler(async ({ data }) => {
-    // Static import would expose the service-role client to client bundles;
-    // this server function is imported by client components.
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-    let userId: string | null = null;
-    const request = getRequest();
-    const authHeader = request?.headers?.get("authorization");
-    if (authHeader?.startsWith("Bearer ")) {
-      const token = authHeader.slice("Bearer ".length);
-      const { data: claims } = await supabaseAdmin.auth.getClaims(token);
-      userId = (claims?.claims?.sub as string | undefined) ?? null;
-    }
-
-    const ip =
-      request?.headers?.get("cf-connecting-ip") ??
-      request?.headers?.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-      "unknown";
-    if (!throttle(userId ?? `ip:${ip}`)) {
-      throw new Error("Du har sendt mange forslag på kort tid. Prøv igjen senere.");
-    }
-
-    const { error } = await supabaseAdmin.from("feedback").insert({
+    const userId = await attributedUserId();
+    await rateLimitedInsert({
+      userId,
       type: "kategori",
       message: data.categoryName,
-      category_name: data.categoryName,
-      category_description: data.description || null,
-      user_id: userId,
-      page_url: data.pageUrl ?? null,
+      pageUrl: data.pageUrl,
+      categoryName: data.categoryName,
+      categoryDescription: data.description || null,
+      rateLimitedMessage: "Du har sendt mange forslag på kort tid. Prøv igjen senere.",
     });
-    if (error) throw error;
   });

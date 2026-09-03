@@ -12,6 +12,8 @@ export type ListingInsightSummary = {
 
 export const DEFAULT_LISTING_VIEW_THRESHOLD = 10;
 export const MAX_LISTING_VIEW_THRESHOLD = 1_000_000;
+export const DEFAULT_SOLD_DAYS = 30;
+export const MAX_SOLD_DAYS = 365;
 
 export function summarizeListingInsights(
   rows: readonly ListingInsightRow[],

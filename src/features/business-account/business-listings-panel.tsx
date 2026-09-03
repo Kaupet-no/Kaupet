@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, ListChecks, Plus, Upload } from "lucide-react";
+import { ListChecks, Plus, Upload } from "lucide-react";
 
 import { EmptyState } from "@/components/ui/empty-state";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -39,7 +40,6 @@ type RawListing = {
   is_free: boolean;
   city: string | null;
   category_id: string | null;
-  description: string | null;
   created_at: string;
   expires_at: string | null;
   listing_images: { storage_path: string; sort_order: number }[] | null;
@@ -55,11 +55,12 @@ export function BusinessListingsPanel({
 }: Props) {
   const listingsQuery = useQuery({
     queryKey: ["business-listings", organization.id, userId, listingAccess, locationId],
+    staleTime: 30_000,
     queryFn: async (): Promise<Row[]> => {
       let baseQuery = supabase
         .from("listings")
         .select(
-          "id, seller_id, kaupet_code, title, status, price_nok, is_free, city, category_id, description, created_at, expires_at, listing_images(storage_path, sort_order)",
+          "id, seller_id, kaupet_code, title, status, price_nok, is_free, city, category_id, created_at, expires_at, listing_images(storage_path, sort_order)",
         )
         .eq("organization_id", organization.id);
       if (locationId !== "all") {
@@ -85,7 +86,7 @@ export function BusinessListingsPanel({
         is_free: listing.is_free,
         city: listing.city,
         category_id: listing.category_id,
-        description: listing.description,
+        description: null,
         view_count: 0,
         favorite_count: 0,
         created_at: listing.created_at,
@@ -144,12 +145,30 @@ export function BusinessListingsPanel({
         </div>
       </div>
       {listingsQuery.isLoading ? (
-        <div
-          className="flex items-center gap-2 text-sm text-muted-foreground"
-          role="status"
-          aria-live="polite"
-        >
-          <Loader2 className="size-4 animate-spin" /> Laster annonser…
+        <div role="status" aria-live="polite">
+          <span className="sr-only">Laster annonser…</span>
+          <div aria-hidden="true">
+            <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center">
+              <Skeleton className="h-10 min-w-0 flex-1" />
+              <Skeleton className="h-10 sm:w-44" />
+            </div>
+            <div className="mt-4 space-y-3">
+              {Array.from({ length: 4 }, (_, index) => (
+                <div
+                  key={index}
+                  className="flex min-h-24 items-center gap-3 rounded-xl border border-border bg-card p-4 sm:gap-4 sm:p-5"
+                >
+                  <Skeleton className="size-14 shrink-0 rounded-lg" />
+                  <div className="flex min-w-0 flex-1 flex-col gap-2">
+                    <Skeleton className="h-4 w-2/3" />
+                    <Skeleton className="h-3 w-1/3" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                  <Skeleton className="size-8 shrink-0 rounded-md" />
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       ) : listingsQuery.isError ? (
         <Alert variant="destructive">

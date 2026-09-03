@@ -126,6 +126,28 @@ bun dev
 
 Stopp stacken med `bunx supabase stop` når du er ferdig. Supabase Studio (lokalt admin-UI) er tilgjengelig på `http://localhost:54323`.
 
+#### Oppdater lokal dev-kopi fra staging
+
+For å få staging-kategorier og annonser inn i den lokale databasen, kjør:
+
+```bash
+bunx supabase start
+bun run env:local
+bun run db:refresh-local -- --replace
+```
+
+Importen leser staging-hemmelighetene fra `.env.staging.local`, kopierer
+kategorier, filtre, flows, kjøretøydata, annonser, popularitetstall og
+annonsebilder, og legger alle annonser under en syntetisk lokal dev-bruker.
+Kladder og utløpte staging-annonser normaliseres til aktive lokale annonser.
+Eksisterende lokale katalogdata, annonser og `listing-images` erstattes.
+Staging-brukere, meldinger, favoritter, adresser og andre private relasjoner
+kopieres ikke.
+Annonsetitler, beskrivelser og lokasjonsfelter kopieres uendret; bruk bare
+lokal maskin med tilgangskontroll og slett kopien når den ikke trengs.
+
+Kommandoen krever `--replace` med vilje, fordi den sletter lokale dev-data.
+
 #### Alternativ: kjør mot Kaupet sitt staging-Supabase
 
 For å kjøre appen lokalt mot staging-prosjektet, dekrypter staging-hemmelighetene

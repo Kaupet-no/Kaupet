@@ -13,10 +13,23 @@ import {
   MapPin,
   MessageCircle,
   Palette,
+  RotateCcw,
   Users,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -53,11 +66,14 @@ import {
   getBusinessListingStats,
   setBusinessPlan,
   type BusinessListingStat,
+  type BusinessListingStats,
 } from "@/lib/business.functions";
 import { BulkListingImport } from "@/features/listing-bulk-import/BulkListingImport";
 import {
   DEFAULT_LISTING_VIEW_THRESHOLD,
+  DEFAULT_SOLD_DAYS,
   MAX_LISTING_VIEW_THRESHOLD,
+  MAX_SOLD_DAYS,
   summarizeListingInsights,
 } from "@/features/business-account/listing-insights";
 
@@ -71,7 +87,7 @@ type Props = {
   userId: string;
   role: "superuser" | "member";
   tab: BusinessTab;
-  onTabChange: (tab: BusinessTab) => void;
+  onTabChange: (tab: BusinessTab) => void | Promise<unknown>;
 };
 
 const TAB_LABELS: Record<BusinessTab, string> = {
@@ -88,6 +104,7 @@ const TAB_ICONS: Record<BusinessTab, typeof LayoutDashboard> = {
   bedriftsprofil: Palette,
   brukere: Users,
 };
+
 export function BusinessConsole({
   organization,
   locations,
@@ -100,16 +117,44 @@ export function BusinessConsole({
   onTabChange,
 }: Props) {
   const [importOpen, setImportOpen] = useState(false);
+  const [thresholdInput, setThresholdInput] = useState(String(DEFAULT_LISTING_VIEW_THRESHOLD));
+  const threshold = Number(thresholdInput);
+  const validThreshold =
+    /^\d{1,7}$/u.test(thresholdInput) &&
+    Number.isInteger(threshold) &&
+    threshold <= MAX_LISTING_VIEW_THRESHOLD;
+  const listingThreshold = validThreshold ? threshold : DEFAULT_LISTING_VIEW_THRESHOLD;
+  const [soldDaysInput, setSoldDaysInput] = useState(String(DEFAULT_SOLD_DAYS));
+  const soldDays = Number(soldDaysInput);
+  const validSoldDays =
+    /^\d{1,3}$/u.test(soldDaysInput) &&
+    Number.isInteger(soldDays) &&
+    soldDays >= 1 &&
+    soldDays <= MAX_SOLD_DAYS;
+  const listingSoldDays = validSoldDays ? soldDays : DEFAULT_SOLD_DAYS;
   const queryClient = useQueryClient();
   const effectiveProff = hasEffectiveProffAccess(organization);
+  const [pendingTab, setPendingTab] = useState<BusinessTab | null>(null);
   const callSetPlan = useServerFn(setBusinessPlan);
   const loadBusinessListingStats = useServerFn(getBusinessListingStats);
   const businessListingStatsQuery = useQuery({
-    queryKey: ["business-listing-stats", organization.id, userId, selectedLocationId, role],
+    queryKey: [
+      "business-listing-stats",
+      organization.id,
+      userId,
+      selectedLocationId,
+      role,
+      listingThreshold,
+      listingSoldDays,
+    ],
+    enabled: tab === "oversikt" || pendingTab === "oversikt",
+    staleTime: 30_000,
     queryFn: () =>
       loadBusinessListingStats({
         data: {
           locationId: selectedLocationId === "all" ? null : selectedLocationId,
+          threshold: listingThreshold,
+          soldDays: listingSoldDays,
         },
       }),
   });
@@ -145,16 +190,34 @@ export function BusinessConsole({
 
   const visibleTab =
     (!effectiveProff || role !== "superuser") && tab === "brukere" ? "oversikt" : tab;
+  const activeTab = pendingTab ?? visibleTab;
   const tabsListRef = useRef<HTMLDivElement>(null);
+  const previousVisibleTabRef = useRef(visibleTab);
+
+  const handleTabChange = (nextTab: BusinessTab) => {
+    setPendingTab(nextTab === visibleTab ? null : nextTab);
+    try {
+      void Promise.resolve(onTabChange(nextTab)).catch(() => setPendingTab(null));
+    } catch {
+      setPendingTab(null);
+    }
+  };
+
+  useEffect(() => {
+    if (previousVisibleTabRef.current === visibleTab) return;
+    previousVisibleTabRef.current = visibleTab;
+    setPendingTab(null);
+  }, [visibleTab]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia?.("(max-width: 1023px)").matches)
       return;
-    const activeTab = tabsListRef.current?.querySelector<HTMLElement>('[data-state="active"]');
-    if (activeTab && typeof activeTab.scrollIntoView === "function") {
-      activeTab.scrollIntoView({ block: "nearest", inline: "nearest" });
+    const activeTabElement =
+      tabsListRef.current?.querySelector<HTMLElement>('[data-state="active"]');
+    if (activeTabElement && typeof activeTabElement.scrollIntoView === "function") {
+      activeTabElement.scrollIntoView({ block: "nearest", inline: "nearest" });
     }
-  }, [visibleTab]);
+  }, [activeTab]);
   return (
     <div className="min-h-[calc(100dvh-4rem)] bg-background">
       <header className="border-b border-border bg-card/80">
@@ -207,8 +270,8 @@ export function BusinessConsole({
 
       <div className="mx-auto grid max-w-7xl gap-8 px-4 pb-safe py-6 sm:px-6 sm:py-8 lg:grid-cols-[13rem_minmax(0,1fr)] lg:px-8 lg:py-10">
         <Tabs
-          value={visibleTab}
-          onValueChange={(value) => onTabChange(value as BusinessTab)}
+          value={activeTab}
+          onValueChange={(value) => handleTabChange(value as BusinessTab)}
           className="contents"
         >
           <aside className="min-w-0 lg:sticky lg:top-24 lg:h-fit">
@@ -250,11 +313,19 @@ export function BusinessConsole({
                 planMutationPending={planMutation.isPending}
                 planMutationSuccess={planMutation.isSuccess}
                 onCancelTrial={() => planMutation.mutate()}
-                onNavigate={onTabChange}
+                onNavigate={handleTabChange}
                 canManageMembers={role === "superuser"}
-                listingStats={businessListingStatsQuery.data}
+                listingStats={businessListingStatsQuery.data?.current}
+                soldCount={businessListingStatsQuery.data?.soldCount}
+                soldDays={listingSoldDays}
+                soldDaysInput={soldDaysInput}
+                onSoldDaysChange={setSoldDaysInput}
+                listingHistory={businessListingStatsQuery.data?.history}
                 listingStatsLoading={businessListingStatsQuery.isLoading}
                 listingStatsError={businessListingStatsQuery.isError}
+                thresholdInput={thresholdInput}
+                threshold={listingThreshold}
+                onThresholdChange={setThresholdInput}
               />
             </TabsContent>
             <TabsContent value="annonser" className="mt-0">
@@ -314,8 +385,16 @@ function Overview({
   onNavigate,
   canManageMembers,
   listingStats,
+  soldCount,
+  soldDays,
+  soldDaysInput,
+  onSoldDaysChange,
+  listingHistory,
   listingStatsLoading,
   listingStatsError,
+  thresholdInput,
+  threshold,
+  onThresholdChange,
 }: {
   organization: BusinessOrganization;
   planName: string;
@@ -329,8 +408,16 @@ function Overview({
   onNavigate: (tab: BusinessTab) => void;
   canManageMembers: boolean;
   listingStats: BusinessListingStat[] | undefined;
+  soldCount: number | undefined;
+  soldDays: number;
+  soldDaysInput: string;
+  onSoldDaysChange: (value: string) => void;
+  listingHistory: BusinessListingStats["history"] | undefined;
   listingStatsLoading: boolean;
   listingStatsError: boolean;
+  thresholdInput: string;
+  threshold: number;
+  onThresholdChange: (value: string) => void;
 }) {
   const trialEnd = organization.proff_trial_ends_at
     ? new Intl.DateTimeFormat("nb-NO", { dateStyle: "long" }).format(
@@ -400,6 +487,14 @@ function Overview({
       </div>
       <ListingInsights
         stats={listingStats}
+        soldCount={soldCount}
+        soldDays={soldDays}
+        soldDaysInput={soldDaysInput}
+        onSoldDaysChange={onSoldDaysChange}
+        history={listingHistory}
+        thresholdInput={thresholdInput}
+        threshold={threshold}
+        onThresholdChange={onThresholdChange}
         isLoading={listingStatsLoading}
         isError={listingStatsError}
       />
@@ -501,118 +596,343 @@ function Overview({
 
 type ListingInsightsProps = {
   stats: BusinessListingStat[] | undefined;
+  soldCount: number | undefined;
+  soldDays: number;
+  soldDaysInput: string;
+  onSoldDaysChange: (value: string) => void;
+  history: BusinessListingStats["history"] | undefined;
+  thresholdInput: string;
+  threshold: number;
+  onThresholdChange: (value: string) => void;
   isLoading: boolean;
   isError: boolean;
 };
 
-function ListingInsights({ stats, isLoading, isError }: ListingInsightsProps) {
-  const [thresholdInput, setThresholdInput] = useState(String(DEFAULT_LISTING_VIEW_THRESHOLD));
-  const threshold = Number(thresholdInput);
-  const validThreshold =
-    /^\d{1,7}$/u.test(thresholdInput) &&
-    Number.isInteger(threshold) &&
-    threshold <= MAX_LISTING_VIEW_THRESHOLD;
-  const summary = summarizeListingInsights(stats ?? [], validThreshold ? threshold : NaN);
+type InsightMetricKey = "active" | "inactive" | "lowViews" | "sold";
+
+function ListingInsights({
+  stats,
+  soldCount,
+  soldDays,
+  soldDaysInput,
+  onSoldDaysChange,
+  history,
+  thresholdInput,
+  threshold,
+  onThresholdChange,
+  isLoading,
+  isError,
+}: ListingInsightsProps) {
+  const [selectedMetric, setSelectedMetric] = useState<InsightMetricKey>("active");
+  const [rangeDays, setRangeDays] = useState(30);
+  const summary = summarizeListingInsights(stats ?? [], threshold);
   const formatter = new Intl.NumberFormat("nb-NO");
+  const thresholdInputValid =
+    /^\d{1,7}$/u.test(thresholdInput) &&
+    Number.isInteger(Number(thresholdInput)) &&
+    Number(thresholdInput) <= MAX_LISTING_VIEW_THRESHOLD;
+  const total = Math.max((stats ?? []).length, 1);
+  const soldDaysInputValid =
+    /^\d{1,3}$/u.test(soldDaysInput) &&
+    Number.isInteger(Number(soldDaysInput)) &&
+    Number(soldDaysInput) >= 1 &&
+    Number(soldDaysInput) <= MAX_SOLD_DAYS;
+  const historyPoints = history ?? [];
+  const visibleHistory = historyPoints.slice(-Math.min(rangeDays, historyPoints.length));
+  const historyIndexByDate = new Map(historyPoints.map((point, index) => [point.date, index]));
+  const selected = {
+    active: {
+      label: "Aktive annonser",
+      description: "Annonser som er synlige for kjøpere akkurat nå.",
+      value: summary.active,
+      color: "text-primary",
+    },
+    inactive: {
+      label: "Inaktive annonser",
+      description: "Utkast, solgte, deaktiverte, arkiverte eller utløpte annonser.",
+      value: summary.inactive,
+      color: "text-brand-text",
+    },
+    lowViews: {
+      label: `Annonser med færre enn ${formatter.format(summary.threshold)} visninger`,
+      description: "Annonser som kan ha nytte av en bedre tittel, pris eller synlighet.",
+      value: summary.lowViews,
+      color: "text-muted-foreground",
+    },
+    sold: {
+      label: `Solgte annonser siste ${soldDays} dager`,
+      description: "Annonser med bekreftet salg i den valgte perioden.",
+      value: soldCount ?? 0,
+      color: "text-primary",
+    },
+  } satisfies Record<
+    InsightMetricKey,
+    { label: string; description: string; value: number; color: string }
+  >;
+  const metrics = Object.entries(selected) as [
+    InsightMetricKey,
+    (typeof selected)[InsightMetricKey],
+  ][];
+  const selectedMetricDetails = selected[selectedMetric];
+  const chartDateFormatter = new Intl.DateTimeFormat("nb-NO", {
+    day: rangeDays > 90 ? undefined : "numeric",
+    month: "short",
+    year: rangeDays >= 365 ? "numeric" : undefined,
+  });
+  const chartData = visibleHistory.map((point) => {
+    const index = historyIndexByDate.get(point.date);
+    const value =
+      selectedMetric === "sold" && index !== undefined
+        ? historyPoints
+            .slice(Math.max(0, index - soldDays + 1), index + 1)
+            .reduce((total, historyPoint) => total + historyPoint.sold, 0)
+        : point[selectedMetric];
+    return {
+      date: point.date,
+      label: chartDateFormatter.format(new Date(point.date)),
+      value,
+    };
+  });
+  const canZoomIn = rangeDays > 7;
+  const canZoomOut = rangeDays < historyPoints.length;
+  const zoomIn = () => setRangeDays((current) => Math.max(7, Math.ceil(current / 2)));
+  const zoomOut = () =>
+    setRangeDays((current) => Math.min(Math.max(historyPoints.length, 30), current * 2));
+  const heading = (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-text">Innsikt</p>
+      <h3 id="listing-insights-title" className="mt-1 font-display text-2xl tracking-tight">
+        Slik går det med annonsene
+      </h3>
+    </div>
+  );
 
   if (isLoading) {
     return (
-      <div
-        className="flex items-center gap-2 text-sm text-muted-foreground"
-        role="status"
-        aria-live="polite"
-      >
-        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-        Laster annonseinnsikt…
-      </div>
+      <section aria-labelledby="listing-insights-title" className="space-y-4">
+        {heading}
+        <div role="status" aria-live="polite">
+          <span className="sr-only">Laster annonseinnsikt…</span>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4" aria-hidden="true">
+            {Array.from({ length: 4 }, (_, index) => (
+              <div
+                key={index}
+                className="flex min-h-56 gap-4 rounded-xl border border-border bg-card p-4 sm:p-5"
+              >
+                <Skeleton className="size-20 shrink-0 rounded-full" />
+                <div className="flex min-w-0 flex-1 flex-col gap-2 pt-2">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-2/3" />
+                </div>
+              </div>
+            ))}
+          </div>
+          <Skeleton className="mt-3 h-72 w-full rounded-xl" />
+        </div>
+      </section>
     );
   }
   if (isError) {
     return (
-      <Alert variant="destructive">
-        <AlertDescription>Kunne ikke laste annonseinnsikten. Prøv igjen senere.</AlertDescription>
-      </Alert>
+      <section aria-labelledby="listing-insights-title" className="space-y-4">
+        {heading}
+        <Alert variant="destructive">
+          <AlertDescription>Kunne ikke laste annonseinnsikten. Prøv igjen senere.</AlertDescription>
+        </Alert>
+      </section>
     );
   }
 
-  const metrics = [
-    {
-      label: "Antall aktive annonser",
-      value: summary.active,
-      description: "Annonser som er synlige for kjøpere akkurat nå.",
-      color: "text-primary",
-    },
-    {
-      label: "Antall inaktive annonser",
-      value: summary.inactive,
-      description: "Utkast, solgte, deaktiverte, arkiverte eller utløpte annonser.",
-      color: "text-brand-text",
-    },
-    {
-      label: `Antall annonser med færre enn ${formatter.format(summary.threshold)} visninger`,
-      value: summary.lowViews,
-      description: "Annonser som kan ha nytte av en bedre tittel, pris eller synlighet.",
-      color: "text-muted-foreground",
-    },
-  ];
-  const total = Math.max((stats ?? []).length, 1);
-
   return (
     <section aria-labelledby="listing-insights-title" className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-text">
-            Innsikt
-          </p>
-          <h3 id="listing-insights-title" className="mt-1 font-display text-2xl tracking-tight">
-            Slik går det med annonsene
-          </h3>
-        </div>
-        <div className="flex items-center gap-2">
-          <label htmlFor="listing-view-threshold" className="text-sm text-muted-foreground">
-            Lav visningsterskel
-          </label>
-          <Input
-            id="listing-view-threshold"
-            type="number"
-            min={0}
-            max={1_000_000}
-            step={1}
-            value={thresholdInput}
-            onChange={(event) => setThresholdInput(event.target.value)}
-            aria-invalid={!validThreshold}
-            aria-describedby="listing-view-threshold-help"
-            className="w-24 bg-background text-right tabular-nums"
-          />
-        </div>
-      </div>
-      <p id="listing-view-threshold-help" className="text-sm text-muted-foreground">
-        Juster tallet for å finne annonser som har fått lite oppmerksomhet. Bruk et helt tall mellom
-        0 og 1 000 000.
-      </p>
-      {!validThreshold && (
-        <p className="text-sm text-destructive" role="alert">
-          Skriv inn et helt tall mellom 0 og 1 000 000.
-        </p>
-      )}
-      <div className="grid gap-3 md:grid-cols-3">
-        {metrics.map((metric) => (
+      {heading}
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {metrics.map(([key, metric]) => (
           <div
-            key={metric.label}
-            className="flex items-center gap-4 rounded-xl border border-border bg-card p-4 sm:p-5"
+            key={key}
+            className={`flex h-full flex-col rounded-xl border bg-card p-4 sm:p-5 ${
+              selectedMetric === key ? "border-primary bg-primary/[0.04]" : "border-border"
+            }`}
           >
-            <MetricRing
-              value={metric.value}
-              percent={metric.value / total}
-              color={metric.color}
-              label={metric.label}
-            />
-            <div className="min-w-0">
-              <p className="text-sm font-semibold">{metric.label}</p>
-              <p className="mt-1 text-sm leading-5 text-muted-foreground">{metric.description}</p>
-            </div>
+            <button
+              type="button"
+              aria-pressed={selectedMetric === key}
+              onClick={() => setSelectedMetric(key)}
+              className="flex min-h-56 flex-1 items-start gap-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <div className="mt-4 shrink-0">
+                <MetricRing
+                  value={metric.value}
+                  percent={metric.value / total}
+                  color={metric.color}
+                  label={metric.label}
+                />
+              </div>
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold leading-5">{metric.label}</span>
+                <span className="mt-1 block text-sm leading-5 text-muted-foreground">
+                  {metric.description}
+                </span>
+              </span>
+            </button>
+            {key === "lowViews" && (
+              <div className="mt-4 border-t border-border pt-4">
+                <div className="flex items-center justify-between gap-3">
+                  <label
+                    htmlFor="listing-view-threshold"
+                    className="text-sm font-medium leading-5 text-muted-foreground"
+                  >
+                    Juster terskel
+                  </label>
+                  <Input
+                    id="listing-view-threshold"
+                    type="number"
+                    min={0}
+                    max={MAX_LISTING_VIEW_THRESHOLD}
+                    step={1}
+                    value={thresholdInput}
+                    onChange={(event) => onThresholdChange(event.target.value)}
+                    aria-invalid={!thresholdInputValid}
+                    aria-describedby="listing-view-threshold-help"
+                    className="w-24 bg-background text-right tabular-nums"
+                  />
+                </div>
+                <p
+                  id="listing-view-threshold-help"
+                  className="mt-2 text-xs leading-5 text-muted-foreground"
+                >
+                  Annonser med færre enn dette antallet visninger telles.
+                </p>
+                {!thresholdInputValid ? (
+                  <p className="mt-2 text-xs leading-5 text-destructive" role="alert">
+                    Skriv inn et helt tall mellom 0 og 1 000 000.
+                  </p>
+                ) : null}
+              </div>
+            )}
+            {key === "sold" && (
+              <div className="mt-4 border-t border-border pt-4">
+                <div className="flex items-center justify-between gap-3">
+                  <label
+                    htmlFor="listing-sold-days"
+                    className="text-sm font-medium leading-5 text-muted-foreground"
+                  >
+                    Juster periode
+                  </label>
+                  <Input
+                    id="listing-sold-days"
+                    type="number"
+                    min={1}
+                    max={MAX_SOLD_DAYS}
+                    step={1}
+                    value={soldDaysInput}
+                    onChange={(event) => onSoldDaysChange(event.target.value)}
+                    aria-invalid={!soldDaysInputValid}
+                    aria-describedby="listing-sold-days-help"
+                    className="w-24 bg-background text-right tabular-nums"
+                  />
+                </div>
+                <p
+                  id="listing-sold-days-help"
+                  className="mt-2 text-xs leading-5 text-muted-foreground"
+                >
+                  Antall dager bakover som skal telles med.
+                </p>
+                {!soldDaysInputValid ? (
+                  <p className="mt-2 text-xs leading-5 text-destructive" role="alert">
+                    Skriv inn et helt tall mellom 1 og 365.
+                  </p>
+                ) : null}
+              </div>
+            )}
           </div>
         ))}
+      </div>
+      <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h4 className="text-base font-semibold">
+              Historisk utvikling: {selectedMetricDetails.label}
+            </h4>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Trykk på en statistikkvisning for å bytte serie.
+            </p>
+          </div>
+          <div className="flex items-center gap-1" aria-label="Zoomkontroller">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={zoomIn}
+              disabled={!canZoomIn}
+              aria-label="Zoom inn"
+              title="Zoom inn"
+            >
+              <ZoomIn className="size-4" aria-hidden="true" />
+            </Button>
+            <span className="min-w-20 text-center text-xs text-muted-foreground">
+              {rangeDays >= 365
+                ? "1 år"
+                : rangeDays >= historyPoints.length
+                  ? "Hele perioden"
+                  : `${rangeDays} dager`}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={zoomOut}
+              disabled={!canZoomOut}
+              aria-label="Zoom ut"
+              title="Zoom ut"
+            >
+              <ZoomOut className="size-4" aria-hidden="true" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setRangeDays(30)}
+              disabled={rangeDays === 30}
+              aria-label="Nullstill zoom"
+              title="Nullstill zoom"
+            >
+              <RotateCcw className="size-4" aria-hidden="true" />
+            </Button>
+          </div>
+        </div>
+        <div className="mt-4 h-72 w-full" aria-label={`Graf for ${selectedMetricDetails.label}`}>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData} margin={{ top: 8, right: 8, bottom: 4, left: -20 }}>
+              <CartesianGrid vertical={false} className="stroke-border" />
+              <XAxis dataKey="label" tickLine={false} axisLine={false} minTickGap={24} />
+              <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={40} />
+              <Tooltip
+                contentStyle={{
+                  background: "var(--card)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "0.5rem",
+                  color: "var(--foreground)",
+                }}
+                formatter={(value) => [value, selectedMetricDetails.label]}
+              />
+              <Line
+                type="monotone"
+                dataKey="value"
+                name={selectedMetricDetails.label}
+                stroke="var(--primary)"
+                strokeWidth={2}
+                dot={false}
+                activeDot={{ r: 4 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Historikken bygger på registrerte statusendringer, bekreftede salg og tilgjengelige
+          visningsdata.
+        </p>
       </div>
     </section>
   );

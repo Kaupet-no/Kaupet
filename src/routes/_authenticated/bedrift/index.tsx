@@ -93,7 +93,7 @@ function BusinessConsoleRoute() {
         role={membership.role}
         tab={tab}
         onTabChange={(nextTab) =>
-          void navigate({ to: "/bedrift", search: { tab: nextTab }, replace: true })
+          navigate({ to: "/bedrift", search: { tab: nextTab }, replace: true })
         }
       />
     </>

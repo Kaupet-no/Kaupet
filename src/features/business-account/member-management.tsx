@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import { hasEffectiveProffAccess } from "@/features/business-account/plans";
 import type {
@@ -302,6 +303,7 @@ export function MemberManagement({ organization, locations, userId, role }: Prop
   const categoriesQuery = useQuery({
     queryKey: ["business-member-categories"],
     enabled: canManage,
+    staleTime: 30_000,
     queryFn: async (): Promise<Category[]> => {
       const { data, error } = await supabase
         .from("categories")
@@ -314,6 +316,7 @@ export function MemberManagement({ organization, locations, userId, role }: Prop
   const membersQuery = useQuery({
     queryKey: ["business-members", organization.id, locations.map((location) => location.id)],
     enabled: canManage,
+    staleTime: 30_000,
     queryFn: async (): Promise<OrganizationMember[]> => {
       const { data: members, error } = await supabase
         .from("organization_members")
@@ -534,11 +537,20 @@ export function MemberManagement({ organization, locations, userId, role }: Prop
         </div>
         <div className="mt-4 overflow-hidden rounded-xl border border-border bg-card">
           {membersQuery.isLoading ? (
-            <div
-              className="flex items-center gap-2 px-6 pb-6 text-sm text-muted-foreground"
-              role="status"
-            >
-              <Loader2 className="size-4 animate-spin" /> Laster medlemmer…
+            <div role="status" aria-live="polite">
+              <span className="sr-only">Laster medlemmer…</span>
+              <ul className="divide-y divide-border" aria-hidden="true">
+                {Array.from({ length: 3 }, (_, index) => (
+                  <li key={index} className="flex items-center gap-3 px-6 py-4">
+                    <Skeleton className="size-9 shrink-0 rounded-full" />
+                    <div className="flex min-w-0 flex-1 flex-col gap-2">
+                      <Skeleton className="h-4 w-1/3" />
+                      <Skeleton className="h-3 w-1/4" />
+                    </div>
+                    <Skeleton className="h-9 w-20 rounded-md" />
+                  </li>
+                ))}
+              </ul>
             </div>
           ) : membersQuery.isError ? (
             <Alert variant="destructive" className="m-6">

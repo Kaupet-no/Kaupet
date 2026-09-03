@@ -304,27 +304,55 @@ async function getOrganization(supabaseAdmin: AdminClient, organizationId: strin
 }
 
 export type BusinessListingStat = {
+  id: string;
   status: Database["public"]["Enums"]["listing_status"];
   viewCount: number;
+  createdAt: string;
+};
+
+export type BusinessListingHistoryPoint = {
+  date: string;
+  active: number;
+  inactive: number;
+  lowViews: number;
+  sold: number;
+};
+
+export type BusinessListingStats = {
+  current: BusinessListingStat[];
+  soldCount: number;
+  history: BusinessListingHistoryPoint[];
 };
 
 const businessListingStatsInput = z.object({
   locationId: uuid.nullable(),
+  threshold: z.number().int().min(0).max(1_000_000),
+  soldDays: z.number().int().min(1).max(365),
 });
+const BUSINESS_HISTORY_DAYS = 365;
+const BUSINESS_MAX_SOLD_DAYS = 365;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function dayKey(value: string | Date) {
+  return new Date(value).toISOString().slice(0, 10);
+}
 
 export const getBusinessListingStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => businessListingStatsInput.parse(input))
-  .handler(async ({ data, context }): Promise<BusinessListingStat[]> => {
+  .handler(async ({ data, context }): Promise<BusinessListingStats> => {
     const { supabaseAdmin, organizationId, role } = await requireOrganizationMember(context.userId);
     let listingQuery = supabaseAdmin
       .from("listings")
-      .select("status, seller_id, organization_location_id, listing_view_totals(total_views)")
+      .select(
+        "id, status, seller_id, organization_location_id, created_at, listing_view_totals(total_views)",
+      )
       .eq("organization_id", organizationId);
 
     if (role === "superuser") {
-      if (data.locationId)
+      if (data.locationId) {
         listingQuery = listingQuery.eq("organization_location_id", data.locationId);
+      }
     } else {
       let assignmentsQuery = supabaseAdmin
         .from("organization_location_members")
@@ -341,22 +369,130 @@ export const getBusinessListingStats = createServerFn({ method: "GET" })
       if (!canViewAll) listingQuery = listingQuery.eq("seller_id", context.userId);
     }
 
-    const { data: listings, error } = await listingQuery;
-    if (error) throw error;
-    return (
-      (listings ?? []) as unknown as Array<{
-        status: Database["public"]["Enums"]["listing_status"];
-        listing_view_totals: { total_views: number } | { total_views: number }[] | null;
-      }>
-    ).map((listing) => {
+    const { data: listings, error: listingsError } = await listingQuery;
+    if (listingsError) throw listingsError;
+    const rawListings = (listings ?? []) as unknown as Array<{
+      id: string;
+      status: Database["public"]["Enums"]["listing_status"];
+      created_at: string;
+      listing_view_totals: { total_views: number } | { total_views: number }[] | null;
+    }>;
+    const listingIds = rawListings.map((listing) => listing.id);
+    const historyStart = new Date(Date.now() - (BUSINESS_HISTORY_DAYS - 1) * DAY_MS);
+    const salesStart = new Date(Date.now() - BUSINESS_MAX_SOLD_DAYS * DAY_MS);
+    const [
+      { data: statusHistory, error: statusHistoryError },
+      { data: sales, error: salesError },
+      { data: viewEvents, error: viewEventsError },
+    ] = listingIds.length
+      ? await Promise.all([
+          supabaseAdmin
+            .from("listing_status_history")
+            .select("listing_id, status, changed_at")
+            .in("listing_id", listingIds)
+            .order("changed_at"),
+          supabaseAdmin
+            .from("listing_sales")
+            .select("listing_id, confirmed_at")
+            .in("listing_id", listingIds)
+            .gte("confirmed_at", salesStart.toISOString()),
+          supabaseAdmin
+            .from("listing_view_events")
+            .select("listing_id, created_at")
+            .in("listing_id", listingIds)
+            .gte("created_at", historyStart.toISOString()),
+        ])
+      : [
+          { data: [], error: null },
+          { data: [], error: null },
+          { data: [], error: null },
+        ];
+    if (statusHistoryError) throw statusHistoryError;
+    if (salesError) throw salesError;
+    if (viewEventsError) throw viewEventsError;
+
+    const current = rawListings.map((listing) => {
       const totals = Array.isArray(listing.listing_view_totals)
         ? listing.listing_view_totals[0]
         : listing.listing_view_totals;
       return {
+        id: listing.id,
         status: listing.status,
         viewCount: Number(totals?.total_views ?? 0),
+        createdAt: listing.created_at,
       };
     });
+    const statusByListing = new Map<
+      string,
+      Array<{ status: Database["public"]["Enums"]["listing_status"]; changed_at: string }>
+    >();
+    for (const row of statusHistory ?? []) {
+      const rows = statusByListing.get(row.listing_id) ?? [];
+      rows.push({ status: row.status, changed_at: row.changed_at });
+      statusByListing.set(row.listing_id, rows);
+    }
+    const eventsByListing = new Map<string, Map<string, number>>();
+    for (const event of viewEvents ?? []) {
+      const events = eventsByListing.get(event.listing_id) ?? new Map<string, number>();
+      const key = dayKey(event.created_at);
+      events.set(key, (events.get(key) ?? 0) + 1);
+      eventsByListing.set(event.listing_id, events);
+    }
+    const soldByDay = new Map<string, number>();
+    for (const sale of sales ?? []) {
+      const key = dayKey(sale.confirmed_at);
+      soldByDay.set(key, (soldByDay.get(key) ?? 0) + 1);
+    }
+    const soldSince = new Date(Date.now() - data.soldDays * DAY_MS);
+    const soldCount = (sales ?? []).filter(
+      (sale) => new Date(sale.confirmed_at).getTime() >= soldSince.getTime(),
+    ).length;
+    const history: BusinessListingHistoryPoint[] = [];
+
+    for (let offset = 0; offset < BUSINESS_HISTORY_DAYS; offset += 1) {
+      const date = new Date(historyStart.getTime() + offset * DAY_MS);
+      const dateValue = dayKey(date);
+      let active = 0;
+      let inactive = 0;
+      let lowViews = 0;
+
+      for (const listing of current) {
+        if (new Date(listing.createdAt).getTime() > date.getTime()) continue;
+        const transitions = statusByListing.get(listing.id) ?? [
+          { status: listing.status, changed_at: listing.createdAt },
+        ];
+        let status: Database["public"]["Enums"]["listing_status"] | null = null;
+        for (const transition of transitions) {
+          if (new Date(transition.changed_at).getTime() > date.getTime()) break;
+          status = transition.status;
+        }
+        if (!status) continue;
+        if (status === "active") active += 1;
+        else inactive += 1;
+
+        const events = eventsByListing.get(listing.id);
+        const knownEvents = events
+          ? [...events.values()].reduce((total, count) => total + count, 0)
+          : 0;
+        let views = Math.max(listing.viewCount - knownEvents, 0);
+        if (events) {
+          for (const [eventDate, count] of events) {
+            if (eventDate <= dateValue) views += count;
+          }
+        }
+        if (views < data.threshold) lowViews += 1;
+      }
+
+      history.push({
+        date: dateValue,
+        active,
+        inactive,
+        lowViews,
+        sold: soldByDay.get(dateValue) ?? 0,
+      });
+    }
+
+    return { current, soldCount, history };
   });
 
 export const getBusinessOrganization = createServerFn({ method: "GET" })

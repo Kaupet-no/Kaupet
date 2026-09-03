@@ -65,6 +65,9 @@ function buildAdmin(
     existingOrganization?: Record<string, unknown> | null;
     membership?: Record<string, unknown> | null;
     listingStats?: Record<string, unknown>[];
+    listingStatusHistory?: Record<string, unknown>[];
+    sales?: Record<string, unknown>[];
+    viewEvents?: Record<string, unknown>[];
     contactEmail?: string | null;
     proff?: boolean;
   } = {},
@@ -93,7 +96,7 @@ function buildAdmin(
   const calls = { updates: [] as Record<string, unknown>[] };
   const makeChain = (table: string) => {
     const chain: Record<string, unknown> = {};
-    for (const method of ["select", "eq", "is", "gt", "lt", "order", "limit"]) {
+    for (const method of ["select", "eq", "is", "gt", "lt", "in", "gte", "order", "limit"]) {
       chain[method] = vi.fn(() => chain);
     }
     chain.maybeSingle = vi.fn(async () => ({
@@ -139,7 +142,13 @@ function buildAdmin(
             ? [{ user_id: "admin-user-1" }]
             : table === "listings"
               ? (overrides.listingStats ?? null)
-              : null,
+              : table === "listing_status_history"
+                ? (overrides.listingStatusHistory ?? null)
+                : table === "listing_sales"
+                  ? (overrides.sales ?? null)
+                  : table === "listing_view_events"
+                    ? (overrides.viewEvents ?? null)
+                    : null,
         error: null,
       }).then(resolve, reject);
     return chain;
@@ -175,17 +184,95 @@ beforeEach(() => {
 
 describe("business server functions", () => {
   it("henter annonseverdier med visninger for bedriftens oversikt", async () => {
+    const listingCreatedAt = new Date(Date.now() - 100 * 24 * 60 * 60 * 1000).toISOString();
     buildAdmin({
       listingStats: [
-        { status: "active", listing_view_totals: { total_views: 12 } },
-        { status: "draft", listing_view_totals: null },
+        {
+          id: "listing-1",
+          status: "active",
+          created_at: listingCreatedAt,
+          listing_view_totals: { total_views: 12 },
+        },
+        {
+          id: "listing-2",
+          status: "draft",
+          created_at: listingCreatedAt,
+          listing_view_totals: null,
+        },
       ],
     });
 
-    await expect(getBusinessListingStats({ data: { locationId: null } })).resolves.toEqual([
-      { status: "active", viewCount: 12 },
-      { status: "draft", viewCount: 0 },
+    const result = await getBusinessListingStats({
+      data: { locationId: null, threshold: 10, soldDays: 30 },
+    });
+
+    expect(result.current).toEqual([
+      {
+        id: "listing-1",
+        status: "active",
+        viewCount: 12,
+        createdAt: listingCreatedAt,
+      },
+      {
+        id: "listing-2",
+        status: "draft",
+        viewCount: 0,
+        createdAt: listingCreatedAt,
+      },
     ]);
+    expect(result.soldCount).toBe(0);
+    expect(result.history).toHaveLength(365);
+    expect(result.history.at(-1)).toMatchObject({ active: 1, inactive: 1, lowViews: 1, sold: 0 });
+  });
+  it("bygger historikk med statusbytte, salg og daglige visninger", async () => {
+    const dayMs = 24 * 60 * 60 * 1000;
+    const daysAgo = (days: number) => new Date(Date.now() - days * dayMs).toISOString();
+    const dayKey = (days: number) => daysAgo(days).slice(0, 10);
+    const listingCreatedAt = daysAgo(10);
+
+    buildAdmin({
+      listingStats: [
+        {
+          id: "listing-history",
+          status: "active",
+          created_at: listingCreatedAt,
+          listing_view_totals: { total_views: 3 },
+        },
+      ],
+      listingStatusHistory: [
+        { listing_id: "listing-history", status: "draft", changed_at: listingCreatedAt },
+        { listing_id: "listing-history", status: "active", changed_at: daysAgo(5) },
+      ],
+      sales: [
+        { listing_id: "listing-history", confirmed_at: daysAgo(2) },
+        { listing_id: "listing-history", confirmed_at: daysAgo(40) },
+      ],
+      viewEvents: [{ listing_id: "listing-history", created_at: daysAgo(4) }],
+    });
+
+    const result = await getBusinessListingStats({
+      data: { locationId: null, threshold: 3, soldDays: 7 },
+    });
+    const beforeActivation = result.history.find((point) => point.date === dayKey(6));
+    const afterActivation = result.history.find((point) => point.date === dayKey(4));
+    const beforeView = result.history.find((point) => point.date === dayKey(5));
+    const afterView = result.history.find((point) => point.date === dayKey(3));
+    const saleDay = result.history.find((point) => point.date === dayKey(2));
+
+    expect(beforeActivation).toMatchObject({ active: 0, inactive: 1, sold: 0 });
+    expect(afterActivation).toMatchObject({ active: 1, inactive: 0, sold: 0 });
+    expect(beforeView?.lowViews).toBe(1);
+    expect(afterView?.lowViews).toBe(0);
+    expect(saleDay?.sold).toBe(1);
+    expect(result.soldCount).toBe(1);
+    const oneDayResult = await getBusinessListingStats({
+      data: { locationId: null, threshold: 3, soldDays: 1 },
+    });
+    expect(oneDayResult.soldCount).toBe(0);
+    const extendedResult = await getBusinessListingStats({
+      data: { locationId: null, threshold: 3, soldDays: 45 },
+    });
+    expect(extendedResult.soldCount).toBe(2);
   });
   it("henviser til support uten å lekke kontaktinfo ved duplikat organisasjonsnummer (L-11)", async () => {
     buildAdmin({ existingOrganization: { id: organizationId } });

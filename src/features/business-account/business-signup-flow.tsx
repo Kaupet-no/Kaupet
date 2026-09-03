@@ -57,7 +57,7 @@ function webOrigin(): string {
   return isNative() ? "https://kaupet.no" : window.location.origin;
 }
 
-export function BusinessSignupFlow() {
+export function BusinessSignupFlow({ onAuthenticated }: { onAuthenticated: () => Promise<void> }) {
   const [step, setStep] = useState<BusinessStep>(1);
   const [organizationNumber, setOrganizationNumber] = useState("");
   const [organization, setOrganization] = useState<BusinessOrganization | null>(null);
@@ -139,7 +139,7 @@ export function BusinessSignupFlow() {
       });
       const token = await getCaptchaToken();
       const acceptedAt = new Date().toISOString();
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: values.email.trim(),
         password: values.password,
         options: {
@@ -156,7 +156,11 @@ export function BusinessSignupFlow() {
         },
       });
       if (error) throw error;
-      setSubmittedEmail(values.email.trim());
+      if (data.session) {
+        await onAuthenticated();
+      } else {
+        setSubmittedEmail(values.email.trim());
+      }
     } catch (error: unknown) {
       setStepError(formatErrorMessage(error, "Kunne ikke opprette profilen. Prøv igjen."));
     } finally {
@@ -425,7 +429,7 @@ export function BusinessSignupFlow() {
               </p>
             ) : (
               <p id="business-password-hint" className="text-xs text-muted-foreground">
-                Minst 8 tegn
+                Minst 10 tegn
               </p>
             )}
             {password.length > 0 && (

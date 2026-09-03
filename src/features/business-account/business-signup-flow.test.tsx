@@ -13,6 +13,7 @@ const lookupBusinessOrganizationMock = vi.fn();
 const bindBusinessSignupEmailMock = vi.fn();
 const signUpMock = vi.fn();
 const resendMock = vi.fn();
+const onAuthenticatedMock = vi.fn();
 
 vi.mock("@/lib/business.functions", () => ({
   lookupBusinessOrganization: (...args: unknown[]) => lookupBusinessOrganizationMock(...args),
@@ -64,11 +65,12 @@ beforeEach(() => {
   bindBusinessSignupEmailMock.mockReset().mockResolvedValue({ email: "kari@example.com" });
   signUpMock.mockReset().mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
   resendMock.mockReset().mockResolvedValue({ error: null });
+  onAuthenticatedMock.mockReset().mockResolvedValue(undefined);
 });
 
 describe("BusinessSignupFlow", () => {
   it("starts at step one with an accessible organization-number field", () => {
-    render(<BusinessSignupFlow />);
+    render(<BusinessSignupFlow onAuthenticated={onAuthenticatedMock} />);
 
     expect(screen.getByRole("heading", { name: "Finn bedriften din" })).toBeTruthy();
     expect(screen.getByLabelText("Organisasjonsnummer").getAttribute("inputmode")).toBe("numeric");
@@ -77,7 +79,7 @@ describe("BusinessSignupFlow", () => {
   });
 
   it("rejects invalid check digits before making a server lookup", () => {
-    render(<BusinessSignupFlow />);
+    render(<BusinessSignupFlow onAuthenticated={onAuthenticatedMock} />);
     fireEvent.change(screen.getByLabelText("Organisasjonsnummer"), {
       target: { value: "974 760 674" },
     });
@@ -94,7 +96,7 @@ describe("BusinessSignupFlow", () => {
     });
     const resolveLookup = (value: typeof organization) => resolvePromise(value);
     lookupBusinessOrganizationMock.mockReturnValueOnce(lookupPromise);
-    render(<BusinessSignupFlow />);
+    render(<BusinessSignupFlow onAuthenticated={onAuthenticatedMock} />);
     lookup();
 
     expect(screen.getByRole("status").textContent).toContain("Søker i Brønnøysundregistrene");
@@ -121,7 +123,7 @@ describe("BusinessSignupFlow", () => {
         "Denne bedriften er allerede registrert på Kaupet. Bedriftens kontaktperson er ka***@ex***.com. Du kan også kontakte support på kontakt@kaupet.no.",
       ),
     );
-    render(<BusinessSignupFlow />);
+    render(<BusinessSignupFlow onAuthenticated={onAuthenticatedMock} />);
     lookup();
 
     await waitFor(() =>
@@ -136,7 +138,7 @@ describe("BusinessSignupFlow", () => {
   });
 
   it("binds email before signup, stores business metadata, and supports resend", async () => {
-    render(<BusinessSignupFlow />);
+    render(<BusinessSignupFlow onAuthenticated={onAuthenticatedMock} />);
     await reachProfile();
     expect(screen.getByRole("link", { name: "brukervilkårene" }).getAttribute("href")).toBe(
       "/vilkar",
@@ -184,5 +186,22 @@ describe("BusinessSignupFlow", () => {
 
     fireEvent.click(resendButton);
     expect(resendMock).toHaveBeenCalledTimes(1);
+  });
+  it("går videre når signup returnerer en aktiv sesjon", async () => {
+    signUpMock.mockResolvedValueOnce({
+      data: { user: { id: "user-1" }, session: { access_token: "token" } },
+      error: null,
+    });
+    render(<BusinessSignupFlow onAuthenticated={onAuthenticatedMock} />);
+    await reachProfile();
+
+    fireEvent.change(screen.getByLabelText("Navn"), { target: { value: "Kari Nordmann" } });
+    fireEvent.change(screen.getByLabelText("E-post"), { target: { value: "KARI2@example.com" } });
+    fireEvent.change(screen.getByLabelText("Passord"), { target: { value: "hemmelig123" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /brukervilkårene/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Opprett bedriftskonto" }));
+
+    await waitFor(() => expect(onAuthenticatedMock).toHaveBeenCalledOnce());
+    expect(screen.queryByRole("heading", { name: "Sjekk e-posten din" })).toBeNull();
   });
 });

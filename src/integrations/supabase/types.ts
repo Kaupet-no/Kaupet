@@ -881,6 +881,35 @@ export type Database = {
           },
         ]
       }
+      listing_status_history: {
+        Row: {
+          changed_at: string
+          id: string
+          listing_id: string
+          status: Database["public"]["Enums"]["listing_status"]
+        }
+        Insert: {
+          changed_at: string
+          id?: string
+          listing_id: string
+          status: Database["public"]["Enums"]["listing_status"]
+        }
+        Update: {
+          changed_at?: string
+          id?: string
+          listing_id?: string
+          status?: Database["public"]["Enums"]["listing_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_status_history_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       listing_sales: {
         Row: {
           buyer_id: string

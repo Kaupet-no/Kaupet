@@ -143,7 +143,7 @@ export function AccountSection() {
       >
         <div>
           <h2 className="text-lg font-medium">Endre passord</h2>
-          <p className="text-sm text-muted-foreground">Minst 8 tegn.</p>
+          <p className="text-sm text-muted-foreground">Minst 10 tegn.</p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="password">Nytt passord</Label>

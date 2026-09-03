@@ -199,7 +199,7 @@ function AuthPage() {
         ? await turnstileRef.current?.getResponsePromise()
         : undefined;
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email: values.email,
           password: values.password,
           options: {
@@ -214,7 +214,11 @@ function AuthPage() {
         });
         if (error) throw error;
         trackProductEvent("auth_completed", { mode: "signup" });
-        setAuthMode("confirm");
+        if (data.session) {
+          await finishAuth();
+        } else {
+          setAuthMode("confirm");
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email: values.email,
@@ -396,12 +400,8 @@ function AuthPage() {
             </p>
           </>
         ) : isSignUp && signupKind === "business" ? (
-          <div
-            id="account-type-business-panel"
-            role="tabpanel"
-            aria-labelledby="account-type-business-tab"
-          >
-            <BusinessSignupFlow />
+          <div aria-labelledby="account-type-business-tab">
+            <BusinessSignupFlow onAuthenticated={finishAuth} />
           </div>
         ) : (
           <div

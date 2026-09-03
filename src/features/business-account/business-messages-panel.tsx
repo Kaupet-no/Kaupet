@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ChevronRight, Loader2, MessageCircle } from "lucide-react";
+import { ChevronRight, MessageCircle } from "lucide-react";
 
 import { EmptyState } from "@/components/ui/empty-state";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { BusinessOrganization } from "@/features/business-account/use-business-membership";
 import { supabase } from "@/integrations/supabase/client";
 import { signListingImageUrls } from "@/lib/storage";
@@ -43,6 +44,7 @@ type Profile = {
 export function BusinessMessagesPanel({ organization, locationId }: Props) {
   const conversationsQuery = useQuery({
     queryKey: ["business-messages", organization.id, locationId],
+    staleTime: 30_000,
     queryFn: async (): Promise<BusinessConversation[]> => {
       let query = supabase
         .from("conversations")
@@ -142,12 +144,27 @@ export function BusinessMessagesPanel({ organization, locationId }: Props) {
           )}
       </div>
       {conversationsQuery.isLoading ? (
-        <div
-          className="flex items-center gap-2 text-sm text-muted-foreground"
-          role="status"
-          aria-live="polite"
-        >
-          <Loader2 className="size-4 animate-spin" /> Laster meldinger…
+        <div role="status" aria-live="polite">
+          <span className="sr-only">Laster meldinger…</span>
+          <div
+            className="overflow-hidden rounded-xl border border-border bg-card"
+            aria-hidden="true"
+          >
+            <ul className="divide-y divide-border">
+              {Array.from({ length: 3 }, (_, index) => (
+                <li key={index} className="flex min-h-24 items-center gap-3 p-4 sm:gap-4 sm:p-5">
+                  <Skeleton className="size-14 shrink-0 rounded-lg" />
+                  <Skeleton className="size-10 shrink-0 rounded-full" />
+                  <div className="flex min-w-0 flex-1 flex-col gap-2">
+                    <Skeleton className="h-4 w-1/3" />
+                    <Skeleton className="h-3 w-2/3" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                  <Skeleton className="size-4 shrink-0 rounded-full" />
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       ) : conversationsQuery.isError ? (
         <Alert variant="destructive">

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   Building2,
@@ -37,6 +37,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import type { BusinessMembership } from "@/features/business-account/use-business-membership";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BUSINESS_PLANS, hasEffectiveProffAccess } from "@/features/business-account/plans";
@@ -48,8 +49,17 @@ import { BusinessListingsPanel } from "@/features/business-account/business-list
 import { BusinessMessagesPanel } from "@/features/business-account/business-messages-panel";
 import { BusinessProfileForm } from "@/features/business-account/business-profile-form";
 import { MemberManagement } from "@/features/business-account/member-management";
-import { setBusinessPlan } from "@/lib/business.functions";
+import {
+  getBusinessListingStats,
+  setBusinessPlan,
+  type BusinessListingStat,
+} from "@/lib/business.functions";
 import { BulkListingImport } from "@/features/listing-bulk-import/BulkListingImport";
+import {
+  DEFAULT_LISTING_VIEW_THRESHOLD,
+  MAX_LISTING_VIEW_THRESHOLD,
+  summarizeListingInsights,
+} from "@/features/business-account/listing-insights";
 
 export type BusinessTab = "oversikt" | "annonser" | "meldinger" | "bedriftsprofil" | "brukere";
 type Props = {
@@ -93,6 +103,16 @@ export function BusinessConsole({
   const queryClient = useQueryClient();
   const effectiveProff = hasEffectiveProffAccess(organization);
   const callSetPlan = useServerFn(setBusinessPlan);
+  const loadBusinessListingStats = useServerFn(getBusinessListingStats);
+  const businessListingStatsQuery = useQuery({
+    queryKey: ["business-listing-stats", organization.id, userId, selectedLocationId, role],
+    queryFn: () =>
+      loadBusinessListingStats({
+        data: {
+          locationId: selectedLocationId === "all" ? null : selectedLocationId,
+        },
+      }),
+  });
   const [now] = useState(() => Date.now());
   const [planError, setPlanError] = useState<string | null>(null);
   const planMutation = useMutation({
@@ -232,6 +252,9 @@ export function BusinessConsole({
                 onCancelTrial={() => planMutation.mutate()}
                 onNavigate={onTabChange}
                 canManageMembers={role === "superuser"}
+                listingStats={businessListingStatsQuery.data}
+                listingStatsLoading={businessListingStatsQuery.isLoading}
+                listingStatsError={businessListingStatsQuery.isError}
               />
             </TabsContent>
             <TabsContent value="annonser" className="mt-0">
@@ -290,6 +313,9 @@ function Overview({
   onCancelTrial,
   onNavigate,
   canManageMembers,
+  listingStats,
+  listingStatsLoading,
+  listingStatsError,
 }: {
   organization: BusinessOrganization;
   planName: string;
@@ -302,6 +328,9 @@ function Overview({
   onCancelTrial: () => void;
   onNavigate: (tab: BusinessTab) => void;
   canManageMembers: boolean;
+  listingStats: BusinessListingStat[] | undefined;
+  listingStatsLoading: boolean;
+  listingStatsError: boolean;
 }) {
   const trialEnd = organization.proff_trial_ends_at
     ? new Intl.DateTimeFormat("nb-NO", { dateStyle: "long" }).format(
@@ -342,6 +371,7 @@ function Overview({
                 ? "Proff er aktiv"
                 : "Proff er ikke aktiv"
           }
+          href="/bedrift/velg-plan"
           emphasized
         />
         <StatusCard
@@ -359,6 +389,7 @@ function Overview({
                   ? "Aktiv tilgang"
                   : "Ingen aktiv tilgang"
           }
+          href="/bedrift/velg-plan"
         />
         <StatusCard
           icon={<Building2 className="size-4" />}
@@ -367,6 +398,11 @@ function Overview({
           detail={organization.organization_number}
         />
       </div>
+      <ListingInsights
+        stats={listingStats}
+        isLoading={listingStatsLoading}
+        isError={listingStatsError}
+      />
 
       <div>
         <div className="mb-3 flex items-end justify-between gap-3">
@@ -463,30 +499,201 @@ function Overview({
   );
 }
 
+type ListingInsightsProps = {
+  stats: BusinessListingStat[] | undefined;
+  isLoading: boolean;
+  isError: boolean;
+};
+
+function ListingInsights({ stats, isLoading, isError }: ListingInsightsProps) {
+  const [thresholdInput, setThresholdInput] = useState(String(DEFAULT_LISTING_VIEW_THRESHOLD));
+  const threshold = Number(thresholdInput);
+  const validThreshold =
+    /^\d{1,7}$/u.test(thresholdInput) &&
+    Number.isInteger(threshold) &&
+    threshold <= MAX_LISTING_VIEW_THRESHOLD;
+  const summary = summarizeListingInsights(stats ?? [], validThreshold ? threshold : NaN);
+  const formatter = new Intl.NumberFormat("nb-NO");
+
+  if (isLoading) {
+    return (
+      <div
+        className="flex items-center gap-2 text-sm text-muted-foreground"
+        role="status"
+        aria-live="polite"
+      >
+        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+        Laster annonseinnsikt…
+      </div>
+    );
+  }
+  if (isError) {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>Kunne ikke laste annonseinnsikten. Prøv igjen senere.</AlertDescription>
+      </Alert>
+    );
+  }
+
+  const metrics = [
+    {
+      label: "Antall aktive annonser",
+      value: summary.active,
+      description: "Annonser som er synlige for kjøpere akkurat nå.",
+      color: "text-primary",
+    },
+    {
+      label: "Antall inaktive annonser",
+      value: summary.inactive,
+      description: "Utkast, solgte, deaktiverte, arkiverte eller utløpte annonser.",
+      color: "text-brand-text",
+    },
+    {
+      label: `Antall annonser med færre enn ${formatter.format(summary.threshold)} visninger`,
+      value: summary.lowViews,
+      description: "Annonser som kan ha nytte av en bedre tittel, pris eller synlighet.",
+      color: "text-muted-foreground",
+    },
+  ];
+  const total = Math.max((stats ?? []).length, 1);
+
+  return (
+    <section aria-labelledby="listing-insights-title" className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-text">
+            Innsikt
+          </p>
+          <h3 id="listing-insights-title" className="mt-1 font-display text-2xl tracking-tight">
+            Slik går det med annonsene
+          </h3>
+        </div>
+        <div className="flex items-center gap-2">
+          <label htmlFor="listing-view-threshold" className="text-sm text-muted-foreground">
+            Lav visningsterskel
+          </label>
+          <Input
+            id="listing-view-threshold"
+            type="number"
+            min={0}
+            max={1_000_000}
+            step={1}
+            value={thresholdInput}
+            onChange={(event) => setThresholdInput(event.target.value)}
+            aria-invalid={!validThreshold}
+            aria-describedby="listing-view-threshold-help"
+            className="w-24 bg-background text-right tabular-nums"
+          />
+        </div>
+      </div>
+      <p id="listing-view-threshold-help" className="text-sm text-muted-foreground">
+        Juster tallet for å finne annonser som har fått lite oppmerksomhet. Bruk et helt tall mellom
+        0 og 1 000 000.
+      </p>
+      {!validThreshold && (
+        <p className="text-sm text-destructive" role="alert">
+          Skriv inn et helt tall mellom 0 og 1 000 000.
+        </p>
+      )}
+      <div className="grid gap-3 md:grid-cols-3">
+        {metrics.map((metric) => (
+          <div
+            key={metric.label}
+            className="flex items-center gap-4 rounded-xl border border-border bg-card p-4 sm:p-5"
+          >
+            <MetricRing
+              value={metric.value}
+              percent={metric.value / total}
+              color={metric.color}
+              label={metric.label}
+            />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">{metric.label}</p>
+              <p className="mt-1 text-sm leading-5 text-muted-foreground">{metric.description}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function MetricRing({
+  value,
+  percent,
+  color,
+  label,
+}: {
+  value: number;
+  percent: number;
+  color: string;
+  label: string;
+}) {
+  const circumference = 2 * Math.PI * 46;
+  const dash = Math.min(Math.max(percent, 0), 1) * circumference;
+  return (
+    <div className={`relative size-20 shrink-0 ${color}`} aria-label={`${label}: ${value}`}>
+      <svg viewBox="0 0 112 112" className="size-full -rotate-90" aria-hidden="true">
+        <circle cx="56" cy="56" r="46" fill="none" className="stroke-muted" strokeWidth="10" />
+        <circle
+          cx="56"
+          cy="56"
+          r="46"
+          fill="none"
+          className="stroke-current"
+          strokeWidth="10"
+          strokeLinecap="round"
+          strokeDasharray={`${dash} ${circumference}`}
+        />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-lg font-semibold tabular-nums">
+        {value}
+      </span>
+    </div>
+  );
+}
 function StatusCard({
   icon,
   label,
   value,
   detail,
+  href,
   emphasized = false,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   detail: string;
+  href?: "/bedrift/velg-plan";
   emphasized?: boolean;
 }) {
-  return (
-    <div
-      className={`border-b border-border p-4 last:border-b-0 sm:border-b-0 sm:p-5 ${emphasized ? "bg-primary/[0.04]" : ""}`}
-    >
+  const content = (
+    <>
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
         <span className="text-primary">{icon}</span>
         {label}
+        {href && (
+          <ChevronRight className="ml-auto size-4 text-muted-foreground" aria-hidden="true" />
+        )}
       </p>
       <p className="mt-3 truncate text-lg font-semibold">{value}</p>
       <p className="mt-1 text-sm text-muted-foreground">{detail}</p>
-    </div>
+    </>
+  );
+  const className = `border-b border-border p-4 last:border-b-0 sm:border-b-0 sm:p-5 ${
+    emphasized ? "bg-primary/[0.04]" : ""
+  }`;
+
+  return href ? (
+    <Link
+      to={href}
+      className={`${className} block transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring`}
+      aria-label={`${label}: ${value}. Åpne plansammenligning`}
+    >
+      {content}
+    </Link>
+  ) : (
+    <div className={className}>{content}</div>
   );
 }
 

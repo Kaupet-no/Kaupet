@@ -46,6 +46,7 @@ const defaultContext = { userId: "superuser-1", supabase: supabaseAdmin };
 
 import {
   acceptOrganizationInvite,
+  getBusinessListingStats,
   inviteOrganizationMember,
   lookupBusinessOrganization,
   removeOrganizationMember,
@@ -53,7 +54,6 @@ import {
   setBusinessPlan,
   updateBusinessProfile,
 } from "./business.functions";
-
 import { fetchOrganizationFromBrreg } from "@/lib/brreg.server";
 
 const organizationId = "11111111-1111-4111-8111-111111111111";
@@ -64,6 +64,7 @@ function buildAdmin(
     organization?: Record<string, unknown>;
     existingOrganization?: Record<string, unknown> | null;
     membership?: Record<string, unknown> | null;
+    listingStats?: Record<string, unknown>[];
     contactEmail?: string | null;
     proff?: boolean;
   } = {},
@@ -133,7 +134,12 @@ function buildAdmin(
     chain.delete = vi.fn(() => chain);
     chain.then = (resolve: (value: unknown) => unknown, reject: (error: unknown) => unknown) =>
       Promise.resolve({
-        data: table === "user_roles" ? [{ user_id: "admin-user-1" }] : null,
+        data:
+          table === "user_roles"
+            ? [{ user_id: "admin-user-1" }]
+            : table === "listings"
+              ? (overrides.listingStats ?? null)
+              : null,
         error: null,
       }).then(resolve, reject);
     return chain;
@@ -168,6 +174,19 @@ beforeEach(() => {
 });
 
 describe("business server functions", () => {
+  it("henter annonseverdier med visninger for bedriftens oversikt", async () => {
+    buildAdmin({
+      listingStats: [
+        { status: "active", listing_view_totals: { total_views: 12 } },
+        { status: "draft", listing_view_totals: null },
+      ],
+    });
+
+    await expect(getBusinessListingStats({ data: { locationId: null } })).resolves.toEqual([
+      { status: "active", viewCount: 12 },
+      { status: "draft", viewCount: 0 },
+    ]);
+  });
   it("henviser til support uten å lekke kontaktinfo ved duplikat organisasjonsnummer (L-11)", async () => {
     buildAdmin({ existingOrganization: { id: organizationId } });
 

@@ -303,6 +303,62 @@ async function getOrganization(supabaseAdmin: AdminClient, organizationId: strin
   return data;
 }
 
+export type BusinessListingStat = {
+  status: Database["public"]["Enums"]["listing_status"];
+  viewCount: number;
+};
+
+const businessListingStatsInput = z.object({
+  locationId: uuid.nullable(),
+});
+
+export const getBusinessListingStats = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) => businessListingStatsInput.parse(input))
+  .handler(async ({ data, context }): Promise<BusinessListingStat[]> => {
+    const { supabaseAdmin, organizationId, role } = await requireOrganizationMember(context.userId);
+    let listingQuery = supabaseAdmin
+      .from("listings")
+      .select("status, seller_id, organization_location_id, listing_view_totals(total_views)")
+      .eq("organization_id", organizationId);
+
+    if (role === "superuser") {
+      if (data.locationId)
+        listingQuery = listingQuery.eq("organization_location_id", data.locationId);
+    } else {
+      let assignmentsQuery = supabaseAdmin
+        .from("organization_location_members")
+        .select("location_id, listing_access")
+        .eq("organization_id", organizationId)
+        .eq("user_id", context.userId);
+      if (data.locationId) assignmentsQuery = assignmentsQuery.eq("location_id", data.locationId);
+      const { data: assignments, error: assignmentsError } = await assignmentsQuery;
+      if (assignmentsError) throw assignmentsError;
+      if (!assignments?.length) throw new Error(UNAUTHORIZED_MESSAGE);
+      const canViewAll = assignments.some((assignment) => assignment.listing_access === "all");
+      const locationIds = assignments.map((assignment) => assignment.location_id as string);
+      listingQuery = listingQuery.in("organization_location_id", locationIds);
+      if (!canViewAll) listingQuery = listingQuery.eq("seller_id", context.userId);
+    }
+
+    const { data: listings, error } = await listingQuery;
+    if (error) throw error;
+    return (
+      (listings ?? []) as unknown as Array<{
+        status: Database["public"]["Enums"]["listing_status"];
+        listing_view_totals: { total_views: number } | { total_views: number }[] | null;
+      }>
+    ).map((listing) => {
+      const totals = Array.isArray(listing.listing_view_totals)
+        ? listing.listing_view_totals[0]
+        : listing.listing_view_totals;
+      return {
+        status: listing.status,
+        viewCount: Number(totals?.total_views ?? 0),
+      };
+    });
+  });
+
 export const getBusinessOrganization = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {

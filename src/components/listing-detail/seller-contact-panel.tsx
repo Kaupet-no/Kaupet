@@ -38,6 +38,7 @@ export function SellerContactPanel({
   onShareOpenChange,
   isNative,
   hasRegistryData,
+  hideBusinessIdentity = false,
 }: {
   isLoggedIn: boolean;
   seller: SellerIdentity | null;
@@ -51,6 +52,8 @@ export function SellerContactPanel({
   onShareOpenChange: (open: boolean) => void;
   isNative?: boolean;
   hasRegistryData: boolean;
+  /** The branded Proff block already owns the business identity. */
+  hideBusinessIdentity?: boolean;
 }) {
   const evidenceSources = [
     ...(hasRegistryData ? [mapListingFactSource("vehicleLookup")] : []),
@@ -65,7 +68,8 @@ export function SellerContactPanel({
   return (
     <div className="rounded-xl border border-border bg-card p-4">
       <div className="flex items-center gap-3">
-        {seller?.kind === "private" && seller.avatar_url ? (
+        {seller?.kind === "business" && hideBusinessIdentity ? null : seller?.kind === "private" &&
+          seller.avatar_url ? (
           <img
             src={seller.avatar_url}
             alt={seller.display_name ? `Profilbilde av ${seller.display_name}` : "Profilbilde"}
@@ -107,21 +111,32 @@ export function SellerContactPanel({
               )}
             </>
           ) : seller?.kind === "business" ? (
-            <>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <p className="font-medium">{seller.displayName}</p>
-                <span className="text-xs text-muted-foreground">Bedrift</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Org.nr.{" "}
-                {seller.organizationNumber.replace(/\D/g, "").replace(/(\d{3})(?=\d)/g, "$1 ")}
-              </p>
-              {seller.visitingAddress && (
+            hideBusinessIdentity ? (
+              <>
+                <p className="font-medium">Bedriftskonto</p>
+                {seller.visitingAddress && (
+                  <p className="text-xs text-muted-foreground">
+                    Besøksadresse: {seller.visitingAddress}
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <p className="font-medium">{seller.displayName}</p>
+                  <span className="text-xs text-muted-foreground">Bedrift</span>
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  Besøksadresse: {seller.visitingAddress}
+                  Org.nr.{" "}
+                  {seller.organizationNumber.replace(/\D/g, "").replace(/(\d{3})(?=\d)/g, "$1 ")}
                 </p>
-              )}
-            </>
+                {seller.visitingAddress && (
+                  <p className="text-xs text-muted-foreground">
+                    Besøksadresse: {seller.visitingAddress}
+                  </p>
+                )}
+              </>
+            )
           ) : !isLoggedIn ? (
             <div className="flex items-start gap-1.5 text-muted-foreground">
               <ShieldCheck className="mt-0.5 size-3.5 shrink-0" />

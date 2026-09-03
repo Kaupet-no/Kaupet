@@ -33,7 +33,14 @@ import {
   VEHICLE_CONDITIONS_BY_SLUG,
 } from "@/lib/constants";
 import { PART_FITMENT_SCOPE_KEY } from "@/lib/category-filters";
-import { resolveBrandColors } from "@/lib/brand-color";
+import {
+  ProffConceptSelector,
+  ProffListingHeader,
+} from "@/components/listing-detail/proff-listing-presentation";
+import type {
+  ProffListingConcept,
+  ProffOrganizationPresentation,
+} from "@/components/listing-detail/proff-listing-types";
 import {
   VEHICLE_LEAF_SLUGS,
   computeOmregistreringsavgift,
@@ -115,13 +122,7 @@ function BackToSearchLink() {
   );
 }
 
-export type ListingOrganizationBrand = {
-  displayName: string;
-  logoUrl: string | null;
-  websiteUrl: string | null;
-  /** Palett-ID (se BRAND_PALETTES) eller egendefinert «#rrggbb». */
-  palette: string | null;
-};
+export type ListingOrganizationBrand = ProffOrganizationPresentation;
 
 export type ListingDetailViewCategory = { name_nb: string; slug: string | null } | null;
 
@@ -191,6 +192,10 @@ export type ListingDetailViewProps = {
   sellerContactSlot?: ReactNode;
   /** Live organization identity shown only when Proff branding is effective. */
   organizationBrand?: ListingOrganizationBrand;
+  /** Active visual direction for the Proff presentation. */
+  proffConcept?: ProffListingConcept;
+  /** Development-only control for comparing the three Proff directions. */
+  onProffConceptChange?: (concept: ProffListingConcept) => void;
   /** Optional related active organization listings section. */
   relatedListingsSlot?: ReactNode;
   /** Compact "Send melding"-button shown in the fixed mobile contact bar.
@@ -241,6 +246,8 @@ export function ListingDetailView({
   ownerStatsSlot,
   sellerContactSlot,
   organizationBrand,
+  proffConcept,
+  onProffConceptChange,
   relatedListingsSlot,
   stickyContactSlot,
   previewBanner,
@@ -400,14 +407,15 @@ export function ListingDetailView({
       imgUrls={imgUrls}
       attributes={attributes}
       canShip={canShip ?? null}
-      requiresDeliveryMethod={requiresDeliveryMethod}
-      vehicle360Frames={vehicle360Frames}
+      organizationBrand={organizationBrand}
+      proffConcept={proffConcept}
+      onProffConceptChange={onProffConceptChange}
+      relatedListingsSlot={relatedListingsSlot}
       vehicle360ImgUrls={vehicle360ImgUrls}
       actionsMenuSlot={actionsMenuSlot}
       ownerStatsSlot={ownerStatsSlot}
+      requiresDeliveryMethod={requiresDeliveryMethod}
       sellerContactSlot={sellerContactSlot}
-      organizationBrand={organizationBrand}
-      relatedListingsSlot={relatedListingsSlot}
       stickyContactSlot={stickyContactSlot}
       previewBanner={previewBanner}
       enableBackToSearch={enableBackToSearch}
@@ -483,6 +491,8 @@ function ListingDetailViewBody({
   ownerStatsSlot,
   sellerContactSlot,
   organizationBrand,
+  proffConcept: proffConceptProp,
+  onProffConceptChange,
   relatedListingsSlot,
   stickyContactSlot,
   previewBanner,
@@ -538,6 +548,8 @@ function ListingDetailViewBody({
   ownerStatsSlot?: ReactNode;
   sellerContactSlot?: ReactNode;
   organizationBrand?: ListingOrganizationBrand;
+  proffConcept?: ProffListingConcept;
+  onProffConceptChange?: (concept: ProffListingConcept) => void;
   relatedListingsSlot?: ReactNode;
   stickyContactSlot?: ReactNode;
   previewBanner?: ReactNode;
@@ -576,7 +588,7 @@ function ListingDetailViewBody({
   const isBoatListing = !isVehicleListing && isBoatAttributes(attributes);
   const nativeSpecLayout = isNative && (isVehicleListing || isBoatListing);
   const nativePlateUnderTitle = isNative && isVehicleListing;
-  const brandColors = organizationBrand ? resolveBrandColors(organizationBrand.palette) : null;
+  const proffConcept = organizationBrand ? (proffConceptProp ?? "redaksjonell") : "redaksjonell";
   // Tilstand-etiketter er per kjøretøytype (se VEHICLE_CONDITIONS_BY_SLUG) —
   // faller tilbake til de generiske etikettene (via `?? v`/CONDITIONS der de
   // brukes) dersom slug mangler eller ikke finnes i tabellen.
@@ -592,34 +604,6 @@ function ListingDetailViewBody({
         <ClientOnly>
           <BackToSearchLink />
         </ClientOnly>
-      )}
-      {organizationBrand && brandColors && (
-        <section
-          aria-label="Bedriftsprofil"
-          className="mb-4 flex items-center gap-3 rounded-xl px-4 py-3"
-          style={{ backgroundColor: brandColors.background, color: brandColors.foreground }}
-        >
-          {organizationBrand.logoUrl && (
-            <img
-              src={organizationBrand.logoUrl}
-              alt={`Logo for ${organizationBrand.displayName}`}
-              className="size-12 rounded-lg bg-white/95 object-contain p-1"
-            />
-          )}
-          <div className="min-w-0">
-            <p className="font-display text-lg font-semibold">{organizationBrand.displayName}</p>
-            {organizationBrand.websiteUrl && (
-              <a
-                href={organizationBrand.websiteUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="text-sm underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-              >
-                {organizationBrand.websiteUrl.replace(/^https:\/\//, "")}
-              </a>
-            )}
-          </div>
-        </section>
       )}
       <header className="mt-4">
         <div className="flex items-start justify-between gap-2">
@@ -989,6 +973,14 @@ function ListingDetailViewBody({
         </div>
 
         <aside className="@container space-y-5">
+          {organizationBrand && (
+            <>
+              {import.meta.env.DEV && onProffConceptChange && (
+                <ProffConceptSelector concept={proffConcept} onSelect={onProffConceptChange} />
+              )}
+              <ProffListingHeader organization={organizationBrand} concept={proffConcept} />
+            </>
+          )}
           {(() => {
             const fmt = (s: string) =>
               new Date(s).toLocaleDateString("nb-NO", {

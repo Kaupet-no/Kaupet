@@ -22,12 +22,13 @@ import { normalizeSlugForMatch } from "@/lib/slug";
 import { searchSchema } from "@/features/listing-search/search-schema";
 import { signListingImageUrls, signVehicle360FrameUrls } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { OwnerStatsPanel } from "@/components/listing-detail/owner-stats-panel";
 import { SellerContactPanel } from "@/components/listing-detail/seller-contact-panel";
 import type { SellerIdentity } from "@/components/listing-detail/seller-contact-panel";
 import { ListingDetailView } from "@/components/listing-detail/listing-detail-view";
 import type { ListingOrganizationBrand } from "@/components/listing-detail/listing-detail-view";
+import { ProffRelatedListings } from "@/components/listing-detail/proff-listing-presentation";
+import type { ProffListingConcept } from "@/components/listing-detail/proff-listing-types";
 import { getCategoryBehavior } from "@/lib/category-behavior";
 import {
   genericBrandFilterFor,
@@ -47,7 +48,6 @@ import { savePendingAuthIntent, takePendingAuthIntent } from "@/lib/pending-auth
 import { trackProductEvent } from "@/lib/product-analytics";
 import { logListingView } from "@/lib/listing-views.functions";
 import { parseVehicleLookup } from "@/lib/vehicle/parse-vehicle-lookup";
-import { ListingCard } from "@/components/listing-card";
 import { toListingCardData } from "@/lib/listing-card-data";
 
 export const Route = createFileRoute("/$kaupetCode")({
@@ -60,6 +60,8 @@ export const Route = createFileRoute("/$kaupetCode")({
     // Owner inline-editing toggle — a search param (not local state) so it
     // survives a reload while editing.
     edit: z.coerce.boolean().optional(),
+    // Design review switch for the three Proff presentation directions.
+    proff: z.enum(["signatur", "redaksjonell", "butikk"]).optional(),
   }),
   loader: async ({ params }) => {
     // A single dynamic root segment serves two purposes: an 8-digit code is
@@ -264,6 +266,9 @@ function ListingDetailPage() {
   const { data: isAdmin } = useIsAdmin();
   const { data: isModerator } = useIsModerator();
   const [imgUrls, setImgUrls] = useState<Record<string, string>>({});
+  const [proffConcept, setProffConcept] = useState<ProffListingConcept>(
+    import.meta.env.DEV ? (search.proff ?? "redaksjonell") : "redaksjonell",
+  );
   const [vehicle360ImgUrls, setVehicle360ImgUrls] = useState<Record<string, string>>({});
   const [statsInfoOpen, setStatsInfoOpen] = useState(false);
   const [promoteOpen, setPromoteOpen] = useState(false);
@@ -664,7 +669,9 @@ function ListingDetailPage() {
   const organizationBrand: ListingOrganizationBrand | undefined =
     hasEffectiveOrganizationProff && organization
       ? {
+          id: organization.id,
           displayName: organization.display_name,
+          organizationNumber: organization.organization_number,
           logoUrl: organization.logo_path
             ? supabase.storage.from("organization-logos").getPublicUrl(organization.logo_path).data
                 .publicUrl
@@ -674,28 +681,13 @@ function ListingDetailPage() {
         }
       : undefined;
   const relatedListingsSlot =
-    hasEffectiveOrganizationProff && !otherListingsError ? (
-      otherListingsLoading ? (
-        <section className="mt-10" aria-label="Flere annonser fra bedriften">
-          <Skeleton className="h-7 w-64" />
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {Array.from({ length: 4 }, (_, index) => (
-              <Skeleton key={index} className="aspect-[4/3] rounded-lg" />
-            ))}
-          </div>
-        </section>
-      ) : otherOrganizationListings && otherOrganizationListings.length > 0 ? (
-        <section className="mt-10" aria-labelledby="organization-listings-heading">
-          <h2 id="organization-listings-heading" className="font-display text-xl">
-            Flere annonser fra bedriften
-          </h2>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {otherOrganizationListings.map((listing) => (
-              <ListingCard key={listing.id} listing={listing} />
-            ))}
-          </div>
-        </section>
-      ) : undefined
+    organizationBrand && !otherListingsError ? (
+      <ProffRelatedListings
+        organization={organizationBrand}
+        concept={proffConcept}
+        listings={otherOrganizationListings}
+        loading={otherListingsLoading}
+      />
     ) : undefined;
 
   return (
@@ -721,6 +713,8 @@ function ListingDetailPage() {
       canShip={data.can_ship}
       requiresDeliveryMethod={behavior.requiresDeliveryMethod}
       organizationBrand={organizationBrand}
+      proffConcept={proffConcept}
+      onProffConceptChange={setProffConcept}
       relatedListingsSlot={relatedListingsSlot}
       breadcrumb={breadcrumb}
       enableBackToSearch
@@ -786,6 +780,7 @@ function ListingDetailPage() {
           onShareOpenChange={handleShareOpenChange}
           isNative={isNative}
           hasRegistryData={parseVehicleLookup(attributes.vehicle_lookup) != null}
+          hideBusinessIdentity={!!organizationBrand}
         />
       }
       stickyContactSlot={

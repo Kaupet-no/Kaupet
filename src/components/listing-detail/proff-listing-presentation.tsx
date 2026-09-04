@@ -12,6 +12,7 @@ import {
   DEFAULT_PROFF_LISTING_CONCEPT,
   DEFAULT_PROFF_LISTING_FONT,
   DEFAULT_PROFF_LISTING_OVERTITLE,
+  PROFF_LISTING_FONT_FAMILIES,
   type ProffListingFont,
   type ProffListingOvertitle,
   type ProffOrganizationPresentation,
@@ -21,11 +22,6 @@ type BrandStyle = CSSProperties & {
   "--proff-brand": string;
   "--proff-on-brand": string;
   "--proff-name-font": string;
-};
-
-const NAME_FONT_FAMILIES: Record<ProffListingFont, string> = {
-  newsreader: '"Newsreader Variable", ui-serif, Georgia, serif',
-  inter: '"Inter Variable", ui-sans-serif, system-ui, sans-serif',
 };
 
 function presentationValues(organization: ProffOrganizationPresentation) {
@@ -57,7 +53,7 @@ function brandStyle(
   return {
     "--proff-brand": colors.background,
     "--proff-on-brand": colors.foreground,
-    "--proff-name-font": NAME_FONT_FAMILIES[font],
+    "--proff-name-font": PROFF_LISTING_FONT_FAMILIES[font],
   };
 }
 

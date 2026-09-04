@@ -69,6 +69,16 @@ describe("Proff-presentasjon", () => {
       "--proff-name-font",
     );
   });
+  it.each([
+    ["dm_sans", "DM Sans Variable"],
+    ["source_serif_4", "Source Serif 4 Variable"],
+  ] as const)("bruker fonten %s i bedriftsprofilen", (font, family) => {
+    render(<ProffListingHeader organization={{ ...organization, font }} />);
+
+    expect(screen.getByRole("region", { name: "Bedriftsprofil" }).getAttribute("style")).toContain(
+      family,
+    );
+  });
   it("formaterer organisasjonsnummer med mellomrom og bruker kontrastfargen i Signatur", () => {
     render(
       <ProffListingHeader

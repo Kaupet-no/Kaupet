@@ -44,7 +44,7 @@ export type BusinessOrganization = {
   brand_palette: string | null;
   /** Profilering på alle bedriftens offentlige annonser. */
   listing_concept: "signatur" | "redaksjonell" | "butikk";
-  listing_font: "newsreader" | "inter";
+  listing_font: "newsreader" | "inter" | "dm_sans" | "source_serif_4";
   listing_overtitle: "annonse_fra" | "presentert_av" | "bedriftsannonse";
   created_at: string;
   updated_at: string;

@@ -608,7 +608,7 @@ const profileSchema = z.object({
     .nullable()
     .optional(),
   listingConcept: z.enum(["signatur", "redaksjonell", "butikk"]).optional(),
-  listingFont: z.enum(["newsreader", "inter"]).optional(),
+  listingFont: z.enum(["newsreader", "inter", "dm_sans", "source_serif_4"]).optional(),
   listingOvertitle: z.enum(["annonse_fra", "presentert_av", "bedriftsannonse"]).optional(),
 });
 

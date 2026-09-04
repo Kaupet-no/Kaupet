@@ -7,11 +7,19 @@ export const PROFF_LISTING_CONCEPT_LABELS: Record<ProffListingConcept, string> =
   butikk: "Butikkprofil",
 };
 
-export const PROFF_LISTING_FONTS = ["newsreader", "inter"] as const;
+export const PROFF_LISTING_FONTS = ["newsreader", "inter", "dm_sans", "source_serif_4"] as const;
 export type ProffListingFont = (typeof PROFF_LISTING_FONTS)[number];
 export const PROFF_LISTING_FONT_LABELS: Record<ProffListingFont, string> = {
   newsreader: "Newsreader",
   inter: "Inter",
+  dm_sans: "DM Sans",
+  source_serif_4: "Source Serif 4",
+};
+export const PROFF_LISTING_FONT_FAMILIES: Record<ProffListingFont, string> = {
+  newsreader: '"Newsreader Variable", ui-serif, Georgia, serif',
+  inter: '"Inter Variable", ui-sans-serif, system-ui, sans-serif',
+  dm_sans: '"DM Sans Variable", ui-sans-serif, system-ui, sans-serif',
+  source_serif_4: '"Source Serif 4 Variable", ui-serif, Georgia, serif',
 };
 
 export const PROFF_LISTING_OVERTITLES = [

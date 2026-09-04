@@ -46,6 +46,7 @@ import {
   PROFF_LISTING_CONCEPTS,
   PROFF_LISTING_CONCEPT_LABELS,
   PROFF_LISTING_FONTS,
+  PROFF_LISTING_FONT_FAMILIES,
   PROFF_LISTING_FONT_LABELS,
   PROFF_LISTING_OVERTITLES,
   PROFF_LISTING_OVERTITLE_LABELS,
@@ -335,7 +336,8 @@ export function BusinessProfileForm({ organization, locations, billingProfile }:
               aria-describedby="business-display-name-help"
             />
             <p id="business-display-name-help" className="text-xs text-muted-foreground">
-              2–120 tegn. Juridisk navn og organisasjonsnummer kan ikke endres.
+              2–120 tegn. Dette endrer kun navnet som vises i annonser. Juridisk navn og
+              organisasjonsnummer kan ikke endres.
             </p>
           </div>
           {canBrand && (
@@ -512,12 +514,7 @@ export function BusinessProfileForm({ organization, locations, billingProfile }:
                           ? "border-primary bg-primary/[0.06] font-medium"
                           : "border-border hover:bg-muted/50"
                       }`}
-                      style={{
-                        fontFamily:
-                          value === "newsreader"
-                            ? '"Newsreader Variable", ui-serif, Georgia, serif'
-                            : '"Inter Variable", ui-sans-serif, system-ui, sans-serif',
-                      }}
+                      style={{ fontFamily: PROFF_LISTING_FONT_FAMILIES[value] }}
                     >
                       <input
                         type="radio"

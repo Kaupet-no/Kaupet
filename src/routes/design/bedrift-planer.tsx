@@ -618,7 +618,7 @@ function BusinessPlanDesignExploration() {
             <div className="border-l-2 border-brand pl-4">
               <p className="font-semibold">Bevar</p>
               <p className="mt-1 text-muted-foreground">
-                Newsreader, Inter, krem, skoggrønn og terrakotta.
+                Newsreader, Inter, DM Sans, Source Serif 4, krem, skoggrønn og terrakotta.
               </p>
             </div>
             <div className="border-l-2 border-brand pl-4">

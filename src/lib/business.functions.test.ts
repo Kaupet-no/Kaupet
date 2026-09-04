@@ -392,20 +392,20 @@ describe("business server functions", () => {
       updateBusinessProfile({
         data: {
           listingConcept: "butikk",
-          listingFont: "inter",
+          listingFont: "source_serif_4",
           listingOvertitle: "annonse_fra",
         },
       }),
     ).resolves.toMatchObject({
       organization: {
         listing_concept: "butikk",
-        listing_font: "inter",
+        listing_font: "source_serif_4",
         listing_overtitle: "annonse_fra",
       },
     });
     expect(admin.calls.updates).toContainEqual({
       listing_concept: "butikk",
-      listing_font: "inter",
+      listing_font: "source_serif_4",
       listing_overtitle: "annonse_fra",
     });
 

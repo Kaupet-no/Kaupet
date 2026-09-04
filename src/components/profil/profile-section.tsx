@@ -18,6 +18,7 @@ import { formatErrorMessage } from "@/lib/errors";
 import {
   deletePreviousAvatarImage,
   describeImageError,
+  IMAGE_ACCEPT,
   uploadAvatarImage,
   validateAvatarImage,
 } from "@/lib/storage";
@@ -194,7 +195,7 @@ export function ProfileSection() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/jpeg,image/png,image/webp"
+                  accept={IMAGE_ACCEPT}
                   className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0];

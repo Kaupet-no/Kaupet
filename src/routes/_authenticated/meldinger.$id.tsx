@@ -10,6 +10,7 @@ import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import {
+  IMAGE_ACCEPT,
   signListingImageUrls,
   signMessageAttachmentUrls,
   uploadMessageAttachment,
@@ -724,7 +725,7 @@ function ConversationPage() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                accept={IMAGE_ACCEPT}
                 className="hidden"
                 onChange={handleAttachmentChange}
                 disabled={disabled}

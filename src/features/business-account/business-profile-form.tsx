@@ -13,6 +13,7 @@ import type { BusinessOrganization } from "@/features/business-account/use-busin
 import { updateBusinessProfile } from "@/lib/business.functions";
 import { compressImage } from "@/lib/image-compression";
 import {
+  IMAGE_ACCEPT,
   ORGANIZATION_LOGOS_BUCKET,
   deletePreviousOrganizationLogo,
   uploadOrganizationLogo,
@@ -408,7 +409,7 @@ export function BusinessProfileForm({ organization }: Props) {
                 <input
                   id="business-logo"
                   type="file"
-                  accept="image/jpeg,image/png,image/webp"
+                  accept={IMAGE_ACCEPT}
                   className="sr-only"
                   onChange={(event) => setLogoFile(event.target.files?.[0] ?? null)}
                 />

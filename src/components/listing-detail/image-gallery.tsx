@@ -24,7 +24,7 @@ import {
 } from "@/components/listing-detail/vehicle/vehicle-360-viewer";
 import { useListingEdit } from "@/features/listing-edit/edit-mode-context";
 import { useInlineListingImages } from "@/features/listing-edit/use-inline-listing-images";
-
+import { IMAGE_ACCEPT } from "@/lib/storage";
 type ListingImage = { storage_path: string; sort_order: number; caption?: string | null };
 
 function ImageCaption({ caption }: { caption?: string | null }) {
@@ -330,7 +330,7 @@ function ImageEditControls({ inline }: { inline: ReturnType<typeof useInlineList
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp"
+        accept={IMAGE_ACCEPT}
         multiple
         className="hidden"
         onChange={(e) => {

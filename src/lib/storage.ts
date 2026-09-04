@@ -5,7 +5,8 @@ export const VEHICLE_360_BUCKET = "listing-360-frames";
 export const AVATAR_BUCKET = "avatars";
 export const MESSAGE_ATTACHMENTS_BUCKET = "message-attachments";
 export const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB
-export const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp"] as const;
+export const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/jxl"] as const;
+export const IMAGE_ACCEPT = `${ALLOWED_MIME.join(",")},.jxl`;
 export const ORGANIZATION_LOGOS_BUCKET = "organization-logos";
 
 export type ImageValidationError =
@@ -29,7 +30,7 @@ export function describeImageError(err: ImageValidationError): string {
     case "too-large":
       return `"${err.name}" er for stor (maks ${Math.round(MAX_FILE_BYTES / 1024 / 1024)} MB).`;
     case "bad-type":
-      return `"${err.name}" har ikke et støttet format (${err.type}). Bruk JPG, PNG eller WebP.`;
+      return `"${err.name}" har ikke et støttet format (${err.type}). Bruk JPG, PNG, WebP eller JPEG XL.`;
   }
 }
 
@@ -37,6 +38,7 @@ export function extFromMime(mime: string): string {
   if (mime === "image/jpeg") return "jpg";
   if (mime === "image/png") return "png";
   if (mime === "image/webp") return "webp";
+  if (mime === "image/jxl") return "jxl";
   return "bin";
 }
 

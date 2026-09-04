@@ -31,9 +31,11 @@ export type VehicleLookupResult = {
   body_type: string | null;
 };
 
-/** Filters reviewed directly after an SVV lookup and therefore hidden from
- * the later generic category-attributes step. */
+/** Filters that SVV can populate when available. Required keys from this set
+ * remain editable on the searchable vehicle-facts step when the lookup has no
+ * value for them. */
 export const VEHICLE_LOOKUP_FILTER_KEYS = [
+  "year",
   "fuel_type",
   "transmission",
   "drive_type",
@@ -49,7 +51,15 @@ export const VEHICLE_LOOKUP_FILTER_KEYS = [
   "next_eu_control",
   "eu_control_exempt",
   "sleeping_places",
+  "power_hk",
+  "cylinders",
+  "engine_displacement_cc",
+  "engine_code",
 ] as const;
+
+/** SVV can return these fields, but they are always optional in listing
+ * creation, including when the lookup has no value. */
+export const VEHICLE_LOOKUP_OPTIONAL_FILTER_KEYS = ["cylinders", "engine_code"] as const;
 
 /** Attributes managed by the registration/SVV wizard rather than generic
  * category inputs. */

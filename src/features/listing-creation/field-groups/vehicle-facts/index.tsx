@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+import { AttributeFields, useAllCategoryFilters } from "@/components/attribute-fields";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
@@ -7,8 +9,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { effectiveFiltersForCategory, getMissingRequiredFilters } from "@/lib/category-filters";
 import { digitsOnlyClamped, formatThousands } from "@/lib/number-input";
 import { DRIVE_TYPE_OPTIONS, getAxleConfigOptions } from "@/lib/vehicle/vehicle-options";
+import {
+  VEHICLE_LOOKUP_FILTER_KEYS,
+  VEHICLE_LOOKUP_OPTIONAL_FILTER_KEYS,
+} from "@/lib/vehicle/vehicle-lookup.types";
 import type { VehicleLeafSlug } from "@/lib/vehicle/vehicle-classification";
 
 import type { WizardSharedProps } from "../types";
@@ -198,6 +205,81 @@ function SubtitleField({
     </section>
   );
 }
+const VEHICLE_FACTS_EDITED_KEYS: Record<string, true> = { drive_type: true, axle_config: true };
+
+function MissingVehicleTechnicalFields(props: WizardSharedProps) {
+  const { data: allFilters } = useAllCategoryFilters();
+  const categoriesById = useMemo(
+    () => new Map(props.categories.map((category) => [category.id, category])),
+    [props.categories],
+  );
+  const { requiredFilterKeys, optionalFilterKeys } = useMemo(() => {
+    if (!props.vehicleRegistered || !props.vehicleLookupResult) {
+      return { requiredFilterKeys: [], optionalFilterKeys: [] };
+    }
+
+    const effectiveFilters = effectiveFiltersForCategory(
+      props.categoryId,
+      allFilters ?? [],
+      categoriesById,
+    );
+    const optionalLookupKeys = VEHICLE_LOOKUP_OPTIONAL_FILTER_KEYS as readonly string[];
+    const requiredFilterKeys = getMissingRequiredFilters(
+      props.categoryId,
+      allFilters ?? [],
+      categoriesById,
+      props.attributes,
+    )
+      .filter(
+        (filter) =>
+          (VEHICLE_LOOKUP_FILTER_KEYS as readonly string[]).includes(filter.key) &&
+          !VEHICLE_FACTS_EDITED_KEYS[filter.key] &&
+          !optionalLookupKeys.includes(filter.key),
+      )
+      .map((filter) => filter.key);
+    const optionalFilterKeys = effectiveFilters
+      .filter((filter) => optionalLookupKeys.includes(filter.key))
+      .map((filter) => filter.key);
+
+    return { requiredFilterKeys, optionalFilterKeys };
+  }, [
+    allFilters,
+    categoriesById,
+    props.attributes,
+    props.categoryId,
+    props.vehicleLookupResult,
+    props.vehicleRegistered,
+  ]);
+
+  if (requiredFilterKeys.length === 0 && optionalFilterKeys.length === 0) return null;
+  return (
+    <>
+      {requiredFilterKeys.length > 0 && (
+        <AttributeFields
+          categoryId={props.categoryId}
+          categories={props.categories}
+          value={props.attributes}
+          onChange={props.onAttributesChange}
+          filterKeys={requiredFilterKeys}
+          required
+          showErrors={props.attributesTouched}
+          heading="Tekniske opplysninger"
+        />
+      )}
+      {optionalFilterKeys.length > 0 && (
+        <AttributeFields
+          categoryId={props.categoryId}
+          categories={props.categories}
+          value={props.attributes}
+          onChange={props.onAttributesChange}
+          filterKeys={optionalFilterKeys}
+          required={false}
+          heading="Flere tekniske opplysninger (valgfritt)"
+        />
+      )}
+    </>
+  );
+}
 
 /**
  * Første av de vehicle-only stegene som erstatter det tidligere
@@ -219,6 +301,7 @@ export function VehicleFactsGroup(props: WizardSharedProps) {
         {props.showMileage && <MileageField {...props} />}
         <DriveOrAxleField {...props} />
       </div>
+      <MissingVehicleTechnicalFields {...props} />
       <DescriptionField {...props} />
       <KeywordChips {...props} />
     </>

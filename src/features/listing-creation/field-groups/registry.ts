@@ -109,8 +109,9 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
         return { field: "model", message: "Velg modell før du går videre." };
       }
       // Bobil/campingvogn og tilhenger har hvert sitt påkrevde spørsmål SVV
-      // aldri kan svare på — spørres her, uansett registrert/ikke-registrert,
-      // siden reg.nr.-bekreftelsespopupen (vist av "Neste") ikke dekker dem.
+      // aldri kan svare på. Registrerte kjøretøy får feltene på vehicle-facts
+      // sammen med andre manglende tekniske opplysninger; manuelle kjøretøy
+      // fyller dem på vehicle-registration.
       const slug = ctx.categories.find((c) => c.id === ctx.categoryId)?.slug;
       if (
         (slug === "bobil" || slug === "campingvogn") &&
@@ -214,6 +215,13 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
         ) {
           return { field: "axle_config", message: "Velg akselkombinasjon før du går videre." };
         }
+      }
+      const firstMissingFilter = ctx.missingFilters[0];
+      if (firstMissingFilter) {
+        return {
+          field: firstMissingFilter.key,
+          message: `Fyll inn ${firstMissingFilter.label_nb.toLowerCase()} før du går videre.`,
+        };
       }
       return null;
     },

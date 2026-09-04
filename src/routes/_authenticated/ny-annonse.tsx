@@ -336,23 +336,28 @@ function NewListingPage() {
     ? categoriesById.get(bilOgMcCategoryId)?.name_nb
     : undefined;
 
-  const missingFilters = useMemo(
-    () =>
-      getMissingRequiredFilters(
-        categoryId || null,
-        allFilters ?? [],
-        categoriesById,
-        attributes,
-        VEHICLE_EQUIPMENT_FILTER_KEYS,
-      ),
-    [categoryId, allFilters, categoriesById, attributes],
-  );
-
   const vehicleGroup = useMemo(
     () => vehicleCategoryGroupFor(categoryId || null, allFilters ?? [], categoriesById),
     [categoryId, allFilters, categoriesById],
   );
   const isVehicle = vehicleGroup !== null;
+
+  const boatCategory = useMemo(
+    () => isBoatCategory(categoryId || null, allFilters ?? [], categoriesById),
+    [categoryId, allFilters, categoriesById],
+  );
+  const behavior = useMemo(
+    () => getCategoryBehavior(vehicleGroup, boatCategory),
+    [vehicleGroup, boatCategory],
+  );
+  const missingFilters = useMemo(
+    () =>
+      getMissingRequiredFilters(categoryId || null, allFilters ?? [], categoriesById, attributes, [
+        ...VEHICLE_EQUIPMENT_FILTER_KEYS,
+        ...behavior.requiredFilterExclusions,
+      ]),
+    [categoryId, allFilters, categoriesById, attributes, behavior],
+  );
 
   const showMileage = useMemo(() => {
     if (!isVehicle) return false;
@@ -407,14 +412,6 @@ function NewListingPage() {
       effectiveFlowForCategory(categoryId || null, allFlows ?? [], categoriesById, fromLanding)
         .fieldGroups,
     [categoryId, allFlows, categoriesById, fromLanding],
-  );
-  const boatCategory = useMemo(
-    () => isBoatCategory(categoryId || null, allFilters ?? [], categoriesById),
-    [categoryId, allFilters, categoriesById],
-  );
-  const behavior = useMemo(
-    () => getCategoryBehavior(vehicleGroup, boatCategory),
-    [vehicleGroup, boatCategory],
   );
   const boatFactsActive = baseFieldGroupKeys.includes("boat-facts");
 
@@ -1112,7 +1109,8 @@ function NewListingPage() {
         if (
           group.key === "category-attributes" ||
           group.key === "boat-facts" ||
-          group.key === "vehicle-registration"
+          group.key === "vehicle-registration" ||
+          group.key === "vehicle-facts"
         )
           setAttributesTouched(true);
         setExtraFieldError(result);

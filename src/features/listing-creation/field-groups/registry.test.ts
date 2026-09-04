@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
 
+import { getCategoryBehavior } from "@/lib/category-behavior";
 import {
   DEFAULT_FIELD_GROUPS,
   resolveWizardPages,
@@ -62,6 +63,27 @@ it.each(["price", "vehicle-price"])("krever pris for ikke-gratis annonser i %s",
   });
   expect(validate?.({ isFree: true, priceNok: "" } as never)).toBeNull();
   expect(validate?.({ isFree: false, priceNok: 0 } as never)).toBeNull();
+});
+
+it("blokkerer kjøretøyfakta når en påkrevd teknisk opplysning mangler", () => {
+  const validate = FIELD_GROUP_REGISTRY["vehicle-facts"].validateExtra;
+
+  expect(
+    validate?.({
+      showMileage: false,
+      categories: [{ id: "bil", slug: "bil" }],
+      categoryId: "bil",
+      attributes: { drive_type: "forhjulsdrift" },
+      missingFilters: [{ key: "fuel_type", label_nb: "Drivstoff" }],
+    } as never),
+  ).toEqual({
+    field: "fuel_type",
+    message: "Fyll inn drivstoff før du går videre.",
+  });
+});
+
+it("unntar sylindre og motorkode fra kjøretøyets påkrevde filterfelt", () => {
+  expect(getCategoryBehavior("bil").requiredFilterExclusions).toEqual(["cylinders", "engine_code"]);
 });
 
 it("krever leveringsmetode når kategorien krever det", () => {

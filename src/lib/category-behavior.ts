@@ -41,6 +41,8 @@ export type CategoryBehavior = {
   requiresDeliveryMethod: boolean;
   /** Whether the generic category-attributes field group should render. False for vehicles, whose attributes are captured via the vehicle-* field groups instead. */
   showGenericAttributes: boolean;
+  /** Filter keys excluded from the required-attribute contract for this category behavior. */
+  requiredFilterExclusions: readonly string[];
   /** Extra breadcrumb segments appended after the category chain, derived from the listing's attributes. */
   extraBreadcrumbSegments: (
     attributes: Record<string, unknown>,
@@ -51,6 +53,7 @@ export type CategoryBehavior = {
 const DEFAULT_BEHAVIOR: CategoryBehavior = {
   requiresDeliveryMethod: true,
   showGenericAttributes: true,
+  requiredFilterExclusions: [],
   extraBreadcrumbSegments: (attributes, { rootCategorySlug, genericBrandFilter }) => {
     if (!genericBrandFilter) return [];
     const raw = attributes[genericBrandFilter.key];
@@ -74,6 +77,7 @@ const DEFAULT_BEHAVIOR: CategoryBehavior = {
 const VEHICLE_BEHAVIOR: CategoryBehavior = {
   requiresDeliveryMethod: false,
   showGenericAttributes: false,
+  requiredFilterExclusions: ["cylinders", "engine_code"],
   extraBreadcrumbSegments: (attributes, { rootCategorySlug }) => {
     const brand = typeof attributes.brand === "string" ? attributes.brand : null;
     const model = typeof attributes.model === "string" ? attributes.model : null;

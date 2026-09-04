@@ -10,8 +10,18 @@ import { VehicleRegistration } from ".";
 const categoryFilters = vi.hoisted(() => ({ current: [] as CategoryFilter[] }));
 
 vi.mock("@/components/attribute-fields", () => ({
-  AttributeFields: ({ required }: { required?: boolean }) => (
-    <div data-testid="attribute-fields" data-required={required ? "true" : "false"} />
+  AttributeFields: ({
+    required,
+    filterKeys,
+  }: {
+    required?: boolean;
+    filterKeys?: readonly string[];
+  }) => (
+    <div
+      data-testid="attribute-fields"
+      data-required={required ? "true" : "false"}
+      data-filter-keys={filterKeys?.join(",") ?? ""}
+    />
   ),
   useAllCategoryFilters: () => ({ data: categoryFilters.current }),
 }));
@@ -141,6 +151,18 @@ describe("VehicleRegistration", () => {
     expect(screen.getByText("Merke: tomt")).toBeTruthy();
     expect(screen.getByText("Modell: tomt")).toBeTruthy();
     expect(screen.queryByLabelText("Registreringsnummer")).toBeNull();
+  });
+
+  it("gjør sylindre og motorkode valgfrie for manuelle kjøretøy", () => {
+    categoryFilters.current = [requiredTextFilter("cylinders"), requiredTextFilter("engine_code")];
+
+    render(<VehicleRegistration {...props({ vehicleRegistered: false })} />);
+
+    const optionalFields = screen
+      .getAllByTestId("attribute-fields")
+      .filter((field) => field.dataset.required === "false");
+    expect(optionalFields).toHaveLength(1);
+    expect(optionalFields[0].dataset.filterKeys).toBe("cylinders,engine_code");
   });
 
   it("åpner og markerer en seksjon med manglende felt etter validering", () => {

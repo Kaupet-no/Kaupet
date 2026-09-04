@@ -66,10 +66,9 @@ describe("lookupVehicle", () => {
     });
   });
 
-  it("markerer bruktimport og manglende hengervekt eksplisitt", async () => {
+  it("registrerer 0 i hengervekt når SVV mangler hengerfeste eksplisitt", async () => {
     mockSvvResponse({
       godkjenning: {
-        forstegangsGodkjenning: { bruktimport: { importland: { landkode: "SE" } } },
         tekniskGodkjenning: {
           tekniskeData: {
             tilhengerkopling: { kopling: [] },
@@ -81,8 +80,24 @@ describe("lookupVehicle", () => {
 
     const result = await lookupVehicle("TEST123");
 
-    expect(result.imported_used).toBe(true);
-    expect(result.max_tow_weight_kg).toBeNull();
+    expect(result.max_tow_weight_kg).toBe(0);
     expect(result.tow_hitch).toBe(false);
+  });
+
+  it("beholder ukjent hengerfeste som null når SVV ikke oppgir koblingsdata", async () => {
+    mockSvvResponse({
+      godkjenning: {
+        tekniskGodkjenning: {
+          tekniskeData: {
+            vekter: {},
+          },
+        },
+      },
+    });
+
+    const result = await lookupVehicle("TEST123");
+
+    expect(result.max_tow_weight_kg).toBeNull();
+    expect(result.tow_hitch).toBeNull();
   });
 });

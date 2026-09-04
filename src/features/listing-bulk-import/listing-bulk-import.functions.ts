@@ -168,12 +168,16 @@ function validateRow(row: BulkImportRow, context: ImportContext): string | null 
   }
 
   const attributes = row.attributes;
+  const behavior = getCategoryBehavior(
+    vehicleCategoryGroupFor(category.id, context.filters, context.categoriesById),
+    isBoatCategory(category.id, context.filters, context.categoriesById),
+  );
   const missing = getMissingRequiredFilters(
     category.id,
     context.filters,
     context.categoriesById,
     attributes,
-    VEHICLE_EQUIPMENT_FILTER_KEYS,
+    [...VEHICLE_EQUIPMENT_FILTER_KEYS, ...behavior.requiredFilterExclusions],
   );
   if (missing.length > 0) return `Fyll inn: ${missing.map((filter) => filter.label_nb).join(", ")}`;
 
@@ -181,10 +185,6 @@ function validateRow(row: BulkImportRow, context: ImportContext): string | null 
     category.id,
     context.flows,
     context.categoriesById,
-  );
-  const behavior = getCategoryBehavior(
-    vehicleCategoryGroupFor(category.id, context.filters, context.categoriesById),
-    isBoatCategory(category.id, context.filters, context.categoriesById),
   );
   return validateRequiredFieldGroups(
     fieldGroups,

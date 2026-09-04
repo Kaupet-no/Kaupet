@@ -443,12 +443,16 @@ export const createListing = createServerFn({ method: "POST" })
       (categoryRows ?? []).map((c) => [c.id as string, c as CategoryNode]),
     );
     const normalizedFilters = (filterRows ?? []).map(normalizeFilter);
+    const categoryBehavior = getCategoryBehavior(
+      vehicleCategoryGroupFor(data.category_id, normalizedFilters, categoriesById),
+      isBoatCategory(data.category_id, normalizedFilters, categoriesById),
+    );
     const missing = getMissingRequiredFilters(
       data.category_id,
       normalizedFilters,
       categoriesById,
       data.attributes ?? {},
-      VEHICLE_EQUIPMENT_FILTER_KEYS,
+      [...VEHICLE_EQUIPMENT_FILTER_KEYS, ...categoryBehavior.requiredFilterExclusions],
     );
     if (missing.length > 0) {
       throw new Error(`Fyll inn: ${missing.map((f) => f.label_nb).join(", ")}`);
@@ -464,10 +468,7 @@ export const createListing = createServerFn({ method: "POST" })
         condition: data.condition,
         can_ship: data.can_ship,
       },
-      getCategoryBehavior(
-        vehicleCategoryGroupFor(data.category_id, normalizedFilters, categoriesById),
-        isBoatCategory(data.category_id, normalizedFilters, categoriesById),
-      ),
+      categoryBehavior,
     );
     if (fieldGroupError) throw new Error(fieldGroupError);
 

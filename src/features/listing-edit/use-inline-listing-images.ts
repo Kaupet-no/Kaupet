@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { showErrorToast } from "@/lib/toast";
@@ -21,6 +21,17 @@ export type InlineImageItem = {
   uploading?: boolean;
 };
 
+export type InlineListingImages = {
+  items: InlineImageItem[];
+  imgUrls: Record<string, string>;
+  fileInputRef: RefObject<HTMLInputElement | null>;
+  addFiles: (files: File[]) => Promise<void>;
+  removeItem: (storagePath: string) => Promise<void>;
+  move: (storagePath: string, direction: -1 | 1) => Promise<void>;
+  moveTo: (storagePath: string, targetStoragePath: string) => Promise<void>;
+  setCaption: (storagePath: string, caption: string) => void;
+};
+
 /**
  * Each action (add/remove/reorder/caption) writes immediately instead of
  * collecting a batch for one big save, mirroring `EditableField`'s
@@ -31,7 +42,7 @@ export function useInlineListingImages(params: {
   listingId: string;
   images: { storage_path: string; sort_order: number; caption?: string | null }[];
   imgUrls: Record<string, string>;
-}) {
+}): InlineListingImages {
   const { listingId, images, imgUrls } = params;
   const queryClient = useQueryClient();
   const [items, setItems] = useState<InlineImageItem[]>(() =>
@@ -164,15 +175,14 @@ export function useInlineListingImages(params: {
     }
   }
 
-  async function move(storagePath: string, dir: -1 | 1) {
+  async function moveTo(storagePath: string, targetStoragePath: string) {
     const prev = items;
-    const idx = items.findIndex((i) => i.storage_path === storagePath);
-    if (idx < 0) return;
-    const newIdx = idx + dir;
-    if (newIdx < 0 || newIdx >= items.length) return;
+    const from = items.findIndex((item) => item.storage_path === storagePath);
+    const to = items.findIndex((item) => item.storage_path === targetStoragePath);
+    if (from < 0 || to < 0 || from === to) return;
     const next = [...items];
-    const [it] = next.splice(idx, 1);
-    next.splice(newIdx, 0, it);
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item);
     setItems(next);
     try {
       await persistOrder(next);
@@ -181,6 +191,13 @@ export function useInlineListingImages(params: {
       setItems(prev);
       showErrorToast(formatErrorMessage(e, "Kunne ikke endre rekkefølge"));
     }
+  }
+
+  async function move(storagePath: string, dir: -1 | 1) {
+    const idx = items.findIndex((item) => item.storage_path === storagePath);
+    const target = items[idx + dir];
+    if (!target) return;
+    await moveTo(storagePath, target.storage_path);
   }
 
   function setCaption(storagePath: string, caption: string) {
@@ -203,5 +220,5 @@ export function useInlineListingImages(params: {
     }, 700);
   }
 
-  return { items, imgUrls, fileInputRef, addFiles, removeItem, move, setCaption };
+  return { items, imgUrls, fileInputRef, addFiles, removeItem, move, moveTo, setCaption };
 }

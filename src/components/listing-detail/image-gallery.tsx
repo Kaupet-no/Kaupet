@@ -5,9 +5,27 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  Move,
   ImagePlus,
   Loader2,
 } from "lucide-react";
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useIsNative } from "@/hooks/use-is-native";
 import { ScrollArrowRow } from "@/components/scroll-arrow-row";
 import {
@@ -23,7 +41,11 @@ import {
   type Vehicle360Frame,
 } from "@/components/listing-detail/vehicle/vehicle-360-viewer";
 import { useListingEdit } from "@/features/listing-edit/edit-mode-context";
-import { useInlineListingImages } from "@/features/listing-edit/use-inline-listing-images";
+import {
+  useInlineListingImages,
+  type InlineImageItem,
+  type InlineListingImages,
+} from "@/features/listing-edit/use-inline-listing-images";
 import { IMAGE_ACCEPT } from "@/lib/storage";
 type ListingImage = { storage_path: string; sort_order: number; caption?: string | null };
 
@@ -267,66 +289,144 @@ export function ImageGallery({
 /** Editing controls (remove/reorder/caption/add) for the thumbnail strip —
  * only rendered when `useListingEdit()?.editMode` is true; the main
  * carousel above stays view-only. */
-function ImageEditControls({ inline }: { inline: ReturnType<typeof useInlineListingImages> }) {
-  const { items, imgUrls, fileInputRef, addFiles, removeItem, move, setCaption } = inline;
+function SortableInlineImageItem({
+  item,
+  index,
+  count,
+  imgUrls,
+  onMove,
+  onRemove,
+  onCaptionChange,
+}: {
+  item: InlineImageItem;
+  index: number;
+  count: number;
+  imgUrls: Record<string, string>;
+  onMove: (storagePath: string, direction: -1 | 1) => void;
+  onRemove: (storagePath: string) => void;
+  onCaptionChange: (storagePath: string, caption: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } =
+    useSortable({
+      id: item.storage_path,
+      disabled: item.uploading,
+    });
+  const src = imgUrls[item.storage_path];
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={`space-y-1 ${isDragging ? "z-10" : ""}`}
+    >
+      <div
+        className={`group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted ${
+          isDragging
+            ? "cursor-grabbing opacity-80 shadow-lg"
+            : isOver
+              ? "ring-2 ring-primary ring-offset-2"
+              : ""
+        }`}
+      >
+        {item.uploading ? (
+          <div className="flex size-full items-center justify-center">
+            <Loader2 className="size-4 animate-spin text-muted-foreground" />
+          </div>
+        ) : src ? (
+          <img src={src} alt="" className="size-full object-cover" draggable={false} />
+        ) : null}
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          disabled={item.uploading}
+          className="native-touch-target absolute left-1 top-1 flex cursor-grab items-center justify-center rounded-md bg-black/60 text-white active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-50"
+          aria-label={`Dra bilde ${index + 1} for å endre rekkefølge`}
+        >
+          <Move className="size-4" aria-hidden="true" />
+        </button>
+        <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent p-1 opacity-0 transition group-hover:opacity-100">
+          <div className="flex">
+            <button
+              type="button"
+              onClick={() => onMove(item.storage_path, -1)}
+              className="native-touch-target rounded p-1 text-white hover:bg-white/20 disabled:opacity-40"
+              disabled={index === 0}
+              aria-label="Flytt venstre"
+            >
+              <ChevronLeft className="size-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onMove(item.storage_path, 1)}
+              className="native-touch-target rounded p-1 text-white hover:bg-white/20 disabled:opacity-40"
+              disabled={index === count - 1}
+              aria-label="Flytt høyre"
+            >
+              <ChevronRight className="size-3.5" />
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => onRemove(item.storage_path)}
+            className="native-touch-target rounded p-1 text-white hover:bg-destructive"
+            aria-label="Fjern bilde"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+      </div>
+      <input
+        type="text"
+        value={item.caption ?? ""}
+        onChange={(e) => onCaptionChange(item.storage_path, e.target.value)}
+        placeholder="Bildetekst (valgfritt)"
+        maxLength={140}
+        className="w-full rounded border border-border bg-surface px-2 py-1 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+      />
+    </li>
+  );
+}
+
+/** Editing controls (remove/reorder/caption/add) for the thumbnail strip —
+ * only rendered when `useListingEdit()?.editMode` is true; the main
+ * carousel above stays view-only. */
+function ImageEditControls({ inline }: { inline: InlineListingImages }) {
+  const { items, imgUrls, fileInputRef, addFiles, removeItem, move, moveTo, setCaption } = inline;
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  function handleDragEnd({ active, over }: DragEndEvent) {
+    if (!over || active.id === over.id) return;
+    void moveTo(String(active.id), String(over.id));
+  }
+
   return (
     <div className="mt-3 space-y-2">
-      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-        {items.map((it, idx) => {
-          const src = imgUrls[it.storage_path];
-          return (
-            <li key={it.storage_path} className="space-y-1">
-              <div className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted">
-                {it.uploading ? (
-                  <div className="flex size-full items-center justify-center">
-                    <Loader2 className="size-4 animate-spin text-muted-foreground" />
-                  </div>
-                ) : src ? (
-                  <img src={src} alt="" className="size-full object-cover" />
-                ) : null}
-                <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent p-1 opacity-0 transition group-hover:opacity-100">
-                  <div className="flex">
-                    <button
-                      type="button"
-                      onClick={() => move(it.storage_path, -1)}
-                      className="rounded p-1 text-white hover:bg-white/20 disabled:opacity-40"
-                      disabled={idx === 0}
-                      aria-label="Flytt venstre"
-                    >
-                      <ChevronLeft className="size-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => move(it.storage_path, 1)}
-                      className="rounded p-1 text-white hover:bg-white/20 disabled:opacity-40"
-                      disabled={idx === items.length - 1}
-                      aria-label="Flytt høyre"
-                    >
-                      <ChevronRight className="size-3.5" />
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removeItem(it.storage_path)}
-                    className="rounded p-1 text-white hover:bg-destructive"
-                    aria-label="Fjern bilde"
-                  >
-                    <X className="size-3.5" />
-                  </button>
-                </div>
-              </div>
-              <input
-                type="text"
-                value={it.caption ?? ""}
-                onChange={(e) => setCaption(it.storage_path, e.target.value)}
-                placeholder="Bildetekst (valgfritt)"
-                maxLength={140}
-                className="w-full rounded border border-border bg-surface px-2 py-1 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext
+          items={items.map((item) => item.storage_path)}
+          strategy={rectSortingStrategy}
+        >
+          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+            {items.map((item, index) => (
+              <SortableInlineImageItem
+                key={item.storage_path}
+                item={item}
+                index={index}
+                count={items.length}
+                imgUrls={imgUrls}
+                onMove={move}
+                onRemove={removeItem}
+                onCaptionChange={setCaption}
               />
-            </li>
-          );
-        })}
-      </ul>
+            ))}
+          </ul>
+        </SortableContext>
+      </DndContext>
       <input
         ref={fileInputRef}
         type="file"

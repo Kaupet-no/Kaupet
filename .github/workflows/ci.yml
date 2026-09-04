@@ -77,8 +77,21 @@ jobs:
       - name: Bundle budget
         run: bun run check:bundle
 
+      # bun audit mister av og til forbindelsen til npm sitt audit-endepunkt
+      # og timer ut etter ~5 min ("Timeout"/"ConnectionClosed: audit request
+      # failed") uten at det har noe med prosjektets avhengigheter å gjøre.
+      # Retry kompenserer for denne nettverksflaksen, samme mønster som
+      # supabase start-steget under.
       - name: Audit dependencies (high/critical fails the build)
-        run: bun audit --audit-level=high
+        run: |
+          for attempt in 1 2 3; do
+            if bun audit --audit-level=high; then
+              exit 0
+            fi
+            echo "bun audit feilet (forsøk $attempt/3), prøver igjen …" >&2
+            sleep 5
+          done
+          exit 1
 
       - name: Audit dependencies (full report, informational)
         run: bun audit

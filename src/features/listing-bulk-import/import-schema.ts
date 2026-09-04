@@ -91,8 +91,12 @@ const rowSchema = z.object({
     .min(0, "Prisen kan ikke være negativ.")
     .max(10_000_000, "Prisen kan ikke være over 10 000 000 kr."),
   subtitle: z.string().trim().max(80, "Undertittelen kan ha maks 80 tegn.").optional(),
-  condition: z.enum(["new", "like_new", "good", "acceptable", "for_parts"]).optional(),
-  canShip: z.boolean().optional(),
+  condition: z
+    .enum(["new", "like_new", "good", "acceptable", "for_parts"], {
+      errorMap: () => ({ message: "Ugyldig tilstand." }),
+    })
+    .optional(),
+  canShip: z.boolean({ errorMap: () => ({ message: "Kan sendes må være ja/nei." }) }).optional(),
   knownIssues: z.string().trim().max(2000, "Kjente feil kan ha maks 2000 tegn.").optional(),
   noKnownIssues: z.boolean().optional(),
   maintenanceHistory: z

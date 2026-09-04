@@ -112,19 +112,28 @@ const listingSchema = z.object({
   condition: z.enum(["new", "like_new", "good", "acceptable", "for_parts"]).nullable().optional(),
   is_free: z.boolean(),
   can_ship: z.enum(["pickup", "ship", "both"]).nullable().optional(),
-  price_nok: z.union([z.coerce.number().int().min(0).max(999_999_999), z.literal("")]).optional(),
+  price_nok: z
+    .union([
+      z.coerce
+        .number()
+        .int("Prisen må være et helt tall")
+        .min(0, "Prisen kan ikke være negativ")
+        .max(999_999_999, "Prisen er for høy"),
+      z.literal(""),
+    ])
+    .optional(),
   postal_code: z
     .string()
     .trim()
     .regex(/^\d{4}$/u, "Norsk postnummer er 4 sifre")
     .optional()
     .or(z.literal("")),
-  city: z.string().trim().max(100).optional().or(z.literal("")),
+  city: z.string().trim().max(100, "Maks 100 tegn").optional().or(z.literal("")),
   organization_location_id: z.string().uuid().nullable().optional(),
   show_visiting_address: z.boolean().optional(),
-  known_issues: z.string().trim().max(2000).optional().or(z.literal("")),
+  known_issues: z.string().trim().max(2000, "Maks 2000 tegn").optional().or(z.literal("")),
   no_known_issues: z.boolean().optional(),
-  maintenance_history: z.string().trim().max(2000).optional().or(z.literal("")),
+  maintenance_history: z.string().trim().max(2000, "Maks 2000 tegn").optional().or(z.literal("")),
 });
 type ListingForm = z.infer<typeof listingSchema>;
 

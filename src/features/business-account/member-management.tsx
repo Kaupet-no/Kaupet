@@ -31,6 +31,7 @@ import {
   type OrganizationMemberPermissions,
 } from "@/lib/business.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { formatErrorMessage } from "@/lib/errors";
 type Category = { id: string; name_nb: string; parent_id: string | null };
 
 export type OrganizationMember = OrganizationMemberPermissions & {
@@ -413,7 +414,8 @@ export function MemberManagement({ organization, locations, userId, role }: Prop
       setPermissions(defaultPermissions);
       await invalidate();
     },
-    onError: (error: Error) => setErrorMessage(error.message),
+    onError: (error: Error) =>
+      setErrorMessage(formatErrorMessage(error, "Kunne ikke invitere brukeren")),
   });
   const updateMutation = useMutation({
     mutationFn: () => {
@@ -436,7 +438,8 @@ export function MemberManagement({ organization, locations, userId, role }: Prop
       setEditing(null);
       await invalidate();
     },
-    onError: (error: Error) => setErrorMessage(error.message),
+    onError: (error: Error) =>
+      setErrorMessage(formatErrorMessage(error, "Kunne ikke oppdatere tilgangene")),
   });
   const removeMutation = useMutation({
     mutationFn: (member: OrganizationMember) => callRemove({ data: { userId: member.user_id } }),
@@ -444,7 +447,8 @@ export function MemberManagement({ organization, locations, userId, role }: Prop
       setRemoveTarget(null);
       await invalidate();
     },
-    onError: (error: Error) => setErrorMessage(error.message),
+    onError: (error: Error) =>
+      setErrorMessage(formatErrorMessage(error, "Kunne ikke fjerne medlemmet")),
   });
 
   if (!canManage) {

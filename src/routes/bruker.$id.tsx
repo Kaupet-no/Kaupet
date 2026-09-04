@@ -44,12 +44,17 @@ export const Route = createFileRoute("/bruker/$id")({
   pendingComponent: ProfilePageSkeleton,
   pendingMs: 200,
   pendingMinMs: 300,
-  errorComponent: ({ error }) => (
-    <div className="mx-auto max-w-2xl px-4 py-20 text-center">
-      <h1 className="font-display text-2xl">Kunne ikke laste brukerprofilen</h1>
-      <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
-    </div>
-  ),
+  errorComponent: ({ error }) => {
+    console.error(error);
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-20 text-center">
+        <h1 className="font-display text-2xl">Kunne ikke laste brukerprofilen</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {formatErrorMessage(error, "Prøv på nytt eller gå tilbake til forsiden.")}
+        </p>
+      </div>
+    );
+  },
   notFoundComponent: () => (
     <div className="mx-auto max-w-2xl px-4 py-20 text-center">
       <h1 className="font-display text-2xl">Brukeren finnes ikke</h1>

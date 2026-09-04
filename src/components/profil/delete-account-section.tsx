@@ -37,7 +37,7 @@ export function DeleteAccountSection({ currentEmail }: { currentEmail: string })
     });
     if (error) {
       setSubmitting(false);
-      showErrorToast(formatErrorMessage(error, "Kunne ikke laste opp profilbildet"));
+      showErrorToast(formatErrorMessage(error, "Kunne ikke slette kontoen"));
       return;
     }
     await supabase.auth.signOut();

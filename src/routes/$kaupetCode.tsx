@@ -30,6 +30,7 @@ import type { ListingOrganizationBrand } from "@/components/listing-detail/listi
 import { ProffRelatedListings } from "@/components/listing-detail/proff-listing-presentation";
 import type { ProffOrganizationPresentation } from "@/components/listing-detail/proff-listing-types";
 import { getCategoryBehavior } from "@/lib/category-behavior";
+import { formatErrorMessage } from "@/lib/errors";
 import {
   genericBrandFilterFor,
   isBoatCategory,
@@ -237,10 +238,13 @@ function RootSlugPage() {
 
 function ListingErrorBoundary({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
+  console.error(error);
   return (
     <div className="mx-auto max-w-2xl px-4 py-20 text-center">
       <h1 className="font-display text-2xl">Kunne ikke laste annonsen</h1>
-      <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        {formatErrorMessage(error, "Prøv på nytt eller gå tilbake til forsiden.")}
+      </p>
       <Button
         className="mt-6"
         onClick={() => {

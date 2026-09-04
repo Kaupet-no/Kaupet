@@ -47,7 +47,14 @@ const wtbSchema = z.object({
   description: z.string().trim().max(2000, "Maks 2000 tegn").optional().or(z.literal("")),
   category_id: z.string().uuid().nullable().optional(),
   max_price_nok: z
-    .union([z.coerce.number().int().min(0).max(10_000_000), z.literal("")])
+    .union([
+      z.coerce
+        .number()
+        .int("Prisen må være et helt tall")
+        .min(0, "Prisen kan ikke være negativ")
+        .max(10_000_000, "Prisen er for høy"),
+      z.literal(""),
+    ])
     .optional(),
 });
 

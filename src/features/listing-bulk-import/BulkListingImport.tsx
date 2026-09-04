@@ -56,6 +56,7 @@ import {
 import { buildTree, descendants, type Category } from "@/lib/categories";
 import { categoryBreadcrumb } from "@/lib/category-filters";
 import { cn } from "@/lib/utils";
+import { formatErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { useCategories, visibleCategories } from "@/hooks/use-categories";
 import { useIsDemo } from "@/hooks/use-is-demo";
@@ -111,7 +112,8 @@ export function BulkListingImport({
       showVisitingAddress: boolean;
     }) => createListingsFromImport({ data: variables }),
     onSuccess: setResults,
-    onError: (error: Error) => showErrorToast(error.message || "Kunne ikke opprette annonsene."),
+    onError: (error: Error) =>
+      showErrorToast(formatErrorMessage(error, "Kunne ikke opprette annonsene.")),
   });
   // Malbyggeren drar med seg logo-PNG-en og OOXML-skriveren, som ingen
   // trenger før de faktisk laster ned malen.
@@ -181,7 +183,7 @@ export function BulkListingImport({
       setParsed(next);
       setImportId(crypto.randomUUID());
     } catch (error) {
-      setFileError((error as Error).message || "Filen kunne ikke leses.");
+      setFileError(formatErrorMessage(error, "Filen kunne ikke leses."));
     }
   };
 

@@ -25,6 +25,7 @@ import { useIsDemo } from "@/hooks/use-is-demo";
 import { useTheme } from "@/hooks/use-theme";
 import { useIsTestEnv } from "@/lib/env";
 import { setTestMode } from "@/lib/test-mode.functions";
+import { formatErrorMessage } from "@/lib/errors";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -86,7 +87,7 @@ function MegPage() {
       showSuccessToast(next ? "Test-modus aktivert" : "Test-modus deaktivert");
       window.location.reload();
     } catch (e) {
-      showErrorToast(e instanceof Error ? e.message : "Kunne ikke endre test-modus");
+      showErrorToast(formatErrorMessage(e, "Kunne ikke endre test-modus"));
       setToggling(false);
     }
   }

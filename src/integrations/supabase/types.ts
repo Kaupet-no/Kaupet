@@ -1642,6 +1642,9 @@ export type Database = {
           display_name: string
           id: string
           legal_name: string
+          listing_concept: string
+          listing_font: string
+          listing_overtitle: string
           logo_path: string | null
           organization_number: string
           proff_access_until: string | null
@@ -1661,6 +1664,9 @@ export type Database = {
           display_name: string
           id?: string
           legal_name: string
+          listing_concept?: string
+          listing_font?: string
+          listing_overtitle?: string
           logo_path?: string | null
           organization_number: string
           proff_access_until?: string | null
@@ -1680,6 +1686,9 @@ export type Database = {
           display_name?: string
           id?: string
           legal_name?: string
+          listing_concept?: string
+          listing_font?: string
+          listing_overtitle?: string
           logo_path?: string | null
           organization_number?: string
           proff_access_until?: string | null
@@ -2528,6 +2537,9 @@ export type Database = {
           website_url: string | null
           logo_path: string | null
           brand_palette: string | null
+          listing_concept: string
+          listing_font: string
+          listing_overtitle: string
           created_at: string
           has_active_proff: boolean | null
         }

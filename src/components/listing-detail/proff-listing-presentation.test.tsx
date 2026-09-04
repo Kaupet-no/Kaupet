@@ -20,6 +20,9 @@ const organization: ProffOrganizationPresentation = {
   logoUrl: null,
   websiteUrl: "https://happypixel.example/",
   palette: "forest",
+  concept: "redaksjonell",
+  font: "newsreader",
+  overtitle: "presentert_av",
 };
 
 const listing = {
@@ -37,12 +40,10 @@ afterEach(cleanup);
 
 describe("Proff-presentasjon", () => {
   it("viser bedrift, nettside og valgt visuell retning i alle tre forslag", () => {
-    const { rerender } = render(
-      <ProffListingHeader organization={organization} concept="signatur" />,
-    );
+    const { rerender } = render(<ProffListingHeader organization={organization} />);
 
     for (const concept of ["signatur", "redaksjonell", "butikk"] as const) {
-      rerender(<ProffListingHeader organization={organization} concept={concept} />);
+      rerender(<ProffListingHeader organization={{ ...organization, concept }} />);
       expect(screen.getByText("HAPPY PIXEL AS")).toBeTruthy();
       expect(screen.queryByRole("img")).toBeNull();
       expect(screen.getByRole("link", { name: /Besøk nettsiden/ }).getAttribute("href")).toBe(
@@ -50,12 +51,28 @@ describe("Proff-presentasjon", () => {
       );
     }
   });
+  it("bruker Redaksjonell, Newsreader og Presentert av som standard", () => {
+    render(
+      <ProffListingHeader
+        organization={{
+          id: "org-default",
+          displayName: "Standard AS",
+          logoUrl: null,
+          websiteUrl: null,
+          palette: null,
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("region", { name: "Bedriftsprofil" }).getAttribute("style")).toContain(
+      "--proff-name-font",
+    );
+  });
 
   it("viser et utvalg annonser og lenken med bedriftens visningsnavn", () => {
     render(
       <ProffRelatedListings
-        organization={organization}
-        concept="signatur"
+        organization={{ ...organization, concept: "signatur" }}
         listings={[listing]}
         loading={false}
       />,
@@ -69,8 +86,7 @@ describe("Proff-presentasjon", () => {
   it("beholder bedriftslenken når det ikke finnes andre aktive annonser", () => {
     render(
       <ProffRelatedListings
-        organization={organization}
-        concept="butikk"
+        organization={{ ...organization, concept: "butikk" }}
         listings={[]}
         loading={false}
       />,
@@ -83,8 +99,11 @@ describe("Proff-presentasjon", () => {
   it("viser opplastet logo når bedriften har en", () => {
     render(
       <ProffListingHeader
-        organization={{ ...organization, logoUrl: "https://example.com/logo.png" }}
-        concept="redaksjonell"
+        organization={{
+          ...organization,
+          logoUrl: "https://example.com/logo.png",
+          concept: "redaksjonell",
+        }}
       />,
     );
 

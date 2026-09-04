@@ -28,7 +28,7 @@ import type { SellerIdentity } from "@/components/listing-detail/seller-contact-
 import { ListingDetailView } from "@/components/listing-detail/listing-detail-view";
 import type { ListingOrganizationBrand } from "@/components/listing-detail/listing-detail-view";
 import { ProffRelatedListings } from "@/components/listing-detail/proff-listing-presentation";
-import type { ProffListingConcept } from "@/components/listing-detail/proff-listing-types";
+import type { ProffOrganizationPresentation } from "@/components/listing-detail/proff-listing-types";
 import { getCategoryBehavior } from "@/lib/category-behavior";
 import {
   genericBrandFilterFor,
@@ -60,8 +60,6 @@ export const Route = createFileRoute("/$kaupetCode")({
     // Owner inline-editing toggle — a search param (not local state) so it
     // survives a reload while editing.
     edit: z.coerce.boolean().optional(),
-    // Design review switch for the three Proff presentation directions.
-    proff: z.enum(["signatur", "redaksjonell", "butikk"]).optional(),
   }),
   loader: async ({ params }) => {
     // A single dynamic root segment serves two purposes: an 8-digit code is
@@ -266,9 +264,6 @@ function ListingDetailPage() {
   const { data: isAdmin } = useIsAdmin();
   const { data: isModerator } = useIsModerator();
   const [imgUrls, setImgUrls] = useState<Record<string, string>>({});
-  const [proffConcept, setProffConcept] = useState<ProffListingConcept>(
-    import.meta.env.DEV ? (search.proff ?? "redaksjonell") : "redaksjonell",
-  );
   const [vehicle360ImgUrls, setVehicle360ImgUrls] = useState<Record<string, string>>({});
   const [statsInfoOpen, setStatsInfoOpen] = useState(false);
   const [promoteOpen, setPromoteOpen] = useState(false);
@@ -365,7 +360,7 @@ function ListingDetailPage() {
             await supabase
               .from("organizations_public")
               .select(
-                "id, display_name, organization_number, created_at, website_url, logo_path, brand_palette, has_active_proff",
+                "id, display_name, organization_number, created_at, website_url, logo_path, brand_palette, listing_concept, listing_font, listing_overtitle, has_active_proff",
               )
               .eq("id", data.organization_id)
               .maybeSingle()
@@ -678,13 +673,15 @@ function ListingDetailPage() {
             : null,
           websiteUrl: organization.website_url,
           palette: organization.brand_palette,
+          concept: organization.listing_concept as ProffOrganizationPresentation["concept"],
+          font: organization.listing_font as ProffOrganizationPresentation["font"],
+          overtitle: organization.listing_overtitle as ProffOrganizationPresentation["overtitle"],
         }
       : undefined;
   const relatedListingsSlot =
     organizationBrand && !otherListingsError ? (
       <ProffRelatedListings
         organization={organizationBrand}
-        concept={proffConcept}
         listings={otherOrganizationListings}
         loading={otherListingsLoading}
       />
@@ -713,8 +710,6 @@ function ListingDetailPage() {
       canShip={data.can_ship}
       requiresDeliveryMethod={behavior.requiresDeliveryMethod}
       organizationBrand={organizationBrand}
-      proffConcept={proffConcept}
-      onProffConceptChange={setProffConcept}
       relatedListingsSlot={relatedListingsSlot}
       breadcrumb={breadcrumb}
       enableBackToSearch

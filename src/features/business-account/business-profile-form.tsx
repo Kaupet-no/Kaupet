@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ProffListingHeader } from "@/components/listing-detail/proff-listing-presentation";
 import { hasEffectiveProffAccess } from "@/features/business-account/plans";
 import type {
   BusinessLocation,
@@ -19,6 +20,7 @@ import {
   updateOrganizationBillingEmail,
   updateOrganizationLocation,
 } from "@/lib/business.functions";
+import { compressImage } from "@/lib/image-compression";
 import {
   ORGANIZATION_LOGOS_BUCKET,
   deletePreviousOrganizationLogo,
@@ -39,8 +41,18 @@ import {
   DEFAULT_BRAND_PALETTE,
   isHexBrandColor,
   normalizeHexColor,
-  resolveBrandColors,
 } from "@/lib/brand-color";
+import {
+  PROFF_LISTING_CONCEPTS,
+  PROFF_LISTING_CONCEPT_LABELS,
+  PROFF_LISTING_FONTS,
+  PROFF_LISTING_FONT_LABELS,
+  PROFF_LISTING_OVERTITLES,
+  PROFF_LISTING_OVERTITLE_LABELS,
+  type ProffListingConcept,
+  type ProffListingFont,
+  type ProffListingOvertitle,
+} from "@/components/listing-detail/proff-listing-types";
 
 /** Startfargen i fargevelgeren når bedriften ikke har en egendefinert farge
  * fra før — `<input type="color">` godtar bare hex. */
@@ -62,6 +74,9 @@ type FormState = {
   websiteUrl: string;
   /** Palett-ID eller egendefinert «#rrggbb». */
   brandPalette: string;
+  listingConcept: ProffListingConcept;
+  listingFont: ProffListingFont;
+  listingOvertitle: ProffListingOvertitle;
 };
 
 function initialState(organization: BusinessOrganization): FormState {
@@ -69,6 +84,9 @@ function initialState(organization: BusinessOrganization): FormState {
     displayName: organization.display_name,
     websiteUrl: organization.website_url ?? "",
     brandPalette: organization.brand_palette ?? DEFAULT_BRAND_PALETTE,
+    listingConcept: organization.listing_concept,
+    listingFont: organization.listing_font,
+    listingOvertitle: organization.listing_overtitle,
   };
 }
 
@@ -173,11 +191,12 @@ export function BusinessProfileForm({ organization, locations, billingProfile }:
       const previousLogoPath = organization.logo_path;
       let logoPath: string | undefined;
       if (canBrand && logoFile) {
-        const imageError = validateAvatarImage(logoFile);
+        const compressedLogo = await compressImage(logoFile, "avatar");
+        const imageError = validateAvatarImage(compressedLogo);
         if (imageError) throw new Error(describeImageError(imageError));
         logoPath = await uploadOrganizationLogo({
           organizationId: organization.id,
-          file: logoFile,
+          file: compressedLogo,
         });
       }
 
@@ -188,6 +207,9 @@ export function BusinessProfileForm({ organization, locations, billingProfile }:
             ? {
                 websiteUrl: websiteUrl || null,
                 brandPalette: form.brandPalette,
+                listingConcept: form.listingConcept,
+                listingFont: form.listingFont,
+                listingOvertitle: form.listingOvertitle,
                 ...(logoPath ? { logoPath } : {}),
               }
             : {}),
@@ -234,7 +256,6 @@ export function BusinessProfileForm({ organization, locations, billingProfile }:
     setForm((previous) => ({ ...previous, [key]: value }));
 
   const previewLogo = pendingLogoUrl ?? logoUrl;
-  const previewColors = resolveBrandColors(form.brandPalette);
   const customColorActive = isHexBrandColor(form.brandPalette);
   const colorPickerValue = normalizeHexColor(hexDraft) ?? CUSTOM_COLOR_FALLBACK;
   const selectCustomColor = (value: string) => {
@@ -279,33 +300,26 @@ export function BusinessProfileForm({ organization, locations, billingProfile }:
         {canBrand && (
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Forhåndsvisning
+              Forhåndsvisning av annons
             </p>
-            <div
-              className="flex items-center gap-3 rounded-xl px-4 py-3"
-              style={{
-                backgroundColor: previewColors.background,
-                color: previewColors.foreground,
-              }}
-            >
-              {previewLogo && (
-                <img
-                  src={previewLogo}
-                  alt=""
-                  className="size-12 rounded-lg bg-white/95 object-contain p-1"
-                />
-              )}
-              <div className="min-w-0">
-                <p className="truncate font-display text-lg font-semibold">
-                  {form.displayName.trim() || organization.legal_name}
-                </p>
-                {form.websiteUrl.trim() && (
-                  <p className="truncate text-sm underline underline-offset-2">
-                    {form.websiteUrl.trim().replace(/^https:\/\//iu, "")}
-                  </p>
-                )}
-              </div>
+            <div className="rounded-xl border border-border bg-surface p-3">
+              <ProffListingHeader
+                organization={{
+                  id: organization.id,
+                  displayName: form.displayName.trim() || organization.legal_name,
+                  organizationNumber: organization.organization_number,
+                  logoUrl: previewLogo,
+                  websiteUrl: form.websiteUrl.trim() || null,
+                  palette: form.brandPalette,
+                  concept: form.listingConcept,
+                  font: form.listingFont,
+                  overtitle: form.listingOvertitle,
+                }}
+              />
             </div>
+            <p className="text-xs text-muted-foreground">
+              Endringer vises her med én gang og gjelder alle nye og aktive annonser.
+            </p>
           </div>
         )}
 
@@ -460,6 +474,89 @@ export function BusinessProfileForm({ organization, locations, billingProfile }:
                 />
               </div>
               <p className="text-xs text-muted-foreground">JPG, PNG eller WebP, maks 5 MB.</p>
+            </div>
+            <div className="grid gap-6 border-t border-border pt-6 sm:grid-cols-2">
+              <fieldset className="space-y-3">
+                <legend className="text-sm font-medium">Stil på annonsen</legend>
+                <div className="grid gap-2">
+                  {PROFF_LISTING_CONCEPTS.map((value) => (
+                    <label
+                      key={value}
+                      className={`flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm ${
+                        form.listingConcept === value
+                          ? "border-primary bg-primary/[0.06] font-medium"
+                          : "border-border hover:bg-muted/50"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="business-listing-concept"
+                        value={value}
+                        checked={form.listingConcept === value}
+                        onChange={() => setField("listingConcept", value)}
+                        className="sr-only"
+                      />
+                      {PROFF_LISTING_CONCEPT_LABELS[value]}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <fieldset className="space-y-3">
+                <legend className="text-sm font-medium">Font for bedriftsnavnet</legend>
+                <div className="grid gap-2">
+                  {PROFF_LISTING_FONTS.map((value) => (
+                    <label
+                      key={value}
+                      className={`flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm ${
+                        form.listingFont === value
+                          ? "border-primary bg-primary/[0.06] font-medium"
+                          : "border-border hover:bg-muted/50"
+                      }`}
+                      style={{
+                        fontFamily:
+                          value === "newsreader"
+                            ? '"Newsreader Variable", ui-serif, Georgia, serif'
+                            : '"Inter Variable", ui-sans-serif, system-ui, sans-serif',
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="business-listing-font"
+                        value={value}
+                        checked={form.listingFont === value}
+                        onChange={() => setField("listingFont", value)}
+                        className="sr-only"
+                      />
+                      {PROFF_LISTING_FONT_LABELS[value]}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <fieldset className="space-y-3 sm:col-span-2">
+                <legend className="text-sm font-medium">Overtittel på annonsen</legend>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {PROFF_LISTING_OVERTITLES.map((value) => (
+                    <label
+                      key={value}
+                      className={`flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm ${
+                        form.listingOvertitle === value
+                          ? "border-primary bg-primary/[0.06] font-medium"
+                          : "border-border hover:bg-muted/50"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="business-listing-overtitle"
+                        value={value}
+                        checked={form.listingOvertitle === value}
+                        onChange={() => setField("listingOvertitle", value)}
+                        className="sr-only"
+                      />
+                      {PROFF_LISTING_OVERTITLE_LABELS[value]}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
             </div>
           </div>
         ) : (

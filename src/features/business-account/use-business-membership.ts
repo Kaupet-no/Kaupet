@@ -42,6 +42,10 @@ export type BusinessOrganization = {
   logo_path: string | null;
   /** Palett-ID (se BRAND_PALETTES) eller egendefinert «#rrggbb». */
   brand_palette: string | null;
+  /** Profilering på alle bedriftens offentlige annonser. */
+  listing_concept: "signatur" | "redaksjonell" | "butikk";
+  listing_font: "newsreader" | "inter";
+  listing_overtitle: "annonse_fra" | "presentert_av" | "bedriftsannonse";
   created_at: string;
   updated_at: string;
 };

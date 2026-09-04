@@ -295,7 +295,7 @@ async function getOrganization(supabaseAdmin: AdminClient, organizationId: strin
   const { data, error } = await supabaseAdmin
     .from("organizations")
     .select(
-      "id, organization_number, legal_name, display_name, selected_plan, proff_trial_started_at, proff_trial_ends_at, proff_trial_cancelled_at, proff_access_until, website_url, logo_path, brand_palette",
+      "id, organization_number, legal_name, display_name, selected_plan, proff_trial_started_at, proff_trial_ends_at, proff_trial_cancelled_at, proff_access_until, website_url, logo_path, brand_palette, listing_concept, listing_font, listing_overtitle, created_at, updated_at",
     )
     .eq("id", organizationId)
     .single();
@@ -603,12 +603,13 @@ const profileSchema = z.object({
     .nullable()
     .optional(),
   logoPath: z.string().trim().max(500).nullable().optional(),
-  // Enten en forhåndsdefinert palett-ID eller en egendefinert hex-farge —
-  // speiler organizations_brand_palette_check i databasen.
   brandPalette: z
     .union([z.enum(["forest", "navy", "burgundy", "slate"]), z.string().regex(/^#[0-9a-f]{6}$/u)])
     .nullable()
     .optional(),
+  listingConcept: z.enum(["signatur", "redaksjonell", "butikk"]).optional(),
+  listingFont: z.enum(["newsreader", "inter"]).optional(),
+  listingOvertitle: z.enum(["annonse_fra", "presentert_av", "bedriftsannonse"]).optional(),
 });
 
 export const updateBusinessProfile = createServerFn({ method: "POST" })
@@ -619,7 +620,10 @@ export const updateBusinessProfile = createServerFn({ method: "POST" })
     const advancedRequested =
       data.websiteUrl !== undefined ||
       data.logoPath !== undefined ||
-      data.brandPalette !== undefined;
+      data.brandPalette !== undefined ||
+      data.listingConcept !== undefined ||
+      data.listingFont !== undefined ||
+      data.listingOvertitle !== undefined;
     if (advancedRequested && !(await hasEffectiveProffAccess(supabaseAdmin, organizationId))) {
       throw new Error(PROFF_REQUIRED_MESSAGE);
     }
@@ -628,6 +632,9 @@ export const updateBusinessProfile = createServerFn({ method: "POST" })
       ...(data.websiteUrl !== undefined && { website_url: data.websiteUrl }),
       ...(data.logoPath !== undefined && { logo_path: data.logoPath }),
       ...(data.brandPalette !== undefined && { brand_palette: data.brandPalette }),
+      ...(data.listingConcept !== undefined && { listing_concept: data.listingConcept }),
+      ...(data.listingFont !== undefined && { listing_font: data.listingFont }),
+      ...(data.listingOvertitle !== undefined && { listing_overtitle: data.listingOvertitle }),
     };
     const { error } = await supabaseAdmin
       .from("organizations")

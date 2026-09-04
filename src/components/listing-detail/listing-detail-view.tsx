@@ -32,21 +32,15 @@ import {
   CONDITIONS,
   VEHICLE_CONDITIONS_BY_SLUG,
 } from "@/lib/constants";
-import { PART_FITMENT_SCOPE_KEY } from "@/lib/category-filters";
-import {
-  ProffConceptSelector,
-  ProffListingHeader,
-} from "@/components/listing-detail/proff-listing-presentation";
-import type {
-  ProffListingConcept,
-  ProffOrganizationPresentation,
-} from "@/components/listing-detail/proff-listing-types";
+import type { ProffOrganizationPresentation } from "@/components/listing-detail/proff-listing-types";
+import { ProffListingHeader } from "@/components/listing-detail/proff-listing-presentation";
 import {
   VEHICLE_LEAF_SLUGS,
   computeOmregistreringsavgift,
   type AvgiftskodeGruppe,
   type VehicleLeafSlug,
 } from "@/lib/vehicle/vehicle-classification";
+import { PART_FITMENT_SCOPE_KEY } from "@/lib/category-filters";
 import { firstRegistrationYear } from "@/lib/vehicle/first-registration";
 import { parseVehicleLookup } from "@/lib/vehicle/parse-vehicle-lookup";
 import { Input } from "@/components/ui/input";
@@ -192,10 +186,6 @@ export type ListingDetailViewProps = {
   sellerContactSlot?: ReactNode;
   /** Live organization identity shown only when Proff branding is effective. */
   organizationBrand?: ListingOrganizationBrand;
-  /** Active visual direction for the Proff presentation. */
-  proffConcept?: ProffListingConcept;
-  /** Development-only control for comparing the three Proff directions. */
-  onProffConceptChange?: (concept: ProffListingConcept) => void;
   /** Optional related active organization listings section. */
   relatedListingsSlot?: ReactNode;
   /** Compact "Send melding"-button shown in the fixed mobile contact bar.
@@ -246,8 +236,6 @@ export function ListingDetailView({
   ownerStatsSlot,
   sellerContactSlot,
   organizationBrand,
-  proffConcept,
-  onProffConceptChange,
   relatedListingsSlot,
   stickyContactSlot,
   previewBanner,
@@ -408,8 +396,6 @@ export function ListingDetailView({
       attributes={attributes}
       canShip={canShip ?? null}
       organizationBrand={organizationBrand}
-      proffConcept={proffConcept}
-      onProffConceptChange={onProffConceptChange}
       relatedListingsSlot={relatedListingsSlot}
       vehicle360ImgUrls={vehicle360ImgUrls}
       actionsMenuSlot={actionsMenuSlot}
@@ -491,10 +477,8 @@ function ListingDetailViewBody({
   ownerStatsSlot,
   sellerContactSlot,
   organizationBrand,
-  proffConcept: proffConceptProp,
-  onProffConceptChange,
-  relatedListingsSlot,
   stickyContactSlot,
+  relatedListingsSlot,
   previewBanner,
   enableBackToSearch,
   activeImage,
@@ -548,8 +532,6 @@ function ListingDetailViewBody({
   ownerStatsSlot?: ReactNode;
   sellerContactSlot?: ReactNode;
   organizationBrand?: ListingOrganizationBrand;
-  proffConcept?: ProffListingConcept;
-  onProffConceptChange?: (concept: ProffListingConcept) => void;
   relatedListingsSlot?: ReactNode;
   stickyContactSlot?: ReactNode;
   previewBanner?: ReactNode;
@@ -588,7 +570,7 @@ function ListingDetailViewBody({
   const isBoatListing = !isVehicleListing && isBoatAttributes(attributes);
   const nativeSpecLayout = isNative && (isVehicleListing || isBoatListing);
   const nativePlateUnderTitle = isNative && isVehicleListing;
-  const proffConcept = organizationBrand ? (proffConceptProp ?? "redaksjonell") : "redaksjonell";
+  // Profileringen kommer fra organisasjonens lagrede profil og deles med konsollforhåndsvisningen.
   // Tilstand-etiketter er per kjøretøytype (se VEHICLE_CONDITIONS_BY_SLUG) —
   // faller tilbake til de generiske etikettene (via `?? v`/CONDITIONS der de
   // brukes) dersom slug mangler eller ikke finnes i tabellen.
@@ -973,14 +955,7 @@ function ListingDetailViewBody({
         </div>
 
         <aside className="@container space-y-5">
-          {organizationBrand && (
-            <>
-              {import.meta.env.DEV && onProffConceptChange && (
-                <ProffConceptSelector concept={proffConcept} onSelect={onProffConceptChange} />
-              )}
-              <ProffListingHeader organization={organizationBrand} concept={proffConcept} />
-            </>
-          )}
+          {organizationBrand && <ProffListingHeader organization={organizationBrand} />}
           {(() => {
             const fmt = (s: string) =>
               new Date(s).toLocaleDateString("nb-NO", {

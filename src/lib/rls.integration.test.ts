@@ -3778,12 +3778,20 @@ describe.skipIf(!canRun)(
 
       const { data: publicSafeColumns, error: publicSafeError } = await anon
         .from("organizations_public")
-        .select("id")
+        .select("id, listing_concept, listing_font, listing_overtitle")
         .in("id", [organizationId, otherOrganizationId]);
       expect(publicSafeError).toBeNull();
       expect(publicSafeColumns?.map((row) => row.id).sort()).toEqual(
         [organizationId, otherOrganizationId].sort(),
       );
+      expect(
+        publicSafeColumns?.every(
+          (row) =>
+            row.listing_concept === "redaksjonell" &&
+            row.listing_font === "newsreader" &&
+            row.listing_overtitle === "presentert_av",
+        ),
+      ).toBe(true);
       const { error: anonymousMembershipError } = await anon
         .from("organization_members")
         .select("organization_id")

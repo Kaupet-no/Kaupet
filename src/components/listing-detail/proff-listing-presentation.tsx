@@ -9,21 +9,50 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { resolveBrandColors } from "@/lib/brand-color";
 import { cn } from "@/lib/utils";
 import {
-  PROFF_LISTING_CONCEPTS,
-  type ProffListingConcept,
+  DEFAULT_PROFF_LISTING_CONCEPT,
+  DEFAULT_PROFF_LISTING_FONT,
+  DEFAULT_PROFF_LISTING_OVERTITLE,
+  type ProffListingFont,
+  type ProffListingOvertitle,
   type ProffOrganizationPresentation,
 } from "@/components/listing-detail/proff-listing-types";
 
 type BrandStyle = CSSProperties & {
   "--proff-brand": string;
   "--proff-on-brand": string;
+  "--proff-name-font": string;
 };
 
-function brandStyle(palette: string | null): BrandStyle {
+const NAME_FONT_FAMILIES: Record<ProffListingFont, string> = {
+  newsreader: '"Newsreader Variable", ui-serif, Georgia, serif',
+  inter: '"Inter Variable", ui-sans-serif, system-ui, sans-serif',
+};
+
+function presentationValues(organization: ProffOrganizationPresentation) {
+  return {
+    concept: organization.concept ?? DEFAULT_PROFF_LISTING_CONCEPT,
+    font: organization.font ?? DEFAULT_PROFF_LISTING_FONT,
+    overtitle: organization.overtitle ?? DEFAULT_PROFF_LISTING_OVERTITLE,
+  };
+}
+
+function overtitleLabel(overtitle: ProffListingOvertitle): string {
+  return {
+    annonse_fra: "Annonse fra",
+    presentert_av: "Presentert av",
+    bedriftsannonse: "Bedriftsannonse",
+  }[overtitle];
+}
+
+function brandStyle(
+  palette: string | null,
+  font: ProffListingFont = DEFAULT_PROFF_LISTING_FONT,
+): BrandStyle {
   const colors = resolveBrandColors(palette);
   return {
     "--proff-brand": colors.background,
     "--proff-on-brand": colors.foreground,
+    "--proff-name-font": NAME_FONT_FAMILIES[font],
   };
 }
 
@@ -106,15 +135,14 @@ function WebsiteLink({
 
 export function ProffListingHeader({
   organization,
-  concept,
   heading = false,
 }: {
   organization: ProffOrganizationPresentation;
-  concept: ProffListingConcept;
   heading?: boolean;
 }) {
   const Name = heading ? "h1" : "p";
-  const style = brandStyle(organization.palette);
+  const { concept, font, overtitle } = presentationValues(organization);
+  const style = brandStyle(organization.palette, font);
 
   if (concept === "redaksjonell") {
     return (
@@ -130,9 +158,12 @@ export function ProffListingHeader({
           />
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Presentert av
+              {overtitleLabel(overtitle)}
             </p>
-            <Name className="mt-1 font-display text-2xl leading-tight tracking-tight sm:text-3xl">
+            <Name
+              className="mt-1 text-2xl leading-tight tracking-tight sm:text-3xl"
+              style={{ fontFamily: "var(--proff-name-font)" }}
+            >
               {organization.displayName}
             </Name>
             <CompanyRegistration organization={organization} />
@@ -158,9 +189,12 @@ export function ProffListingHeader({
           <CompanyLogo organization={organization} className="size-14 border border-border" />
           <div className="min-w-0 flex-1">
             <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-              Bedriftsannonse
+              {overtitleLabel(overtitle)}
             </p>
-            <Name className="mt-1 font-display text-xl font-semibold leading-tight sm:text-2xl">
+            <Name
+              className="mt-1 text-xl font-semibold leading-tight sm:text-2xl"
+              style={{ fontFamily: "var(--proff-name-font)" }}
+            >
               {organization.displayName}
             </Name>
             <CompanyRegistration organization={organization} />
@@ -181,9 +215,12 @@ export function ProffListingHeader({
         <CompanyLogo organization={organization} className="size-16 sm:size-20" />
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] opacity-75">
-            Annonse fra
+            {overtitleLabel(overtitle)}
           </p>
-          <Name className="mt-1 font-display text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
+          <Name
+            className="mt-1 text-2xl font-semibold leading-tight tracking-tight sm:text-3xl"
+            style={{ fontFamily: "var(--proff-name-font)" }}
+          >
             {organization.displayName}
           </Name>
           <CompanyRegistration organization={organization} />
@@ -194,53 +231,17 @@ export function ProffListingHeader({
   );
 }
 
-export function ProffConceptSelector({
-  concept,
-  onSelect,
-}: {
-  concept: ProffListingConcept;
-  onSelect: (concept: ProffListingConcept) => void;
-}) {
-  const labels: Record<ProffListingConcept, string> = {
-    signatur: "1 · Signatur",
-    redaksjonell: "2 · Redaksjonell",
-    butikk: "3 · Butikkprofil",
-  };
-
-  return (
-    <div
-      role="group"
-      aria-label="Velg designforslag for Proff-annonsen"
-      className="mb-4 flex flex-wrap gap-2 rounded-xl border border-dashed border-border bg-surface p-2"
-    >
-      {PROFF_LISTING_CONCEPTS.map((value) => (
-        <Button
-          key={value}
-          type="button"
-          size="sm"
-          variant={concept === value ? "default" : "ghost"}
-          aria-pressed={concept === value}
-          onClick={() => onSelect(value)}
-        >
-          {labels[value]}
-        </Button>
-      ))}
-    </div>
-  );
-}
-
 export function ProffRelatedListings({
   organization,
-  concept,
   listings,
   loading,
 }: {
   organization: ProffOrganizationPresentation;
-  concept: ProffListingConcept;
   listings: ListingCardData[] | undefined;
   loading: boolean;
 }) {
-  const style = brandStyle(organization.palette);
+  const { concept, font } = presentationValues(organization);
+  const style = brandStyle(organization.palette, font);
   const compact = concept === "butikk";
   const content = loading
     ? Array.from({ length: 4 }, (_, index) => (

@@ -1,7 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Building2 } from "lucide-react";
-import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,14 +11,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { toListingCardData } from "@/lib/listing-card-data";
 
 export const Route = createFileRoute("/bedrift/$organizationId")({
-  validateSearch: z.object({
-    proff: z.enum(["signatur", "redaksjonell", "butikk"]).optional(),
-  }),
   loader: async ({ params }) => {
     const { data, error } = await supabase
       .from("organizations_public")
       .select(
-        "id, display_name, organization_number, website_url, logo_path, brand_palette, has_active_proff",
+        "id, display_name, organization_number, website_url, logo_path, brand_palette, listing_concept, listing_font, listing_overtitle, has_active_proff",
       )
       .eq("id", params.organizationId)
       .maybeSingle();
@@ -57,7 +53,6 @@ export const Route = createFileRoute("/bedrift/$organizationId")({
 
 function OrganizationListingsPage() {
   const organization = Route.useLoaderData();
-  const search = Route.useSearch();
   const listingsQuery = useQuery({
     queryKey: ["organization-listings-page", organization.id],
     queryFn: async () => {
@@ -86,6 +81,9 @@ function OrganizationListingsPage() {
       : null,
     websiteUrl: organization.website_url,
     palette: organization.brand_palette,
+    concept: organization.listing_concept as ProffOrganizationPresentation["concept"],
+    font: organization.listing_font as ProffOrganizationPresentation["font"],
+    overtitle: organization.listing_overtitle as ProffOrganizationPresentation["overtitle"],
   };
 
   return (
@@ -96,11 +94,7 @@ function OrganizationListingsPage() {
           Tilbake til alle annonser
         </Link>
       </Button>
-      <ProffListingHeader
-        organization={brand}
-        concept={import.meta.env.DEV ? (search.proff ?? "redaksjonell") : "redaksjonell"}
-        heading
-      />
+      <ProffListingHeader organization={brand} heading />
       <section aria-labelledby="organization-listings-page-heading">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           Bedriftsprofil

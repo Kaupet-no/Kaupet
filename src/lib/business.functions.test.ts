@@ -87,6 +87,9 @@ function buildAdmin(
     website_url: null,
     logo_path: null,
     brand_palette: null,
+    listing_concept: "redaksjonell",
+    listing_font: "newsreader",
+    listing_overtitle: "presentert_av",
     ...overrides.organization,
   };
   const membership =
@@ -381,6 +384,35 @@ describe("business server functions", () => {
     await expect(
       updateBusinessProfile({ data: { websiteUrl: "https://example.com" } }),
     ).rejects.toThrow("aktivt Proff-abonnement");
+  });
+
+  it("lagrer alle Proff-profileringsvalg samlet og avviser dem uten aktivt Proff", async () => {
+    const admin = buildAdmin({ proff: true });
+    await expect(
+      updateBusinessProfile({
+        data: {
+          listingConcept: "butikk",
+          listingFont: "inter",
+          listingOvertitle: "annonse_fra",
+        },
+      }),
+    ).resolves.toMatchObject({
+      organization: {
+        listing_concept: "butikk",
+        listing_font: "inter",
+        listing_overtitle: "annonse_fra",
+      },
+    });
+    expect(admin.calls.updates).toContainEqual({
+      listing_concept: "butikk",
+      listing_font: "inter",
+      listing_overtitle: "annonse_fra",
+    });
+
+    buildAdmin({ proff: false });
+    await expect(updateBusinessProfile({ data: { listingFont: "inter" } })).rejects.toThrow(
+      "aktivt Proff-abonnement",
+    );
   });
 
   it("requires an active superuser and Proff before inviting members", async () => {

@@ -44,6 +44,11 @@ function overtitleLabel(overtitle: ProffListingOvertitle): string {
   }[overtitle];
 }
 
+function formatOrganizationNumber(value: string): string {
+  const digits = value.replace(/\D/gu, "");
+  return digits.replace(/(\d)(?=(\d{3})+$)/gu, "$1 ");
+}
+
 function brandStyle(
   palette: string | null,
   font: ProffListingFont = DEFAULT_PROFF_LISTING_FONT,
@@ -88,9 +93,23 @@ function CompanyLogo({
     </span>
   );
 }
-function CompanyRegistration({ organization }: { organization: ProffOrganizationPresentation }) {
+
+function CompanyRegistration({
+  organization,
+  inverse = false,
+}: {
+  organization: ProffOrganizationPresentation;
+  inverse?: boolean;
+}) {
   return organization.organizationNumber ? (
-    <p className="mt-1 text-xs text-muted-foreground">Org.nr. {organization.organizationNumber}</p>
+    <p
+      className={cn(
+        "mt-1 text-xs",
+        inverse ? "text-[var(--proff-on-brand)] opacity-75" : "text-muted-foreground",
+      )}
+    >
+      Org.nr. {formatOrganizationNumber(organization.organizationNumber)}
+    </p>
   ) : null;
 }
 
@@ -223,7 +242,7 @@ export function ProffListingHeader({
           >
             {organization.displayName}
           </Name>
-          <CompanyRegistration organization={organization} />
+          <CompanyRegistration organization={organization} inverse />
         </div>
         <WebsiteLink organization={organization} inverse />
       </div>

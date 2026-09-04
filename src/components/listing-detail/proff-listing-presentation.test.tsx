@@ -17,6 +17,7 @@ vi.mock("@/components/listing-card", () => ({
 const organization: ProffOrganizationPresentation = {
   id: "org-1",
   displayName: "HAPPY PIXEL AS",
+  organizationNumber: "974760673",
   logoUrl: null,
   websiteUrl: "https://happypixel.example/",
   palette: "forest",
@@ -67,6 +68,20 @@ describe("Proff-presentasjon", () => {
     expect(screen.getByRole("region", { name: "Bedriftsprofil" }).getAttribute("style")).toContain(
       "--proff-name-font",
     );
+  });
+  it("formaterer organisasjonsnummer med mellomrom og bruker kontrastfargen i Signatur", () => {
+    render(
+      <ProffListingHeader
+        organization={{
+          ...organization,
+          concept: "signatur",
+          palette: "navy",
+        }}
+      />,
+    );
+
+    const registration = screen.getByText("Org.nr. 974 760 673");
+    expect(registration.className).toContain("text-[var(--proff-on-brand)]");
   });
 
   it("viser et utvalg annonser og lenken med bedriftens visningsnavn", () => {

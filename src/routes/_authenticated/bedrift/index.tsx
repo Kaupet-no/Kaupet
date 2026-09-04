@@ -8,7 +8,14 @@ import { BusinessConsole, type BusinessTab } from "@/features/business-account/b
 import { useBusinessMembership } from "@/features/business-account/use-business-membership";
 import { useAuth } from "@/hooks/use-auth";
 
-const TABS: BusinessTab[] = ["oversikt", "annonser", "meldinger", "bedriftsprofil", "brukere"];
+const TABS: BusinessTab[] = [
+  "oversikt",
+  "annonser",
+  "meldinger",
+  "bedriftsprofil",
+  "administrer",
+  "brukere",
+];
 
 export const Route = createFileRoute("/_authenticated/bedrift/")({
   validateSearch: (search: Record<string, unknown>): { tab: BusinessTab; location?: string } => ({

@@ -14,6 +14,7 @@ import {
   MessageCircle,
   Palette,
   RotateCcw,
+  Settings2,
   Users,
   ZoomIn,
   ZoomOut,
@@ -61,6 +62,7 @@ import type {
 import { BusinessListingsPanel } from "@/features/business-account/business-listings-panel";
 import { BusinessMessagesPanel } from "@/features/business-account/business-messages-panel";
 import { BusinessProfileForm } from "@/features/business-account/business-profile-form";
+import { BusinessAdminPanel } from "@/features/business-account/business-admin-panel";
 import { MemberManagement } from "@/features/business-account/member-management";
 import {
   getBusinessListingStats,
@@ -69,6 +71,7 @@ import {
   type BusinessListingStats,
 } from "@/lib/business.functions";
 import { BulkListingImport } from "@/features/listing-bulk-import/BulkListingImport";
+import { formatErrorMessage } from "@/lib/errors";
 import {
   DEFAULT_LISTING_VIEW_THRESHOLD,
   DEFAULT_SOLD_DAYS,
@@ -77,7 +80,8 @@ import {
   summarizeListingInsights,
 } from "@/features/business-account/listing-insights";
 
-export type BusinessTab = "oversikt" | "annonser" | "meldinger" | "bedriftsprofil" | "brukere";
+export type BusinessTab =
+  "oversikt" | "annonser" | "meldinger" | "bedriftsprofil" | "administrer" | "brukere";
 type Props = {
   organization: BusinessOrganization;
   locations: BusinessLocation[];
@@ -95,6 +99,7 @@ const TAB_LABELS: Record<BusinessTab, string> = {
   annonser: "Annonser",
   meldinger: "Meldinger",
   bedriftsprofil: "Bedriftsprofil",
+  administrer: "Administrer",
   brukere: "Brukere",
 };
 const TAB_ICONS: Record<BusinessTab, typeof LayoutDashboard> = {
@@ -102,6 +107,7 @@ const TAB_ICONS: Record<BusinessTab, typeof LayoutDashboard> = {
   annonser: ListChecks,
   meldinger: MessageCircle,
   bedriftsprofil: Palette,
+  administrer: Settings2,
   brukere: Users,
 };
 
@@ -168,7 +174,8 @@ export function BusinessConsole({
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["business-membership"] });
     },
-    onError: (error: Error) => setPlanError(error.message),
+    onError: (error: Error) =>
+      setPlanError(formatErrorMessage(error, "Kunne ikke endre bedriftsplanen")),
   });
 
   const plan = organization.selected_plan ? BUSINESS_PLANS[organization.selected_plan] : null;
@@ -189,7 +196,10 @@ export function BusinessConsole({
     selectedLocation?.permissions.listingEditScope ?? (role === "superuser" ? "all" : "none");
 
   const visibleTab =
-    (!effectiveProff || role !== "superuser") && tab === "brukere" ? "oversikt" : tab;
+    ((!effectiveProff || role !== "superuser") && tab === "brukere") ||
+    (role !== "superuser" && tab === "administrer")
+      ? "oversikt"
+      : tab;
   const activeTab = pendingTab ?? visibleTab;
   const tabsListRef = useRef<HTMLDivElement>(null);
   const previousVisibleTabRef = useRef(visibleTab);
@@ -284,7 +294,11 @@ export function BusinessConsole({
               aria-label="Bedriftskonsoll"
             >
               {(Object.keys(TAB_LABELS) as BusinessTab[])
-                .filter((value) => value !== "brukere" || (effectiveProff && role === "superuser"))
+                .filter((value) => {
+                  if (value === "brukere") return effectiveProff && role === "superuser";
+                  if (value === "administrer") return role === "superuser";
+                  return true;
+                })
                 .map((value) => {
                   const Icon = TAB_ICONS[value];
                   return (
@@ -343,11 +357,10 @@ export function BusinessConsole({
               <BusinessMessagesPanel organization={organization} locationId={selectedLocationId} />
             </TabsContent>
             <TabsContent value="bedriftsprofil" className="mt-0">
-              <BusinessProfileForm
-                organization={organization}
-                locations={locations}
-                billingProfile={billingProfile}
-              />
+              <BusinessProfileForm organization={organization} />
+            </TabsContent>
+            <TabsContent value="administrer" className="mt-0">
+              <BusinessAdminPanel locations={locations} billingProfile={billingProfile} />
             </TabsContent>
             <TabsContent value="brukere" className="mt-0">
               <MemberManagement

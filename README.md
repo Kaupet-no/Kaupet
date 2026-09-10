@@ -35,7 +35,7 @@ Søket håndterer blant annet:
 - **Tall med enhet** — `under 150000 kr`, `over 100 hk`, `maks 12000 mil` blir til pris- og tallintervaller.
 - **Kategorier og bilmerker** — skriver du et kategorinavn eller et merke, foreslår Kaupet å navigere dit i stedet for å bare søke på ordet.
 - **Negasjon** — `sykkel unntatt elsykkel` fjerner treffene du ikke vil ha.
-- **Alle tolkninger er synlige og kan fjernes.** Hver tolkning vises som en brikke du kan klikke bort — ingenting skjer i det skjulte.
+- **Alle tolkninger er synlige og kan fjernes.** Hver tolkning vises som en brikke du kan klikke bort.
 
 I tillegg finnes et filterpanel med kategori, tilstand, pris, kategorispesifikke felter, kart og stedssøk med radius (via OpenStreetMap), i tillegg til å støtte mer avanserte spørringer som _må inneholde_, _kan inneholde_, _skal ikke inneholde_ osv. Søk du bruker ofte kan lagres for å få **varsel når det kommer nye annonser** som treffer kriteriene.
 

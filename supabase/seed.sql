@@ -29,24 +29,24 @@ ON CONFLICT (slug) DO UPDATE SET
   icon = EXCLUDED.icon,
   is_hidden = EXCLUDED.is_hidden;
 
-INSERT INTO public.category_flows (category_id, modules, field_groups)
+INSERT INTO public.category_flows (category_id, field_groups)
 SELECT
   id,
-  ARRAY['generic-attributes'],
   ARRAY[
     'vehicle-registration',
     'category-attributes',
-    'title-photos',
+    'photos',
+    'title',
     'vehicle-facts',
     'vehicle-condition',
     'description-keywords',
-    'delivery-location',
+    'delivery',
+    'location',
     'review-publish'
   ]
 FROM public.categories
 WHERE slug = 'bil-og-mc'
 ON CONFLICT (category_id) DO UPDATE SET
-  modules = EXCLUDED.modules,
   field_groups = EXCLUDED.field_groups;
 
 INSERT INTO public.category_filters (category_id, key, label_nb, type, unit, sort_order)

@@ -45,7 +45,10 @@ export const createDemoUser = createServerFn({ method: "POST" })
     const { error: roleAssignErr } = await context.supabase.rpc("admin_grant_demo_role", {
       _user_id: userId,
     });
-    if (roleAssignErr) throw roleAssignErr;
+    if (roleAssignErr) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", roleAssignErr);
+    }
 
     return { user_id: userId, email: data.email };
   });

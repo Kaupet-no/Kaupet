@@ -24,7 +24,6 @@ export function CategorySelect({
   categoryTouchedManually,
   applyCategorySuggestion,
   setSuggestionDismissed,
-  setCategorySuggestions,
   bilOgMcCategoryId,
 }: WizardSharedProps) {
   return (
@@ -57,7 +56,6 @@ export function CategorySelect({
             className="ml-auto"
             onClick={() => {
               setSuggestionDismissed(true);
-              setCategorySuggestions([]);
             }}
           >
             ✕
@@ -73,6 +71,7 @@ export function CategorySelect({
         selectedId={categoryId}
         onSelect={onCategorySelect}
         selectableGroups={bilOgMcCategoryId ? [bilOgMcCategoryId] : undefined}
+        allowSelectAny="below-root"
       />
       <CategorySuggestionDialog />
 

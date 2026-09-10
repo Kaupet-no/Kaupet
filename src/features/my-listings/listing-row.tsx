@@ -133,7 +133,8 @@ export function ListingRow({
   const statusBadges = (
     <>
       <Badge variant={row.status === "active" ? "default" : "secondary"} className="text-xs">
-        {STATUS_LABEL[row.status]}
+        {/* En bortgitt gjenstand er ikke "solgt" — samme status, annen sannhet. */}
+        {row.status === "sold" && row.is_free ? "Gitt bort" : STATUS_LABEL[row.status]}
       </Badge>
       {row.status === "active" && d != null && (
         <span

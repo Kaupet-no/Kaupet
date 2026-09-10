@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 
-import { supabase } from "@/integrations/supabase/client";
 import type { AttributeFilterValue, CategoryFilter } from "@/lib/category-filters";
+import { getListingFacetCounts } from "@/lib/listing-facet.functions";
 
 type Args = {
   filters: CategoryFilter[];
@@ -32,6 +33,7 @@ export function useFilterFacetCounts({
   includeFree,
 }: Args) {
   const facetKeys = filters.map((f) => f.key);
+  const getFacetCounts = useServerFn(getListingFacetCounts);
 
   return useQuery({
     queryKey: [
@@ -46,18 +48,19 @@ export function useFilterFacetCounts({
     ],
     enabled: facetKeys.length > 0,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("listing_filter_facet_counts", {
-        p_category_ids: categoryIds ?? undefined,
-        p_conditions: conditions.length > 0 ? conditions : undefined,
-        p_price_min: min,
-        p_price_max: max,
-        p_include_free: includeFree,
-        p_active_attrs: values,
-        p_facet_keys: facetKeys,
+      const data = await getFacetCounts({
+        data: {
+          categoryIds,
+          conditions,
+          priceMin: min,
+          priceMax: max,
+          includeFree,
+          activeAttrs: values,
+          facetKeys,
+        },
       });
-      if (error) throw error;
       const counts: Record<string, Record<string, number>> = {};
-      for (const row of data ?? []) {
+      for (const row of data) {
         (counts[row.attr_key] ??= {})[row.attr_value] = row.cnt;
       }
       return counts;

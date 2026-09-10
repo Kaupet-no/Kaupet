@@ -16,6 +16,8 @@ import { Route as AnnonserRouteImport } from './routes/annonser'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as BedriftsinvitasjonRouteImport } from './routes/bedriftsinvitasjon'
 import { Route as BekreftEpostRouteImport } from './routes/bekreft-epost'
+import { Route as NyAnnonseRouteImport } from './routes/ny-annonse'
+import { Route as NyOkAnnonseRouteImport } from './routes/ny-ok-annonse'
 import { Route as PersonvernRouteImport } from './routes/personvern'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as TilbakestillPassordRouteImport } from './routes/tilbakestill-passord'
@@ -27,8 +29,6 @@ import { Route as AuthenticatedBedriftRouteRouteImport } from './routes/_authent
 import { Route as AuthenticatedFavoritterRouteImport } from './routes/_authenticated/favoritter'
 import { Route as AuthenticatedMegRouteImport } from './routes/_authenticated/meg'
 import { Route as AuthenticatedMineSokRouteImport } from './routes/_authenticated/mine-sok'
-import { Route as AuthenticatedNyAnnonseRouteImport } from './routes/_authenticated/ny-annonse'
-import { Route as AuthenticatedNyOkAnnonseRouteImport } from './routes/_authenticated/ny-ok-annonse'
 import { Route as AuthenticatedProfilRouteImport } from './routes/_authenticated/profil'
 import { Route as AuthenticatedVarslerRouteImport } from './routes/_authenticated/varsler'
 import { Route as AnnonseListingIdRouteImport } from './routes/annonse.$listingId'
@@ -92,6 +92,16 @@ const BekreftEpostRoute = BekreftEpostRouteImport.update({
   path: '/bekreft-epost',
   getParentRoute: () => rootRouteImport,
 } as any)
+const NyAnnonseRoute = NyAnnonseRouteImport.update({
+  id: '/ny-annonse',
+  path: '/ny-annonse',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NyOkAnnonseRoute = NyOkAnnonseRouteImport.update({
+  id: '/ny-ok-annonse',
+  path: '/ny-ok-annonse',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PersonvernRoute = PersonvernRouteImport.update({
   id: '/personvern',
   path: '/personvern',
@@ -148,17 +158,6 @@ const AuthenticatedMineSokRoute = AuthenticatedMineSokRouteImport.update({
   path: '/mine-sok',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedNyAnnonseRoute = AuthenticatedNyAnnonseRouteImport.update({
-  id: '/ny-annonse',
-  path: '/ny-annonse',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedNyOkAnnonseRoute =
-  AuthenticatedNyOkAnnonseRouteImport.update({
-    id: '/ny-ok-annonse',
-    path: '/ny-ok-annonse',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedProfilRoute = AuthenticatedProfilRouteImport.update({
   id: '/profil',
   path: '/profil',
@@ -323,6 +322,8 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/bedriftsinvitasjon': typeof BedriftsinvitasjonRoute
   '/bekreft-epost': typeof BekreftEpostRoute
+  '/ny-annonse': typeof NyAnnonseRoute
+  '/ny-ok-annonse': typeof NyOkAnnonseRoute
   '/personvern': typeof PersonvernRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/tilbakestill-passord': typeof TilbakestillPassordRoute
@@ -334,8 +335,6 @@ export interface FileRoutesByFullPath {
   '/favoritter': typeof AuthenticatedFavoritterRoute
   '/meg': typeof AuthenticatedMegRoute
   '/mine-sok': typeof AuthenticatedMineSokRoute
-  '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
-  '/ny-ok-annonse': typeof AuthenticatedNyOkAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
   '/varsler': typeof AuthenticatedVarslerRoute
   '/annonse/$listingId': typeof AnnonseListingIdRoute
@@ -372,6 +371,8 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/bedriftsinvitasjon': typeof BedriftsinvitasjonRoute
   '/bekreft-epost': typeof BekreftEpostRoute
+  '/ny-annonse': typeof NyAnnonseRoute
+  '/ny-ok-annonse': typeof NyOkAnnonseRoute
   '/personvern': typeof PersonvernRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/tilbakestill-passord': typeof TilbakestillPassordRoute
@@ -381,8 +382,6 @@ export interface FileRoutesByTo {
   '/favoritter': typeof AuthenticatedFavoritterRoute
   '/meg': typeof AuthenticatedMegRoute
   '/mine-sok': typeof AuthenticatedMineSokRoute
-  '/ny-annonse': typeof AuthenticatedNyAnnonseRoute
-  '/ny-ok-annonse': typeof AuthenticatedNyOkAnnonseRoute
   '/profil': typeof AuthenticatedProfilRoute
   '/varsler': typeof AuthenticatedVarslerRoute
   '/annonse/$listingId': typeof AnnonseListingIdRoute
@@ -421,6 +420,8 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/bedriftsinvitasjon': typeof BedriftsinvitasjonRoute
   '/bekreft-epost': typeof BekreftEpostRoute
+  '/ny-annonse': typeof NyAnnonseRoute
+  '/ny-ok-annonse': typeof NyOkAnnonseRoute
   '/personvern': typeof PersonvernRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/tilbakestill-passord': typeof TilbakestillPassordRoute
@@ -432,8 +433,6 @@ export interface FileRoutesById {
   '/_authenticated/favoritter': typeof AuthenticatedFavoritterRoute
   '/_authenticated/meg': typeof AuthenticatedMegRoute
   '/_authenticated/mine-sok': typeof AuthenticatedMineSokRoute
-  '/_authenticated/ny-annonse': typeof AuthenticatedNyAnnonseRoute
-  '/_authenticated/ny-ok-annonse': typeof AuthenticatedNyOkAnnonseRoute
   '/_authenticated/profil': typeof AuthenticatedProfilRoute
   '/_authenticated/varsler': typeof AuthenticatedVarslerRoute
   '/annonse/$listingId': typeof AnnonseListingIdRoute
@@ -472,6 +471,8 @@ export interface FileRouteTypes {
     | '/auth'
     | '/bedriftsinvitasjon'
     | '/bekreft-epost'
+    | '/ny-annonse'
+    | '/ny-ok-annonse'
     | '/personvern'
     | '/sitemap.xml'
     | '/tilbakestill-passord'
@@ -483,8 +484,6 @@ export interface FileRouteTypes {
     | '/favoritter'
     | '/meg'
     | '/mine-sok'
-    | '/ny-annonse'
-    | '/ny-ok-annonse'
     | '/profil'
     | '/varsler'
     | '/annonse/$listingId'
@@ -521,6 +520,8 @@ export interface FileRouteTypes {
     | '/auth'
     | '/bedriftsinvitasjon'
     | '/bekreft-epost'
+    | '/ny-annonse'
+    | '/ny-ok-annonse'
     | '/personvern'
     | '/sitemap.xml'
     | '/tilbakestill-passord'
@@ -530,8 +531,6 @@ export interface FileRouteTypes {
     | '/favoritter'
     | '/meg'
     | '/mine-sok'
-    | '/ny-annonse'
-    | '/ny-ok-annonse'
     | '/profil'
     | '/varsler'
     | '/annonse/$listingId'
@@ -569,6 +568,8 @@ export interface FileRouteTypes {
     | '/auth'
     | '/bedriftsinvitasjon'
     | '/bekreft-epost'
+    | '/ny-annonse'
+    | '/ny-ok-annonse'
     | '/personvern'
     | '/sitemap.xml'
     | '/tilbakestill-passord'
@@ -580,8 +581,6 @@ export interface FileRouteTypes {
     | '/_authenticated/favoritter'
     | '/_authenticated/meg'
     | '/_authenticated/mine-sok'
-    | '/_authenticated/ny-annonse'
-    | '/_authenticated/ny-ok-annonse'
     | '/_authenticated/profil'
     | '/_authenticated/varsler'
     | '/annonse/$listingId'
@@ -620,6 +619,8 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   BedriftsinvitasjonRoute: typeof BedriftsinvitasjonRoute
   BekreftEpostRoute: typeof BekreftEpostRoute
+  NyAnnonseRoute: typeof NyAnnonseRoute
+  NyOkAnnonseRoute: typeof NyOkAnnonseRoute
   PersonvernRoute: typeof PersonvernRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TilbakestillPassordRoute: typeof TilbakestillPassordRoute
@@ -686,6 +687,20 @@ declare module '@tanstack/react-router' {
       path: '/bekreft-epost'
       fullPath: '/bekreft-epost'
       preLoaderRoute: typeof BekreftEpostRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ny-annonse': {
+      id: '/ny-annonse'
+      path: '/ny-annonse'
+      fullPath: '/ny-annonse'
+      preLoaderRoute: typeof NyAnnonseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ny-ok-annonse': {
+      id: '/ny-ok-annonse'
+      path: '/ny-ok-annonse'
+      fullPath: '/ny-ok-annonse'
+      preLoaderRoute: typeof NyOkAnnonseRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/personvern': {
@@ -763,20 +778,6 @@ declare module '@tanstack/react-router' {
       path: '/mine-sok'
       fullPath: '/mine-sok'
       preLoaderRoute: typeof AuthenticatedMineSokRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/ny-annonse': {
-      id: '/_authenticated/ny-annonse'
-      path: '/ny-annonse'
-      fullPath: '/ny-annonse'
-      preLoaderRoute: typeof AuthenticatedNyAnnonseRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/ny-ok-annonse': {
-      id: '/_authenticated/ny-ok-annonse'
-      path: '/ny-ok-annonse'
-      fullPath: '/ny-ok-annonse'
-      preLoaderRoute: typeof AuthenticatedNyOkAnnonseRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/profil': {
@@ -1034,8 +1035,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedFavoritterRoute: typeof AuthenticatedFavoritterRoute
   AuthenticatedMegRoute: typeof AuthenticatedMegRoute
   AuthenticatedMineSokRoute: typeof AuthenticatedMineSokRoute
-  AuthenticatedNyAnnonseRoute: typeof AuthenticatedNyAnnonseRoute
-  AuthenticatedNyOkAnnonseRoute: typeof AuthenticatedNyOkAnnonseRoute
   AuthenticatedProfilRoute: typeof AuthenticatedProfilRoute
   AuthenticatedVarslerRoute: typeof AuthenticatedVarslerRoute
   AuthenticatedBekrefterPromoIdRoute: typeof AuthenticatedBekrefterPromoIdRoute
@@ -1051,8 +1050,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFavoritterRoute: AuthenticatedFavoritterRoute,
   AuthenticatedMegRoute: AuthenticatedMegRoute,
   AuthenticatedMineSokRoute: AuthenticatedMineSokRoute,
-  AuthenticatedNyAnnonseRoute: AuthenticatedNyAnnonseRoute,
-  AuthenticatedNyOkAnnonseRoute: AuthenticatedNyOkAnnonseRoute,
   AuthenticatedProfilRoute: AuthenticatedProfilRoute,
   AuthenticatedVarslerRoute: AuthenticatedVarslerRoute,
   AuthenticatedBekrefterPromoIdRoute: AuthenticatedBekrefterPromoIdRoute,
@@ -1073,6 +1070,8 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   BedriftsinvitasjonRoute: BedriftsinvitasjonRoute,
   BekreftEpostRoute: BekreftEpostRoute,
+  NyAnnonseRoute: NyAnnonseRoute,
+  NyOkAnnonseRoute: NyOkAnnonseRoute,
   PersonvernRoute: PersonvernRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TilbakestillPassordRoute: TilbakestillPassordRoute,

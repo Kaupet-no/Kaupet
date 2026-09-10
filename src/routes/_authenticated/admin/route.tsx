@@ -12,7 +12,7 @@ import {
   BadgeCheck,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useIsAdmin } from "@/hooks/use-is-admin";
+import { useIsAdmin } from "@/hooks/use-user-roles";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   ssr: false,

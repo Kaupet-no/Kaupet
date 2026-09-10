@@ -17,17 +17,17 @@ describe("NoImageDialog", () => {
     expect(screen.getByRole("alertdialog", { name: "Ingen bilder lagt til" })).toBeTruthy();
     expect(
       screen.getByText(
-        "Bilder vil gjøre annonsen din mer attraktiv og føre til flere besøkende. Du kan også legge til bilder senere.",
+        "Gode bilder gjør det enklere å vurdere annonsen. Du kan også legge til bilder senere.",
       ),
     ).toBeTruthy();
     expect(screen.getByRole("button", { name: "Legg til bilder" })).toBeTruthy();
     expect(screen.getByTestId("continue-without-image-button").textContent).toBe(
-      "Fortsett uten bilde",
+      "Fortsett uten bilder",
     );
     expect(screen.queryByText(/selger mye raskere/i)).toBeNull();
   });
 
-  it("lar brukeren legge til bilder eller fortsette uten bilde", () => {
+  it("lar brukeren legge til bilder eller fortsette uten bilder", () => {
     const onOpenChange = vi.fn();
     const onContinue = vi.fn();
 

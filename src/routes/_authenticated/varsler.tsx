@@ -12,6 +12,7 @@ import { nb } from "date-fns/locale";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { formatNok } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
@@ -59,10 +60,6 @@ type WtbMatchItem = WtbMatchNotification & {
   wtb_title: string | null;
 };
 type Item = SearchItem | PriceDropItem | WtbMatchItem;
-
-function formatKr(n: number) {
-  return new Intl.NumberFormat("nb-NO").format(n) + " kr";
-}
 
 function VarslerPage() {
   const native = useIsNative();
@@ -253,7 +250,7 @@ function VarslerPage() {
                           ) : (
                             <>
                               Prisfall −{Number(n.drop_pct).toFixed(0)} % ·{" "}
-                              {formatKr(n.old_price_nok)} → {formatKr(n.new_price_nok)}
+                              {formatNok(n.old_price_nok)} → {formatNok(n.new_price_nok)}
                             </>
                           )}{" "}
                           ·{" "}

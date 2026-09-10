@@ -24,14 +24,13 @@ export function NoImageDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Ingen bilder lagt til</AlertDialogTitle>
           <AlertDialogDescription>
-            Bilder vil gjøre annonsen din mer attraktiv og føre til flere besøkende. Du kan også
-            legge til bilder senere.
+            Gode bilder gjør det enklere å vurdere annonsen. Du kan også legge til bilder senere.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Legg til bilder</AlertDialogCancel>
           <AlertDialogAction data-testid="continue-without-image-button" onClick={onContinue}>
-            Fortsett uten bilde
+            Fortsett uten bilder
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

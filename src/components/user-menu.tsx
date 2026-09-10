@@ -16,8 +16,7 @@ import {
   Building2,
 } from "lucide-react";
 
-import { useIsAdmin } from "@/hooks/use-is-admin";
-import { useIsDemo } from "@/hooks/use-is-demo";
+import { useIsAdmin, useIsDemo } from "@/hooks/use-user-roles";
 import { useTheme } from "@/hooks/use-theme";
 import { useIsTestEnv } from "@/lib/env";
 import { setTestMode } from "@/lib/test-mode.functions";
@@ -25,6 +24,7 @@ import { formatErrorMessage } from "@/lib/errors";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { supabase } from "@/integrations/supabase/client";
+import { clearSignedUrlCaches } from "@/lib/storage";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -203,6 +203,7 @@ export function UserMenu({ userId, email }: { userId: string; email: string | nu
         <DropdownMenuItem
           className="cursor-pointer text-destructive focus:text-destructive"
           onSelect={async () => {
+            clearSignedUrlCaches();
             await supabase.auth.signOut();
             navigate({ to: "/" });
           }}

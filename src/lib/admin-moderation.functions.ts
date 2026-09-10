@@ -18,7 +18,10 @@ export const adminDisableListing = createServerFn({ method: "POST" })
       _id: data.id,
       _reason: data.reason,
     });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { ok: true };
   });
 
@@ -30,7 +33,10 @@ export const adminEnableListing = createServerFn({ method: "POST" })
     const { error } = await context.supabase.rpc("admin_enable_listing", {
       _id: data.id,
     });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { ok: true };
   });
 
@@ -43,7 +49,10 @@ export const adminSetListingHomeVisibility = createServerFn({ method: "POST" })
       _id: data.id,
       _hidden: data.hidden,
     });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { ok: true };
   });
 
@@ -56,7 +65,10 @@ export const adminBanUser = createServerFn({ method: "POST" })
       _user_id: data.userId,
       _reason: data.reason,
     });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { ok: true };
   });
 
@@ -68,7 +80,10 @@ export const adminUnbanUser = createServerFn({ method: "POST" })
     const { error } = await context.supabase.rpc("admin_unban_user", {
       _user_id: data.userId,
     });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { ok: true };
   });
 
@@ -90,7 +105,10 @@ export const adminSuspendUser = createServerFn({ method: "POST" })
       _reason: data.reason,
       _days: data.days,
     });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { ok: true };
   });
 
@@ -102,7 +120,10 @@ export const adminUnsuspendUser = createServerFn({ method: "POST" })
     const { error } = await context.supabase.rpc("admin_unsuspend_user", {
       _user_id: data.userId,
     });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { ok: true };
   });
 
@@ -132,7 +153,10 @@ export const adminBanIp = createServerFn({ method: "POST" })
       _reason: data.reason,
       _expires_at: data.expiresAt ?? undefined,
     });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { ok: true };
   });
 
@@ -144,7 +168,10 @@ export const adminUnbanIp = createServerFn({ method: "POST" })
     const { error } = await context.supabase.rpc("admin_unban_ip", {
       _id: data.id,
     });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { ok: true };
   });
 
@@ -165,7 +192,10 @@ export const submitReport = createServerFn({ method: "POST" })
       _reason: data.reason,
       _comment: data.comment ?? undefined,
     });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { ok: true };
   });
 
@@ -186,7 +216,10 @@ export const submitUserReport = createServerFn({ method: "POST" })
       _reason: data.reason,
       _comment: data.comment ?? undefined,
     });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { ok: true };
   });
 
@@ -200,7 +233,10 @@ export const adminDisableListingWithMessage = createServerFn({ method: "POST" })
       _reason: data.reason,
       _message: data.message,
     });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { ok: true };
   });
 
@@ -213,7 +249,10 @@ export const adminDeleteListing = createServerFn({ method: "POST" })
       _id: data.id,
       _message: data.message,
     });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { ok: true };
   });
 
@@ -221,7 +260,10 @@ export const adminListReports = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase.rpc("admin_list_reports", { _limit: 200 });
-    if (error) throw new Error(error.message);
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return data ?? [];
   });
 
@@ -231,6 +273,9 @@ export const adminResolveReport = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await requireAdminOrModeratorRole(context.supabase, context.userId);
     const { error } = await context.supabase.rpc("admin_resolve_report", { _id: data.id });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { ok: true };
   });

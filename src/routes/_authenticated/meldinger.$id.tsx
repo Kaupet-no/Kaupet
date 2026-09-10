@@ -17,6 +17,7 @@ import {
   validateImages,
   describeImageError,
 } from "@/lib/storage";
+import { sendMessage } from "@/lib/messages.functions";
 import { compressImage } from "@/lib/image-compression";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,6 +26,7 @@ import { listMyBlocks, listBlocksAgainstMe } from "@/lib/blocks.functions";
 import { confirmBuyer, getSaleForListing, unconfirmBuyer } from "@/lib/sales.functions";
 import { createReview, getMyReviewForListing } from "@/lib/reviews.functions";
 import { formatErrorMessage } from "@/lib/errors";
+import { displayPriceNok } from "@/lib/format";
 import { useIsNative } from "@/hooks/use-is-native";
 import { useFormFactor } from "@/hooks/use-form-factor";
 import { InboxPage } from "@/components/inbox-page";
@@ -84,6 +86,7 @@ function ConversationPage() {
   const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
   const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sendAttemptRef = useRef<{ clientId: string; attachmentPath: string | null } | null>(null);
 
   const { data: myBlocks } = useQuery({
     queryKey: ["my-blocks"],
@@ -108,7 +111,7 @@ function ConversationPage() {
         .from("conversations")
         .select(
           `id, buyer_id, seller_id, listing_id, buyer_last_read_at, seller_last_read_at,
-           listing:listings(id, organization_id, kaupet_code, title, price_nok, is_free, listing_images(storage_path, sort_order))`,
+           listing:listings(id, organization_id, kaupet_code, title, price_nok, is_free, attributes, listing_images(storage_path, sort_order), categories(slug))`,
         )
         .eq("id", id)
         .maybeSingle();
@@ -137,11 +140,28 @@ function ConversationPage() {
       });
       const otherDeleted = !!profile?.deleted_at;
       const otherPending = !!pendingFlag;
+      // Buyers see who they are talking to on both levels: the person who
+      // answers *and* the business they answer for. The seller side doesn't
+      // need it — they know their own organisation.
+      //
+      // organizations_public, not organizations: the base table holds
+      // commercial columns that must not be publicly readable, so RLS returns
+      // null there for a buyer (see the same lookup in $kaupetCode.tsx).
+      let otherOrganizationName: string | null = null;
+      if (!viewerIsSeller && listingOrganizationId) {
+        const { data: organization } = await supabase
+          .from("organizations_public")
+          .select("display_name")
+          .eq("id", listingOrganizationId)
+          .maybeSingle();
+        otherOrganizationName = organization?.display_name ?? null;
+      }
       return {
         ...data,
         listing,
         isBusinessSeller,
         other: profile,
+        otherOrganizationName,
         otherDeleted,
         otherPending,
       };
@@ -296,34 +316,43 @@ function ConversationPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages, id, conv, user]);
 
+  const sendMessageFn = useServerFn(sendMessage);
+
   const sendMutation = useMutation({
-    mutationFn: async ({ text, file }: { text: string; file: File | null }) => {
+    mutationFn: async ({
+      text,
+      file,
+      attempt,
+    }: {
+      text: string;
+      file: File | null;
+      attempt: { clientId: string; attachmentPath: string | null };
+    }) => {
       const trimmed = text.trim();
       if (!trimmed && !file) throw new Error("Tom melding");
       if (trimmed.length > 4000) throw new Error("Meldingen er for lang");
-      let attachmentPath: string | null = null;
-      if (file) {
+      if (file && !attempt.attachmentPath) {
         const compressed = await compressImage(file, "listing");
-        attachmentPath = await uploadMessageAttachment({ conversationId: id, file: compressed });
+        attempt.attachmentPath = await uploadMessageAttachment({
+          conversationId: id,
+          file: compressed,
+        });
       }
-      const { data, error } = await supabase
-        .from("messages")
-        .insert({
-          conversation_id: id,
-          sender_id: user!.id,
+      const data = await sendMessageFn({
+        data: {
+          conversationId: id,
           body: trimmed,
-          attachment_path: attachmentPath,
-        })
-        .select("id, conversation_id, sender_id, body, created_at, deleted_at, attachment_path")
-        .single();
-      if (error) throw error;
-      // conversations.last_message_at oppdateres nå atomisk av en
-      // databasetrigger (messages_bump_conversation_last_message_at_trg)
-      // for å unngå at feltet kan drifte fra faktisk siste melding.
+          attachmentPath: attempt.attachmentPath,
+          clientId: attempt.clientId,
+        },
+      });
       return data as Message;
     },
+    // conversations.last_message_at oppdateres nå atomisk av en
+    // databasetrigger (messages_bump_conversation_last_message_at_trg)
+    // for å unngå at feltet kan drifte fra faktisk siste melding.
     // Optimistisk: vis meldingen og tøm feltet umiddelbart; rull tilbake ved feil.
-    onMutate: ({ text, file }: { text: string; file: File | null }) => {
+    onMutate: ({ text, file }) => {
       const trimmed = text.trim();
       if ((!trimmed && !file) || trimmed.length > 4000) return {};
       const previewUrl = file ? URL.createObjectURL(file) : undefined;
@@ -344,7 +373,7 @@ function ConversationPage() {
       clearAttachment();
       return { optimisticId: optimistic.id, previousBody: text, previewUrl };
     },
-    onSuccess: (m, _vars, context) => {
+    onSuccess: (m, vars, context) => {
       queryClient.setQueryData<Message[]>(["messages", id], (prev) => {
         const withoutOptimistic = (prev ?? []).filter((x) => x.id !== context?.optimisticId);
         if (withoutOptimistic.some((x) => x.id === m.id)) return withoutOptimistic;
@@ -353,18 +382,38 @@ function ConversationPage() {
       if (context?.previewUrl) URL.revokeObjectURL(context.previewUrl);
       queryClient.invalidateQueries({ queryKey: ["my-conversations"] });
       void import("@/lib/haptics").then((m) => m.hapticSelection());
+      if (sendAttemptRef.current === vars.attempt) sendAttemptRef.current = null;
     },
-    onError: (e: Error, _vars, context) => {
+    onError: (e: Error, vars, context) => {
       if (context?.optimisticId) {
         queryClient.setQueryData<Message[]>(["messages", id], (prev) =>
           prev?.filter((x) => x.id !== context.optimisticId),
         );
-        setBody((curr) => (curr.trim() ? curr : (context.previousBody ?? "")));
+        if (sendAttemptRef.current === vars.attempt) {
+          setBody((curr) => (curr.trim() ? curr : (context.previousBody ?? "")));
+          if (vars.file) {
+            setAttachment((current) => current ?? vars.file);
+            setAttachmentPreview((current) => current ?? URL.createObjectURL(vars.file!));
+          }
+        }
       }
       if (context?.previewUrl) URL.revokeObjectURL(context.previewUrl);
       showErrorToast(formatErrorMessage(e, "Meldingen ble ikke sendt. Prøv igjen."));
     },
   });
+
+  function sendCurrentMessage() {
+    const attempt = sendAttemptRef.current ?? {
+      clientId: crypto.randomUUID(),
+      attachmentPath: null,
+    };
+    sendAttemptRef.current = attempt;
+    sendMutation.mutate({
+      text: body,
+      file: personalSellerControlsDisabled ? null : attachment,
+      attempt,
+    });
+  }
 
   function clearAttachment() {
     setAttachment(null);
@@ -386,6 +435,7 @@ function ConversationPage() {
     }
     setAttachment(file);
     setAttachmentPreview(URL.createObjectURL(file));
+    sendAttemptRef.current = null;
   }
 
   const deleteMessageMutation = useMutation({
@@ -405,10 +455,23 @@ function ConversationPage() {
     onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke slette meldingen")),
   });
 
+  // Same number as the ad and the search cards: for a vehicle where the buyer
+  // pays the re-registration fee, every price shown to them is the total.
+  const conversationPriceKr = conv?.listing
+    ? displayPriceNok({
+        category_slug:
+          (Array.isArray(conv.listing.categories)
+            ? conv.listing.categories[0]
+            : conv.listing.categories
+          )?.slug ?? null,
+        price_nok: conv.listing.price_nok,
+        attributes: (conv.listing.attributes ?? null) as Record<string, unknown> | null,
+      })
+    : null;
   const priceLabel = conv?.listing?.is_free
     ? "Gis bort"
-    : conv?.listing?.price_nok != null
-      ? `${conv.listing.price_nok.toLocaleString("nb-NO")} kr`
+    : conversationPriceKr != null
+      ? `${conversationPriceKr.toLocaleString("nb-NO")} kr`
       : "Pris ved henvendelse";
   const isBusinessSeller = !!conv?.isBusinessSeller;
   const otherId = conv
@@ -571,6 +634,9 @@ function ConversationPage() {
                     {conv.other?.display_name ?? "Ukjent bruker"}
                   </Link>
                 )}
+                {conv.otherOrganizationName ? (
+                  <span className="text-muted-foreground"> hos {conv.otherOrganizationName}</span>
+                ) : null}
               </p>
             </div>
             {otherId && !conv.otherDeleted ? (
@@ -666,7 +732,7 @@ function ConversationPage() {
           ) : (messages ?? []).length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
               {conv?.other?.display_name
-                ? `Send den første meldingen til ${conv.other.display_name}${conv.listing?.title ? ` om «${conv.listing.title}»` : ""}.`
+                ? `Send den første meldingen til ${conv.other.display_name}${conv.otherOrganizationName ? ` hos ${conv.otherOrganizationName}` : ""}${conv.listing?.title ? ` om «${conv.listing.title}»` : ""}.`
                 : "Send den første meldingen for å starte samtalen."}
             </p>
           ) : (
@@ -697,7 +763,10 @@ function ConversationPage() {
             <button
               type="button"
               aria-label="Fjern vedlegg"
-              onClick={clearAttachment}
+              onClick={() => {
+                sendAttemptRef.current = null;
+                clearAttachment();
+              }}
               className="absolute -right-2 -top-2 rounded-full bg-foreground/80 p-1 text-background"
             >
               <X className="size-3.5" />
@@ -714,10 +783,7 @@ function ConversationPage() {
               !disabled &&
               (body.trim() || (!personalSellerControlsDisabled && attachment))
             )
-              sendMutation.mutate({
-                text: body,
-                file: personalSellerControlsDisabled ? null : attachment,
-              });
+              sendCurrentMessage();
           }}
         >
           {!personalSellerControlsDisabled && (
@@ -745,7 +811,10 @@ function ConversationPage() {
           )}
           <Textarea
             value={body}
-            onChange={(e) => setBody(e.target.value)}
+            onChange={(e) => {
+              sendAttemptRef.current = null;
+              setBody(e.target.value);
+            }}
             onKeyDown={(e) => {
               // Enter-for-å-sende er en tastatursnarvei for fysisk tastatur
               // (desktop/web), der Shift+Enter gir linjeskift. Native
@@ -761,10 +830,7 @@ function ConversationPage() {
                   !disabled &&
                   (body.trim() || (!personalSellerControlsDisabled && attachment))
                 ) {
-                  sendMutation.mutate({
-                    text: body,
-                    file: personalSellerControlsDisabled ? null : attachment,
-                  });
+                  sendCurrentMessage();
                 }
               }
             }}

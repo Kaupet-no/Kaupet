@@ -38,8 +38,8 @@ describe("ComposerReviewStatuses", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "Må fylles ut (1)" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Anbefales (1)" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Dette må fylles ut (1)" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Gjør annonsen bedre (1)" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Fiks dette" }));
     expect(onFix).toHaveBeenCalledOnce();
   });

@@ -108,7 +108,10 @@ export const createReview = createServerFn({ method: "POST" })
       .select("seller_id, buyer_id")
       .eq("listing_id", data.listingId)
       .maybeSingle();
-    if (saleErr) throw new Error(saleErr.message);
+    if (saleErr) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", saleErr);
+    }
     if (!sale) throw new Error("Det finnes ingen bekreftet kjøper for denne annonsen");
 
     let role: "buyer" | "seller";
@@ -135,7 +138,8 @@ export const createReview = createServerFn({ method: "POST" })
       if (error.code === "23505") {
         throw new Error("Du har allerede gitt en vurdering for dette salget");
       }
-      throw new Error(error.message);
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
     }
     return { ok: true };
   });
@@ -151,7 +155,10 @@ export const getMyReviewForListing = createServerFn({ method: "POST" })
       .eq("listing_id", data.listingId)
       .eq("reviewer_id", userId)
       .maybeSingle();
-    if (error) throw new Error(error.message);
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return row ?? null;
   });
 
@@ -164,7 +171,10 @@ export const getPublicProfile = createServerFn({ method: "POST" })
       .select("id, display_name, avatar_url, created_at, deleted_at")
       .eq("id", data.userId)
       .maybeSingle();
-    if (error) throw new Error(error.message);
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     if (!profile) return null;
 
     const { data: summary } = await supabaseAdmin.rpc("user_review_summary", {
@@ -194,17 +204,24 @@ export const getMyProfileStats = createServerFn({ method: "POST" })
       { data: summary },
     ] = await Promise.all([
       supabase.from("profiles").select("created_at").eq("id", userId).maybeSingle(),
+      // Utkast holdes utenfor: telleren står ved siden av Salg og Vurdering
+      // og leses som "annonser jeg har ute", mens utkast bare er synlige for
+      // eieren selv. Den offentlige profilen viser allerede kun aktive.
       supabase
         .from("listings")
         .select("id", { count: "exact", head: true })
-        .eq("seller_id", userId),
+        .eq("seller_id", userId)
+        .neq("status", "draft"),
       supabase
         .from("listing_sales")
         .select("listing_id", { count: "exact", head: true })
         .eq("seller_id", userId),
       supabase.rpc("user_review_summary", { _user_id: userId }),
     ]);
-    if (profileErr) throw new Error(profileErr.message);
+    if (profileErr) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", profileErr);
+    }
 
     const row = Array.isArray(summary) ? summary[0] : summary;
     return {
@@ -249,7 +266,10 @@ export const listUserReviews = createServerFn({ method: "POST" })
         .eq("reviewee_id", data.userId)
         .order("created_at", { ascending: false })
         .range(offset, offset + limit - 1);
-      if (e2) throw new Error(e2.message);
+      if (e2) {
+        const { toClientError } = await import("@/lib/to-client-error");
+        throw await toClientError("database", e2);
+      }
       const ids = Array.from(new Set((plain ?? []).map((r) => r.reviewer_id)));
       const listingIds = Array.from(new Set((plain ?? []).map((r) => r.listing_id)));
       const [{ data: profs }, { data: listings }] = await Promise.all([

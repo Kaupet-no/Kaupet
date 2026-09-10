@@ -72,6 +72,7 @@ import {
 } from "@/lib/business.functions";
 import { BulkListingImport } from "@/features/listing-bulk-import/BulkListingImport";
 import { formatErrorMessage } from "@/lib/errors";
+import { formatNokNumber } from "@/lib/format";
 import {
   DEFAULT_LISTING_VIEW_THRESHOLD,
   DEFAULT_SOLD_DAYS,
@@ -639,7 +640,6 @@ function ListingInsights({
   const [selectedMetric, setSelectedMetric] = useState<InsightMetricKey>("active");
   const [rangeDays, setRangeDays] = useState(30);
   const summary = summarizeListingInsights(stats ?? [], threshold);
-  const formatter = new Intl.NumberFormat("nb-NO");
   const thresholdInputValid =
     /^\d{1,7}$/u.test(thresholdInput) &&
     Number.isInteger(Number(thresholdInput)) &&
@@ -667,7 +667,7 @@ function ListingInsights({
       color: "text-brand-text",
     },
     lowViews: {
-      label: `Annonser med færre enn ${formatter.format(summary.threshold)} visninger`,
+      label: `Annonser med færre enn ${formatNokNumber(summary.threshold)} visninger`,
       description: "Annonser som kan ha nytte av en bedre tittel, pris eller synlighet.",
       value: summary.lowViews,
       color: "text-muted-foreground",

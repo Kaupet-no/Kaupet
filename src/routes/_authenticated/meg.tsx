@@ -20,8 +20,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 
 import { useAuth } from "@/hooks/use-auth";
-import { useIsAdmin } from "@/hooks/use-is-admin";
-import { useIsDemo } from "@/hooks/use-is-demo";
+import { useIsAdmin, useIsDemo } from "@/hooks/use-user-roles";
 import { useTheme } from "@/hooks/use-theme";
 import { useIsTestEnv } from "@/lib/env";
 import { setTestMode } from "@/lib/test-mode.functions";

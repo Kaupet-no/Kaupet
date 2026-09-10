@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useRef, useState } from "react";
 import { showSuccessToast } from "@/lib/toast";
 import { discardDraftListing, saveDraftListing } from "@/lib/listings.functions";
 import { computeVehicleTitle } from "@/lib/vehicle/vehicle-title";
@@ -38,6 +38,10 @@ type DraftFields = {
   noKnownIssues?: boolean;
   maintenanceHistory?: string;
   stepKey: string;
+  /** False for a signed-out guest: localStorage/IndexedDB still autosave,
+   * but every Supabase draft call is skipped (the server functions require
+   * auth anyway — see requireSupabaseAuth in listings.functions.ts). */
+  authenticated: boolean;
 };
 
 type RestoreTarget = {
@@ -82,14 +86,27 @@ export function useDraftAutosave(fields: DraftFields) {
     showVisitingAddress,
     coords,
     stepKey,
+    authenticated,
   } = fields;
 
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [draftSaveError, setDraftSaveError] = useState(false);
   const [hasDraftData, setHasDraftData] = useState<Record<string, unknown> | null>(null);
   const [draftId, setDraftId] = useState<string | null>(null);
+  // The localStorage read below happens in an effect, so `hasDraftData` is
+  // still null during the first commit. Callers that redirect away when there
+  // is no draft (ny-annonse.tsx) have to wait for this instead, or they bounce
+  // the user off their own saved draft before it has been read.
+  const [draftChecked, setDraftChecked] = useState(false);
   const draftIdRef = useRef<string | null>(null);
   const draftRestorePending = useRef(false);
+  // Set by clearDraftStorage({ stopAutosave: true }) on publish: the wizard
+  // stays mounted (the success dialog renders on top of it) with the form
+  // still populated, so the 30s interval and the visibilitychange handler
+  // would otherwise fire another save. With draftIdRef nulled that save is an
+  // INSERT, which resurrects the just-published listing as a duplicate draft.
+  // One guard here covers all three save paths.
+  const draftSavingStopped = useRef(false);
   const draftSaveInProgress = useRef(false);
   const imageStoreReady = useRef(false);
   const restorableImages = useRef<PendingImage[]>([]);
@@ -137,6 +154,8 @@ export function useDraftAutosave(fields: DraftFields) {
       }
     } catch {
       // ignore
+    } finally {
+      setDraftChecked(true);
     }
   }, []);
 
@@ -159,67 +178,69 @@ export function useDraftAutosave(fields: DraftFields) {
 
   // Scalar/JSON fields live in localStorage. Binary image drafts are stored
   // separately in IndexedDB below.
+  const buildLocalDraft = useCallback(
+    () => ({
+      draft_kind: "sell" as const,
+      draft_version: 1 as const,
+      title,
+      subtitle,
+      description,
+      selectedParentId,
+      category_id: categoryId,
+      condition,
+      is_free: isFree,
+      can_ship: canShip,
+      price_nok: priceNok,
+      postal_code: postalCode,
+      city,
+      organization_location_id: organizationLocationId,
+      show_visiting_address: showVisitingAddress,
+      coords,
+      attributes,
+      known_issues: knownIssues,
+      no_known_issues: noKnownIssues,
+      maintenance_history: maintenanceHistory,
+      image_count: images.length,
+      step_key: stepKey,
+      saved_at: Date.now(),
+    }),
+    [
+      title,
+      subtitle,
+      description,
+      selectedParentId,
+      categoryId,
+      condition,
+      isFree,
+      canShip,
+      priceNok,
+      postalCode,
+      city,
+      organizationLocationId,
+      showVisitingAddress,
+      coords,
+      attributes,
+      knownIssues,
+      noKnownIssues,
+      maintenanceHistory,
+      images.length,
+      stepKey,
+    ],
+  );
+
   useEffect(() => {
     if (draftRestorePending.current) return;
     const t = window.setTimeout(() => {
+      if (draftSavingStopped.current) return;
       try {
-        localStorage.setItem(
-          DRAFT_KEY,
-          JSON.stringify({
-            draft_kind: "sell",
-            draft_version: 1,
-            title,
-            subtitle,
-            description,
-            selectedParentId,
-            category_id: categoryId,
-            condition,
-            is_free: isFree,
-            can_ship: canShip,
-            price_nok: priceNok,
-            postal_code: postalCode,
-            city,
-            organization_location_id: organizationLocationId,
-            show_visiting_address: showVisitingAddress,
-            coords,
-            attributes,
-            known_issues: knownIssues,
-            no_known_issues: noKnownIssues,
-            maintenance_history: maintenanceHistory,
-            image_count: images.length,
-            step_key: stepKey,
-            saved_at: Date.now(),
-          }),
-        );
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(buildLocalDraft()));
         setLastSaved(new Date());
       } catch {
         // ignore storage errors
       }
     }, 2000);
     return () => window.clearTimeout(t);
-  }, [
-    title,
-    subtitle,
-    description,
-    selectedParentId,
-    categoryId,
-    condition,
-    isFree,
-    canShip,
-    priceNok,
-    postalCode,
-    city,
-    organizationLocationId,
-    showVisitingAddress,
-    coords,
-    attributes,
-    knownIssues,
-    noKnownIssues,
-    maintenanceHistory,
-    stepKey,
-    images.length,
-    hasDraftData,
-  ]);
+  }, [buildLocalDraft, hasDraftData]);
 
   useEffect(() => {
     if (!imageStoreReady.current) return;
@@ -228,7 +249,30 @@ export function useDraftAutosave(fields: DraftFields) {
     }, 750);
     return () => window.clearTimeout(timeout);
   }, [images]);
+
+  /** Writes the draft locally *now* — no debounce, no server call. Used when
+   * a signed-out guest is sent to /auth to publish: the draft has to survive
+   * the redirect, and the server would reject an unauthenticated save. */
+  async function flushLocalDraft(): Promise<boolean> {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(buildLocalDraft()));
+      setLastSaved(new Date());
+    } catch {
+      setDraftSaveError(true);
+      return false;
+    }
+    try {
+      await saveDraftImages(latestImages.current);
+      setDraftSaveError(false);
+      return true;
+    } catch {
+      setDraftSaveError(true);
+      return false;
+    }
+  }
   async function saveDraftToSupabase(): Promise<string | null> {
+    if (!authenticated) return null;
+    if (draftSavingStopped.current) return null;
     if (draftRestorePending.current) return null;
     const currentDraftId = draftIdRef.current;
     if (draftSaveInProgress.current) return currentDraftId;
@@ -246,9 +290,14 @@ export function useDraftAutosave(fields: DraftFields) {
           ...(currentDraftId ? { id: currentDraftId } : {}),
           title: effectiveTitle,
           subtitle: (subtitle ?? "").trim() || null,
-          description: (description ?? "").trim() || undefined,
+          // Always send the value, never `undefined`: saveDraftListing strips
+          // undefined keys from the update payload, so an emptied description
+          // would keep whatever the row held before — which leaked the
+          // previous listing's text into the next one when the draft row is
+          // reused. Empty string rather than null: the column is NOT NULL.
+          description: (description ?? "").trim(),
           category_id: categoryId || null,
-          condition: condition || undefined,
+          condition: condition || null,
           is_free: isFree,
           price_nok: isFree ? null : typeof priceNok === "number" ? priceNok : null,
           postal_code: postalCode || null,
@@ -339,12 +388,13 @@ export function useDraftAutosave(fields: DraftFields) {
       setValue("description", hasDraftData.description);
     if (typeof hasDraftData.condition === "string") setValue("condition", hasDraftData.condition);
     if (typeof hasDraftData.is_free === "boolean") setValue("is_free", hasDraftData.is_free);
-    if (
-      hasDraftData.can_ship === "pickup" ||
-      hasDraftData.can_ship === "ship" ||
-      hasDraftData.can_ship === "both"
-    )
-      setValue("can_ship", hasDraftData.can_ship);
+    // "both" is a legacy draft value from when this was a three-way choice
+    // it never survived: the column is a boolean, so "both" and "ship" always
+    // persisted identically. Normalise rather than drop, so old drafts keep a
+    // delivery method instead of coming back blank.
+    if (hasDraftData.can_ship === "pickup") setValue("can_ship", "pickup");
+    else if (hasDraftData.can_ship === "ship" || hasDraftData.can_ship === "both")
+      setValue("can_ship", "ship");
     if (hasDraftData.price_nok !== undefined) setValue("price_nok", hasDraftData.price_nok);
     if (typeof hasDraftData.postal_code === "string") {
       setValue("postal_code", hasDraftData.postal_code);
@@ -386,7 +436,11 @@ export function useDraftAutosave(fields: DraftFields) {
     );
   }
 
-  function clearDraftStorage() {
+  /** `stopAutosave` when the wizard is done with this draft for good (publish).
+   * Left false for "start over" flows, where the same mounted wizard keeps
+   * autosaving a fresh draft right afterwards. */
+  function clearDraftStorage({ stopAutosave = false }: { stopAutosave?: boolean } = {}) {
+    draftSavingStopped.current = stopAutosave;
     localStorage.removeItem(DRAFT_KEY);
     localStorage.removeItem(DRAFT_ID_KEY);
     draftRestorePending.current = false;
@@ -399,7 +453,7 @@ export function useDraftAutosave(fields: DraftFields) {
   async function discardDraft() {
     const id = draftIdRef.current ?? localStorage.getItem(DRAFT_ID_KEY);
     clearDraftStorage();
-    if (!id) return;
+    if (!authenticated || !id) return;
     try {
       await discardDraftListing({ data: { id } });
       setDraftSaveError(false);
@@ -411,9 +465,11 @@ export function useDraftAutosave(fields: DraftFields) {
 
   return {
     draftId,
+    draftChecked,
     lastSaved,
     draftSaveError,
     hasDraftData,
+    flushLocalDraft,
     saveDraftToSupabase,
     ensureDraftId,
     restoreDraft,

@@ -125,12 +125,18 @@ async function requireOrganizationMember(userId: string) {
     .eq("user_id", userId)
     .eq("status", "active")
     .maybeSingle();
-  if (error) throw error;
+  if (error) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("database", error);
+  }
   if (!membership) throw new Error(UNAUTHORIZED_MESSAGE);
   const { error: syncError } = await supabaseAdmin.rpc("sync_organization_entitlements", {
     _organization_id: membership.organization_id,
   });
-  if (syncError) throw syncError;
+  if (syncError) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("database", syncError);
+  }
   return {
     supabaseAdmin,
     organizationId: membership.organization_id as string,
@@ -149,7 +155,10 @@ async function hasEffectiveProffAccess(supabaseAdmin: AdminClient, organizationI
   const { data, error } = await supabaseAdmin.rpc("organization_has_proff_access", {
     _organization_id: organizationId,
   });
-  if (error) throw error;
+  if (error) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("database", error);
+  }
   return data === true;
 }
 
@@ -192,7 +201,10 @@ export const lookupBusinessOrganization = createServerFn({ method: "POST" })
       .select("id")
       .eq("organization_number", organizationNumber)
       .maybeSingle();
-    if (existingError) throw existingError;
+    if (existingError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", existingError);
+    }
     if (existing) {
       throw new Error(duplicateOrganizationMessage());
     }
@@ -224,7 +236,8 @@ export const lookupBusinessOrganization = createServerFn({ method: "POST" })
       if (intentError.code === "23505") {
         throw new Error(`${DUPLICATE_ORGANIZATION_MESSAGE} ${SUPPORT_MESSAGE}`);
       }
-      throw intentError;
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("createBusinessSignupIntent", intentError);
     }
 
     return {
@@ -261,7 +274,10 @@ export const bindBusinessSignupEmail = createServerFn({ method: "POST" })
       .eq("signup_token", data.signupToken)
       .gt("expires_at", now)
       .maybeSingle();
-    if (intentError) throw intentError;
+    if (intentError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", intentError);
+    }
     if (!intent) throw new Error("Registreringen er utløpt. Start på nytt.");
     if (intent.email && intent.email !== email) {
       throw new Error("Denne registreringen er allerede knyttet til en annen e-postadresse.");
@@ -276,7 +292,10 @@ export const bindBusinessSignupEmail = createServerFn({ method: "POST" })
       .gt("expires_at", now)
       .select("email")
       .maybeSingle();
-    if (updateError) throw updateError;
+    if (updateError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", updateError);
+    }
     if (updated?.email === email) return { email };
 
     // A concurrent binder won the conditional update; only the same address may reuse it.
@@ -286,7 +305,10 @@ export const bindBusinessSignupEmail = createServerFn({ method: "POST" })
       .eq("signup_token", data.signupToken)
       .gt("expires_at", new Date().toISOString())
       .maybeSingle();
-    if (reboundError) throw reboundError;
+    if (reboundError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", reboundError);
+    }
     if (rebound?.email === email) return { email };
     throw new Error("Denne registreringen er allerede knyttet til en annen e-postadresse.");
   });
@@ -299,7 +321,10 @@ async function getOrganization(supabaseAdmin: AdminClient, organizationId: strin
     )
     .eq("id", organizationId)
     .single();
-  if (error) throw error;
+  if (error) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("database", error);
+  }
   return data;
 }
 
@@ -361,7 +386,10 @@ export const getBusinessListingStats = createServerFn({ method: "GET" })
         .eq("user_id", context.userId);
       if (data.locationId) assignmentsQuery = assignmentsQuery.eq("location_id", data.locationId);
       const { data: assignments, error: assignmentsError } = await assignmentsQuery;
-      if (assignmentsError) throw assignmentsError;
+      if (assignmentsError) {
+        const { toClientError } = await import("@/lib/to-client-error");
+        throw await toClientError("database", assignmentsError);
+      }
       if (!assignments?.length) throw new Error(UNAUTHORIZED_MESSAGE);
       const canViewAll = assignments.some((assignment) => assignment.listing_access === "all");
       const locationIds = assignments.map((assignment) => assignment.location_id as string);
@@ -370,7 +398,10 @@ export const getBusinessListingStats = createServerFn({ method: "GET" })
     }
 
     const { data: listings, error: listingsError } = await listingQuery;
-    if (listingsError) throw listingsError;
+    if (listingsError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", listingsError);
+    }
     const rawListings = (listings ?? []) as unknown as Array<{
       id: string;
       status: Database["public"]["Enums"]["listing_status"];
@@ -407,9 +438,18 @@ export const getBusinessListingStats = createServerFn({ method: "GET" })
           { data: [], error: null },
           { data: [], error: null },
         ];
-    if (statusHistoryError) throw statusHistoryError;
-    if (salesError) throw salesError;
-    if (viewEventsError) throw viewEventsError;
+    if (statusHistoryError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", statusHistoryError);
+    }
+    if (salesError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", salesError);
+    }
+    if (viewEventsError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", viewEventsError);
+    }
 
     const current = rawListings.map((listing) => {
       const totals = Array.isArray(listing.listing_view_totals)
@@ -510,13 +550,19 @@ export const getBusinessOrganization = createServerFn({ method: "GET" })
       .eq("organization_id", organizationId)
       .eq("user_id", context.userId)
       .single();
-    if (membershipError) throw membershipError;
+    if (membershipError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", membershipError);
+    }
     const { data: categories, error: categoriesError } = await supabaseAdmin
       .from("organization_member_categories")
       .select("category_id")
       .eq("organization_id", organizationId)
       .eq("user_id", context.userId);
-    if (categoriesError) throw categoriesError;
+    if (categoriesError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", categoriesError);
+    }
     const { data: locations, error: locationsError } = await supabaseAdmin
       .from("organization_locations")
       .select(
@@ -526,7 +572,10 @@ export const getBusinessOrganization = createServerFn({ method: "GET" })
       .eq("active", true)
       .order("is_default", { ascending: false })
       .order("name");
-    if (locationsError) throw locationsError;
+    if (locationsError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", locationsError);
+    }
     const allowedCategoryIds = (categories ?? []).map((row) => row.category_id as string);
     const normalizedLocations = (locations ?? [])
       .map((location) => {
@@ -576,7 +625,10 @@ export const getBusinessOrganization = createServerFn({ method: "GET" })
         )
         .eq("organization_id", organizationId)
         .maybeSingle();
-      if (error) throw error;
+      if (error) {
+        const { toClientError } = await import("@/lib/to-client-error");
+        throw await toClientError("database", error);
+      }
       billingProfile = data;
     }
     return {
@@ -640,7 +692,10 @@ export const updateBusinessProfile = createServerFn({ method: "POST" })
       .from("organizations")
       .update(updates)
       .eq("id", organizationId);
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { organization: await getOrganization(supabaseAdmin, organizationId) };
   });
 
@@ -661,7 +716,10 @@ export const updateOrganizationBillingEmail = createServerFn({ method: "POST" })
         "organization_id, billing_email, address_line, postal_code, city, registry_refreshed_at",
       )
       .single();
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { billingProfile };
   });
 
@@ -693,7 +751,10 @@ export const setBusinessPlan = createServerFn({ method: "POST" })
         })
         .eq("id", organizationId)
         .is("proff_trial_started_at", null);
-      if (error) throw error;
+      if (error) {
+        const { toClientError } = await import("@/lib/to-client-error");
+        throw await toClientError("database", error);
+      }
     } else {
       const hasAccess =
         current.selected_plan === "proff" &&
@@ -709,13 +770,19 @@ export const setBusinessPlan = createServerFn({ method: "POST" })
         .from("organizations")
         .update(updates)
         .eq("id", organizationId);
-      if (error) throw error;
+      if (error) {
+        const { toClientError } = await import("@/lib/to-client-error");
+        throw await toClientError("database", error);
+      }
     }
 
     const { error: syncError } = await supabaseAdmin.rpc("sync_organization_entitlements", {
       _organization_id: organizationId,
     });
-    if (syncError) throw syncError;
+    if (syncError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", syncError);
+    }
     return { organization: await getOrganization(supabaseAdmin, organizationId) };
   });
 
@@ -738,7 +805,10 @@ export const createOrganizationLocation = createServerFn({ method: "POST" })
       _postal_code: data.postalCode,
       _city: data.city,
     });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { location };
   });
 
@@ -761,7 +831,10 @@ export const updateOrganizationLocation = createServerFn({ method: "POST" })
         "id, organization_id, name, address_line, postal_code, city, lat, lng, is_default, active",
       )
       .single();
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { location };
   });
 
@@ -787,7 +860,10 @@ export const setOrganizationLocationMember = createServerFn({ method: "POST" })
       _listing_edit_scope: data.listingEditScope,
       _chat_access: data.chatAccess,
     });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return {
       userId: data.userId,
       locationId: data.locationId,
@@ -804,7 +880,10 @@ export const removeOrganizationLocationMember = createServerFn({ method: "POST" 
       _location_id: data.locationId,
       _user_id: data.userId,
     });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return {
       userId: data.userId,
       locationId: data.locationId,
@@ -881,7 +960,8 @@ export const inviteOrganizationMember = createServerFn({ method: "POST" })
       ) {
         throw new Error(INVITE_EXISTING_MESSAGE);
       }
-      throw inviteError;
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("inviteOrganizationMember", inviteError);
     }
     const userId = invited.user?.id;
     if (!userId) throw new Error("Kunne ikke opprette invitasjonen. Prøv igjen.");
@@ -897,7 +977,8 @@ export const inviteOrganizationMember = createServerFn({ method: "POST" })
     if (memberError) {
       await supabaseAdmin.auth.admin.deleteUser(userId);
       if (memberError.code === "23505") throw new Error(INVITE_EXISTING_MESSAGE);
-      throw memberError;
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("inviteOrganizationMember", memberError);
     }
     if (permissions.categoryAccess === "restricted") {
       const { error: categoryError } = await supabaseAdmin
@@ -915,7 +996,8 @@ export const inviteOrganizationMember = createServerFn({ method: "POST" })
           user_id: userId,
         });
         await supabaseAdmin.auth.admin.deleteUser(userId);
-        throw categoryError;
+        const { toClientError } = await import("@/lib/to-client-error");
+        throw await toClientError("inviteOrganizationMember", categoryError);
       }
     }
     let assignments = data.locationAssignments;
@@ -959,7 +1041,8 @@ export const inviteOrganizationMember = createServerFn({ method: "POST" })
         user_id: userId,
       });
       await supabaseAdmin.auth.admin.deleteUser(userId);
-      throw locationsError;
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("inviteOrganizationMember", locationsError);
     }
     return { userId, email };
   });
@@ -974,13 +1057,19 @@ export const acceptOrganizationInvite = createServerFn({ method: "POST" })
       .eq("user_id", context.userId)
       .eq("status", "invited")
       .maybeSingle();
-    if (lookupError) throw lookupError;
+    if (lookupError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", lookupError);
+    }
     if (!membership) throw new Error("Invitasjonen er ugyldig, utløpt eller allerede brukt.");
     const organizationId = membership.organization_id as string;
     const { error: syncError } = await supabaseAdmin.rpc("sync_organization_entitlements", {
       _organization_id: organizationId,
     });
-    if (syncError) throw syncError;
+    if (syncError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", syncError);
+    }
     if (!(await hasEffectiveProffAccess(supabaseAdmin, organizationId))) {
       throw new Error("Invitasjonen er ikke lenger tilgjengelig.");
     }
@@ -992,7 +1081,10 @@ export const acceptOrganizationInvite = createServerFn({ method: "POST" })
       .eq("status", "invited")
       .select("organization_id")
       .single();
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { organizationId: accepted.organization_id as string };
   });
 
@@ -1005,7 +1097,10 @@ export const removeOrganizationMember = createServerFn({ method: "POST" })
       _organization_id: organizationId,
       _user_id: data.userId,
     });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { userId: data.userId };
   });
 
@@ -1035,7 +1130,10 @@ async function findOpenProffOrder(
     .eq("organization_id", organizationId)
     .in("status", ["pending", "invoiced"])
     .maybeSingle();
-  if (error) throw error;
+  if (error) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("database", error);
+  }
   return (data as ProffOrder | null) ?? null;
 }
 
@@ -1064,7 +1162,10 @@ export const requestProffSubscription = createServerFn({ method: "POST" })
       .select("billing_email, address_line, postal_code, city")
       .eq("organization_id", organizationId)
       .single();
-    if (profileError) throw profileError;
+    if (profileError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", profileError);
+    }
     const { data: inserted, error } = await supabaseAdmin
       .from("proff_orders")
       .insert({
@@ -1102,7 +1203,10 @@ async function proffOrderRecipients(supabaseAdmin: AdminClient): Promise<string[
     .from("user_roles")
     .select("user_id")
     .eq("role", "admin");
-  if (error) throw error;
+  if (error) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("database", error);
+  }
 
   const emails = await Promise.all(
     (admins ?? []).map(async ({ user_id }) => {

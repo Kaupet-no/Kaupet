@@ -67,11 +67,14 @@ type Props = {
   highlighted?: boolean;
   onHoverChange?: (id: string | null) => void;
   compact?: boolean;
+  /** Renders the same static card surface for pre-publish previews. */
+  preview?: boolean;
   linkState?: Record<string, unknown>;
   onOpen?: () => void;
   /** Pre-signed by a result-list batch. Undefined keeps the standalone-card
    * fallback; null means the batch found no usable image. */
   signedImageUrl?: string | null;
+  missingPriceLabel?: string;
   knownFavorite?: boolean;
   favoriteStateReady?: boolean;
 };
@@ -165,9 +168,11 @@ export function ListingCard({
   highlighted,
   onHoverChange,
   compact = false,
+  preview = false,
   linkState,
   onOpen,
   signedImageUrl,
+  missingPriceLabel,
   knownFavorite,
   favoriteStateReady,
 }: Props) {
@@ -211,6 +216,17 @@ export function ListingCard({
   }`;
   const linkClass =
     "block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";
+  if (preview) {
+    return (
+      <article className={`${cardClass} text-left`}>
+        <ListingCardContent
+          listing={listing}
+          imgUrl={effectiveImageUrl}
+          missingPriceLabel={missingPriceLabel}
+        />
+      </article>
+    );
+  }
 
   if (compact) {
     return (

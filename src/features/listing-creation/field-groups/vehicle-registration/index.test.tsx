@@ -153,8 +153,12 @@ describe("VehicleRegistration", () => {
     expect(screen.queryByLabelText("Registreringsnummer")).toBeNull();
   });
 
-  it("gjør sylindre og motorkode valgfrie for manuelle kjøretøy", () => {
-    categoryFilters.current = [requiredTextFilter("cylinders"), requiredTextFilter("engine_code")];
+  it("gjør sylindre, slagvolum og motorkode valgfrie for manuelle kjøretøy", () => {
+    categoryFilters.current = [
+      requiredTextFilter("cylinders"),
+      requiredTextFilter("engine_displacement_cc"),
+      requiredTextFilter("engine_code"),
+    ];
 
     render(<VehicleRegistration {...props({ vehicleRegistered: false })} />);
 
@@ -162,7 +166,9 @@ describe("VehicleRegistration", () => {
       .getAllByTestId("attribute-fields")
       .filter((field) => field.dataset.required === "false");
     expect(optionalFields).toHaveLength(1);
-    expect(optionalFields[0].dataset.filterKeys).toBe("cylinders,engine_code");
+    expect(optionalFields[0].dataset.filterKeys).toBe(
+      "cylinders,engine_displacement_cc,engine_code",
+    );
   });
 
   it("åpner og markerer en seksjon med manglende felt etter validering", () => {

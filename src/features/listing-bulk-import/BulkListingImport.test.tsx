@@ -48,7 +48,7 @@ vi.mock("@/hooks/use-categories", () => ({
   visibleCategories: (categories: Array<{ is_hidden?: boolean }>, isDemo: boolean) =>
     categories.filter((category) => isDemo || !category.is_hidden),
 }));
-vi.mock("@/hooks/use-is-demo", () => ({ useIsDemo: () => ({ data: false }) }));
+vi.mock("@/hooks/use-user-roles", () => ({ useIsDemo: () => ({ data: false }) }));
 vi.mock("@/hooks/use-category-filters", () => ({
   useAllCategoryFilters: () => ({ data: [] }),
 }));

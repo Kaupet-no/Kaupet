@@ -37,6 +37,7 @@ function loadRestorableDraft(): WtbDraftData | null {
 
 export function useWtbDraftAutosave(
   fields: Omit<WtbDraftData, "draft_kind" | "draft_version" | "saved_at">,
+  authenticated: boolean,
 ) {
   const [draftId, setDraftId] = useState<string | null>(null);
   const [restorableDraft, setRestorableDraft] = useState<WtbDraftData | null>(null);
@@ -44,6 +45,7 @@ export function useWtbDraftAutosave(
   const [draftSaveError, setDraftSaveError] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const saveInProgress = useRef<Promise<string | null> | null>(null);
+  const savingStopped = useRef(false);
   const fieldsRef = useRef(fields);
   useEffect(() => {
     fieldsRef.current = fields;
@@ -54,6 +56,7 @@ export function useWtbDraftAutosave(
       const local = loadRestorableDraft();
       setDraftId(localStorage.getItem(DRAFT_ID_KEY));
       setRestorableDraft(local);
+      if (!authenticated) return;
       void getLatestWtbDraft()
         .then((server) => {
           if (!server) return;
@@ -79,9 +82,12 @@ export function useWtbDraftAutosave(
         });
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, []);
+  }, [authenticated]);
 
-  function saveLocal() {
+  /** Returns false when the browser refused the write (private mode, quota) —
+   * the guest publish handoff must not navigate away on a lost draft. */
+  function saveLocal(): boolean {
+    if (savingStopped.current) return true;
     try {
       localStorage.setItem(
         DRAFT_KEY,
@@ -94,8 +100,10 @@ export function useWtbDraftAutosave(
       );
       setLastSaved(new Date());
       setDraftSaveError(false);
+      return true;
     } catch {
       setDraftSaveError(true);
+      return false;
     }
   }
 
@@ -106,8 +114,9 @@ export function useWtbDraftAutosave(
   }, [fields, restorableDraft]);
 
   async function saveToServer(): Promise<string | null> {
+    if (savingStopped.current) return draftId;
     saveLocal();
-    // An autosave and a publish-triggered save can land on the same tick;
+    if (!authenticated) return draftId;
     // share the in-flight promise instead of one of them bailing out with a
     // stale draftId, which would otherwise leave the concurrent save's
     // draft row orphaned (see saveWtbDraft/createWtbListing).
@@ -159,7 +168,7 @@ export function useWtbDraftAutosave(
     // saveToServer always reads the latest fields via fieldsRef, so it
     // doesn't belong in this effect's deps (see fieldsRef above).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftId]);
+  }, [draftId, authenticated]);
 
   function clearStorage() {
     localStorage.removeItem(DRAFT_KEY);
@@ -171,6 +180,7 @@ export function useWtbDraftAutosave(
     restorableDraft,
     lastSaved,
     draftSaveError,
+    flushLocalDraft: saveLocal,
     isSaving,
     saveToServer,
     dismissRestore: () => setRestorableDraft(null),
@@ -179,15 +189,15 @@ export function useWtbDraftAutosave(
       clearStorage();
       setRestorableDraft(null);
       setDraftId(null);
-      if (id) {
-        try {
-          await discardWtbDraft({ data: { id } });
-        } catch {
-          setDraftSaveError(true);
-        }
+      if (!id || !authenticated) return;
+      try {
+        await discardWtbDraft({ data: { id } });
+      } catch {
+        setDraftSaveError(true);
       }
     },
     clearAfterPublish: () => {
+      savingStopped.current = true;
       clearStorage();
       setRestorableDraft(null);
       setDraftId(null);

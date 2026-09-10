@@ -17,6 +17,22 @@ describe("productEventSchema", () => {
       }),
     ).toMatchObject({ eventName: "search_filter_applied" });
   });
+  it("beholder kompatibilitet for eksisterende annonsehendelser", () => {
+    expect(
+      productEventSchema.parse({
+        ...baseEvent,
+        eventName: "listing_creation_step_completed",
+        properties: { kind: "sell", step: "photos", stepNumber: 2 },
+      }),
+    ).toMatchObject({ properties: { stepNumber: 2 } });
+
+    expect(
+      productEventSchema.parse({
+        ...baseEvent,
+        eventName: "listing_creation_started",
+      }),
+    ).toMatchObject({ properties: {} });
+  });
 
   it("avviser rå søketekst og lokasjon i properties", () => {
     expect(() =>

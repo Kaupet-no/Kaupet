@@ -11,6 +11,9 @@ export async function requireAdminOrModeratorRole(
     .eq("user_id", userId)
     .in("role", ["admin", "moderator"])
     .maybeSingle();
-  if (error) throw error;
+  if (error) {
+    const { toClientError } = await import("@/lib/to-client-error.server");
+    throw await toClientError("database", error);
+  }
   if (!data) throw new Error("Ikke autorisert");
 }

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/server-error-log", () => ({ logServerError: vi.fn().mockResolvedValue(undefined) }));
 
 import { logServerError } from "@/lib/server-error-log";
-import { toClientError } from "./to-client-error.server";
+import { toClientError } from "./to-client-error";
 
 describe("toClientError (L-14)", () => {
   it("logs the real error and returns a generic message for an unknown code", async () => {

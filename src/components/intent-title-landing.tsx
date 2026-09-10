@@ -8,7 +8,7 @@ import {
   ShoppingBag,
   type LucideIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +39,18 @@ const INTENT_OPTIONS: { value: Intent; label: string; description: string; icon:
   },
 ];
 
+const INTENT_HEADINGS: Record<Intent, string> = {
+  sell: "Hva vil du selge?",
+  buy: "Hva leter du etter?",
+  free: "Hva vil du gi bort?",
+};
+
+const INTENT_EXAMPLES: Record<Intent, string> = {
+  sell: "For eksempel: vintage lenestol i eik",
+  buy: "For eksempel: terrengsykkel til voksen",
+  free: "For eksempel: barneseng som gis bort",
+};
+
 /** Matches wtbSchema's title min (3) for "kjøpe", listingSchema's (5) for
  * "selge"/"gi bort" — a title shorter than this never triggers the
  * suggestCategoryForTitle fetch (see use-listing-title-hints.ts), so letting
@@ -59,6 +71,7 @@ export function IntentTitleLanding({
   const [intent, setIntent] = useState<Intent>(defaultIntent);
   const [title, setTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   function submit() {
     const trimmed = title.trim();
@@ -90,7 +103,7 @@ export function IntentTitleLanding({
           Ny annonse
         </p>
         <h2 className="font-display text-4xl leading-[1.04] tracking-tight sm:text-5xl">
-          Hva vil du gjøre?
+          {INTENT_HEADINGS[intent]}
         </h2>
       </header>
 
@@ -108,6 +121,7 @@ export function IntentTitleLanding({
               onClick={() => {
                 setIntent(opt.value);
                 setError(null);
+                titleInputRef.current?.focus();
               }}
               className={cn(
                 "native-touch-target group relative flex min-h-14 items-center gap-3 rounded-xl border p-3 text-left transition-[background-color,border-color,box-shadow,transform] duration-150 ease-out hover:-translate-y-0.5 hover:border-primary/50 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:min-h-32 sm:flex-col sm:items-stretch sm:justify-between sm:gap-0 sm:rounded-2xl sm:p-4",
@@ -152,13 +166,14 @@ export function IntentTitleLanding({
         <div className="w-full space-y-2">
           <div className="flex items-baseline justify-between gap-3">
             <Label htmlFor="listing-title" className="text-sm font-medium">
-              Hva gjelder annonsen?
+              Tittel
             </Label>
             <span className="hidden text-xs text-muted-foreground sm:inline">
               Du kan endre dette senere
             </span>
           </div>
           <Input
+            ref={titleInputRef}
             id="listing-title"
             autoFocus
             value={title}
@@ -166,11 +181,15 @@ export function IntentTitleLanding({
               setTitle(e.target.value);
               setError(null);
             }}
-            placeholder="For eksempel: vintage lenestol i eik"
             className="h-14 rounded-xl px-4 text-base sm:text-lg"
             aria-invalid={!!error}
-            aria-describedby={error ? "listing-title-error" : undefined}
+            aria-describedby={
+              error ? "listing-title-help listing-title-error" : "listing-title-help"
+            }
           />
+          <p id="listing-title-help" className="text-sm text-muted-foreground">
+            {INTENT_EXAMPLES[intent]}
+          </p>
           {error && (
             <p id="listing-title-error" className="text-sm text-destructive">
               {error}
@@ -178,7 +197,7 @@ export function IntentTitleLanding({
           )}
         </div>
         <Button type="submit" size="lg" className="h-14 w-full gap-2 rounded-xl">
-          Start annonsen
+          Fortsett
           <ArrowRight className="size-4" aria-hidden="true" />
         </Button>
       </div>

@@ -2,7 +2,7 @@ import type { RefObject } from "react";
 import { Loader2 } from "lucide-react";
 import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 
-import { ListingCardContent, type ListingCardData } from "@/components/listing-card";
+import { ListingCard, type ListingCardData } from "@/components/listing-card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -58,17 +58,12 @@ export function ReviewPreview({
     attributes,
   };
   const card = (
-    <div
-      className={`group w-full overflow-hidden rounded-lg border border-border bg-card text-left transition-[border-color,box-shadow] duration-150 hover:border-primary/70 hover:shadow-sm ${
-        onPreview ? "cursor-pointer hover:bg-primary/5" : ""
-      }`}
-    >
-      <ListingCardContent
-        listing={listing}
-        imgUrl={images[0]?.previewUrl ?? null}
-        missingPriceLabel="Pris er foreløpig ikke satt"
-      />
-    </div>
+    <ListingCard
+      listing={listing}
+      preview
+      signedImageUrl={images[0]?.previewUrl ?? null}
+      missingPriceLabel="Ingen pris"
+    />
   );
 
   return (
@@ -127,6 +122,7 @@ type PublishActionsProps = {
   turnstileRef: RefObject<TurnstileInstance | null>;
   mutationIsPending: boolean;
   onCancel: () => void;
+  isGuest?: boolean;
 };
 
 /**
@@ -224,7 +220,7 @@ export function ReviewPublishGroup(props: WizardSharedProps) {
         <section aria-labelledby="listing-improvements-title" className="space-y-3">
           <div>
             <h3 id="listing-improvements-title" className="text-lg font-semibold">
-              Dette vil gi en bedre annonse
+              Gjør annonsen bedre
             </h3>
             <p className="text-sm text-muted-foreground">
               Valgfritt – du kan fortsatt publisere annonsen.
@@ -296,6 +292,7 @@ export function PublishActions({
   turnstileRef,
   mutationIsPending,
   onCancel,
+  isGuest = false,
 }: PublishActionsProps) {
   if (native) {
     return (
@@ -304,7 +301,7 @@ export function PublishActions({
           <Turnstile
             ref={turnstileRef}
             siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-            options={{ size: "invisible" }}
+            options={{ size: "invisible", action: "kaupet" }}
           />
         )}
         <Button
@@ -314,7 +311,7 @@ export function PublishActions({
           className="min-h-12 min-w-24 rounded-xl px-3 text-base"
         >
           {mutationIsPending && <Loader2 className="size-4 animate-spin" />}
-          Publiser
+          {isGuest ? "Logg inn og publiser" : "Publiser"}
         </Button>
       </>
     );
@@ -330,12 +327,12 @@ export function PublishActions({
           <Turnstile
             ref={turnstileRef}
             siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-            options={{ size: "invisible" }}
+            options={{ size: "invisible", action: "kaupet" }}
           />
         )}
         <Button type="submit" data-testid="publish-listing-button" disabled={mutationIsPending}>
           {mutationIsPending && <Loader2 className="size-4 animate-spin" />}
-          Publiser annonse
+          {isGuest ? "Logg inn og publiser" : "Publiser annonse"}
         </Button>
       </div>
     </>

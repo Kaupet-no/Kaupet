@@ -43,6 +43,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatErrorMessage } from "@/lib/errors";
+import { formatNok } from "@/lib/format";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
 export const Route = createFileRoute("/_authenticated/admin/proff-abonnement")({
@@ -64,10 +65,6 @@ const STATUS_LABEL: Record<AdminProffOrder["status"], string> = {
   paid: "Betalt",
   cancelled: "Kansellert",
 };
-
-function formatNok(value: number) {
-  return `${new Intl.NumberFormat("nb-NO").format(value)} kr`;
-}
 
 function formatDate(value: string | null) {
   return value ? new Date(value).toLocaleDateString("nb-NO") : "—";

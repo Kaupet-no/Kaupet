@@ -20,7 +20,7 @@ import { showSuccessToast, showErrorToast } from "@/lib/toast";
 
 import { usePushStatus } from "@/hooks/use-push-status";
 import { useCategories, visibleCategories } from "@/hooks/use-categories";
-import { useIsDemo } from "@/hooks/use-is-demo";
+import { useIsDemo } from "@/hooks/use-user-roles";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

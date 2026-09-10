@@ -12,7 +12,7 @@ import { RangeFilterField } from "@/components/range-filter-field";
 import { CategoryFilterFields } from "@/components/category-filter-fields";
 import { LocationPicker, RadiusPicker } from "@/components/location-filter";
 import { TermGroupEditor } from "@/components/term-group-editor";
-import { ModeToggle, CategoryPicker } from "@/components/advanced-search-sheet";
+import { ModeToggle, CategorySlugPicker } from "@/components/advanced-search-sheet";
 import { CONDITIONS } from "@/components/advanced-search-value";
 import { PRICE_BOUNDS } from "@/lib/filter-range-bounds";
 import { searchSchema, conditionEnum } from "@/features/listing-search/search-schema";
@@ -277,7 +277,7 @@ function FilterPage() {
               </CollapsibleContent>
             </Collapsible>
 
-            <CategoryPicker
+            <CategorySlugPicker
               categories={categories ?? []}
               selected={effectiveCategories}
               onChange={(slugs) =>

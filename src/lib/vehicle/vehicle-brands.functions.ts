@@ -57,7 +57,10 @@ export const createVehicleBrand = createServerFn({ method: "POST" })
       })
       .select("id, name, status")
       .single();
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return created;
   });
 
@@ -93,6 +96,9 @@ export const createVehicleModel = createServerFn({ method: "POST" })
       })
       .select("id, name, status")
       .single();
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return created;
   });

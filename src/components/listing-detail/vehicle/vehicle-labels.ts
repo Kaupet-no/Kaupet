@@ -23,6 +23,38 @@ export const DRIVE_TYPE_LABEL_NB: Record<string, string> = {
   "4x4": "Firehjulstrekk",
 };
 
+/** Selgeroppgitt farge (`attributes.color`) — brukes når SVV-oppslaget
+ * mangler og selgeren har fylt ut feltet manuelt. SVV leverer farge som ferdig
+ * visningstekst ("Hvit"), mens kategorifilteret lagrer opsjonsverdier. */
+export const COLOR_LABEL_NB: Record<string, string> = {
+  black: "Svart",
+  white: "Hvit",
+  silver: "Sølv",
+  gray: "Grå",
+  red: "Rød",
+  blue: "Blå",
+  green: "Grønn",
+  yellow: "Gul",
+  orange: "Oransje",
+  brown: "Brun",
+  beige: "Beige",
+  purple: "Lilla",
+  other: "Annen farge",
+};
+
+/** Selgeroppgitt karosseri (`attributes.body_type`). SVV gir i stedet
+ * `body_type_hint` som ferdig tekst ("Kupé (AD)"). */
+export const BODY_TYPE_LABEL_NB: Record<string, string> = {
+  sedan: "Sedan",
+  stasjonsvogn: "Stasjonsvogn",
+  suv: "SUV",
+  cabriolet: "Cabriolet",
+  coupe: "Coupé",
+  kombi: "Kombi",
+  pickup: "Pickup",
+  varebil: "Varebil",
+};
+
 /** Akselkombinasjon (bobil/lastebil/buss) — verdiene er selvforklarende
  * (4x2/6x4/8x8 osv.), så etiketten er identisk med verdien; egen map likevel
  * for symmetri med de andre *_LABEL_NB-oppslagene og i tilfelle det trengs

@@ -133,7 +133,7 @@ describe.skipIf(!canRun)("RLS: conversations & messages are only visible to part
     expect(messages).toHaveLength(0);
   });
 
-  it("rejects a message body over 4000 characters (M-7)", async () => {
+  it("rejects direct message writes, including valid-length bodies (M-7)", async () => {
     const buyer = await signIn(emails.buyer);
     const {
       data: { user: buyerUser },
@@ -150,10 +150,26 @@ describe.skipIf(!canRun)("RLS: conversations & messages are only visible to part
       sender_id: buyerUser!.id,
       body: "x".repeat(4000),
     });
-    expect(okError).toBeNull();
+    expect(okError).not.toBeNull();
+  });
+  it("inserts messages atomically and returns the same row for retries", async () => {
+    const buyerId = userIds[0]!;
+    const clientId = crypto.randomUUID();
+    const args = {
+      _conversation_id: conversationId,
+      _sender_id: buyerId,
+      _body: "Idempotent message",
+      _attachment_path: null,
+      _client_id: clientId,
+    };
+    const first = await admin.rpc("send_message_rate_limited", args);
+    expect(first.error).toBeNull();
+    const second = await admin.rpc("send_message_rate_limited", args);
+    expect(second.error).toBeNull();
+    expect(second.data?.id).toBe(first.data?.id);
   });
 
-  it("rejects a display_name over 80 characters (M-7)", async () => {
+  it("rejects direct profile writes, including valid-length names (M-7)", async () => {
     const buyer = await signIn(emails.buyer);
     const {
       data: { user: buyerUser },
@@ -168,8 +184,22 @@ describe.skipIf(!canRun)("RLS: conversations & messages are only visible to part
       .from("profiles")
       .update({ display_name: "x".repeat(80) })
       .eq("id", buyerUser!.id);
-    expect(okError).toBeNull();
+    expect(okError).not.toBeNull();
   });
+
+  it("denies category sync to authenticated users", async () => {
+    const buyer = await signIn(emails.buyer);
+    const { error } = await buyer.rpc("sync_categories_from_payload", {
+      p_categories: {},
+      p_category_filters: {},
+      p_category_flows: {},
+      p_filter_synonyms: {},
+      p_default_search_examples: [],
+      p_synced_by: userIds[0]!,
+    });
+    expect(error?.code).toBe("42501");
+  });
+
   it("lar hver deltaker flytte sin egen samtale til papirkurven og gjenopprette den", async () => {
     const buyer = await signIn(emails.buyer);
     const seller = await signIn(emails.seller);
@@ -336,12 +366,11 @@ describe.skipIf(!canRun)("RLS: listings — draft visibility and owner-only writ
 
   it("blocks the owner from re-activating an admin-disabled listing", async () => {
     const seller = await signIn(emails.seller);
-    const { error, count } = await seller
+    const { error } = await seller
       .from("listings")
       .update({ status: "active" }, { count: "exact" })
       .eq("id", disabledListingId);
-    expect(error).toBeNull();
-    expect(count).toBe(0);
+    expect(error).not.toBeNull();
 
     const { data: check } = await admin
       .from("listings")
@@ -1375,12 +1404,12 @@ describe.skipIf(!canRun)(
       await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
     });
 
-    it("lets a user submit their own report", async () => {
+    it("rejects direct report writes; the server function owns submission", async () => {
       const reporter = await signIn(emails.reporter);
       const { error } = await reporter
         .from("reports")
         .insert({ listing_id: listingId, reporter_id: reporterId, reason: "Second report" });
-      expect(error).toBeNull();
+      expect(error).not.toBeNull();
     });
 
     it("blocks a user from submitting a report on someone else's behalf", async () => {
@@ -1975,34 +2004,31 @@ describe.skipIf(!canRun)(
       expect(data).toHaveLength(0);
     });
 
-    it("lets the owner update and activate their own draft", async () => {
+    it("rejects direct WTB updates, including the owner path", async () => {
       const owner = await signIn(emails.owner);
-      const { error, count } = await owner
+      const { error } = await owner
         .from("wtb_listings")
         .update({ title: "Updated private draft", status: "active" }, { count: "exact" })
         .eq("id", activatableDraftId);
-      expect(error).toBeNull();
-      expect(count).toBe(1);
+      expect(error).not.toBeNull();
     });
 
-    it("blocks a non-owner from activating someone else's draft", async () => {
+    it("rejects direct WTB updates from other users", async () => {
       const other = await signIn(emails.other);
-      const { error, count } = await other
+      const { error } = await other
         .from("wtb_listings")
         .update({ status: "active" }, { count: "exact" })
         .eq("id", draftId);
-      expect(error).toBeNull();
-      expect(count).toBe(0);
+      expect(error).not.toBeNull();
     });
 
-    it("lets the owner delete their own draft", async () => {
+    it("rejects direct WTB deletes; the server function owns deletion", async () => {
       const owner = await signIn(emails.owner);
-      const { error, count } = await owner
+      const { error } = await owner
         .from("wtb_listings")
         .delete({ count: "exact" })
         .eq("id", deletableDraftId);
-      expect(error).toBeNull();
-      expect(count).toBe(1);
+      expect(error).not.toBeNull();
     });
 
     it("creates WTB notifications only when the owner opted in", async () => {
@@ -2014,14 +2040,13 @@ describe.skipIf(!canRun)(
       expect(data?.map((row) => row.wtb_listing_id)).toEqual([notifiedActiveId]);
     });
 
-    it("blocks a non-owner from updating someone else's wtb listing", async () => {
+    it("rejects direct WTB updates from another user", async () => {
       const other = await signIn(emails.other);
-      const { error, count } = await other
+      const { error } = await other
         .from("wtb_listings")
         .update({ title: "Hijacked" }, { count: "exact" })
         .eq("id", activeId);
-      expect(error).toBeNull();
-      expect(count).toBe(0);
+      expect(error).not.toBeNull();
     });
 
     it("blocks a user from creating a wtb listing on someone else's behalf", async () => {
@@ -2407,6 +2432,7 @@ describe.skipIf(!canRun)(
     const userIds: string[] = [];
     let sellerId: string;
     let draftListingId: string;
+    let imagePath: string;
     let draftImageId: string;
 
     async function signIn(email: string) {
@@ -2440,9 +2466,14 @@ describe.skipIf(!canRun)(
       if (listingErr) throw listingErr;
       draftListingId = listing.id;
 
+      imagePath = `${sellerId}/${draftListingId}/rls-test-${suffix}.jpg`;
+      const { error: uploadError } = await admin.storage
+        .from("listing-images")
+        .upload(imagePath, new Blob(["test"], { type: "image/jpeg" }), { upsert: false });
+      if (uploadError) throw uploadError;
       const { data: image, error: imageErr } = await admin
         .from("listing_images")
-        .insert({ listing_id: draftListingId, storage_path: `rls-test/${suffix}.jpg` })
+        .insert({ listing_id: draftListingId, storage_path: imagePath })
         .select("id")
         .single();
       if (imageErr) throw imageErr;
@@ -2452,6 +2483,7 @@ describe.skipIf(!canRun)(
     afterAll(async () => {
       if (!canRun) return;
       await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
+      await admin.storage.from("listing-images").remove([imagePath]);
     });
 
     it("lets the owner see images on their own draft listing", async () => {
@@ -2909,25 +2941,21 @@ describe.skipIf(!canRun)(
         .delete()
         .eq("word", lexeme)
         .eq("category_id", categoryId);
-      await admin.from("categories").delete().eq("id", categoryId);
-      await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)));
     });
 
-    it("lets an anonymous visitor read both stats tables", async () => {
+    it("keeps search statistics private to server code", async () => {
       const anon = createClient(URL!, ANON_KEY!);
-      const { data: wordData, error: wordErr } = await anon
+      const { error: wordErr } = await anon
         .from("listing_category_word_stats")
         .select("lexeme")
         .eq("lexeme", lexeme);
-      expect(wordErr).toBeNull();
-      expect(wordData).toHaveLength(1);
+      expect(wordErr).not.toBeNull();
 
-      const { data: keywordData, error: keywordErr } = await anon
+      const { error: keywordErr } = await anon
         .from("listing_keyword_stats")
         .select("word")
         .eq("word", lexeme);
-      expect(keywordErr).toBeNull();
-      expect(keywordData).toHaveLength(1);
+      expect(keywordErr).not.toBeNull();
     });
 
     it("blocks a regular authenticated client from writing to either stats table", async () => {
@@ -3529,6 +3557,7 @@ describe.skipIf(!canRun)(
     const organizationIds: string[] = [];
     const locationIds = new Map<string, string>();
     const objectPaths: string[] = [];
+    const listingImagePaths: string[] = [];
     let ownerId: string;
     let memberId: string;
     let buyerId: string;
@@ -3718,6 +3747,9 @@ describe.skipIf(!canRun)(
       if (objectPaths.length > 0) {
         await admin.storage.from("organization-logos").remove(objectPaths);
       }
+      if (listingImagePaths.length > 0) {
+        await admin.storage.from("listing-images").remove(listingImagePaths);
+      }
       await Promise.all(
         organizationIds.map((id) => admin.from("organizations").delete().eq("id", id)),
       );
@@ -3863,7 +3895,7 @@ describe.skipIf(!canRun)(
       });
       expect(anonymousInsertError).not.toBeNull();
 
-      const { data: insertedListing, error: insertError } = await member
+      const { data: insertedListing, error: insertError } = await admin
         .from("listings")
         .insert({
           seller_id: memberId,
@@ -3907,6 +3939,31 @@ describe.skipIf(!canRun)(
         .delete({ count: "exact" })
         .eq("id", insertedListingId);
       expect(ownerDeleteCount).toBe(1);
+    });
+
+    it("lets an authorized organization member attach an image uploaded under their own id", async () => {
+      const owner = await signIn(emails.owner);
+      const path = `${ownerId}/${memberListingId}/rls-${suffix}.png`;
+      listingImagePaths.push(path);
+
+      const { error: uploadError } = await owner.storage
+        .from("listing-images")
+        .upload(path, new Blob(["img"], { type: "image/png" }), {
+          contentType: "image/png",
+        });
+      expect(uploadError).toBeNull();
+
+      const { data: image, error: metadataError } = await owner
+        .from("listing_images")
+        .insert({
+          listing_id: memberListingId,
+          storage_path: path,
+          sort_order: 0,
+        })
+        .select("id")
+        .single();
+      expect(metadataError).toBeNull();
+      expect(image?.id).toBeTruthy();
     });
 
     it("lets an organization superuser read and send messages, but not another business", async () => {
@@ -3954,7 +4011,7 @@ describe.skipIf(!canRun)(
         sender_id: ownerId,
         body: "Jeg følger opp på vegne av bedriften.",
       });
-      expect(sendError).toBeNull();
+      expect(sendError).not.toBeNull();
 
       const { error: readUpdateError, count: readUpdateCount } = await owner
         .from("conversations")
@@ -4565,7 +4622,7 @@ describe.skipIf(!canRun)(
       expect(error).not.toBeNull();
     });
 
-    it("rejects admin_verify_organization from a non-admin, then allows listing creation once an admin approves it", async () => {
+    it("keeps direct listing insertion closed after organization verification", async () => {
       const owner = await signIn(emails.owner);
       const { error: selfVerifyError } = await owner.rpc("admin_verify_organization", {
         _organization_id: organizationId,
@@ -4594,7 +4651,7 @@ describe.skipIf(!canRun)(
         price_nok: 100,
         status: "draft",
       });
-      expect(insertError).toBeNull();
+      expect(insertError).not.toBeNull();
     });
   },
 );

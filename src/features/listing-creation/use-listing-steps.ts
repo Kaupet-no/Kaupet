@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { FieldGroup } from "./field-groups/registry";
 
@@ -12,7 +12,20 @@ export type WizardPage = { groups: FieldGroup[] };
  */
 export function useListingSteps(pages: WizardPage[]) {
   const [step, setStepRaw] = useState(1);
-  const clamp = (n: number) => Math.min(Math.max(n, 1), pages.length);
+  const clamp = useCallback((n: number) => Math.min(Math.max(n, 1), pages.length), [pages.length]);
+  const previousPagesRef = useRef(pages);
+
+  useEffect(() => {
+    const previousPages = previousPagesRef.current;
+    if (previousPages === pages) return;
+
+    const activeKey = previousPages[step - 1]?.groups[0]?.key;
+    const matchingPage = activeKey
+      ? pages.findIndex((page) => page.groups.some((group) => group.key === activeKey))
+      : -1;
+    setStepRaw(matchingPage >= 0 ? matchingPage + 1 : clamp(step));
+    previousPagesRef.current = pages;
+  }, [clamp, pages, step]);
 
   return {
     step,

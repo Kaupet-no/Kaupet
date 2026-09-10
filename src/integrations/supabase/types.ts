@@ -165,6 +165,7 @@ export type Database = {
           name_nb: string
           parent_id: string | null
           search_examples: string[]
+          search_synonyms: string[]
           slug: string
           sort_order: number
           title_example: string | null
@@ -180,6 +181,7 @@ export type Database = {
           name_nb: string
           parent_id?: string | null
           search_examples?: string[]
+          search_synonyms?: string[]
           slug: string
           sort_order?: number
           title_example?: string | null
@@ -195,6 +197,7 @@ export type Database = {
           name_nb?: string
           parent_id?: string | null
           search_examples?: string[]
+          search_synonyms?: string[]
           slug?: string
           sort_order?: number
           title_example?: string | null
@@ -278,9 +281,7 @@ export type Database = {
           created_at: string
           field_groups: string[]
           id: string
-          modules: string[]
           sort_order: number
-          steps: string[]
           updated_at: string
         }
         Insert: {
@@ -288,9 +289,7 @@ export type Database = {
           created_at?: string
           field_groups?: string[]
           id?: string
-          modules?: string[]
           sort_order?: number
-          steps?: string[]
           updated_at?: string
         }
         Update: {
@@ -298,9 +297,7 @@ export type Database = {
           created_at?: string
           field_groups?: string[]
           id?: string
-          modules?: string[]
           sort_order?: number
-          steps?: string[]
           updated_at?: string
         }
         Relationships: [
@@ -1184,6 +1181,7 @@ export type Database = {
         Row: {
           attachment_path: string | null
           body: string
+          client_id: string | null
           conversation_id: string
           created_at: string
           deleted_at: string | null
@@ -1193,6 +1191,7 @@ export type Database = {
         Insert: {
           attachment_path?: string | null
           body: string
+          client_id?: string | null
           conversation_id: string
           created_at?: string
           deleted_at?: string | null
@@ -1202,6 +1201,7 @@ export type Database = {
         Update: {
           attachment_path?: string | null
           body?: string
+          client_id?: string | null
           conversation_id?: string
           created_at?: string
           deleted_at?: string | null
@@ -3276,6 +3276,26 @@ export type Database = {
         Returns: undefined
       }
       request_account_deletion: { Args: { _email: string }; Returns: undefined }
+      purge_endpoint_rate_limits: { Args: never; Returns: undefined }
+      send_message_rate_limited: {
+        Args: {
+          _attachment_path?: string | null
+          _body: string
+          _client_id: string
+          _conversation_id: string
+          _sender_id: string
+        }
+        Returns: {
+          attachment_path: string | null
+          body: string
+          client_id: string | null
+          conversation_id: string
+          created_at: string
+          deleted_at: string | null
+          id: string
+          sender_id: string
+        }
+      }
       saved_search_unread_counts: {
         Args: never
         Returns: {

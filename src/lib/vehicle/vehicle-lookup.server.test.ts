@@ -65,6 +65,30 @@ describe("lookupVehicle", () => {
       imported_used: false,
     });
   });
+  it("mapper norsk Kupé-kode til den kanoniske coupe-verdien", async () => {
+    mockSvvResponse({
+      godkjenning: {
+        tekniskGodkjenning: {
+          tekniskeData: {
+            karosseriOgLasteplan: {
+              karosseritype: {
+                kodeVerdi: "AD",
+                kodeNavn: "Kupé (AD)",
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const result = await lookupVehicle("TEST123");
+
+    expect(result).toMatchObject({
+      body_type_code: "AD",
+      body_type_hint: "Kupé (AD)",
+      body_type: "coupe",
+    });
+  });
 
   it("registrerer 0 i hengervekt når SVV mangler hengerfeste eksplisitt", async () => {
     mockSvvResponse({

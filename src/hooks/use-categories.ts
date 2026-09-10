@@ -10,6 +10,7 @@ export type CategoryRecord = {
   color: string | null;
   heading_font: string | null;
   search_examples: string[];
+  search_synonyms: string[];
   is_hidden: boolean;
   title_example: string | null;
   sort_order: number;

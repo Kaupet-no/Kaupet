@@ -12,6 +12,9 @@ export async function requireAdminRole(
     .eq("user_id", userId)
     .eq("role", "admin")
     .maybeSingle();
-  if (error) throw error;
+  if (error) {
+    const { toClientError } = await import("@/lib/to-client-error.server");
+    throw await toClientError("database", error);
+  }
   if (!data) throw new Error("Ikke autorisert");
 }

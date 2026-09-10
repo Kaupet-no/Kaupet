@@ -2,8 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
-import { useIsAdmin } from "@/hooks/use-is-admin";
-import { useIsDemo } from "@/hooks/use-is-demo";
+import { useIsAdmin, useIsDemo } from "@/hooks/use-user-roles";
 import { supabase } from "@/integrations/supabase/client";
 
 /**

@@ -41,10 +41,17 @@ type ListingMutationRow = {
   seller_id: string;
   organization_id: string | null;
   organization_location_id: string | null;
-  status: string;
+  status: "disabled" | "active" | "expired" | "draft" | "sold" | "archived";
+  title: string | null;
+  description: string | null;
+  condition: string | null;
+  can_ship: boolean | null;
+  postal_code: string | null;
+  city: string | null;
   is_free: boolean;
   price_nok: number | null;
   category_id: string | null;
+  attributes: unknown;
 };
 
 async function resolveListingOwnership(
@@ -59,7 +66,10 @@ async function resolveListingOwnership(
     .eq("user_id", userId)
     .eq("status", "active")
     .maybeSingle();
-  if (error) throw error;
+  if (error) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("database", error);
+  }
   if (!membership) {
     return { seller_id: userId, organization_id: null, organization_location_id: null };
   }
@@ -67,12 +77,18 @@ async function resolveListingOwnership(
     const { error: syncError } = await supabaseAdmin.rpc("sync_organization_entitlements", {
       _organization_id: membership.organization_id,
     });
-    if (syncError) throw syncError;
+    if (syncError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", syncError);
+    }
     const { data: hasAccess, error: accessError } = await supabaseAdmin.rpc(
       "organization_has_proff_access",
       { _organization_id: membership.organization_id },
     );
-    if (accessError) throw accessError;
+    if (accessError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", accessError);
+    }
     if (!hasAccess) throw new Error("Proff-tilgang er ikke aktiv.");
     if (!membership.can_create_listings) {
       throw new Error("Du har ikke tilgang til å opprette annonser.");
@@ -86,7 +102,10 @@ async function resolveListingOwnership(
         .eq("user_id", userId)
         .eq("category_id", categoryId)
         .maybeSingle();
-      if (categoryError) throw categoryError;
+      if (categoryError) {
+        const { toClientError } = await import("@/lib/to-client-error");
+        throw await toClientError("database", categoryError);
+      }
       if (!allowed) throw new Error("Du har ikke tilgang til denne kategorien.");
     }
   }
@@ -98,7 +117,10 @@ async function resolveListingOwnership(
     .eq("organization_id", membership.organization_id)
     .eq("active", true)
     .maybeSingle();
-  if (locationError) throw locationError;
+  if (locationError) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("database", locationError);
+  }
   if (!location) throw new Error("Lokasjonen finnes ikke eller er ikke aktiv.");
   if (membership.role !== "superuser") {
     const { data: assignment, error: assignmentError } = await supabaseAdmin
@@ -107,7 +129,10 @@ async function resolveListingOwnership(
       .eq("location_id", requestedLocationId)
       .eq("user_id", userId)
       .maybeSingle();
-    if (assignmentError) throw assignmentError;
+    if (assignmentError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", assignmentError);
+    }
     if (!assignment) throw new Error("Du har ikke tilgang til denne lokasjonen.");
   }
   return {
@@ -151,7 +176,10 @@ async function saveVisitingAddressSnapshot(
     postal_code: location.postal_code,
     city: location.city,
   });
-  if (error) throw error;
+  if (error) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("database", error);
+  }
 }
 
 async function authorizeListingMutation(
@@ -162,11 +190,14 @@ async function authorizeListingMutation(
   const { data: listing, error } = await supabaseAdmin
     .from("listings")
     .select(
-      "id, seller_id, organization_id, organization_location_id, status, is_free, price_nok, category_id",
+      "id, seller_id, organization_id, organization_location_id, status, title, description, condition, can_ship, postal_code, city, is_free, price_nok, category_id, attributes",
     )
     .eq("id", listingId)
     .maybeSingle();
-  if (error) throw error;
+  if (error) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("database", error);
+  }
   if (!listing) throw new Error("Annonsen finnes ikke.");
   if (listing.seller_id === userId && !listing.organization_id) return listing;
   if (!listing.organization_id || !listing.organization_location_id) {
@@ -183,7 +214,10 @@ async function authorizeListingMutation(
       _user_id: userId,
     },
   );
-  if (permissionError) throw permissionError;
+  if (permissionError) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("database", permissionError);
+  }
   if (!allowed) throw new Error("Du har ikke tilgang til denne annonsen");
   return listing;
 }
@@ -235,6 +269,101 @@ function validatePartFitment(
   if (typeof yearFrom === "number" && typeof yearTo === "number" && yearFrom > yearTo) {
     throw new Error("Årsmodell fra kan ikke være høyere enn årsmodell til.");
   }
+}
+async function validateExistingListingForPublish(
+  supabaseAdmin: SupabaseClient,
+  listing: ListingMutationRow,
+) {
+  const titleLength = listing.title?.trim().length ?? 0;
+  if (titleLength < 5) throw new Error("Tittelen må være minst 5 tegn.");
+  if (titleLength > 120) throw new Error("Tittelen kan ikke være lengre enn 120 tegn.");
+  const descriptionLength = listing.description?.trim().length ?? 0;
+  if (descriptionLength < 20) throw new Error("Beskrivelsen må være minst 20 tegn.");
+  if (descriptionLength > 4000) throw new Error("Beskrivelsen kan ikke være lengre enn 4000 tegn.");
+  if (!listing.category_id) throw new Error("Velg en kategori før annonsen publiseres.");
+  if (!listing.postal_code || !/^\d{4}$/.test(listing.postal_code)) {
+    throw new Error("Oppgi et gyldig postnummer før annonsen publiseres.");
+  }
+  if (!listing.city?.trim()) throw new Error("Oppgi sted før annonsen publiseres.");
+  if (
+    !listing.is_free &&
+    (listing.price_nok == null ||
+      !Number.isInteger(listing.price_nok) ||
+      listing.price_nok < 0 ||
+      listing.price_nok > 10_000_000)
+  ) {
+    throw new Error("Oppgi en gyldig pris før annonsen publiseres.");
+  }
+  if (
+    listing.condition !== null &&
+    !["new", "like_new", "good", "acceptable", "for_parts"].includes(listing.condition)
+  ) {
+    throw new Error("Annonsens tilstand er ugyldig.");
+  }
+
+  const [
+    { data: filterRows, error: filterError },
+    { data: categoryRows, error: categoryError },
+    { data: flowRows, error: flowError },
+  ] = await Promise.all([
+    supabaseAdmin
+      .from("category_filters")
+      .select(
+        "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value, depends_on_not_value, is_optional",
+      ),
+    supabaseAdmin.from("categories").select("id, parent_id"),
+    supabaseAdmin.from("category_flows").select("id, category_id, field_groups, sort_order"),
+  ]);
+  if (filterError) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("republishListing.filters", filterError);
+  }
+  if (categoryError) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("republishListing.categories", categoryError);
+  }
+  if (flowError) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("republishListing.flows", flowError);
+  }
+
+  const categoriesById = new Map<string, CategoryNode>(
+    (categoryRows ?? []).map((category) => [category.id as string, category as CategoryNode]),
+  );
+  const normalizedFilters = (filterRows ?? []).map(normalizeFilter);
+  const categoryBehavior = getCategoryBehavior(
+    vehicleCategoryGroupFor(listing.category_id, normalizedFilters, categoriesById),
+    isBoatCategory(listing.category_id, normalizedFilters, categoriesById),
+  );
+  const attributesResult = attributesSchema.safeParse(listing.attributes ?? {});
+  if (!attributesResult.success) throw new Error("Annonsens attributter er ugyldige.");
+  const attributes = attributesResult.data;
+
+  if (categoryBehavior.requiresCategoryFilterValues) {
+    const missing = getMissingRequiredFilters(
+      listing.category_id,
+      normalizedFilters,
+      categoriesById,
+      attributes,
+      [...VEHICLE_EQUIPMENT_FILTER_KEYS, ...categoryBehavior.requiredFilterExclusions],
+    );
+    if (missing.length > 0) {
+      throw new Error(`Fyll inn: ${missing.map((filter) => filter.label_nb).join(", ")}`);
+    }
+    validatePartFitment(listing.category_id, normalizedFilters, categoriesById, attributes);
+  }
+
+  const { fieldGroups } = effectiveFlowForCategory(
+    listing.category_id,
+    (flowRows ?? []) as CategoryFlowRow[],
+    categoriesById,
+  );
+  const fieldGroupError = validateRequiredFieldGroups(
+    fieldGroups,
+    { condition: listing.condition, can_ship: listing.can_ship },
+    categoryBehavior,
+  );
+  if (fieldGroupError) throw new Error(fieldGroupError);
 }
 
 export const saveDraftListing = createServerFn({ method: "POST" })
@@ -326,7 +455,7 @@ export const saveDraftListing = createServerFn({ method: "POST" })
         .select("id, kaupet_code")
         .single();
       if (error) {
-        const { toClientError } = await import("@/lib/to-client-error.server");
+        const { toClientError } = await import("@/lib/to-client-error");
         throw await toClientError("saveDraftListing.update", error, { listing_id: data.id });
       }
       return { id: updated.id as string, kaupet_code: updated.kaupet_code as string };
@@ -364,7 +493,10 @@ export const saveDraftListing = createServerFn({ method: "POST" })
       })
       .select("id, kaupet_code")
       .single();
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { id: listing.id as string, kaupet_code: listing.kaupet_code as string };
   });
 
@@ -379,7 +511,10 @@ export const discardDraftListing = createServerFn({ method: "POST" })
       .delete()
       .eq("id", data.id)
       .eq("status", "draft");
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
   });
 
 export const createListing = createServerFn({ method: "POST" })
@@ -435,9 +570,7 @@ export const createListing = createServerFn({ method: "POST" })
           "id, category_id, key, label_nb, type, unit, options, sort_order, is_primary, depends_on_key, depends_on_value, depends_on_not_value, is_optional",
         ),
       supabaseAdmin.from("categories").select("id, parent_id"),
-      supabaseAdmin
-        .from("category_flows")
-        .select("id, category_id, field_groups, modules, sort_order"),
+      supabaseAdmin.from("category_flows").select("id, category_id, field_groups, sort_order"),
     ]);
     const categoriesById = new Map<string, CategoryNode>(
       (categoryRows ?? []).map((c) => [c.id as string, c as CategoryNode]),
@@ -447,17 +580,26 @@ export const createListing = createServerFn({ method: "POST" })
       vehicleCategoryGroupFor(data.category_id, normalizedFilters, categoriesById),
       isBoatCategory(data.category_id, normalizedFilters, categoriesById),
     );
-    const missing = getMissingRequiredFilters(
-      data.category_id,
-      normalizedFilters,
-      categoriesById,
-      data.attributes ?? {},
-      [...VEHICLE_EQUIPMENT_FILTER_KEYS, ...categoryBehavior.requiredFilterExclusions],
-    );
+    const missing = categoryBehavior.requiresCategoryFilterValues
+      ? getMissingRequiredFilters(
+          data.category_id,
+          normalizedFilters,
+          categoriesById,
+          data.attributes ?? {},
+          [...VEHICLE_EQUIPMENT_FILTER_KEYS, ...categoryBehavior.requiredFilterExclusions],
+        )
+      : [];
     if (missing.length > 0) {
       throw new Error(`Fyll inn: ${missing.map((f) => f.label_nb).join(", ")}`);
     }
-    validatePartFitment(data.category_id, normalizedFilters, categoriesById, data.attributes ?? {});
+    if (categoryBehavior.requiresCategoryFilterValues) {
+      validatePartFitment(
+        data.category_id,
+        normalizedFilters,
+        categoriesById,
+        data.attributes ?? {},
+      );
+    }
 
     // category_flows may not exist yet in every environment (pre-migration); degrade to the default flow.
     const flowRows = (flowsResult.data ?? []) as CategoryFlowRow[];
@@ -515,7 +657,10 @@ export const createListing = createServerFn({ method: "POST" })
         .eq("status", "draft")
         .select("id, kaupet_code")
         .single();
-      if (error) throw error;
+      if (error) {
+        const { toClientError } = await import("@/lib/to-client-error");
+        throw await toClientError("database", error);
+      }
       await saveVisitingAddressSnapshot(
         supabaseAdmin,
         listing.id as string,
@@ -553,7 +698,10 @@ export const createListing = createServerFn({ method: "POST" })
       })
       .select("id, kaupet_code")
       .single();
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     await saveVisitingAddressSnapshot(
       supabaseAdmin,
       listing.id as string,
@@ -565,18 +713,34 @@ export const createListing = createServerFn({ method: "POST" })
 
 export const republishListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .validator((input: unknown) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        turnstileToken: z.string().nullable().optional(),
+      })
+      .parse(input),
+  )
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { verifyTurnstileToken } = await import("@/lib/turnstile.server");
+    await verifyTurnstileToken(data.turnstileToken);
+
     const { userId } = context;
     const listing = await authorizeListingMutation(supabaseAdmin, userId, data.id);
 
     if (listing.status === "disabled") {
       throw new Error("Denne annonsen er deaktivert av moderator og kan ikke reaktiveres");
     }
-    if (!listing.is_free && listing.price_nok == null) {
-      throw new Error("Oppgi en pris før annonsen publiseres på nytt");
+    if (!["draft", "archived", "sold", "expired"].includes(listing.status)) {
+      throw new Error("Annonsen kan ikke publiseres på nytt fra denne statusen.");
     }
+    await validateExistingListingForPublish(supabaseAdmin, listing);
+    await assertUnderHourlyListingLimit(
+      supabaseAdmin,
+      userId,
+      "Du har publisert for mange annonser den siste timen. Prøv igjen senere.",
+    );
 
     const now = new Date().toISOString();
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -589,10 +753,47 @@ export const republishListing = createServerFn({ method: "POST" })
         expires_at: expiresAt,
       })
       .eq("id", data.id)
+      .eq("status", listing.status)
       .select("id, status, published_at, expires_at")
       .single();
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("republishListing.update", error, { listing_id: data.id });
+    }
 
+    return updated;
+  });
+
+export const updateListingStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        status: z.enum(["archived", "sold"]),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const listing = await authorizeListingMutation(supabaseAdmin, context.userId, data.id);
+    if (listing.status === "disabled") {
+      throw new Error("Denne annonsen er deaktivert av moderator");
+    }
+    if (listing.status !== "active") {
+      throw new Error("Bare aktive annonser kan endre status.");
+    }
+    const { data: updated, error } = await supabaseAdmin
+      .from("listings")
+      .update({ status: data.status })
+      .eq("id", data.id)
+      .eq("status", "active")
+      .select("id, status")
+      .single();
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("updateListingStatus", error, { listing_id: data.id });
+    }
     return updated;
   });
 
@@ -610,6 +811,9 @@ export const getListingKaupetCodeById = createServerFn({ method: "GET" })
       .eq("id", data.listing_id)
       .eq("status", "active")
       .maybeSingle();
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { kaupet_code: row?.kaupet_code ?? null };
   });

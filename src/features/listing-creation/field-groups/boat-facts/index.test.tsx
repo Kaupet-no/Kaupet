@@ -39,7 +39,10 @@ function props(overrides: Partial<WizardSharedProps> = {}): WizardSharedProps {
     native: false,
     register: vi.fn(() => ({})) as unknown as WizardSharedProps["register"],
     showMileage: false,
-    behavior: { showGenericAttributes: true } as WizardSharedProps["behavior"],
+    behavior: {
+      showGenericAttributes: true,
+      requiresCategoryFilterValues: false,
+    } as WizardSharedProps["behavior"],
     errors: {},
     touchedFields: {},
     subtitle: "",
@@ -49,7 +52,6 @@ function props(overrides: Partial<WizardSharedProps> = {}): WizardSharedProps {
     attributes: {},
     onAttributesChange: vi.fn(),
     attributesTouched: false,
-    genericAttributesActive: true,
     boatFactsActive: true,
     vehicleAttributeHiddenKeys: [],
     extraFieldError: null,
@@ -70,7 +72,6 @@ function props(overrides: Partial<WizardSharedProps> = {}): WizardSharedProps {
     categoryTouchedManually: false,
     applyCategorySuggestion: vi.fn(),
     setSuggestionDismissed: vi.fn(),
-    setCategorySuggestions: vi.fn(),
     setCategoryPickerOpen: vi.fn(),
     onCategorySelect: vi.fn(),
     images: [],
@@ -96,11 +97,10 @@ describe("BoatFactsGroup", () => {
     expect(screen.getByText("Grunnleggende")).toBeTruthy();
     expect(screen.getByText("Motor og kapasitet")).toBeTruthy();
     expect(screen.getByText("Flere opplysninger")).toBeTruthy();
-    expect(screen.getAllByText("Beskrivelse").length).toBeGreaterThan(0);
-    expect(screen.getAllByLabelText(/Merke/)).toHaveLength(1);
-    expect(screen.getAllByLabelText(/Modell/)).toHaveLength(1);
+    expect(screen.getAllByLabelText(/Merke/)[0].getAttribute("aria-required")).toBe("false");
+    expect(screen.getAllByLabelText(/Modell/)[0].getAttribute("aria-required")).toBe("false");
     for (const field of screen.getAllByTestId(/^attribute-fields-/)) {
-      expect(field.getAttribute("data-required")).toBe("true");
+      expect(field.getAttribute("data-required")).toBe("false");
     }
   });
 
@@ -108,7 +108,6 @@ describe("BoatFactsGroup", () => {
     render(
       <CategoryAttributes
         {...props({
-          genericAttributesActive: true,
           errors: {},
         })}
       />,

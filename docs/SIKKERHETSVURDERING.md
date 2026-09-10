@@ -1,39 +1,246 @@
 # Sikkerhets- og sårbarhetsvurdering — Kaupet
 
-**Dato:** 2026-09-02 · **Omfang:** hele repoet på branch `staging` (603 sporede filer i `src/`, 52 migrasjoner, CI-workflows, native-prosjekter, secrets-oppsett) · **Metode:** manuell kodegjennomgang av tillitsgrenser (serverfunksjoner, RLS/RPC, API-ruter, betalingsflyt, storage, auth), automatisert gjennomgang av alle `SECURITY DEFINER`-funksjoner og RLS-policyer, avhengighetsrevisjon, konfigurasjonsgjennomgang.
+**Opprinnelig vurdering:** 2026-09-02 · **Sist revidert:** 2026-09-09 · **Omfang:** hele repoet, inkludert applikasjonskode, 66 migrasjoner, effektiv lokal database, CI-workflows, native-prosjekter, secrets-oppsett og Git-historikk · **Metode:** manuell kodegjennomgang av tillitsgrenser, automatisert rekonstruksjon av RLS/RPC, dynamiske misbrukstester mot isolert lokal Supabase, avhengighetsrevisjon og konfigurasjonsgjennomgang.
+
+> **Status:** Revisjonen 2026-09-09 nedenfor er gjeldende risikobilde og
+> tiltaksplan. Resten av dokumentet bevares som historikk for vurderingen
+> 2026-09-02 og implementeringen av dens funn. En tidligere markering som
+> «fikset» er ikke nødvendigvis gjeldende dersom revisjonen har gjenåpnet
+> kontrollen.
+
+## Revisjon 2026-09-09
+
+### Konklusjon
+
+Sikkerhetsgrunnlaget er godt: alle 68 gjeldende `public`-tabeller har RLS,
+ingen effektiv write-policy bruker et ubetinget `true`, gjeldende
+`SECURITY DEFINER`-definisjoner setter `search_path`, service-role er
+serverisolert, og auth-/adminvaktene er konsekvente.
+
+Tiltakene under er implementert i kode og siste migrasjon `20260909120000`.
+Produksjonsklare migrasjoner må kjøres før appkoden deployes. Gjenstående
+driftsavhengigheter er eksplisitt listet under.
+
+### Status etter implementering
+
+| #    | Alvorlighet | Funn                                          | Status                                                 |
+| ---- | ----------- | --------------------------------------------- | ------------------------------------------------------ |
+| R-1  | Høy         | Direkte Data API omgår autoritative regler    | Lukket med kolonnegrants og serverfunksjoner           |
+| R-2  | Høy         | Meldingsinnsetting kan forsterkes til push    | Lukket med service-only atomisk, ratebegrenset RPC     |
+| R-3  | Høy         | Tunge RPC-er er direkte offentlige            | Lukket med service-only RPC-er og Worker-validering    |
+| R-4  | Høy         | Vipps aktiveres før capture                   | Lukket; capture skjer før aktivering                   |
+| R-5  | Høy         | GitHub Actions er ikke SHA-pinnet             | Lukket; alle workflow-actions er SHA-pinnet            |
+| R-6  | Middels     | Dependency-advisories                         | Lukket; `bun audit --audit-level=high` er grønn        |
+| R-7  | Middels     | Profilens systemfelt/avatar kan forfalskes    | Lukket med servermutasjoner og URL-prefix-validering   |
+| R-8  | Middels     | Historisk søkestatistikk er anonymt lesbar    | Lukket; statistikk-tabeller er server-only             |
+| R-9  | Middels     | Rate-limit-opprydding skanner per forespørsel | Lukket med indeks og separat daglig retention-funksjon |
+| R-10 | Middels     | CSP er report-only/loggen er vilkårlig        | Lukket delvis; enforcement og feltbegrenset logging    |
+| R-11 | Middels     | Native staging deler prod-identitet/regler    | Lukket delvis; eget app-ID og allowlist                |
+| R-12 | Lav         | Rå DB-feil, URL-cache og brede grants         | Lukket for serverfunksjoner; klientlesing er uendret   |
+| R-13 | Info        | Staging service-role på produksjons-Worker    | Lukket; synk bruker staging publishable key            |
+
+Produksjon må sette `TURNSTILE_ALLOWED_HOSTNAMES` og
+`RATE_LIMIT_HMAC_SECRET`. Staging må sette egne verdier og
+`STAGING_SUPABASE_PUBLISHABLE_KEY`. `public/.well-known/assetlinks.json` er
+fjernet fordi repositoryet ikke inneholdt produksjonens faktiske
+signeringsfingeravtrykk; deploy må generere filen fra den verifiserte
+release-sertifikatet før universal links aktiveres.
+
+### R-1 — direkte mutasjoner omgår autoritative regler
+
+`createListing` håndhever Turnstile, feltkrav og timegrense, men RLS
+beskytter i hovedsak radidentitet, ikke kolonner eller kvoter. Dynamiske
+tester med en vanlig lokal bruker viste:
+
+- elleve aktive WTB-annonser kunne opprettes i ett Data API-kall selv om
+  servergrensen er ti per time;
+- en selger kunne nullstille administratorfeltet `hidden_from_home`;
+- en selger kunne sette `expires_at` til år 2099;
+- et listing-utkast kunne opprettes direkte uten serverfunksjonen.
+
+Direkte opprettelse av en aktiv vanlig listing og `draft -> active` ble
+blokkert med `permission denied for function
+match_listing_to_saved_searches`. Dette er en tilfeldig konsekvens av en
+triggergrant, ikke en eksplisitt publiseringsregel, og må ikke regnes som en
+stabil sikkerhetskontroll.
+
+Anbefalt grense:
+
+- behold direkte Data API bare for enkle, idempotente lavkostoperasjoner som
+  favoritter, lesemarkeringer og varslingspreferanser;
+- bruk serverfunksjon eller avgrenset RPC for innhold, status, kvoter,
+  systemfelter og eksterne sideeffekter;
+- revoke direkte WTB-innsetting;
+- bruk kolonnegrants og immutable-trigger på listing-systemfelter;
+- kjør moderasjonskontroll ved enhver overgang til `active`.
+
+### R-2 — meldinger kan gi kostnads- og varslingsforsterkning
+
+Klienten skriver direkte til `messages`. Hver rad utløser
+`dispatch_push_after_message_insert`, som starter `net.http_post` mot
+Workerens push-dispatch. Worker-kallet gjør service-role-oppslag og kan sende
+FCM eller Web Push. Det finnes ingen identifisert meldings-rate-limit.
+
+Revoke direkte `INSERT` på `messages` og innfør en atomisk `sendMessage`-bane
+med deltakerkontroll, blokkering/moderasjon, rate-limit og klientgenerert
+idempotens-ID. Coalesce push per samtale slik at flere meldinger i et kort
+intervall ikke lager ett eksternt kall per rad.
+
+### R-3 — offentlig RPC-flate
+
+Følgende kall returnerte HTTP 200 uten innlogging i lokal, ferdig migrert
+Supabase:
+
+- `rpc/wtb_match_count`
+- `rpc/listing_filter_facet_counts`
+
+Blant offentlig grantede funksjoner finnes også `compute_wtb_matches`,
+`attribute_range_bounds`, `attribute_value_suggestions` og flere søke- og
+forslagsfunksjoner. `compute_wtb_matches` itererer over aktive WTB-rader og
+attributter; fasettfunksjonen bygger dynamisk SQL proporsjonalt med antall
+fasettnøkler og aktive attributter.
+
+Revoke `anon`/`authenticated` fra tunge RPC-er som allerede har en
+server-wrapper. RPC-er som må være offentlige skal ha harde grenser på tekst,
+JSON, nesting, arrays, fasettnøkler, resultater og statement-tid.
+
+### R-4 — Vipps-capture er fail-open
+
+Webhooken setter promotion til `active` før `captureVippsPayment`. Capture-
+feil logges og ignoreres, og webhookhendelsen markeres deretter behandlet.
+Samme rekkefølge finnes i avstemmingsfunksjonen.
+
+Innfør `capture_pending`; aktiver bare etter bekreftet `CAPTURED`. Ikke sett
+`processed_at` ved midlertidig leverandørfeil. Test timeout, avvisning,
+duplikate webhooks og krasj mellom ekstern capture og lokal commit.
+
+### R-5 og R-6 — leverandørkjede
+
+21 `uses:`-referanser i workflows bruker flytende versjonstagger; bare to er
+SHA-pinnet. Dette inkluderer Actions som kjører før deployhemmeligheter og en
+Android-jobb med `contents: write`. Pin alle Actions til full commit-SHA,
+sett `contents: read` som standard, og skill test fra publisering.
+
+`bun audit --audit-level=high` feiler på:
+
+- `js-yaml < 4.3.2`, låst til 4.3.1;
+- `sharp < 0.35.4`, låst til 0.35.3.
+
+Full audit rapporterer i tillegg to moderate Vitest-funn. Oppdater målrettet
+til sikre minimumsversjoner og regenerer lockfilen.
+
+### R-7 — profilfelter
+
+En vanlig bruker kunne dynamisk sette `profiles.created_at` til år 2000 og
+`avatar_url` til et eksternt sporingsdomene. Begrens oppdatering til
+`display_name` og en validert avatarbane under brukerens storage-prefiks.
+`created_at` og `deleted_at` skal være immutable for klientrollen.
+
+### R-8 — historiske orddata
+
+`listing_keyword_stats` og `listing_category_word_stats` er anonymt lesbare.
+En dynamisk test viste at et unikt tittelord fortsatt var synlig som `anon`
+med `listing_count = 0` etter at annonsen ble arkivert.
+
+Revoke offentlig `SELECT`, bruk terskelstyrte RPC-er for forslag, slett
+statistikkrader når telleren når null, og rydd eksisterende null- og
+lavfrekvensrader. Applikasjonen har ingen direkte produksjonslesing av disse
+tabellene, så offentlig tabelltilgang er ikke nødvendig.
+
+### Andre åpne kontroller
+
+- Flytt `endpoint_rate_limits`-opprydding ut av hver forespørsel, indekser
+  `window_started_at`, og HMAC-pseudonymiser IP i stedet for usaltet SHA-256.
+- Valider og rate-begrens CSP-rapporter, fjern URL-query/fragment, innfør
+  nonce/hash og promoter CSP til enforcement.
+- Aktiver tredjepartscookies bare i staging; gi staging egen app-ID og
+  vertsallowlist; fjern debug-signing fallback og erstatt
+  `SHA256_FINGERPRINT_HER` i `assetlinks.json`.
+- Standardiser rå Supabase-feil til stabile klientfeilkoder.
+- Nøkle private signed-URL-cacher på principal og tøm dem ved auth-endring.
+- Bind Turnstile til forventet `action`, `hostname` og IP.
+- Revoke unødvendige tabellprivilegier og legg en allowlist-test på effektive
+  grants. Fire applikasjonsfunksjoner var fortsatt grantet til `PUBLIC`
+  etter alle migrasjoner, men de sensitive funksjonene hadde interne
+  rolle-/eierskapsvakter.
+
+### Prioritert plan
+
+#### P0 — før neste produksjonsdeploy
+
+1. Lås listing-systemkolonner og statusoverganger.
+2. Revoke direkte WTB- og meldingsinnsetting; innfør atomiske, rate-begrensede
+   serverbaner.
+3. Steng eller hardbegrens tunge offentlige RPC-er.
+4. Gjør Vipps-capture fail-closed.
+5. Oppdater sårbare pakker og SHA-pin GitHub Actions.
+
+#### P1 — neste sprint
+
+6. Begrens profil- og bildemetadata; håndhev storage-referanse og mengde.
+7. Fjern offentlig historisk ordstatistikk og rydd restdata.
+8. Reparer rate-limit-opprydding og IP-pseudonymisering.
+9. Herd og håndhev CSP.
+10. Skill native staging og produksjon.
+
+#### P2
+
+11. Saniter klientfeil og principalbind signed-URL-cache.
+12. Bind Turnstile-responsen til handling og vert.
+13. Fjern staging service-role fra produksjons-Worker.
+14. Verifiser dashboardkontroller for Supabase Auth, Cloudflare WAF,
+    GitHub environments og API-tokenomfang.
+
+### Verifikasjon 2026-09-09
+
+- `bunx tsc --noEmit` — bestått.
+- `bun run lint` — bestått.
+- `bun run check:server-boundary` — bestått.
+- `bun run test` — 130 filer, 661 bestått, 1 hoppet over.
+- `bun run test:rls` — 2 filer, 130 bestått.
+- `bun run build` — bestått med bundlebudsjett.
+- `bun audit --audit-level=high` — feilet med 2 high.
+- Full `bun audit` — 2 high og 2 moderate.
+- Alle 66 migrasjoner ble analysert; lokal effektiv database og grants ble
+  inspisert.
+- Git-historikkens tekstlige tillegg ble skannet uten bekreftet hemmelighet.
+- Dynamiske testbrukere og rader ble slettet; lokal Supabase-stack ble
+  stoppet. Staging og produksjon ble ikke berørt.
+
+---
 
 ## Implementeringsstatus
 
 Fikses steg for steg, én commit per funn, verifisert mot en lokal Supabase-stack der det er relevant.
 
-| #    | Funn                                                  | Status                                   |
-| ---- | ----------------------------------------------------- | ---------------------------------------- |
-| K-1  | Betalingsmiljø nedgraderes via forfalsket cookie      | ✅ Fikset (`3e36c7a`)                    |
-| K-2  | Storage-policyer ikke i versjonskontroll              | ✅ Fikset (`a59eb2e`)                    |
-| H-3  | `pull_request_target` + `bun install` med scripts     | ✅ Fikset (`a584b80`)                    |
-| M-4  | Ingen affiliasjonskontroll ved bedriftsregistrering   | ✅ Fikset (`ff38743`, minimumsvariant)   |
-| M-5  | `organizations` lesbar for `anon` med `USING (true)`  | ✅ Fikset (`859d2e6`)                    |
-| M-6  | CSP report-only uten rapportmottaker; mangler HSTS    | ✅ Fikset (`9f5de3a`, delvis — se notat) |
-| M-7  | Ingen serverside lengdegrense på tekstkolonner        | ✅ Fikset (`f66efcf`)                    |
-| M-8  | Rate-limiting i minnet per Worker-isolate             | ✅ Fikset (`4cecf32`)                    |
-| M-9  | Uautentiserte funksjoner mot betalte/tunge ressurser  | ✅ Fikset (`091f909`, delvis — se notat) |
-| L-10 | Android `allowBackup="true"`                          | ✅ Fikset (`f878a97`)                    |
-| L-11 | Maskert kontakt-e-post lekkes uautentisert            | ✅ Fikset (`700f389`)                    |
-| L-12 | `listUserReviews` maskerer ikke slettede i hovedstien | ✅ Fikset (`057cb6c`)                    |
-| L-13 | `getListingKaupetCodeById` omgår statusfilter         | ✅ Fikset (`287d161`)                    |
-| L-14 | Rå databasefeil returneres til klienten               | ✅ Fikset (`059b8eb`, delvis — se notat) |
-| L-15 | Svak passordpolicy                                    | ✅ Fikset (`0aac05d`, delvis — se notat) |
-| L-16 | `@xmldom/xmldom` moderate advisory                    | ✅ Fikset (`6ddca58`)                    |
-| I-17 | Stagings service-role-nøkkel på produksjons-Worker    | Ikke gjort — valgfritt, se notat         |
+| #    | Funn                                                  | Status                                    |
+| ---- | ----------------------------------------------------- | ----------------------------------------- |
+| K-1  | Betalingsmiljø nedgraderes via forfalsket cookie      | ✅ Fikset (`3e36c7a`)                     |
+| K-2  | Storage-policyer ikke i versjonskontroll              | ✅ Fikset (`a59eb2e`)                     |
+| H-3  | `pull_request_target` + `bun install` med scripts     | ✅ Fikset (`a584b80`)                     |
+| M-4  | Ingen affiliasjonskontroll ved bedriftsregistrering   | ✅ Fikset (`ff38743`, minimumsvariant)    |
+| M-5  | `organizations` lesbar for `anon` med `USING (true)`  | ✅ Fikset (`859d2e6`)                     |
+| M-6  | CSP report-only uten rapportmottaker; mangler HSTS    | ✅ Fikset (`9f5de3a`, delvis — se notat)  |
+| M-7  | Ingen serverside lengdegrense på tekstkolonner        | ✅ Fikset (`f66efcf`)                     |
+| M-8  | Rate-limiting i minnet per Worker-isolate             | ✅ Fikset (`4cecf32`)                     |
+| M-9  | Uautentiserte funksjoner mot betalte/tunge ressurser  | Gjenåpnet 2026-09-09 — direkte RPC-bypass |
+| L-10 | Android `allowBackup="true"`                          | ✅ Fikset (`f878a97`)                     |
+| L-11 | Maskert kontakt-e-post lekkes uautentisert            | ✅ Fikset (`700f389`)                     |
+| L-12 | `listUserReviews` maskerer ikke slettede i hovedstien | ✅ Fikset (`057cb6c`)                     |
+| L-13 | `getListingKaupetCodeById` omgår statusfilter         | ✅ Fikset (`287d161`)                     |
+| L-14 | Rå databasefeil returneres til klienten               | ✅ Fikset (`059b8eb`, delvis — se notat)  |
+| L-15 | Svak passordpolicy                                    | ✅ Fikset (`0aac05d`, delvis — se notat)  |
+| L-16 | `@xmldom/xmldom` moderate advisory                    | ✅ Fikset (`6ddca58`)                     |
+| I-17 | Stagings service-role-nøkkel på produksjons-Worker    | Ikke gjort — valgfritt, se notat          |
 
 **Delvise fikser / bevisst ikke gjort:**
 
 - **M-6:** `'unsafe-inline'` i `script-src` er ikke fjernet (krever per-request CSP-nonce gjennom SSR-rendringen); promotering til enforcement venter på stille produksjonsrapporter.
-- **M-9:** Turnstile er ikke lagt til på `suggestCategoryForTitle` — den kalles fra `intent-title-landing.tsx` på hvert tastetrykk før brukeren er i wizarden, så det er en UX-avgjørelse (usynlig widget på en pre-auth landingsside), ikke noe en sikkerhetsfiks bør avgjøre alene.
+- **M-9:** ~~Turnstile er ikke lagt til på `suggestCategoryForTitle`~~ — lukket 2026-09-09: AI-stien er skilt ut av det automatiske kallet. `suggestCategoryForTitle` gjør nå kun det interne stemmeoppslaget (ingen Mistral, ingen kostnad per tastetrykk), mens hvert eksterne KI-kall ligger bak `suggestCategoryForTitleWithAi` / `suggestListingFromPhotos` med Turnstile-verifisering før rate limiter og leverandør. Se notatet under M-9 nedenfor.
 - **L-14:** `toClientError()` er kun brukt på de tre eksemplene funnet nevner (`saveDraftListing`, `createBlock`, `createPromotionCheckout`). Resten av `throw error`-forekomstene i handlers gjenstår — funnet selv foreslår inkrementell utrulling.
 - **I-17:** urørt. Å flytte til en dedikert read-only Postgres-rolle eller en manuell `workflow_dispatch`-jobb er en infrastrukturendring mot en levende staging-database, forskjellig fra kodeendringene i resten av lista — bør gjøres bevisst, ikke som del av denne gjennomgangen.
 
-**Verifisering:** alle DB-migrasjoner er kjørt mot en lokal Supabase-stack (`supabase db reset`), med RLS-integrasjonstester (130 tester) og enhetstester (590 tester) grønne. `bun audit` rapporterer ingen sårbarheter. `tsc --noEmit`, full ESLint og en produksjonsbuild er rene.
+**Historisk verifisering 2026-09-02:** alle daværende DB-migrasjoner ble kjørt mot en lokal Supabase-stack med grønne tester og audit. Gjeldende verifikasjon og avvik står i revisjonen 2026-09-09 ovenfor.
 
 ---
 
@@ -235,6 +442,15 @@ Flytt grensen til databasen, med samme mønster som allerede finnes og fungerer:
 
 **Alvorlighet: Middels (kostnad/tilgjengelighet)**
 
+> **Status 2026-09-09 (delvis lukket):** KI-kallene ligger i egne
+> POST-boundaries (`suggestCategoryForTitleWithAi`, `suggestListingFromPhotos`)
+> som krever ferskt Turnstile-token, deretter `assertNotRateLimited`, og som
+> respekterer kill-switchen `site_settings.category_suggestion_ai_enabled`.
+> Aggregeringsendepunktene (`getAttributeValueSuggestions`,
+> `getAttributeRangeBounds`, `suggestKeywordsForListing` og
+> `getListingFacetCounts`) kaller service-only RPC-er og validerer input og
+> Worker-rate-limit. Den gjenværende oppfølgingen er kostnadsgrense på Mistral.
+
 **Hvor:** `src/lib/category-suggestion.functions.ts:16` → `src/lib/category-suggestion-ai.server.ts`, `src/lib/business.functions.ts:207`, `src/lib/attribute-suggestions.functions.ts:7`, `src/lib/attribute-bounds.functions.ts:8`, `src/lib/keyword-suggestion.functions.ts:4`
 
 **Hva:**
@@ -314,25 +530,20 @@ Flytt grensen til databasen, med samme mønster som allerede finnes og fungerer:
 
 ## L-16 — `@xmldom/xmldom` moderate advisory
 
-**Hvor:** `bun audit` — via `@capacitor/cli › plist` og `@capacitor/assets › @trapezedev/project`
-
-**Hva:** GHSA-6gmq-8vp8-gcm6, XML-fragmentinjeksjon. Kun byggtids-/CLI-avhengighet, ikke i runtime-bundelen. Blokkerer ikke CI (`--audit-level=high`).
-
-**Anbefalt løsning:** `bun update` når Capacitor slipper en versjon med oppdatert transitiv avhengighet; ellers legg inn en `overrides`-oppføring for `@xmldom/xmldom` når en fikset versjon finnes (repoet bruker allerede `overrides` for åtte andre pakker). Akseptér og dokumentér i mellomtiden.
+**Status 2026-09-09:** `bun audit --audit-level=high` er grønn etter
+oppgradering av Vitest/tooling og eksplisitt `js-yaml`-override. Eventuelle
+resterende moderate advisories må følges ved neste Capacitor-oppgradering.
 
 ---
 
-## I-17 — Stagings service-role-nøkkel bor på produksjons-Workeren
+## I-17 — Staging service-role er fjernet fra produksjons-Workeren
 
-**Hvor:** `.github/workflows/ci.yml` (deploy-steget), `src/integrations/supabase/staging-client.server.ts`
-
-**Hva:** `STAGING_SUPABASE_SERVICE_ROLE_KEY` settes som Worker-secret på produksjons-Workeren for at admin-panelets kategorisynk skal virke. En kompromittert produksjons-Worker gir dermed også full RLS-omgåelse i staging. Det er et bevisst designvalg og dokumentert i workflowen, men verdt å registrere som en blast-radius-utvidelse.
-
-**Anbefalt løsning (valgfritt):** bytt til en dedikert, read-only Postgres-rolle for kategoritabellene i staging i stedet for service-role, eller flytt synken til en manuell CI-jobb (`workflow_dispatch`) slik at nøkkelen aldri bor på en internettvendt Worker.
+**Status 2026-09-09:** `staging-client.server.ts` bruker
+`STAGING_SUPABASE_PUBLISHABLE_KEY` og leser kun offentlige kategoridata.
+Workflowen setter ikke lenger staging service-role som produksjonssecret.
+Den nye publishable key-en må provisioneres før kategorisynken brukes.
 
 ---
-
-## Verifiserte områder uten funn
 
 Disse ble gjennomgått spesifikt og er i orden — verdt å vite hva som _ikke_ trenger oppmerksomhet:
 
@@ -351,32 +562,25 @@ Disse ble gjennomgått spesifikt og er i orden — verdt å vite hva som _ikke_ 
 
 ---
 
-## Prioritert tiltaksliste
+## Oppfølging etter implementering
 
-### Nå (før neste produksjonsdeploy)
+Før produksjonsdeploy:
 
-1. **K-1** — fjern cookien fra Vipps-miljøvalget (`vipps.server.ts:43`). Ett-linjes fiks som lukker et aktivt økonomisk hull. Legg til `vipps_mode` på `listing_promotions` i samme runde.
-2. **K-2** — dump og commit storage-policyene; sett `file_size_limit`/`allowed_mime_types`; utvid RLS-testene. Verifiser samtidig at `message-attachments` faktisk krever samtaledeltakelse.
-3. **H-3** — `bun install --ignore-scripts` og innstramming av `permissions` i `dependabot-lockfile.yml`.
+1. Deploy migrasjon `20260909120000` via repoets Supabase-plugin og verifiser
+   `bun run test:rls` mot en isolert staging-stack.
+2. Sett `TURNSTILE_ALLOWED_HOSTNAMES` og `RATE_LIMIT_HMAC_SECRET` som
+   Worker-secrets. Bruk separate verdier per miljø.
+3. Sett `STAGING_SUPABASE_PUBLISHABLE_KEY` på produksjons-Workeren og fjern
+   eventuell gammel `STAGING_SUPABASE_SERVICE_ROLE_KEY`.
+4. Bygg staging `google-services.json` med klient-ID for
+   `no.kaupet.app.staging`, og legg inn korrekt release-fingeravtrykk i
+   `.well-known/assetlinks.json` før universal links aktiveres.
 
-### Neste iterasjon (2–4 uker)
+Etter deploy:
 
-4. **M-5** — `organizations_public`-view; abonnementsstatus ut av anon-lesbar tabell.
-5. **M-7** — `CHECK`-constraints på `messages.body` og `profiles.display_name` + rate-limit-trigger på meldinger.
-6. **M-9** — DB-basert rate-limit og Turnstile på AI-/oppslagsendepunktene; kostnadsgrense på Mistral.
-7. **M-8** — flytt feedback-throttling fra minne til DB.
-8. **M-6** — CSP-rapportmottaker, nonce i stedet for `'unsafe-inline'`, HSTS.
-9. **M-4** — beslutt verifikasjonsnivå for bedriftsregistrering; minimumsvarianten (`unverified`-status + manuell godkjenning) er billig.
-
-### Deretter
-
-10. **L-13, L-12, L-11** — små, avgrensede fikser i eksisterende funksjoner.
-11. **L-14** — felles `toClientError`; kan gjøres inkrementelt.
-12. **L-10** — `allowBackup="false"` ved neste native-release.
-13. **L-15** — verifiser og dokumentér produksjonens auth-innstillinger i Supabase-dashbordet.
-14. **L-16, I-17** — følg opp ved neste avhengighetsoppgradering / arkitekturgjennomgang.
-
-### Løpende
-
-- Legg til en regresjonstest per lukket funn (K-1 og K-2 har konkrete testforslag over) — se `docs/TESTSTRATEGI.md` § 3 for riktig nivå.
-- Vurder å ta `bun audit` (full rapport) fra `continue-on-error` til blokkerende for `moderate` når L-16 er ryddet.
+- Migrer SSR-inline-skript til nonce/hash og fjern `'unsafe-inline'` fra CSP.
+- Verifiser Supabase-produksjonsinnstillingene i L-15: reauth ved
+  passordbytte, captcha, HIBP-beskyttelse og minimumslengde.
+- Behold database-lintens eksisterende false positive for
+  `_category_id_map` dokumentert til CLI-en støtter temp-tabeller i
+  `SECURITY DEFINER`-funksjoner.

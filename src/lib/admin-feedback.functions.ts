@@ -42,7 +42,10 @@ export const adminListFeedback = createServerFn({ method: "GET" })
     if (data.typeFilter) query = query.eq("type", data.typeFilter);
 
     const { data: rows, error, count } = await query;
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
 
     // Attach display names for logged-in submitters ("anonym bruker" otherwise).
     const userIds = [
@@ -78,5 +81,8 @@ export const adminDeleteFeedback = createServerFn({ method: "POST" })
     await requireAdminRole(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("feedback").delete().in("id", data.ids);
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
   });

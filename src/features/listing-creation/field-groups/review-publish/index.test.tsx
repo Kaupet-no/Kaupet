@@ -55,7 +55,7 @@ describe("ReviewPublishGroup", () => {
 
     expect(screen.getByRole("heading", { name: "Publiseringsklar" })).toBeTruthy();
     expect(screen.getByRole("alert").textContent).toContain("Tittelen må være minst 5 tegn");
-    expect(screen.getByRole("heading", { name: "Dette vil gi en bedre annonse" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Gjør annonsen bedre" })).toBeTruthy();
     expect(screen.getByText("Legg til bilder")).toBeTruthy();
 
     rerender(view([]));
@@ -117,7 +117,8 @@ describe("ReviewPreview", () => {
     expect(screen.getByRole("heading", { name: "Forhåndsvisning" })).toBeTruthy();
     expect(screen.getAllByText("Ingen bilde").length).toBeGreaterThan(0);
     expect(screen.getByText("—")).toBeTruthy();
-    expect(screen.getByText("Pris er foreløpig ikke satt")).toBeTruthy();
+    expect(screen.getByText("Ingen pris")).toBeTruthy();
+    expect(screen.getByRole("article").className).toContain("text-left");
     expect(screen.queryByText("Pris ved henvendelse")).toBeNull();
   });
   it("gjør hele forhåndsvisningskortet trykkbart med beskrivende navn", () => {

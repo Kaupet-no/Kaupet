@@ -17,7 +17,6 @@ export const DEFAULT_FIELD_GROUPS: string[] = [
   "location",
   "review-publish",
 ];
-export const DEFAULT_MODULES: string[] = ["generic-attributes"];
 
 export type ListingTask = "showcase" | "searchable" | "trade" | "review";
 
@@ -43,33 +42,23 @@ export const LISTING_TASK_BY_FIELD_GROUP_KEY: Partial<Record<string, ListingTask
 
 export type CategoryFlow = {
   fieldGroups: string[];
-  modules: string[];
 };
 
 export type CategoryFlowRow = {
   id: string;
   category_id: string;
   field_groups: string[];
-  modules: string[];
   sort_order: number;
 };
 
-const DEFAULT_FLOW: CategoryFlow = { fieldGroups: DEFAULT_FIELD_GROUPS, modules: DEFAULT_MODULES };
+const DEFAULT_FLOW: CategoryFlow = { fieldGroups: DEFAULT_FIELD_GROUPS };
 
 export function normalizeFieldGroupKeys(keys: string[]): string[] {
   // Deduplicated (first occurrence wins): a field group asked twice in the
   // same flow means the user is asked the same question twice, which is a
   // configuration mistake in every case — cheaper to make impossible here
   // than to guard in each group.
-  const normalized = [
-    ...new Set(
-      keys.flatMap((key) => {
-        if (key === "title-photos") return ["photos", "title"];
-        if (key === "delivery-location") return ["delivery", "location"];
-        return [key];
-      }),
-    ),
-  ];
+  const normalized = [...new Set(keys)];
   if (!normalized.includes("vehicle-registration")) return normalized;
   // description-keywords er droppet helt for kjøretøy: Beskrivelse (+
   // nøkkelord-chips) rendres nå direkte inne i vehicle-facts (Tittel,
@@ -94,31 +83,12 @@ export function normalizeFieldGroupKeys(keys: string[]): string[] {
   return withoutOrderedGroups;
 }
 
-/** Writers keep legacy keys until the phase 6 transition migration is applied everywhere. */
-export function toStoredFieldGroupKeys(keys: string[]): string[] {
-  const stored: string[] = [];
-  for (let index = 0; index < keys.length; index += 1) {
-    if (keys[index] === "photos") {
-      stored.push("title-photos");
-      if (keys[index + 1] === "title") index += 1;
-    } else if (keys[index] === "delivery" && keys[index + 1] === "location") {
-      stored.push("delivery-location");
-      index += 1;
-    } else if (keys[index] === "location") {
-      stored.push("delivery-location");
-    } else {
-      stored.push(keys[index]);
-    }
-  }
-  return stored;
-}
-
 /**
- * Returns the effective flow (field groups + modules) for a category: the
+ * Returns the effective flow (field groups) for a category: the
  * flow declared on the category itself, or the nearest ancestor's flow, or
  * the default flow if no category in the chain has one. Unlike
  * category_filters (which merges parent + child by key), a child flow row
- * overrides its parent's field_groups/modules wholesale — a category either
+ * overrides its parent's field_groups wholesale — a category either
  * opts into a fully custom flow or inherits one completely.
  *
  * `category-select` is always prepended and is never part of the stored
@@ -138,10 +108,7 @@ export function effectiveFlowForCategory(
   while (cur) {
     const row = flowsByCategoryId.get(cur.id);
     if (row) {
-      return prepend({
-        fieldGroups: normalizeFieldGroupKeys(row.field_groups),
-        modules: row.modules,
-      });
+      return prepend({ fieldGroups: normalizeFieldGroupKeys(row.field_groups) });
     }
     cur = cur.parent_id ? categoriesById.get(cur.parent_id) : undefined;
   }
@@ -205,17 +172,6 @@ export function withRuntimeFieldGroups(
   return [...next.slice(0, priceInsertAt), "vehicle-price", ...next.slice(priceInsertAt)];
 }
 
-/**
- * Chunks an ordered list of active field-group keys into wizard pages.
- * Ordinary flows use the same four task boundaries on web and native: show
- * the item, make it searchable, clarify the trade, and review/publish.
- * Category selection and confirmation remain structural solo pages. Bil og
- * MC keeps its existing platform-specific atomic pages until its dedicated
- * vehicle-flow phases are implemented.
- *
- * Group order within each task page still follows the configured flow; only
- * the four established task boundaries are fixed.
- */
 /** Field-group keys that always get their own solo page, wherever they land
  * in the ordered array — `category-select` is always first (see
  * prependCategorySelect); `vehicle-registration`/`vehicle-price` can land
@@ -229,55 +185,57 @@ const SOLO_FIELD_GROUP_KEYS: Record<string, true> = {
   "vehicle-price": true,
 };
 
-export function resolveWizardPages(
-  fieldGroupKeys: string[],
-  options: {
-    native: boolean;
-    /** Keys that always start a fresh page (flushing whatever came before),
-     * without being solo themselves — unlike `SOLO_FIELD_GROUP_KEYS`, keys
-     * after a force-break one still bundle together up to `chunkSize`. Used
-     * to split the Bil og MC flow into an images-only page (title-photos)
-     * and its own Tittel/Undertittel/Kilometerstand/Beskrivelse page
-     * (vehicle-facts), without changing chunking for every other category.
-     * Optional — omitting it preserves prior behavior exactly. */
-    forceBreakBeforeKeys?: ReadonlySet<string>;
-  },
-): string[][] {
-  const isVehicleFlow = fieldGroupKeys.includes("vehicle-registration");
-  if (!isVehicleFlow) {
-    const taskPages: Record<ListingTask, string[]> = {
-      showcase: [],
-      searchable: [],
-      trade: [],
-      review: [],
-    };
-    for (const key of fieldGroupKeys) {
-      const task = LISTING_TASK_BY_FIELD_GROUP_KEY[key];
-      if (task) taskPages[task].push(key);
-      else if (!SOLO_FIELD_GROUP_KEYS[key]) taskPages.searchable.push(key);
-    }
-    const pages = [
-      ...(fieldGroupKeys.includes("category-select") ? [["category-select"]] : []),
-      taskPages.showcase,
-      ...(fieldGroupKeys.includes("category-confirm") ? [["category-confirm"]] : []),
-      taskPages.searchable,
-      taskPages.trade,
-      taskPages.review,
-    ];
-    return pages.filter((groups) => groups.length > 0);
+/**
+ * Ordinære flyter: samme fire oppgavegrenser på web og native — vis tingen,
+ * gjør den søkbar, avklar handelen, se over og publiser. Kategorivalg og
+ * -bekreftelse forblir strukturelle solo-sider.
+ *
+ * Gruppe­rekkefølgen inne på hver oppgaveside følger fortsatt den
+ * konfigurerte flyten; bare de fire grensene ligger fast.
+ */
+function resolveTaskPages(fieldGroupKeys: string[]): string[][] {
+  const taskPages: Record<ListingTask, string[]> = {
+    showcase: [],
+    searchable: [],
+    trade: [],
+    review: [],
+  };
+  for (const key of fieldGroupKeys) {
+    const task = LISTING_TASK_BY_FIELD_GROUP_KEY[key];
+    if (task) taskPages[task].push(key);
+    else if (!SOLO_FIELD_GROUP_KEYS[key]) taskPages.searchable.push(key);
   }
+  const pages = [
+    ...(fieldGroupKeys.includes("category-select") ? [["category-select"]] : []),
+    taskPages.showcase,
+    ...(fieldGroupKeys.includes("category-confirm") ? [["category-confirm"]] : []),
+    taskPages.searchable,
+    taskPages.trade,
+    taskPages.review,
+  ];
+  return pages.filter((groups) => groups.length > 0);
+}
 
+const VEHICLE_CHUNK_SIZE = 4;
+
+/**
+ * Bil og MC beholder sine egne, plattformspesifikke sider til de dedikerte
+ * kjøretøyfasene er implementert: én gruppe per side på native, og ellers
+ * grupper bunta i sider på inntil `VEHICLE_CHUNK_SIZE`.
+ * `delivery`/`location`/`review-publish` trekkes alltid ut på den siste
+ * siden, uansett hvor i arrayet de står.
+ *
+ * `forceBreakBeforeKeys` starter en ny side foran nøkkelen uten å gjøre den
+ * solo — nøkler etter en slik brytes fortsatt sammen opp til chunk-grensen.
+ * Brukes til å skille bildesiden (photos/title) fra vehicle-facts.
+ */
+function resolveVehiclePages(
+  fieldGroupKeys: string[],
+  options: { native: boolean; forceBreakBeforeKeys?: ReadonlySet<string> },
+): string[][] {
   if (options.native) return fieldGroupKeys.map((key) => [key]);
-  const chunkSize = 4;
-  const forceBreakBeforeKeys = options.forceBreakBeforeKeys;
 
-  const withoutEnds = fieldGroupKeys.filter(
-    (k) => k !== "review-publish" && k !== "delivery" && k !== "location",
-  );
-  const hasReviewPublish = fieldGroupKeys.includes("review-publish");
-  const hasDelivery = fieldGroupKeys.includes("delivery");
-  const hasLocation = fieldGroupKeys.includes("location");
-
+  const endKeys = ["delivery", "location", "review-publish"];
   const pages: string[][] = [];
   let buffer: string[] = [];
   let bufferSize = 0;
@@ -289,24 +247,36 @@ export function resolveWizardPages(
     }
   };
 
-  for (const key of withoutEnds) {
+  for (const key of fieldGroupKeys.filter((k) => !endKeys.includes(k))) {
     if (SOLO_FIELD_GROUP_KEYS[key]) {
       flush();
       pages.push([key]);
-    } else {
-      if (forceBreakBeforeKeys?.has(key)) flush();
-      buffer.push(key);
-      if (!(key === "title" && buffer.at(-2) === "photos")) bufferSize += 1;
-      if (bufferSize >= chunkSize) flush();
+      continue;
     }
+    if (options.forceBreakBeforeKeys?.has(key)) flush();
+    buffer.push(key);
+    // photos + title deler én visuell rad og teller derfor som én gruppe.
+    if (!(key === "title" && buffer.at(-2) === "photos")) bufferSize += 1;
+    if (bufferSize >= VEHICLE_CHUNK_SIZE) flush();
   }
   flush();
 
-  const lastPage: string[] = [];
-  if (hasDelivery) lastPage.push("delivery");
-  if (hasLocation) lastPage.push("location");
-  if (hasReviewPublish) lastPage.push("review-publish");
+  const lastPage = endKeys.filter((key) => fieldGroupKeys.includes(key));
   if (lastPage.length > 0) pages.push(lastPage);
 
   return pages;
+}
+
+/** Deler en ordnet liste med aktive feltgruppenøkler i wizard-sider. */
+export function resolveWizardPages(
+  fieldGroupKeys: string[],
+  options: {
+    native: boolean;
+    /** Se `resolveVehiclePages` — gjelder bare kjøretøyflyten. */
+    forceBreakBeforeKeys?: ReadonlySet<string>;
+  },
+): string[][] {
+  return fieldGroupKeys.includes("vehicle-registration")
+    ? resolveVehiclePages(fieldGroupKeys, options)
+    : resolveTaskPages(fieldGroupKeys);
 }

@@ -14,15 +14,10 @@ const SECURITY_HEADERS = {
   "referrer-policy": "strict-origin-when-cross-origin",
   "permissions-policy": "camera=(self), geolocation=(self), microphone=()",
   "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
-  // Report-only first: the app has intentional inline bootstrap/JSON-LD and
-  // third-party Turnstile/map/Supabase traffic. Promote to enforcement after
-  // production reports (now collected at /api/public/csp-report — see
-  // docs/SIKKERHETSVURDERING.md M-6) confirm this source inventory is
-  // complete. 'unsafe-inline' still covers the intentional inline
-  // bootstrap/JSON-LD scripts; replacing it with a per-request nonce needs
-  // threading a nonce through SSR rendering, which is a bigger change than
-  // this header config and is tracked separately.
-  "content-security-policy-report-only": [
+  // Enforce the policy. Keep the explicit inline allowance until SSR
+  // hydration/bootstrap has been migrated to nonces; report-only provided no
+  // protection at all.
+  "content-security-policy": [
     "default-src 'self'",
     "base-uri 'self'",
     "object-src 'none'",

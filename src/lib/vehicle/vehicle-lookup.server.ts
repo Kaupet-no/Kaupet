@@ -147,8 +147,12 @@ function mapBodyTypeOption(
   code: string | null | undefined,
   name: string | null | undefined,
 ): string | null {
-  const value = `${code ?? ""} ${name ?? ""}`.toLowerCase();
+  const value = `${code ?? ""} ${name ?? ""}`
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
   if (code?.toUpperCase() === "BB") return "varebil";
+  if (code?.toUpperCase() === "AD" || value.includes("kupe")) return "coupe";
   if (value.includes("suv")) return "suv";
   if (value.includes("stasjonsvogn")) return "stasjonsvogn";
   if (value.includes("sedan")) return "sedan";

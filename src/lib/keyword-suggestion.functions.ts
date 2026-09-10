@@ -15,7 +15,10 @@ export const suggestKeywordsForListing = createServerFn({ method: "GET" })
       _title: data.title,
       _category_id: data.category_id,
     });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
 
     return (rows ?? []) as { word: string; listing_count: number }[];
   });

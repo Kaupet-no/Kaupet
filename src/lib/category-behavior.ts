@@ -36,11 +36,22 @@ export type CategoryBreadcrumbContext = {
  * category-attributes, field-groups/registry.ts, validators.ts) so a new
  * flag only needs to be added in one place.
  */
+type ComposerPage = { groups: { key: string }[] };
+
+/** Falls back to the vehicle-registration step when present, else the generic attributes step. */
+function defaultAttributeReviewGroupKey(pages: ComposerPage[]) {
+  return pages.some((page) => page.groups.some((group) => group.key === "vehicle-registration"))
+    ? "vehicle-registration"
+    : "category-attributes";
+}
+
 export type CategoryBehavior = {
   /** Whether the listing must declare a delivery method (pickup/ship/both). Bil/MC and Båt opt out. */
   requiresDeliveryMethod: boolean;
   /** Whether the generic category-attributes field group should render. False for vehicles, whose attributes are captured via the vehicle-* field groups instead. */
   showGenericAttributes: boolean;
+  /** Whether category-specific filter values are required before publishing. */
+  requiresCategoryFilterValues: boolean;
   /** Filter keys excluded from the required-attribute contract for this category behavior. */
   requiredFilterExclusions: readonly string[];
   /** Extra breadcrumb segments appended after the category chain, derived from the listing's attributes. */
@@ -48,12 +59,16 @@ export type CategoryBehavior = {
     attributes: Record<string, unknown>,
     ctx: CategoryBreadcrumbContext,
   ) => BreadcrumbSegment[];
+  /** Resolves which review-step group an "attr-*" validation error should scroll the wizard to. */
+  attributeReviewGroupKey: (pages: ComposerPage[], vehicleRegistered: boolean) => string;
 };
 
 const DEFAULT_BEHAVIOR: CategoryBehavior = {
   requiresDeliveryMethod: true,
   showGenericAttributes: true,
+  requiresCategoryFilterValues: true,
   requiredFilterExclusions: [],
+  attributeReviewGroupKey: defaultAttributeReviewGroupKey,
   extraBreadcrumbSegments: (attributes, { rootCategorySlug, genericBrandFilter }) => {
     if (!genericBrandFilter) return [];
     const raw = attributes[genericBrandFilter.key];
@@ -77,7 +92,13 @@ const DEFAULT_BEHAVIOR: CategoryBehavior = {
 const VEHICLE_BEHAVIOR: CategoryBehavior = {
   requiresDeliveryMethod: false,
   showGenericAttributes: false,
-  requiredFilterExclusions: ["cylinders", "engine_code"],
+  requiresCategoryFilterValues: true,
+  // Hold i synk med VEHICLE_LOOKUP_OPTIONAL_FILTER_KEYS i
+  // lib/vehicle/vehicle-lookup.types.ts. Den kan ikke importeres hit: denne
+  // filen er vertikal-agnostisk kjerne, og eslint blokkerer @/lib/vehicle/*.
+  requiredFilterExclusions: ["cylinders", "engine_displacement_cc", "engine_code"],
+  attributeReviewGroupKey: (pages, vehicleRegistered) =>
+    vehicleRegistered ? "vehicle-facts" : defaultAttributeReviewGroupKey(pages),
   extraBreadcrumbSegments: (attributes, { rootCategorySlug }) => {
     const brand = typeof attributes.brand === "string" ? attributes.brand : null;
     const model = typeof attributes.model === "string" ? attributes.model : null;
@@ -111,6 +132,7 @@ const VEHICLE_BEHAVIOR: CategoryBehavior = {
 const BOAT_BEHAVIOR: CategoryBehavior = {
   ...DEFAULT_BEHAVIOR,
   requiresDeliveryMethod: false,
+  requiresCategoryFilterValues: false,
 };
 
 /** Resolves category behavior from a vehicle brand group or a boat flow. */

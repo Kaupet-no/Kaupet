@@ -47,6 +47,16 @@ const BOUNDS_BY_KEY: Record<string, Omit<RangeBounds, "unit">> = {
   effekt_hk: { min: 0, max: 1000, step: 5 },
   engine_size_ccm: { min: 0, max: 3000, step: 50 },
   vekt_kg: { min: 0, max: 5000, step: 50 },
+  // Uten disse faller feltene til DEFAULT_BOUNDS (0–10 000) og gir sliders
+  // ingen kan bruke — en sykkelramme på 10 000 cm, skostørrelse 7 500.
+  frame_size_cm: { min: 30, max: 75, step: 1, noGrouping: true },
+  ski_length_cm: { min: 80, max: 220, step: 1, noGrouping: true },
+  shoe_size_eu: { min: 15, max: 52, step: 1, noGrouping: true },
+  boot_size_eu: { min: 15, max: 52, step: 1, noGrouping: true },
+  age_months: { min: 0, max: 96, step: 1, noGrouping: true },
+  tent_capacity: { min: 1, max: 12, step: 1, noGrouping: true },
+  sleeping_places: { min: 0, max: 12, step: 1, noGrouping: true },
+  max_speed_knots: { min: 0, max: 100, step: 1, noGrouping: true },
 };
 
 /** Bounds for keys we have no explicit scale for, picked from the unit so a
@@ -55,6 +65,10 @@ const BOUNDS_BY_UNIT: Record<string, Omit<RangeBounds, "unit">> = {
   km: { min: 0, max: 500_000, step: 1000 },
   kr: { min: 0, max: 1_000_000, step: 1000 },
   kg: { min: 0, max: 5000, step: 50 },
+  // Dimensjonsfelt (møbler, sportsutstyr): 0–10 000 cm er 100 meter.
+  cm: { min: 0, max: 300, step: 1, noGrouping: true },
+  m: { min: 0, max: 30, step: 0.5, noGrouping: true },
+  liter: { min: 0, max: 1000, step: 5 },
 };
 
 /** Bounds keyed by label rather than `key` — for filters whose

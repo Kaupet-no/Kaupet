@@ -23,3 +23,14 @@ export function displayPriceNok(
     listing.price_nok
   );
 }
+
+/** Tallformatering med norske tusenskiller — `1234` → `"1 234"`. For beløp
+ * som skal ha " kr" bak, bruk `formatNok`. */
+export function formatNokNumber(n: number): string {
+  return n.toLocaleString("nb-NO");
+}
+
+/** Standard beløpsvisning i appen — `1234` → `"1 234 kr"`. */
+export function formatNok(n: number): string {
+  return `${formatNokNumber(n)} kr`;
+}

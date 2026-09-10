@@ -4,6 +4,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { getCategoryIcon } from "@/lib/category-icons";
 
 type Category = {
@@ -12,7 +13,19 @@ type Category = {
   parent_id: string | null;
   icon?: string | null;
   color?: string | null;
+  /** Admin-maintained alternative search words, never rendered. Lets a
+   * seller find "TV og lyd" by typing "hodetelefon" — see
+   * 20260909150000_category_search_synonyms.sql. */
+  search_synonyms?: string[] | null;
 };
+
+/** Name match first, then synonyms — so typing an exact category name never
+ * gets outranked by another category that merely lists it as a synonym. */
+function categoryMatchRank(category: Category, needle: string): number {
+  if (category.name_nb.toLowerCase().includes(needle)) return 0;
+  if (category.search_synonyms?.some((syn) => syn.toLowerCase().includes(needle))) return 1;
+  return -1;
+}
 
 /** How long the checkmark confirmation is shown on the picked item before
  * `onSelect` fires and the picker closes. Gives the user visible feedback
@@ -42,12 +55,18 @@ type Props = {
    * actual leaf (bil/motorsykkel/...) to the Statens Vegvesen lookup
    * instead of forcing manual drill-down. */
   selectableGroups?: string[];
-  /** Admin use case (choosing a *parent* category rather than a leaf): shows
-   * a pinned "select this level" row at the top of every level (including
-   * the root, as "Ingen (toppnivå)"), so any category — not just leaves —
-   * can be the final choice, while drilling down to inspect children still
-   * works via the normal grid/list clicks. */
-  allowSelectAny?: boolean;
+  /** Shows a pinned "select this level" row at the top of a level, so a
+   * category with children — not just a leaf — can be the final choice,
+   * while drilling down to inspect children still works via the normal
+   * grid/list clicks.
+   *
+   * - `"any"`: every level including the root, where the row reads "Ingen
+   *   (toppnivå)". Admin use case (choosing a *parent*, or none at all).
+   * - `"below-root"`: every level except the root. The seller flow, where a
+   *   listing must always end up in *some* category — this only rescues the
+   *   seller whose item has no matching leaf (see the missing headphones
+   *   category), it never lets them publish uncategorised. */
+  allowSelectAny?: "any" | "below-root";
   /** Seeds the drill-down at this category's children instead of the root —
    * e.g. when the surrounding step has already scoped the user to "Bil og
    * MC" and the root category itself shouldn't be shown as a choice again.
@@ -55,18 +74,10 @@ type Props = {
   initialParentId?: string;
 };
 
-function useIsDesktop() {
-  const [isDesktop, setIsDesktop] = useState(() =>
-    typeof window !== "undefined" ? window.matchMedia("(min-width: 768px)").matches : false,
-  );
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 768px)");
-    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-  return isDesktop;
-}
+/** Egen 768px-grense (Tailwind `md`) for Dialog-vs-Sheet-oppsettet her —
+ * ikke det samme som delte `useIsDesktop()` i `use-form-factor.ts`, som
+ * betyr ≥1024px. */
+const DESKTOP_DIALOG_QUERY = "(min-width: 768px)";
 
 /**
  * Lets the user drill down through an arbitrary number of category levels
@@ -87,7 +98,7 @@ export function CategoryPicker({
   allowSelectAny,
   initialParentId,
 }: Props) {
-  const isDesktop = useIsDesktop();
+  const isDesktop = useMediaQuery(DESKTOP_DIALOG_QUERY);
   const initialPath = useMemo(() => {
     if (!initialParentId) return [];
     const root = categories.find((c) => c.id === initialParentId);
@@ -98,6 +109,7 @@ export function CategoryPicker({
   const [search, setSearch] = useState("");
   const [pendingSelection, setPendingSelection] = useState<string | null>(null);
   const confirmTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     return () => {
@@ -105,11 +117,18 @@ export function CategoryPicker({
     };
   }, []);
 
+  // Only the dialog/sheet variant opens as its own surface; the inline variant
+  // is part of a wizard step and must not steal focus on mount.
+  useEffect(() => {
+    if (isDesktop && !inline) searchInputRef.current?.focus();
+  }, [isDesktop, inline]);
+
   const currentParentId = path.at(-1)?.id ?? null;
   const currentLevel = categories.filter((c) => c.parent_id === currentParentId);
 
-  const filteredCurrentLevel = search.trim()
-    ? currentLevel.filter((c) => c.name_nb.toLowerCase().includes(search.toLowerCase()))
+  const needle = search.trim().toLowerCase();
+  const filteredCurrentLevel = needle
+    ? currentLevel.filter((c) => categoryMatchRank(c, needle) >= 0)
     : currentLevel;
 
   /** Once a category at this level is selected, the grid collapses to just
@@ -123,8 +142,12 @@ export function CategoryPicker({
   const selectedInLevel = filteredCurrentLevel.find((c) => c.id === selectedId);
   const gridLevel = !manualExpand && selectedInLevel ? [selectedInLevel] : filteredCurrentLevel;
 
-  const searchResults = search.trim()
-    ? categories.filter((c) => c.name_nb.toLowerCase().includes(search.toLowerCase()))
+  const searchResults = needle
+    ? categories
+        .map((c) => ({ c, rank: categoryMatchRank(c, needle) }))
+        .filter((m) => m.rank >= 0)
+        .sort((a, b) => a.rank - b.rank)
+        .map((m) => m.c)
     : null;
 
   function hasChildren(id: string) {
@@ -253,6 +276,7 @@ export function CategoryPicker({
       <div className="relative p-3 border-b shrink-0">
         <Search className="absolute left-6 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
         <Input
+          ref={searchInputRef}
           data-testid="category-search-input"
           placeholder="Søk i kategorier..."
           value={search}
@@ -263,7 +287,7 @@ export function CategoryPicker({
       </div>
 
       <div className="flex-1 overflow-y-auto p-2">
-        {allowSelectAny && !searchResults && (
+        {allowSelectAny && !searchResults && (allowSelectAny === "any" || path.length > 0) && (
           <button
             type="button"
             onClick={handleSelectCurrentLevel}

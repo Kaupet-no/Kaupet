@@ -16,6 +16,7 @@ import { ModerationBanner } from "@/components/moderation-banner";
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthProvider } from "@/lib/auth";
+import { clearSignedUrlCaches } from "@/lib/storage";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { initOfflineWatcher } from "@/lib/native-offline";
 import {
@@ -33,8 +34,7 @@ import { FeedbackTag } from "@/components/feedback-tag";
 import { TestEnvBanner } from "@/components/test-env-banner";
 import { TestEnvGate } from "@/components/test-env-gate";
 import { useIsTestEnv } from "@/lib/env";
-import { isComposerRoute } from "@/features/listing-creation/composer-route";
-import { isFocusedRoute } from "@/features/listing-creation/focused-route";
+import { isComposerRoute, isFocusedRoute } from "@/features/listing-creation/chrome-routes";
 
 function NotFoundComponent() {
   return (
@@ -232,6 +232,7 @@ function RootComponent() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") clearSignedUrlCaches();
       if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
         router.invalidate();
         queryClient.invalidateQueries();

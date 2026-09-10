@@ -289,7 +289,7 @@ export function BusinessSignupFlow({ onAuthenticated }: { onAuthenticated: () =>
             <Turnstile
               ref={turnstileRef}
               siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-              options={{ size: "invisible" }}
+              options={{ size: "invisible", action: "kaupet" }}
             />
           )}
           {lookupLoading && (
@@ -483,7 +483,7 @@ export function BusinessSignupFlow({ onAuthenticated }: { onAuthenticated: () =>
             <Turnstile
               ref={turnstileRef}
               siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-              options={{ size: "invisible" }}
+              options={{ size: "invisible", action: "kaupet" }}
             />
           )}
           <Button type="submit" className="w-full gap-2" disabled={submitLoading || !acceptedTerms}>

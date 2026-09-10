@@ -68,6 +68,9 @@ export function CategoryDetailsPanel({
   const [searchExamples, setSearchExamples] = useState<string>(
     (category?.search_examples ?? []).join("\n"),
   );
+  const [searchSynonyms, setSearchSynonyms] = useState<string>(
+    (category?.search_synonyms ?? []).join("\n"),
+  );
   const [titleExample, setTitleExample] = useState<string>(category?.title_example ?? "");
   const [isHidden, setIsHidden] = useState(category?.is_hidden ?? false);
 
@@ -86,6 +89,10 @@ export function CategoryDetailsPanel({
           .split("\n")
           .map((w) => w.trim())
           .filter(Boolean),
+        search_synonyms: searchSynonyms
+          .split("\n")
+          .map((w) => w.trim())
+          .filter(Boolean),
         title_example: titleExample.trim() || null,
         is_hidden: isHidden,
       };
@@ -95,7 +102,10 @@ export function CategoryDetailsPanel({
           .update(payload)
           .eq("id", category.id)
           .select(
-            "id, name_nb, slug, parent_id, sort_order, icon, color, heading_font, search_examples, title_example, is_hidden",
+            // select("*") rather than a column list so the query keeps working in the
+            // window before the search_synonyms migration is applied — same reason
+            // as in use-category-filters.ts.
+            "*",
           )
           .single();
         if (error) throw error;
@@ -113,7 +123,10 @@ export function CategoryDetailsPanel({
           .from("categories")
           .insert({ ...payload, sort_order: siblingMaxSortOrder + 10 })
           .select(
-            "id, name_nb, slug, parent_id, sort_order, icon, color, heading_font, search_examples, title_example, is_hidden",
+            // select("*") rather than a column list so the query keeps working in the
+            // window before the search_synonyms migration is applied — same reason
+            // as in use-category-filters.ts.
+            "*",
           )
           .single();
         if (error) throw error;
@@ -319,6 +332,21 @@ export function CategoryDetailsPanel({
           </p>
         </div>
         <div className="space-y-2">
+          <Label htmlFor="search-synonyms">Synonymer</Label>
+          <Textarea
+            id="search-synonyms"
+            value={searchSynonyms}
+            onChange={(e) => setSearchSynonyms(e.target.value)}
+            placeholder={"hodetelefoner\nheadset\nøreklokker"}
+            rows={4}
+          />
+          <p className="text-xs text-muted-foreground">
+            Ett ord per linje. Brukes kun til å finne kategorien i kategorivelgeren når selgeren
+            søker — vises ingen steder i appen. Legg inn ordene folk faktisk skriver, ikke hele
+            søkefraser (det er eksempelsøkeordene over).
+          </p>
+        </div>
+        <div className="space-y-2">
           <Label htmlFor="title-example">Tittel-eksempel</Label>
           <Input
             id="title-example"
@@ -358,7 +386,7 @@ export function CategoryDetailsPanel({
               onOpenChange={setParentPickerOpen}
               categories={possibleParents}
               selectedId={parent}
-              allowSelectAny
+              allowSelectAny="any"
               onSelect={(categoryId) => setParent(categoryId)}
               trigger={
                 <Button type="button" variant="outline" className="w-full justify-between">

@@ -58,7 +58,10 @@ export const adminListProffOrders = createServerFn({ method: "GET" })
       .limit(200);
     if (data.status) query = query.eq("status", data.status);
     const { data: orders, error } = await query;
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return (orders ?? []) as unknown as AdminProffOrder[];
   });
 
@@ -82,7 +85,10 @@ export const adminMarkProffOrderInvoiced = createServerFn({ method: "POST" })
       .eq("status", "pending")
       .select("id")
       .maybeSingle();
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     if (!updated) throw new Error("Bestillingen er ikke lenger til fakturering.");
     return { ok: true };
   });
@@ -110,7 +116,10 @@ export const adminMarkProffOrderPaid = createServerFn({ method: "POST" })
       .in("status", ["pending", "invoiced"])
       .select("id, organization_id, term")
       .maybeSingle();
-    if (claimError) throw claimError;
+    if (claimError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", claimError);
+    }
     if (!claimed) throw new Error("Bestillingen er allerede registrert betalt eller kansellert.");
 
     const { data: period, error: extendError } = await supabaseAdmin
@@ -119,13 +128,19 @@ export const adminMarkProffOrderPaid = createServerFn({ method: "POST" })
         _months: PROFF_TERMS[claimed.term as ProffTerm].months,
       })
       .single();
-    if (extendError) throw extendError;
+    if (extendError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", extendError);
+    }
 
     const { error: periodError } = await supabaseAdmin
       .from("proff_orders")
       .update({ period_start: period.period_start, period_end: period.period_end })
       .eq("id", claimed.id);
-    if (periodError) throw periodError;
+    if (periodError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", periodError);
+    }
 
     return { ok: true, periodStart: period.period_start, periodEnd: period.period_end };
   });
@@ -145,7 +160,10 @@ export const adminCancelProffOrder = createServerFn({ method: "POST" })
       .in("status", ["pending", "invoiced"])
       .select("id")
       .maybeSingle();
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     if (!cancelled) throw new Error("Bestillingen kan ikke kanselleres.");
     return { ok: true };
   });
@@ -176,7 +194,10 @@ export const adminListLocationCharges = createServerFn({ method: "GET" })
       )
       .lte("next_period_start", new Date().toISOString())
       .order("next_period_start");
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     const rows = (data ?? []) as unknown as Array<{
       id: string;
       location_id: string;
@@ -196,7 +217,10 @@ export const adminListLocationCharges = createServerFn({ method: "GET" })
       .from("organization_billing_profiles")
       .select("organization_id, billing_email")
       .in("organization_id", organizationIds);
-    if (profilesError) throw profilesError;
+    if (profilesError) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", profilesError);
+    }
     const billingEmails = new Map(
       (profiles ?? []).map((profile) => [profile.organization_id, profile.billing_email]),
     );
@@ -243,7 +267,10 @@ export const adminMarkLocationChargeInvoiced = createServerFn({ method: "POST" }
         _fiken_invoice_number: data.fikenInvoiceNumber,
       },
     );
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return {
       period: period
         ? {

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { CategoryFilter } from "@/lib/category-filters";
@@ -12,16 +12,21 @@ vi.mock("@/components/attribute-fields", () => ({
   AttributeFields: ({
     filterKeys,
     heading,
+    onChange,
   }: {
     filterKeys?: readonly string[];
     heading?: string | null;
-  }) => (
-    <div
-      data-testid="technical-attributes"
-      data-filter-keys={filterKeys?.join(",") ?? ""}
-      data-heading={heading ?? ""}
-    />
-  ),
+    onChange?: (next: unknown) => void;
+  }) => {
+    return (
+      <div
+        data-testid="technical-attributes"
+        data-filter-keys={filterKeys?.join(",") ?? ""}
+        data-heading={heading ?? ""}
+        data-editable={typeof onChange === "function"}
+      />
+    );
+  },
   useAllCategoryFilters: () => ({ data: categoryFilters.current }),
 }));
 
@@ -98,27 +103,71 @@ describe("VehicleFactsGroup", () => {
     render(<VehicleFactsGroup {...props()} />);
     const technicalFields = screen.getByTestId("technical-attributes");
     expect(technicalFields.getAttribute("data-filter-keys")).toBe("fuel_type");
-    expect(technicalFields.getAttribute("data-heading")).toBe("Tekniske opplysninger");
+    expect(screen.getByText("Tekniske opplysninger du må fylle ut")).toBeTruthy();
+    expect(technicalFields.getAttribute("data-heading")).toBe("");
+    expect(screen.getByText("Tekniske detaljer")).toBeTruthy();
+    expect(screen.getAllByText("Førstegangsregistrering").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("VIN").length).toBeGreaterThan(0);
+  });
+  it("viser Hjuldrift i seksjonen for påkrevde tekniske opplysninger uten SVV-oppslag", () => {
+    render(<VehicleFactsGroup {...props({ vehicleRegistered: false })} />);
+
+    expect(screen.getByText("Tekniske opplysninger du må fylle ut")).toBeTruthy();
+    expect(screen.getByText("Hjuldrift")).toBeTruthy();
   });
 
-  it("viser ikke SVV-felt på nytt når oppslaget allerede har fylt det ut", () => {
+  it("viser forhåndsutfylte SVV-felt redigerbare bak Tekniske detaljer", () => {
     categoryFilters.current = [requiredFilter("fuel_type")];
 
-    render(<VehicleFactsGroup {...props({ attributes: { fuel_type: "bensin" } })} />);
+    render(
+      <VehicleFactsGroup
+        {...props({
+          attributes: {
+            fuel_type: "bensin",
+            drive_type: "front",
+            first_registration_date: "2018-03-08",
+            vin: "VIN123",
+            vehicle_lookup: JSON.stringify({
+              fuel_type: "bensin",
+              drive_type: "front",
+              first_registration_date: "2018-03-08",
+              vin: "VIN123",
+            }),
+          },
+          vehicleLookupResult: null,
+        })}
+      />,
+    );
 
-    expect(screen.queryByTestId("technical-attributes")).toBeNull();
+    const details = screen.getByText("Tekniske detaljer").closest("details");
+    expect(details?.hasAttribute("open")).toBe(false);
+    expect(
+      screen.getByText(/Opplysninger fra Statens vegvesen er forhåndsutfylt når de finnes/),
+    ).toBeTruthy();
+    const technicalFields = screen.getByTestId("technical-attributes");
+    expect(technicalFields.getAttribute("data-filter-keys")).toBe("fuel_type");
+    expect(technicalFields.getAttribute("data-heading")).toBe("");
+    fireEvent.click(details?.querySelector("summary") as HTMLElement);
+    expect(technicalFields.getAttribute("data-editable")).toBe("true");
+    expect(screen.getByText(/Andre tekniske opplysninger/)).toBeTruthy();
+    expect(screen.getByText(/Førstegangsregistrering/)).toBeTruthy();
+    expect(screen.getByText(/^VIN/)).toBeTruthy();
+    expect(screen.getByText("Hjuldrift").closest("details")).toBeNull();
   });
 
-  it("viser sylindre og motorkode som valgfrie selv når SVV ikke har data", () => {
-    categoryFilters.current = [requiredFilter("cylinders"), requiredFilter("engine_code")];
+  it("viser sylindre, slagvolum og motorkode som valgfrie selv når SVV ikke har data", () => {
+    categoryFilters.current = [
+      requiredFilter("cylinders"),
+      requiredFilter("engine_displacement_cc"),
+      requiredFilter("engine_code"),
+    ];
 
-    render(<VehicleFactsGroup {...props()} />);
+    render(<VehicleFactsGroup {...props({ attributes: { drive_type: "front" } })} />);
     const technicalFields = screen.getAllByTestId("technical-attributes");
 
     expect(technicalFields).toHaveLength(1);
-    expect(technicalFields[0].getAttribute("data-filter-keys")).toBe("cylinders,engine_code");
-    expect(technicalFields[0].getAttribute("data-heading")).toBe(
-      "Flere tekniske opplysninger (valgfritt)",
-    );
+    expect(technicalFields[0].getAttribute("data-filter-keys")).toBe("cylinders");
+    expect(screen.getByText("engine_displacement_cc")).toBeTruthy();
+    expect(technicalFields[0].getAttribute("data-heading")).toBe("");
   });
 });

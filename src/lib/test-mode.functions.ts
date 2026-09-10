@@ -18,7 +18,10 @@ export const setTestMode = createServerFn({ method: "POST" })
       .eq("user_id", context.userId)
       .in("role", ["admin", "demo"])
       .limit(1);
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     if (!rows || rows.length === 0) throw new Error("Ikke autorisert");
 
     if (data.enabled) {

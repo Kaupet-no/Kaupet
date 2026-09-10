@@ -14,7 +14,10 @@ export const getPromotionPricing = createServerFn({ method: "GET" }).handler(asy
     .select("duration_days, price_nok")
     .eq("active", true)
     .order("duration_days");
-  if (error) throw error;
+  if (error) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("database", error);
+  }
   return data ?? [];
 });
 
@@ -38,7 +41,10 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
       .select("id, seller_id, status, title")
       .eq("id", data.listing_id)
       .maybeSingle();
-    if (lerr) throw lerr;
+    if (lerr) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", lerr);
+    }
     if (!listing) throw new Error("Annonsen finnes ikke");
     if (listing.seller_id !== userId) throw new Error("Du eier ikke denne annonsen");
     if (listing.status !== "active") throw new Error("Annonsen må være aktiv for å fremheves");
@@ -51,7 +57,7 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
       .eq("active", true)
       .maybeSingle();
     if (perr) {
-      const { toClientError } = await import("@/lib/to-client-error.server");
+      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("createPromotionCheckout.getPricing", perr);
     }
     if (!pricing) throw new Error("Ugyldig pakkevarighet");
@@ -93,7 +99,10 @@ export const createPromotionCheckout = createServerFn({ method: "POST" })
       })
       .select("id")
       .single();
-    if (ierr) throw ierr;
+    if (ierr) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", ierr);
+    }
     const origin = host
       ? `https://${host}`
       : (process.env.PUBLIC_SITE_URL ??
@@ -170,7 +179,10 @@ export const getPromotionReceipt = createServerFn({ method: "GET" })
       )
       .eq("id", data.promotion_id)
       .maybeSingle();
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     if (!promo) throw new Error("Fant ikke kvittering");
     if (promo.user_id !== userId) throw new Error("Ikke tilgang");
     const listing = Array.isArray(promo.listings) ? promo.listings[0] : promo.listings;
@@ -205,7 +217,10 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
       )
       .eq("id", data.promotion_id)
       .maybeSingle();
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     if (!promo) throw new Error("Fant ikke fremheving");
     if (promo.user_id !== userId) throw new Error("Ikke tilgang");
 
@@ -229,6 +244,25 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
     const payment = await getVippsPayment(promo.vipps_reference, host, vippsMode);
 
     if (payment.state === "AUTHORIZED" || payment.state === "CAPTURED") {
+      if (payment.state === "AUTHORIZED") {
+        try {
+          await captureVippsPayment(
+            promo.vipps_reference,
+            promo.price_nok,
+            `capture-${promo.id}`,
+            host,
+            vippsMode,
+          );
+        } catch (e) {
+          await logServerError("reconcilePromotionPayment.capture", e, {
+            promotion_id: promo.id,
+          });
+          throw new Error("Betalingen er autorisert, men ikke belastet ennå. Prøv igjen.", {
+            cause: e,
+          });
+        }
+      }
+
       const now = new Date();
       const expires = new Date(now.getTime() + promo.duration_days * 24 * 60 * 60 * 1000);
       const { error: uerr } = await supabaseAdmin
@@ -241,20 +275,9 @@ export const reconcilePromotionPayment = createServerFn({ method: "POST" })
         })
         .eq("id", promo.id)
         .eq("status", "pending");
-      if (uerr) throw uerr;
-
-      if (payment.state === "AUTHORIZED") {
-        try {
-          await captureVippsPayment(
-            promo.vipps_reference,
-            promo.price_nok,
-            `capture-${promo.id}`,
-            host,
-            vippsMode,
-          );
-        } catch (e) {
-          console.error("[reconcilePromotionPayment] capture failed", e);
-        }
+      if (uerr) {
+        const { toClientError } = await import("@/lib/to-client-error");
+        throw await toClientError("database", uerr);
       }
       return { status: "active" as const, expires_at: expires.toISOString() };
     }
@@ -305,7 +328,10 @@ export const getMyActivePromotions = createServerFn({ method: "GET" })
       .select("id, listing_id, status, starts_at, expires_at, duration_days, is_gift")
       .eq("user_id", userId)
       .order("created_at", { ascending: false });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return data ?? [];
   });
 
@@ -324,7 +350,10 @@ export const getFeaturedListings = createServerFn({ method: "GET" })
       _category_slug: data.category_slug ?? undefined,
       _limit: data.limit ?? 2,
     });
-    if (idErr) throw idErr;
+    if (idErr) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", idErr);
+    }
     const ids = (idRows ?? []).map((r: { listing_id: string }) => r.listing_id);
     if (ids.length === 0) return [];
 
@@ -335,7 +364,10 @@ export const getFeaturedListings = createServerFn({ method: "GET" })
       )
       .in("id", ids)
       .eq("status", "active");
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return (listings ?? []).map((l) => {
       const imgs = (l.listing_images ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
       const category = Array.isArray(l.categories) ? l.categories[0] : l.categories;

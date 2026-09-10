@@ -47,7 +47,7 @@ import {
 import type { TurnstileInstance } from "@marsidev/react-turnstile";
 import type { VehicleLeafSlug } from "@/lib/vehicle/vehicle-classification";
 
-import { useIsDemo } from "@/hooks/use-is-demo";
+import { useIsDemo } from "@/hooks/use-user-roles";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { DiscardListingDialog } from "@/features/listing-creation/discard-listing-dialog";
@@ -79,6 +79,8 @@ import type {
 import type { PreviewDraft } from "@/features/listing-creation/preview-draft-store";
 import { PreviewDraftView } from "@/features/listing-creation/preview-draft-view";
 import { trackProductEvent } from "@/lib/product-analytics";
+import { authResumeReturnTo, currentReturnTo } from "@/lib/auth-return";
+import { publishGate } from "@/features/listing-creation/publish-gate";
 import { NewListingError } from "@/features/listing-creation/new-listing-error";
 import { StepIndicator } from "@/features/listing-creation/step-indicator";
 import { ListingComposerShell } from "@/features/listing-creation/listing-composer-shell";
@@ -111,7 +113,7 @@ const listingSchema = z.object({
   category_id: z.string().uuid("Velg en kategori"),
   condition: z.enum(["new", "like_new", "good", "acceptable", "for_parts"]).nullable().optional(),
   is_free: z.boolean(),
-  can_ship: z.enum(["pickup", "ship", "both"]).nullable().optional(),
+  can_ship: z.enum(["pickup", "ship"]).nullable().optional(),
   price_nok: z
     .union([
       z.coerce
@@ -152,11 +154,12 @@ type ListingForm = z.infer<typeof listingSchema>;
  * every platform. See resolveWizardPages' `forceBreakBeforeKeys`. */
 const VEHICLE_FORCE_BREAK_BEFORE_KEYS = new Set(["vehicle-facts", "vehicle-condition"]);
 
-export const Route = createFileRoute("/_authenticated/ny-annonse")({
+export const Route = createFileRoute("/ny-annonse")({
   validateSearch: z
     .object({
       type: z.enum(["sell", "free"]).optional(),
       title: z.string().optional(),
+      resume: z.enum(["auth-publish"]).optional(),
     })
     .catch({}),
   head: () => ({
@@ -187,6 +190,9 @@ function NewListingPage() {
   const pendingReviewFocusRef = useRef<string | null>(null);
   const [reviewJumpRequested, setReviewJumpRequested] = useState(false);
   const pendingRestoreStepKeyRef = useRef<string | null>(null);
+  const authResumeHandledRef = useRef(false);
+  const bypassNavigationBlockerRef = useRef(false);
+  const noImagePromptShownRef = useRef(false);
   const [showNoImageDialog, setShowNoImageDialog] = useState(false);
   const [publishingStatusOpen, setPublishingStatusOpen] = useState(false);
   const [extraFieldError, setExtraFieldError] = useState<{
@@ -213,9 +219,9 @@ function NewListingPage() {
   } | null>(null);
   const native = isNative();
   const { data: isDemo = false } = useIsDemo();
+  const { type: typeParam, title: titleParam, resume } = Route.useSearch();
   const turnstileEnabled = !!import.meta.env.VITE_TURNSTILE_SITE_KEY;
   const turnstileRef = useRef<TurnstileInstance | null>(null);
-  const { type: typeParam, title: titleParam } = Route.useSearch();
   const listingType = typeParam ?? null;
   // Set once from the initial search params (mirrors the useForm defaultValues
   // pattern below — not kept in sync with titleParam afterwards): true when
@@ -352,10 +358,15 @@ function NewListingPage() {
   );
   const missingFilters = useMemo(
     () =>
-      getMissingRequiredFilters(categoryId || null, allFilters ?? [], categoriesById, attributes, [
-        ...VEHICLE_EQUIPMENT_FILTER_KEYS,
-        ...behavior.requiredFilterExclusions,
-      ]),
+      behavior.requiresCategoryFilterValues
+        ? getMissingRequiredFilters(
+            categoryId || null,
+            allFilters ?? [],
+            categoriesById,
+            attributes,
+            [...VEHICLE_EQUIPMENT_FILTER_KEYS, ...behavior.requiredFilterExclusions],
+          )
+        : [],
     [categoryId, allFilters, categoriesById, attributes, behavior],
   );
 
@@ -364,17 +375,6 @@ function NewListingPage() {
     const slug = categoriesById.get(categoryId)?.slug;
     return !VEHICLE_LEAF_SLUGS_WITHOUT_MILEAGE.includes(slug as VehicleLeafSlug);
   }, [isVehicle, categoryId, categoriesById]);
-
-  const genericAttributesActive = useMemo(
-    () =>
-      effectiveFlowForCategory(
-        categoryId || null,
-        allFlows ?? [],
-        categoriesById,
-        fromLanding,
-      ).modules.includes("generic-attributes"),
-    [categoryId, allFlows, categoriesById, fromLanding],
-  );
 
   // Hoisted above its natural spot (near the other category-suggestion state)
   // because useVehicleLookupFlow's confirmVehicleData needs it, and that hook
@@ -494,9 +494,24 @@ function NewListingPage() {
       resolveWizardPages(fieldGroupKeys, {
         native,
         forceBreakBeforeKeys: isVehicleFlow ? VEHICLE_FORCE_BREAK_BEFORE_KEYS : undefined,
-      }).map((keys) => ({
-        groups: fieldGroupsForKeys(keys),
-      })),
+      })
+        .map((keys) => ({
+          groups: fieldGroupsForKeys(keys),
+        }))
+        // A page whose keys all resolve to nothing renders as an empty step
+        // titled "Steg" (pageLabel's fallback) that the user still has to
+        // click past. That happens whenever category_flows.field_groups in
+        // the database names a key the registry no longer has — drop the
+        // page instead of shipping a blank one.
+        .filter((page) => {
+          if (page.groups.length > 0) return true;
+          if (import.meta.env.DEV) {
+            console.warn(
+              "[ny-annonse] hopper over tomt wizard-steg — ukjente field_groups-nøkler i category_flows",
+            );
+          }
+          return false;
+        }),
     [fieldGroupKeys, native, isVehicleFlow],
   );
 
@@ -682,9 +697,7 @@ function NewListingPage() {
       );
     }
     if (field.startsWith("attr-")) {
-      return pages.some((page) => page.groups.some((group) => group.key === "vehicle-registration"))
-        ? "vehicle-registration"
-        : "category-attributes";
+      return behavior.attributeReviewGroupKey(pages, vehicleRegistered);
     }
     const exact = pages
       .flatMap((page) => page.groups)
@@ -859,7 +872,8 @@ function NewListingPage() {
   const blocker = useBlocker({
     // `next.pathname === current.pathname` skjer når et overlay (f.eks. forhåndsvisning) rydder sin egen synthetic history-oppføring med
     // `history.back()` ved lukking — se useOverlayHistory. Det er ikke en faktisk sideforlatelse, så den skal ikke trigge "endringer går tapt".
-    shouldBlockFn: ({ current, next }) => shouldBlockNav && next.pathname !== current.pathname,
+    shouldBlockFn: ({ current, next }) =>
+      !bypassNavigationBlockerRef.current && shouldBlockNav && next.pathname !== current.pathname,
     withResolver: true,
     enableBeforeUnload: shouldBlockNav,
   });
@@ -884,6 +898,8 @@ function NewListingPage() {
     lastSaved,
     draftSaveError,
     hasDraftData,
+    draftChecked,
+    flushLocalDraft,
     saveDraftToSupabase,
     ensureDraftId,
     restoreDraft: restoreDraftFields,
@@ -912,6 +928,7 @@ function NewListingPage() {
     showVisitingAddress,
     maintenanceHistory,
     stepKey: currentStepKey,
+    authenticated: !!user,
   });
 
   function restoreDraft() {
@@ -931,6 +948,21 @@ function NewListingPage() {
       setCoords,
     });
   }
+
+  useEffect(() => {
+    if (resume !== "auth-publish" || !user || !hasDraftData || authResumeHandledRef.current) {
+      return;
+    }
+    authResumeHandledRef.current = true;
+    restoreDraft();
+    trackProductEvent("listing_creation_step_completed", {
+      kind: "sell",
+      action: "auth_resumed",
+      step: currentStepKey,
+    });
+    setReviewJumpRequested(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resume, user?.id, hasDraftData]);
   async function startNewListing() {
     trackProductEvent("listing_creation_step_completed", {
       kind: "sell",
@@ -980,7 +1012,6 @@ function NewListingPage() {
   const {
     categorySuggestions,
     categorySuggestionLoading,
-    setCategorySuggestions,
     setSuggestionDismissed,
     applyCategorySuggestion,
     similarListings,
@@ -998,7 +1029,6 @@ function NewListingPage() {
     priceNok: typeof priceNok === "number" ? priceNok : undefined,
     isFree,
     attributes,
-    immediate: fromLanding,
     setValue,
   });
 
@@ -1077,7 +1107,8 @@ function NewListingPage() {
       const result = group.validateExtra?.(validateCtx);
       if (result === "SHOW_NO_IMAGE_DIALOG") {
         if (native) continue;
-        if (options?.skipImageCheck) continue;
+        if (options?.skipImageCheck || noImagePromptShownRef.current) continue;
+        noImagePromptShownRef.current = true;
         trackProductEvent("listing_creation_step_completed", {
           kind: "sell",
           action: "validation_prompt",
@@ -1251,7 +1282,10 @@ function NewListingPage() {
       return listing;
     },
     onSuccess: (result) => {
-      clearDraftStorage();
+      // stopAutosave: the wizard stays mounted behind the success dialog with
+      // the form still populated — without this the next autosave tick would
+      // INSERT the published listing back as a duplicate draft.
+      clearDraftStorage({ stopAutosave: true });
       trackProductEvent("listing_published", {
         kind: "sell",
         action: "success",
@@ -1363,12 +1397,17 @@ function NewListingPage() {
     setPreviewOpen(true);
   }
 
-  // Redirect to home if no type selected and no draft — entry should go through the picker dialog
+  // Redirect to home if no type selected and no draft — entry should go through the picker dialog.
+  // `draftChecked` gates this: the draft is read from localStorage in an
+  // effect, so on a direct visit to /ny-annonse this would otherwise fire on
+  // the first commit — while hasDraftData is still null — and bounce the user
+  // off a draft they do have.
   useEffect(() => {
+    if (!draftChecked) return;
     if (listingType === null && !hasDraftData) {
       void navigate({ to: "/" });
     }
-  }, [listingType, hasDraftData, navigate]);
+  }, [draftChecked, listingType, hasDraftData, navigate]);
 
   // Nearest ancestor with a title_example wins; null → generic placeholder.
   const titleExample = useMemo(() => {
@@ -1386,7 +1425,6 @@ function NewListingPage() {
     setCategoryTouchedManually(true);
     setSelectedParentId(parentId);
     setValue("category_id", id, { shouldValidate: true });
-    setCategorySuggestions([]);
     if (via !== "wizard") return;
     if (currentPage?.groups?.some((g) => g.key === "category-select")) {
       goToNextPage();
@@ -1509,11 +1547,9 @@ function NewListingPage() {
     categoryTouchedManually,
     applyCategorySuggestion: applySuggestedCategory,
     setSuggestionDismissed,
-    setCategorySuggestions,
     attributes,
     onAttributesChange: setAttributes,
     attributesTouched,
-    genericAttributesActive,
     boatFactsActive,
     vehicleAttributeHiddenKeys,
     extraFieldError,
@@ -1614,13 +1650,18 @@ function NewListingPage() {
   // is safe.
   const submitComposer = handleSubmit(
     // eslint-disable-next-line react-hooks/refs
-    (v) => {
-      if (missingFilters.length > 0) {
+    async (v) => {
+      const gate = publishGate({
+        hasMissingAttributes: missingFilters.length > 0,
+        authenticated: !!user,
+        hasPreviewed,
+        native,
+      });
+      if (gate === "fill-required-attributes") {
         trackProductEvent("listing_creation_step_completed", {
           kind: "sell",
           action: "validation_failed",
           step: currentStepKey,
-          reason: "required_attributes",
         });
         setAttributesTouched(true);
         pendingReviewFocusRef.current = missingFilters[0]?.key
@@ -1630,7 +1671,19 @@ function NewListingPage() {
         setValidationError("Fyll inn alle obligatoriske egenskaper før du publiserer.");
         return;
       }
-      if (!hasPreviewed && !native) {
+      // Auth is checked before the preview nudge: "Publiser likevel" calls
+      // mutation.mutate() directly, so a guest reaching that dialog would hit
+      // the server's auth error instead of the sign-in handoff.
+      if (gate === "sign-in") {
+        if (!(await flushLocalDraft())) return;
+        bypassNavigationBlockerRef.current = true;
+        void navigate({
+          to: "/auth",
+          search: { mode: "signin", returnTo: authResumeReturnTo(currentReturnTo()) },
+        });
+        return;
+      }
+      if (gate === "confirm-without-preview") {
         pendingSubmitValuesRef.current = v;
         setPreviewNudgeOpen(true);
         return;
@@ -1684,6 +1737,7 @@ function NewListingPage() {
           turnstileRef={turnstileRef}
           mutationIsPending={mutation.isPending}
           onCancel={() => navigate({ to: "/" })}
+          isGuest={!user}
         />
       )}
     </>
@@ -1937,6 +1991,7 @@ function NewListingPage() {
         }}
         categories={pickableCategories}
         selectedId={categoryId}
+        allowSelectAny="below-root"
         onSelect={(id, parentId) => {
           if (editingCategoryViaTitle) {
             // Already confirmed via categoryEditConfirmOpen below — apply
@@ -2133,6 +2188,11 @@ function NewListingPage() {
             blocker.proceed?.();
           }}
           onSaveDraft={async () => {
+            if (!user) {
+              if (!(await flushLocalDraft())) return false;
+              blocker.proceed?.();
+              return true;
+            }
             setIsSavingDraft(true);
             const id = await saveDraftToSupabase();
             setIsSavingDraft(false);

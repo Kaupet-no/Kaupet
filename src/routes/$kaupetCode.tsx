@@ -8,8 +8,7 @@ import { toast } from "sonner";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { z } from "zod";
 import { useIsNative } from "@/hooks/use-is-native";
-import { useIsAdmin } from "@/hooks/use-is-admin";
-import { useIsModerator } from "@/hooks/use-is-moderator";
+import { useIsAdmin, useIsModerator } from "@/hooks/use-user-roles";
 import { ListingActionsMenu } from "@/components/listing-detail/listing-actions-menu";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -18,6 +17,7 @@ import { CategoryLandingPage } from "@/components/category-landing-page";
 import { breadcrumbPath, buildTree, type Category } from "@/lib/categories";
 import { encodeAttrFilters } from "@/features/listing-search/search-schema";
 import { normalizeSlugForMatch } from "@/lib/slug";
+import { displayPriceNok } from "@/lib/format";
 
 import { searchSchema } from "@/features/listing-search/search-schema";
 import { signListingImageUrls, signVehicle360FrameUrls } from "@/lib/storage";
@@ -71,7 +71,11 @@ export const Route = createFileRoute("/$kaupetCode")({
       const { data, error } = await supabase
         .from("listings")
         .select(
-          "id, kaupet_code, title, description, price_nok, is_free, condition, city, updated_at, published_at, status",
+          // attributes + categories(slug) are only here for displayPriceNok:
+          // a vehicle's meta title, og:title and schema.org price have to be
+          // the same number the page and the search cards show, or Google
+          // advertises a price the buyer never sees.
+          "id, kaupet_code, title, description, price_nok, is_free, condition, city, updated_at, published_at, status, attributes, categories(slug)",
         )
         .eq("kaupet_code", params.kaupetCode)
         .maybeSingle();
@@ -144,10 +148,15 @@ export const Route = createFileRoute("/$kaupetCode")({
         meta: [{ title: "Annonse — Kaupet.no" }, { name: "robots", content: "noindex" }],
       };
     }
+    const displayPrice = displayPriceNok({
+      category_slug: (Array.isArray(l.categories) ? l.categories[0] : l.categories)?.slug ?? null,
+      price_nok: l.price_nok,
+      attributes: (l.attributes ?? null) as Record<string, unknown> | null,
+    });
     const priceLabel = l.is_free
       ? "Gis bort gratis"
-      : l.price_nok != null
-        ? `${l.price_nok.toLocaleString("nb-NO")} kr`
+      : displayPrice != null
+        ? `${displayPrice.toLocaleString("nb-NO")} kr`
         : "Pris ved henvendelse";
     const place = l.city ? ` i ${l.city}` : "";
     const rawTitle = `${l.title} — ${priceLabel}${place} | Kaupet.no`;
@@ -187,7 +196,7 @@ export const Route = createFileRoute("/$kaupetCode")({
             offers: {
               "@type": "Offer",
               priceCurrency: "NOK",
-              price: l.is_free ? 0 : (l.price_nok ?? undefined),
+              price: l.is_free ? 0 : (displayPrice ?? undefined),
               availability: isActive
                 ? "https://schema.org/InStock"
                 : "https://schema.org/OutOfStock",
@@ -713,6 +722,7 @@ function ListingDetailPage() {
       categoryId={data.category_id}
       canShip={data.can_ship}
       requiresDeliveryMethod={behavior.requiresDeliveryMethod}
+      listingStatus={data.status}
       organizationBrand={organizationBrand}
       relatedListingsSlot={relatedListingsSlot}
       breadcrumb={breadcrumb}

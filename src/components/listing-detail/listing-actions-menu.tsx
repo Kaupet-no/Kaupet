@@ -7,6 +7,7 @@ import { showSuccessToast, showErrorToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";
 import { supabase } from "@/integrations/supabase/client";
 import { MarkSoldDialog } from "@/components/listing-detail/mark-sold-dialog";
+import { updateListingStatus } from "@/lib/listings.functions";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -66,6 +67,7 @@ export function ListingActionsMenu({
   const submitUserFn = useServerFn(submitUserReport);
   const disableFn = useServerFn(adminDisableListingWithMessage);
   const deleteFn = useServerFn(adminDeleteListing);
+  const updateStatusFn = useServerFn(updateListingStatus);
 
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState("");
@@ -153,13 +155,7 @@ export function ListingActionsMenu({
   const [markSoldOpen, setMarkSoldOpen] = useState(false);
 
   const ownerArchiveMut = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase
-        .from("listings")
-        .update({ status: "archived" })
-        .eq("id", listingId);
-      if (error) throw error;
-    },
+    mutationFn: () => updateStatusFn({ data: { id: listingId, status: "archived" } }),
     onSuccess: () => {
       showSuccessToast("Annonsen er avpublisert");
       setConfirmAction(null);

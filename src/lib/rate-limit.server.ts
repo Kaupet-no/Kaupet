@@ -16,6 +16,9 @@ export async function assertNotRateLimited(
     _limit: limit,
     _window_seconds: windowSeconds,
   });
-  if (error) throw error;
+  if (error) {
+    const { toClientError } = await import("@/lib/to-client-error.server");
+    throw await toClientError("database", error);
+  }
   if (!allowed) throw new Error("For mange forespørsler. Prøv igjen senere.");
 }

@@ -168,7 +168,11 @@ export function SellerContactPanel({
         </div>
       )}
       <div className="mt-2 flex flex-col gap-2">
-        <FavoriteButton listingId={listingId} variant="full" size="lg" className="w-full" />
+        {/* Favouriting your own listing does nothing useful — it just puts the
+            ad you already own in your own "saved for later" list. */}
+        {!isOwner && (
+          <FavoriteButton listingId={listingId} variant="full" size="lg" className="w-full" />
+        )}
         <Button
           type="button"
           variant="outline"

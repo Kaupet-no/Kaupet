@@ -46,7 +46,10 @@ export const createBlock = createServerFn({ method: "POST" })
         .select("id, buyer_id, seller_id, listing_id")
         .eq("id", data.conversationId)
         .maybeSingle();
-      if (convErr) throw convErr;
+      if (convErr) {
+        const { toClientError } = await import("@/lib/to-client-error");
+        throw await toClientError("database", convErr);
+      }
       if (!conv) throw new Error("Samtalen finnes ikke");
       if (conv.buyer_id !== userId && conv.seller_id !== userId) {
         throw new Error("Du er ikke deltaker i denne samtalen");
@@ -71,7 +74,7 @@ export const createBlock = createServerFn({ method: "POST" })
       if ((error as { code?: string }).code === "23505") {
         return { ok: true, alreadyBlocked: true };
       }
-      const { toClientError } = await import("@/lib/to-client-error.server");
+      const { toClientError } = await import("@/lib/to-client-error");
       throw await toClientError("createBlock", error, { blocker_id: userId });
     }
     return { ok: true, alreadyBlocked: false };
@@ -86,7 +89,10 @@ export const deleteBlock = createServerFn({ method: "POST" })
       .delete()
       .eq("id", data.blockId)
       .eq("blocker_id", context.userId);
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return { ok: true };
   });
 
@@ -99,7 +105,10 @@ export const listMyBlocks = createServerFn({ method: "GET" })
       .select("id, blocker_id, blocked_id, scope, conversation_id, listing_id, reason, created_at")
       .eq("blocker_id", userId)
       .order("created_at", { ascending: false });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     const list = rows ?? [];
     if (list.length === 0) return [];
 
@@ -133,6 +142,9 @@ export const listBlocksAgainstMe = createServerFn({ method: "GET" })
       .from("user_blocks")
       .select("scope, blocker_id, conversation_id")
       .eq("blocked_id", userId);
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return data ?? [];
   });

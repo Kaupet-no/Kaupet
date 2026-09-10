@@ -24,6 +24,9 @@ export const getAttributeValueSuggestions = createServerFn({ method: "GET" })
       attr_key: data.key,
       q: data.q,
     });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return (rows ?? []).map((r) => r.value);
   });

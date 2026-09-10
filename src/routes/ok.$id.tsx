@@ -11,7 +11,7 @@ import { NativePageHeader } from "@/components/native-page-header";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useCategories, visibleCategories } from "@/hooks/use-categories";
-import { useIsDemo } from "@/hooks/use-is-demo";
+import { useIsDemo } from "@/hooks/use-user-roles";
 import { useIsNative } from "@/hooks/use-is-native";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { formatErrorMessage } from "@/lib/errors";

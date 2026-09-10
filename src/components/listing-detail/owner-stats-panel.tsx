@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Check, ChevronDown, Eye, Heart, Info, Loader2, Pencil, Send } from "lucide-react";
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -57,15 +58,23 @@ export function OwnerStatsPanel({
 }) {
   const queryClient = useQueryClient();
   const [showPublishWarning, setShowPublishWarning] = useState(false);
+  const turnstileEnabled = Boolean(import.meta.env.VITE_TURNSTILE_SITE_KEY);
+  const turnstileRef = useRef<TurnstileInstance | null>(null);
   const doRepublish = useServerFn(republishListing);
   const publishDraft = useMutation({
-    mutationFn: () => doRepublish({ data: { id: listingId } }),
+    mutationFn: async () => {
+      const turnstileToken = turnstileEnabled
+        ? await turnstileRef.current?.getResponsePromise()
+        : null;
+      return doRepublish({ data: { id: listingId, turnstileToken: turnstileToken ?? null } });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-listings"] });
       queryClient.invalidateQueries({ queryKey: ["listing"] });
       showSuccessToast("Annonsen er publisert!");
     },
     onError: (e: Error) => showErrorToast(formatErrorMessage(e, "Kunne ikke publisere annonsen")),
+    onSettled: () => turnstileRef.current?.reset(),
   });
 
   return (
@@ -108,6 +117,13 @@ export function OwnerStatsPanel({
             Publiser
           </Button>
         </Alert>
+      )}
+      {status === "draft" && turnstileEnabled && (
+        <Turnstile
+          ref={turnstileRef}
+          siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+          options={{ size: "invisible", action: "kaupet" }}
+        />
       )}
 
       <AlertDialog open={showPublishWarning} onOpenChange={setShowPublishWarning}>

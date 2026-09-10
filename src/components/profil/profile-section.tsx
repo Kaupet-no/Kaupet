@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getMyProfileStats } from "@/lib/reviews.functions";
 import { formatErrorMessage } from "@/lib/errors";
+import { updateOwnAvatar, updateOwnProfile } from "@/lib/profile.functions";
 import {
   deletePreviousAvatarImage,
   describeImageError,
@@ -91,15 +92,13 @@ export function ProfileSection() {
     }
   }, [profile, reset]);
 
+  const updateProfile = useServerFn(updateOwnProfile);
+  const updateAvatar = useServerFn(updateOwnAvatar);
+
   const mutation = useMutation({
     mutationFn: async (values: ProfileForm) => {
-      if (!userId) throw new Error("Ikke innlogget");
       const parsed = profileSchema.parse(values);
-      const { error } = await supabase
-        .from("profiles")
-        .update({ display_name: parsed.display_name })
-        .eq("id", userId);
-      if (error) throw error;
+      await updateProfile({ data: { displayName: parsed.display_name } });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile-edit", userId] });
@@ -114,11 +113,7 @@ export function ProfileSection() {
       if (!userId) throw new Error("Ikke innlogget");
       const previousUrl = profile?.avatar_url ?? null;
       const avatarUrl = await uploadAvatarImage({ userId, file });
-      const { error } = await supabase
-        .from("profiles")
-        .update({ avatar_url: avatarUrl })
-        .eq("id", userId);
-      if (error) throw error;
+      await updateAvatar({ data: { avatarUrl } });
       await deletePreviousAvatarImage(previousUrl);
     },
     onSuccess: () => {

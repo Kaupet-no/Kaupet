@@ -58,8 +58,13 @@ export const VEHICLE_LOOKUP_FILTER_KEYS = [
 ] as const;
 
 /** SVV can return these fields, but they are always optional in listing
- * creation, including when the lookup has no value. */
-export const VEHICLE_LOOKUP_OPTIONAL_FILTER_KEYS = ["cylinders", "engine_code"] as const;
+ * creation, including when the lookup has no value. Engine displacement is
+ * optional because it is not relevant to every fuel type. */
+export const VEHICLE_LOOKUP_OPTIONAL_FILTER_KEYS = [
+  "cylinders",
+  "engine_displacement_cc",
+  "engine_code",
+] as const;
 
 /** Attributes managed by the registration/SVV wizard rather than generic
  * category inputs. */

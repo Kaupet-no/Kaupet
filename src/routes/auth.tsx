@@ -21,7 +21,7 @@ import { NativePageHeader } from "@/components/native-page-header";
 import { formatErrorMessage } from "@/lib/errors";
 import { passwordStrength } from "@/lib/password-strength";
 import { passwordSchema } from "@/lib/auth-schemas";
-import { postAuthDestination, safeReturnTo } from "@/lib/auth-return";
+import { authConfirmationRedirect, postAuthDestination, safeReturnTo } from "@/lib/auth-return";
 import { trackProductEvent } from "@/lib/product-analytics";
 
 const TERMS_VERSION = "1.0";
@@ -175,7 +175,7 @@ function AuthPage() {
       const { error } = await supabase.auth.resend({
         type: "signup",
         email: getValues("email"),
-        options: { emailRedirectTo: isNative() ? "https://kaupet.no/" : window.location.origin },
+        options: { emailRedirectTo: authConfirmationRedirect(returnTo, webOrigin()) },
       });
       if (error) throw error;
       resendCooldown.startCooldown();
@@ -203,7 +203,7 @@ function AuthPage() {
           email: values.email,
           password: values.password,
           options: {
-            emailRedirectTo: isNative() ? "https://kaupet.no/" : window.location.origin,
+            emailRedirectTo: authConfirmationRedirect(returnTo, webOrigin()),
             captchaToken: turnstileToken ?? undefined,
             data: {
               display_name: values.displayName || values.email.split("@")[0],
@@ -567,7 +567,7 @@ function AuthPage() {
                 <Turnstile
                   ref={turnstileRef}
                   siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-                  options={{ size: "invisible" }}
+                  options={{ size: "invisible", action: "kaupet" }}
                 />
               )}
               <Button

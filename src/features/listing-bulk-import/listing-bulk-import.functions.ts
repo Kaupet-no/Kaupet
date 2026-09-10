@@ -137,9 +137,7 @@ async function loadImportContext(
           .eq("user_id", userId)
       : Promise.resolve({ data: [], error: null }),
     supabaseAdmin.from("category_filters").select("*"),
-    supabaseAdmin
-      .from("category_flows")
-      .select("id, category_id, field_groups, modules, sort_order"),
+    supabaseAdmin.from("category_flows").select("id, category_id, field_groups, sort_order"),
   ]);
   if (categoryError || memberCategoryError || filterError) {
     throw categoryError ?? memberCategoryError ?? filterError;
@@ -172,13 +170,12 @@ function validateRow(row: BulkImportRow, context: ImportContext): string | null 
     vehicleCategoryGroupFor(category.id, context.filters, context.categoriesById),
     isBoatCategory(category.id, context.filters, context.categoriesById),
   );
-  const missing = getMissingRequiredFilters(
-    category.id,
-    context.filters,
-    context.categoriesById,
-    attributes,
-    [...VEHICLE_EQUIPMENT_FILTER_KEYS, ...behavior.requiredFilterExclusions],
-  );
+  const missing = behavior.requiresCategoryFilterValues
+    ? getMissingRequiredFilters(category.id, context.filters, context.categoriesById, attributes, [
+        ...VEHICLE_EQUIPMENT_FILTER_KEYS,
+        ...behavior.requiredFilterExclusions,
+      ])
+    : [];
   if (missing.length > 0) return `Fyll inn: ${missing.map((filter) => filter.label_nb).join(", ")}`;
 
   const { fieldGroups } = effectiveFlowForCategory(

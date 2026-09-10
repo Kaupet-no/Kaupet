@@ -82,8 +82,45 @@ it("blokkerer kjøretøyfakta når en påkrevd teknisk opplysning mangler", () =
   });
 });
 
-it("unntar sylindre og motorkode fra kjøretøyets påkrevde filterfelt", () => {
-  expect(getCategoryBehavior("bil").requiredFilterExclusions).toEqual(["cylinders", "engine_code"]);
+// Speiler VEHICLE_LOOKUP_OPTIONAL_FILTER_KEYS i lib/vehicle/vehicle-lookup.types.ts.
+it("unntar sylindre, slagvolum og motorkode fra kjøretøyets påkrevde filterfelt", () => {
+  expect(getCategoryBehavior("bil").requiredFilterExclusions).toEqual([
+    "cylinders",
+    "engine_displacement_cc",
+    "engine_code",
+  ]);
+});
+it("krever kategoriattributter for generiske kategorier og Bil/MC, men ikke Båt", () => {
+  expect(getCategoryBehavior("bil").requiresCategoryFilterValues).toBe(true);
+  expect(getCategoryBehavior(null, true).requiresCategoryFilterValues).toBe(false);
+  expect(getCategoryBehavior(null).requiresCategoryFilterValues).toBe(true);
+});
+
+it("sender registrerte kjøretøykrav til kjøretøyfakta-steget", () => {
+  const pages = [
+    { groups: [{ key: "vehicle-registration" }] },
+    { groups: [{ key: "vehicle-facts" }] },
+  ];
+
+  expect(getCategoryBehavior("bil").attributeReviewGroupKey(pages, true)).toBe("vehicle-facts");
+  expect(getCategoryBehavior("bil").attributeReviewGroupKey(pages, false)).toBe(
+    "vehicle-registration",
+  );
+  expect(getCategoryBehavior(null).attributeReviewGroupKey(pages, false)).toBe(
+    "vehicle-registration",
+  );
+});
+
+it("blokkerer ikke tomme båtattributter", () => {
+  const validate = FIELD_GROUP_REGISTRY["boat-facts"].validateExtra;
+
+  expect(
+    validate?.({
+      behavior: getCategoryBehavior(null, true),
+      attributes: {},
+      missingFilters: [{ key: "length_ft", label_nb: "Lengde" }],
+    } as never),
+  ).toBeNull();
 });
 
 it("krever leveringsmetode når kategorien krever det", () => {

@@ -76,16 +76,15 @@ export function DeliveryLocation({
             role="radiogroup"
             aria-labelledby="delivery-label"
             aria-required="true"
-            className="grid grid-cols-3 gap-2"
+            className="grid grid-cols-2 gap-2"
           >
             {(
               [
                 { value: "pickup", label: "Må hentes", description: "Kjøper henter selv" },
-                { value: "ship", label: "Må sendes", description: "Selger sender" },
                 {
-                  value: "both",
-                  label: "Begge deler",
-                  description: "Kan både hentes og sendes",
+                  value: "ship",
+                  label: "Kan sendes",
+                  description: "Selger sender, eller kjøper henter",
                 },
               ] as const
             ).map((opt) => (

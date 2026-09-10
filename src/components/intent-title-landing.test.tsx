@@ -27,7 +27,7 @@ describe("IntentTitleLanding", () => {
     render(<IntentTitleLanding />);
 
     const group = screen.getByRole("radiogroup", { name: "Jeg ønsker å" });
-    expect(screen.getByRole("heading", { name: "Hva vil du gjøre?" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Hva vil du selge?" })).toBeTruthy();
     const sell = screen.getByRole("radio", { name: "Jeg vil selge" });
     const buy = screen.getByRole("radio", { name: "Jeg leter etter" });
     const free = screen.getByRole("radio", { name: "Jeg vil gi bort" });
@@ -38,16 +38,18 @@ describe("IntentTitleLanding", () => {
     expect(buy.getAttribute("aria-checked")).toBe("false");
   });
 
-  it("bytter intensjon og navigasjonsmål ved klikk på et annet valg", () => {
+  it("bytter intensjon, flytter fokus og navigerer med trimmet tittel", () => {
     render(<IntentTitleLanding />);
 
     fireEvent.click(screen.getByRole("radio", { name: "Jeg leter etter" }));
     expect(
       screen.getByRole("radio", { name: "Jeg leter etter" }).getAttribute("aria-checked"),
     ).toBe("true");
+    expect(screen.getByRole("heading", { name: "Hva leter du etter?" })).toBeTruthy();
+    const input = screen.getByRole("textbox", { name: "Tittel" });
+    expect(document.activeElement).toBe(input);
 
-    const input = screen.getByRole("textbox", { name: "Hva gjelder annonsen?" });
-    fireEvent.change(input, { target: { value: "sykkel" } });
+    fireEvent.change(input, { target: { value: "  sykkel  " } });
     fireEvent.submit(input.closest("form")!);
 
     expect(mocks.navigate).toHaveBeenCalledWith({
@@ -56,18 +58,19 @@ describe("IntentTitleLanding", () => {
     });
   });
 
-  it("har en synlig etikett som peker til tittel-feltet", () => {
+  it("har en synlig tittel-etikett og hjelpetekst med eksempel", () => {
     render(<IntentTitleLanding />);
 
-    const input = screen.getByRole("textbox", { name: "Hva gjelder annonsen?" });
-    expect(screen.getByText("Hva gjelder annonsen?")).toBeTruthy();
+    const input = screen.getByRole("textbox", { name: "Tittel" });
+    expect(screen.getByText("Tittel")).toBeTruthy();
+    expect(screen.getByText("For eksempel: vintage lenestol i eik")).toBeTruthy();
     expect(input.getAttribute("id")).toBe("listing-title");
   });
 
   it("beholder fem-tegnsgrensen for selge og starter ikke navigering ved kort tittel", () => {
     render(<IntentTitleLanding />);
 
-    const input = screen.getByRole("textbox", { name: "Hva gjelder annonsen?" });
+    const input = screen.getByRole("textbox", { name: "Tittel" });
     fireEvent.change(input, { target: { value: "abcd" } });
     fireEvent.submit(input.closest("form")!);
 
@@ -79,7 +82,7 @@ describe("IntentTitleLanding", () => {
   it("beholder kjøpe-intent med tre-tegnsgrense og tekstbasert kategoriforslag", () => {
     render(<IntentTitleLanding defaultIntent="buy" />);
 
-    const input = screen.getByRole("textbox", { name: "Hva gjelder annonsen?" });
+    const input = screen.getByRole("textbox", { name: "Tittel" });
     fireEvent.change(input, { target: { value: "ab" } });
     fireEvent.submit(input.closest("form")!);
 
@@ -100,7 +103,7 @@ describe("IntentTitleLanding", () => {
   it("beholder gi bort-intent med fem-tegnsgrense", () => {
     render(<IntentTitleLanding defaultIntent="free" />);
 
-    const input = screen.getByRole("textbox", { name: "Hva gjelder annonsen?" });
+    const input = screen.getByRole("textbox", { name: "Tittel" });
     fireEvent.change(input, { target: { value: "stol" } });
     fireEvent.submit(input.closest("form")!);
 

@@ -26,7 +26,10 @@ export const adminListUnverifiedOrganizations = createServerFn({ method: "GET" }
       .select("id, legal_name, display_name, organization_number, created_at")
       .eq("verification_status", "unverified")
       .order("created_at", { ascending: true });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
     return (data ?? []) as AdminUnverifiedOrganization[];
   });
 
@@ -41,5 +44,8 @@ export const adminVerifyOrganization = createServerFn({ method: "POST" })
     const { error } = await context.supabase.rpc("admin_verify_organization", {
       _organization_id: data.organizationId,
     });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
   });

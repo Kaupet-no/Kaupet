@@ -59,7 +59,7 @@ import { cn } from "@/lib/utils";
 import { formatErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { useCategories, visibleCategories } from "@/hooks/use-categories";
-import { useIsDemo } from "@/hooks/use-is-demo";
+import { useIsDemo } from "@/hooks/use-user-roles";
 import { useAllCategoryFilters } from "@/hooks/use-category-filters";
 import { createListingsFromImport, type BulkImportResult } from "./listing-bulk-import.functions";
 import {

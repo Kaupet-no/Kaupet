@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { confirmBuyer } from "@/lib/sales.functions";
 import { showSuccessToast, showErrorToast } from "@/lib/toast";
+import { updateListingStatus } from "@/lib/listings.functions";
 import { formatErrorMessage } from "@/lib/errors";
 
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ export function MarkSoldDialog({ open, onOpenChange, listingId }: Props) {
   const queryClient = useQueryClient();
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const confirmBuyerFn = useServerFn(confirmBuyer);
+  const updateStatusFn = useServerFn(updateListingStatus);
 
   const { data: contacts, isLoading } = useQuery({
     queryKey: ["listing-contacts", listingId],
@@ -104,13 +106,7 @@ export function MarkSoldDialog({ open, onOpenChange, listingId }: Props) {
   });
 
   const markSoldWithoutBuyerMut = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase
-        .from("listings")
-        .update({ status: "sold" })
-        .eq("id", listingId);
-      if (error) throw error;
-    },
+    mutationFn: () => updateStatusFn({ data: { id: listingId, status: "sold" } }),
     onSuccess: () => {
       showSuccessToast("Annonsen er merket som solgt");
       queryClient.invalidateQueries({ queryKey: ["listing"] });

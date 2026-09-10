@@ -22,7 +22,24 @@ vi.mock("./use-search-synonym-matches", async (importOriginal) => {
               categoryId: "sofa",
             },
           ]
-        : [],
+        : query.includes("hodetelefoner")
+          ? [
+              {
+                startWord: 0,
+                endWord: 0,
+                matchedText: "hodetelefoner",
+                // A filter key that exists in no category passed to
+                // resolveTextToFilters — mirrors a globally-resolved synonym
+                // whose owning category is not in scope for this search.
+                filterKey: "accessory_type",
+                filterLabel: "Type",
+                optionValue: "hodetelefoner",
+                optionLabel: "Hodetelefoner",
+                isAmbiguous: false,
+                categoryId: "mobiltilbehor",
+              },
+            ]
+          : [],
     ),
   };
 });
@@ -61,6 +78,21 @@ const filters: CategoryFilter[] = [
 ];
 
 describe("resolveTextToFilters", () => {
+  it("beholder fritekst når synonymtreffet ikke gir et faktisk filter", async () => {
+    // Uten dette ble frasen strippet fra q selv om ingen filter ble satt,
+    // slik at søket «hodetelefoner» ga et tomt søk som traff alle annonser.
+    const resolved = await resolveTextToFilters({
+      q: "hodetelefoner",
+      categories: [{ id: "sofa", slug: "sofa", name_nb: "Sofa", parent_id: null }],
+      vehicleBrands: [],
+      allFilters: filters,
+    });
+
+    expect(resolved.q).toBe("hodetelefoner");
+    expect(resolved.attrPatch).toEqual({});
+    expect(resolved.criteria).toEqual([]);
+  });
+
   it("returnerer normalisert query og tolkede kriterier i tekstens rekkefølge", async () => {
     const resolved = await resolveTextToFilters({
       q: "Sofa under 300 cm automat klassiker",

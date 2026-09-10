@@ -96,59 +96,72 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
         // Re-fetch authoritative state from Vipps, using the environment the
         // transaction was created in — not the request's host.
         const promoMode = promo.vipps_mode as "test" | "production";
+        let payment;
         try {
-          const payment = await getVippsPayment(reference, host, promoMode);
-          if (payment.state === "AUTHORIZED" || payment.state === "CAPTURED") {
-            if (promo.status === "pending") {
-              const now = new Date();
-              const expires = new Date(now.getTime() + promo.duration_days * 24 * 60 * 60 * 1000);
-              await supabaseAdmin
-                .from("listing_promotions")
-                .update({
-                  status: "active",
-                  starts_at: now.toISOString(),
-                  expires_at: expires.toISOString(),
-                  vipps_psp_reference: payment.pspReference ?? null,
-                })
-                .eq("id", promo.id);
-
-              // Capture funds if only authorized
-              if (payment.state === "AUTHORIZED") {
-                try {
-                  const { captureVippsPayment } = await import("@/lib/vipps.server");
-                  await captureVippsPayment(
-                    reference,
-                    promo.price_nok,
-                    `capture-${promo.id}`,
-                    host,
-                    promoMode,
-                  );
-                } catch (e) {
-                  console.error("[vipps webhook] capture failed", e);
-                }
-              }
-            }
-          } else if (
-            payment.state === "CANCELLED" ||
-            payment.state === "EXPIRED" ||
-            payment.state === "TERMINATED" ||
-            payment.state === "ABORTED" ||
-            payment.state === "FAILED"
-          ) {
-            if (promo.status === "pending") {
-              await supabaseAdmin
-                .from("listing_promotions")
-                .update({ status: "failed" })
-                .eq("id", promo.id);
-            }
-          } else if (payment.state === "REFUNDED") {
-            await supabaseAdmin
-              .from("listing_promotions")
-              .update({ status: "refunded" })
-              .eq("id", promo.id);
-          }
+          payment = await getVippsPayment(reference, host, promoMode);
         } catch (err) {
           console.error("[vipps webhook] state fetch failed", err);
+          return new Response("Retry later", { status: 503 });
+        }
+
+        if (payment.state === "AUTHORIZED" || payment.state === "CAPTURED") {
+          if (promo.status === "pending") {
+            if (payment.state === "AUTHORIZED") {
+              try {
+                const { captureVippsPayment } = await import("@/lib/vipps.server");
+                await captureVippsPayment(
+                  reference,
+                  promo.price_nok,
+                  `capture-${promo.id}`,
+                  host,
+                  promoMode,
+                );
+              } catch (err) {
+                console.error("[vipps webhook] capture failed", err);
+                // Keep the promotion pending and the event unprocessed. Vipps
+                // or the reconciliation job can safely retry the idempotent
+                // capture instead of granting an unpaid promotion.
+                return new Response("Retry later", { status: 503 });
+              }
+            }
+
+            const now = new Date();
+            const expires = new Date(now.getTime() + promo.duration_days * 24 * 60 * 60 * 1000);
+            const { error: activateError } = await supabaseAdmin
+              .from("listing_promotions")
+              .update({
+                status: "active",
+                starts_at: now.toISOString(),
+                expires_at: expires.toISOString(),
+                vipps_psp_reference: payment.pspReference ?? null,
+              })
+              .eq("id", promo.id)
+              .eq("status", "pending");
+            if (activateError) throw activateError;
+          }
+        } else if (
+          payment.state === "CANCELLED" ||
+          payment.state === "EXPIRED" ||
+          payment.state === "TERMINATED" ||
+          payment.state === "ABORTED" ||
+          payment.state === "FAILED"
+        ) {
+          if (promo.status === "pending") {
+            const { error: failError } = await supabaseAdmin
+              .from("listing_promotions")
+              .update({ status: "failed" })
+              .eq("id", promo.id)
+              .eq("status", "pending");
+            if (failError) throw failError;
+          }
+        } else if (payment.state === "REFUNDED") {
+          const { error: refundError } = await supabaseAdmin
+            .from("listing_promotions")
+            .update({ status: "refunded" })
+            .eq("id", promo.id);
+          if (refundError) throw refundError;
+        } else {
+          return new Response("Retry later", { status: 503 });
         }
 
         await supabaseAdmin
@@ -156,7 +169,7 @@ export const Route = createFileRoute("/api/public/vipps/webhook")({
           .update({ processed_at: new Date().toISOString() })
           .eq("event_id", eventId);
 
-        return new Response("ok");
+        return new Response("ok", { status: 200 });
       },
     },
   },

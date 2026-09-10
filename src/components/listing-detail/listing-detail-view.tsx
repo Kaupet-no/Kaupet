@@ -66,6 +66,7 @@ import { VehicleConditionPanel } from "@/components/listing-detail/edit-panels/v
 import { SellerNoKnownIssues } from "@/components/listing-detail/listing-evidence";
 import { VehicleEquipmentPanel } from "@/components/listing-detail/edit-panels/vehicle-equipment-panel";
 import { GenericAttributesPanel } from "@/components/listing-detail/edit-panels/generic-attributes-panel";
+import { GenericAttributesGrid } from "@/components/listing-detail/generic-attributes-grid";
 import { PartFitmentSummary } from "@/components/listing-detail/part-fitment-summary";
 
 const ListingDetailMap = lazy(() =>
@@ -82,6 +83,14 @@ const ImageLightbox = lazy(() =>
 const MapOverlay = lazy(() =>
   import("@/components/listing-detail/map-overlay").then((m) => ({ default: m.MapOverlay })),
 );
+
+function StatusBadge({ label }: { label: string }) {
+  return (
+    <span className="mb-1 inline-block rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+      {label}
+    </span>
+  );
+}
 
 function LightboxLoadingFallback() {
   return (
@@ -167,6 +176,10 @@ export type ListingDetailViewProps = {
   attributes: Record<string, unknown>;
   /** Whether this category uses delivery choices. False for Bil/MC and Båt. */
   requiresDeliveryMethod: boolean;
+  /** Listing lifecycle status. Only the owner (and admins) can open a listing
+   * that is not active, and without this nothing on the page said so — a sold
+   * ad looked exactly like a live one. Omitted by the pre-publish preview. */
+  listingStatus?: string | null;
   /** Persisted delivery capability for categories that use delivery choices. */
   canShip: boolean | null;
   /** Enables owner inline-editing: wraps the view in `ListingEditContext` and
@@ -230,6 +243,7 @@ export function ListingDetailView({
   attributes,
   actionsMenuSlot,
   requiresDeliveryMethod,
+  listingStatus,
   canShip,
   vehicle360Frames,
   vehicle360ImgUrls,
@@ -258,12 +272,6 @@ export function ListingDetailView({
   // formfaktor); desktop web har allerede kontaktpanelet synlig i
   // sidekolonnen uten scroll, se md:hidden på selve baren under.
   const showStickyContact = !!stickyContactSlot;
-
-  const priceLabel = isFree
-    ? "Gis bort"
-    : priceNok != null
-      ? `${priceNok.toLocaleString("nb-NO")} kr`
-      : "Pris ved henvendelse";
 
   // Slug-based, not the canonical filter-based `isVehicleCategory`
   // (category-filters.ts) — this view only receives `category.slug`, not the
@@ -310,18 +318,47 @@ export function ListingDetailView({
         )
     : null;
 
+  /** True when the re-registration fee lands on the buyer on top of the
+   * seller's asking price. Then, and only then, every price the buyer sees
+   * is the total — otherwise the number in the search list would not be the
+   * number they end up paying, and the ad and the list would disagree. */
+  const buyerPaysAvgift =
+    isVehicleListing && !avgiftFritatt && !avgiftInkludert && omregistreringsavgiftKr != null;
+
   const avgiftNote = avgiftFritatt
     ? "Fritatt for omregistreringsavgift"
     : avgiftInkludert
-      ? "omregistreringsavgift inkludert i kjøpesummen (dekkes av selger)"
-      : omregistreringsavgiftKr != null
-        ? `+ ${omregistreringsavgiftKr.toLocaleString("nb-NO")} kr i omregistreringsavgift ved eierskifte (betales av kjøper)`
+      ? "Omregistreringsavgift inkludert i kjøpesummen (dekkes av selger)"
+      : buyerPaysAvgift
+        ? `Inkluderer ${omregistreringsavgiftKr!.toLocaleString("nb-NO")} kr i omregistreringsavgift som betales av kjøper ved eierskifte. Selgers pris: ${(priceNok ?? 0).toLocaleString("nb-NO")} kr.`
         : null;
 
   const totalPriceKr =
     isVehicleListing && priceNok != null
       ? priceNok + (avgiftFritatt || avgiftInkludert ? 0 : (omregistreringsavgiftKr ?? 0))
       : null;
+
+  /** The number shown to the buyer everywhere on this page — matches
+   * `displayPriceNok` in lib/format.ts, which the search cards already use. */
+  const displayPriceKr = buyerPaysAvgift && priceNok != null ? totalPriceKr : priceNok;
+
+  const priceLabel = isFree
+    ? "Gis bort"
+    : displayPriceKr != null
+      ? `${displayPriceKr.toLocaleString("nb-NO")} kr`
+      : "Pris ved henvendelse";
+
+  /** Only non-active listings say anything — an active ad needs no badge. */
+  const statusBadge =
+    listingStatus === "sold"
+      ? isFree
+        ? "Gitt bort"
+        : "Solgt"
+      : listingStatus === "expired"
+        ? "Utløpt"
+        : listingStatus === "archived"
+          ? "Arkivert"
+          : null;
 
   const priceBlock = (
     <EditableField
@@ -332,7 +369,7 @@ export function ListingDetailView({
           {v.isFree
             ? "Gis bort"
             : v.priceNok != null
-              ? `${v.priceNok.toLocaleString("nb-NO")} kr`
+              ? `${(buyerPaysAvgift ? v.priceNok + omregistreringsavgiftKr! : v.priceNok).toLocaleString("nb-NO")} kr`
               : "Pris ved henvendelse"}
         </p>
       )}
@@ -345,6 +382,9 @@ export function ListingDetailView({
         >
           <Checkbox checked={v.isFree} onCheckedChange={(c) => onChange({ ...v, isFree: !!c })} />
           <Label className="text-xs">Gis bort</Label>
+          {!v.isFree && buyerPaysAvgift && (
+            <span className="text-xs text-muted-foreground">Din pris, uten avgift:</span>
+          )}
           {!v.isFree && (
             <Input
               type="number"
@@ -418,6 +458,7 @@ export function ListingDetailView({
       showStickyContact={showStickyContact}
       priceLabel={priceLabel}
       priceBlock={priceBlock}
+      statusBadge={statusBadge}
       isVehicleListing={isVehicleListing}
       vehicleLookup={vehicleLookup}
       mileageKm={mileageKm}
@@ -494,6 +535,7 @@ function ListingDetailViewBody({
   showStickyContact,
   priceLabel,
   priceBlock,
+  statusBadge,
   isVehicleListing,
   vehicleLookup,
   mileageKm,
@@ -549,6 +591,7 @@ function ListingDetailViewBody({
   showStickyContact: boolean;
   priceLabel: string;
   priceBlock: ReactNode;
+  statusBadge: string | null;
   isVehicleListing: boolean;
   vehicleLookup: ReturnType<typeof parseVehicleLookup>;
   mileageKm: number | null;
@@ -755,6 +798,7 @@ function ListingDetailViewBody({
               overlaySlot={
                 (has360 || sortedImages.length > 0) && (
                   <div className="absolute -bottom-8 left-4 max-w-[calc(100%-2rem)] rounded-xl border border-border bg-card px-4 py-2.5 shadow-lg">
+                    {statusBadge && <StatusBadge label={statusBadge} />}
                     {priceBlock}
                     {avgiftNote && (
                       <p className="mt-1 text-xs leading-snug text-muted-foreground">
@@ -769,6 +813,7 @@ function ListingDetailViewBody({
 
           {!has360 && sortedImages.length === 0 && (
             <div>
+              {statusBadge && <StatusBadge label={statusBadge} />}
               {priceBlock}
               {avgiftNote && <p className="mt-1 text-xs text-muted-foreground">{avgiftNote}</p>}
             </div>
@@ -782,6 +827,7 @@ function ListingDetailViewBody({
                   mileageKm={mileageKm}
                   euControlExempt={euControlExempt}
                   driveType={driveType}
+                  attributes={attributes}
                 />
               )}
               panel={({ close }) => (
@@ -930,18 +976,21 @@ function ListingDetailViewBody({
           {/* Boat attributes already have a direct edit entry point via the
               BoatInfoGrid/BoatExtraInfo regions above — this fallback only
               covers non-vehicle, non-boat categories with no dedicated
-              display component of their own. */}
+              display component of their own. Rendered for everyone, not just
+              in edit mode: these are required fields in the wizard, so
+              hiding them from buyers made the whole step pointless. */}
           {!isVehicleListing &&
             !isBoatAttributes(attributes) &&
-            editCtx?.editMode &&
-            categoryId && (
+            categoryId &&
+            (editCtx?.editMode ? (
               <EditableRegion
                 className="mt-8"
                 render={() => (
-                  <section className="mt-8">
-                    <h2 className="font-display text-xl">Egenskaper</h2>
-                    <p className="mt-2 text-sm text-muted-foreground">Klikk for å redigere</p>
-                  </section>
+                  <GenericAttributesGrid
+                    categoryId={categoryId}
+                    attributes={attributes}
+                    emptyHint="Klikk for å redigere"
+                  />
                 )}
                 panel={({ close }) => (
                   <GenericAttributesPanel
@@ -951,7 +1000,9 @@ function ListingDetailViewBody({
                   />
                 )}
               />
-            )}
+            ) : (
+              <GenericAttributesGrid categoryId={categoryId} attributes={attributes} />
+            ))}
         </div>
 
         <aside className="@container space-y-5">

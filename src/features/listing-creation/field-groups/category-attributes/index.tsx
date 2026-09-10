@@ -25,8 +25,6 @@ export function CategoryAttributes({
   categoryTouchedManually,
   applyCategorySuggestion,
   setSuggestionDismissed,
-  setCategorySuggestions,
-  genericAttributesActive,
   categoryId,
   categories,
   attributes,
@@ -72,7 +70,6 @@ export function CategoryAttributes({
             aria-label="Lukk kategoriforslag"
             onClick={() => {
               setSuggestionDismissed(true);
-              setCategorySuggestions([]);
             }}
           >
             ✕
@@ -109,7 +106,7 @@ export function CategoryAttributes({
         </p>
       )}
 
-      {!boatFactsActive && genericAttributesActive && (
+      {!boatFactsActive && (
         <AttributeFields
           categoryId={categoryId || null}
           categories={categories ?? []}
@@ -117,7 +114,7 @@ export function CategoryAttributes({
           onChange={onAttributesChange}
           showErrors={attributesTouched}
           hiddenKeys={vehicleAttributeHiddenKeys}
-          required
+          required={behavior.requiresCategoryFilterValues}
         />
       )}
     </section>

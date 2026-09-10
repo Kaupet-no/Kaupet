@@ -23,7 +23,10 @@ export async function organizationListingLocation(
     .eq("organization_id", organizationId)
     .eq("active", true)
     .single();
-  if (error) throw error;
+  if (error) {
+    const { toClientError } = await import("@/lib/to-client-error.server");
+    throw await toClientError("database", error);
+  }
 
   const location: OrganizationListingLocation = {
     postal_code: data.postal_code ?? null,

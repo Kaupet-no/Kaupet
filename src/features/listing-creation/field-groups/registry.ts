@@ -242,6 +242,9 @@ export const FIELD_GROUP_REGISTRY: Record<string, FieldGroup> = {
     Component: BoatFactsGroup,
     fieldsToValidate: ["subtitle", "description"],
     validateExtra: (ctx) => {
+      // Båtens kategoriattributter er frivillige; beskrivelse valideres fortsatt
+      // via fieldsToValidate.
+      if (!ctx.behavior.requiresCategoryFilterValues) return null;
       // Brand/model and every boat category filter are rendered by boat-facts;
       // category-attributes remains present in the stored flow but is a
       // category-picker-only shell for this vertical.

@@ -24,7 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useIsAdmin } from "@/hooks/use-is-admin";
+import { useIsAdmin } from "@/hooks/use-user-roles";
 import { adminBanUser, adminSuspendUser } from "@/lib/admin-moderation.functions";
 import { formatErrorMessage } from "@/lib/errors";
 

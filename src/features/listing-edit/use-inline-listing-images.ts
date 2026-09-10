@@ -6,6 +6,7 @@ import { formatErrorMessage } from "@/lib/errors";
 import {
   describeImageError,
   LISTING_BUCKET,
+  MAX_LISTING_IMAGES,
   uploadListingImage,
   uploadListingImageThumb,
   validateImages,
@@ -99,6 +100,10 @@ export function useInlineListingImages(params: {
 
   async function addFiles(files: File[]) {
     const err = validateImages(files);
+    if (items.length + files.length > MAX_LISTING_IMAGES) {
+      showErrorToast(`En annonse kan ha maksimalt ${MAX_LISTING_IMAGES} bilder.`);
+      return;
+    }
     if (err) {
       showErrorToast(describeImageError(err));
       return;

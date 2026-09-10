@@ -10,10 +10,10 @@ import { showErrorToast } from "@/lib/toast";
 import { AlertCircle, ChevronLeft, ChevronRight, Loader2, Check, Bell } from "lucide-react";
 
 import { useCategories, visibleCategories } from "@/hooks/use-categories";
-import { useIsDemo } from "@/hooks/use-is-demo";
+import { useIsDemo } from "@/hooks/use-user-roles";
 import { createWtbListing } from "@/lib/wtb-listings.functions";
 import { prefetchCategorySuggestion } from "@/lib/category-suggestion.functions";
-import { useCategorySuggestionLoadingMessage } from "@/features/listing-creation/use-category-suggestion-loading-message";
+import { CATEGORY_SUGGESTION_LOADING_MESSAGE } from "@/features/listing-creation/use-category-suggestion-loading-message";
 import { CategoryPicker } from "@/components/category-picker";
 import { useAllCategoryFilters } from "@/components/attribute-fields";
 import { WtbCriteriaFields } from "@/features/wtb/wtb-criteria-fields";
@@ -38,30 +38,40 @@ import {
   type ComposerNavigationResult,
 } from "@/features/listing-creation/composer-navigation";
 import { NativeComposerDeck } from "@/features/listing-creation/native-composer-deck";
+import { useAuth } from "@/hooks/use-auth";
+import { authResumeReturnTo, currentReturnTo } from "@/lib/auth-return";
 import { useWtbDraftAutosave } from "@/features/wtb/use-wtb-draft-autosave";
 import { DiscardListingDialog } from "@/features/listing-creation/discard-listing-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 
-const wtbSchema = z.object({
+export const wtbSchema = z.object({
   title: z.string().trim().min(3, "Tittelen må være minst 3 tegn").max(120, "Maks 120 tegn"),
   description: z.string().trim().max(2000, "Maks 2000 tegn").optional().or(z.literal("")),
   category_id: z.string().uuid().nullable().optional(),
+  // The empty-string branch has to come first: `z.coerce.number()` turns ""
+  // into 0, so with the number branch first an empty (optional) max price
+  // was stored as "maks 0 kr" — a wanted-ad nothing can ever match.
   max_price_nok: z
     .union([
+      z.literal(""),
       z.coerce
         .number()
         .int("Prisen må være et helt tall")
         .min(0, "Prisen kan ikke være negativ")
         .max(10_000_000, "Prisen er for høy"),
-      z.literal(""),
     ])
     .optional(),
 });
 
 type WtbForm = z.infer<typeof wtbSchema>;
 
-export const Route = createFileRoute("/_authenticated/ny-ok-annonse")({
-  validateSearch: z.object({ title: z.string().optional() }).catch({}),
+export const Route = createFileRoute("/ny-ok-annonse")({
+  validateSearch: z
+    .object({
+      title: z.string().optional(),
+      resume: z.enum(["auth-publish"]).optional(),
+    })
+    .catch({}),
   head: () => ({
     meta: [
       { title: "Ønskes kjøpt — Kaupet.no" },
@@ -145,7 +155,8 @@ const STEP_META: Record<WtbStep, { title: string; help: string }> = {
 
 function NewWtbPage() {
   const native = useIsNative();
-  const { title: titleParam } = Route.useSearch();
+  const { user } = useAuth();
+  const { title: titleParam, resume } = Route.useSearch();
   // Set once from the initial search params: true when the wizard was
   // entered via the intent+title landing screen — skips the forced "category"
   // (and, on native, "title") step in favor of a category-confirm step after
@@ -161,12 +172,21 @@ function NewWtbPage() {
   const steps = useMemo(() => {
     const base = native ? NATIVE_STEPS : WEB_STEPS;
     if (!skipCategoryStep || categoryConfirmed) return base;
-    const withoutCategory = base.filter((s) => s !== "category" && s !== "title");
+    // "attributes" flyttes ut sammen med "category" og settes inn igjen rett
+    // etter category-confirm: kriteriefeltene er utledet fra kategorien, så
+    // før den er valgt hadde steget ingenting å vise. Det ga et helt tomt
+    // "Hva er viktig for deg?" som førstesteg hver gang wizarden ble åpnet
+    // fra tittel-landingen, og feltene dukket først opp hvis brukeren gikk
+    // tilbake etter å ha valgt kategori.
+    const withoutCategory = base.filter(
+      (s) => s !== "category" && s !== "title" && s !== "attributes",
+    );
     const detailsIdx = withoutCategory.indexOf("details");
     const insertAt = detailsIdx === -1 ? withoutCategory.length : detailsIdx + 1;
     return [
       ...withoutCategory.slice(0, insertAt),
       "category-confirm" as const,
+      "attributes" as const,
       ...withoutCategory.slice(insertAt),
     ];
   }, [native, skipCategoryStep, categoryConfirmed]);
@@ -180,6 +200,8 @@ function NewWtbPage() {
   const returnToReviewRef = useRef(false);
   const forwardBusyRef = useRef(false);
   const [attributes, setAttributes] = useState<WtbAttributeMap>({});
+  const authResumeHandledRef = useRef(false);
+  const bypassNavigationBlockerRef = useRef(false);
   const [checkedKeys, setCheckedKeys] = useState<string[]>([]);
   const [titleManualOverride, setTitleManualOverride] = useState(false);
   const [categorySuggestions, setCategorySuggestions] = useState<
@@ -188,9 +210,7 @@ function NewWtbPage() {
   const [categorySuggestionLoading, setCategorySuggestionLoading] = useState(false);
   const [categoryConfirmShowPicker, setCategoryConfirmShowPicker] = useState(false);
   const suggestionFiredImmediatelyRef = useRef(false);
-  const categoryLoadingMessage = useCategorySuggestionLoadingMessage(
-    !categoryConfirmShowPicker && categorySuggestionLoading && categorySuggestions.length === 0,
-  );
+  const categoryLoadingMessage = CATEGORY_SUGGESTION_LOADING_MESSAGE;
 
   const step = steps[stepIndex];
 
@@ -237,13 +257,13 @@ function NewWtbPage() {
       max_price_nok: "",
     },
   });
-
   const [categoryId, title, description, maxPriceNok] = useWatch({
     control,
     name: ["category_id", "title", "description", "max_price_nok"],
   });
   const titleLength = title.length;
   const descriptionLength = (description ?? "").length;
+
   const draftFields = useMemo(
     () => ({
       title,
@@ -262,10 +282,11 @@ function NewWtbPage() {
     draftSaveError,
     isSaving,
     saveToServer,
+    flushLocalDraft,
     dismissRestore,
     discardDraft,
     clearAfterPublish,
-  } = useWtbDraftAutosave(draftFields);
+  } = useWtbDraftAutosave(draftFields, !!user);
 
   const vehicleGroup = useMemo(
     () => vehicleCategoryGroupFor(categoryId ?? null, allFilters ?? [], categoriesById),
@@ -326,7 +347,7 @@ function NewWtbPage() {
 
   const shouldBlockNav = !published && (title.trim().length > 0 || stepIndex > 0);
   const blocker = useBlocker({
-    shouldBlockFn: () => shouldBlockNav,
+    shouldBlockFn: () => !bypassNavigationBlockerRef.current && shouldBlockNav,
     withResolver: true,
     enableBeforeUnload: shouldBlockNav,
   });
@@ -454,6 +475,21 @@ function NewWtbPage() {
     });
   }
 
+  useEffect(() => {
+    if (resume !== "auth-publish" || !user || !restorableDraft || authResumeHandledRef.current) {
+      return;
+    }
+    authResumeHandledRef.current = true;
+    restoreDraft();
+    trackProductEvent("listing_creation_step_completed", {
+      kind: "want",
+      action: "auth_resumed",
+      step,
+    });
+    requestAnimationFrame(() => setStepIndex(steps.length - 1));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resume, user?.id, restorableDraft]);
+
   if (published) {
     return (
       <div
@@ -521,7 +557,17 @@ function NewWtbPage() {
         <Button
           type="button"
           onClick={handleSubmit(
+            // eslint-disable-next-line react-hooks/refs -- callback runs only on submit
             (values) => {
+              if (!user) {
+                if (!flushLocalDraft()) return;
+                bypassNavigationBlockerRef.current = true;
+                void navigate({
+                  to: "/auth",
+                  search: { mode: "signin", returnTo: authResumeReturnTo(currentReturnTo()) },
+                });
+                return;
+              }
               trackProductEvent("listing_creation_step_completed", {
                 kind: "want",
                 action: "publish_started",
@@ -543,7 +589,7 @@ function NewWtbPage() {
           className={native ? "min-h-12 min-w-24 rounded-xl px-3 text-base" : "gap-2"}
         >
           {isPending && <Loader2 className="size-4 animate-spin" aria-hidden />}
-          {native ? "Publiser" : "Publiser ønskes kjøpt"}
+          {user ? (native ? "Publiser" : "Publiser ønskes kjøpt") : "Logg inn og publiser"}
         </Button>
       )}
     </>
@@ -1031,6 +1077,11 @@ function NewWtbPage() {
           blocker.proceed?.();
         }}
         onSaveDraft={async () => {
+          if (!user) {
+            if (!flushLocalDraft()) return false;
+            blocker.proceed?.();
+            return true;
+          }
           const id = await saveToServer();
           if (!id) return false;
           blocker.proceed?.();

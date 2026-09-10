@@ -33,11 +33,26 @@ async function fetchCategorySyncTables(client: SupabaseClient<Database>) {
       client.from("filter_synonyms").select("*"),
       client.from("site_settings").select("default_search_examples").eq("id", true).single(),
     ]);
-  if (categories.error) throw categories.error;
-  if (categoryFilters.error) throw categoryFilters.error;
-  if (categoryFlows.error) throw categoryFlows.error;
-  if (filterSynonyms.error) throw filterSynonyms.error;
-  if (siteSettings.error) throw siteSettings.error;
+  if (categories.error) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("database", categories.error);
+  }
+  if (categoryFilters.error) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("database", categoryFilters.error);
+  }
+  if (categoryFlows.error) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("database", categoryFlows.error);
+  }
+  if (filterSynonyms.error) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("database", filterSynonyms.error);
+  }
+  if (siteSettings.error) {
+    const { toClientError } = await import("@/lib/to-client-error");
+    throw await toClientError("database", siteSettings.error);
+  }
 
   return {
     categories: categories.data as CategoryRow[],
@@ -67,7 +82,10 @@ export const getCategorySyncStatus = createServerFn({ method: "GET" })
       fetchCategorySyncTables(stagingAdmin),
       supabaseAdmin.from("category_sync_status").select("last_synced_at").eq("id", true).single(),
     ]);
-    if (status.error) throw status.error;
+    if (status.error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", status.error);
+    }
 
     const stagingUpdatedAt =
       [
@@ -255,7 +273,10 @@ export const syncCategoriesFromStaging = createServerFn({ method: "POST" })
       p_default_search_examples: staging.defaultSearchExamples ?? [],
       p_synced_by: context.userId,
     });
-    if (error) throw error;
+    if (error) {
+      const { toClientError } = await import("@/lib/to-client-error");
+      throw await toClientError("database", error);
+    }
 
     return { ok: true };
   });

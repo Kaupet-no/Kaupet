@@ -26,7 +26,13 @@ export function useListingSteps(pages: WizardPage[]) {
 
   useEffect(() => {
     const previousPages = previousPagesRef.current;
-    if (previousPages === pages) return;
+    if (previousPages === pages) {
+      // No reshape this render — any navigatedRef flag is now stale (it only
+      // guards a reshape landing in the *same* commit as the nav call) and
+      // must not leak into a later, unrelated pages change.
+      navigatedRef.current = false;
+      return;
+    }
     previousPagesRef.current = pages;
     if (navigatedRef.current) {
       navigatedRef.current = false;

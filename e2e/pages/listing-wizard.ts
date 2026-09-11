@@ -34,10 +34,18 @@ export async function login(page: Page, email: string, password: string) {
 export async function goToNewListing(page: Page, title?: string) {
   const suffix = title ? `&title=${encodeURIComponent(title)}` : "";
   await page.goto(`/ny-annonse?type=sell${suffix}`);
+  // See goToNewWantListing: the category search box is present pre-hydration,
+  // so filling it too early can be silently discarded once React hydrates.
+  await page.locator("html[data-kaupet-hydrated='true']").waitFor();
 }
 
 export async function goToNewWantListing(page: Page, native = false) {
   await page.goto(`/ny-ok-annonse${native ? "?forcenative=1" : ""}`);
+  // The "Kort beskrivelse" input is present in the pre-hydration SSR markup,
+  // so a fill() right after goto() can land before React attaches its
+  // listeners — the value (and the following click) is then silently lost
+  // once hydration commits and re-renders from still-empty form state.
+  await page.locator("html[data-kaupet-hydrated='true']").waitFor();
 }
 
 export function composerPage(page: Page, pageKey: string) {

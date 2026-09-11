@@ -79,6 +79,12 @@ export default async function globalSetup() {
         display_name: "E2E Proff",
         selected_plan: "proff",
         proff_access_until: new Date(Date.now() + 86_400_000).toISOString(),
+        // New organizations default to 'unverified' and can't publish (or
+        // update/republish) listings until admin-approved — see
+        // 20260902200000_organization_verification.sql. The E2E fixture org
+        // needs to actually publish, so mark it pre-verified.
+        verification_status: "verified",
+        verified_at: new Date().toISOString(),
       })
       .select("id")
       .single();

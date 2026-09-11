@@ -30,7 +30,11 @@ test.describe("Proff masseimport", () => {
     const credentials = users["desktop-web"];
     if (!credentials) throw new Error("Mangler desktop E2E-bruker");
     await login(page, credentials.email, credentials.password);
-    await page.goto("/bedrift?tab=bedriftsprofil");
+    // The location management UI (and its "Ny lokasjon koster..." pricing
+    // notice) lives on "administrer", not "bedriftsprofil" — see
+    // business-admin-panel.tsx.
+    await page.goto("/bedrift?tab=administrer");
+    await page.locator("html[data-kaupet-hydrated='true']").waitFor();
 
     await expect(page.getByLabel("Aktiv lokasjon")).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Lokasjoner" })).toHaveCount(0);
@@ -48,6 +52,7 @@ test.describe("Proff masseimport", () => {
     if (!credentials) throw new Error("Mangler desktop E2E-bruker");
     await login(page, credentials.email, credentials.password);
     await page.goto("/bedrift?tab=annonser");
+    await page.locator("html[data-kaupet-hydrated='true']").waitFor();
     await page.getByRole("button", { name: "Importer annonser" }).click();
     const csvPath = testInfo.outputPath("bulk-import.csv");
     writeFileSync(csvPath, validCsv);
@@ -73,6 +78,7 @@ test.describe("Proff masseimport", () => {
     if (!credentials) throw new Error("Mangler desktop E2E-bruker");
     await login(page, credentials.email, credentials.password);
     await page.goto("/bedrift?tab=annonser");
+    await page.locator("html[data-kaupet-hydrated='true']").waitFor();
     await page.getByRole("button", { name: "Importer annonser" }).click();
     const csvPath = testInfo.outputPath("bulk-import-invalid.csv");
     writeFileSync(

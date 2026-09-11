@@ -31,17 +31,23 @@ function PanelSection({
   children,
   footer,
 }: {
-  title: string;
-  description: string;
+  // A lone location needs no heading to distinguish it from other
+  // locations — see the `locations.length > 1` check below.
+  title?: string;
+  description?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
 }) {
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-card">
-      <div className="border-b border-border px-5 py-4 sm:px-6">
-        <h3 className="text-base font-semibold">{title}</h3>
-        <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>
-      </div>
+      {title && (
+        <div className="border-b border-border px-5 py-4 sm:px-6">
+          <h3 className="text-base font-semibold">{title}</h3>
+          {description && (
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>
+          )}
+        </div>
+      )}
       <div className="space-y-6 px-5 py-5 sm:px-6">{children}</div>
       {footer && (
         <div className="flex flex-wrap items-center gap-3 border-t border-border bg-muted/30 px-5 py-3 sm:px-6">
@@ -130,8 +136,12 @@ export function BusinessAdminPanel({ locations, billingProfile }: Props) {
       </div>
 
       <PanelSection
-        title="Lokasjoner"
-        description="Adressen velges per lokasjon og brukes på annonsene som opprettes der."
+        title={locations.length > 1 ? "Lokasjoner" : undefined}
+        description={
+          locations.length > 1
+            ? "Adressen velges per lokasjon og brukes på annonsene som opprettes der."
+            : undefined
+        }
         footer={
           canManageLocations ? (
             <>
